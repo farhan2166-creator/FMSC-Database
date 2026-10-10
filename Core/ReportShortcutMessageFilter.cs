@@ -9,7 +9,8 @@ internal sealed class ReportShortcutMessageFilter : IMessageFilter, IDisposable
     {
         Keys.Control | Keys.P, Keys.Control | Keys.E, Keys.Alt | Keys.P,
         Keys.Control | Keys.Left, Keys.Control | Keys.Right,
-        Keys.Control | Keys.D0, Keys.Control | Keys.D1,
+        Keys.Control | Keys.D0, Keys.Control | Keys.D1, Keys.Control | Keys.D2,
+        Keys.Control | Keys.G, Keys.Control | Keys.Home, Keys.Control | Keys.End,
         Keys.Control | Keys.Oemplus, Keys.Control | Keys.Add,
         Keys.Control | Keys.OemMinus, Keys.Control | Keys.Subtract, Keys.Escape
     };

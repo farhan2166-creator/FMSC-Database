@@ -8,9 +8,9 @@ namespace FMSC_SMS.Core;
 
 internal static class RdlcReportPrinter
 {
-    internal static void Print(Form owner, ReportViewer viewer)
+    internal static void Print(Form owner, ReportViewer viewer, int? selectedPage = null)
     {
-        try { PrintReport(owner, viewer); }
+        try { PrintReport(owner, viewer, selectedPage); }
         finally
         {
             RestoreFocus(owner, viewer);
@@ -24,16 +24,18 @@ internal static class RdlcReportPrinter
         if (!viewer.IsDisposed) viewer.Focus();
     }
 
-    private static void PrintReport(Form owner, ReportViewer viewer)
+    private static void PrintReport(Form owner, ReportViewer viewer, int? selectedPage)
     {
         var pageSettings = viewer.GetPageSettings();
         using var document = CreateDocument(viewer.LocalReport, pageSettings, owner.Text);
         document.PrinterSettings = (PrinterSettings)viewer.PrinterSettings.Clone();
         document.PrinterSettings.MinimumPage = 1;
         document.PrinterSettings.MaximumPage = document.PageCount;
-        document.PrinterSettings.FromPage = 1;
-        document.PrinterSettings.ToPage = document.PageCount;
-        document.PrinterSettings.PrintRange = PrintRange.AllPages;
+        if (selectedPage.HasValue && (selectedPage.Value < 1 || selectedPage.Value > document.PageCount))
+            throw new InvalidOperationException($"Select a page between 1 and {document.PageCount} before printing.");
+        document.PrinterSettings.FromPage = selectedPage ?? 1;
+        document.PrinterSettings.ToPage = selectedPage ?? document.PageCount;
+        document.PrinterSettings.PrintRange = selectedPage.HasValue ? PrintRange.SomePages : PrintRange.AllPages;
         using var dialog = new PrintDialog {
             Document = document,
             AllowSomePages = true,

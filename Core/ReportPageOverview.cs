@@ -95,7 +95,12 @@ internal sealed class ReportPageOverview : ScrollableControl
     {
         base.OnMouseClick(e);
         if (e.Button != MouseButtons.Left) return;
-        var location = new Point(e.X - AutoScrollPosition.X, e.Y - AutoScrollPosition.Y);
+        SelectAt(e.Location);
+    }
+
+    internal void SelectAt(Point position)
+    {
+        var location = new Point(position.X - AutoScrollPosition.X, position.Y - AutoScrollPosition.Y);
         int index = rectangles.FindIndex(rectangle => rectangle.Contains(location));
         if (index < 0) return;
         selectedPage = index + 1; Invalidate(); PageSelected?.Invoke(selectedPage);

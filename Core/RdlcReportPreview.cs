@@ -117,6 +117,7 @@ internal static class RdlcReportPreview
             };
 
         var print = Button("Print", 88, "Primary");
+        var printCurrent = Button("Print this page", 136);
         var pageSetup = Button("Page setup", 108);
         var exportPdf = Button("Export PDF", 112);
         var previous = Button("Previous", 94);
@@ -125,7 +126,7 @@ internal static class RdlcReportPreview
 
         var page = new Label {
             AutoSize = false,
-            Width = AppScale.Scale(104),
+            Width = AppScale.Scale(78),
             Height = AppMetrics.ButtonHeight,
             Margin = new Padding(0, 0, AppScale.Scale(8), 0),
             Font = AppTheme.NormalFont,
@@ -133,6 +134,12 @@ internal static class RdlcReportPreview
             TextAlign = ContentAlignment.MiddleCenter,
             Text = "Page 1"
         };
+        var pageNumber = new NumericUpDown {
+            Minimum = 1, Maximum = 1, Value = 1, Width = AppScale.Scale(66),
+            Font = AppTheme.NormalFont, AccessibleName = "Go to page", TextAlign = HorizontalAlignment.Center,
+            Margin = new Padding(0, AppScale.Scale(4), AppScale.Scale(4), 0)
+        };
+        var go = Button("Go", 52);
         var zoom = new ModernComboBox {
             Width = AppScale.Scale(132),
             Height = AppMetrics.InputControlHeight,
@@ -163,6 +170,7 @@ internal static class RdlcReportPreview
             Padding = Padding.Empty
         };
         actions.Controls.Add(print);
+        actions.Controls.Add(printCurrent);
         actions.Controls.Add(pageSetup);
         actions.Controls.Add(exportPdf);
 
@@ -176,7 +184,9 @@ internal static class RdlcReportPreview
             Padding = Padding.Empty
         };
         navigation.Controls.Add(previous);
+        navigation.Controls.Add(pageNumber);
         navigation.Controls.Add(page);
+        navigation.Controls.Add(go);
         navigation.Controls.Add(next);
         navigation.Controls.Add(zoom);
         navigation.Controls.Add(close);
@@ -212,7 +222,7 @@ internal static class RdlcReportPreview
             overview.Visible = multiple; viewer.Visible = !multiple;
             if (multiple) { overview.BringToFront(); overview.SelectPage(viewer.CurrentPage); }
         }
-        overview.PageSelected += selected => { viewer.CurrentPage = selected; RefreshPageState(); };
+        overview.PageSelected += selected => { if (viewer.CurrentPage != selected) viewer.CurrentPage = selected; RefreshPageState(); };
 
         void RefreshPageState()
         {
@@ -227,9 +237,12 @@ internal static class RdlcReportPreview
                 totalPages = 1;
             }
             int currentPage = Math.Clamp(viewer.CurrentPage, 1, totalPages);
-            page.Text = $"Page {currentPage} of {totalPages}";
-            previous.Enabled = currentPage > 1;
-            next.Enabled = currentPage < totalPages;
+            pageNumber.Maximum = totalPages;
+            pageNumber.Value = currentPage;
+            page.Text = $"of {totalPages}";
+            printCurrent.Text = $"Print page {currentPage}";
+            previous.Enabled = pageNumber.Enabled && currentPage > 1;
+            next.Enabled = pageNumber.Enabled && currentPage < totalPages;
         }
 
         void Execute(string action, Action execute)
@@ -245,6 +258,27 @@ internal static class RdlcReportPreview
 
         BindToolbarAction(form, print, Keys.Control | Keys.P, "Ctrl+P", () => Execute("print", () =>
             RdlcReportPrinter.Print(form, viewer)));
+        printCurrent.Click += (_, _) => Execute("print this page", () => RdlcReportPrinter.Print(form, viewer, viewer.CurrentPage));
+        void NavigateTo(int number)
+        {
+            if (!pageNumber.Enabled) return;
+            Execute("go to page", () => {
+                viewer.CurrentPage = Math.Clamp(number, 1, Math.Max(1, viewer.GetTotalPages()));
+                if (overview.Visible) overview.SelectPage(viewer.CurrentPage);
+                RefreshPageState();
+            });
+        }
+        go.Click += (_, _) => NavigateTo((int)pageNumber.Value);
+        pageNumber.KeyDown += (_, e) => {
+            if (e.KeyCode != Keys.Enter) return;
+            NavigateTo((int)pageNumber.Value); e.SuppressKeyPress = true;
+        };
+        form.ShortcutController.RegisterShortcut(pageNumber, Keys.Control | Keys.G, "Ctrl+G", () => {
+            if (!pageNumber.Enabled) return;
+            pageNumber.Focus(); pageNumber.Select(0, pageNumber.Text.Length);
+        });
+        form.ShortcutController.RegisterShortcut(go, Keys.Control | Keys.Home, "Ctrl+Home", () => NavigateTo(1));
+        form.ShortcutController.RegisterShortcut(go, Keys.Control | Keys.End, "Ctrl+End", () => NavigateTo(Math.Max(1, viewer.GetTotalPages())));
         BindToolbarAction(form, pageSetup, Keys.Alt | Keys.P, "Alt+P", () => Execute("set up", () => { viewer.PageSetupDialog(); overview.ClearPages(); ApplyPageView(); }));
         BindToolbarAction(form, exportPdf, Keys.Control | Keys.E, "Ctrl+E", () => {
             Execute("export", () => {
@@ -293,6 +327,7 @@ internal static class RdlcReportPreview
         BindToolbarAction(form, close, Keys.Escape, "Esc", () => form.Close());
         form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.D0, "Ctrl+0", () => SelectZoom("Fit page"));
         form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.D1, "Ctrl+1", () => SelectZoom("Page width"));
+        form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.D2, "Ctrl+2", () => SelectZoom("100%"));
         form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.Oemplus, "Ctrl++", () => StepZoom(1));
         form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.Add, "Ctrl++", () => StepZoom(1));
         form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.OemMinus, "Ctrl+-", () => StepZoom(-1));
@@ -303,7 +338,15 @@ internal static class RdlcReportPreview
         canvasMenu.Items.Add(new ToolStripSeparator());
         canvasMenu.Items.Add("Fit page (Ctrl+0)", null, (_, _) => SelectZoom("Fit page"));
         canvasMenu.Items.Add("Page width (Ctrl+1)", null, (_, _) => SelectZoom("Page width"));
-        canvasMenu.Items.Add("100%", null, (_, _) => SelectZoom("100%"));
+        canvasMenu.Items.Add("100% (Ctrl+2)", null, (_, _) => SelectZoom("100%"));
+        canvasMenu.Items.Add(new ToolStripSeparator());
+        canvasMenu.Items.Add("Go to page (Ctrl+G)", null, (_, _) => { pageNumber.Focus(); pageNumber.Select(0, pageNumber.Text.Length); });
+        canvasMenu.Items.Add("First page (Ctrl+Home)", null, (_, _) => NavigateTo(1));
+        canvasMenu.Items.Add("Last page (Ctrl+End)", null, (_, _) => NavigateTo(Math.Max(1, viewer.GetTotalPages())));
+        var printPageMenu = canvasMenu.Items.Add("Print this page", null, (_, _) => {
+            if (printCurrent.Enabled) printCurrent.PerformClick();
+        });
+        canvasMenu.Opening += (_, _) => { printPageMenu.Text = printCurrent.Text; printPageMenu.Enabled = printCurrent.Enabled; };
         if (pageView is not null)
         {
             canvasMenu.Items.Add(new ToolStripSeparator());
@@ -334,7 +377,8 @@ internal static class RdlcReportPreview
         form.ShortcutController.RefreshHints();
         void SetReady(bool ready)
         {
-            print.Enabled = pageSetup.Enabled = exportPdf.Enabled = zoom.Enabled = ready;
+            print.Enabled = printCurrent.Enabled = pageSetup.Enabled = exportPdf.Enabled = zoom.Enabled = pageNumber.Enabled = go.Enabled = ready;
+            printPageMenu.Enabled = ready;
             if (pageView is not null) pageView.Enabled = ready;
             if (!ready) { previous.Enabled = next.Enabled = false; page.Text = "Loading..."; }
         }
@@ -368,6 +412,7 @@ internal static class RdlcReportPreview
                         viewer.ZoomMode = Microsoft.Reporting.WinForms.ZoomMode.PageWidth;
                     Execute("show page view", ApplyPageView);
                     RefreshPageState();
+                    printPageMenu.Text = printCurrent.Text;
                 }));
         };
 

@@ -36,6 +36,8 @@ internal sealed class ReportPreviewInteractionFilter : IMessageFilter, IDisposab
         if (message.Msg is 0x0205 or 0x007B) // WM_RBUTTONUP / WM_CONTEXTMENU
         {
             EndDrag();
+            if (message.Msg == 0x0205 && source is ReportPageOverview overview)
+                overview.SelectAt(overview.PointToClient(Cursor.Position));
             menu.Show(source, source.PointToClient(Cursor.Position));
             return true;
         }
