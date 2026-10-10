@@ -118,7 +118,7 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
             saving=true;save.Enabled=false;cancel.Enabled=false;grid.Enabled=false;reason.Enabled=false;flags.Enabled=false;
             certificates.Enabled=false;startDate.Enabled=false;leaveDate.Enabled=false;billingDate.Enabled=false;updateWithdrawal.Enabled=false;withdrawalDate.Enabled=false;
             try {
-                await DatabaseHelper.QueryUserAsync("RepairLifecycleDates", DatabaseHelper.Bit("@WriteAudit", false),DatabaseHelper.Int("@AdmissionId",this.admissionId),
+                await DatabaseHelper.QueryUserAsync("RepairLifecycleDates",DatabaseHelper.Int("@AdmissionId",this.admissionId),
                     DatabaseHelper.P("@ExpectedSnapshot",snapshot),DatabaseHelper.P("@Changes",changes),DatabaseHelper.P("@Reason",reason.Text.Trim()),
                     DatabaseHelper.Bit("@AllowLegacyExceptions",legacy.Checked),DatabaseHelper.Bit("@KeepFinancialHistory",finances.Checked),
                     DatabaseHelper.P("@CertificateChanges",JsonSerializer.Serialize(certificatePreview.AsEnumerable().Where(r=>Convert.ToBoolean(r["Apply"])).Select(r=>new {

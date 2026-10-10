@@ -1328,7 +1328,7 @@ public sealed class StudentRecordChecksPage : V2Page
                 relatedEffect + "\n\nBills, payments and certificates stay unchanged. The database will check the correction before saving.\n" +
                 $"Reason: {statusReason.Text.Trim()}\n\nApply this status correction?","Confirm Status Correction"))return;
             var statusResult=DatabaseHelper.Query(
-                "CorrectStudentStatus", DatabaseHelper.Bit("@WriteAudit", false),
+                "CorrectStudentStatus",
                 DatabaseHelper.Int("@UserId", CurrentUser.UserId),
                 DatabaseHelper.Int("@AdmissionId", student.SelectedId),
                 DatabaseHelper.P("@NewStatus", status),
@@ -1427,7 +1427,7 @@ public sealed class StudentRecordChecksPage : V2Page
                 "Fee assignments, bills, payments and certificates stay unchanged. A placement correction does not apply new fee rates.\n" +
                 $"Reason: {reason}\n\nSave this enrollment correction?","Confirm Enrollment Correction"))return;
             var saved=DatabaseHelper.Query(
-                "CorrectEnrollmentStatus", DatabaseHelper.Bit("@WriteAudit", false),
+                "CorrectEnrollmentStatus",
                 DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@EnrollmentId",correctedEnrollmentId),
                 DatabaseHelper.P("@NewStatus",newStatus),DatabaseHelper.P("@NewEnrollmentDate",newStart),
                 DatabaseHelper.P("@NewLeavingDate",newLeave.HasValue?newLeave.Value:(object)DBNull.Value),
@@ -1500,7 +1500,7 @@ public sealed class StudentRecordChecksPage : V2Page
                 "This creates the enrollment and its correction history only. No fee assignments or bills are created. Existing bills, payments and certificates stay unchanged.\n" +
                 $"Reason: {correctionReason}\n\nCreate this missing enrollment?","Confirm Missing Enrollment"))return;
             var created=DatabaseHelper.Query(
-                "CorrectEnrollmentStatus", DatabaseHelper.Bit("@WriteAudit", false),
+                "CorrectEnrollmentStatus",
                 DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@AdmissionId",correctedAdmissionId),
                 DatabaseHelper.P("@NewStatus",newStatus),DatabaseHelper.P("@NewEnrollmentDate",newStart),
                 DatabaseHelper.P("@NewLeavingDate",newLeave.HasValue?newLeave.Value:(object)DBNull.Value),

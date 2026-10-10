@@ -66,7 +66,7 @@ internal sealed class EnrollmentDateCorrectionDialog : ApplicationWindowForm
             SetBusy(true);
             try
             {
-                var preview = await DatabaseHelper.QueryUserAsync("ReconcileEnrollmentDates", DatabaseHelper.Bit("@WriteAudit", false),
+                var preview = await DatabaseHelper.QueryUserAsync("ReconcileEnrollmentDates",
                     DatabaseHelper.Int("@EnrollmentId", enrollmentId), DatabaseHelper.Date("@EnrollmentDate", start.Value.Date),
                     DatabaseHelper.P("@BillingStartDate", BillingValue()), DatabaseHelper.P("@Reason", reason.Text.Trim()),
                     DatabaseHelper.Bit("@AllowLegacyExceptions", legacy.Checked), DatabaseHelper.Bit("@Preview", true));
@@ -95,7 +95,7 @@ internal sealed class EnrollmentDateCorrectionDialog : ApplicationWindowForm
             SetBusy(true);
             try
             {
-                var result = await DatabaseHelper.QueryUserAsync("ReconcileEnrollmentDates", DatabaseHelper.Bit("@WriteAudit", false),
+                var result = await DatabaseHelper.QueryUserAsync("ReconcileEnrollmentDates",
                     DatabaseHelper.Int("@EnrollmentId", enrollmentId), DatabaseHelper.Date("@EnrollmentDate", start.Value.Date),
                     DatabaseHelper.P("@BillingStartDate", BillingValue()), DatabaseHelper.P("@Reason", reason.Text.Trim()),
                     DatabaseHelper.Bit("@AllowLegacyExceptions", legacy.Checked), DatabaseHelper.Bit("@Preview", false),
