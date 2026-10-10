@@ -1373,7 +1373,7 @@ public sealed class StudentRecordChecksPage : V2Page
             if (selectedEnrollmentId <= 0)
             {
                 Warn(
-                    "Select an academic enrolment row first, or use Add Enrolment " +
+                    "Select an academic enrolment row first, or use Add Missing Record " +
                     "to create a new one.");
                 return;
             }
@@ -1394,31 +1394,55 @@ public sealed class StudentRecordChecksPage : V2Page
                 !Equals(original["BillingStartDate"],billingStartDate.Checked?(object)billingStartDate.Value.Date:DBNull.Value)) {
                 Warn("Use Correct Enrollment Dates to save the date changes first, then save the status or placement correction.");return;
             }
-            if (!Confirm("Save these changes to the selected academic enrolment?", "Confirm Enrolment Correction"))
-            {
-                return;
+            int correctedEnrollmentId=selectedEnrollmentId;
+            string newStatus=(enrollmentStatusCombo.SelectedItem as string)??Convert.ToString(original["Status"])!;
+            int newPlacementId=classSection.SelectedId>0?classSection.SelectedId:Convert.ToInt32(original["ClassSectionId"]);
+            DateTime newStart=enrollmentDate.Value.Date;
+            DateTime? newLeave=leavingDate.Checked?leavingDate.Value.Date:null;
+            string newPlacement=classSection.Text,reason=enrollmentReason.Text.Trim();
+            var currentRecords=await DatabaseHelper.QueryUserAsync("GetStudentEnrollmentsForLifecycle",DatabaseHelper.Int("@AdmissionId",correctedAdmissionId));
+            if(IsDisposed || student.SelectedId!=correctedAdmissionId || selectedEnrollmentId!=correctedEnrollmentId)return;
+            var current=currentRecords.AsEnumerable().FirstOrDefault(row=>Convert.ToInt32(row["EnrollmentId"])==correctedEnrollmentId);
+            string[] reviewedFields={"Status","ClassSectionId","EnrollmentDate","LeavingDate","BillingStartDate"};
+            if(current==null || reviewedFields.Any(field=>!Equals(current[field],original[field]))) {
+                Warn("This enrollment changed since it was loaded. Refresh and review it before saving.");return;
             }
-            DatabaseHelper.Execute(
+            if(newStatus=="Left" && !newLeave.HasValue) {Warn("Enter a leaving date before marking this enrollment Left.");return;}
+            if(newLeave.HasValue && newLeave.Value<newStart) {Warn("Leaving date cannot be before enrollment start.");return;}
+            if(newStatus=="Promoted" && !currentRecords.AsEnumerable().Any(row=>Convert.ToInt32(row["EnrollmentId"])!=correctedEnrollmentId && Convert.ToString(row["Status"])=="Active")) {
+                Warn("Use Promotion to create the destination enrollment before marking this record Promoted.");return;
+            }
+            string oldPlacement=$"{current["CampusName"]} / {current["ClassName"]} / {current["SectionName"]}";
+            string oldLeave=current["LeavingDate"] is DateTime previousLeave?previousLeave.ToString("dd MMM yyyy"):"not recorded";
+            string proposedLeave=newLeave.HasValue?newLeave.Value.ToString("dd MMM yyyy"):"not recorded";
+            string studentEffect=newStatus=="Left"
+                ? $"The student's overall status becomes Left and the withdrawal date becomes {newLeave:dd MMM yyyy}."
+                : newStatus=="Active"
+                    ? "If the student's overall status is not Active, it becomes Active and the withdrawal date is cleared."
+                    : "The student's overall status and withdrawal date stay unchanged.";
+            if(!Confirm($"Student: {student.Text}\nEnrollment: {correctedEnrollmentId} ({current["YearName"]})\n" +
+                $"Status: {current["Status"]} → {newStatus}\nPlacement: {oldPlacement} → {newPlacement}\n" +
+                $"Leaving date: {oldLeave} → {proposedLeave}\n" +
+                $"\n{studentEffect}\n" +
+                "Fee assignments, bills, payments and certificates stay unchanged. A placement correction does not apply new fee rates.\n" +
+                $"Reason: {reason}\n\nSave this enrollment correction?","Confirm Enrollment Correction"))return;
+            var saved=DatabaseHelper.Query(
                 "CorrectEnrollmentStatus",
-                DatabaseHelper.Int("@UserId", CurrentUser.UserId),
-                DatabaseHelper.Int("@EnrollmentId", selectedEnrollmentId),
-                DatabaseHelper.P("@NewStatus", (object?)(enrollmentStatusCombo.SelectedItem as string) ?? DBNull.Value),
-                DatabaseHelper.P("@NewEnrollmentDate", enrollmentDate.Value.Date),
-                DatabaseHelper.P(
-                    "@NewLeavingDate",
-                    leavingDate.Checked ? leavingDate.Value.Date : (object)DBNull.Value),
-                DatabaseHelper.Bit("@ClearLeavingDate", !leavingDate.Checked),
-                DatabaseHelper.NullableInt(
-                    "@NewClassSectionId",
-                    classSection.SelectedId > 0 ? classSection.SelectedId : null),
-                DatabaseHelper.P("@Reason", enrollmentReason.Text.Trim()));
+                DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@EnrollmentId",correctedEnrollmentId),
+                DatabaseHelper.P("@NewStatus",newStatus),DatabaseHelper.P("@NewEnrollmentDate",newStart),
+                DatabaseHelper.P("@NewLeavingDate",newLeave.HasValue?newLeave.Value:(object)DBNull.Value),
+                DatabaseHelper.Bit("@ClearLeavingDate",!newLeave.HasValue),DatabaseHelper.Int("@NewClassSectionId",newPlacementId),
+                DatabaseHelper.P("@Reason",reason));
             enrollmentReason.Clear();
             /* this refresh belongs to the mode that is on screen now, so it uses the current version: it binds unless the operator switches mode while it runs. */
             await LoadEnrollments(gridModeVersion);
             // CorrectEnrollmentStatus can now synchronize Students.Status/WithdrawalDate as a side effect of this save (e.g. closing the Active enrollment to Left, or reactivating one to Active).
             await LoadStudentSnapshot();
             StudentSearchCache.Invalidate();
-            await ReportCorrectionAsync(correctedAdmissionId,"Academic enrolment saved.");
+            SelectEnrollmentRow(correctedEnrollmentId);
+            await ReportCorrectionAsync(correctedAdmissionId,Convert.ToBoolean(saved.Rows[0]["Changed"])
+                ? $"Enrollment {correctedEnrollmentId} corrected: status {saved.Rows[0]["Status"]}, placement {newPlacement}. Fee assignments and bills were not changed."
+                : "No enrollment changes were needed.");
         }
         catch (Exception ex) { Fail(ex); }
     }

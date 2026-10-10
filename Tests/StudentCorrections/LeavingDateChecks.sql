@@ -209,3 +209,23 @@ END TRY BEGIN CATCH IF ERROR_NUMBER()<>57117 THROW; END CATCH;
 IF @@TRANCOUNT>0 ROLLBACK;
 PRINT 'PASS established missing-Left-record date requirement';
 GO
+-- Existing-enrollment closure coordinates student status and preserves related records.
+BEGIN TRANSACTION;
+DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date,@Leave date,@Placement int;
+EXEC #Fixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
+SELECT @Leave=LeavingDate,@Placement=ClassSectionId FROM dbo.Enrollments WHERE EnrollmentId=@E;
+UPDATE dbo.Enrollments SET Status=N'Active',LeavingDate=NULL WHERE EnrollmentId=@E;
+UPDATE dbo.Students SET Status=N'Active',WithdrawalDate=NULL WHERE AdmissionId=@S;
+DECLARE @Result TABLE(EnrollmentId int,AdmissionId int,Status nvarchar(30),Changed bit);
+INSERT @Result EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@EnrollmentId=@E,@NewStatus=N'Left',@NewLeavingDate=@Leave,@NewClassSectionId=@Placement,@Reason=N'Existing enrollment review test';
+IF NOT EXISTS(SELECT 1 FROM @Result WHERE EnrollmentId=@E AND Status=N'Left' AND Changed=1) THROW 57929,'Confirmed closure result missing.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@S AND Status=N'Left' AND WithdrawalDate=@Leave) THROW 57930,'Student closure was not coordinated.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.BillingCharges WHERE BillingChargeId=@B AND Status=N'Open' AND NetAmount=100) THROW 57931,'Existing bill changed.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.StudentFeeAssignments WHERE StudentFeeAssignmentId=@A AND Amount=100) THROW 57932,'Existing assignment changed.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.LeaveCertificates WHERE EnrollmentId=@E AND LeaveDate=@Leave) THROW 57933,'Existing certificate changed.',1;
+DELETE FROM @Result;
+INSERT @Result EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@EnrollmentId=@E,@NewStatus=N'Left',@NewLeavingDate=@Leave,@NewClassSectionId=@Placement,@Reason=N'Existing enrollment review test';
+IF NOT EXISTS(SELECT 1 FROM @Result WHERE Changed=0) THROW 57934,'No-op result missing.',1;
+ROLLBACK;
+PRINT 'PASS existing enrollment closure, confirmed result, related-record preservation and no-op';
+GO
