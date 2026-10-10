@@ -155,6 +155,9 @@ public sealed class AdditionalFeePostingPage : V2Page
         int count = selected.Count;
         if (!Confirm($"Post {fee.Text} to {count} students?\nCharge date: {date.Value:dd-MMM-yyyy}\nAmount each: Rs. {amount.Value:N0}\nTotal: Rs. {amount.Value * count:N0}",
             "Post Additional Fee")) return;
+        string postedFeeName = fee.Text;
+        decimal postedAmount = amount.Value;
+        DateTime postedDate = date.Value;
         try
         {
             await DatabaseHelper.QueryUserAsync("PostAdditionalFee",
@@ -166,7 +169,7 @@ public sealed class AdditionalFeePostingPage : V2Page
                 DatabaseHelper.P("@Reason", reason.Text.Trim()),
                 new SqlParameter("@Selection", SqlDbType.Structured) { TypeName = "dbo.ManualChargeSelectionType", Value = Tvp.ManualChargeSelection(selected) });
             requestId = Guid.NewGuid();
-            Info($"Additional fee posted to {count} students.");
+            Info($"{postedFeeName} posted to {count} student(s): Rs. {postedAmount:0.##} each, dated {postedDate:dd MMM yyyy}.");
             ClearCandidates();
         }
         catch (Exception ex) { Fail(ex); }

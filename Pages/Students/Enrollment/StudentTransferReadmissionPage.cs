@@ -484,7 +484,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
             Fail(ex);
         }
     }
-    private void LoadEnrollments()
+    private void LoadEnrollments(string? completionMessage = null)
     {
         currentAdmissionNumber.Text = student.SelectedId > 0 ? AdmissionNumbers.ForId(student.SelectedId) : string.Empty;
         enrollment.ClearLookup();
@@ -516,6 +516,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
             }
             Bind(raw);
             UpdateAvailableOperations();
+            if (completionMessage is not null) Info(completionMessage);
         }
         catch (Exception ex)
         {
@@ -1341,9 +1342,8 @@ public sealed class StudentTransferReadmissionPage : V2Page
             });
             AdmissionNumbers.Invalidate();
             StudentSearchCache.Invalidate();
-            Info(completionMessage +
+            LoadEnrollments(completionMessage +
                 (string.IsNullOrEmpty(note) ? string.Empty : "\n\n" + note));
-            LoadEnrollments();
             if (fixedOperation is not null) OperationCompleted?.Invoke(this, EventArgs.Empty);
         }
         catch (InvalidOperationException ex)
@@ -1357,7 +1357,6 @@ public sealed class StudentTransferReadmissionPage : V2Page
         finally
         {
             isExecuting = false;
-            SetStatus(string.Empty);
         }
     }
     /// <summary>"Keep existing fees" maps to a NULL policy, which the database interprets as "skip fee sync entirely".</summary>

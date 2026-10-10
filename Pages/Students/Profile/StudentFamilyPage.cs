@@ -346,6 +346,7 @@ public sealed class StudentFamilyPage : V2Page
             {
                 return;
             }
+            string removedStudentName = selectedCard.StudentName;
             int familyMemberId = selectedCard.FamilyMemberId;
             int removedAdmissionId = selectedCard.AdmissionId;
             int selectedAdmissionId = student.SelectedId;
@@ -361,7 +362,7 @@ public sealed class StudentFamilyPage : V2Page
             if (preserve == 0)
                 preserve = null;
             await LoadStudentsAsync(preserveAdmissionId: preserve);
-            Info("Family member removed successfully.");
+            Info($"{removedStudentName} removed from this family.");
         }
         catch (Exception ex) { Fail(ex); }
     }

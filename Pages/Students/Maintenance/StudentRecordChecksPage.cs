@@ -1292,10 +1292,14 @@ public sealed class StudentRecordChecksPage : V2Page
                     withdrawalDate.Checked ? withdrawalDate.Value.Date : (object)DBNull.Value),
                 DatabaseHelper.Bit("@ClearWithdrawalDate", !withdrawalDate.Checked),
                 DatabaseHelper.P("@Reason", statusReason.Text.Trim()));
+            string statusOutcome = $"Student status corrected to {status}." +
+                (withdrawalDate.Checked
+                    ? $" Withdrawal date: {withdrawalDate.Value:dd MMM yyyy}."
+                    : " Withdrawal date cleared.");
             statusReason.Clear();
             await LoadStudentSnapshot();
             StudentSearchCache.Invalidate();
-            Info("Student status saved.");
+            Info(statusOutcome);
         }
         catch (Exception ex) { Fail(ex); }
     }

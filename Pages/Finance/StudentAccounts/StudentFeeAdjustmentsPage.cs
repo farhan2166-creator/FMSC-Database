@@ -209,7 +209,9 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
     {
         await LoadPaymentsAsync();
     }
-    private async Task LoadPaymentsAsync()
+    private Task LoadPaymentsAsync() => LoadPaymentsAsync(null, null);
+
+    private async Task LoadPaymentsAsync(string? completionMessage, int? completedAdmissionId)
     {
         int version=++paymentsLoadVersion;
         payments.Rows.Clear();
@@ -264,6 +266,8 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
             UiHelper.SetGridEmptyMessage(payments,"No payments were found for this student.");
             SetStatus($"{payments.Rows.Count} recorded entries. All payments and adjustments are shown.");
             OnPaymentSelected();
+            if (completionMessage is not null && completedAdmissionId == chosen)
+                Info(completionMessage);
         }
         catch(Exception ex) { if(!IsDisposed && version==paymentsLoadVersion) Fail(ex); }
     }
@@ -447,9 +451,13 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
             string receipt = result.Rows.Count > 0 && result.Columns.Contains("ReceiptNumber")
                 ? GetText(result.Rows[0], "ReceiptNumber")
                 : string.Empty;
-            Info(string.IsNullOrWhiteSpace(receipt)
-                ? $"{transactionType} completed successfully."
-                : $"{transactionType} completed successfully. Receipt: {receipt}.");
+            string completionMessage = transactionType switch {
+                "Correction" => $"Collection corrected to Rs. {amount:0.##}.",
+                "Refund" => $"Refund of Rs. {amount:0.##} recorded.",
+                _ => $"Payment of Rs. {amount:0.##} reversed."
+            };
+            if (!string.IsNullOrWhiteSpace(receipt))
+                completionMessage += $" Receipt: {receipt}.";
             // Clear the selection BEFORE reloading, so the amount box and the confirmation summary cannot still be describing the payment that was just adjusted.
             reason.Clear();
             selectedPaymentId = 0;
@@ -457,7 +465,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
             enrollmentId = 0;
             actionAmount.Text = "0";
             actionAmount.ReadOnly = false;
-            await LoadPaymentsAsync();
+            await LoadPaymentsAsync(completionMessage, admissionId);
         }
         catch (Exception ex)
         {
