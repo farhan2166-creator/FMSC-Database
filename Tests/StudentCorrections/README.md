@@ -1,10 +1,10 @@
 # Coordinated leaving-date checks
 
-Run `LeavingDateChecks.sql` through `sqlcmd -b` against a **disposable database copy** with the existing lifecycle repair procedures. No migration or trigger change is required. Tests need catalogue rows and an administrator account. All synthetic student/enrolment/fee/certificate fixtures are created inside transactions and rolled back. Do not run against the live school database.
+Run `LeavingDateChecks.sql` through `sqlcmd -b` against a **disposable database copy** with the existing lifecycle repair procedures. Apply `Migrations/18.sql` first. No trigger change is required. Tests need catalogue rows and an administrator account. All synthetic student/enrolment/fee/certificate fixtures are created inside transactions and rolled back. Do not run against the live school database.
 
 Coverage: related departure dates update together; paid bills and certificate creation timestamps remain unchanged; earlier departures preserve a later withdrawal; stale certificate data rejects the complete correction; financial-history acknowledgement remains mandatory; established closed-bill cancellation and amount protections remain intact; chronology and authentication are enforced.
 
-The console calls the existing `RepairLifecycleDates` contract. Original database definitions in `Database/Reference` and all migrations remain unchanged. The new review automatically proposes linked certificate dates and, for the latest departure of a Left student, the withdrawal date. It passes every enrolment and the original snapshot to the database for its established validation and atomic save. Existing financial history is preserved only after explicit acknowledgement. Legacy exceptions use the existing explicit acknowledgement, not a new bypass.
+The console calls `RepairLifecycleDates` with `@WriteAudit=0`. Original database definitions in `Database/Reference` remain a historical snapshot; migration 18 adds the optional flag without changing lifecycle rules. The new review automatically proposes linked certificate dates and, for the latest departure of a Left student, the withdrawal date. It passes every enrolment and the original snapshot to the database for its established validation and atomic save. Existing financial history is preserved only after explicit acknowledgement. Legacy exceptions use the existing explicit acknowledgement, not a new bypass.
 
 ## Windows review
 
@@ -14,7 +14,7 @@ This first workflow corrects an already recorded departure, not a new withdrawal
 
 ## Active enrollment dates
 
-Run `EnrollmentDateChecks.sql` against the same disposable database copy. Five scenarios verify the existing `ReconcileEnrollmentDates` procedure: preview is read-only and the save matches its charge counts; paid bills block both preview eligibility and saving; financial changes invalidate the reviewed snapshot; confirmed enrollments cannot lose their billing start; closed enrollments cannot use active reconciliation. Fixtures roll back, including expected database failures. No SQL definition is changed.
+Run `EnrollmentDateChecks.sql` against the same disposable database copy. Five scenarios verify the existing `ReconcileEnrollmentDates` procedure: preview is read-only and the save matches its charge counts; paid bills block both preview eligibility and saving; financial changes invalidate the reviewed snapshot; confirmed enrollments cannot lose their billing start; closed enrollments cannot use active reconciliation. Fixtures roll back, including expected database failures. Migration 18 adds the optional audit flag; reconciliation rules are unchanged.
 
 On Windows, select an Active enrolment and choose Correct Enrollment Dates (or Save Enrollment for a date-only correction). Student administration and fee-adjustment permissions are required. Check the loaded/proposed dates and the database-returned charge counts, amounts, billing-through month and resulting confirmed-return date. Editing any input invalidates the review. Apply must remain disabled for a blocked plan. A save must retain the actual added/cancelled counts inline after refreshing the console. Mixed date/status/placement edits still follow the database's required sequence; the console now names the date-correction action explicitly.
 
@@ -24,12 +24,18 @@ The leaving-date check script also tests confirmed status outcomes, closing an a
 
 ## Missing enrollment review
 
-The leaving-date check script reproduces an existing creation blocker: `CorrectEnrollmentStatus` passes the plain-English reason as `WriteAuditLog.@NewValues`, but the audit procedure requires valid JSON (error 59941). The operation rolls back completely. No database procedure is changed. The script also verifies rejection of a second active enrollment and the leaving-date requirement for Left. Successful creation and its returned ID remain unverified until that database contract is repaired separately.
+The leaving-date check script verifies successful console creation with `@WriteAudit=0`: confirmed ID/status, synchronized student status, retained correction/status histories, no automatic fees/bills/billing start and no audit rows/operations. It also verifies rejection of a second active enrollment and the leaving-date requirement for Left. The optional flag defaults to 1 so callers outside the console retain existing auditing. A separate check confirms that default behavior.
 
-On Windows, Add Missing Record should show Active explicitly and disable the billing-start/legacy-date controls that this procedure does not accept. Review the existing creation confirmation: year, placement, status, dates, reason, existing count and overlapping record warnings must match submitted values. Overlap warnings are advisory; the database retains final authority. Cancel makes no changes. Once the database creation blocker is resolved, creating a record should select the returned record, explain that fees/bills were not generated and recheck remaining issues. No new success/error message boxes are added.
+On Windows, Add Missing Record should show Active explicitly and disable the billing-start/legacy-date controls that this procedure does not accept. Review the existing creation confirmation: year, placement, status, dates, reason, existing count and overlapping record warnings must match submitted values. Overlap warnings are advisory; the database retains final authority. Cancel makes no changes. Creating a record should select the returned record, explain that fees/bills were not generated and recheck remaining issues. No new success/error message boxes are added.
 
 ## Existing enrollment correction review
 
 The existing-enrollment closure check verifies the procedure's returned status/Changed flag, coordinated student withdrawal, unchanged assignment/bill/certificate and no-op response. The console uses that returned result instead of a generic success message.
 
 On Windows, select an Active record and change its placement or status. The existing confirmation must show student/year, old/proposed placement, status and leaving date, reason, student-status effect and unchanged fee/billing/certificate scope. Dates must still use Correct Enrollment Dates first. A refresh detected before confirmation must require another review. A missing Left date and a Promoted record without an active destination must be explained inline. Cancel must make no changes. After saving, the corrected record must remain selected and the refreshed checks must retain the result. The procedure remains the final authority, including changes made by another user after the review.
+
+## Console audit policy and deployment
+
+Apply `Migrations/18.sql` to the target database **before deploying the updated application**. It uses `CREATE OR ALTER` and may be applied again. The application compatibility baseline remains 3. All four correction procedures gain a trailing optional `@WriteAudit bit=1` parameter. The console and its correction dialogs pass 0, including reconciliation preview/save. Audit operations and audit log entries are skipped; permission checks, snapshots, atomic saves, chronology, financial protections and lifecycle/correction histories remain in place. Existing audit entries are retained.
+
+Both scripts assert unchanged audit row/operation counts for successful console corrections. The historical snapshot's missing-enrollment creation branch passes plain text into JSON audit values; skipping that audit branch removes the console blocker without altering audit behavior for other callers.

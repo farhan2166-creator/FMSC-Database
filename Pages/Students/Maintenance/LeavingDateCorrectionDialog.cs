@@ -95,7 +95,7 @@ internal sealed class LeavingDateCorrectionDialog : ApplicationWindowForm
             SetBusy(true);
             try
             {
-                var result = await DatabaseHelper.QueryUserAsync("RepairLifecycleDates",
+                var result = await DatabaseHelper.QueryUserAsync("RepairLifecycleDates", DatabaseHelper.Bit("@WriteAudit", false),
                     DatabaseHelper.Int("@AdmissionId", admissionId), DatabaseHelper.P("@ExpectedSnapshot", Convert.ToString(student["Snapshot"])),
                     DatabaseHelper.P("@Changes", JsonSerializer.Serialize(enrollments.AsEnumerable().Select(row => new {
                         EnrollmentId = Convert.ToInt32(row["EnrollmentId"]), EnrollmentDate = Convert.ToDateTime(row["EnrollmentDate"]).Date,

@@ -1,8 +1,10 @@
--- Execute only against a disposable copy of the established database. No migration is needed.
+-- Execute only against a disposable copy of the established database. Apply Migrations/18.sql first.
 -- Synthetic fixtures are rolled back; no school records are modified.
 SET NOCOUNT ON;
 SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON; SET ANSI_PADDING ON;
 SET ANSI_WARNINGS ON; SET ARITHABORT ON; SET CONCAT_NULL_YIELDS_NULL ON; SET NUMERIC_ROUNDABORT OFF;
+GO
+CREATE TABLE #AuditBaseline(Logs bigint,Operations bigint);
 GO
 CREATE PROCEDURE #Fixture @User int OUTPUT,@Student int OUTPUT,@Enrollment int OUTPUT,@Assignment int OUTPUT,@Bill bigint OUTPUT,@NewDate date OUTPUT
 AS
@@ -28,6 +30,8 @@ BEGIN
  UPDATE dbo.Enrollments SET Status=N'Left' WHERE EnrollmentId=@Enrollment;
  INSERT dbo.LeaveCertificates(AdmissionId,EnrollmentId,StudentName,ClassStudied,LeaveDate,CreatedByUserId)
  VALUES(@Student,@Enrollment,N'Correction test',N'Test class',DATEADD(day,50,@Start),@User);
+ DELETE FROM #AuditBaseline;
+ INSERT #AuditBaseline SELECT (SELECT COUNT_BIG(*) FROM dbo.AuditLogs),(SELECT COUNT_BIG(*) FROM dbo.AuditOperations);
 END;
 GO
 CREATE PROCEDURE #Repair @User int,@Student int,@Enrollment int,@Date date,@Snapshot nvarchar(max),@Keep bit=1,@Withdrawal bit=1
@@ -37,7 +41,7 @@ BEGIN
   CASE WHEN EnrollmentId=@Enrollment THEN @Date ELSE LeavingDate END LeavingDate,BillingStartDate
   FROM dbo.Enrollments WHERE AdmissionId=@Student ORDER BY EnrollmentId FOR JSON PATH,INCLUDE_NULL_VALUES),
  @Certificates nvarchar(max)=(SELECT LeaveRecordId,@Date LeaveDate FROM dbo.LeaveCertificates WHERE EnrollmentId=@Enrollment FOR JSON PATH);
- EXEC dbo.RepairLifecycleDates @User,@Student,@Snapshot,@Changes,N'Integration test',0,@Keep,@Certificates,@Withdrawal,@Date;
+ EXEC dbo.RepairLifecycleDates @User,@Student,@Snapshot,@Changes,N'Integration test',0,@Keep,@Certificates,@Withdrawal,@Date, @WriteAudit=0;
 END;
 GO
 -- Related dates change together, while financial and original history records remain.
@@ -53,6 +57,7 @@ IF NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@S AND WithdrawalDate
 IF NOT EXISTS(SELECT 1 FROM dbo.LeaveCertificates WHERE EnrollmentId=@E AND LeaveDate=@D AND CreatedAt=@Created) THROW 57904,'Certificate not corrected or creation changed.',1;
 IF NOT EXISTS(SELECT 1 FROM dbo.BillingCharges WHERE BillingChargeId=@B AND Status=N'Paid' AND GrossAmount=100) THROW 57905,'Financial history changed.',1;
 IF NOT EXISTS(SELECT 1 FROM dbo.EnrollmentHistory WHERE EnrollmentId=@E AND ActionType=N'CORRECTION') THROW 57906,'Correction history missing.',1;
+IF EXISTS(SELECT 1 FROM #AuditBaseline WHERE Logs<>(SELECT COUNT_BIG(*) FROM dbo.AuditLogs) OR Operations<>(SELECT COUNT_BIG(*) FROM dbo.AuditOperations)) THROW 57790,'Console correction created audit data.',1;
 ROLLBACK;
 PRINT 'PASS linked dates corrected together; paid bills and creation/history preserved';
 GO
@@ -67,6 +72,7 @@ UPDATE dbo.Students SET WithdrawalDate=DATEADD(day,5,@LaterDate) WHERE Admission
 EXEC dbo.GetLifecycleRepairSnapshot @S,@Snapshot OUTPUT;
 EXEC #Repair @U,@S,@E,@D,@Snapshot,1,0;
 IF NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@S AND WithdrawalDate=DATEADD(day,5,@LaterDate)) THROW 57907,'Later withdrawal overwritten.',1;
+IF EXISTS(SELECT 1 FROM #AuditBaseline WHERE Logs<>(SELECT COUNT_BIG(*) FROM dbo.AuditLogs) OR Operations<>(SELECT COUNT_BIG(*) FROM dbo.AuditOperations)) THROW 57790,'Console correction created audit data.',1;
 ROLLBACK;
 PRINT 'PASS earlier departure preserves later withdrawal';
 GO
@@ -146,13 +152,14 @@ UPDATE dbo.Students SET Status=N'Active',WithdrawalDate=NULL WHERE AdmissionId=@
 UPDATE dbo.Enrollments SET Status=N'Active',LeavingDate=NULL WHERE EnrollmentId=@E;
 SELECT @D=DATEADD(day,70,EnrollmentDate) FROM dbo.Enrollments WHERE EnrollmentId=@E;
 DECLARE @Outcome TABLE(AdmissionId int,Status nvarchar(30),WithdrawalDate date,Changed bit);
-INSERT @Outcome EXEC dbo.CorrectStudentStatus @U,@S,N'Left',@D,0,N'Status integration test';
+INSERT @Outcome EXEC dbo.CorrectStudentStatus @U,@S,N'Left',@D,0,N'Status integration test', @WriteAudit=0;
 IF NOT EXISTS(SELECT 1 FROM @Outcome WHERE Status=N'Left' AND WithdrawalDate=@D AND Changed=1) THROW 57917,'Status outcome not confirmed.',1;
 IF NOT EXISTS(SELECT 1 FROM dbo.Enrollments WHERE EnrollmentId=@E AND Status=N'Left' AND LeavingDate=@D) THROW 57918,'Active enrollment not closed.',1;
 IF NOT EXISTS(SELECT 1 FROM dbo.BillingCharges WHERE BillingChargeId=@B AND Status=N'Open') THROW 57919,'Status correction altered a bill.',1;
 DELETE @Outcome;
-INSERT @Outcome EXEC dbo.CorrectStudentStatus @U,@S,N'Left',@D,0,N'Status integration test';
+INSERT @Outcome EXEC dbo.CorrectStudentStatus @U,@S,N'Left',@D,0,N'Status integration test', @WriteAudit=0;
 IF NOT EXISTS(SELECT 1 FROM @Outcome WHERE Changed=0) THROW 57920,'Unchanged status reported as changed.',1;
+IF EXISTS(SELECT 1 FROM #AuditBaseline WHERE Logs<>(SELECT COUNT_BIG(*) FROM dbo.AuditLogs) OR Operations<>(SELECT COUNT_BIG(*) FROM dbo.AuditOperations)) THROW 57790,'Console correction created audit data.',1;
 ROLLBACK;
 PRINT 'PASS confirmed status result, coordinated closure and no-op reporting';
 GO
@@ -161,26 +168,30 @@ BEGIN TRANSACTION;
 DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date;
 EXEC #Fixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
 BEGIN TRY
- EXEC dbo.CorrectStudentStatus @U,@S,N'Active',NULL,1,N'Status integration test';
+ EXEC dbo.CorrectStudentStatus @U,@S,N'Active',NULL,1,N'Status integration test', @WriteAudit=0;
  THROW 57921,'Student reactivated without an active enrollment.',1;
 END TRY BEGIN CATCH IF ERROR_NUMBER()<>57008 THROW; END CATCH;
 IF @@TRANCOUNT>0 ROLLBACK;
 PRINT 'PASS established reactivation restriction retained';
 GO
--- Existing creation fails audit validation for a plain-English reason; changes roll back.
--- Preserve this regression evidence without changing established database procedures.
+-- Console creation skips auditing, preserves histories and creates no fees/bills.
 BEGIN TRANSACTION;
-DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date,@Year int,@Placement int,@NewStart date;
+DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date,@Year int,@Placement int,@NewStart date,@CreatedId int;
 EXEC #Fixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
 SELECT @Year=AcademicYearId,@Placement=ClassSectionId,@NewStart=DATEADD(day,1,LeavingDate) FROM dbo.Enrollments WHERE EnrollmentId=@E;
-BEGIN TRY
- EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@AdmissionId=@S,@NewStatus=N'Active',@NewEnrollmentDate=@NewStart,@ClearLeavingDate=1,
-  @NewClassSectionId=@Placement,@AcademicYearId=@Year,@Reason=N'Missing record integration test';
- THROW 57922,'Expected existing audit validation failure was not raised; revisit this regression check.',1;
-END TRY BEGIN CATCH IF ERROR_NUMBER()<>59941 THROW; END CATCH;
-IF @@TRANCOUNT<>0 THROW 57923,'Failed creation did not roll back its transaction.',1;
-IF EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@S) THROW 57924,'Failed creation left transaction data behind.',1;
-PRINT 'PASS existing missing-record audit blocker reproduced with complete rollback';
+DECLARE @Created TABLE(EnrollmentId int,AdmissionId int,Status nvarchar(30),Changed bit);
+INSERT @Created EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@AdmissionId=@S,@NewStatus=N'Active',@NewEnrollmentDate=@NewStart,@ClearLeavingDate=1,
+ @NewClassSectionId=@Placement,@AcademicYearId=@Year,@Reason=N'Missing record integration test',@WriteAudit=0;
+SELECT @CreatedId=EnrollmentId FROM @Created WHERE Changed=1 AND Status=N'Active';
+IF @CreatedId IS NULL THROW 57922,'Confirmed creation result missing.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@S AND Status=N'Active' AND WithdrawalDate IS NULL) THROW 57923,'Student status not synchronized.',1;
+IF EXISTS(SELECT 1 FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@CreatedId) OR EXISTS(SELECT 1 FROM dbo.BillingCharges WHERE EnrollmentId=@CreatedId) THROW 57924,'Unexpected fees or bills created.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.Enrollments WHERE EnrollmentId=@CreatedId AND BillingStartDate IS NULL) THROW 57925,'Unexpected billing start.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.EnrollmentHistory WHERE EnrollmentId=@CreatedId AND ActionType=N'CORRECTION_CREATE') THROW 57926,'Creation history missing.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.StudentStatusHistory WHERE AdmissionId=@S AND NewStatus=N'Active') THROW 57935,'Student status history missing.',1;
+IF EXISTS(SELECT 1 FROM #AuditBaseline WHERE Logs<>(SELECT COUNT_BIG(*) FROM dbo.AuditLogs) OR Operations<>(SELECT COUNT_BIG(*) FROM dbo.AuditOperations)) THROW 57790,'Console correction created audit data.',1;
+ROLLBACK;
+PRINT 'PASS missing-record creation without audit, confirmed result, status history and no fees/bills';
 GO
 -- A second active enrollment remains forbidden.
 BEGIN TRANSACTION;
@@ -190,7 +201,7 @@ SELECT @Year=AcademicYearId,@Placement=ClassSectionId FROM dbo.Enrollments WHERE
 UPDATE dbo.Enrollments SET Status=N'Active',LeavingDate=NULL WHERE EnrollmentId=@E;
 BEGIN TRY
  EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@AdmissionId=@S,@NewStatus=N'Active',@NewEnrollmentDate=@D,@ClearLeavingDate=1,
-  @NewClassSectionId=@Placement,@AcademicYearId=@Year,@Reason=N'Missing record integration test';
+  @NewClassSectionId=@Placement,@AcademicYearId=@Year,@Reason=N'Missing record integration test', @WriteAudit=0;
  THROW 57927,'Second active enrollment accepted.',1;
 END TRY BEGIN CATCH IF ERROR_NUMBER()<>57216 THROW; END CATCH;
 IF @@TRANCOUNT>0 ROLLBACK;
@@ -203,7 +214,7 @@ EXEC #Fixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
 SELECT @Year=AcademicYearId,@Placement=ClassSectionId FROM dbo.Enrollments WHERE EnrollmentId=@E;
 BEGIN TRY
  EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@AdmissionId=@S,@NewStatus=N'Left',@NewEnrollmentDate=@D,@ClearLeavingDate=1,
-  @NewClassSectionId=@Placement,@AcademicYearId=@Year,@Reason=N'Missing record integration test';
+  @NewClassSectionId=@Placement,@AcademicYearId=@Year,@Reason=N'Missing record integration test', @WriteAudit=0;
  THROW 57928,'Left record without departure date accepted.',1;
 END TRY BEGIN CATCH IF ERROR_NUMBER()<>57117 THROW; END CATCH;
 IF @@TRANCOUNT>0 ROLLBACK;
@@ -217,15 +228,26 @@ SELECT @Leave=LeavingDate,@Placement=ClassSectionId FROM dbo.Enrollments WHERE E
 UPDATE dbo.Enrollments SET Status=N'Active',LeavingDate=NULL WHERE EnrollmentId=@E;
 UPDATE dbo.Students SET Status=N'Active',WithdrawalDate=NULL WHERE AdmissionId=@S;
 DECLARE @Result TABLE(EnrollmentId int,AdmissionId int,Status nvarchar(30),Changed bit);
-INSERT @Result EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@EnrollmentId=@E,@NewStatus=N'Left',@NewLeavingDate=@Leave,@NewClassSectionId=@Placement,@Reason=N'Existing enrollment review test';
+INSERT @Result EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@EnrollmentId=@E,@NewStatus=N'Left',@NewLeavingDate=@Leave,@NewClassSectionId=@Placement,@Reason=N'Existing enrollment review test', @WriteAudit=0;
 IF NOT EXISTS(SELECT 1 FROM @Result WHERE EnrollmentId=@E AND Status=N'Left' AND Changed=1) THROW 57929,'Confirmed closure result missing.',1;
 IF NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@S AND Status=N'Left' AND WithdrawalDate=@Leave) THROW 57930,'Student closure was not coordinated.',1;
 IF NOT EXISTS(SELECT 1 FROM dbo.BillingCharges WHERE BillingChargeId=@B AND Status=N'Open' AND NetAmount=100) THROW 57931,'Existing bill changed.',1;
 IF NOT EXISTS(SELECT 1 FROM dbo.StudentFeeAssignments WHERE StudentFeeAssignmentId=@A AND Amount=100) THROW 57932,'Existing assignment changed.',1;
 IF NOT EXISTS(SELECT 1 FROM dbo.LeaveCertificates WHERE EnrollmentId=@E AND LeaveDate=@Leave) THROW 57933,'Existing certificate changed.',1;
 DELETE FROM @Result;
-INSERT @Result EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@EnrollmentId=@E,@NewStatus=N'Left',@NewLeavingDate=@Leave,@NewClassSectionId=@Placement,@Reason=N'Existing enrollment review test';
+INSERT @Result EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@EnrollmentId=@E,@NewStatus=N'Left',@NewLeavingDate=@Leave,@NewClassSectionId=@Placement,@Reason=N'Existing enrollment review test', @WriteAudit=0;
 IF NOT EXISTS(SELECT 1 FROM @Result WHERE Changed=0) THROW 57934,'No-op result missing.',1;
+IF EXISTS(SELECT 1 FROM #AuditBaseline WHERE Logs<>(SELECT COUNT_BIG(*) FROM dbo.AuditLogs) OR Operations<>(SELECT COUNT_BIG(*) FROM dbo.AuditOperations)) THROW 57790,'Console correction created audit data.',1;
 ROLLBACK;
 PRINT 'PASS existing enrollment closure, confirmed result, related-record preservation and no-op';
+GO
+
+-- Omitting the flag preserves the existing audit behavior for other callers.
+BEGIN TRANSACTION;
+DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date;
+EXEC #Fixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
+EXEC dbo.CorrectStudentStatus @U,@S,N'Left',@D,0,N'Default audit behavior test';
+IF NOT EXISTS(SELECT 1 FROM #AuditBaseline WHERE Logs<(SELECT COUNT_BIG(*) FROM dbo.AuditLogs) AND Operations<(SELECT COUNT_BIG(*) FROM dbo.AuditOperations)) THROW 57936,'Default auditing was not preserved.',1;
+ROLLBACK;
+PRINT 'PASS default auditing preserved outside the console';
 GO

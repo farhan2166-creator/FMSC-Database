@@ -1,8 +1,10 @@
--- Execute only against a disposable copy of the established database. No migration is needed.
+-- Execute only against a disposable copy of the established database. Apply Migrations/18.sql first.
 -- Synthetic fixtures are rolled back; no school records are modified.
 SET NOCOUNT ON;
 SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON; SET ANSI_PADDING ON;
 SET ANSI_WARNINGS ON; SET ARITHABORT ON; SET CONCAT_NULL_YIELDS_NULL ON; SET NUMERIC_ROUNDABORT OFF;
+GO
+CREATE TABLE #AuditBaseline(Logs bigint,Operations bigint);
 GO
 CREATE PROCEDURE #DateFixture @User int OUTPUT,@Student int OUTPUT,@Enrollment int OUTPUT,@Assignment int OUTPUT,@Bill bigint OUTPUT,@NewDate date OUTPUT
 AS
@@ -27,6 +29,8 @@ BEGIN
  SET @Bill=SCOPE_IDENTITY();
  UPDATE dbo.Enrollments SET LeavingDate=NULL,BillingReady=1 WHERE EnrollmentId=@Enrollment;
  UPDATE dbo.Students SET Status=N'Active',WithdrawalDate=NULL WHERE AdmissionId=@Student;
+ DELETE FROM #AuditBaseline;
+ INSERT #AuditBaseline SELECT (SELECT COUNT_BIG(*) FROM dbo.AuditLogs),(SELECT COUNT_BIG(*) FROM dbo.AuditOperations);
 END;
 GO
 -- Read-only preview and coordinated date/charge save.
@@ -36,16 +40,17 @@ EXEC #DateFixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
 SELECT @Start=EnrollmentDate FROM dbo.Enrollments WHERE EnrollmentId=@E;
 SET @Billing=DATEADD(month,2,DATEFROMPARTS(YEAR(@Start),MONTH(@Start),1));
 DECLARE @Plan TABLE(Snapshot nvarchar(max),CancelCount int,AddCount int,CancelledAmount decimal(18,2),AddedAmount decimal(18,2),BlockedCount int,ThroughDate date,ReturnDate datetime2);
-INSERT @Plan EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test';
+INSERT @Plan EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test', @WriteAudit=0;
 SELECT @Snapshot=Snapshot,@Cancel=CancelCount,@Add=AddCount FROM @Plan;
 IF @Cancel<>1 OR @Add<1 THROW 57800,'Preview did not identify expected cancellation/additions.',1;
 IF NOT EXISTS(SELECT 1 FROM dbo.BillingCharges WHERE BillingChargeId=@B AND Status=N'Open') THROW 57801,'Preview changed the existing bill.',1;
 IF (SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@E)<>1 THROW 57802,'Preview created bills.',1;
-EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test',0,0,@Snapshot;
+EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test',0,0,@Snapshot, @WriteAudit=0;
 IF NOT EXISTS(SELECT 1 FROM dbo.Enrollments WHERE EnrollmentId=@E AND BillingStartDate=@Billing AND Status=N'Active') THROW 57803,'Dates/status incorrect.',1;
 IF NOT EXISTS(SELECT 1 FROM dbo.BillingCharges WHERE BillingChargeId=@B AND Status=N'Cancelled') THROW 57804,'Old unpaid bill not retained as cancelled.',1;
 IF (SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@E AND Status<>N'Cancelled')<>@Add THROW 57805,'Added count differs from preview.',1;
 IF EXISTS(SELECT 1 FROM dbo.FeePayments WHERE EnrollmentId=@E) THROW 57806,'Payment unexpectedly created.',1;
+IF EXISTS(SELECT 1 FROM #AuditBaseline WHERE Logs<>(SELECT COUNT_BIG(*) FROM dbo.AuditLogs) OR Operations<>(SELECT COUNT_BIG(*) FROM dbo.AuditOperations)) THROW 57790,'Console correction created audit data.',1;
 ROLLBACK;
 PRINT 'PASS read-only preview, accurate impact counts and atomic date/charge reconciliation';
 GO
@@ -57,11 +62,11 @@ SELECT @Start=EnrollmentDate FROM dbo.Enrollments WHERE EnrollmentId=@E;
 SET @Billing=DATEADD(month,2,DATEFROMPARTS(YEAR(@Start),MONTH(@Start),1));
 UPDATE dbo.BillingCharges SET Status=N'Paid' WHERE BillingChargeId=@B;
 DECLARE @Plan TABLE(Snapshot nvarchar(max),CancelCount int,AddCount int,CancelledAmount decimal(18,2),AddedAmount decimal(18,2),BlockedCount int,ThroughDate date,ReturnDate datetime2);
-INSERT @Plan EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test';
+INSERT @Plan EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test', @WriteAudit=0;
 IF NOT EXISTS(SELECT 1 FROM @Plan WHERE BlockedCount=1) THROW 57807,'Paid bill not flagged in preview.',1;
 SELECT @Snapshot=Snapshot FROM @Plan;
 BEGIN TRY
- EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test',0,0,@Snapshot;
+ EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test',0,0,@Snapshot, @WriteAudit=0;
  THROW 57808,'Paid bill was reconciled.',1;
 END TRY BEGIN CATCH IF ERROR_NUMBER()<>57410 THROW; END CATCH;
 IF @@TRANCOUNT>0 ROLLBACK;
@@ -74,11 +79,11 @@ EXEC #DateFixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
 SELECT @Start=EnrollmentDate FROM dbo.Enrollments WHERE EnrollmentId=@E;
 SET @Billing=DATEADD(month,2,DATEFROMPARTS(YEAR(@Start),MONTH(@Start),1));
 DECLARE @Plan TABLE(Snapshot nvarchar(max),CancelCount int,AddCount int,CancelledAmount decimal(18,2),AddedAmount decimal(18,2),BlockedCount int,ThroughDate date,ReturnDate datetime2);
-INSERT @Plan EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test';
+INSERT @Plan EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test', @WriteAudit=0;
 SELECT @Snapshot=Snapshot FROM @Plan;
 UPDATE dbo.BillingCharges SET GrossAmount=101 WHERE BillingChargeId=@B;
 BEGIN TRY
- EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test',0,0,@Snapshot;
+ EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Billing,N'Date correction test',0,0,@Snapshot, @WriteAudit=0;
  THROW 57809,'Stale financial review accepted.',1;
 END TRY BEGIN CATCH IF ERROR_NUMBER()<>57408 THROW; END CATCH;
 IF @@TRANCOUNT>0 ROLLBACK;
@@ -91,7 +96,7 @@ DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date,@Start date;
 EXEC #DateFixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
 SELECT @Start=EnrollmentDate FROM dbo.Enrollments WHERE EnrollmentId=@E;
 BEGIN TRY
- EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,NULL,N'Date correction test';
+ EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,NULL,N'Date correction test', @WriteAudit=0;
  THROW 57811,'Confirmed billing start was cleared.',1;
 END TRY BEGIN CATCH IF ERROR_NUMBER()<>57404 THROW; END CATCH;
 IF @@TRANCOUNT>0 ROLLBACK;
@@ -104,7 +109,7 @@ EXEC #DateFixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
 SELECT @Start=EnrollmentDate FROM dbo.Enrollments WHERE EnrollmentId=@E;
 UPDATE dbo.Enrollments SET Status=N'Left',LeavingDate=@D WHERE EnrollmentId=@E;
 BEGIN TRY
- EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Start,N'Date correction test';
+ EXEC dbo.ReconcileEnrollmentDates @U,@E,@Start,@Start,N'Date correction test', @WriteAudit=0;
  THROW 57812,'Closed enrollment reconciled.',1;
 END TRY BEGIN CATCH IF ERROR_NUMBER()<>57403 THROW; END CATCH;
 IF @@TRANCOUNT>0 ROLLBACK;
