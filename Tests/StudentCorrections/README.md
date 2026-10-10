@@ -1,10 +1,10 @@
 # Coordinated leaving-date checks
 
-Run `LeavingDateChecks.sql` through `sqlcmd -b` against a **disposable database copy** with the existing lifecycle repair procedures. No migration or trigger change is required. Tests need catalogue rows and an administrator account. All synthetic student/enrolment/fee/certificate fixtures are created inside transactions and rolled back. Do not run against the live school database.
+Run `LeavingDateChecks.sql` through `sqlcmd -b` against a **disposable database copy** after applying migration 18. No trigger change is required. Tests need catalogue rows and an administrator account. All synthetic student/enrolment/fee/certificate fixtures are created inside transactions and rolled back. Do not run against the live school database.
 
 Coverage: related departure dates update together; paid bills and certificate creation timestamps remain unchanged; earlier departures preserve a later withdrawal; stale certificate data rejects the complete correction; financial-history acknowledgement remains mandatory; established closed-bill cancellation and amount protections remain intact; chronology and authentication are enforced.
 
-The console calls the existing `RepairLifecycleDates` contract. Original database definitions in `Database/Reference` and all migrations remain unchanged. The new review automatically proposes linked certificate dates and, for the latest departure of a Left student, the withdrawal date. It passes every enrolment and the original snapshot to the database for its established validation and atomic save. Existing financial history is preserved only after explicit acknowledgement. Legacy exceptions use the existing explicit acknowledgement, not a new bypass.
+The console calls the existing `RepairLifecycleDates` contract. Original database definitions in `Database/Reference` remain unchanged; migration 18 separately repairs the missing-enrollment audit payload. The new review automatically proposes linked certificate dates and, for the latest departure of a Left student, the withdrawal date. It passes every enrolment and the original snapshot to the database for its established validation and atomic save. Existing financial history is preserved only after explicit acknowledgement. Legacy exceptions use the existing explicit acknowledgement, not a new bypass.
 
 ## Windows review
 
@@ -24,9 +24,9 @@ The leaving-date check script also tests confirmed status outcomes, closing an a
 
 ## Missing enrollment review
 
-The leaving-date check script reproduces an existing creation blocker: `CorrectEnrollmentStatus` passes the plain-English reason as `WriteAuditLog.@NewValues`, but the audit procedure requires valid JSON (error 59941). The operation rolls back completely. No database procedure is changed. The script also verifies rejection of a second active enrollment and the leaving-date requirement for Left. Successful creation and its returned ID remain unverified until that database contract is repaired separately.
+Migration 18 repairs the creation audit payload in `CorrectEnrollmentStatus`: the existing reason and confirmed record details are passed as valid JSON to the existing audit procedure. Audit logging remains enabled. The leaving-date script verifies successful creation, the returned ID, student/status coordination, plain-text history reasons and the valid audit entry, without generating fees or bills. It also verifies rejection of a second active enrollment and the leaving-date requirement for Left.
 
-On Windows, Add Missing Record should show Active explicitly and disable the billing-start/legacy-date controls that this procedure does not accept. Review the existing creation confirmation: year, placement, status, dates, reason, existing count and overlapping record warnings must match submitted values. Overlap warnings are advisory; the database retains final authority. Cancel makes no changes. Once the database creation blocker is resolved, creating a record should select the returned record, explain that fees/bills were not generated and recheck remaining issues. No new success/error message boxes are added.
+On Windows, Add Missing Record should show Active explicitly and disable the billing-start/legacy-date controls that this procedure does not accept. Review the existing creation confirmation: year, placement, status, dates, reason, existing count and overlapping record warnings must match submitted values. Overlap warnings are advisory; the database retains final authority. Cancel makes no changes. Creating a record should select the returned record, explain that fees/bills were not generated and recheck remaining issues. No new success/error message boxes are added.
 
 ## Existing enrollment correction review
 

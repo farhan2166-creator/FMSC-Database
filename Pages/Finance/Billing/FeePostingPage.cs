@@ -317,6 +317,7 @@ public sealed class FeePostingPage : V2Page
             // @ExcludeAlreadyPosted = 1: fees already posted for this month are not eligible and are not listed.
             DataSet result = await DatabaseHelper.QueryUserSetAsync(
                 "PreviewMonthlyFees",
+                DatabaseHelper.Int("@AcademicYearId", academicYear.SelectedId),
                 DatabaseHelper.Date("@BillingMonth", previewMonth),
                 DatabaseHelper.Int("@CampusId", campus.SelectedId),
                 DatabaseHelper.Int("@ClassId", klass.SelectedId),
@@ -374,6 +375,7 @@ public sealed class FeePostingPage : V2Page
             return;
         HideColumn("StudentFeeAssignmentId");
         HideColumn("EnrollmentId");
+        HideColumn("AcademicYearId");
         HideColumn("FeeTypeId");
         HideColumn("ChargeDate");
         HideColumn("DueDate");
@@ -501,6 +503,7 @@ public sealed class FeePostingPage : V2Page
                 .Distinct()
                 .Count();
             string month = loadedMonth.ToString("MMMM yyyy");
+            int postingYearId = academicYear.SelectedId;
             int reversedCount=chosen.Count(row=>Convert.ToString(row["EligibilityNote"])!.StartsWith("Previously reversed",StringComparison.Ordinal));
             if (!Confirm(
                     $"Post {chosen.Count:N0} fee(s) for {students:N0} student(s) for {month}?" +
@@ -529,6 +532,7 @@ public sealed class FeePostingPage : V2Page
             };
             DataTable result = await DatabaseHelper.QueryUserAsync(
                 "PostSelectedMonthlyFees",
+                DatabaseHelper.Int("@AcademicYearId", postingYearId),
                 DatabaseHelper.Date("@BillingMonth", loadedMonth),
                 selectionParameter,
                 DatabaseHelper.P("@Reason", $"Posted from Post Monthly Fees for {month}."));

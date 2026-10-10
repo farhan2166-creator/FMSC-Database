@@ -1,4 +1,4 @@
--- Execute only against a disposable copy of the established database. No migration is needed.
+-- Execute only against a disposable copy of the established database. Apply migration 18 first.
 -- Synthetic fixtures are rolled back; no school records are modified.
 SET NOCOUNT ON;
 SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON; SET ANSI_PADDING ON;
@@ -167,20 +167,24 @@ END TRY BEGIN CATCH IF ERROR_NUMBER()<>57008 THROW; END CATCH;
 IF @@TRANCOUNT>0 ROLLBACK;
 PRINT 'PASS established reactivation restriction retained';
 GO
--- Existing creation fails audit validation for a plain-English reason; changes roll back.
--- Preserve this regression evidence without changing established database procedures.
+-- Missing-record creation now uses valid audit JSON without changing auditing policy.
 BEGIN TRANSACTION;
-DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date,@Year int,@Placement int,@NewStart date;
+DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date,@Year int,@Placement int,@NewStart date,@CreatedId int;
 EXEC #Fixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
 SELECT @Year=AcademicYearId,@Placement=ClassSectionId,@NewStart=DATEADD(day,1,LeavingDate) FROM dbo.Enrollments WHERE EnrollmentId=@E;
-BEGIN TRY
- EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@AdmissionId=@S,@NewStatus=N'Active',@NewEnrollmentDate=@NewStart,@ClearLeavingDate=1,
-  @NewClassSectionId=@Placement,@AcademicYearId=@Year,@Reason=N'Missing record integration test';
- THROW 57922,'Expected existing audit validation failure was not raised; revisit this regression check.',1;
-END TRY BEGIN CATCH IF ERROR_NUMBER()<>59941 THROW; END CATCH;
-IF @@TRANCOUNT<>0 THROW 57923,'Failed creation did not roll back its transaction.',1;
-IF EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@S) THROW 57924,'Failed creation left transaction data behind.',1;
-PRINT 'PASS existing missing-record audit blocker reproduced with complete rollback';
+DECLARE @Created TABLE(EnrollmentId int,AdmissionId int,Status nvarchar(30),Changed bit);
+INSERT @Created EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@AdmissionId=@S,@NewStatus=N'Active',@NewEnrollmentDate=@NewStart,@ClearLeavingDate=1,
+ @NewClassSectionId=@Placement,@AcademicYearId=@Year,@Reason=N'Missing record integration test';
+SELECT @CreatedId=EnrollmentId FROM @Created WHERE Changed=1 AND Status=N'Active';
+IF @CreatedId IS NULL THROW 57922,'Confirmed creation result missing.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@S AND Status=N'Active' AND WithdrawalDate IS NULL) THROW 57923,'Student status not synchronized.',1;
+IF EXISTS(SELECT 1 FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@CreatedId) OR EXISTS(SELECT 1 FROM dbo.BillingCharges WHERE EnrollmentId=@CreatedId) THROW 57924,'Unexpected fees or bills created.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.Enrollments WHERE EnrollmentId=@CreatedId AND BillingStartDate IS NULL AND Remarks=N'Missing record integration test') THROW 57925,'Original reason or billing start changed.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.EnrollmentHistory WHERE EnrollmentId=@CreatedId AND ActionType=N'CORRECTION_CREATE' AND Remarks=N'Missing record integration test') THROW 57926,'Creation history missing.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.StudentStatusHistory WHERE AdmissionId=@S AND NewStatus=N'Active') THROW 57935,'Student status history missing.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.AuditLogs WHERE TableName=N'Enrollments' AND RecordId=CONVERT(nvarchar(200),@CreatedId) AND ISJSON(NewValues)=1 AND JSON_VALUE(NewValues,'$.Reason')=N'Missing record integration test') THROW 57936,'Valid creation audit entry missing.',1;
+ROLLBACK;
+PRINT 'PASS missing-record creation, confirmed ID, unchanged reason/history, retained audit and no automatic bills';
 GO
 -- A second active enrollment remains forbidden.
 BEGIN TRANSACTION;

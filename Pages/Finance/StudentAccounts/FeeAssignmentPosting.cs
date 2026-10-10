@@ -24,11 +24,16 @@ internal static class FeeAssignmentPosting
             WHERE EnrollmentId=@EnrollmentId AND BillingMonth=@Month AND ChargeKind=N'Monthly' AND Status<>N'Cancelled';
             SELECT DISTINCT FeeTypeId FROM dbo.BillingCharges WITH(UPDLOCK,HOLDLOCK)
             WHERE EnrollmentId=@EnrollmentId AND BillingMonth=@Month AND ChargeKind=N'Monthly' AND Status=N'Cancelled';
+            SELECT AcademicYearId FROM dbo.Enrollments WITH(UPDLOCK,HOLDLOCK) WHERE EnrollmentId=@EnrollmentId;
             """, connection, transaction);
         validate.Parameters.AddRange(new[] { DatabaseHelper.Int("@UserId", CurrentUser.UserId),
             DatabaseHelper.Int("@EnrollmentId", enrollmentId), DatabaseHelper.Date("@Month", months[0]) });
         var current = new DataSet();
         using (var adapter = new SqlDataAdapter(validate)) adapter.Fill(current);
+        if (current.Tables[3].Rows.Count != 1) throw new InvalidOperationException("The enrollment no longer exists.");
+        int academicYearId = Convert.ToInt32(current.Tables[3].Rows[0]["AcademicYearId"]);
+        if (selected.AsEnumerable().Any(row => Convert.ToInt32(row["AcademicYearId"]) != academicYearId))
+            throw new InvalidOperationException("The enrollment's academic year changed. Refresh the review; nothing was posted.");
         foreach (DataRow expected in selected.Rows) {
             bool reversed = current.Tables[2].AsEnumerable().Any(row => Convert.ToInt32(row["FeeTypeId"]) == Convert.ToInt32(expected["FeeTypeId"]));
             bool reviewedReversal = selected.Columns.Contains("ReviewNote") && Convert.ToString(expected["ReviewNote"])!.StartsWith("Previously reversed");
@@ -43,7 +48,7 @@ internal static class FeeAssignmentPosting
                 throw new InvalidOperationException("Fees changed since this review. Refresh and review the amounts again; nothing was posted.");
         }
         using var post = new SqlCommand("PostSelectedMonthlyFees", connection, transaction) { CommandType = CommandType.StoredProcedure };
-        post.Parameters.AddRange(new[] { DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Date("@BillingMonth", months[0]),
+        post.Parameters.AddRange(new[] { DatabaseHelper.Int("@AcademicYearId", academicYearId), DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Date("@BillingMonth", months[0]),
             new SqlParameter("@Selection", SqlDbType.Structured) { TypeName="dbo.PostingSelectionType", Value=Tvp.PostingSelectionsFromPreview(selected,_=>true) },
             DatabaseHelper.P("@Reason", "Explicitly reviewed monthly fee posting from student fee changes.") });
         int created;
@@ -75,16 +80,25 @@ internal static class FeeAssignmentPosting
     }
     internal static Task<DataTable> PendingThroughAsync(int enrollmentId, DateTime throughMonth) =>
         Task.Run(() => PendingThrough(enrollmentId, throughMonth));
-    private static SqlParameter[] Parameters(DateTime month) => new[] {
+    private static SqlParameter[] Parameters(int enrollmentId, DateTime month) => new[] {
+        DatabaseHelper.Int("@AcademicYearId", EnrollmentYear(enrollmentId)),
         DatabaseHelper.Date("@BillingMonth", month),
         DatabaseHelper.Int("@CampusId", 0), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0),
         new SqlParameter("@FeeTypeIds", SqlDbType.Structured) { TypeName = "dbo.FeeTypeIdList", Value = Tvp.FeeTypeIds(Array.Empty<int>()) },
         DatabaseHelper.Bit("@ExcludeAlreadyPosted", true)
     };
     internal static DataTable Preview(int enrollmentId, DateTime month) => Select(
-        DatabaseHelper.QueryUserSet("PreviewMonthlyFees", Parameters(month)), enrollmentId);
-    internal static async Task<DataTable> PreviewAsync(int enrollmentId, DateTime month) => Select(
-        await DatabaseHelper.QueryUserSetAsync("PreviewMonthlyFees", Parameters(month)), enrollmentId);
+        DatabaseHelper.QueryUserSet("PreviewMonthlyFees", Parameters(enrollmentId, month)), enrollmentId);
+    internal static Task<DataTable> PreviewAsync(int enrollmentId, DateTime month) => Task.Run(() => Preview(enrollmentId, month));
+    private static int EnrollmentYear(int enrollmentId)
+    {
+        var enrollment = DatabaseHelper.QuerySql("""
+            EXEC dbo.RequirePermission @UserId, N'Fees.Collect';
+            SELECT AcademicYearId FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId;
+            """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@EnrollmentId", enrollmentId));
+        if (enrollment.Rows.Count == 0) throw new InvalidOperationException("The enrollment no longer exists.");
+        return Convert.ToInt32(enrollment.Rows[0]["AcademicYearId"]);
+    }
     private static DataTable Select(DataSet result, int enrollmentId)
     {
         var rows = result.Tables[0];

@@ -9,7 +9,7 @@ public sealed class BillingStatusReportPage : V2Page
     public BillingStatusReportPage()
         : base(
             "Billing Status",
-            "Check which active students have been billed this month.")
+            "See how many active students have at least one monthly fee posted.")
     {
         asOfDate.Value = DateTime.Today;
         var viewStatus = AddBusyAction("View Status", ViewStatusAsync, "Primary");
@@ -90,8 +90,8 @@ public sealed class BillingStatusReportPage : V2Page
         HideColumn("CampusId");
         SetHeader("BillingMonth", "Billing Month", 140);
         SetHeader("TotalActiveEnrollments", "Total Active Enrolments", 190);
-        SetHeader("BilledThisMonth", "Billed This Month", 160);
-        SetHeader("RemainingToBill", "Remaining To Bill", 160);
+        SetHeader("BilledThisMonth", "Students With Fees Posted", 200);
+        SetHeader("RemainingToBill", "Students Without Fees Posted", 220);
         Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
     }
     private void HideColumn(string columnName)

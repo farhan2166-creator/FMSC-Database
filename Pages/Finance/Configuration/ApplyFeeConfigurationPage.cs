@@ -21,6 +21,7 @@ public sealed class ApplyFeeConfigurationPage : V2Page
     private DataTable? previewRows;
     private SavedFeeScope[] previewScopes = Array.Empty<SavedFeeScope>();
     private bool applying;
+    private readonly Label applyOutcome = new() { AutoSize = true, Dock = DockStyle.Fill, Visible = false, ForeColor = AppTheme.Text, Padding = new Padding(4), Margin = new Padding(0, 4, 0, 4) };
     private DataTable academicYears = new();
     private DateTime earliestMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private int monthRequest;
@@ -97,17 +98,20 @@ public sealed class ApplyFeeConfigurationPage : V2Page
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4,
+            RowCount = 5,
             Padding = new Padding(0)
         };
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
         root.Controls.Add(filters, 0, 0);
         root.Controls.Add(applyRow, 0, 1);
-        root.Controls.Add(buttonRow, 0, 2);
-        root.Controls.Add(Grid, 0, 3);
+        root.Controls.Add(applyOutcome, 0, 2);
+        root.Controls.Add(buttonRow, 0, 3);
+        root.Controls.Add(Grid, 0, 4);
+        root.SizeChanged += (_, _) => applyOutcome.MaximumSize = new Size(Math.Max(AppScale.Scale(300), root.ClientSize.Width - AppScale.Scale(16)), 0);
         SetContent(root, UiText.Fees.StudentRateScope);
         FeeTypeCatalog.Changed += OnFeeTypesChanged;
         Disposed += (_, _) => FeeTypeCatalog.Changed -= OnFeeTypesChanged;
@@ -463,6 +467,8 @@ public sealed class ApplyFeeConfigurationPage : V2Page
         if (applying || !ValidateRequiredInputs())
             return;
         applyButton.Enabled = false;
+        FeeRateApplyProgress? progress = null;
+        string outcomeContext = string.Empty;
         try
         {
             try
@@ -527,8 +533,11 @@ public sealed class ApplyFeeConfigurationPage : V2Page
                 previewButton.Enabled = false;
                 classBox.Enabled = feeType.Enabled = effectiveFrom.Enabled = reason.Enabled = false;
                 previewIsCurrent = false;
+                progress = new FeeRateApplyProgress(scopesToApply.Length);
+                outcomeContext = $"{appliedCampusName}, effective {appliedEffectiveFrom:MMMM yyyy}. ";
                 foreach (var scope in scopesToApply)
                 {
+                    progress.Begin($"{scope.ClassName} / {scope.FeeTypeName}");
                     DataSet result = await DatabaseHelper.QueryUserSetAsync(
                         "ApplyFeeConfigurationToExistingAssignments",
                         DatabaseHelper.Int("@CampusId", campusId),
@@ -537,6 +546,8 @@ public sealed class ApplyFeeConfigurationPage : V2Page
                         DatabaseHelper.Date("@EffectiveFrom", appliedEffectiveFrom),
                         DatabaseHelper.P("@Reason", appliedReason));
                     var outcome = FeeRateApplyResult.Read(result);
+                    progress.Confirm(outcome);
+                    applyOutcome.Text = outcomeContext + progress.Summary(); applyOutcome.Visible = true;
                     total += outcome.Total;
                     succeeded += outcome.Succeeded;
                     failed += outcome.Failed;
@@ -574,7 +585,15 @@ public sealed class ApplyFeeConfigurationPage : V2Page
                 // Re-preview so the grid reflects what just happened (students that succeeded should no longer appear as affected).
                 await PreviewAsync();
             }
-            catch (Exception ex) { Fail(ex); }
+            catch (Exception ex)
+            {
+                if (progress is null) { Fail(ex); return; }
+                AppExceptionHandler.LogNonFatal(ex, "Applying saved fee rates: interrupted batch");
+                previewIsCurrent = false;
+                string message = outcomeContext + progress.Interrupted();
+                applyOutcome.Text = message; applyOutcome.Visible = true;
+                Warn(message + "\n" + DbMessage.UserMessage(ex));
+            }
         }
         finally
         {

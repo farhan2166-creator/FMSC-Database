@@ -2,7 +2,7 @@ using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Reports;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Billing;
-/// <summary>Reverses a monthly fee posting - but only the part that has NOT been collected. That is the intended repair loop: post -> mistake -> reverse -> repost.</summary>
+/// <summary>Reverses charges assigned to a billing month - but only the part that has NOT been collected. That is the intended repair loop: post -> mistake -> reverse -> repost.</summary>
 public sealed class FeePostingReversalPage : V2Page
 {
     /// <summary>The months that have a live posting to reverse (dbo.GetReversibleMonths), newest first. A month with nothing posted, or already fully reversed, is not offered. Keyed as yyyymm - see BillingMonthKey.</summary>
@@ -22,7 +22,7 @@ public sealed class FeePostingReversalPage : V2Page
     private int monthsLoadVersion;
     private ModernButton reverseButton = null!;
     public FeePostingReversalPage()
-        : base("Reverse a Posting", "Review and cancel uncollected fee charges for a month.")
+        : base("Reverse a Posting", "Review uncollected monthly, annual and additional charges assigned to a billing month.")
     {
         // Required by dbo.ReverseMonthlyFees, so it is a labelled input rather than an optional remark.
         reason.Width = AppScale.Scale(320);
@@ -280,6 +280,7 @@ public sealed class FeePostingReversalPage : V2Page
         SetHeader("ClassName", "Class", 95);
         SetHeader("SectionName", "Section", 85);
         SetHeader("FeeTypeName", "Fee Type", 140);
+        SetHeader("ChargeKind", "Charge Kind", 100);
         SetHeader("BillingMonth", "Billing Month", 120);
         SetHeader("NetAmount", "Posted", 100);
         SetHeader("CollectedAmount", "Collected", 100);
@@ -340,8 +341,7 @@ public sealed class FeePostingReversalPage : V2Page
                 $"Amount to be reversed: Rs. {reversibleAmount:N0}\n\n" +
                 "These charges will be marked Cancelled. No payment records are " +
                 "touched, because none of these charges has any payment against it. " +
-                "The students become eligible for this month again, so you can post " +
-                "the fees afresh.";
+                "Monthly fees can be posted again. Annual and additional fees must be restored through their own workflows.";
             if (blocked > 0)
             {
                 confirmation +=
