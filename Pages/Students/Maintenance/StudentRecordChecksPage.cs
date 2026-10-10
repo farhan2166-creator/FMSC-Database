@@ -421,8 +421,13 @@ public sealed class StudentRecordChecksPage : V2Page
         var record=enrollmentsRaw.AsEnumerable().FirstOrDefault(r=>enrollmentsRaw.Columns.Contains("EnrollmentId") && Convert.ToInt32(r["EnrollmentId"])==selectedEnrollmentId);
         bool editable=creatingEnrollment || (selected && Convert.ToString(record?["Status"])=="Active");
         saveEnrollmentAction.Visible=!creatingEnrollment;saveEnrollmentAction.Enabled=selected && editable && CanCorrect;
-        repairDatesAction.Visible=selected && Convert.ToString(record?["Status"])=="Left";
-        repairDatesAction.Text="Correct Leaving Date";repairDatesAction.Enabled=selected && CanCorrect;
+        bool active=selected && Convert.ToString(record?["Status"])=="Active";
+        repairDatesAction.Visible=selected && (active || Convert.ToString(record?["Status"])=="Left");
+        repairDatesAction.Text=active?"Correct Enrollment Dates":"Correct Leaving Date";
+        repairDatesAction.Enabled=selected && CanCorrect && (!active || CurrentUser.HasPermission("Fees.Adjust"));
+        SetToolTip(repairDatesAction,active
+            ? "Review enrollment dates and affected charges together. Requires student administration and fee-adjustment permissions."
+            : "Review this departure, its linked certificates and applicable withdrawal date together.");
         foreach(Control control in new Control[]{enrollmentDate,leavingDate,billingStartDate,allowLegacyDates,classSection,enrollmentStatusCombo,enrollmentReason})control.Enabled=editable && CanCorrect;
         if(selected && !editable)enrollmentSelection.Text=$"Enrollment {selectedEnrollmentId} — {record?["Status"]}\n" +
             (Convert.ToString(record?["Status"])=="Left"?"Use Correct Leaving Date to review its departure.":"This historical record is view only.");
@@ -446,7 +451,7 @@ public sealed class StudentRecordChecksPage : V2Page
         if(selectedEnrollmentId<=0) {Warn("Select the enrollment whose dates need correction");return;}
         var record=enrollmentsRaw.AsEnumerable().FirstOrDefault(r=>Convert.ToInt32(r["EnrollmentId"])==selectedEnrollmentId);
         if(Convert.ToString(record?["Status"])=="Left") {await RepairDates(selectedEnrollmentId);return;}
-        await RepairDates(selectedEnrollmentId,enrollmentDate.Value.Date,leavingDate.Checked?leavingDate.Value.Date:null,!leavingDate.Checked,enrollmentReason.Text.Trim(),focused:true);
+        await ReconcileDatesFromEditor();
     }
     private void ShowCorrectionTab(CorrectionTab tab)
     {
@@ -1315,35 +1320,19 @@ public sealed class StudentRecordChecksPage : V2Page
     }
     private async Task ReconcileDatesFromEditor()
     {
-        int enrollmentId=selectedEnrollmentId,admissionId=student.SelectedId;
-        DateTime start=enrollmentDate.Value.Date;
-        object billing=billingStartDate.Checked?(object)billingStartDate.Value.Date:DBNull.Value;
-        string reason=enrollmentReason.Text.Trim();bool legacy=allowLegacyDates.Checked;
-        var preview=await DatabaseHelper.QueryUserAsync("ReconcileEnrollmentDates",
-            DatabaseHelper.Int("@EnrollmentId",enrollmentId),DatabaseHelper.P("@EnrollmentDate",start),
-            DatabaseHelper.P("@BillingStartDate",billing),DatabaseHelper.P("@Reason",reason),
-            DatabaseHelper.Bit("@AllowLegacyExceptions",legacy),DatabaseHelper.Bit("@Preview",true));
-        if(IsDisposed || selectedEnrollmentId!=enrollmentId || student.SelectedId!=admissionId)return;
-        var plan=preview.Rows[0];
-        if(Convert.ToInt32(plan["BlockedCount"])>0) {
-            Warn("Affected charges have payment history. Use Student Fees to reverse or refund those payments before reconciling. No records were changed.");return;
+        if(!CanCorrect || !CurrentUser.HasPermission("Fees.Adjust")) {
+            Warn("Correcting enrollment dates and billing requires student administration and fee-adjustment permissions.");return;
         }
-        string impact=$"Enrollment start: {start:dd MMM yyyy}\nBilling start: {(billing is DateTime date?date.ToString("dd MMM yyyy"):"not set")}\n\n"+
-            $"Cancel {plan["CancelCount"]} unpaid charge(s): Rs. {Convert.ToDecimal(plan["CancelledAmount"]):N0}\n"+
-            $"Add {plan["AddCount"]} charge(s): Rs. {Convert.ToDecimal(plan["AddedAmount"]):N0}\n"+
-            $"Reconcile through {Convert.ToDateTime(plan["ThroughDate"]):MMM yyyy}.\n"+
-            (plan["ReturnDate"] is DateTime returned?$"Confirmed return: {returned:dd MMM yyyy}\n":"")+
-            "\nCancelled bills remain in history. Payments stay unchanged.\nSave this reconciliation?";
-        if(!Confirm(impact,"Confirm Enrollment Reconciliation"))return;
-        await DatabaseHelper.QueryUserAsync("ReconcileEnrollmentDates",
-            DatabaseHelper.Int("@EnrollmentId",enrollmentId),DatabaseHelper.P("@EnrollmentDate",start),
-            DatabaseHelper.P("@BillingStartDate",billing),DatabaseHelper.P("@Reason",reason),
-            DatabaseHelper.Bit("@AllowLegacyExceptions",legacy),DatabaseHelper.Bit("@Preview",false),
-            DatabaseHelper.P("@ExpectedSnapshot",Convert.ToString(plan["Snapshot"])));
+        int enrollmentId=selectedEnrollmentId,admissionId=student.SelectedId;
+        var current=enrollmentsRaw.AsEnumerable().FirstOrDefault(row=>Convert.ToInt32(row["EnrollmentId"])==enrollmentId);
+        if(current is null || Convert.ToString(current["Status"])!="Active") {Warn("Select an active enrollment to correct its start and billing dates.");return;}
+        using var correction=new EnrollmentDateCorrectionDialog(student.Text,enrollmentId,current,enrollmentDate.Value.Date,
+            billingStartDate.Checked?billingStartDate.Value.Date:null,enrollmentReason.Text.Trim(),allowLegacyDates.Checked);
+        if(correction.ShowDialog(FindForm())!=DialogResult.OK)return;
         StudentSearchCache.Invalidate();
         if(IsDisposed || student.SelectedId!=admissionId)return;
         await LoadStudentSnapshot();await LoadEnrollments(gridModeVersion);
-        Info("Enrollment dates and unpaid billing reconciled.");
+        SelectEnrollmentRow(enrollmentId);Info(correction.ResultMessage);
     }
     private async Task SaveEnrollment()
     {
@@ -1371,7 +1360,7 @@ public sealed class StudentRecordChecksPage : V2Page
             }
             if(Convert.ToDateTime(original["EnrollmentDate"]).Date!=enrollmentDate.Value.Date ||
                 !Equals(original["BillingStartDate"],billingStartDate.Checked?(object)billingStartDate.Value.Date:DBNull.Value)) {
-                Warn("Save date reconciliation before changing status or placement.");return;
+                Warn("Use Correct Enrollment Dates to save the date changes first, then save the status or placement correction.");return;
             }
             if (!Confirm("Save these changes to the selected academic enrolment?", "Confirm Enrolment Correction"))
             {
