@@ -68,7 +68,12 @@ public sealed class ReportsHomePage : V2Page
                         "Student Reports",
                         "Student lists, admissions, strength and movement in one report - group, sort, compare years and choose your own columns.",
                         "Students",
-                        () => new StudentReportsPage())
+                        () => new StudentReportsPage()),
+                    new(
+                        "Class Marks & Attendance Sheets",
+                        "A4 class and section lists with blank marks or attendance fields. Two copies per page.",
+                        "Students",
+                        () => new ClassSheetsPage())
                 });
             hasReports = true;
         }
