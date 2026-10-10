@@ -7,17 +7,27 @@ public sealed class ClassSheetsPage : V2Page
     private readonly LookupBox campus = new(), year = new(), klass = new(), section = new();
     private readonly ModernComboBox sheet = HumanUi.Combo();
     private readonly ModernTextBox exam = HumanUi.TextBox(false, 100), subject = HumanUi.TextBox(false, 100),
-        examDate = HumanUi.TextBox(false, 50), teacher = HumanUi.TextBox(false, 100);
-    private DataTable? placements;
-    private bool rebinding;
+        examDate = HumanUi.TextBox(false, 50), teacher = HumanUi.TextBox(false, 100),
+        search = HumanUi.TextBox(false, 100);
+    private readonly ModernButton previewButton;
+    private readonly ModernButton selectAllButton, clearSelectionButton;
+    private DataTable? placements, roster;
+    private bool rebinding, loading;
+    private int rosterRevision;
+    private Scope? loadedScope;
+    private sealed record Scope(int Campus, int Year, int Class, int Section);
+    private Scope CurrentScope() => new(campus.SelectedId, year.SelectedId, klass.SelectedId, section.SelectedId);
 
     public ClassSheetsPage() : base("Class Marks & Attendance Sheets",
-        "Print class lists for teachers to fill in by hand. Two matching copies on each A4 page.")
+        "Choose students and print two matching copies on each A4 page.")
     {
         sheet.Items.AddRange(new object[] { "Marks Sheet", "Exam Attendance Sheet" });
         sheet.SelectedIndex = 0;
-        var preview = AddBusyAction("Print Preview", PreviewAsync, "Primary");
-        RelocateFromActions(preview);
+        var load = AddBusyAction("Load Students", LoadStudentsAsync, "Primary");
+        previewButton = AddBusyAction("Print Preview", PreviewAsync, "Secondary");
+        selectAllButton = AddAction("Select All", (_, _) => SelectStudents(true), "Secondary");
+        clearSelectionButton = AddAction("Clear Selection", (_, _) => SelectStudents(false), "Secondary");
+        RelocateFromActions(load, selectAllButton, clearSelectionButton, previewButton);
         var fields = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 4, RowCount = 3,
             Height = AppMetrics.FieldRowHeight * 3 };
         for (int i = 0; i < 4; i++) fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
@@ -25,20 +35,51 @@ public sealed class ClassSheetsPage : V2Page
         (string Caption, Control Input)[] inputs = {
             ("Campus", campus), ("Academic Year", year), ("Class", klass), ("Section", section),
             ("Sheet", sheet), ("Exam (optional)", exam), ("Subject / Paper (optional)", subject),
-            ("Date (optional)", examDate), ("Teacher (optional)", teacher)
+            ("Date (optional)", examDate), ("Teacher (optional)", teacher), ("Find Student", search)
         };
         for (int i = 0; i < inputs.Length; i++)
             fields.Controls.Add(HumanUi.Field(inputs[i].Caption, inputs[i].Input, i < 4), i % 4, i / 4);
         examDate.PlaceholderText = "Leave blank to write by hand";
-        SetContent(ReportUi.Layout(fields, Grid, "Class List", preview),
-            "Choose a campus, year, class and section. Only active students are listed. Exam details and teacher name may be left blank.");
-        UiHelper.SetGridPlaceholderMessage(Grid, "Choose a class and section, then press Print Preview.");
+        search.PlaceholderText = "Name / admission number";
+        Grid.AutoGenerateColumns = false; Grid.ReadOnly = false;
+        Grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Include", DataPropertyName = "Include",
+            HeaderText = "Print", Width = AppScale.Scale(65) });
+        Grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "AdmissionNumber", DataPropertyName = "AdmissionNumber",
+            HeaderText = "Admission Number", ReadOnly = true, Width = AppScale.Scale(140) });
+        Grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "StudentName", DataPropertyName = "StudentName",
+            HeaderText = "Student Name", ReadOnly = true, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
+        Grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "FatherName", DataPropertyName = "FatherName",
+            HeaderText = "Father Name", ReadOnly = true, Width = AppScale.Scale(220) });
+        Grid.CurrentCellDirtyStateChanged += (_, _) => {
+            if (Grid.IsCurrentCellDirty) Grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+        };
+        Grid.CellValueChanged += (_, _) => UpdateSelection();
+        search.TextChanged += (_, _) => FilterStudents();
+        var details = HumanUi.Card("Class and Exam Details",
+            "Choose a class and section. Exam details may be left blank for handwriting.");
+        details.Content.Controls.Add(fields);
+        var studentsCard = HumanUi.Card("Students to Print",
+            "Uncheck students to exclude. Search narrows the list; checked hidden students remain included.");
+        studentsCard.Content.Controls.Add(Grid);
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(3)));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.Controls.Add(details, 0, 0);
+        root.Controls.Add(HumanUi.ButtonRow(load, selectAllButton, clearSelectionButton, previewButton), 0, 1);
+        root.Controls.Add(studentsCard, 0, 2);
+        SetContent(root, "Load students, choose who to print, then open Print Preview. Exam details and selections are not saved to the database.");
+        UiHelper.SetGridPlaceholderMessage(Grid, "Choose a class and section, then press Load Students.");
+        foreach (var filter in new[] { campus, year, klass, section })
+            filter.SelectedIndexChanged += (_, _) => InvalidateRoster();
         campus.UserSelectionChanged += (_, _) => BindClasses();
         klass.UserSelectionChanged += (_, _) => BindSections();
-        Defer(LoadAsync);
+        UpdateSelection();
+        Defer(LoadLookupsAsync);
     }
 
-    private async Task LoadAsync()
+    private async Task LoadLookupsAsync()
     {
         try
         {
@@ -85,37 +126,98 @@ public sealed class ClassSheetsPage : V2Page
         section.Bind(selected.DefaultView.ToTable(true, "SectionId", "SectionName"), "SectionId", "SectionName");
     }
 
-    private async Task PreviewAsync()
+    private void InvalidateRoster()
     {
-        if (!CurrentUser.HasPermission("Reports.View")) return;
-        if (campus.SelectedId <= 0 || year.SelectedId <= 0 || klass.SelectedId <= 0 || section.SelectedId <= 0)
+        bool hadRoster = roster is not null;
+        rosterRevision++; loadedScope = null; roster = null; Grid.DataSource = null;
+        if (hadRoster) Info("Load students again for the selected class and section.");
+        UpdateSelection();
+    }
+
+    private void CommitSelection()
+    {
+        Grid.EndEdit();
+        if (Grid.DataSource is not null && BindingContext is not null)
+            (BindingContext[Grid.DataSource] as CurrencyManager)?.EndCurrentEdit();
+    }
+
+    private void FilterStudents()
+    {
+        CommitSelection();
+        if (roster is null) return;
+        string text = search.Text.Trim().Replace("'", "''").Replace("[", "[[]").Replace("%", "[%]").Replace("*", "[*]");
+        roster.DefaultView.RowFilter = text.Length == 0 ? ""
+            : $"StudentName LIKE '%{text}%' OR AdmissionNumber LIKE '%{text}%'";
+        UpdateSelection();
+    }
+
+    private void SelectStudents(bool include)
+    {
+        CommitSelection();
+        if (roster is null || loading) return;
+        foreach (DataRow row in roster.Rows) row["Include"] = include;
+        UpdateSelection();
+    }
+
+    private void UpdateSelection(bool showStatus = true)
+    {
+        int count = roster?.AsEnumerable().Count(row => row.Field<bool>("Include")) ?? 0;
+        bool current = roster is not null && loadedScope == CurrentScope();
+        previewButton.Enabled = current && count > 0 && !loading;
+        selectAllButton.Enabled = clearSelectionButton.Enabled = current && roster!.Rows.Count > 0 && !loading;
+        if (current && showStatus)
+            Info($"{count} of {roster!.Rows.Count} students selected. Select All and Clear Selection apply to the whole class list.");
+    }
+
+    private async Task LoadStudentsAsync()
+    {
+        if (loading || !CurrentUser.HasPermission("Reports.View")) return;
+        Scope scope = CurrentScope();
+        if (scope.Campus <= 0 || scope.Year <= 0 || scope.Class <= 0 || scope.Section <= 0)
         { Warn("Choose a campus, academic year, class and section first."); return; }
-        int campusId = campus.SelectedId, yearId = year.SelectedId, classId = klass.SelectedId, sectionId = section.SelectedId;
-        bool attendance = sheet.SelectedIndex == 1;
-        string examText = exam.Text, subjectText = subject.Text, dateText = examDate.Text, teacherText = teacher.Text;
+        InvalidateRoster(); int revision = rosterRevision;
+        loading = true; UpdateSelection();
         try
         {
             var students = await DatabaseHelper.QueryUserAsync("GetStudentRegister",
-                DatabaseHelper.Int("@CampusId", campusId), DatabaseHelper.Int("@AcademicYearId", yearId),
-                DatabaseHelper.Int("@ClassId", classId), DatabaseHelper.Int("@SectionId", sectionId),
+                DatabaseHelper.Int("@CampusId", scope.Campus), DatabaseHelper.Int("@AcademicYearId", scope.Year),
+                DatabaseHelper.Int("@ClassId", scope.Class), DatabaseHelper.Int("@SectionId", scope.Section),
                 DatabaseHelper.P("@StudentStatus", "Active"), DatabaseHelper.P("@EnrollmentStatus", "Active"),
                 DatabaseHelper.Bit("@IncludeFormerStudents", false), DatabaseHelper.Bit("@IncludeBalance", false));
+            if (IsDisposed || revision != rosterRevision || scope != CurrentScope()) return;
+            roster = ClassSheetData.CreateRoster(students); loadedScope = scope;
+            Grid.DataSource = roster.DefaultView; FilterStudents();
+            if (roster.Rows.Count == 0) Warn("No active students were found in this class and section for the selected year.");
+        }
+        catch (Exception ex) { if (!IsDisposed && revision == rosterRevision) Fail(ex); }
+        finally { loading = false; if (!IsDisposed) UpdateSelection(showStatus: false); }
+    }
+
+    private async Task PreviewAsync()
+    {
+        if (loading || !CurrentUser.HasPermission("Reports.View")) return;
+        CommitSelection();
+        if (roster is null || loadedScope != CurrentScope())
+        { Warn("Load students for the selected class and section first."); return; }
+        // Snapshot includes every checked student, even when search hides a row.
+        int revision = rosterRevision;
+        var selected = roster.Copy();
+        bool attendance = sheet.SelectedIndex == 1;
+        string examText = exam.Text, subjectText = subject.Text, dateText = examDate.Text, teacherText = teacher.Text;
+        if (!selected.AsEnumerable().Any(row => row.Field<bool>("Include")))
+        { Warn("Select at least one student to print."); return; }
+        loading = true; UpdateSelection();
+        try
+        {
             var school = await InstitutionProfile.GetNameAsync();
-            if (IsDisposed) return;
+            if (IsDisposed || revision != rosterRevision) return;
             if (string.IsNullOrWhiteSpace(school)) { Warn("Check School Profile before printing class sheets."); return; }
-            var data = ClassSheetData.Create(students, school, examText, subjectText, dateText, teacherText);
-            if (data.Rows.Count == 0) { Grid.DataSource = null; Warn("No active students were found in this class and section for the selected year."); return; }
-            var list = new DataTable(); list.Columns.Add("Sr. No.", typeof(int)); list.Columns.Add("Student Name");
-            foreach (DataRow page in data.Rows)
-                for (int i = 1; i <= ClassSheetData.StudentsPerPage; i++)
-                    if (Convert.ToString(page[$"Number{i:00}"]) is string number && number.Length > 0)
-                        list.Rows.Add(int.Parse(number), page[$"Name{i:00}"]);
-            Grid.DataSource = list;
-            Info($"{list.Rows.Count} students. {data.Rows.Count} A4 page(s), with two copies on each page.");
+            var data = ClassSheetData.Create(selected, school, examText, subjectText, dateText, teacherText);
             RdlcReportPreview.Show(FindForm(), attendance ? "Exam Attendance Sheet" : "Marks Sheet",
                 Path.Combine(AppContext.BaseDirectory, "Reports", attendance ? "ClassAttendanceSheet.rdlc" : "ClassMarksSheet.rdlc"),
                 "ClassSheetData", data);
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
+        finally { loading = false; if (!IsDisposed) UpdateSelection(showStatus: false); }
     }
 }

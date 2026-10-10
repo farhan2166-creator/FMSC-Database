@@ -4,7 +4,25 @@ namespace FMSC_SMS.Pages.Reports.Students;
 
 internal static class ClassSheetData
 {
-    internal const int StudentsPerPage = 25;
+    internal const int StudentsPerPage = 30;
+
+    internal static DataTable CreateRoster(DataTable students)
+    {
+        var roster = students.Clone();
+        if (!roster.Columns.Contains("Include")) roster.Columns.Add("Include", typeof(bool));
+        foreach (var student in OrderedStudents(students))
+        {
+            roster.ImportRow(student);
+            roster.Rows[roster.Rows.Count - 1]["Include"] = true;
+        }
+        return roster;
+    }
+
+    private static IEnumerable<DataRow> OrderedStudents(DataTable students) => students.AsEnumerable()
+        .Where(row => !row.IsNull("EnrollmentId") && Convert.ToString(row["EnrollmentStatus"]) == "Active")
+        .OrderBy(row => Convert.ToString(row["StudentName"]), StringComparer.CurrentCultureIgnoreCase)
+        .ThenBy(row => Convert.ToString(row["AdmissionNumber"]), StringComparer.OrdinalIgnoreCase)
+        .ThenBy(row => Convert.ToInt32(row["AdmissionId"]));
 
     internal static DataTable Create(DataTable students, string schoolName,
         string exam, string subject, string examDate, string teacher)
@@ -19,11 +37,8 @@ internal static class ClassSheetData
             data.Columns.Add($"Number{i:00}", typeof(string));
             data.Columns.Add($"Name{i:00}", typeof(string));
         }
-        var roster = students.AsEnumerable()
-            .Where(row => !row.IsNull("EnrollmentId") && Convert.ToString(row["EnrollmentStatus"]) == "Active")
-            .OrderBy(row => Convert.ToString(row["StudentName"]), StringComparer.CurrentCultureIgnoreCase)
-            .ThenBy(row => Convert.ToString(row["AdmissionNumber"]), StringComparer.OrdinalIgnoreCase)
-            .ThenBy(row => Convert.ToInt32(row["AdmissionId"]))
+        var roster = OrderedStudents(students)
+            .Where(row => !students.Columns.Contains("Include") || row.Field<bool>("Include"))
             .ToArray();
         int pages = (roster.Length + StudentsPerPage - 1) / StudentsPerPage;
         for (int page = 0; page < pages; page++)
