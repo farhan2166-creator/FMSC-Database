@@ -1244,15 +1244,36 @@ public sealed class StudentRecordChecksPage : V2Page
                 using var correction=new LeavingDateCorrectionDialog(admissionId,targetEnrollmentId,data,proposedLeave,initialReason);
                 if(correction.ShowDialog(FindForm())!=DialogResult.OK)return;
                 StudentSearchCache.Invalidate();await LoadStudentSnapshot();await SetGridMode("Enrollments");
-                SelectEnrollmentRow(targetEnrollmentId);Info(correction.ResultMessage);return;
+                SelectEnrollmentRow(targetEnrollmentId);await ReportCorrectionAsync(admissionId,correction.ResultMessage);return;
             }
             if(target!=null && Convert.ToString(target["Status"])!="Active") {Warn("Select a Left enrollment to correct a departure, or an active enrollment to review its dates.");return;}
             using var dialog=new LifecycleDateRepairDialog(admissionId,data,targetEnrollmentId,proposedStart,proposedLeave,clearLeave,initialReason,focused);
             if(dialog.ShowDialog(FindForm())!=DialogResult.OK)return;
             StudentSearchCache.Invalidate();await LoadStudentSnapshot();await SetGridMode("Enrollments");
             if(targetEnrollmentId>0)SelectEnrollmentRow(targetEnrollmentId);
-            SetStatus("Selected date corrections saved. Scan to review remaining conflicts.");
+            await ReportCorrectionAsync(admissionId,"Selected date corrections saved.");
         } catch(Exception ex) {Fail(ex);}
+    }
+    private async Task ReportCorrectionAsync(int admissionId,string resultMessage)
+    {
+        if(IsDisposed || student.SelectedId!=admissionId)return;
+        Info(resultMessage + " Checking for remaining issues…");
+        try {
+            var checkedFindings=await DatabaseHelper.QueryUserAsync("CheckStudentConsistency",DatabaseHelper.Int("@AdmissionId",admissionId));
+            if(IsDisposed || student.SelectedId!=admissionId)return;
+            findingsRaw=checkedFindings;
+            if(gridMode=="Findings") {
+                ApplyStudentDisplayToFindings(findingsRaw);UpdateFindingInstructions(findingsRaw);
+                ResetRowFilter();Bind(findingsRaw);DecorateFindingsGrid();UpdateFindingsSummary(findingsRaw,false);
+            }
+            int remaining=checkedFindings.Rows.Count;
+            Info(resultMessage + (remaining==0
+                ? " No remaining issues found by the console checks."
+                : $" {remaining} issue(s) remain. Open Issues to review them."));
+        } catch(Exception ex) {
+            if(!IsDisposed && student.SelectedId==admissionId)
+                Warn(resultMessage + " Could not recheck remaining issues: " + DbMessage.UserMessage(ex));
+        }
     }
     private async Task SaveStatus()
     {
@@ -1277,27 +1298,34 @@ public sealed class StudentRecordChecksPage : V2Page
                 Warn("Enter a reason for this correction.");
                 return;
             }
-            if(status=="Left" && withdrawalDate.Checked) {
-                var current=DatabaseHelper.QuerySql("""
-                    EXEC dbo.RequirePermission @UserId,N'Students.Administer';
-                    SELECT Status,WithdrawalDate FROM dbo.Students WHERE AdmissionId=@AdmissionId;
-                    """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@AdmissionId",student.SelectedId));
-                if(current.Rows.Count>0 && Convert.ToString(current.Rows[0]["Status"])=="Left" &&
-                    (current.Rows[0]["WithdrawalDate"]==DBNull.Value || Convert.ToDateTime(current.Rows[0]["WithdrawalDate"]).Date!=withdrawalDate.Value.Date)) {
-                    await RepairDates(proposedLeave:withdrawalDate.Value.Date,initialReason:statusReason.Text.Trim());return;
-                }
+            int correctedAdmissionId=student.SelectedId;
+            var current=DatabaseHelper.QuerySql("""
+                EXEC dbo.RequirePermission @UserId,N'Students.Administer';
+                SELECT Status,WithdrawalDate FROM dbo.Students WHERE AdmissionId=@AdmissionId;
+                """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@AdmissionId",correctedAdmissionId));
+            if(current.Rows.Count==0) {Warn("The student no longer exists.");return;}
+            string oldStatus=Convert.ToString(current.Rows[0]["Status"])??"";
+            if(status=="Left" && withdrawalDate.Checked && oldStatus=="Left" &&
+                (current.Rows[0]["WithdrawalDate"]==DBNull.Value || Convert.ToDateTime(current.Rows[0]["WithdrawalDate"]).Date!=withdrawalDate.Value.Date)) {
+                await RepairDates(proposedLeave:withdrawalDate.Value.Date,initialReason:statusReason.Text.Trim());return;
             }
-            if (!Confirm(
-                    $"Set this student's status to {status}" +
-                    (withdrawalDate.Checked
-                        ? $" with withdrawal date {withdrawalDate.Value:dd-MMM-yyyy}"
-                        : " and clear the withdrawal date") +
-                    "?",
-                    "Confirm Status Correction"))
-            {
-                return;
+            var enrollmentReview=DatabaseHelper.QueryUser("GetStudentEnrollmentsForLifecycle",DatabaseHelper.Int("@AdmissionId",correctedAdmissionId));
+            var active=enrollmentReview.AsEnumerable().Where(row=>Convert.ToString(row["Status"])=="Active")
+                .OrderByDescending(row=>Convert.ToInt32(row["EnrollmentId"])).ToArray();
+            if(status=="Active" && oldStatus=="Left" && active.Length==0) {
+                Warn("This student has no active enrollment. Use Readmission to bring them back into a class; status repair cannot create that enrollment.");return;
             }
-            DatabaseHelper.Execute(
+            object proposedWithdrawal=withdrawalDate.Checked?withdrawalDate.Value.Date:DBNull.Value;
+            bool noChange=oldStatus==status && Equals(current.Rows[0]["WithdrawalDate"],proposedWithdrawal);
+            string relatedEffect=noChange?"These values already match; no record changes are expected.":status=="Left" && active.Length>0
+                ? $"The latest active enrollment ({active[0]["EnrollmentId"]}) will close as Left. Its leaving date will be " +
+                    (withdrawalDate.Checked?withdrawalDate.Value.ToString("dd MMM yyyy"):"today because no withdrawal date is recorded") + "."
+                : "Existing enrollment records will not be changed by this status correction.";
+            if(!Confirm($"Student: {student.Text}\nStatus: {oldStatus} → {status}\n" +
+                (withdrawalDate.Checked?$"Withdrawal date: {withdrawalDate.Value:dd MMM yyyy}\n":"Withdrawal date will be cleared.\n") +
+                relatedEffect + "\n\nBills, payments and certificates stay unchanged. The database will check the correction before saving.\n" +
+                $"Reason: {statusReason.Text.Trim()}\n\nApply this status correction?","Confirm Status Correction"))return;
+            var statusResult=DatabaseHelper.Query(
                 "CorrectStudentStatus",
                 DatabaseHelper.Int("@UserId", CurrentUser.UserId),
                 DatabaseHelper.Int("@AdmissionId", student.SelectedId),
@@ -1307,14 +1335,15 @@ public sealed class StudentRecordChecksPage : V2Page
                     withdrawalDate.Checked ? withdrawalDate.Value.Date : (object)DBNull.Value),
                 DatabaseHelper.Bit("@ClearWithdrawalDate", !withdrawalDate.Checked),
                 DatabaseHelper.P("@Reason", statusReason.Text.Trim()));
-            string statusOutcome = $"Student status corrected to {status}." +
-                (withdrawalDate.Checked
-                    ? $" Withdrawal date: {withdrawalDate.Value:dd MMM yyyy}."
-                    : " Withdrawal date cleared.");
+            var saved=statusResult.Rows[0];
+            string statusOutcome=Convert.ToBoolean(saved["Changed"])
+                ? $"Student status corrected to {saved["Status"]}. " +
+                    (saved["WithdrawalDate"] is DateTime savedDate?$"Withdrawal date: {savedDate:dd MMM yyyy}.":"Withdrawal date cleared.")
+                : "Student status and withdrawal date already match. No changes were needed.";
             statusReason.Clear();
             await LoadStudentSnapshot();
             StudentSearchCache.Invalidate();
-            Info(statusOutcome);
+            await ReportCorrectionAsync(correctedAdmissionId,statusOutcome);
         }
         catch (Exception ex) { Fail(ex); }
     }
@@ -1332,10 +1361,11 @@ public sealed class StudentRecordChecksPage : V2Page
         StudentSearchCache.Invalidate();
         if(IsDisposed || student.SelectedId!=admissionId)return;
         await LoadStudentSnapshot();await LoadEnrollments(gridModeVersion);
-        SelectEnrollmentRow(enrollmentId);Info(correction.ResultMessage);
+        SelectEnrollmentRow(enrollmentId);await ReportCorrectionAsync(admissionId,correction.ResultMessage);
     }
     private async Task SaveEnrollment()
     {
+        int correctedAdmissionId=student.SelectedId;
         try
         {
             if (selectedEnrollmentId <= 0)
@@ -1386,12 +1416,13 @@ public sealed class StudentRecordChecksPage : V2Page
             // CorrectEnrollmentStatus can now synchronize Students.Status/WithdrawalDate as a side effect of this save (e.g. closing the Active enrollment to Left, or reactivating one to Active).
             await LoadStudentSnapshot();
             StudentSearchCache.Invalidate();
-            Info("Academic enrolment saved.");
+            await ReportCorrectionAsync(correctedAdmissionId,"Academic enrolment saved.");
         }
         catch (Exception ex) { Fail(ex); }
     }
     private async Task AddEnrollment()
     {
+        int correctedAdmissionId=student.SelectedId;
         try
         {
             if(!creatingEnrollment || selectedEnrollmentId>0) {Warn("Use Add Missing Record first to start a separate historical enrollment");return;}
@@ -1439,7 +1470,7 @@ public sealed class StudentRecordChecksPage : V2Page
             // Refresh the snapshot panel so it reflects that instead of the pre-correction status.
             await LoadStudentSnapshot();
             StudentSearchCache.Invalidate();
-            Info("Academic enrolment created.");
+            await ReportCorrectionAsync(correctedAdmissionId,"Academic enrolment created.");
         }
         catch (Exception ex) { Fail(ex); }
     }

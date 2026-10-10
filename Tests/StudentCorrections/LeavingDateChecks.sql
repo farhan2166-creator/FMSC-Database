@@ -137,3 +137,33 @@ BEGIN TRY
 END TRY BEGIN CATCH IF ERROR_NUMBER()<>50003 THROW; END CATCH;
 PRINT 'PASS unauthenticated caller rejected';
 GO
+
+-- Status correction returns confirmed outcomes and closes an active enrollment coherently.
+BEGIN TRANSACTION;
+DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date;
+EXEC #Fixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
+UPDATE dbo.Students SET Status=N'Active',WithdrawalDate=NULL WHERE AdmissionId=@S;
+UPDATE dbo.Enrollments SET Status=N'Active',LeavingDate=NULL WHERE EnrollmentId=@E;
+SELECT @D=DATEADD(day,70,EnrollmentDate) FROM dbo.Enrollments WHERE EnrollmentId=@E;
+DECLARE @Outcome TABLE(AdmissionId int,Status nvarchar(30),WithdrawalDate date,Changed bit);
+INSERT @Outcome EXEC dbo.CorrectStudentStatus @U,@S,N'Left',@D,0,N'Status integration test';
+IF NOT EXISTS(SELECT 1 FROM @Outcome WHERE Status=N'Left' AND WithdrawalDate=@D AND Changed=1) THROW 57917,'Status outcome not confirmed.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.Enrollments WHERE EnrollmentId=@E AND Status=N'Left' AND LeavingDate=@D) THROW 57918,'Active enrollment not closed.',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.BillingCharges WHERE BillingChargeId=@B AND Status=N'Open') THROW 57919,'Status correction altered a bill.',1;
+DELETE @Outcome;
+INSERT @Outcome EXEC dbo.CorrectStudentStatus @U,@S,N'Left',@D,0,N'Status integration test';
+IF NOT EXISTS(SELECT 1 FROM @Outcome WHERE Changed=0) THROW 57920,'Unchanged status reported as changed.',1;
+ROLLBACK;
+PRINT 'PASS confirmed status result, coordinated closure and no-op reporting';
+GO
+-- Status-only reactivation still needs an active enrollment.
+BEGIN TRANSACTION;
+DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date;
+EXEC #Fixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
+BEGIN TRY
+ EXEC dbo.CorrectStudentStatus @U,@S,N'Active',NULL,1,N'Status integration test';
+ THROW 57921,'Student reactivated without an active enrollment.',1;
+END TRY BEGIN CATCH IF ERROR_NUMBER()<>57008 THROW; END CATCH;
+IF @@TRANCOUNT>0 ROLLBACK;
+PRINT 'PASS established reactivation restriction retained';
+GO
