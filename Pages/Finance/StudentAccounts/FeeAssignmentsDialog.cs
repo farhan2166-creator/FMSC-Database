@@ -258,7 +258,7 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
         }
     }
 }
-/// <summary>Discontinue: sets EffectiveTo on the assignment's current open row via dbo.DiscontinueStudentFeeAssignment. @Reason is mandatory.</summary>
+/// <summary>Stops transport through the existing writer. An optional note supplements the recorded action summary.</summary>
 public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
 {
     /* UX - field problems are marked on the fields, all at once, not shown in message boxes. */
@@ -379,7 +379,7 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
         /* caption and consequence both use the field's real meaning - the selected month is the last month that stays active. */
         fields.Controls.Add(HumanUi.Field("Stop Transport From", effectiveTo, true), 0, 0);
         fields.Controls.Add(effectiveConsequence, 0, 1);
-        fields.Controls.Add(HumanUi.Field("Reason", reason, true), 0, 2);
+        fields.Controls.Add(HumanUi.Field("Reason (optional)", reason), 0, 2);
         card.Content.Controls.Add(fields);
         var buttons = HumanUi.ButtonRow(discontinueButton, cancel);
         buttons.Dock = DockStyle.Fill;
@@ -407,14 +407,16 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
         if (submitting || savedSuccessfully)
             return;
         validator.Begin();
-        validator.Required(reason, "Give a reason - it is recorded");
         validator.Rule(effectiveTo, () => effectiveTo.SelectedItem is StopMonth, "Choose a stopping month");
         if (!validator.Finish())
             return;
         submitting = true;
         try
         {
-            TransportStop.Save(studentFeeAssignmentId, SelectedStopMonth, reason.Text.Trim());
+            string recordedReason = reason.Text.Trim();
+            if (recordedReason.Length == 0)
+                recordedReason = $"Stop transport from {SelectedStopMonth:MMMM yyyy}.";
+            TransportStop.Save(studentFeeAssignmentId, SelectedStopMonth, recordedReason);
             /* The write committed, so this close is not a discard. */
             savedSuccessfully = true;
             DialogResult = DialogResult.OK;
@@ -446,7 +448,7 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
         return ModernMessageDialog.ConfirmDiscardOnce(this, IsDirty, ref discardConfirmed);
     }
 }
-/// <summary>Change Amount: closes the current open row and opens a new versioned row via dbo.ChangeStudentFeeAssignmentAmount. @Reason is mandatory.</summary>
+/// <summary>Changes a fee amount through the existing procedure. An optional note supplements the recorded action summary.</summary>
 public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
 {
     /* UX - field problems are marked on the fields, all at once, not shown in message boxes. */
@@ -581,7 +583,7 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
         fields.Controls.Add(HumanUi.Field("New Amount", newAmount, true), 0, 0);
         fields.Controls.Add(HumanUi.Field("Effective From", effectiveFrom, true), 0, 1);
         fields.Controls.Add(effectiveConsequence, 0, 2);
-        fields.Controls.Add(HumanUi.Field("Reason", reason, true), 0, 3);
+        fields.Controls.Add(HumanUi.Field("Reason (optional)", reason), 0, 3);
         card.Content.Controls.Add(fields);
         var buttons = HumanUi.ButtonRow(saveButton, cancel);
         buttons.Dock = DockStyle.Fill;
@@ -620,7 +622,6 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
             /* The discount is carried into the new version unchanged, so an amount below it produces a row CK_StudentFeeAssignments_Discount refuses. dbo.ChangeStudentFeeAssignmentAmount_Internal rejects it with Msg 53149 and remains the authoritative check. */
             validator.Fail(newAmount, $"Not below the discount (Rs. {currentDiscount:0.##})");
         }
-        validator.Required(reason, "Give a reason - it is recorded");
         if (!validator.Finish())
         {
             if (amountParsed && amount < currentDiscount)
@@ -629,13 +630,16 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
         }
         /* state the whole change - fee, before, after, effective month and the reason already entered - before anything is written. */
         DateTime newAmountMonth = FirstOfMonth(effectiveFrom.Value);
+        string recordedReason = reason.Text.Trim();
+        if (recordedReason.Length == 0)
+            recordedReason = $"Change fee amount from Rs. {currentAmount:0.##} to Rs. {amount:0.##}, effective {newAmountMonth:MMMM yyyy}.";
         if (!ModernMessageDialog.Confirm(
                 this,
                 $"Fee: {feeTypeName}\n"
                 + $"Current amount: Rs. {currentAmount:0.##}\n"
                 + $"New amount: Rs. {amount:0.##}\n"
                 + $"Effective from: {newAmountMonth:MMMM-yyyy}\n"
-                + $"Reason: {reason.Text.Trim()}\n\n"
+                + $"Recorded note: {recordedReason}\n\n"
                 + $"This is a future-billing change only: the current amount stays in force through "
                 + $"{newAmountMonth.AddMonths(-1):MMMM-yyyy}, and charges that are already generated are not changed. "
                 + "If an already-generated charge must be corrected, cancel this and use the financial correction workflow instead.",
@@ -651,7 +655,7 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
                 DatabaseHelper.Int("@StudentFeeAssignmentId", studentFeeAssignmentId),
                 DatabaseHelper.P("@NewAmount", amount),
                 DatabaseHelper.Date("@EffectiveFrom", effectiveFrom.Value),
-                DatabaseHelper.P("@Reason", reason.Text.Trim()));
+                DatabaseHelper.P("@Reason", recordedReason));
             /* The write committed, so this close is not a discard. */
             savedSuccessfully = true;
             DialogResult = DialogResult.OK;
