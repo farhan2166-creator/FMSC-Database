@@ -368,7 +368,7 @@ public sealed class StudentRecordChecksPage : V2Page
         form.RowStyles.Add(new RowStyle(SizeType.Absolute, fieldHeight));
         form.RowStyles.Add(new RowStyle(SizeType.Absolute, reasonHeight));
         form.Height = hintHeight + fieldHeight + reasonHeight;
-        var hint = CorrectionHint("Correct the student's overall status. Edit current enrollment dates on the Enrollment panel.");
+        var hint = CorrectionHint("Correct overall status here. For an existing departure, use Enrollment → Correct Leaving Date.");
         form.Controls.Add(hint, 0, 0);
         form.SetColumnSpan(hint, 2);
         form.Controls.Add(HumanUi.Field("Student Status", statusCombo, fillHeight: false), 0, 1);
@@ -392,7 +392,7 @@ public sealed class StudentRecordChecksPage : V2Page
         form.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.NormalFont)*3+12));
         form.RowStyles.Add(new RowStyle(SizeType.Absolute, reasonHeight));
         form.Height = hintHeight + 4 * fieldHeight + AppMetrics.TextHeight(AppTheme.NormalFont)*3+12 + reasonHeight;
-        enrollmentSelection.Text="Edit the active enrollment, then Save Enrollment.\nClosed records are view only.";
+        enrollmentSelection.Text="Edit the active enrollment, then Save Enrollment.\nSelect a Left record to correct its leaving date.";
         form.Controls.Add(enrollmentSelection, 0, 0);
         form.SetColumnSpan(enrollmentSelection, 2);
         var section = HumanUi.Field("Campus / Class / Section", classSection, fillHeight: false);
@@ -421,13 +421,15 @@ public sealed class StudentRecordChecksPage : V2Page
         var record=enrollmentsRaw.AsEnumerable().FirstOrDefault(r=>enrollmentsRaw.Columns.Contains("EnrollmentId") && Convert.ToInt32(r["EnrollmentId"])==selectedEnrollmentId);
         bool editable=creatingEnrollment || (selected && Convert.ToString(record?["Status"])=="Active");
         saveEnrollmentAction.Visible=!creatingEnrollment;saveEnrollmentAction.Enabled=selected && editable && CanCorrect;
-        repairDatesAction.Visible=false;repairDatesAction.Enabled=selected && editable && CanCorrect;
+        repairDatesAction.Visible=selected && Convert.ToString(record?["Status"])=="Left";
+        repairDatesAction.Text="Correct Leaving Date";repairDatesAction.Enabled=selected && CanCorrect;
         foreach(Control control in new Control[]{enrollmentDate,leavingDate,billingStartDate,allowLegacyDates,classSection,enrollmentStatusCombo,enrollmentReason})control.Enabled=editable && CanCorrect;
-        if(selected && !editable)enrollmentSelection.Text=$"Enrollment {selectedEnrollmentId} — {record?["Status"]}\nClosed enrollment — view only";
+        if(selected && !editable)enrollmentSelection.Text=$"Enrollment {selectedEnrollmentId} — {record?["Status"]}\n" +
+            (Convert.ToString(record?["Status"])=="Left"?"Use Correct Leaving Date to review its departure.":"This historical record is view only.");
         addEnrollmentAction.Visible=creatingEnrollment;addEnrollmentAction.Enabled=creatingEnrollment && CanCorrect;
         newEnrollmentAction.Visible=gridMode=="Enrollments" && !creatingEnrollment;newEnrollmentAction.Enabled=student.SelectedId>0 && CanCorrect;
         academicYear.Enabled=creatingEnrollment;
-        if(!selected && !creatingEnrollment)enrollmentSelection.Text="Edit the active enrollment, then Save Enrollment.\nClosed records are view only.";
+        if(!selected && !creatingEnrollment)enrollmentSelection.Text="Edit the active enrollment, then Save Enrollment.\nSelect a Left record to correct its leaving date.";
     }
     private void BeginMissingEnrollment()
     {
@@ -442,6 +444,8 @@ public sealed class StudentRecordChecksPage : V2Page
     private async Task RepairDatesFromEditor()
     {
         if(selectedEnrollmentId<=0) {Warn("Select the enrollment whose dates need correction");return;}
+        var record=enrollmentsRaw.AsEnumerable().FirstOrDefault(r=>Convert.ToInt32(r["EnrollmentId"])==selectedEnrollmentId);
+        if(Convert.ToString(record?["Status"])=="Left") {await RepairDates(selectedEnrollmentId);return;}
         await RepairDates(selectedEnrollmentId,enrollmentDate.Value.Date,leavingDate.Checked?leavingDate.Value.Date:null,!leavingDate.Checked,enrollmentReason.Text.Trim(),focused:true);
     }
     private void ShowCorrectionTab(CorrectionTab tab)
@@ -1231,7 +1235,13 @@ public sealed class StudentRecordChecksPage : V2Page
                     .OrderByDescending(r=>Convert.ToDateTime(r["EnrollmentDate"])).ThenByDescending(r=>Convert.ToInt32(r["EnrollmentId"]))
                     .Select(r=>Convert.ToInt32(r["EnrollmentId"])).FirstOrDefault();
             var target=data.Tables[1].AsEnumerable().FirstOrDefault(r=>Convert.ToInt32(r["EnrollmentId"])==targetEnrollmentId);
-            if(target!=null && Convert.ToString(target["Status"])!="Active") {Warn("Closed enrollments are view only.");return;}
+            if(target!=null && Convert.ToString(target["Status"])=="Left") {
+                using var correction=new LeavingDateCorrectionDialog(admissionId,targetEnrollmentId,data,proposedLeave,initialReason);
+                if(correction.ShowDialog(FindForm())!=DialogResult.OK)return;
+                StudentSearchCache.Invalidate();await LoadStudentSnapshot();await SetGridMode("Enrollments");
+                SelectEnrollmentRow(targetEnrollmentId);Info(correction.ResultMessage);return;
+            }
+            if(target!=null && Convert.ToString(target["Status"])!="Active") {Warn("Select a Left enrollment to correct a departure, or an active enrollment to review its dates.");return;}
             using var dialog=new LifecycleDateRepairDialog(admissionId,data,targetEnrollmentId,proposedStart,proposedLeave,clearLeave,initialReason,focused);
             if(dialog.ShowDialog(FindForm())!=DialogResult.OK)return;
             StudentSearchCache.Invalidate();await LoadStudentSnapshot();await SetGridMode("Enrollments");
