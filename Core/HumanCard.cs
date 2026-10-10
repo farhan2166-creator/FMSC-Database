@@ -26,7 +26,7 @@ public class HumanCard : RoundedPanel
         Margin = new Padding(0);
         Color moduleAccent = accent ?? AppTheme.ModuleAccent(title);
         int titleLineHeight =
-            Math.Max(16, AppMetrics.TextHeight(UiDesignSystem.Typography.Caption));
+            Math.Max(16, AppMetrics.TextHeight(UiDesignSystem.Typography.Action));
         int subtitleLineHeight = string.IsNullOrWhiteSpace(subtitle)
             ? 0
             : Math.Max(12, AppMetrics.TextHeight(AppTheme.NormalFont));

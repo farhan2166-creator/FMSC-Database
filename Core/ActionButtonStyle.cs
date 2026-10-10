@@ -10,18 +10,27 @@ internal static class ActionButtonStyle
         while (first < label.Length && !char.IsLetter(label[first])) first++;
         return label[first..];
     }
-    private static bool Starts(string label, string word) => label.Equals(word, StringComparison.OrdinalIgnoreCase) ||
-        label.StartsWith(word + " ", StringComparison.OrdinalIgnoreCase);
+    private static bool Starts(string label, string word) =>
+        label.StartsWith(word, StringComparison.OrdinalIgnoreCase) &&
+        (label.Length == word.Length || !char.IsLetterOrDigit(label[word.Length]));
     internal static string Role(string text, string fallback)
     {
+        // Navigation, tabs and deliberately custom buttons have their own appearance.
         if (fallback is "Navigation" or "TabInactive" or "Outline" or "Custom") return fallback;
         string label = Label(text);
-        if (label.StartsWith("Save &", StringComparison.OrdinalIgnoreCase) || Starts(label, "New") ||
-            Starts(label, "Clear") || Starts(label, "Reset") || Starts(label, "Cancel") || Starts(label, "Close")) return "Secondary";
-        if (Starts(label, "Delete") || Starts(label, "Remove") || Starts(label, "Reverse")) return "Danger";
-        if (Starts(label, "Save")) return "Success";
-        if (Starts(label, "Apply") || Starts(label, "Post") || Starts(label, "Collect") || Starts(label, "Confirm") ||
-            Starts(label, "Process") || Starts(label, "Execute")) return "Primary";
+        bool Any(params string[] words) => words.Any(word => Starts(label, word));
+        if (Any("Delete", "Remove", "Reverse", "Restore", "Destroy")) return UiDesignSystem.Actions.Danger;
+        if (label.StartsWith("Save &", StringComparison.OrdinalIgnoreCase)) return UiDesignSystem.Actions.Secondary;
+        if (Any("Save", "Update", "Backup", "Back Up")) return UiDesignSystem.Actions.Success;
+        if (Any("New", "Clear", "Reset", "Cancel", "Close", "Back", "Next Student"))
+            return UiDesignSystem.Actions.Secondary;
+        if (Any("Warning", "Retry")) return UiDesignSystem.Actions.Warning;
+        if (Any("Apply", "Post", "Collect", "Confirm", "Process", "Execute", "Create", "Issue", "Mark Collected"))
+            return UiDesignSystem.Actions.Primary;
+        if (Any("Load", "Refresh", "Reload", "Search", "Find", "Print", "Export", "Preview",
+            "View", "Review", "Browse", "Choose", "Locate", "History", "Select"))
+            return UiDesignSystem.Actions.Secondary;
+        // Preserve explicit warnings and unusual actions such as the one-time cleanup.
         return fallback;
     }
     private static int? Order(Control button)

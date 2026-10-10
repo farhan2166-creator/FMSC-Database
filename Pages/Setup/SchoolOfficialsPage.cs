@@ -7,7 +7,7 @@ public sealed class SchoolOfficialsPage : MasterPage
     public SchoolOfficialsPage()
         : base(
             "School Officials",
-            "Principal, Chairman, Managing Director, or any other designation a document needs to show",
+            "Add the names and roles shown on school documents.",
             "GetSchoolOfficials",
             "SaveSchoolOfficial",
             new[]

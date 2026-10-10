@@ -13,10 +13,10 @@ public sealed class AdditionalFeePostingPage : V2Page
     private Guid requestId = Guid.NewGuid();
     private bool loading;
     public AdditionalFeePostingPage() : base("Post Additional Fee",
-        "Filter students as needed, then post one charge to each selected student.")
+        "Select students and add the same fee charge to each.")
     {
         var load = AddBusyAction("Load Students", LoadAsync, "Secondary");
-        var selectAll = AddAction("Select All", (_, _) => SelectAll(), "Secondary");
+        var selectAll = AddAction(UiText.Actions.SelectAll, (_, _) => SelectAll(), "Secondary");
         var post = AddBusyAction("Post Selected", PostAsync, "Success");
         RelocateFromActions(load, selectAll, post);
         students.ReadOnly = false;

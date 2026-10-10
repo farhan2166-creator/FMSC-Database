@@ -87,7 +87,7 @@ public sealed class ApplyFeeConfigurationPage : V2Page
         applyRow.Controls.Add(HumanUi.Field("Reason (optional)", reason), 1, 0);
         /* Preview and Apply were removed from the action bar and never placed, so the page had no buttons. */
         var closeButton = new ModernButton {
-            Text = "Close", Width = AppScale.Scale(100), Height = AppMetrics.ButtonHeight, ThemeRole = "Secondary"
+            Text = UiText.Actions.Close, Width = AppScale.Scale(100), Height = AppMetrics.ButtonHeight, ThemeRole = "Secondary"
         };
         closeButton.Click += (_, _) => { if (!applying) FindForm()?.Close(); };
         var buttonRow = scopes is null ? HumanUi.ButtonRow(previewButton, applyButton)

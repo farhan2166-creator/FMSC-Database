@@ -20,7 +20,7 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
     /* UX - the missing reason is marked on its field, not shown in a message box. */
     private readonly FormValidator validator = new();
     private readonly ModernButton cancelButton = new() {
-        Text = "Cancel",
+        Text = UiText.Actions.Cancel,
         Width = AppScale.Scale(105),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Secondary"

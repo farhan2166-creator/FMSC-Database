@@ -99,7 +99,7 @@ internal static class ClearanceUi
         dialog.Disposed += (_, _) => validator.Dispose();
         var confirmButton = new ModernButton { Text = "Confirm Clearance & Continue", ThemeRole = "Success", Width = AppScale.Scale(220) };
         /* no DialogResult on the button: a button that assigns it dismisses the modal form before the discard confirmation can keep it open. */
-        var cancelButton = new ModernButton { Text = "Cancel", ThemeRole = "Secondary", Width = AppScale.Scale(100) };
+        var cancelButton = new ModernButton { Text = UiText.Actions.Cancel, ThemeRole = "Secondary", Width = AppScale.Scale(100) };
         var buttonRow = HumanUi.ButtonRow(confirmButton, cancelButton);
         buttonRow.Dock = DockStyle.Bottom;
         bool confirmed = false;

@@ -30,7 +30,7 @@ public sealed class FeeAssignmentsDialog : ApplicationWindowForm
     private void BuildLayout()
     {
         var closeButton = new ModernButton {
-            Text = "Close",
+            Text = UiText.Actions.Close,
             Width = AppScale.Scale(105),
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary",
@@ -104,7 +104,7 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
     private void BuildLayout()
     {
         var cancel = new ModernButton {
-            Text = "Cancel",
+            Text = UiText.Actions.Cancel,
             Width = AppScale.Scale(105),
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary",
@@ -349,7 +349,7 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
     private void BuildLayout(string feeTypeName)
     {
         var cancel = new ModernButton {
-            Text = "Cancel",
+            Text = UiText.Actions.Cancel,
             Width = AppScale.Scale(105),
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary"
@@ -478,7 +478,7 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
     };
     private readonly ModernTextBox reason = HumanUi.TextBox(true, 500);
     private readonly ModernButton saveButton = new() {
-        Text = "Save",
+        Text = UiText.Actions.Save,
         Width = AppScale.Scale(110),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Success"
@@ -550,7 +550,7 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
     private void BuildLayout(string feeTypeName, decimal currentAmount, decimal currentDiscount)
     {
         var cancel = new ModernButton {
-            Text = "Cancel",
+            Text = UiText.Actions.Cancel,
             Width = AppScale.Scale(105),
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary"
@@ -698,7 +698,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
     private bool monthly;
     private DateTime initialFrom, initialThrough;
     private readonly ModernButton saveButton = new() {
-        Text = "Save",
+        Text = UiText.Actions.Save,
         Width = AppScale.Scale(110),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Success"
@@ -767,7 +767,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
     private void BuildLayout(string feeTypeName)
     {
         var cancel = new ModernButton {
-            Text = "Cancel",
+            Text = UiText.Actions.Cancel,
             Width = AppScale.Scale(105),
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary"

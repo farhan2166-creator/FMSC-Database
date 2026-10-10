@@ -61,7 +61,7 @@ public sealed class UserAccountDialog : ApplicationWindowForm
         };
         save.Click += (_, _) => Save();
         var cancel = new ModernButton {
-            Text = "Cancel",
+            Text = UiText.Actions.Cancel,
             Dock = DockStyle.Fill,
             ThemeRole = "Secondary"
         };

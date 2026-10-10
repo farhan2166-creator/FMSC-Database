@@ -283,7 +283,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             studentFeesMenu.Show(studentFeesMenuButton, new Point(0, studentFeesMenuButton.Height));
         var clear =
             AddAction(
-                "Next Student",
+                UiText.Certificates.NextStudent,
                 (_, _) => { if (transactionBusy) return; ClearPayment(); student.Focus(); },
                 "Secondary");
         RelocateFromActions(
@@ -513,7 +513,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             2);
         selectAllSiblings =
             new ModernButton {
-                Text = "Select All",
+                Text = UiText.Actions.SelectAll,
                 Dock = DockStyle.Left,
                 Width = AppScale.Scale(108),
                 Height = AppTheme.CompactButtonHeight,
@@ -3221,7 +3221,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             recentPayments);
         var closeButton =
             new ModernButton {
-                Text = "Close",
+                Text = UiText.Actions.Close,
                 Width = AppScale.Scale(105),
                 Height = AppMetrics.ButtonHeight,
                 ThemeRole = "Secondary",

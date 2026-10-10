@@ -25,10 +25,10 @@ internal sealed class ReadmissionFeeDecisionDialog : ApplicationWindowForm
         grid.Columns[2].DefaultCellStyle.Format="N0";
         var note=new Label {Dock=DockStyle.Fill,AutoSize=true,Text=$"Old enrollment balance: Rs. {oldDebt:N0} — remains collectible.\nExisting charges for {enrollmentDate:MMM yyyy}: Rs. {oldMonthCharges:N0}.\nChoose when new monthly fees start and whether yearly fees apply. Existing bills and payments stay unchanged."};
         if (!string.IsNullOrWhiteSpace(admissionNumberSummary))
-            note.Text = admissionNumberSummary + "\nAdmission ID and registration number remain unchanged.\n\n" + note.Text;
+            note.Text = admissionNumberSummary + "\nThe student record and registration number stay the same.\n\n" + note.Text;
         var impact=new Label {Dock=DockStyle.Fill,AutoSize=true};
         var confirm=new ModernButton {Text="Apply and Readmit",Enabled=false};
-        var cancel=new ModernButton {Text="Cancel",DialogResult=DialogResult.Cancel};
+        var cancel=new ModernButton {Text=UiText.Actions.Cancel,DialogResult=DialogResult.Cancel};
         decimal monthly=rates.AsEnumerable().Where(r=>Convert.ToString(r["Frequency"])=="Monthly").Sum(r=>Convert.ToDecimal(r["Amount"]));
         decimal yearly=rates.AsEnumerable().Where(r=>Convert.ToString(r["Frequency"])=="Yearly").Sum(r=>Convert.ToDecimal(r["Amount"]));
         void Update() {

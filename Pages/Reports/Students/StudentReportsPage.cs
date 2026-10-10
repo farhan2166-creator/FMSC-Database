@@ -333,10 +333,10 @@ public partial class StudentReportsPage : V2Page
         (ModeChanges, "Movement and changes")
     };
     private static string ModeContext(string key) => key switch {
-        ModeAdmissions => "Students admitted in a period - group, sort and choose the columns however you need.",
-        ModeStrength => "How many students are in each class - split them, and compare two academic years.",
-        ModeChanges => "Admissions, promotions, transfers, leavers and corrections - group them, or list every one.",
-        _ => "Every student, with any of their details. Group, sort and choose the columns you need."
+        ModeAdmissions => "Review admissions for a date range. Choose the grouping and columns.",
+        ModeStrength => "Review student totals by class and compare academic years.",
+        ModeChanges => "Review admissions, promotions, transfers, departures and corrections.",
+        _ => "Review student details. Choose the filters, grouping and columns."
     };
     /* The one line above the filters: what this report is for, and the next step. */
     private static string ModeHint(string key) => key switch {

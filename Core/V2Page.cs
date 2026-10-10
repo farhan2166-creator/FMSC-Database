@@ -873,28 +873,8 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
         finally { _previewingReport = false; }
     }
-    private static string InferActionRole(string text)
-    {
-        string label = (text ?? string.Empty).TrimStart();
-        string[] secondaryPrefixes =
-        {
-            "Clear",
-            "Load",
-            "Export",
-            "Refresh",
-            "Reload",
-            "History",
-            "Print",
-            "Cancel",
-            "Choose",
-            "Locate",
-            "Browse"
-        };
-        return secondaryPrefixes.Any(prefix =>
-            label.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            ? UiDesignSystem.Actions.Secondary
-            : UiDesignSystem.Actions.Primary;
-    }
+    private static string InferActionRole(string text) =>
+        ActionButtonStyle.Role(text, UiDesignSystem.Actions.Primary);
     protected ModernButton AddAction(
         string text,
         EventHandler click,
@@ -947,7 +927,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         string filePrefix = "FMSC_Report")
     {
         var button = AddBusyAction(
-            "Export",
+            UiText.Actions.Export,
             () => ExportGridAsync(filePrefix),
             "Secondary");
         /* registered so a landing under changed filters can close it. */

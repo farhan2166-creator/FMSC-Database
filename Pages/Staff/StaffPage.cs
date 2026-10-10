@@ -45,7 +45,7 @@ public sealed class StaffProfilePage : MasterPage
     internal void RefreshStaffRecords() => Reload();
     public StaffProfilePage() : base(
         "Staff",
-        "Personal details and contact information",
+        "Manage staff details and contact information.",
         "GetStaff",
         "SaveStaff",
         new[] {

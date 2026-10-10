@@ -35,12 +35,12 @@ public sealed class StaffEmploymentPage : MasterPage
     }
     private readonly Func<int>? _staffProvider;
     private DataTable? _selectionSnapshot;
-    public StaffEmploymentPage() : base("Staff Employment", "Staff → Employment history", "GetStaffEmployment", "SaveStaffEmployment", new[] { new FieldSpec("StaffId", "Staff", FieldKind.ComboInt, Required: true, LookupProcedure: "GetStaff", LookupIdColumn: "StaffId", LookupTextColumn: "StaffName"), new FieldSpec("Designation", "Designation", Required: true), new FieldSpec("Department", "Department"), new FieldSpec("EmploymentType", "Employment Type"), new FieldSpec("HireDate", "Hire Date", FieldKind.Date, Required: true), new FieldSpec("LeavingDate", "Leaving Date", FieldKind.Date), new FieldSpec("Remarks", "Remarks") }, v => new[] { DatabaseHelper.P("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@StaffEmploymentId", Convert.ToInt32(v["Id"] ?? 0)), DatabaseHelper.Int("@StaffId", Convert.ToInt32(v["StaffId"] ?? 0)), DatabaseHelper.P("@Designation", v["Designation"]), DatabaseHelper.P("@Department", v["Department"]), DatabaseHelper.P("@EmploymentType", v["EmploymentType"]), DatabaseHelper.Date("@HireDate", (DateTime)v["HireDate"]!), DatabaseHelper.P("@LeavingDate", v["LeavingDate"]), DatabaseHelper.P("@Remarks", v["Remarks"]) }, savePermission: "Staff.Manage") { }
+    public StaffEmploymentPage() : base("Staff Employment", "Manage staff jobs and employment history.", "GetStaffEmployment", "SaveStaffEmployment", new[] { new FieldSpec("StaffId", "Staff", FieldKind.ComboInt, Required: true, LookupProcedure: "GetStaff", LookupIdColumn: "StaffId", LookupTextColumn: "StaffName"), new FieldSpec("Designation", "Designation", Required: true), new FieldSpec("Department", "Department"), new FieldSpec("EmploymentType", "Employment Type"), new FieldSpec("HireDate", "Hire Date", FieldKind.Date, Required: true), new FieldSpec("LeavingDate", "Leaving Date", FieldKind.Date), new FieldSpec("Remarks", "Remarks") }, v => new[] { DatabaseHelper.P("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@StaffEmploymentId", Convert.ToInt32(v["Id"] ?? 0)), DatabaseHelper.Int("@StaffId", Convert.ToInt32(v["StaffId"] ?? 0)), DatabaseHelper.P("@Designation", v["Designation"]), DatabaseHelper.P("@Department", v["Department"]), DatabaseHelper.P("@EmploymentType", v["EmploymentType"]), DatabaseHelper.Date("@HireDate", (DateTime)v["HireDate"]!), DatabaseHelper.P("@LeavingDate", v["LeavingDate"]), DatabaseHelper.P("@Remarks", v["Remarks"]) }, savePermission: "Staff.Manage") { }
     // Constructor that binds the page to a selected StaffId provider so the records shown reflect the currently selected staff member in a parent page (e.g. StaffManagementPage).
     public StaffEmploymentPage(Func<int> staffIdProvider)
         : base(
             "Employment",
-            "Add or update a job in Job Details. Open past or current jobs from Employment History.",
+            "Add a job or select a saved job to update its details.",
             "GetStaffEmployment",
             "SaveStaffEmployment",
             new[] {
@@ -70,7 +70,7 @@ public sealed class StaffEmploymentPage : MasterPage
             // That override is gone. dbo.SaveStaffEmployment synchronizes Staff.Status in its own transaction, and dbo.EndStaffEmployment ends the newest ACTIVE record for the staff member.
             savePermission: "Staff.Manage",
             separateEntryAndRecords: true,
-            guidance: "Select a saved job to update it. Set its Leaving Date to end it. A new job without a Leaving Date is active; only one active job is allowed per staff member.")
+            guidance: "Select a job to edit it. Set a Leaving Date when it ends. Each staff member can have one active job.")
     {
         _staffProvider = staffIdProvider;
         HideContextEditorField("StaffId");

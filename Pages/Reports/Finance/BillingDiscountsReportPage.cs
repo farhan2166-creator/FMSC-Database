@@ -3,7 +3,7 @@ namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed class BillingDiscountsReportPage : CanonicalFinanceReportPage
 {
     public BillingDiscountsReportPage() : base(
-        "Billing & Discounts", "What was actually charged and which discounts were applied to those charges.",
+        "Billing & Discounts", "Review fee charges and their discounts.",
         "GetBillingAndDiscountsReport", "FMSC_Billing_Discounts",
         new[] { "Billing Summary", "Billing Detail", "Discount Detail" },
         new[] { "Day", "Week", "Month", "Class", "Campus", "Fee Type" },

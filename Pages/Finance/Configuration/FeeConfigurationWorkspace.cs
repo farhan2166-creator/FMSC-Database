@@ -7,7 +7,7 @@ public static class FeeConfigurationWorkspace
     public static Control Create() =>
         new WorkspacePage(
             PageTitles.FeeRateSetup,
-            "Set class fees in the matrix, then apply saved rates to existing students when needed. Manage fee types or use the bulk tools for copying and adjusting rates.",
+            "Set class fee rates, copy or adjust rates, then update student fees when needed.",
             (PageTitles.FeeRateMatrix, () => FeeRateMatrixForm.CreateEmbedded()),
             ("Fee Types", () => new FeeTypesPage()),
             (PageTitles.CopyFeeRates, () => CopyFeeRatesForm.CreateEmbedded()),

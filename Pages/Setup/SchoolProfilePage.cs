@@ -33,20 +33,20 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
     private string? _logoContentType;
     private bool _logoRemoved;
     public SchoolProfilePage()
-        : base("School Information", "Identity information printed on reports, certificates, receipts and letters.")
+        : base(PageTitles.SchoolInformation, "Set the school details shown on reports, certificates and receipts.")
     {
         UiHelper.DisposePictureImageOnDispose(logoPreview);
         RecordTextPolicy.WireInput(schoolName, "@SchoolName");
         RecordTextPolicy.WireInput(addressLine, "@AddressLine");
         RecordTextPolicy.WireInput(city, "@City");
-        AddAction("Save", (_, _) => Save(), "Success");
+        AddAction(UiText.Actions.Save, (_, _) => Save(), "Success");
         /* # - Reload re-reads every field and the logo, so a click could throw away typed work without a word. */
-        AddAction("Reload", (_, _) => {
+        AddAction(UiText.Actions.Reload, (_, _) => {
             if (!ConfirmDiscardChanges())
                 return;
             LoadProfile();
         });
-        AddBusyAction("Choose Logo...", ChooseLogoAsync);
+        AddBusyAction("Choose Logo…", ChooseLogoAsync);
         AddAction("Remove Logo", (_, _) => RemoveLogo(), "Danger");
         UseToolbar();
         var details =
@@ -80,7 +80,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             HumanUi.Field("Email", email), 0, 2);
         details.Content.Controls.Add(fields);
         var logoCard =
-            HumanUi.Card("Logo", "PNG or JPEG, stored directly in the database - the same way student photos are stored. Maximum 2 MB.");
+            HumanUi.Card("Logo", "Choose a PNG or JPEG image up to 2 MB.");
         var logoPanel =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -140,7 +140,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
         root.SetRowSpan(logoCard, 2);
         SetContent(
             root,
-            "Edit the school's identity information, then click Save. This information is used across the application wherever a document needs the school's letterhead details. Leave the fee proration cutoff day blank to keep billing exactly as it is today.");
+            "Update the school details and click Save. Leave the fee cutoff day blank to keep the current billing rules.");
         FormFlow.EnterMovesToNext(this);
         Defer(LoadProfile);
     }

@@ -60,7 +60,7 @@ public sealed class StudentAccountStatementPage : V2Page
     private readonly Dictionary<int, HashSet<int>> familySelections =
         new();
     public StudentAccountStatementPage()
-        : base(PageTitles.StudentAccountStatement, "Find students, choose who to include, then review or print their account activity")
+        : base(PageTitles.StudentAccountStatement, "Select students to review or print their charges, payments and balances.")
     {
         var export =
             AddExportAction("Student_Fee_Statement");

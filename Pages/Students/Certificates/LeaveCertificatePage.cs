@@ -40,27 +40,27 @@ public sealed class LeaveCertificatePage : V2Page
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton clearButton = new() {
-        Text = "Next Student",
+        Text = UiText.Certificates.NextStudent,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton issueAgainButton = new() {
-        Text = "Issue Again",
+        Text = UiText.Certificates.IssueAgainAction,
         Width = AppScale.Scale(140)
     };
     private readonly ModernButton collectButton = new() {
-        Text = "Mark Collected",
+        Text = UiText.Certificates.MarkCollected,
         Width = AppScale.Scale(150)
     };
     private readonly ModernButton printButton = new() {
-        Text = "Print",
+        Text = UiText.Actions.Print,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton refreshButton = new() {
-        Text = "Refresh",
+        Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
     public LeaveCertificatePage(int? preselectAdmissionId = null)
-        : base("Leave Certificate", "Create, issue, collect and print student leave certificates")
+        : base("Leave Certificate", "Create, issue, collect and print student leave certificates.")
     {
         feeReview = new LeaveFeeReviewBar(() => student.SelectedId, () => currentEnrollmentId, () => leave.Value.Date, () => HasCertificateForCurrentEnrollment());
         leave.ValueChanged += (_, _) => feeReview.RefreshFees();
@@ -114,7 +114,7 @@ public sealed class LeaveCertificatePage : V2Page
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
-                "Create the original leave certificate for an active student (this also marks them Left), or for a student already marked Left with no certificate on file. Either way, the first issuance is recorded automatically.");
+                "Create a certificate for an active student or a former student without one. Creating it marks the student Left and records the first issue.");
         var fields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -156,7 +156,7 @@ public sealed class LeaveCertificatePage : V2Page
         var records =
             HumanUi.Card(
                 UiText.Certificates.IssuanceHistory,
-                "Each time the certificate is issued, the system records when it was issued, who issued it, and who collected it.");
+                UiText.Certificates.IssueHistoryGuidance);
         var certificateActions =
             CertificateButtonRow.Create(issueAgainButton, collectButton, printButton, refreshButton);
         certificateActions.Dock =
@@ -181,7 +181,7 @@ public sealed class LeaveCertificatePage : V2Page
         root.Controls.Add(records, 0, 1);
         SetContent(
             root,
-            "Select the student, then move the certificate through Create, Issue, Collect and Print in order. The available actions change to match the certificate's current stage.");
+            UiText.Certificates.IssueGuidance);
         ApplyWorkflowState();
     }
     private void StudentChanged()
@@ -1140,7 +1140,7 @@ public sealed class LeaveCertificatePage : V2Page
         var cancel =
             new ModernButton {
                 Text =
-                    "Cancel",
+                    UiText.Actions.Cancel,
                 ThemeRole =
                     UiDesignSystem.Actions.Secondary,
                 Width =

@@ -3,5 +3,6 @@
   <ItemGroup>
     <Compile Include="../../Core/AppHotKeys.cs" Link="AppHotKeys.cs" />
     <Compile Include="../../Core/PageActionShortcutController.cs" Link="PageActionShortcutController.cs" />
+    <Compile Include="../../Core/ActionButtonStyle.cs" Link="ActionButtonStyle.cs" />
   </ItemGroup>
 </Project>

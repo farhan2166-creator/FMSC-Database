@@ -18,7 +18,7 @@ public sealed class AddAdditionalFeeDialog : ApplicationWindowForm
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         var close = new ModernButton {
-            Text = "Cancel", Width = AppScale.Scale(110), Height = AppMetrics.ButtonHeight,
+            Text = UiText.Actions.Cancel, Width = AppScale.Scale(110), Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary", DialogResult = DialogResult.Cancel
         };
         entry = new AdditionalFeeEntry(close);

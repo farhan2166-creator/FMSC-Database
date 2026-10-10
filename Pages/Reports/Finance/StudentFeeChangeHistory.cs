@@ -175,7 +175,7 @@ internal static class StudentFeeChangeHistory
             }
         }
         if (events==0) rows.Rows.Add("—","No linked audit events","—","—","—","Stored rates and charges are shown above; earlier change details may not have been retained.");
-        AddSection("HISTORY COVERAGE", $"{events} linked audit entries; {incomplete} entries with incomplete details. Dates/times are stored database times. Missing audit values are not inferred from current records.");
+        AddSection("HISTORY COVERAGE", $"{events} linked audit entries; {incomplete} entries with incomplete details. Times are shown as recorded. Unavailable details are marked as missing.");
         object?[] coverage=rows.Rows[rows.Rows.Count-1].ItemArray;
         rows.Rows.RemoveAt(rows.Rows.Count-1);
         DataRow coverageRow=rows.NewRow();

@@ -68,7 +68,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
             input.Height = AppMetrics.InputControlHeight;
         }
         add = new ModernButton {
-            Text = "New",
+            Text = UiText.Actions.New,
             Width = AppScale.Scale(105),
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary",
@@ -82,7 +82,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
             TabIndex = 7
         };
         cancel = new ModernButton {
-            Text = "Close",
+            Text = UiText.Actions.Close,
             Width = AppScale.Scale(105),
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary",

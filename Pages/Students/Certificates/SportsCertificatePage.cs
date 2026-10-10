@@ -27,23 +27,23 @@ public sealed class SportsCertificatePage : V2Page
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton newButton = new() {
-        Text = "New Certificate",
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(110)
     };
     private readonly ModernButton clearButton = new() {
-        Text = "Next Student",
+        Text = UiText.Certificates.NextStudent,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton printButton = new() {
-        Text = "Print",
+        Text = UiText.Actions.Print,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton refreshButton = new() {
-        Text = "Refresh",
+        Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
     public SportsCertificatePage()
-        : base("Sports Certificate", "Record and print sports certificates for students")
+        : base("Sports Certificate", "Record and print sports certificates for students.")
     {
         sportName.MaxLength = 200;
         performance.MaxLength = 1000;
@@ -170,7 +170,7 @@ public sealed class SportsCertificatePage : V2Page
         root.Controls.Add(records, 0, 1);
         SetContent(
             root,
-            "Select the student, fill in the sport and performance, and create the certificate. Select any existing certificate below to edit or print it.");
+            UiText.Certificates.StudentGuidance);
         sportName.TextChanged += (_, _) => ApplyWorkflowState();
         performance.TextChanged += (_, _) => ApplyWorkflowState();
         certificateDate.ValueChanged += (_, _) => ApplyWorkflowState();

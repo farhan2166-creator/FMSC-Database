@@ -9,7 +9,7 @@ public sealed class BillingStatusReportPage : V2Page
     public BillingStatusReportPage()
         : base(
             "Billing Status",
-            "See which active enrollments have been billed for the current month, school-wide or by campus.")
+            "Check which active students have been billed this month.")
     {
         asOfDate.Value = DateTime.Today;
         var viewStatus = AddBusyAction("View Status", ViewStatusAsync, "Primary");

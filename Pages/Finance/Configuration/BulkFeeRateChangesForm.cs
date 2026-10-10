@@ -57,7 +57,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
         Font = AppTheme.NormalFont
     };
     private readonly ModernButton previewButton = new() {
-        Text = "Preview",
+        Text = UiText.Actions.Preview,
         Width = AppScale.Scale(110),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Secondary"
@@ -69,8 +69,8 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
         ThemeRole = "Warning",
         Enabled = false
     };
-    private readonly ModernButton selectAllButton = new() { Text = "Select All", ThemeRole = "Secondary" };
-    private readonly ModernButton selectNoneButton = new() { Text = "Select None", ThemeRole = "Secondary" };
+    private readonly ModernButton selectAllButton = new() { Text = UiText.Actions.SelectAll, ThemeRole = "Secondary" };
+    private readonly ModernButton selectNoneButton = new() { Text = UiText.Actions.SelectNone, ThemeRole = "Secondary" };
     private List<PlanRow> SelectedPlan() => preview.Rows.Cast<DataGridViewRow>()
         .Where(row => row.Tag is PlanRow item && item.OldAmount != item.NewAmount && row.Cells["Include"].Value is true)
         .Select(row => (PlanRow)row.Tag!).ToList();
@@ -168,7 +168,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
     private readonly ToolTip tip = new();
     private bool embedded;
     private readonly ModernButton closeButton = new() {
-        Text = "Close",
+        Text = UiText.Actions.Close,
         Width = AppScale.Scale(105),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Secondary"
@@ -203,7 +203,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
             ForeColor = AppTheme.Text
         };
         var help = FeeToolLayout.Help(
-            "Increase or decrease many fees at once. Choose which fees, say how much, then preview before applying.",
+            "Choose the fees and adjustment amount, then preview the changes before applying them.",
             tip);
         /* Increase and Decrease share one control, as do the two ways of stating the amount, so a change reads as one sentence: Increase, 10, percent. */
         typePercentage.Text = "Percent (%)";

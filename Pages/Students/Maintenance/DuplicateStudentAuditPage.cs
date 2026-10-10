@@ -6,7 +6,7 @@ public sealed class DuplicateStudentAuditPage : V2Page
     public DuplicateStudentAuditPage()
         : base(
             "Find Duplicate Students",
-            "Sweep the student base for likely duplicate admissions (matching name, father's name and date of birth), then review each candidate pair.")
+            "Find students with matching names, father’s names and birth dates, then review possible duplicates.")
     {
         Grid.MultiSelect = true;
         var scan = AddBusyAction("Scan for Duplicates", ScanAsync, "Primary");

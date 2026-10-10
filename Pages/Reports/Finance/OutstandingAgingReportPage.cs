@@ -3,7 +3,7 @@ namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
 {
     public OutstandingAgingReportPage() : base(
-        "Outstanding & Aging", "Who owes money, which charges make up the balance, and how old the debt is.",
+        "Outstanding & Aging", "Review unpaid charges, outstanding balances and how long they have been due.",
         "GetOutstandingAndAgingReport", "FMSC_Outstanding_Aging",
         new[] { "Students", "Charges", "Aging", "Families" },
         Array.Empty<string>(), false, true, false, false)

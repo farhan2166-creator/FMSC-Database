@@ -43,7 +43,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
         Enabled = false
     };
     private readonly ModernButton closeButton = new() {
-        Text = "Close",
+        Text = UiText.Actions.Close,
         Width = AppScale.Scale(100),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Secondary"
@@ -274,7 +274,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
             ForeColor = AppTheme.Text
         };
         var subtitle = new Label {
-            Text = "Edit amounts in the grid. Edit Selected Fee changes one class's frequency and remarks; the Frequency column changes the whole row. Save Grid, then apply saved rates to existing students when needed.",
+            Text = "Edit amounts, then Save Grid. Use Edit Selected Fee for one class; Frequency changes the whole row. Update student fees separately.",
             Dock = DockStyle.Top,
             AutoSize = false,
             AutoEllipsis = true,

@@ -20,7 +20,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         ThemeRole = UiDesignSystem.Actions.Success
     };
     private readonly ModernButton closeButton = new() {
-        Text = "Close",
+        Text = UiText.Actions.Close,
         Width = AppScale.Scale(110),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = UiDesignSystem.Actions.Secondary

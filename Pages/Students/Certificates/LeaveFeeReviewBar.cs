@@ -174,7 +174,7 @@ internal sealed class LeaveFeeReviewBar : TableLayoutPanel
             }
         };
         showHistory.CheckedChanged+=(_,_)=>{PopulateGrid(); UpdateTotals();};
-        var cancel=new ModernButton {Text="Cancel",DialogResult=DialogResult.Cancel,Width=110};
+        var cancel=new ModernButton {Text=UiText.Actions.Cancel,DialogResult=DialogResult.Cancel,Width=110};
         use.Click+=(_,_)=> {
             if(!use.Enabled) return;
             if(payments.Checked) {dialog.DialogResult=DialogResult.Retry; return;}

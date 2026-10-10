@@ -12,7 +12,7 @@ public sealed class FeeTypesPage : MasterPage
     public FeeTypesPage(bool splitEditorAndRecords = true)
         : base(
             "Fee Types",
-            "Define the fees a class can be charged",
+            "Manage the types of fees charged to students.",
             "GetFeeTypes",
             "SaveFeeTypeWithDefaultFrequency",
             new[]

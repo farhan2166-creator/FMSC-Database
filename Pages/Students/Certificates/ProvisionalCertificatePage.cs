@@ -26,7 +26,7 @@ public sealed class ProvisionalCertificatePage : V2Page
         CheckOnClick = true,
         BorderStyle = BorderStyle.FixedSingle
     };
-    private readonly ModernButton selectAllSubjects = new() { Text = "Select All", Width = AppScale.Scale(110), ThemeRole = "Secondary" };
+    private readonly ModernButton selectAllSubjects = new() { Text = UiText.Actions.SelectAll, Width = AppScale.Scale(110), ThemeRole = "Secondary" };
     private readonly ModernButton clearAllSubjects = new() { Text = "Clear All", Width = AppScale.Scale(110), ThemeRole = "Secondary" };
     private bool changingSubjectChecks;
     private bool syncingSubjectChecks;
@@ -56,19 +56,19 @@ public sealed class ProvisionalCertificatePage : V2Page
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton newButton = new() {
-        Text = "New Certificate",
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(110)
     };
     private readonly ModernButton clearButton = new() {
-        Text = "Next Student",
+        Text = UiText.Certificates.NextStudent,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton printButton = new() {
-        Text = "Print",
+        Text = UiText.Actions.Print,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton refreshButton = new() {
-        Text = "Refresh",
+        Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
     private static readonly string[] ExamTypeCodes = { "SSC", "HSSC1", "HSSC2" };
@@ -78,7 +78,7 @@ public sealed class ProvisionalCertificatePage : V2Page
         "HSSC Part II"
     };
     public ProvisionalCertificatePage()
-        : base("Provisional Certificate", "Record and print provisional (board result) certificates for SSC/HSSC")
+        : base("Provisional Certificate", "Record and print provisional (board result) certificates for SSC/HSSC.")
     {
         examType.DropDownStyle =
             ComboBoxStyle.DropDownList;
@@ -419,7 +419,7 @@ public sealed class ProvisionalCertificatePage : V2Page
         subjectsPanel.SizeChanged += (_, _) => FitCards();
         SetContent(
             root,
-            "Select the student, fill in the exam/board result and check the subjects passed, then create the certificate. Select any existing certificate below to edit or print it.");
+            UiText.Certificates.StudentGuidance);
         examYear.TextChanged += (_, _) => { CalculateGrade(); ApplyWorkflowState(); };
         boardName.TextChanged += (_, _) => ApplyWorkflowState();
         rollNumber.TextChanged += (_, _) => ApplyWorkflowState();

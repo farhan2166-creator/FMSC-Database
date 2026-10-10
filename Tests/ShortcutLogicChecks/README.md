@@ -9,7 +9,7 @@ dotnet run --project Tests/ShortcutLogicChecks/ShortcutTests.csproj
 These dependency-free checks compile the production shortcut catalog and controller
 against minimal simulated controls. They exercise focused-editor resolution,
 ambiguity, disabled targets, search focus, native editing keys, cache invalidation,
-local registration, and tab navigation. They do not test native WinForms key routing,
+local registration, tab navigation, and consistent action styling. They do not test native WinForms key routing,
 report viewer integration, DPI scaling, or visual layout.
 
 On Windows, also check:
@@ -29,3 +29,8 @@ On Windows, also check:
 Changed bindings: View → Ctrl+O; Add → Insert; Edit → F2; Clear → Alt+C;
 Scan → F8; Delete/Remove → Alt+Delete; previous tab → Ctrl+PageUp;
 dashboard modules → Alt+1–8; report page setup → Alt+P.
+
+Also compare Student Admissions, Staff, School Information, Fee Rate Setup and
+certificate pages in both light and dark themes. Common actions should use the
+same styling, while New, Clear and Reset keep their own meaning. Check long labels
+and guidance at your usual Windows display scale.

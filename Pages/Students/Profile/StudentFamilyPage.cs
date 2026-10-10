@@ -37,9 +37,9 @@ public sealed class StudentFamilyPage : V2Page
     private int _familyLoadVersion;
     public StudentFamilyPage() : base(
         "Family / Siblings",
-        "Manage existing family groups. New families are started from a student's Admission page (Fees & Siblings tab).")
+        "Manage family groups and siblings. Start a new family from Student Admissions > Fees & Siblings.")
     {
-        var refresh = AddBusyAction("Refresh", async () => {
+        var refresh = AddBusyAction(UiText.Actions.Refresh, async () => {
             if (student.SelectedId <= 0) { Warn(UiText.Prompts.SelectStudent); return; }
             await LoadFamilyForSelectedStudentAsync();
         }, "Secondary");

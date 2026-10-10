@@ -57,7 +57,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         PaymentMethod.Items.AddRange(new object[] { "All", "Cash", "Bank", "Card", "Online", "Other", "Refund", "Correction" });
         PaymentMethod.SelectedIndex = 0;
         var run = AddBusyAction("Run Report", RunAsync, "Primary");
-        _print = AddBusyAction("Print", PrintAsync, "Secondary");
+        _print = AddBusyAction(UiText.Actions.Print, PrintAsync, "Secondary");
         _export = AddExportAction(exportName);
         RelocateFromActions(run, _print, _export);
         Defer(BindLookupsAsync);

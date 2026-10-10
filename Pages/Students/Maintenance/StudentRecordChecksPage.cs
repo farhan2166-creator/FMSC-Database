@@ -140,7 +140,7 @@ public sealed class StudentRecordChecksPage : V2Page
         newEnrollmentAction.Click+=(_,_)=>BeginMissingEnrollment();
         GateAction(repairDates,"Students.Administer");
         var export = AddExportAction("Student_Consistency_Findings");
-        var clear = AddBusyAction("Clear", () => ClearForm(), "Secondary");
+        var clear = AddBusyAction(UiText.Actions.Clear, () => ClearForm(), "Secondary");
         /* this page is reachable with Students.View alone, but every one of these three writes goes to a procedure that requires Students.Administer (dbo.CorrectStudentStatus, dbo.CorrectEnrollmentStatus, dbo.AddEnrollment...). Scan/Export/Clear stay - they only read. */
         GateAction(saveStatus, "Students.Administer");
         GateAction(saveEnrollment, "Students.Administer");

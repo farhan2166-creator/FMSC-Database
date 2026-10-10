@@ -14,8 +14,8 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
     private readonly ProgressBar _progress = new() { Dock = DockStyle.Fill, Style = ProgressBarStyle.Marquee };
     private readonly ModernButton _reconnect = new() { Text = "Reconnect", ThemeRole = "Primary" };
     private readonly ModernButton _restart = new() { Text = "Restart Connection", ThemeRole = "Secondary" };
-    private readonly ModernButton _repair = new() { Text = "Repair SQL Dependencies", ThemeRole = "Secondary" };
-    private readonly ModernButton _close = new() { Text = "Close", ThemeRole = "Secondary" };
+    private readonly ModernButton _repair = new() { Text = "Repair Connection", ThemeRole = "Secondary" };
+    private readonly ModernButton _close = new() { Text = UiText.Actions.Close, ThemeRole = "Secondary" };
     private readonly ModernTextBox _details = new() {
         Multiline = true, ReadOnly = true, Dock = DockStyle.Fill,
         ScrollBars = ScrollBars.Vertical
@@ -61,7 +61,7 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         state.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.ButtonFont) + gap));
         state.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         state.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.S(12)));
-        _message.Text = "Please wait while FMSC checks the database engine and your saved school records.";
+        _message.Text = "Please wait while FMSC connects to your saved school records.";
         _message.ForeColor = AppTheme.Text;
         _message.UseMnemonic = false;
         _message.Margin = new Padding(0, 0, 0, gap);
@@ -151,7 +151,7 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
     {
         if (_busy) return;
         SetBusy(true);
-        _message.Text = restart ? "Restarting the database engine safely. Your school records will be kept." : "Checking the engine and reconnecting to your school records…";
+        _message.Text = restart ? "Restarting the connection. Your saved school records will be kept." : "Reconnecting to your saved school records…";
         _status.Text = restart ? "Restarting connection…" : "Checking connection…";
         try
         {
@@ -186,13 +186,10 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         _repair.Visible = !_incompatibleDatabase && (LocalDatabaseEngine.FindTool() is null || message.Contains("database engine", StringComparison.OrdinalIgnoreCase) || message.Contains("LocalDB", StringComparison.OrdinalIgnoreCase));
         if (_incompatibleDatabase)
         {
-            _status.Text = "Database update required";
-            _message.Text = "FMSC reached your saved database, but its structure does not match this application. " +
-                "An older restored backup needs the saved database updates applied, or you can restore a backup from the current release. " +
-                "Restart Connection cannot fix a database version mismatch. After updating or restoring, choose Reconnect.";
-            var version = System.Text.RegularExpressions.Regex.Match(message,
-                @"(?:Restored schema version|schema version)\s+[^.\r\n]+", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            if (version.Success) _message.Text += "\r\n\r\n" + version.Value.Trim() + ".";
+            _status.Text = "School data update needed";
+            _message.Text = "Your saved school data needs an update before FMSC can open it. " +
+                "Ask the administrator to update it or restore a compatible backup, then choose Reconnect. " +
+                "Restart Connection will not resolve this issue.";
             _details.Text = ConnectionDetails(message + "\r\n" + details);
             return;
         }
@@ -202,13 +199,13 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
             : message.Contains("schema version", StringComparison.OrdinalIgnoreCase) || message.Contains("admission-number update", StringComparison.OrdinalIgnoreCase)
                 ? "Your school data is not compatible with this application version. Contact your administrator."
                 : message.Contains("approved database", StringComparison.OrdinalIgnoreCase) || message.Contains("not FMSC_DB", StringComparison.OrdinalIgnoreCase)
-                    ? "FMSC found a different database. Your school records have not been replaced. Contact your administrator to connect the correct school data."
+                    ? "FMSC found different school data. Your records have not been replaced. Ask the administrator to connect the correct school records."
                     : message.Contains("Error", StringComparison.OrdinalIgnoreCase)
                         ? "FMSC could not connect to your saved records. Choose Reconnect first. If it still fails, try Restart Connection. "
                             + "Contact your administrator if the problem continues."
-                        : message;
+                        : "School records could not be opened. Choose Reconnect or contact the administrator.";
         _details.Text = ConnectionDetails(message + "\r\n" + details);
-        if (_repair.Visible) _message.Text += " You can download and repair SQL Server LocalDB using Repair SQL Dependencies (internet and administrator approval required).";
+        if (_repair.Visible) _message.Text += " Choose Repair Connection to reinstall the required connection software. Internet access and Windows administrator approval are required.";
     }
 
     internal static bool IsCompatibilityFailure(string message) =>

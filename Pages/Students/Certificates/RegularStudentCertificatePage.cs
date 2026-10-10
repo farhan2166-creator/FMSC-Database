@@ -30,23 +30,23 @@ public sealed class RegularStudentCertificatePage : V2Page
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton newButton = new() {
-        Text = "New Certificate",
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(110)
     };
     private readonly ModernButton clearButton = new() {
-        Text = "Next Student",
+        Text = UiText.Certificates.NextStudent,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton printButton = new() {
-        Text = "Print",
+        Text = UiText.Actions.Print,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton refreshButton = new() {
-        Text = "Refresh",
+        Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
     public RegularStudentCertificatePage()
-        : base("Regular Student Certificate", "Record and print regular student (proof of enrollment) certificates")
+        : base("Regular Student Certificate", "Record and print regular student (proof of enrollment) certificates.")
     {
         className.MaxLength = 100;
         className.ReadOnly = true;
@@ -183,7 +183,7 @@ public sealed class RegularStudentCertificatePage : V2Page
         root.Controls.Add(records, 0, 1);
         SetContent(
             root,
-            "Select the student, confirm the class, and create the certificate. Select any existing certificate below to edit or print it.");
+            UiText.Certificates.StudentGuidance);
         ApplyWorkflowState();
     }
     private void StudentChanged()

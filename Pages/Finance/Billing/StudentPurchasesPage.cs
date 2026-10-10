@@ -22,7 +22,7 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
         clear = AddAction("Clear Student", (_, _) => {
             if (CanChangeStudent()) ClearStudent();
         }, "Secondary");
-        var refresh = AddBusyAction("Refresh", RefreshAsync, "Secondary");
+        var refresh = AddBusyAction(UiText.Actions.Refresh, RefreshAsync, "Secondary");
         RelocateFromActions(clear, refresh);
         var identity = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty

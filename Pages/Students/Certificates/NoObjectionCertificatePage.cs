@@ -23,23 +23,23 @@ public sealed class NoObjectionCertificatePage : V2Page
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton newButton = new() {
-        Text = "New Certificate",
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(110)
     };
     private readonly ModernButton clearButton = new() {
-        Text = "Next Student",
+        Text = UiText.Certificates.NextStudent,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton printButton = new() {
-        Text = "Print",
+        Text = UiText.Actions.Print,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton refreshButton = new() {
-        Text = "Refresh",
+        Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
     public NoObjectionCertificatePage()
-        : base("No Objection Certificate", "Record and print No Objection Certificates (NOC) for students")
+        : base("No Objection Certificate", "Record and print No Objection Certificates (NOC) for students.")
     {
         /* dbo.CreateNoObjectionCertificate has no duplicate guard, and the certificate table has no unique constraint on (AdmissionId, ...). */
         createCertificateButton.Click += async (_, _) => {
@@ -158,7 +158,7 @@ public sealed class NoObjectionCertificatePage : V2Page
         root.Controls.Add(records, 0, 1);
         SetContent(
             root,
-            "Select the student, confirm the certificate date, and create the NOC. Select any existing certificate below to edit or print it.");
+            UiText.Certificates.StudentGuidance);
         certificateDate.ValueChanged += (_, _) => ApplyWorkflowState();
         ApplyWorkflowState();
     }

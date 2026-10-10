@@ -10,7 +10,7 @@ namespace FMSC_SMS.Core;
 }
 internal class Control {
  private bool visible=true, enabled=true, focused;
- public List<Control> Controls { get; }=new();
+ public ControlCollection Controls { get; }=new();
  public Control? Parent {get;private set;}
  public bool Visible {get=>visible && (Parent?.Visible ?? true);set=>visible=value;}
  public bool Enabled {get=>enabled && (Parent?.Enabled ?? true);set=>enabled=value;}
@@ -18,6 +18,7 @@ internal class Control {
  public bool ContainsFocus=>focused || Controls.Any(c=>c.ContainsFocus);
  public bool CanFocus=>Visible && Enabled && !IsDisposed;
  public bool TabStop {get;set;}=true;
+ public Padding Margin {get;set;}
  public int TabIndex {get;set;}
  public string Text {get;set;}=""; public string Name {get;set;}="";
  public string? AccessibleName {get;set;} public bool HasChildren=>Controls.Count>0;
@@ -26,7 +27,7 @@ internal class Control {
  private static void Clear(Control root){root.focused=false;foreach(var c in root.Controls)Clear(c);}
  public void BeginInvoke(Action action)=>action();
 }
-internal class ModernButton:Control {
+internal class ModernButton:Button {
  public string ThemeRole {get;set;}="Primary"; public char? ShortcutLetter {get;set;}
  public int Clicks {get;private set;} public void PerformClick(){if(Enabled && Visible)Clicks++;}
 }
@@ -62,3 +63,16 @@ internal class ApplicationWindowForm:Control {
 internal static class FormFlow {public static bool FocusFirstInput(Control c)=>false;}
 internal static class LookupDataCache {public static int Invalidations;public static void Invalidate()=>Invalidations++;}
 internal static class StudentSearchCache {public static int Invalidations;public static void Invalidate()=>Invalidations++;}
+
+internal class Button:Control { }
+internal class FlowLayoutPanel:Control {public void SuspendLayout(){} public void ResumeLayout(){} }
+internal class ControlCollection:List<Control> {
+ public void SetChildIndex(Control control,int index){Remove(control);Insert(index,control);}
+}
+internal readonly record struct Padding(int Left,int Top,int Right,int Bottom);
+internal static class AppMetrics {public const int SpacingMd=12, SpacingXs=4;}
+internal static class UiDesignSystem {
+ internal static class Actions {
+  public const string Danger="Danger",Secondary="Secondary",Success="Success",Primary="Primary",Warning="Warning";
+ }
+}

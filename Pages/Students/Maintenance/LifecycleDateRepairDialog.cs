@@ -12,7 +12,7 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
     private readonly CheckBox finances=new() {Text="Keep existing bills and payments at their original dates and amounts",AutoSize=true};
     private readonly Label impact=new() {Dock=DockStyle.Fill,AutoSize=true};
     private readonly ModernButton save=new() {Text="Apply Date Repair",Enabled=false};
-    private readonly ModernButton cancel=new() {Text="Cancel",DialogResult=DialogResult.Cancel};
+    private readonly ModernButton cancel=new() {Text=UiText.Actions.Cancel,DialogResult=DialogResult.Cancel};
     private readonly ModernDatePicker startDate=HumanUi.Date();
     private readonly ModernDatePicker leaveDate=HumanUi.Date();
     private readonly ModernDatePicker billingDate=HumanUi.Date();

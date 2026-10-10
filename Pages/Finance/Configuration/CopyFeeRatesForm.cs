@@ -22,8 +22,8 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
     private readonly ModernComboBox targetCampus = HumanUi.Combo();
     private readonly ModernComboBox conflictMode = HumanUi.Combo();
     private readonly DataGridView preview = HumanUi.Grid(false);
-    private readonly ModernButton selectAllButton = new() { Text = "Select All", ThemeRole = "Secondary" };
-    private readonly ModernButton selectNoneButton = new() { Text = "Select None", ThemeRole = "Secondary" };
+    private readonly ModernButton selectAllButton = new() { Text = UiText.Actions.SelectAll, ThemeRole = "Secondary" };
+    private readonly ModernButton selectNoneButton = new() { Text = UiText.Actions.SelectNone, ThemeRole = "Secondary" };
     private string previewWarnings = "";
     private static bool CanCopy(PlanRow row) => row.Action is "New" or "Overwrite";
     private List<PlanRow> SelectedPlan() => preview.Rows.Cast<DataGridViewRow>()
@@ -57,7 +57,7 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
         Enabled = false
     };
     private readonly ModernButton closeButton = new() {
-        Text = "Cancel",
+        Text = UiText.Actions.Cancel,
         Width = AppScale.Scale(105),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Secondary",
@@ -97,7 +97,7 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
     }
     public CopyFeeRatesForm(int sourceCampusId = 0, int sourceClassId = 0)
     {
-        Text = "Copy Fees to Another Campus";
+        Text = PageTitles.CopyFeeRates;
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
         MaximizeBox = true;
@@ -110,8 +110,8 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
         BuildLayout();
         SetSaveShortcut(applyButton);
         conflictMode.Items.AddRange(new object[] {
-            "Skip fee types the target already has",
-            "Overwrite the target's existing amounts"
+            "Keep existing fees",
+            "Replace existing amounts"
         });
         conflictMode.SelectedIndex = 0;
         LoadSourceCampuses(sourceCampusId, sourceClassId);
@@ -132,20 +132,20 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
     private void BuildLayout()
     {
         titleLabel = new Label {
-            Text = "Copy Fees to Another Campus",
+            Text = PageTitles.CopyFeeRates,
             Dock = DockStyle.Top,
             Height = Math.Max(30, AppMetrics.TextHeight(AppTheme.PageTitleFont) + 8),
             Font = AppTheme.PageTitleFont,
             ForeColor = AppTheme.Text
         };
         var help = FeeToolLayout.Help(
-            "Copy one class, or every class of a campus, to another campus. Classes are matched by name. Review the preview, then copy.",
+            "Copy fee rates between campuses. Classes are matched by name; review the selected rows before copying.",
             tip);
         var fields = FeeToolLayout.FieldRow(
-            ("From campus", sourceCampus, true),
+            ("From Campus", sourceCampus, true),
             ("Class", sourceClass, true),
-            ("To campus", targetCampus, true),
-            ("If the target already has the fee type", conflictMode, true));
+            ("To Campus", targetCampus, true),
+            ("Existing Fees", conflictMode, true));
         preview.Dock = DockStyle.Fill;
         preview.AutoGenerateColumns = false;
         preview.ReadOnly = false;

@@ -31,13 +31,13 @@ public sealed class ReportNameDialog : ApplicationWindowForm
         name.Dock = DockStyle.Top;
         name.Text = initial;
         var ok = new ModernButton {
-            Text = "Save",
+            Text = UiText.Actions.Save,
             ThemeRole = "Primary",
             Width = AppScale.S(100),
             Height = AppMetrics.ButtonHeight
         };
         var cancel = new ModernButton {
-            Text = "Cancel",
+            Text = UiText.Actions.Cancel,
             ThemeRole = "Secondary",
             Width = AppScale.S(100),
             Height = AppMetrics.ButtonHeight,

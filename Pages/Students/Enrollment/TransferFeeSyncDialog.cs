@@ -308,7 +308,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         foreach(var option in new[]{keepOption,nextMonthOption,currentMonthOption})
             option.CheckedChanged += (_, _) => {if(option.Checked) {customMonthOption.Checked=false; RefreshComparison();}};
         var cancelButton = new ModernButton {
-            Text = "Cancel",
+            Text = UiText.Actions.Cancel,
             Width = AppScale.Scale(105),
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary",

@@ -69,7 +69,7 @@ public sealed class ConfirmReturnAdmissionPage : V2Page
         Action<Func<Control>, string, string>? navigate = null,
         int preselectAdmissionId = 0, bool compactDialog = false)
         : base("Confirm Return Admission",
-            "Review the new class fees, then confirm the return to create the opening charges.")
+            "Review the class fees and confirm the returning student’s admission.")
     {
         this.compactDialog = compactDialog;
         var confirm = AddBusyAction(compactDialog ? "Confirm Return" : "Confirm Return & Create Charges", ConfirmAsync, "Success");
@@ -189,7 +189,7 @@ public sealed class ConfirmReturnAdmissionPage : V2Page
             root.RowStyles[3].Height = amountFieldHeight + totalsGuidanceHeight + totalsGrid.Padding.Vertical +
                 summaryCard.Padding.Vertical + summaryCard.Content.Padding.Vertical;
             root.Controls.Remove(buttonRow);
-            var cancel = new ModernButton { Text = "Cancel", ThemeRole = "Secondary" };
+            var cancel = new ModernButton { Text = UiText.Actions.Cancel, ThemeRole = "Secondary" };
             cancel.Click += (_, _) => FindForm()?.Close();
             buttonRow.Controls.Add(cancel);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 2 };

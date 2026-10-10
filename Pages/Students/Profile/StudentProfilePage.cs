@@ -70,7 +70,7 @@ public sealed class StudentProfilePage : V2Page
     public StudentProfilePage(Action<Func<Control>, string, string>? navigate = null)
         : base(
             "Student Profile",
-            "Select a student to see identity, family, balance and history, with links to edit each area.")
+            "View a student’s details, family, balance and history.")
     {
         UiHelper.DisposePictureImageOnDispose(photo);
         this.navigate = navigate;
@@ -524,7 +524,7 @@ public sealed class StudentProfilePage : V2Page
                   sql.Number is 2812 or 208)
         {
             balanceLabel.Text =
-                "Outstanding Balance: unavailable (pending database migration)";
+                "Outstanding Balance: unavailable. Contact the administrator.";
             balanceLabel.ForeColor =
                 AppTheme.MutedText;
         }

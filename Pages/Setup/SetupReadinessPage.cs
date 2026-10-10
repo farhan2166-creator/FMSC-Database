@@ -12,7 +12,7 @@ public sealed class SetupReadinessPage : V2Page
     private readonly ModernButton open;
     private bool checking;
     public SetupReadinessPage(Action<Func<Control>, string, string> navigate) : base(
-        "Setup Readiness", "Checks configuration for daily admission and billing. These checks do not change school data.")
+        PageTitles.SetupReadiness, "Check what needs to be set up before admitting students or billing fees.")
     {
         this.navigate = navigate;
         AddBusyAction("Check Again", CheckAsync, "Primary");

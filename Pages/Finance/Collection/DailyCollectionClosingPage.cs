@@ -20,7 +20,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges
         "The daily closing amounts or notes have not been submitted.";
 
     public DailyCollectionClosingPage() : base("Daily Collection Closing",
-        "Check the day's recorded collections against money counted or confirmed. Student payments remain unchanged.")
+        "Compare recorded payments with the day’s cash and bank totals. Student payments stay the same.")
     {
         day.Value = DateTime.Today;
         AddClosingAction("Load Day", LoadAsync, "Primary");

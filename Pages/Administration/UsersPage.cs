@@ -72,7 +72,7 @@ public sealed class UsersPage : V2Page, IUnsavedChanges
     readonly ModernButton clearButton =
         new() { Text = "Deselect", Width = AppScale.Scale(110), ThemeRole = "Secondary" };
     readonly ModernButton selectAllRolesButton =
-        new() { Text = "Select All", Width = AppScale.Scale(105), ThemeRole = "Secondary" };
+        new() { Text = UiText.Actions.SelectAll, Width = AppScale.Scale(105), ThemeRole = "Secondary" };
     readonly ModernButton clearRolesButton =
         new() { Text = "Clear All", Width = AppScale.Scale(105), ThemeRole = "Secondary" };
     /* The pending role selection is not the saved role set, and the page must say so. Kept in a collapsed row so it costs no space while clean. */
@@ -116,7 +116,7 @@ public sealed class UsersPage : V2Page, IUnsavedChanges
     public UsersPage()
         : base(
             "Users",
-            "Create accounts and assign the roles that grant their permissions.")
+            "Manage user accounts and assign their access roles.")
     {
         newUserButton.Enabled = canManageUsers && canViewUsers;
         editAccountButton.Enabled = false;
@@ -1538,7 +1538,7 @@ public sealed class UsersPage : V2Page, IUnsavedChanges
                 "No (Stay) keeps the selected user and the unsaved role selections.",
                 "Yes (Discard) loads the user you just selected instead.",
                 "",
-                "The roles saved in the database are not changed either way."
+                "Previously saved roles will stay the same."
             };
             if (!ModernMessageDialog.Confirm(
                     this,
@@ -1585,7 +1585,7 @@ public sealed class UsersPage : V2Page, IUnsavedChanges
                 "No (Stay) keeps the selected user and the unsaved role selections.",
                 "Yes (Discard) clears the selection instead.",
                 "",
-                "The roles saved in the database are not changed either way."
+                "Previously saved roles will stay the same."
             };
             if (!ModernMessageDialog.Confirm(
                     this,
@@ -1603,7 +1603,7 @@ public sealed class UsersPage : V2Page, IUnsavedChanges
         Environment.NewLine +
         Environment.NewLine +
         "If you leave now, the selected roles will not be saved. " +
-        "The roles saved in the database are unchanged.";
+        "Previously saved roles will stay the same.";
     void DeselectUser()
     {
         /* The checks are about to be cleared, which fires CheckedChanged once per role. Suppressed so nothing is recomputed against a half-cleared editor, and the pending state is reset explicitly below. */

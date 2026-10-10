@@ -56,22 +56,22 @@ public static class DbMessage
                     .Where(m => !string.IsNullOrWhiteSpace(m))
                     .Distinct(StringComparer.OrdinalIgnoreCase));
             return string.IsNullOrWhiteSpace(custom)
-                ? "The database rejected this operation. Please review the information entered and try again."
+                ? "Please review the information entered and try again."
                 : MakeBusinessText(custom);
         }
         return sql.Number switch {
             -1 or 0 or 2 or 20 or 26 or 40 or 52 or 53 or 64 or 233 or 10053 or 10054 or 10060 or 10061 or 17142 =>
-                "FMSC could not reach the database. Please make sure the database is installed and available, then try again." + Code(sql),
+                "FMSC could not connect to your school records. Try reconnecting or contact the administrator." + Code(sql),
             18456 =>
-                "The database login was not accepted. Please contact the administrator.",
+                "Access to school records was refused. Contact the administrator.",
             4060 =>
-                "The FMSC database could not be opened. Please contact the administrator.",
+                "School records could not be opened. Contact the administrator.",
             229 =>
                 "Your account does not have permission to perform this operation.",
             208 =>
-                "The required database object is missing. Please contact the administrator.",
+                "This feature could not be opened. Contact the administrator.",
             2812 =>
-                "The requested database operation is not available. Please contact the administrator.",
+                "This feature is not available. Contact the administrator.",
             2601 or 2627 =>
                 "This record already exists. Please review the information and use the existing record if appropriate.",
             547 =>
@@ -79,17 +79,17 @@ public static class DbMessage
             515 =>
                 "Some required information is missing. Please complete all required fields and try again.",
             8152 or 2628 =>
-                "Some information is too long for the database field. Please shorten the value and try again.",
+                "Some information is too long. Shorten the value and try again.",
             8114 or 245 or 241 =>
                 "One of the entered values has an invalid format. Please check the numbers, dates, and other fields and try again.",
             1205 =>
-                "The database was busy with another operation. No changes were intentionally lost. Please wait a moment and try again.",
+                "Another operation interrupted this request. Wait a moment and try again.",
             -2 =>
-                "The database operation took too long to finish. Please try again.",
+                "The operation took too long. Please try again.",
             1105 or 9002 =>
-                "The database is currently unable to complete this operation because of a storage problem. Please contact the administrator.",
+                "A storage problem prevented this operation. Contact the administrator.",
             _ =>
-                "The database could not complete this operation. Please review the information and try again. If the problem continues, contact the administrator." + Code(sql)
+                "The operation could not be completed. Try again or contact the administrator." + Code(sql)
         };
     }
     /* An unmapped or connection-level failure carries its error number so a support call (or the log) can identify it; the friendly sentence alone cannot. */

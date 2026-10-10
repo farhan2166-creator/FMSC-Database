@@ -139,7 +139,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         int initialAdmissionId = 0, string? initialStudentDisplay = null, string? initialOperation = null)
         : base(
             PageTitles.StudentTransfers,
-            "Transfer section, transfer class, transfer campus, and re-admit students without mixing academic-year workflows")
+            "Transfer students between classes or campuses, or readmit returning students.")
     {
         fixedOperation = initialAdmissionId > 0 ? initialOperation : null;
         if (fixedOperation is not null) selectedOperation = fixedOperation;
@@ -151,7 +151,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         currentAdmissionNumber.TabStop = false;
         currentAdmissionNumber.BackColor = AppTheme.SurfaceSecondary;
         UiAccessibility.Describe(readmissionNumberChoice, "Readmission admission number",
-            "Keep the current number or automatically allot a new unique admission number. Admission ID and registration number stay unchanged.");
+            "Keep the current admission number or assign a new one. The student record and registration number stay the same.");
         currentCampusDisplay.ReadOnly = true;
         currentCampusDisplay.BackColor = AppTheme.SurfaceSecondary;
         currentClassDisplay.ReadOnly = true;
@@ -331,7 +331,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         history.TabIndex = 2;
         SetContent(
             root,
-            "Choose one operation above - the fields below change to match it, and the button names the operation it will run. Transfer Section/Class/Campus move a student within the same academic year; Re-Admit brings a left/inactive student back for a new one. Only one operation runs per click.");
+            "Choose a transfer within the same academic year, or Re-Admit for a returning student in a new year. Review the details before confirming.");
         if (fixedOperation is not null)
         {
             PrepareForEmbedding();

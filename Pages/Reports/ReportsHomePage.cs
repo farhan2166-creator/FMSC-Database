@@ -26,7 +26,7 @@ public sealed class ReportsHomePage : V2Page
         return (factory, module, title) => navigate(factory(), module, title);
     }
     public ReportsHomePage(Action<Func<Control>, string, string> navigate)
-        : base("Reports", "All school reports in one place. Select a report to open it.")
+        : base("Reports", "Choose a student or finance report.")
     {
         _navigate =
             navigate ??
@@ -98,7 +98,7 @@ public sealed class ReportsHomePage : V2Page
                         () => new BillingDiscountsReportPage()),
                     new(
                         PageTitles.StudentAccountStatement,
-                        "A selected student's financial transaction and account history.",
+                        "A student's charges, payments and balance.",
                         "Finance",
                         () => new StudentAccountStatementPage()),
                     new(

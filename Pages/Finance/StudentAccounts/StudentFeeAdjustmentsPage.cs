@@ -33,7 +33,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
     public StudentFeeAdjustmentsPage()
         : base(
             PageTitles.StudentFeeCorrections,
-            "Review recorded payments, refunds, corrections and reversals.")
+            "Review payments and record refunds or corrections.")
     {
         transactionDate.Value = DateTime.Today;
         operation.Items.AddRange(new object[] { "Correction", "Refund", "Reversal" });
@@ -498,7 +498,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
         grid.Columns["Amount (Rs.)"].HeaderCell.Style.Alignment=DataGridViewContentAlignment.MiddleCenter;
         var card=HumanUi.Card(receipt,$"{state?.Status}. {state?.Explanation}",AppTheme.ModuleAccent("Finance"));
         card.Dock=DockStyle.Fill;card.Content.Controls.Add(grid);
-        var close=new ModernButton { Text="Close",DialogResult=DialogResult.OK,ThemeRole="Secondary" };
+        var close=new ModernButton { Text=UiText.Actions.Close,DialogResult=DialogResult.OK,ThemeRole="Secondary" };
         var layout=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(12) };
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.Controls.Add(card,0,0);layout.Controls.Add(HumanUi.ButtonRow(close),0,1);

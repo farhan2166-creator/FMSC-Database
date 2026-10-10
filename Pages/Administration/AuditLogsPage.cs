@@ -15,7 +15,7 @@ public sealed class AuditLogsPage : V2Page
     /// <summary>Searches audit table, record, action, and before/after values by keyword.</summary>
     readonly ModernTextBox search = HumanUi.TextBox(false, 200);
     public AuditLogsPage()
-        : base("Audit Logs", "Review critical changes to fees, access, student lifecycle and certificates.")
+        : base("Audit Logs", "Review changes to payments, access, student records and certificates.")
     {
         from.Value = DateTime.Today.AddDays(-30);
         to.Value = DateTime.Today;
@@ -27,7 +27,7 @@ public sealed class AuditLogsPage : V2Page
         WorkspaceState.Remember(to, "Audit:To");
         WorkspaceState.Remember(search, "Audit:Search");
         var runAudit = AddBusyAction("Run Audit", RunAsync, "Primary");
-        var clear = AddAction("Clear", (_, _) => ClearForm(), "Secondary");
+        var clear = AddAction(UiText.Actions.Clear, (_, _) => ClearForm(), "Secondary");
         RelocateFromActions(runAudit, clear);
         Defer(async () => {
             try
@@ -79,7 +79,7 @@ public sealed class AuditLogsPage : V2Page
         var buttonRow = HumanUi.ButtonRow(runAudit, clear);
         buttonRow.Dock = DockStyle.Bottom;
         filters.Content.Controls.Add(buttonRow);
-        var records = HumanUi.Card("Audit History", "Changed values for critical events. Older entries may contain full snapshots.");
+        var records = HumanUi.Card("Audit History", "See what changed, who changed it and when. Older entries may show the full record.");
         records.Content.Controls.Add(Grid);
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill,

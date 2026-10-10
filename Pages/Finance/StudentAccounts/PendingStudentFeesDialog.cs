@@ -9,7 +9,7 @@ internal sealed class PendingStudentFeesDialog : ApplicationWindowForm
     private readonly DataGridView grid = HumanUi.Grid(false);
     private readonly Label status = new() { Dock=DockStyle.Fill, TextAlign=ContentAlignment.MiddleLeft, AutoEllipsis=true };
     private readonly ModernButton post = new() { Text="Post Selected Fees", ThemeRole="Success", AutoSize=true, Enabled=false };
-    private readonly ModernButton refresh = new() { Text="Refresh", AutoSize=true };
+    private readonly ModernButton refresh = new() { Text=UiText.Actions.Refresh, AutoSize=true };
     private DataTable preview = new();
     private bool busy;
     private string resultNote = "";
@@ -42,7 +42,7 @@ internal sealed class PendingStudentFeesDialog : ApplicationWindowForm
             ToggleRow(grid.CurrentRow.Index); e.Handled=true; e.SuppressKeyPress=true;
         };
         grid.CellValueChanged+=(_,_)=>UpdateTotal();
-        var close=new ModernButton { Text="Close", AutoSize=true, DialogResult=DialogResult.OK };
+        var close=new ModernButton { Text=UiText.Actions.Close, AutoSize=true, DialogResult=DialogResult.OK };
         var root=new TableLayoutPanel { Dock=DockStyle.Fill, ColumnCount=1, RowCount=5, Padding=new Padding(AppScale.Scale(16)) };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppScale.Scale(40)));

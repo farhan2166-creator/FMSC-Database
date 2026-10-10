@@ -15,7 +15,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         ThemeRole = UiDesignSystem.Actions.Primary
     };
     private readonly ModernButton resetButton = new() {
-        Text = "Reset",
+        Text = UiText.Actions.Reset,
         Width = AppScale.Scale(110),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = UiDesignSystem.Actions.Secondary
@@ -27,7 +27,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         ThemeRole = UiDesignSystem.Actions.Success
     };
     private readonly ModernButton closeButton = new() {
-        Text = "Close",
+        Text = UiText.Actions.Close,
         Width = AppScale.Scale(110),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = UiDesignSystem.Actions.Secondary

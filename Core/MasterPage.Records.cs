@@ -943,7 +943,7 @@ public partial class MasterPage
             Padding = new Padding(UiDesignSystem.Spacing.Sm, 0, 0, 0)
         };
         var clearButton = new ModernButton {
-            Text = "Clear",
+            Text = UiText.Actions.Clear,
             Height = AppMetrics.InputControlHeight,
             ThemeRole = "Secondary",
             Image = UiHelper.CreateGlyphIcon("↺", AppTheme.MutedText, 16),

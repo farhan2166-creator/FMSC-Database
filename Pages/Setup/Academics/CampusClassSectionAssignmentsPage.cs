@@ -38,7 +38,7 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
     private bool dragAssigned;
     private ModernButton resetButton = null!;
     public CampusClassSectionAssignmentsPage()
-        : base(PageTitles.CampusAssignments, "Assign the available classes and sections to each campus in one operation")
+        : base(PageTitles.CampusAssignments, "Choose which classes and sections each campus offers.")
     {
         applyButton =
             AddAction("Apply Changes", (_, _) => Save(), "Success");
@@ -59,7 +59,7 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
                 if (HasUnsavedChanges &&
                     !Confirm(
                         $"{UnsavedChangesMessage}{Environment.NewLine}{Environment.NewLine}" +
-                        $"Changing the campus reloads the matrix from the database and discards them.{Environment.NewLine}{Environment.NewLine}" +
+                        $"Changing the campus will discard your unsaved selections.{Environment.NewLine}{Environment.NewLine}" +
                         "Use Apply Changes first to keep them - the saved assignments are not changed either way.",
                         "Unsaved Assignment Changes"))
                 {

@@ -27,23 +27,23 @@ public sealed class CharacterCertificatePage : V2Page
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton clearButton = new() {
-        Text = "Next Student",
+        Text = UiText.Certificates.NextStudent,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton issueAgainButton = new() {
-        Text = "Issue Again",
+        Text = UiText.Certificates.IssueAgainAction,
         Width = AppScale.Scale(140)
     };
     private readonly ModernButton collectButton = new() {
-        Text = "Mark Collected",
+        Text = UiText.Certificates.MarkCollected,
         Width = AppScale.Scale(150)
     };
     private readonly ModernButton printButton = new() {
-        Text = "Print",
+        Text = UiText.Actions.Print,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton refreshButton = new() {
-        Text = "Refresh",
+        Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
     /* Business rule (V20 audit F-01, confirmed by the owner): exam type is operator-selected
@@ -57,7 +57,7 @@ public sealed class CharacterCertificatePage : V2Page
         "H.S.S.C (Intermediate)"
     };
     public CharacterCertificatePage()
-        : base("Character Certificate", "Create, issue, collect and print student character certificates")
+        : base("Character Certificate", "Create, issue, collect and print student character certificates.")
     {
         examType.DropDownStyle =
             ComboBoxStyle.DropDownList;
@@ -144,7 +144,7 @@ public sealed class CharacterCertificatePage : V2Page
         var records =
             HumanUi.Card(
                 UiText.Certificates.IssuanceHistory,
-                "Each time the certificate is issued, the system records when it was issued, who issued it, and who collected it.");
+                UiText.Certificates.IssueHistoryGuidance);
         var certificateActions =
             CertificateButtonRow.Create(issueAgainButton, collectButton, printButton, refreshButton);
         certificateActions.Dock =
@@ -169,7 +169,7 @@ public sealed class CharacterCertificatePage : V2Page
         root.Controls.Add(records, 0, 1);
         SetContent(
             root,
-            "Select the student, then move the certificate through Create, Issue, Collect and Print in order. The certificate belongs to the current academic year.");
+            UiText.Certificates.IssueGuidance + " The certificate is for the current academic year.");
         ApplyWorkflowState();
     }
     private void StudentChanged()
@@ -438,7 +438,7 @@ public sealed class CharacterCertificatePage : V2Page
         }
         /* Finding 6 - one per student, not one per exam type: say that plainly instead of naming the exam type the certificate does not record. */
         SetStatus(
-            "This student already has a character certificate - the database allows one per student. Select an issuance below to print it, or use Issue Again for another copy.");
+            "This student already has a character certificate. Select it to print, or choose Issue Again for another copy.");
     }
     private bool IsLatestIssueCollectedFor(int certificateRecordId)
     {
@@ -901,7 +901,7 @@ public sealed class CharacterCertificatePage : V2Page
         var cancel =
             new ModernButton {
                 Text =
-                    "Cancel",
+                    UiText.Actions.Cancel,
                 ThemeRole =
                     UiDesignSystem.Actions.Secondary,
                 Width =

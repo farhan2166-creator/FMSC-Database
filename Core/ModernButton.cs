@@ -286,49 +286,8 @@ namespace FMSC_SMS.Core
                 Font = AppTheme.ButtonFont;
             }
         }
-        private static string InferTextRole(string? text)
-        {
-            string normalized =
-                (text ?? string.Empty).Trim().ToLowerInvariant();
-            if (normalized.Contains("delete") ||
-                normalized.Contains("remove") ||
-                normalized.Contains("destroy"))
-            {
-                return "Danger";
-            }
-            if (normalized.Contains("collect") ||
-                normalized.Contains("approve") ||
-                normalized.Contains("complete") ||
-                normalized.Contains("activate") ||
-                normalized.Contains("restore") ||
-                normalized.Contains("confirm"))
-            {
-                return "Success";
-            }
-            if (normalized.Contains("warning") ||
-                normalized.Contains("retry"))
-            {
-                return "Warning";
-            }
-            if (normalized == "clear" ||
-                normalized.StartsWith("clear ") ||
-                normalized.Contains("cancel") ||
-                normalized == "close" ||
-                normalized.StartsWith("close ") ||
-                normalized == "back" ||
-                normalized.StartsWith("back ") ||
-                normalized == "refresh" ||
-                normalized.StartsWith("refresh ") ||
-                normalized == "print" ||
-                normalized.StartsWith("print ") ||
-                normalized == "export" ||
-                normalized.StartsWith("export ") ||
-                normalized == "search")
-            {
-                return "Secondary";
-            }
-            return "Primary";
-        }
+        private static string InferTextRole(string? text) =>
+            ActionButtonStyle.Role(text ?? string.Empty, UiDesignSystem.Actions.Primary);
         protected override void OnGotFocus(EventArgs e)
         {
             base.OnGotFocus(e);

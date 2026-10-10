@@ -26,10 +26,10 @@ public sealed class MigrationBillingCleanupPage : V2Page
     private int candidateCount;
     public MigrationBillingCleanupPage()
         : base(
-            "Migration Billing Cleanup",
-            "One-time setup tool: sets a billing start date for already-imported students who are genuinely still enrolled, so recurring fee charges never back-date to their real, years-old admission date. This can only be run once.")
+            PageTitles.BillingStartSetup,
+            "Set when recurring fees begin for imported students. This setup can only be run once.")
     {
-        refreshButton = AddAction("Refresh", (_, _) => LoadStatus());
+        refreshButton = AddAction(UiText.Actions.Refresh, (_, _) => LoadStatus());
         runButton =
             AddBusyAction("Run Cleanup", RunAsync, "Danger");
         /* nothing has been read yet, so the cleanup action starts closed; the deferred LoadStatus below opens it only on success. */
@@ -37,14 +37,14 @@ public sealed class MigrationBillingCleanupPage : V2Page
         var reviewCard =
             HumanUi.Card(
                 "Students Affected",
-                "Every currently Active enrollment with no billing start date set yet and no fee charges generated yet. Review this list before running - it cannot be undone from here.");
+                "Active students with no billing start date or existing charges. Review the list; this action cannot be undone here.");
         grid.Dock = DockStyle.Fill;
         reviewCard.Content.Controls.Add(
             grid);
         var settingsCard =
             HumanUi.Card(
-                "Go-Live Settings",
-                "Recurring fee charges (Tuition, etc.) will start generating from this date for every student listed above. One-time fees such as Admission are not affected.");
+                "Billing Start Date",
+                "Recurring fees begin on this date for the listed students. One-time fees stay the same.");
         settingsFieldsHost =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -60,7 +60,7 @@ public sealed class MigrationBillingCleanupPage : V2Page
         ((TableLayoutPanel)settingsFieldsHost).RowStyles.Add(
             new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
         ((TableLayoutPanel)settingsFieldsHost).Controls.Add(
-            HumanUi.Field("Go-Live Date", goLiveDate, true),
+            HumanUi.Field("Billing Start Date", goLiveDate, true),
             0,
             0);
         ((TableLayoutPanel)settingsFieldsHost).Controls.Add(
@@ -90,7 +90,7 @@ public sealed class MigrationBillingCleanupPage : V2Page
         root.Controls.Add(settingsCard, 0, 2);
         SetContent(
             root,
-            "Restricted to users with System.Setup (the same permission that guards School Information). Once run, this page locks itself and shows who ran it and when - use Student Record Checks afterward for any individual billing-start correction.");
+            "Run once after reviewing the students and start date. Use Student Record Checks for later corrections.");
         Defer(LoadStatus);
     }
     /// <summary>The page's own rule for Run Cleanup - a successfully read status, candidate data to act on, and no completed run behind it.</summary>
@@ -212,14 +212,14 @@ public sealed class MigrationBillingCleanupPage : V2Page
         if (string.IsNullOrWhiteSpace(reason.Text))
         {
             Warn(
-                "Enter a reason for this migration cleanup.");
+                "Enter a reason for setting the billing start date.");
             return;
         }
         /* The count the operator agreed to, captured before the run, so the result can be reported against it instead of as a bare figure. */
         int previewedCount = grid.Rows.Count;
         if (!Confirm(
             $"This will set the billing start date to {goLiveDate.Value:dd-MMM-yyyy} for {previewedCount} student(s), and cannot be run again afterward. Continue?",
-            "Run Migration Billing Cleanup",
+            "Run Billing Start Setup",
             defaultYes: false))
         {
             return;
@@ -235,7 +235,7 @@ public sealed class MigrationBillingCleanupPage : V2Page
             runButton.Enabled = false;
         isRunning = true;
         SetStatus(
-            "Running migration billing cleanup...");
+            "Setting billing start dates…");
         try
         {
             var result = await Task.Run(() =>
@@ -252,14 +252,12 @@ public sealed class MigrationBillingCleanupPage : V2Page
                     : 0;
             /* report the server's own count against what was listed, and do not present a shortfall as a full success. */
             Info(
-                "Migration billing cleanup finished.\n\n" +
-                $"Students listed for cleanup: {previewedCount:N0}\n" +
-                $"Enrollments the server reported as updated: {processed:N0}\n\n" +
+                "Billing start setup finished.\n\n" +
+                $"Students listed: {previewedCount:N0}\n" +
+                $"Enrollment records updated: {processed:N0}\n\n" +
                 (processed < previewedCount
-                    ? "The server reported fewer enrollments updated than students were listed. " +
-                      "The two counts are different units and this page cannot say which students " +
-                      "were affected - check Transfer / Re-Admit for any student who still has no " +
-                      "billing start date.\n\n"
+                    ? "The student and enrollment totals differ. Check the billing start dates " +
+                      "in Student Record Checks before continuing.\n\n"
                     : "") +
                 "This page is now locked and cannot be run again.");
         }

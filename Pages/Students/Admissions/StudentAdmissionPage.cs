@@ -15,7 +15,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private static readonly string[] MandatoryFeeTypeCodes = { "TUITION", "ADMISSION" };
     /// <summary>The page's normal subtitle, held in one place so the header can be restored exactly when the form returns to "new admission" mode.</summary>
     private const string AdmissionContextSubtitle =
-        "Search, admit, or update a student - placement, fee preview, photo and siblings.";
+        "Admit a student or update their details, class, fees and family.";
     private static readonly string[] TransportFeeTypeCodes = { "TRANSPORT", "TRANSPORTFEE" };
     private static bool IsMandatoryFeeTypeCode(string? code) =>
         code is not null &&
@@ -751,7 +751,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             "Clear student details and start a new admission. Confirm before discarding unsaved changes. Placement is retained when Keep placement is selected.");
         /* Save writes the student record (and can create it), so it is guarded against a double submit. Clear is local; the print actions only read. */
         saveButton = AddBusyAction(
-            "Save",
+            UiText.Actions.Save,
             Save,
             "Success");
         saveAndNewButton = AddBusyAction("Save && New", SaveAndStartNextAsync, "Success");

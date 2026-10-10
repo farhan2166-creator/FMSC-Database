@@ -46,22 +46,22 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
     public BackupRestorePage()
         : base(
             PageTitles.BackupRestore,
-            "Save a full copy of the FMSC database, or restore one that was saved earlier.")
+            "Back up your school data or restore a saved copy.")
     {
         backupFolder.ReadOnly = true;
         restoreFile.ReadOnly = true;
         var chooseBackupButton =
-            AddBusyAction("Choose Backup Folder...", ChooseBackupFolderAsync);
+            AddBusyAction("Choose Backup Folder…", ChooseBackupFolderAsync);
         backupNowButton =
-            AddBusyAction("Backup Database", BackupNowAsync, "Success");
+            AddBusyAction("Back Up Data", BackupNowAsync, "Success");
         ModernButton? chooseRestoreButton = null;
         if (canRestore)
         {
             chooseRestoreButton =
-                AddAction("Choose Backup File...", (_, _) => ChooseRestoreFile());
+                AddAction("Choose Backup File…", (_, _) => ChooseRestoreFile());
             /* restoring replaces the whole database, so it must never be able to start twice from a double click. */
             restoreButton =
-                AddBusyAction("Restore Database", RestoreNowAsync, "Danger");
+                AddBusyAction("Restore Data", RestoreNowAsync, "Danger");
             /* AddBusyAction re-enables its button in a finally block after every attempt, which would undo a disabled state. */
             restoreButton.EnabledChanged += (_, _) => {
                 if ((!restoreAllowed || !HistoryDependentActionsUsable) &&
@@ -71,7 +71,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         }
         refreshHistoryButton = AddBusyAction("Refresh History", LoadHistoryAsync);
         locateFileButton =
-            AddBusyAction("Locate Missing File...", LocateMissingFileAsync, "Secondary");
+            AddBusyAction("Locate Missing File…", LocateMissingFileAsync, "Secondary");
         RelocateFromActions(
             chooseBackupButton,
             backupNowButton);
@@ -82,7 +82,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         UseToolbar();
         var backupCard = HumanUi.Card(
             "Backup",
-            "Choose a folder and save a full FMSC_DB backup file to it.");
+            "Choose a folder and save a complete copy of your school data.");
         var localOnlyNotice = new Label {
             Dock = DockStyle.Top,
             Height = AppScale.Scale(46),
@@ -90,9 +90,9 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
             Font = AppTheme.NormalFont,
             ForeColor = AppTheme.MutedText,
             TextAlign = ContentAlignment.TopLeft,
-            Text = "Note: this database lives only on this computer (it is not shared over a " +
-                   "network). If your school uses more than one computer, records entered on " +
-                   "one machine will not automatically appear on another. Back up regularly - " +
+            Text = "School records are saved on this computer. They are not shared over a " +
+                   "network. Records entered on " +
+                   "one computer will not appear on another. Back up regularly; " +
                    "this is the only copy of your data."
         };
         var backupFields = new TableLayoutPanel {
@@ -126,7 +126,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         {
             var restoreCard = HumanUi.Card(
                 "Restore",
-                "Replace the current database with a previously saved backup. This cannot be undone.");
+                "Replace current school data with a saved backup. Newer records will be replaced.");
             var restoreFields = new TableLayoutPanel {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
@@ -257,7 +257,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         if (isBusy)
             return;
         using var dialog = new FolderBrowserDialog {
-            Description = "Select the folder where FMSC database backups will be saved.",
+            Description = "Choose where to save school data backups.",
             UseDescriptionForTitle = true,
             ShowNewFolderButton = true
         };
@@ -314,7 +314,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         isBusy = true;
         busyMessage = "A backup is running. Please wait until it finishes.";
         SetBusyState(true);
-        SetStatus("Backing up database...");
+        SetStatus("Backing up school data…");
         try
         {
             var result = await Task.Run(() => DatabaseBackupManager.CreateBackup(backupPath));
@@ -368,17 +368,14 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         {
             case RestoreFileState.Unverified:
                 SetStatus(
-                    "Restore file selected (backup metadata could not be verified). " +
+                    "The selected backup could not be checked. " +
                     "Restore is disabled.",
                     true);
                 break;
             case RestoreFileState.WrongDatabase:
-                SetStatus("Restore file selected (wrong database). Restore is disabled.", true);
+                SetStatus("This backup is not compatible with FMSC. Choose another file.", true);
                 /* this is now refused, not merely advised. The wording says so, because the restore itself will reject the file. */
-                Warn(
-                    $"This file was backed up from \"{selectedRestoreBackupInfo!.DatabaseName}\", " +
-                    "not FMSC_DB.\n\nIt cannot be restored: a restore replaces the FMSC database, " +
-                    "and only a backup of FMSC_DB may do that. Choose the correct backup file.");
+                Warn("This backup is not compatible with FMSC. Choose an FMSC school data backup.");
                 break;
             case RestoreFileState.Stale:
                 SetStatus(
@@ -415,7 +412,6 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
             restoreStatusHeadline is null ||
             restoreStatusDetail is null)
             return;
-        string databaseName = info?.DatabaseName ?? string.Empty;
         string backupAge = info is null ? string.Empty : FormatBackupAge(info);
         string headline;
         string detail;
@@ -424,34 +420,34 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         {
             case RestoreFileState.Valid:
                 accent = AppTheme.Success;
-                headline = "Valid FMSC backup";
+                headline = "Ready to Restore";
                 detail =
-                    $"Database: {databaseName} - backup taken {backupAge}. " +
-                    "Restore Database will ask for confirmation.";
+                    $"Backup taken {backupAge}. " +
+                    "Restore Data will ask for confirmation.";
                 break;
             case RestoreFileState.Stale:
                 accent = AppTheme.Warning;
-                headline = "Stale FMSC backup - older than the staleness limit";
+                headline = "Older FMSC Backup";
                 detail =
-                    $"Database: {databaseName} - backup taken {backupAge}. " +
+                    $"Backup taken {backupAge}. " +
                     "Warning: newer records would be lost.";
                 break;
             case RestoreFileState.WrongDatabase:
                 accent = AppTheme.Danger;
-                headline = "Wrong database - this is not an FMSC_DB backup";
+                headline = "Incompatible Backup";
                 detail =
-                    $"Database: {databaseName} (not FMSC_DB). Restore is disabled.";
+                    "Choose an FMSC backup file. Restore is disabled.";
                 break;
             case RestoreFileState.Unverified:
                 accent = AppTheme.Danger;
-                headline = "Backup metadata could not be verified";
+                headline = "Backup Could Not Be Checked";
                 detail =
-                    "Backup header could not be read: database and date unknown. " +
+                    "The file could not be checked. " +
                     "Restore is disabled.";
                 break;
             default:
                 accent = AppTheme.MutedText;
-                headline = "No backup file selected";
+                headline = "No Backup Selected";
                 detail = "Choose a .bak file to see whether it is a valid FMSC backup.";
                 break;
         }
@@ -526,40 +522,34 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         ShowRestoreFileStatus(state, info);
         if (state is RestoreFileState.Unverified or RestoreFileState.WrongDatabase)
         {
-            Warn(
-                state == RestoreFileState.Unverified
-                    ? "This file's backup metadata could not be verified, so it cannot be " +
-                      "restored. Choose a readable FMSC_DB backup file."
-                    : $"This file was backed up from \"{info?.DatabaseName}\", not FMSC_DB, " +
-                      "so it cannot be restored. Choose an FMSC_DB backup file.");
+            Warn(state == RestoreFileState.Unverified
+                ? "This backup could not be checked. Choose a readable FMSC backup file."
+                : "This backup is not compatible with FMSC. Choose an FMSC school data backup.");
             return;
         }
         var detailLines = new List<string> {
-            "Restoring this backup will replace the current FMSC database with the " +
+            "Restoring this backup will replace your current school records with the " +
                 "selected backup.",
             "",
-            "Any data created after this backup may be lost. This action cannot be undone."
+            "Records added after this backup will be replaced. Review the backup date before continuing."
         };
         if (info is null)
         {
             detailLines.Add("");
             detailLines.Add(
-                "WARNING: This file's backup header could not be read, so its source " +
-                "database and date are unknown. It will still be integrity-checked " +
-                "before anything is changed, but proceed with extra caution.");
+                "The backup could not be checked, so its source and date are unknown. " +
+                "Ask the administrator to check the file before restoring it.");
         }
         else
         {
             detailLines.Add("");
-            detailLines.Add($"Backup source database: {info.DatabaseName}");
+            detailLines.Add($"Backup source: {info.DatabaseName}");
             detailLines.Add($"Backup taken: {FormatBackupAge(info)}");
             if (!info.IsForFmscDatabase)
             {
                 detailLines.Add("");
                 detailLines.Add(
-                    $"This backup was taken from \"{info.DatabaseName}\", not FMSC_DB. " +
-                    "It will be REJECTED and nothing will be changed. Choose a backup " +
-                    "of FMSC_DB instead.");
+                    "This backup is not compatible with FMSC. Nothing will be changed. Choose an FMSC backup file.");
             }
             else if (info.IsStale)
             {
@@ -572,14 +562,14 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         }
         detailLines.Add("");
         detailLines.Add(
-            "A safety backup of the CURRENT database will be taken automatically " +
-            "before the restore proceeds, so this can be undone if needed.");
+            "A safety copy of your current school data will be saved automatically " +
+            "before restoring. Restore that safety copy if you need to recover your current records.");
         detailLines.Add("");
         detailLines.Add(UiText.Dialogs.Continue);
         var confirmation = ModernMessageDialog.Show(
             FindForm(),
             string.Join("\n", detailLines),
-            "Confirm Database Restore",
+            "Confirm Data Restore",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Warning,
             MessageBoxDefaultButton.Button2);
@@ -588,7 +578,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         isBusy = true;
         busyMessage = "A restore is running. Please wait until it finishes.";
         SetBusyState(true);
-        SetStatus("Restoring database...");
+        SetStatus("Restoring school data…");
         try
         {
             var result = await Task.Run(() => DatabaseBackupManager.RestoreBackup(backupPath));

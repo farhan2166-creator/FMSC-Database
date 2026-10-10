@@ -2,6 +2,24 @@ namespace FMSC_SMS.Core;
 /// <summary>Operator-facing sentences and captions that more than one screen says, in one place, so a wording change happens once instead of in fourteen files.</summary>
 public static class UiText
 {
+    /// <summary>Shared captions. Choose by behavior; New, Clear and Reset are distinct actions.</summary>
+    public static class Actions
+    {
+        public const string New = "New";
+        public const string Clear = "Clear";
+        public const string Reset = "Reset";
+        public const string Save = "Save";
+        public const string Refresh = "Refresh";
+        public const string Reload = "Reload";
+        public const string Close = "Close";
+        public const string Cancel = "Cancel";
+        public const string Print = "Print";
+        public const string Export = "Export";
+        public const string Preview = "Preview";
+        public const string SelectAll = "Select All";
+        public const string SelectNone = "Select None";
+    }
+
     /// <summary>Asking the operator for the thing an action needs before it can run. These are the sentences that appear on the most screens.</summary>
     public static class Prompts
     {
@@ -12,7 +30,7 @@ public static class UiText
         public const string SearchingStudents = "Searching students...";
         public const string NoStudentsFound = "No students found.";
         /// <summary>The student search boxes' placeholder text.</summary>
-        public const string StudentSearchPlaceholder = "Admission Number or student name...";
+        public const string StudentSearchPlaceholder = "Search by admission number or student name…";
     }
     /// <summary>The messages an empty grid shows (see UiHelper.SetGridEmptyMessage).</summary>
     public static class EmptyGrid
@@ -56,8 +74,16 @@ public static class UiText
     {
         /// <summary>Window title of a new certificate.</summary>
         public const string Create = "Create Certificate";
+        public const string New = "New Certificate";
+        public const string NextStudent = "Next Student";
+        public const string IssueAgainAction = "Issue Again";
+        public const string MarkCollected = "Mark Collected";
         /// <summary>Window title of an existing certificate.</summary>
         public const string Update = "Update Certificate";
+        public const string StudentGuidance = "Select a student and complete the details. Create a certificate, or select a saved one to edit or print.";
+        public const string StaffGuidance = "Select a staff member and complete the details. Create a certificate, or select a saved one to edit or print.";
+        public const string IssueGuidance = "Select a student and create the certificate. Use the available actions to issue another copy, record collection or print.";
+        public const string IssueHistoryGuidance = "See who issued and collected each copy, and when.";
         public const string Details = "Certificate Details";
         public const string Date = "Certificate Date";
         public const string IssuanceHistory = "Certificate Issuance History";

@@ -47,7 +47,7 @@ public sealed class RolesPage : V2Page
     readonly ModernButton clearButton =
         new() { Text = "Deselect", Width = AppScale.Scale(110), ThemeRole = "Secondary" };
     readonly ModernButton selectAllButton =
-        new() { Text = "Select All", Width = AppScale.Scale(105), ThemeRole = "Secondary" };
+        new() { Text = UiText.Actions.SelectAll, Width = AppScale.Scale(105), ThemeRole = "Secondary" };
     readonly ModernButton clearAllButton =
         new() { Text = "Clear All", Width = AppScale.Scale(105), ThemeRole = "Secondary" };
     readonly Panel permissionHost = new() {
@@ -76,7 +76,7 @@ public sealed class RolesPage : V2Page
     readonly bool canManageRoles =
         CurrentUser.HasPermission("System.Roles.Manage");
     public RolesPage()
-        : base("Roles && Permissions", "Create security roles and control exactly which tasks each role can perform.")
+        : base("Roles && Permissions", "Choose which tasks each access role can perform.")
     {
         newRoleButton.Enabled = canManageRoles;
         editRoleButton.Enabled = false;

@@ -27,7 +27,7 @@ internal sealed class FeeRateDetailsDialog : ApplicationWindowForm
         amount.Value = value;
         remarks.Text = remarksValue;
         var apply = new ModernButton { Text = "Use in Grid", Width = AppScale.Scale(140), Height = AppMetrics.ButtonHeight, ThemeRole = "Success" };
-        var cancel = new ModernButton { Text = "Cancel", Width = AppScale.Scale(100), Height = AppMetrics.ButtonHeight, ThemeRole = "Secondary", DialogResult = DialogResult.Cancel };
+        var cancel = new ModernButton { Text = UiText.Actions.Cancel, Width = AppScale.Scale(100), Height = AppMetrics.ButtonHeight, ThemeRole = "Secondary", DialogResult = DialogResult.Cancel };
         apply.Click += (_, _) => { DialogResult = DialogResult.OK; Close(); };
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(16) };
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));

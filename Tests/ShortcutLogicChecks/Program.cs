@@ -42,4 +42,20 @@ Check(!AppHotKeys.TrySwitchTab(tabRoot,Keys.Control|Keys.D2)&&tabs.SelectedIndex
 Check(!AppHotKeys.TrySwitchTab(tabRoot,Keys.Control|Keys.D9),"Nonexistent direct tab ignored");
 var nested=new TabControl();tabs.Add(nested);nested.TabPages.AddRange(new[]{new Control(),new Control()});nested.Focus();
 Check(AppHotKeys.TrySwitchTab(tabRoot,Keys.Control|Keys.Tab)&&nested.SelectedIndex==1&&tabs.SelectedIndex==2,"Nested focused tabs take precedence");
+foreach (string caption in new[] { "Save", "Update Certificate", "Refresh", "Search Students", "Preview", "New", "Clear" })
+ Check(ActionButtonStyle.Role(caption, "Primary")==ActionButtonStyle.Role(caption, "Secondary"),
+  "Action styling independent of creation path: "+caption);
+Check(ActionButtonStyle.Role("Restore Data", "Success")=="Danger", "Restore remains destructive even with an incorrect fallback");
+Check(ActionButtonStyle.Role("Run Cleanup", "Danger")=="Danger", "Explicit warning for unusual action preserved");
+Check(ActionButtonStyle.Role("Next Student", "Primary")=="Secondary", "Next Student uses secondary styling");
+foreach (string role in new[] { "Navigation", "TabInactive", "Outline", "Custom" })
+ Check(ActionButtonStyle.Role("Save",role)==role,"Special appearance preserved: "+role);
+Check(ActionButtonStyle.Role("Back Up Data", "Secondary")=="Success", "Back Up does not inherit the Back navigation style");
+Check(ActionButtonStyle.Role("Save & New", "Success")=="Secondary", "Save and New retains its secondary action role");
+Check(ActionButtonStyle.Role("Browse…", "Primary")=="Secondary", "Picker ellipsis is handled as a word boundary");
+Check(ActionButtonStyle.Role("SaveView", "Primary")=="Primary", "Action style does not match unrelated word prefixes");
+var save=new Button{Text="Save"};var print=new Button{Text="Print"};var clear=new Button{Text="Clear"};
+var ordered=ActionButtonStyle.Ordered(new Control[]{clear,print,save});
+Check(ReferenceEquals(ordered[0],save)&&ReferenceEquals(ordered[1],print)&&ReferenceEquals(ordered[2],clear),
+ "Save precedes Clear without moving unrelated tool slots");
 Console.WriteLine($"{count} logic checks passed (simulated controls; native Windows UI untested).");

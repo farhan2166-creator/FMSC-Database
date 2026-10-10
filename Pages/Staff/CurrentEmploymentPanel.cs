@@ -30,10 +30,10 @@ public sealed class CurrentEmploymentPanel : HumanCard, IUnsavedChanges, IBusyPa
     private readonly ModernDatePicker hireDate = HumanUi.Date();
     private readonly ModernDatePicker leavingDate = HumanUi.Date();
     private readonly ModernTextBox remarks = HumanUi.TextBox(true, 500);
-    private readonly ModernButton saveButton = new() { Text = "Save", ThemeRole = "Success" };
+    private readonly ModernButton saveButton = new() { Text = UiText.Actions.Save, ThemeRole = "Success" };
     /* UX - a missing designation is marked on the field; the summary goes to the panel's status line. */
     private FormValidator? validator;
-    private readonly ModernButton clearButton = new() { Text = "Clear", ThemeRole = "Secondary" };
+    private readonly ModernButton clearButton = new() { Text = UiText.Actions.Clear, ThemeRole = "Secondary" };
     /// <summary>this panel had no way to report anything. The panel now carries its own one-line status instead of reaching for a host method that was never written.</summary>
     private readonly Label statusLabel = new() {
         Dock = DockStyle.Bottom,
@@ -80,7 +80,7 @@ public sealed class CurrentEmploymentPanel : HumanCard, IUnsavedChanges, IBusyPa
             UiText.Dialogs.UnsavedChanges);
     }
     public CurrentEmploymentPanel()
-        : base("Current Employment", "Active employment record for the selected staff member")
+        : base("Current Employment", "View or update the selected staff member’s current job.")
     {
         leavingDate.ShowCheckBox = true;
         UiAccessibility.Describe(leavingDate, "Leaving date",

@@ -22,7 +22,7 @@ public sealed class FeePostingReversalPage : V2Page
     private int monthsLoadVersion;
     private ModernButton reverseButton = null!;
     public FeePostingReversalPage()
-        : base("Reverse a Posting", "Preview the impact, then reverse the uncollected fees posted for a month.")
+        : base("Reverse a Posting", "Review and cancel uncollected fee charges for a month.")
     {
         // Required by dbo.ReverseMonthlyFees, so it is a labelled input rather than an optional remark.
         reason.Width = AppScale.Scale(320);

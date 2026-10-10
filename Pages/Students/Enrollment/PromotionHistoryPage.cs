@@ -18,18 +18,18 @@ public sealed class PromotionHistoryPage : V2Page
         TextAlign = ContentAlignment.MiddleLeft
     };
     public PromotionHistoryPage()
-        : base("Promotion History", "Review completed bulk-promotion batches and their student counts")
+        : base("Promotion History", "Review completed promotions and the students included.")
     {
         var load = AddAction("Load", (_, _) => LoadData(), "Secondary");
         var export = AddExportAction("Promotion_Batch_History");
-        var clear = AddAction("Clear", (_, _) => ClearForm(), "Secondary");
+        var clear = AddAction(UiText.Actions.Clear, (_, _) => ClearForm(), "Secondary");
         RelocateFromActions(load, export, clear);
         var filters = ReportUi.Bar(("Source Academic Year", year), ("Source Class", cls), ("Source Section", section));
-        var filterCard = HumanUi.Card("Filter", "Leave a filter blank to show all completed bulk-promotion batches.");
+        var filterCard = HumanUi.Card("Filter", "Leave filters blank to view all completed promotions.");
         filterCard.Content.Controls.Add(filters);
         var historyCard = HumanUi.Card(
             "Batch History",
-            "Every batch records its source, destination, effective date and processed student counts.");
+            "See the previous class, next class, promotion date and student totals.");
         historyCard.Content.Controls.Add(Grid);
         historyCard.Content.Controls.Add(summary);
         /* Load, Export and Clear were removed from the action bar and never placed, so the page had no buttons. */

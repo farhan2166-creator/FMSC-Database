@@ -64,7 +64,7 @@ public sealed class BulkPromotionPage : V2Page
         Width = AppScale.Scale(150)
     };
     private readonly ModernButton selectAllButton = new() {
-        Text = "Select All",
+        Text = UiText.Actions.SelectAll,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton clearSelectionButton = new() {
@@ -84,7 +84,7 @@ public sealed class BulkPromotionPage : V2Page
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton clearButton = new() {
-        Text = "Clear",
+        Text = UiText.Actions.Clear,
         Width = AppScale.Scale(120)
     };
     private DataTable? candidateData;
@@ -99,7 +99,7 @@ public sealed class BulkPromotionPage : V2Page
     private int busyCount;
     /// <param name="navigate">The shell's navigate delegate, so the step after promoting (Confirm Return Admission) can open the next screen.</param>
     public BulkPromotionPage(Action<Func<Control>, string, string>? navigate = null)
-        : base("Bulk Promotion", "Promote a class or selected students in repeatable batches")
+        : base("Bulk Promotion", "Move a class or selected students to their next class.")
     {
         nextSteps = new NextStepBar(navigate, Fail);
         sourceCampusField =
@@ -341,13 +341,13 @@ public sealed class BulkPromotionPage : V2Page
     {
         var setupCard =
             HumanUi.Card(
-                "Promotion Setup & Destination",
-                "Select the source campus, year, class and section, then choose the destination year, class, section and effective date.");
+                "Promotion Details",
+                "Choose the current class, next class and promotion date.");
         setupCard.Content.Controls.Add(promotionSetupTable);
         var candidatesCard =
             HumanUi.Card(
                 "Students to Process",
-                "Select the entire class or individual students. Unselected students remain available for a later promotion batch.");
+                "Select the students to promote. You can promote the others later.");
         candidatesCard.Content.Controls.Add(candidatesGrid);
         candidatesCard.Content.Controls.Add(BuildCandidateActionBar());
         var root =
@@ -375,7 +375,7 @@ public sealed class BulkPromotionPage : V2Page
         root.Controls.Add(candidatesCard, 0, 2);
         SetContent(
             root,
-            "Choose the source class to load candidates, then set the destination class and section they will be promoted into. Review the candidate list before promoting the whole class or only the selected students.");
+            "Choose the current and next class, then review the selected students before promoting them.");
     }
     private Control BuildCandidateActionBar()
     {

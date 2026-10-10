@@ -24,15 +24,15 @@ public sealed class StudentPhotoPage : V2Page
     private ModernButton savePhotoButton = null!;
     private ModernButton removePhotoButton = null!;
     private bool CanManagePhotos => CurrentUser.HasPermission("Students.Administer");
-    public StudentPhotoPage() : base("Student Photo", "Student → profile photo")
+    public StudentPhotoPage() : base("Student Photo", "Add or update a student’s profile photo.")
     {
         UiHelper.DisposePictureImageOnDispose(preview);
-        choosePhotoButton = AddBusyAction("Choose Photo...", ChoosePhotoAsync);
+        choosePhotoButton = AddBusyAction("Choose Photo…", ChoosePhotoAsync);
         /* writing a photo is a real write; guarded so a double click cannot save twice. */
         savePhotoButton = AddBusyAction("Save Photo", SavePhotoAsync, "Success");
         /* removing a photo deletes a row from the student record, so it is guarded like Save. */
         removePhotoButton = AddBusyAction("Remove Photo", RemovePhotoAsync, "Danger");
-        var clear = AddAction("Clear", (_, _) => {
+        var clear = AddAction(UiText.Actions.Clear, (_, _) => {
             ClearForm();
             FormValidator.FocusInput(student);
         }, "Secondary");
@@ -50,7 +50,7 @@ public sealed class StudentPhotoPage : V2Page
         StudentSearchCache.Warm();
         var details = HumanUi.Card("Student", "Select a student to view or replace their profile photo.");
         details.Content.Controls.Add(HumanUi.Field("Student", student, true));
-        var photoCard = HumanUi.Card("Photo", "JPEG or PNG, stored directly in the database. Maximum 5 MB.");
+        var photoCard = HumanUi.Card("Photo", "Choose a JPEG or PNG image up to 5 MB.");
         var photoPanel = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
         photoPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         photoPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, fileInfo.Height));

@@ -4,7 +4,7 @@ namespace FMSC_SMS.Core;
 public sealed class HotKeysPage : V2Page
 {
     public HotKeysPage()
-        : base("Hot Keys", "Familiar shortcuts • one modifier at most • actions follow the active editor")
+        : base("Hot Keys", "Find shortcuts for page actions, navigation and editing.")
     {
         var table = new DataTable();
         table.Columns.Add("Action", typeof(string));
@@ -68,6 +68,6 @@ public sealed class HotKeysPage : V2Page
         content.Controls.Add(search, 0, 0);
         content.Controls.Add(Grid, 0, 1);
         SetContent(content,
-            "Hold Ctrl or Alt to reveal available key badges. Page actions require a visible, enabled, unambiguous target. Preview shortcuts apply only inside a report preview; typing shortcuts stay with the focused input.");
+            "Hold Ctrl or Alt to see available shortcuts. Actions use the active editor; report preview keys work only in the preview.");
     }
 }

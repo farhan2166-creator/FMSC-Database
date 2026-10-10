@@ -14,7 +14,7 @@ public sealed class FutureFeesDialog : ApplicationWindowForm
     };
     private readonly ModernComboBox monthsAhead = HumanUi.Combo();
     private readonly ModernButton refreshButton = new() {
-        Text = "Refresh",
+        Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(100),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Secondary"
@@ -101,7 +101,7 @@ public sealed class FutureFeesDialog : ApplicationWindowForm
         grid.Columns["ExpectedDiscountAmount"].FillWeight = 120;
         HumanUi.ApplyGridStyle(grid, AppTheme.ModuleAccent("Finance"));
         var closeButton = new ModernButton {
-            Text = "Close",
+            Text = UiText.Actions.Close,
             Width = AppScale.Scale(105),
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary",

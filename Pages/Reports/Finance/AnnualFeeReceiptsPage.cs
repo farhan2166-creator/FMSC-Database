@@ -10,7 +10,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page
     public AnnualFeeReceiptsPage()
         : base(
             PageTitles.AnnualFeeReceipts,
-            "Print every receipt for one student and academic year, oldest first")
+            "Print a student’s receipts for an academic year, oldest first.")
     {
         var view = AddBusyAction("View / Print Receipts", ViewLedgerAsync, "Primary");
         RelocateFromActions(view);

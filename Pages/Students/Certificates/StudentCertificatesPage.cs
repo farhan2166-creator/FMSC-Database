@@ -11,7 +11,7 @@ public sealed class StudentCertificatesPage : V2Page
             FontStyle.Regular);
     private readonly Action<Func<Control>, string, string>? navigate;
     public StudentCertificatesPage(Action<Func<Control>, string, string>? navigate = null)
-        : base(PageTitles.StudentCertificates, "Create, issue and print student certificates from one place")
+        : base(PageTitles.StudentCertificates, "Choose a certificate to create, issue or print.")
     {
         this.navigate = navigate;
         var root = new TableLayoutPanel {
@@ -34,7 +34,7 @@ public sealed class StudentCertificatesPage : V2Page
     {
         var card = HumanUi.Card(
             PageTitles.StudentCertificates,
-            "Choose a certificate type to open its existing workflow. All certificate records, issuance and printing rules remain unchanged.",
+            "Choose a certificate type, then select a student to get started.",
             AppTheme.ModuleAccent("Certificates"));
         card.Margin = new Padding(0, 0, 0, AppMetrics.SectionGap);
         return card;
@@ -58,7 +58,7 @@ public sealed class StudentCertificatesPage : V2Page
         AddCard(grid, 0, 1, "College Leaving", "College leaving certificate", () => new CollegeLeaveCertificatePage());
         AddCard(grid, 1, 1, "Date of Birth", "Student date of birth certificate", () => new DateOfBirthCertificatePage());
         AddCard(grid, 2, 1, "Sports", "Student sports certificate", () => new SportsCertificatePage());
-        AddCard(grid, 0, 2, "No Objection", "Student NOC workflow", () => new NoObjectionCertificatePage());
+        AddCard(grid, 0, 2, "No Objection", "No objection certificate", () => new NoObjectionCertificatePage());
         AddCard(grid, 1, 2, "Provisional", "Student provisional certificate", () => new ProvisionalCertificatePage());
         return grid;
     }

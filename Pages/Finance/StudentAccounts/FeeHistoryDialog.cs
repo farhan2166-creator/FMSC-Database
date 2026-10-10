@@ -20,7 +20,7 @@ public sealed class FeeHistoryDialog : ApplicationWindowForm
             Dock = DockStyle.Fill
         };
         var closeButton = new ModernButton {
-            Text = "Close",
+            Text = UiText.Actions.Close,
             Width = AppScale.Scale(105),
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary",
