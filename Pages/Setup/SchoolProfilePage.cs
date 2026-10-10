@@ -95,7 +95,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
         logoPanel.Controls.Add(logoInfo, 0, 1);
         logoCard.Content.Controls.Add(logoPanel);
         var feePolicyCard =
-            HumanUi.Card("Fee Policy", "Controls when recurring fee billing starts for a newly admitted or re-admitted student.");
+            HumanUi.Card("Fee Policy", "When monthly fees begin for new admissions.");
         var feePolicyFields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -112,6 +112,21 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
         feePolicyFields.Controls.Add(
             HumanUi.Field("Fee Proration Cutoff Day", feeProrationCutoffDay), 0, 0);
+        const string cutoffExplanation = "New admissions on or after this day start monthly fees next month; earlier admissions start in their admission month. Readmission uses the month chosen during fee review.";
+        SetToolTip(feeProrationCutoffDay, cutoffExplanation);
+        feePolicyFields.RowCount = 2;
+        int guidanceHeight = AppMetrics.TextHeight(AppTheme.NormalFont) * 3 + 8;
+        feePolicyFields.RowStyles.Add(new RowStyle(SizeType.Absolute, guidanceHeight));
+        var cutoffGuidance = new Label {
+            Text = cutoffExplanation,
+            Dock = DockStyle.Fill,
+            Font = AppTheme.NormalFont,
+            ForeColor = AppTheme.MutedText,
+            AutoEllipsis = true
+        };
+        SetToolTip(cutoffGuidance, cutoffExplanation);
+        feePolicyFields.Controls.Add(cutoffGuidance, 0, 1);
+        feePolicyFields.SetColumnSpan(cutoffGuidance, 2);
         feePolicyCard.Content.Controls.Add(feePolicyFields);
         /* Left column: School Identity, then Fee Policy under it. Row heights are absolute so the logo card spans exactly the two left cards. */
         int gap = UiDesignSystem.Spacing.Md;
@@ -130,7 +145,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
         root.RowStyles.Add(
             new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(3) + gap));
         root.RowStyles.Add(
-            new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(1)));
+            new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(1) + guidanceHeight));
         details.Margin = new Padding(0, 0, gap, gap);
         feePolicyCard.Margin = new Padding(0, 0, gap, 0);
         logoCard.Margin = new Padding(0);
@@ -140,7 +155,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
         root.SetRowSpan(logoCard, 2);
         SetContent(
             root,
-            "Update the school details and click Save. Leave the fee cutoff day blank to keep the current billing rules.");
+            "Update the school details and click Save. Leave the fee cutoff day blank to start monthly fees in the admission month.");
         FormFlow.EnterMovesToNext(this);
         Defer(LoadProfile);
     }

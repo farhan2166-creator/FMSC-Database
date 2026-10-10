@@ -1,0 +1,137 @@
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER OFF;
+GO
+-- Optional report filters: blank dates and year 0 do not restrict results.
+CREATE   PROCEDURE dbo.GetCollectionsAndReceiptsReport
+    @UserId int,
+    @View nvarchar(30),
+    @GroupBy nvarchar(30) = N'Day',
+    @FromDate date = NULL,
+    @ToDate date = NULL,
+    @CampusId int = 0,
+    @ClassId int = 0,
+    @SectionId int = 0,
+    @PaymentMethod nvarchar(40) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    EXEC dbo.RequirePermission @UserId, N'Reports.View';
+
+    IF @View NOT IN (N'Receipts', N'Detailed Transactions', N'Summary')
+        THROW 59901, 'The collections report view is not supported.', 1;
+    IF @View = N'Summary' AND @GroupBy NOT IN
+       (N'Day', N'Week', N'Month', N'Payment Method', N'Class', N'Campus', N'Fee Type')
+        THROW 59902, 'The collections report grouping is not supported.', 1;
+    IF @FromDate IS NOT NULL AND @ToDate IS NOT NULL AND @FromDate > @ToDate
+        THROW 59903, 'The collections report date range is invalid.', 1;
+
+    SELECT FP.FeePaymentId, FP.ReceiptNumber,
+           COALESCE(NULLIF(FP.ReceiptNumber, N''), CONCAT(N'PAYMENT-', FP.FeePaymentId)) ReceiptKey,
+           FP.PaymentDate, FP.PaymentMethod, FP.ReferenceNumber, FP.TotalAmount,
+           FP.RelatedFeePaymentId, FP.IsGroupPayment, FP.AdmissionId,
+           S.RegistrationNumber, S.StudentName, CAMP.CampusName, C.ClassName, SEC.SectionName,
+           U.Username ReceivedBy
+    INTO #Payments
+    FROM dbo.FeePayments FP
+    JOIN dbo.Students S ON S.AdmissionId = FP.AdmissionId
+    JOIN dbo.Enrollments E ON E.EnrollmentId = FP.EnrollmentId AND E.AdmissionId = FP.AdmissionId
+    LEFT JOIN dbo.CampusClassSections CCS ON CCS.ClassSectionId = E.ClassSectionId
+    LEFT JOIN dbo.Campuses CAMP ON CAMP.CampusId = CCS.CampusId
+    LEFT JOIN dbo.Classes C ON C.ClassId = CCS.ClassId
+    LEFT JOIN dbo.Sections SEC ON SEC.SectionId = CCS.SectionId
+    LEFT JOIN dbo.Users U ON U.UserId = FP.CreatedByUserId
+    WHERE FP.Status = N'Completed'
+      AND (@FromDate IS NULL OR FP.PaymentDate >= @FromDate) AND (@ToDate IS NULL OR FP.PaymentDate <= @ToDate)
+      AND (@CampusId = 0 OR CCS.CampusId = @CampusId)
+      AND (@ClassId = 0 OR CCS.ClassId = @ClassId)
+      AND (@SectionId = 0 OR CCS.SectionId = @SectionId)
+      AND (@PaymentMethod IS NULL OR FP.PaymentMethod = @PaymentMethod);
+
+    IF @View = N'Receipts'
+    BEGIN
+        SELECT MAX(ReceiptNumber) [Receipt No.], MIN(PaymentDate) [Date],
+               CASE WHEN COUNT(DISTINCT AdmissionId) > 1 THEN N'Family receipt'
+                    ELSE MAX(StudentName) END [Student / Family],
+               CASE WHEN COUNT(DISTINCT ClassName) > 1 THEN N'Multiple' ELSE MAX(ClassName) END [Class],
+               CASE WHEN COUNT(DISTINCT PaymentMethod) > 1 THEN N'Mixed' ELSE MAX(PaymentMethod) END [Payment Method],
+               SUM(CASE WHEN TotalAmount > 0 THEN TotalAmount ELSE 0 END) [Gross Received],
+               -SUM(CASE WHEN TotalAmount < 0 AND PaymentMethod = N'Refund' THEN TotalAmount ELSE 0 END) [Refunds],
+               -SUM(CASE WHEN TotalAmount < 0 AND PaymentMethod = N'Correction' THEN TotalAmount ELSE 0 END) [Corrections],
+               SUM(TotalAmount) [Net Amount], MAX(ReceivedBy) [Received By]
+        FROM #Payments GROUP BY ReceiptKey ORDER BY MIN(PaymentDate), MAX(ReceiptNumber);
+        SELECT COUNT(DISTINCT ReceiptKey) Receipts,
+               COALESCE(SUM(CASE WHEN TotalAmount > 0 THEN TotalAmount ELSE 0 END), 0) [Gross Received],
+               -COALESCE(SUM(CASE WHEN TotalAmount < 0 AND PaymentMethod = N'Refund' THEN TotalAmount ELSE 0 END), 0) Refunds,
+               -COALESCE(SUM(CASE WHEN TotalAmount < 0 AND PaymentMethod = N'Correction' THEN TotalAmount ELSE 0 END), 0) Corrections,
+               COALESCE(SUM(TotalAmount), 0) [Net Collection] FROM #Payments;
+        RETURN;
+    END;
+
+    IF @View = N'Detailed Transactions'
+    BEGIN
+        SELECT P.ReceiptNumber [Receipt No.], P.PaymentDate [Date],
+               COALESCE(CS.StudentName, P.StudentName) [Student],
+               FT.FeeTypeName [Fee Type], COALESCE(CONVERT(nvarchar(20), BC.BillingMonth, 106), BC.Remarks) [Charge / Month],
+               FPA.Amount [Amount], P.PaymentMethod [Payment Method],
+               OP.ReceiptNumber [Original Receipt], P.ReferenceNumber [Reference]
+        FROM #Payments P
+        LEFT JOIN dbo.FeePaymentAllocations FPA ON FPA.FeePaymentId = P.FeePaymentId
+        LEFT JOIN dbo.BillingCharges BC ON BC.BillingChargeId = FPA.BillingChargeId
+        LEFT JOIN dbo.Students CS ON CS.AdmissionId = BC.AdmissionId
+        LEFT JOIN dbo.FeeTypes FT ON FT.FeeTypeId = BC.FeeTypeId
+        LEFT JOIN dbo.FeePayments OP ON OP.FeePaymentId = P.RelatedFeePaymentId
+        ORDER BY P.PaymentDate, P.ReceiptNumber, FPA.FeePaymentAllocationId;
+        SELECT COUNT(DISTINCT ReceiptKey) Receipts,
+               COALESCE(SUM(CASE WHEN TotalAmount > 0 THEN TotalAmount ELSE 0 END), 0) [Gross Received],
+               -COALESCE(SUM(CASE WHEN TotalAmount < 0 AND PaymentMethod = N'Refund' THEN TotalAmount ELSE 0 END), 0) Refunds,
+               -COALESCE(SUM(CASE WHEN TotalAmount < 0 AND PaymentMethod = N'Correction' THEN TotalAmount ELSE 0 END), 0) Corrections,
+               COALESCE(SUM(TotalAmount), 0) [Net Collection] FROM #Payments;
+        RETURN;
+    END;
+
+    IF @GroupBy = N'Fee Type'
+    BEGIN
+        SELECT COALESCE(FT.FeeTypeName, N'Unallocated') [Group],
+               COUNT(DISTINCT P.ReceiptKey) [Receipts],
+               COALESCE(SUM(CASE WHEN FPA.Amount > 0 THEN FPA.Amount ELSE 0 END), 0) [Gross Received],
+               -COALESCE(SUM(CASE WHEN FPA.Amount < 0 AND P.PaymentMethod = N'Refund' THEN FPA.Amount ELSE 0 END), 0) [Refunds],
+               -COALESCE(SUM(CASE WHEN FPA.Amount < 0 AND P.PaymentMethod = N'Correction' THEN FPA.Amount ELSE 0 END), 0) [Corrections],
+               COALESCE(SUM(FPA.Amount), 0) [Net Collection]
+        FROM #Payments P
+        LEFT JOIN dbo.FeePaymentAllocations FPA ON FPA.FeePaymentId = P.FeePaymentId
+        LEFT JOIN dbo.BillingCharges BC ON BC.BillingChargeId = FPA.BillingChargeId
+        LEFT JOIN dbo.FeeTypes FT ON FT.FeeTypeId = BC.FeeTypeId
+        GROUP BY COALESCE(FT.FeeTypeName, N'Unallocated')
+        ORDER BY [Group];
+    END
+    ELSE
+    BEGIN
+        ;WITH S AS
+        (
+            SELECT CASE @GroupBy
+                     WHEN N'Week' THEN CONCAT(CONVERT(char(10), DATEADD(day, -(DATEDIFF(day, 0, PaymentDate) % 7), PaymentDate), 23), N' week')
+                     WHEN N'Month' THEN CONVERT(char(7), PaymentDate, 126)
+                     WHEN N'Payment Method' THEN PaymentMethod
+                     WHEN N'Class' THEN COALESCE(ClassName, N'Unassigned')
+                     WHEN N'Campus' THEN COALESCE(CampusName, N'Unassigned')
+                     ELSE CONVERT(char(10), PaymentDate, 23) END [Group],
+                   ReceiptKey, TotalAmount, PaymentMethod
+            FROM #Payments
+        )
+        SELECT [Group], COUNT(DISTINCT ReceiptKey) [Receipts],
+               COALESCE(SUM(CASE WHEN TotalAmount > 0 THEN TotalAmount ELSE 0 END), 0) [Gross Received],
+               -COALESCE(SUM(CASE WHEN TotalAmount < 0 AND PaymentMethod = N'Refund' THEN TotalAmount ELSE 0 END), 0) [Refunds],
+               -COALESCE(SUM(CASE WHEN TotalAmount < 0 AND PaymentMethod = N'Correction' THEN TotalAmount ELSE 0 END), 0) [Corrections],
+               COALESCE(SUM(TotalAmount), 0) [Net Collection]
+        FROM S GROUP BY [Group] ORDER BY [Group];
+    END;
+
+    SELECT COUNT(DISTINCT ReceiptKey) Receipts,
+           COALESCE(SUM(CASE WHEN TotalAmount > 0 THEN TotalAmount ELSE 0 END), 0) [Gross Received],
+           -COALESCE(SUM(CASE WHEN TotalAmount < 0 AND PaymentMethod = N'Refund' THEN TotalAmount ELSE 0 END), 0) Refunds,
+           -COALESCE(SUM(CASE WHEN TotalAmount < 0 AND PaymentMethod = N'Correction' THEN TotalAmount ELSE 0 END), 0) Corrections,
+           COALESCE(SUM(TotalAmount), 0) [Net Collection] FROM #Payments;
+END;
+
+GO

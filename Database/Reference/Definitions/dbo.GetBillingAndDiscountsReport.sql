@@ -1,0 +1,92 @@
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER OFF;
+GO
+CREATE   PROCEDURE dbo.GetBillingAndDiscountsReport
+    @UserId int,
+    @View nvarchar(30),
+    @GroupBy nvarchar(30) = N'Month',
+    @FromDate date = NULL,
+    @ToDate date = NULL,
+    @CampusId int = 0,
+    @ClassId int = 0,
+    @SectionId int = 0
+AS
+BEGIN
+    SET NOCOUNT ON;
+    EXEC dbo.RequirePermission @UserId, N'Reports.View';
+
+    IF @View NOT IN (N'Billing Summary', N'Billing Detail', N'Discount Detail')
+        THROW 59904, 'The billing report view is not supported.', 1;
+    IF @View = N'Billing Summary' AND @GroupBy NOT IN
+       (N'Day', N'Week', N'Month', N'Class', N'Campus', N'Fee Type')
+        THROW 59905, 'The billing report grouping is not supported.', 1;
+    IF @FromDate IS NOT NULL AND @ToDate IS NOT NULL AND @FromDate > @ToDate
+        THROW 59906, 'The billing report date range is invalid.', 1;
+
+    SELECT BC.BillingChargeId, BC.ChargeDate, BC.BillingMonth, S.RegistrationNumber, S.AdmissionNumber, S.StudentName,
+           CAMP.CampusName, C.ClassName, SEC.SectionName, FT.FeeTypeName,
+           BC.GrossAmount, BC.DiscountAmount, BC.NetAmount
+    INTO #Billing
+    FROM dbo.BillingCharges BC
+    JOIN dbo.Students S ON S.AdmissionId = BC.AdmissionId
+    JOIN dbo.Enrollments E ON E.EnrollmentId = BC.EnrollmentId
+    JOIN dbo.CampusClassSections CCS ON CCS.ClassSectionId = E.ClassSectionId
+    JOIN dbo.Campuses CAMP ON CAMP.CampusId = CCS.CampusId
+    JOIN dbo.Classes C ON C.ClassId = CCS.ClassId
+    JOIN dbo.Sections SEC ON SEC.SectionId = CCS.SectionId
+    JOIN dbo.FeeTypes FT ON FT.FeeTypeId = BC.FeeTypeId
+    WHERE BC.Status <> N'Cancelled' AND (@FromDate IS NULL OR BC.ChargeDate >= @FromDate) AND (@ToDate IS NULL OR BC.ChargeDate <= @ToDate)
+      AND (@CampusId = 0 OR CCS.CampusId = @CampusId)
+      AND (@ClassId = 0 OR CCS.ClassId = @ClassId)
+      AND (@SectionId = 0 OR CCS.SectionId = @SectionId);
+
+    IF @View = N'Billing Detail'
+    BEGIN
+        SELECT AdmissionNumber [Admission Number], StudentName [Student], ClassName [Class], FeeTypeName [Fee Type],
+               BillingMonth [Billing Period], ChargeDate [Charge Date], GrossAmount [Gross Amount],
+               DiscountAmount [Discount], NetAmount [Net Charge]
+        FROM #Billing ORDER BY ChargeDate, StudentName, FeeTypeName;
+        SELECT COALESCE(SUM(GrossAmount), 0) [Gross Billed], COALESCE(SUM(DiscountAmount), 0) Discounts,
+               COALESCE(SUM(NetAmount), 0) [Net Billed] FROM #Billing;
+        RETURN;
+    END;
+
+    IF @View = N'Discount Detail'
+    BEGIN
+        SELECT AdmissionNumber [Admission Number], StudentName [Student], ClassName [Class], FeeTypeName [Fee Type],
+               BillingMonth [Billing Period], ChargeDate [Charge Date], GrossAmount [Gross Amount],
+               DiscountAmount [Applied Discount], NetAmount [Net Charge]
+        FROM #Billing WHERE DiscountAmount > 0 ORDER BY ChargeDate, StudentName, FeeTypeName;
+        SELECT COALESCE(SUM(GrossAmount), 0) [Gross Billed], COALESCE(SUM(DiscountAmount), 0) Discounts,
+               COALESCE(SUM(NetAmount), 0) [Net Billed]
+        FROM #Billing WHERE DiscountAmount > 0;
+        RETURN;
+    END;
+
+    SELECT CASE @GroupBy
+               WHEN N'Day' THEN CONVERT(char(10), ChargeDate, 23)
+               WHEN N'Week' THEN CONCAT(CONVERT(char(10), DATEADD(day, -(DATEDIFF(day, 0, ChargeDate) % 7), ChargeDate), 23), N' week')
+               WHEN N'Month' THEN CONVERT(char(7), ChargeDate, 126)
+               WHEN N'Fee Type' THEN FeeTypeName
+               WHEN N'Class' THEN ClassName
+               WHEN N'Campus' THEN CampusName END [Group],
+           COUNT(*) [Charges], COALESCE(SUM(GrossAmount), 0) [Gross Charges],
+           COALESCE(SUM(DiscountAmount), 0) [Discounts Applied], COALESCE(SUM(NetAmount), 0) [Net Charges]
+    FROM #Billing
+    GROUP BY CASE @GroupBy
+               WHEN N'Day' THEN CONVERT(char(10), ChargeDate, 23)
+               WHEN N'Week' THEN CONCAT(CONVERT(char(10), DATEADD(day, -(DATEDIFF(day, 0, ChargeDate) % 7), ChargeDate), 23), N' week')
+               WHEN N'Month' THEN CONVERT(char(7), ChargeDate, 126)
+               WHEN N'Fee Type' THEN FeeTypeName
+               WHEN N'Class' THEN ClassName
+               WHEN N'Campus' THEN CampusName END
+    ORDER BY [Group];
+    SELECT COALESCE(SUM(GrossAmount), 0) [Gross Billed], COALESCE(SUM(DiscountAmount), 0) Discounts,
+           COALESCE(SUM(NetAmount), 0) [Net Billed] FROM #Billing;
+END;
+
+
+-- GetBillingCycleStatus
+
+GO

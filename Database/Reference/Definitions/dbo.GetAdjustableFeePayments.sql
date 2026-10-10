@@ -1,0 +1,28 @@
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+CREATE   PROCEDURE dbo.GetAdjustableFeePayments
+    @UserId int, @AdmissionId int
+AS
+BEGIN
+    SET NOCOUNT ON;
+    EXEC dbo.RequirePermission @UserId,N'Fees.View';
+    IF @AdmissionId<=0 OR NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@AdmissionId)
+        THROW 54001,'A valid student is required.',1;
+    SELECT FP.FeePaymentId, FP.EnrollmentId, FP.PaymentDate AS TransactionDate,
+           FP.ReceiptNumber, FP.PaymentMethod, N'PAYMENT' AS TransactionType,
+           FP.TotalAmount AS PaidAmount, FP.TotalAmount-ISNULL(R.ReducedAmount,0) AS RemainingAmount
+    FROM dbo.FeePayments FP
+    OUTER APPLY (SELECT -SUM(A.Amount) AS ReducedAmount
+                 FROM dbo.FeePayments P JOIN dbo.FeePaymentAllocations A ON A.FeePaymentId=P.FeePaymentId
+                 WHERE P.RelatedFeePaymentId=FP.FeePaymentId AND P.Status=N'Completed'
+                   AND P.TotalAmount<0 AND A.Amount<0) R
+    WHERE FP.AdmissionId=@AdmissionId AND FP.Status=N'Completed'
+      AND FP.RelatedFeePaymentId IS NULL AND FP.TotalAmount>0
+      AND FP.TotalAmount-ISNULL(R.ReducedAmount,0)>0
+    ORDER BY FP.PaymentDate DESC,FP.FeePaymentId DESC;
+END;
+
+GO

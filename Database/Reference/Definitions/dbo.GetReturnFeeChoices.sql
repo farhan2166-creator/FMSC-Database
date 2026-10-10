@@ -1,0 +1,36 @@
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+-- GetReturnFeeChoices
+CREATE   PROCEDURE dbo.GetReturnFeeChoices
+@UserId INT, @EnrollmentId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Students.Administer';
+    SELECT   SFA.FeeTypeId,
+             FT.FeeTypeName,
+             SFA.Frequency,
+             SFA.Amount,
+             SFA.DiscountAmount,
+             SFA.Amount - SFA.DiscountAmount AS NetAmount
+    FROM     dbo.StudentFeeAssignments AS SFA
+             INNER JOIN
+             dbo.FeeTypes AS FT
+             ON FT.FeeTypeId = SFA.FeeTypeId
+             INNER JOIN
+             dbo.Enrollments AS E
+             ON E.EnrollmentId = SFA.EnrollmentId
+    WHERE    SFA.EnrollmentId = @EnrollmentId
+             AND E.Status = N'Active'
+             AND E.BillingReady = 0
+             AND SFA.CancelledAt IS NULL
+             AND FT.IsMandatory = 1
+    ORDER BY FT.DisplayOrder, FT.FeeTypeName;
+END
+
+
+
+GO

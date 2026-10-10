@@ -1,0 +1,31 @@
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+/* ---------------------------------------------------------------------------
+   3/18  dbo.GetCampusUsageCount  ->  System.Setup
+   --------------------------------------------------------------------------- */
+CREATE   PROCEDURE dbo.GetCampusUsageCount
+(
+    @UserId int,
+    @CampusId int
+)
+AS
+
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'System.Setup';
+
+    SELECT COUNT(*)
+    FROM dbo.Enrollments E
+    INNER JOIN dbo.CampusClassSections CCS
+        ON CCS.ClassSectionId = E.ClassSectionId
+    WHERE CCS.CampusId = @CampusId
+      AND E.Status = N'Active';
+END;
+
+GO

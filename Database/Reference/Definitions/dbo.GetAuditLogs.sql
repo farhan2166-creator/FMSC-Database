@@ -1,0 +1,59 @@
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+/* ---------------------------------------------------------------------------
+   2. The read procedure, with the keyword search
+   --------------------------------------------------------------------------- */
+
+CREATE PROCEDURE dbo.GetAuditLogs
+    @UserId INT,
+    @TableName NVARCHAR(128) = NULL,
+    @RecordId NVARCHAR(200) = NULL,
+    @TargetUserId INT = 0,
+    @FromDate DATETIME2 = NULL,
+    @ToDate DATETIME2 = NULL,
+    @Search NVARCHAR(200) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequireAnyPermission
+        @UserId,
+        N'System.Audit',
+        N'System.Administration';
+
+    /* A keyword is the difference between "I know the table and the date" and
+       "I know a name". It is matched against everything a person could remember -
+       including the recorded before/after values, which is where a name, an amount
+       or a fee month actually lives. Detail older than the retention window has had
+       its values cleared, so those rows can only be found by their table, record or
+       action; the screen says so next to the box. */
+    DECLARE @Term NVARCHAR(200) = NULLIF(LTRIM(RTRIM(@Search)), N'');
+
+    SELECT
+        A.AuditLogId,A.OperationId,A.UserId,U.Username,
+        A.ActionDateTime,A.TableName,A.RecordId,A.Action,
+        A.OldValues,A.NewValues
+    FROM dbo.AuditLogs A
+    INNER JOIN dbo.Users U ON U.UserId=A.UserId
+    WHERE (@TableName IS NULL OR A.TableName=@TableName)
+      AND (@RecordId IS NULL OR A.RecordId=@RecordId)
+      AND (@TargetUserId=0 OR A.UserId=@TargetUserId)
+      AND (@FromDate IS NULL OR A.ActionDateTime>=@FromDate)
+      AND (@ToDate IS NULL OR A.ActionDateTime<=@ToDate)
+      AND
+      (
+          @Term IS NULL
+          OR A.TableName LIKE N'%' + @Term + N'%'
+          OR A.RecordId  LIKE N'%' + @Term + N'%'
+          OR A.Action    LIKE N'%' + @Term + N'%'
+          OR A.OldValues LIKE N'%' + @Term + N'%'
+          OR A.NewValues LIKE N'%' + @Term + N'%'
+          OR U.Username  LIKE N'%' + @Term + N'%'
+      )
+    ORDER BY A.ActionDateTime DESC,A.AuditLogId DESC;
+END;
+
+GO

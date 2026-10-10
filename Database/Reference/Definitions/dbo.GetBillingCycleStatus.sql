@@ -1,0 +1,49 @@
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER OFF;
+GO
+CREATE   PROCEDURE dbo.GetBillingCycleStatus
+@UserId INT, @AcademicYearId INT, @CampusId INT=0, @AsOfDate DATE=NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Fees.Reports.View';
+    SET @AsOfDate = COALESCE (@AsOfDate, CONVERT (DATE, SYSDATETIME()));
+    DECLARE @Month AS DATE = DATEFROMPARTS(YEAR(@AsOfDate), MONTH(@AsOfDate), 1);
+    WITH   InScope
+    AS     (SELECT E.EnrollmentId,
+                   CASE WHEN EXISTS (SELECT 1
+                                     FROM   dbo.BillingCharges AS BC
+                                     WHERE  BC.EnrollmentId = E.EnrollmentId
+                                            AND BC.BillingMonth = @Month
+                                            AND BC.ChargeKind = N'Monthly'
+                                            AND BC.Status <> N'Cancelled') THEN 1 ELSE 0 END AS IsBilled
+            FROM   dbo.Enrollments AS E
+                   INNER JOIN
+                   dbo.CampusClassSections AS CCS
+                   ON CCS.ClassSectionId = E.ClassSectionId
+            WHERE  (@AcademicYearId = 0 OR E.AcademicYearId = @AcademicYearId)
+                   AND E.Status = N'Active'
+                   AND E.BillingReady = 1
+                   AND @Month >= DATEFROMPARTS(YEAR(ISNULL(E.BillingStartDate, E.EnrollmentDate)), MONTH(ISNULL(E.BillingStartDate, E.EnrollmentDate)), 1)
+                   AND (@CampusId = 0
+                        OR CCS.CampusId = @CampusId)
+                   AND EXISTS (SELECT 1
+                               FROM   dbo.StudentFeeAssignments AS SFA
+                               WHERE  SFA.EnrollmentId = E.EnrollmentId
+                                      AND SFA.CancelledAt IS NULL
+                                      AND SFA.Frequency = N'Monthly'
+                                      AND (SFA.EffectiveFrom IS NULL
+                                           OR @Month >= SFA.EffectiveFrom)
+                                      AND (SFA.EffectiveTo IS NULL
+                                           OR @Month <= SFA.EffectiveTo)))
+    SELECT @AcademicYearId AS AcademicYearId,
+           @CampusId AS CampusId,
+           @Month AS BillingMonth,
+           COUNT(*) AS TotalActiveEnrollments,
+           COALESCE (SUM(IsBilled), 0) AS BilledThisMonth,
+           COUNT(*) - COALESCE (SUM(IsBilled), 0) AS RemainingToBill
+    FROM   InScope;
+END
+
+GO

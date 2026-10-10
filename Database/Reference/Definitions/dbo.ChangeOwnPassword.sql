@@ -1,0 +1,40 @@
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+-- ChangeOwnPassword
+CREATE   PROCEDURE dbo.ChangeOwnPassword
+@UserId INT, @PasswordHash VARBINARY (64), @PasswordSalt VARBINARY (32)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    EXECUTE dbo.RequireAuthenticatedUser @UserId;
+    IF @PasswordHash IS NULL
+       OR DATALENGTH(@PasswordHash) <> 64
+        THROW 57001, 'The supplied password hash is invalid.', 1;
+    IF @PasswordSalt IS NULL
+       OR DATALENGTH(@PasswordSalt) <> 32
+        THROW 57002, 'The supplied password salt is invalid.', 1;
+    BEGIN TRANSACTION;
+    UPDATE dbo.Users
+    SET    PasswordHash       = @PasswordHash,
+           PasswordSalt       = @PasswordSalt,
+           MustChangePassword = 0,
+           UpdatedAt          = SYSDATETIME()
+    WHERE  UserId = @UserId;
+    IF @@ROWCOUNT = 0
+        THROW 57003, 'The user account is inactive or was not found.', 1;
+    DECLARE @OperationId AS UNIQUEIDENTIFIER = NEWID();
+    DECLARE @AuditRecordId AS NVARCHAR (200) = CAST (@UserId AS NVARCHAR (200));
+    INSERT  dbo.AuditOperations (OperationId, UserId, OperationType, CorrelationNote)
+    VALUES                     (@OperationId, @UserId, N'PASSWORD_CHANGE', @AuditRecordId);
+    EXECUTE dbo.WriteAuditLog @OperationId = @OperationId, @UserId = @UserId, @TableName = N'Users', @RecordId = @AuditRecordId, @Action = N'UPDATE', @OldValues = NULL, @NewValues = N'{"PasswordChanged":true,"MustChangePassword":false}';
+    DELETE dbo.AuditOperations WHERE OperationId=@OperationId AND NOT EXISTS(SELECT 1 FROM dbo.AuditLogs WHERE OperationId=@OperationId);
+COMMIT TRANSACTION;
+END
+
+
+
+GO

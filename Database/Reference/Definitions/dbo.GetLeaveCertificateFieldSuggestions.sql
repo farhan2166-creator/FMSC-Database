@@ -1,0 +1,56 @@
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+/* =====================================================================
+   3. dbo.GetLeaveCertificateFieldSuggestions - type-ahead for Academic
+      Record, Attendance Record and Remarks on the Leave Certificate
+      page, matching dbo.GetStudentFieldSuggestions (see
+      field-suggestions-support.sql). Reads from dbo.LeaveCertificates,
+      the only table these three free-text fields are stored in.
+
+      Uses RequirePermission @UserId, N'Students.Leave' rather than
+      RequireAuthenticatedUser, since every other Leave Certificate
+      procedure the page calls is already scoped to that permission -
+      unlike Father's Occupation/Previous School/Place of Birth on the
+      Student Admission page, this data belongs to a specific,
+      permissioned workflow rather than being general reference data.
+   ===================================================================== */
+CREATE   PROCEDURE dbo.GetLeaveCertificateFieldSuggestions
+    @UserId INT,
+    @Field NVARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Students.Leave';
+
+    IF @Field = N'AcademicRecord'
+        SELECT DISTINCT TOP (500) AcademicRecord AS Value
+        FROM dbo.LeaveCertificates
+        WHERE AcademicRecord IS NOT NULL
+          AND LTRIM(RTRIM(AcademicRecord)) <> N''
+        ORDER BY AcademicRecord;
+
+    ELSE IF @Field = N'AttendanceRecord'
+        SELECT DISTINCT TOP (500) AttendanceRecord AS Value
+        FROM dbo.LeaveCertificates
+        WHERE AttendanceRecord IS NOT NULL
+          AND LTRIM(RTRIM(AttendanceRecord)) <> N''
+        ORDER BY AttendanceRecord;
+
+    ELSE IF @Field = N'Remarks'
+        SELECT DISTINCT TOP (500) Remarks AS Value
+        FROM dbo.LeaveCertificates
+        WHERE Remarks IS NOT NULL
+          AND LTRIM(RTRIM(Remarks)) <> N''
+        ORDER BY Remarks;
+
+    ELSE
+        THROW 51500, 'Unknown suggestion field.', 1;
+END;
+
+GO
