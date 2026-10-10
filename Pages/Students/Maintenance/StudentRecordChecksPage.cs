@@ -434,6 +434,8 @@ public sealed class StudentRecordChecksPage : V2Page
         addEnrollmentAction.Visible=creatingEnrollment;addEnrollmentAction.Enabled=creatingEnrollment && CanCorrect;
         newEnrollmentAction.Visible=gridMode=="Enrollments" && !creatingEnrollment;newEnrollmentAction.Enabled=student.SelectedId>0 && CanCorrect;
         academicYear.Enabled=creatingEnrollment;
+        billingStartDate.Enabled=!creatingEnrollment && editable && CanCorrect;
+        allowLegacyDates.Enabled=!creatingEnrollment && editable && CanCorrect;
         if(!selected && !creatingEnrollment)enrollmentSelection.Text="Edit the active enrollment, then Save Enrollment.\nSelect a Left record to correct its leaving date.";
     }
     private void BeginMissingEnrollment()
@@ -441,9 +443,9 @@ public sealed class StudentRecordChecksPage : V2Page
         if(student.SelectedId<=0 || !CanCorrect)return;
         creatingEnrollment=true;selectedEnrollmentId=0;
         Grid.CurrentCell=null;Grid.ClearSelection();
-        classSection.SelectedIndex=-1;academicYear.SelectedIndex=-1;enrollmentStatusCombo.SelectedIndex=-1;
-        enrollmentDate.Value=DateTime.Today;leavingDate.Checked=false;enrollmentReason.Clear();
-        enrollmentSelection.Text="New missing historical enrollment\nComplete the fields and reason, then Create.";
+        classSection.SelectedIndex=-1;academicYear.SelectedIndex=-1;enrollmentStatusCombo.SelectedItem="Active";
+        enrollmentDate.Value=DateTime.Today;leavingDate.Checked=false;billingStartDate.Checked=false;allowLegacyDates.Checked=false;enrollmentReason.Clear();
+        enrollmentSelection.Text="Add a genuinely missing enrollment. Review existing records before creating.\nThis creates no fee assignments or bills; billing start is configured separately.";
         UpdateEnrollmentActions();OpenCorrections(CorrectionTab.Enrollment);
     }
     private async Task RepairDatesFromEditor()
@@ -1446,31 +1448,49 @@ public sealed class StudentRecordChecksPage : V2Page
                 Warn("Enter a reason for this correction.");
                 return;
             }
-            if (!Confirm("Create a new academic enrolment for this student?", "Confirm New Enrolment"))
-            {
-                return;
-            }
-            DatabaseHelper.Execute(
+            string newStatus=(enrollmentStatusCombo.SelectedItem as string)??"Active";
+            DateTime newStart=enrollmentDate.Value.Date;
+            DateTime? newLeave=leavingDate.Checked?leavingDate.Value.Date:null;
+            int newPlacementId=classSection.SelectedId,newYearId=academicYear.SelectedId;
+            string newPlacementName=classSection.Text,newYearName=academicYear.Text,correctionReason=enrollmentReason.Text.Trim();
+            var existingRecords=await DatabaseHelper.QueryUserAsync("GetStudentEnrollmentsForLifecycle",DatabaseHelper.Int("@AdmissionId",correctedAdmissionId));
+            if(IsDisposed || student.SelectedId!=correctedAdmissionId)return;
+            bool hasActive=existingRecords.AsEnumerable().Any(row=>Convert.ToString(row["Status"])=="Active");
+            if(newStatus=="Active" && hasActive) {Warn("An active enrollment already exists. Select and correct it instead of creating another.");return;}
+            if(newStatus=="Promoted" && !hasActive) {Warn("A Promoted record requires an existing active destination enrollment. Review the student's enrollments first.");return;}
+            if(newStatus=="Left" && !newLeave.HasValue) {Warn("Enter the leaving date for the missing Left enrollment.");return;}
+            if(newLeave.HasValue && newLeave.Value<newStart) {Warn("Leaving date cannot be before enrollment start.");return;}
+            var overlapping=existingRecords.AsEnumerable().Where(row=>
+                Convert.ToDateTime(row["EnrollmentDate"])<=(newLeave??DateTime.MaxValue) &&
+                newStart<=(row["LeavingDate"] is DateTime end?end:DateTime.MaxValue)).ToArray();
+            string recordReview=overlapping.Length==0?"No overlapping enrollment dates were found.":
+                $"Review carefully: {overlapping.Length} existing record(s) overlap these dates: " +
+                string.Join(", ",overlapping.Take(6).Select(row=>$"{row["EnrollmentId"]} ({row["YearName"]}, {row["Status"]})")) +
+                (overlapping.Length>6?" and more.":".") + " Do not create a duplicate record.";
+            string statusEffect=newStatus=="Active"
+                ? "If the student's overall status is not Active, creating this record sets it to Active and clears the withdrawal date."
+                : "The student's overall status and withdrawal date stay unchanged.";
+            if(!Confirm($"Student: {student.Text}\nYear: {newYearName}\nPlacement: {newPlacementName}\nStatus: {newStatus}\nStart: {newStart:dd MMM yyyy}\n" +
+                (newLeave.HasValue?$"Leave: {newLeave.Value:dd MMM yyyy}\n":"Leave: not recorded\n") +
+                $"\nExisting enrollments: {existingRecords.Rows.Count}. {recordReview}\n\n{statusEffect}\n" +
+                "This creates the enrollment and its correction history only. No fee assignments or bills are created. Existing bills, payments and certificates stay unchanged.\n" +
+                $"Reason: {correctionReason}\n\nCreate this missing enrollment?","Confirm Missing Enrollment"))return;
+            var created=DatabaseHelper.Query(
                 "CorrectEnrollmentStatus",
-                DatabaseHelper.Int("@UserId", CurrentUser.UserId),
-                DatabaseHelper.Int("@AdmissionId", student.SelectedId),
-                DatabaseHelper.P(
-                    "@NewStatus",
-                    (enrollmentStatusCombo.SelectedItem as string) ?? "Active"),
-                DatabaseHelper.P("@NewEnrollmentDate", enrollmentDate.Value.Date),
-                DatabaseHelper.P(
-                    "@NewLeavingDate",
-                    leavingDate.Checked ? leavingDate.Value.Date : (object)DBNull.Value),
-                DatabaseHelper.Bit("@ClearLeavingDate", !leavingDate.Checked),
-                DatabaseHelper.Int("@NewClassSectionId", classSection.SelectedId),
-                DatabaseHelper.Int("@AcademicYearId", academicYear.SelectedId),
-                DatabaseHelper.P("@Reason", enrollmentReason.Text.Trim()));
+                DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@AdmissionId",correctedAdmissionId),
+                DatabaseHelper.P("@NewStatus",newStatus),DatabaseHelper.P("@NewEnrollmentDate",newStart),
+                DatabaseHelper.P("@NewLeavingDate",newLeave.HasValue?newLeave.Value:(object)DBNull.Value),
+                DatabaseHelper.Bit("@ClearLeavingDate",!newLeave.HasValue),DatabaseHelper.Int("@NewClassSectionId",newPlacementId),
+                DatabaseHelper.Int("@AcademicYearId",newYearId),DatabaseHelper.P("@Reason",correctionReason));
+            int createdId=Convert.ToInt32(created.Rows[0]["EnrollmentId"]);
+            creatingEnrollment=false;
             enrollmentReason.Clear();
             await SetGridMode("Enrollments");
             // Refresh the snapshot panel so it reflects that instead of the pre-correction status.
             await LoadStudentSnapshot();
             StudentSearchCache.Invalidate();
-            await ReportCorrectionAsync(correctedAdmissionId,"Academic enrolment created.");
+            SelectEnrollmentRow(createdId);
+            await ReportCorrectionAsync(correctedAdmissionId,$"Missing enrollment {createdId} created for {newYearName}, status {created.Rows[0]["Status"]}. No fee assignments or bills were created.");
         }
         catch (Exception ex) { Fail(ex); }
     }

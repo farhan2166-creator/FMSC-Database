@@ -167,3 +167,45 @@ END TRY BEGIN CATCH IF ERROR_NUMBER()<>57008 THROW; END CATCH;
 IF @@TRANCOUNT>0 ROLLBACK;
 PRINT 'PASS established reactivation restriction retained';
 GO
+-- Existing creation fails audit validation for a plain-English reason; changes roll back.
+-- Preserve this regression evidence without changing established database procedures.
+BEGIN TRANSACTION;
+DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date,@Year int,@Placement int,@NewStart date;
+EXEC #Fixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
+SELECT @Year=AcademicYearId,@Placement=ClassSectionId,@NewStart=DATEADD(day,1,LeavingDate) FROM dbo.Enrollments WHERE EnrollmentId=@E;
+BEGIN TRY
+ EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@AdmissionId=@S,@NewStatus=N'Active',@NewEnrollmentDate=@NewStart,@ClearLeavingDate=1,
+  @NewClassSectionId=@Placement,@AcademicYearId=@Year,@Reason=N'Missing record integration test';
+ THROW 57922,'Expected existing audit validation failure was not raised; revisit this regression check.',1;
+END TRY BEGIN CATCH IF ERROR_NUMBER()<>59941 THROW; END CATCH;
+IF @@TRANCOUNT<>0 THROW 57923,'Failed creation did not roll back its transaction.',1;
+IF EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@S) THROW 57924,'Failed creation left transaction data behind.',1;
+PRINT 'PASS existing missing-record audit blocker reproduced with complete rollback';
+GO
+-- A second active enrollment remains forbidden.
+BEGIN TRANSACTION;
+DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date,@Year int,@Placement int;
+EXEC #Fixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
+SELECT @Year=AcademicYearId,@Placement=ClassSectionId FROM dbo.Enrollments WHERE EnrollmentId=@E;
+UPDATE dbo.Enrollments SET Status=N'Active',LeavingDate=NULL WHERE EnrollmentId=@E;
+BEGIN TRY
+ EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@AdmissionId=@S,@NewStatus=N'Active',@NewEnrollmentDate=@D,@ClearLeavingDate=1,
+  @NewClassSectionId=@Placement,@AcademicYearId=@Year,@Reason=N'Missing record integration test';
+ THROW 57927,'Second active enrollment accepted.',1;
+END TRY BEGIN CATCH IF ERROR_NUMBER()<>57216 THROW; END CATCH;
+IF @@TRANCOUNT>0 ROLLBACK;
+PRINT 'PASS established duplicate-active-enrollment restriction';
+GO
+-- Missing Left records still require a leaving date.
+BEGIN TRANSACTION;
+DECLARE @U int,@S int,@E int,@A int,@B bigint,@D date,@Year int,@Placement int;
+EXEC #Fixture @U OUTPUT,@S OUTPUT,@E OUTPUT,@A OUTPUT,@B OUTPUT,@D OUTPUT;
+SELECT @Year=AcademicYearId,@Placement=ClassSectionId FROM dbo.Enrollments WHERE EnrollmentId=@E;
+BEGIN TRY
+ EXEC dbo.CorrectEnrollmentStatus @UserId=@U,@AdmissionId=@S,@NewStatus=N'Left',@NewEnrollmentDate=@D,@ClearLeavingDate=1,
+  @NewClassSectionId=@Placement,@AcademicYearId=@Year,@Reason=N'Missing record integration test';
+ THROW 57928,'Left record without departure date accepted.',1;
+END TRY BEGIN CATCH IF ERROR_NUMBER()<>57117 THROW; END CATCH;
+IF @@TRANCOUNT>0 ROLLBACK;
+PRINT 'PASS established missing-Left-record date requirement';
+GO
