@@ -23,6 +23,7 @@ public sealed class ReportSavedView
 }
 internal sealed class ReportUserData
 {
+    public Dictionary<string, string> Preferences { get; set; } = new();
     public Dictionary<string, List<string>> Layouts { get; set; } = new();
     public Dictionary<string, List<ReportSavedView>> Views { get; set; } = new();
 }
@@ -75,6 +76,16 @@ public static class ReportLayoutStore
         catch (Exception ex)
         {
             AppExceptionHandler.LogNonFatal(ex, "Saving the report layouts - the choice applies to this session only");
+        }
+    }
+    internal static string? GetPreference(string key)
+    {
+        lock (Gate) return Load().Preferences.GetValueOrDefault(key);
+    }
+    internal static void SetPreference(string key, string value)
+    {
+        lock (Gate) {
+            var data = Load(); data.Preferences[key] = value; Save(data);
         }
     }
     /// <summary>The columns this user last chose for a layout, in order, or null when they never chose.</summary>

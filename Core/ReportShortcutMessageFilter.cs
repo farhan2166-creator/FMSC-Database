@@ -9,7 +9,9 @@ internal sealed class ReportShortcutMessageFilter : IMessageFilter, IDisposable
     {
         Keys.Control | Keys.P, Keys.Control | Keys.E, Keys.Alt | Keys.P,
         Keys.Control | Keys.Left, Keys.Control | Keys.Right,
-        Keys.Control | Keys.D0, Keys.Control | Keys.D1, Keys.Escape
+        Keys.Control | Keys.D0, Keys.Control | Keys.D1,
+        Keys.Control | Keys.Oemplus, Keys.Control | Keys.Add,
+        Keys.Control | Keys.OemMinus, Keys.Control | Keys.Subtract, Keys.Escape
     };
 
     internal ReportShortcutMessageFilter(ApplicationWindowForm window)
@@ -28,6 +30,8 @@ internal sealed class ReportShortcutMessageFilter : IMessageFilter, IDisposable
         var source = Control.FromChildHandle(message.HWnd);
         if (source is null || !ReferenceEquals(source.FindForm(), _window)) return false;
         Keys key = (Keys)message.WParam.ToInt32() | modifiers;
+        if ((key & Keys.KeyCode) == Keys.Oemplus && modifiers == (Keys.Control | Keys.Shift))
+            key = Keys.Control | Keys.Oemplus;
         if (!Shortcuts.Contains(key)) return false;
         return _window.ShortcutController.TryHandle(key);
     }

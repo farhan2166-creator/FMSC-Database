@@ -60,6 +60,17 @@ internal static class RdlcReportPrinter
 
     internal static RdlcPrintDocument CreateDocument(LocalReport report, PageSettings settings, string title)
     {
+        var pages = RenderPages(report, settings);
+        return new RdlcPrintDocument(pages) {
+            DocumentName = title,
+            DefaultPageSettings = (PageSettings)settings.Clone(),
+            OriginAtMargins = false
+        };
+    }
+
+    // The overview uses the exact same pages and geometry as printing.
+    internal static List<MemoryStream> RenderPages(LocalReport report, PageSettings settings)
+    {
         string Inches(int value) => (value / 100d).ToString(CultureInfo.InvariantCulture) + "in";
         int width = settings.Landscape ? settings.PaperSize.Height : settings.PaperSize.Width;
         int height = settings.Landscape ? settings.PaperSize.Width : settings.PaperSize.Height;
@@ -82,11 +93,7 @@ internal static class RdlcReportPrinter
             if (pages.Count == 0 || pages.Any(page => page.Length == 0))
                 throw new InvalidOperationException("The report could not generate printable pages.");
             foreach (var page in pages) page.Position = 0;
-            return new RdlcPrintDocument(pages) {
-                DocumentName = title,
-                DefaultPageSettings = (PageSettings)settings.Clone(),
-                OriginAtMargins = false
-            };
+            return pages;
         }
         catch
         {

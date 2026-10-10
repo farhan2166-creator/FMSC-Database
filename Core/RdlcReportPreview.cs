@@ -14,7 +14,8 @@ internal static class RdlcReportPreview
         DataTable data,
         bool fitPageWidth = false,
         string? reportDefinition = null,
-        bool enableExternalImages = false)
+        bool enableExternalImages = false,
+        bool allowMultiplePages = true)
     {
         Rectangle workingArea = owner is Control ownerControl
             ? Screen.FromControl(ownerControl).WorkingArea
@@ -51,8 +52,13 @@ internal static class RdlcReportPreview
         viewer.LocalReport.DataSources.Add(
             new Microsoft.Reporting.WinForms.ReportDataSource(dataSourceName, data));
 
-        Control toolbar = CreateToolbar(form, viewer, fitPageWidth);
-        form.Controls.Add(viewer);
+        using var surface = new Panel { Dock = DockStyle.Fill };
+        using var overview = new ReportPageOverview { Visible = false };
+        surface.Controls.Add(viewer); surface.Controls.Add(overview);
+        Control toolbar = CreateToolbar(form, viewer, fitPageWidth, out var interactions,
+            surface, overview, allowMultiplePages);
+        using var interactionLifetime = interactions;
+        form.Controls.Add(surface);
         form.Controls.Add(toolbar);
         using var shortcuts = new ReportShortcutMessageFilter(form);
         form.KeyDown += (_, e) => {
@@ -83,7 +89,9 @@ internal static class RdlcReportPreview
     private static Control CreateToolbar(
         ApplicationWindowForm form,
         Microsoft.Reporting.WinForms.ReportViewer viewer,
-        bool fitPageWidth)
+        bool fitPageWidth,
+        out ReportPreviewInteractionFilter interactions,
+        Control surface, ReportPageOverview overview, bool allowMultiplePages)
     {
         var toolbar = new FlowLayoutPanel {
             Dock = DockStyle.Top,
@@ -133,9 +141,15 @@ internal static class RdlcReportPreview
         zoom.Items.AddRange(new object[] {
             "Fit page",
             "Page width",
+            "25%",
+            "50%",
+            "75%",
             "100%",
             "125%",
-            "150%"
+            "150%",
+            "200%",
+            "300%",
+            "400%"
         });
         zoom.SelectedIndex = fitPageWidth ? 1 : 0;
 
@@ -169,6 +183,36 @@ internal static class RdlcReportPreview
 
         toolbar.Controls.Add(actions);
         toolbar.Controls.Add(navigation);
+        ModernComboBox? pageView = null;
+        if (allowMultiplePages)
+        {
+            pageView = new ModernComboBox {
+                Width = AppScale.Scale(170), Height = AppMetrics.InputControlHeight,
+                Margin = new Padding(0, 0, AppScale.Scale(8), 0), AccessibleName = "Page view"
+            };
+            pageView.Items.AddRange(new object[] { "Single page", "Multiple pages" });
+            pageView.SelectedIndex = ReportLayoutStore.GetPreference("ReportPageView") == "Multiple" ? 1 : 0;
+            pageView.SelectionChangeCommitted += (_, _) => Execute("change page view", () => {
+                ApplyPageView();
+                ReportLayoutStore.SetPreference("ReportPageView", pageView.SelectedIndex == 1 ? "Multiple" : "Single");
+            });
+            toolbar.Controls.Add(pageView);
+        }
+        void ApplyPageView()
+        {
+            bool multiple = pageView?.SelectedIndex == 1;
+            if (multiple && !overview.HasPages)
+            {
+                form.UseWaitCursor = true;
+                try { overview.LoadPages(viewer); }
+                catch { if (pageView is not null) pageView.SelectedIndex = 0; overview.Visible = false; viewer.Visible = true; throw; }
+                finally { form.UseWaitCursor = false; }
+            }
+            overview.SetZoom(viewer.ZoomMode, viewer.ZoomPercent);
+            overview.Visible = multiple; viewer.Visible = !multiple;
+            if (multiple) { overview.BringToFront(); overview.SelectPage(viewer.CurrentPage); }
+        }
+        overview.PageSelected += selected => { viewer.CurrentPage = selected; RefreshPageState(); };
 
         void RefreshPageState()
         {
@@ -201,7 +245,7 @@ internal static class RdlcReportPreview
 
         BindToolbarAction(form, print, Keys.Control | Keys.P, "Ctrl+P", () => Execute("print", () =>
             RdlcReportPrinter.Print(form, viewer)));
-        BindToolbarAction(form, pageSetup, Keys.Alt | Keys.P, "Alt+P", () => Execute("set up", () => viewer.PageSetupDialog()));
+        BindToolbarAction(form, pageSetup, Keys.Alt | Keys.P, "Alt+P", () => Execute("set up", () => { viewer.PageSetupDialog(); overview.ClearPages(); ApplyPageView(); }));
         BindToolbarAction(form, exportPdf, Keys.Control | Keys.E, "Ctrl+E", () => {
             Execute("export", () => {
                 using var dialog = new SaveFileDialog {
@@ -216,44 +260,82 @@ internal static class RdlcReportPreview
         });
         BindToolbarAction(form, previous, Keys.Control | Keys.Left, "Ctrl+Left", () => {
             viewer.CurrentPage = Math.Max(1, viewer.CurrentPage - 1);
+            if (overview.Visible) overview.SelectPage(viewer.CurrentPage);
             RefreshPageState();
         });
         BindToolbarAction(form, next, Keys.Control | Keys.Right, "Ctrl+Right", () => {
             int totalPages = Math.Max(1, viewer.GetTotalPages());
             viewer.CurrentPage = Math.Min(totalPages, viewer.CurrentPage + 1);
+            if (overview.Visible) overview.SelectPage(viewer.CurrentPage);
             RefreshPageState();
         });
-        zoom.SelectionChangeCommitted += (_, _) => {
-            switch (zoom.SelectedItem?.ToString())
-            {
-                case "Page width":
-                    viewer.ZoomMode = Microsoft.Reporting.WinForms.ZoomMode.PageWidth;
-                    break;
-                case "100%":
-                case "125%":
-                case "150%":
-                    viewer.ZoomMode = Microsoft.Reporting.WinForms.ZoomMode.Percent;
-                    viewer.ZoomPercent = int.Parse(
-                        zoom.SelectedItem!.ToString()!.TrimEnd('%'));
-                    break;
-                default:
-                    viewer.ZoomMode = Microsoft.Reporting.WinForms.ZoomMode.FullPage;
-                    break;
+        void SelectZoom(string value)
+        {
+            if (!zoom.Enabled) return;
+            if (!zoom.Items.Contains(value)) zoom.Items.Add(value);
+            zoom.SelectedItem = value;
+            if (value == "Fit page") viewer.ZoomMode = Microsoft.Reporting.WinForms.ZoomMode.FullPage;
+            else if (value == "Page width") viewer.ZoomMode = Microsoft.Reporting.WinForms.ZoomMode.PageWidth;
+            else {
+                viewer.ZoomMode = Microsoft.Reporting.WinForms.ZoomMode.Percent;
+                viewer.ZoomPercent = int.Parse(value.TrimEnd('%'));
             }
-        };
+            overview.SetZoom(viewer.ZoomMode, viewer.ZoomPercent);
+        }
+        void StepZoom(int direction)
+        {
+            if (!zoom.Enabled) return;
+            int current = overview.Visible ? overview.EffectiveZoomPercent : viewer.ZoomPercent;
+            int percent = Math.Clamp(current + direction * 25, 25, 400);
+            SelectZoom($"{percent}%");
+        }
+        zoom.SelectionChangeCommitted += (_, _) => SelectZoom(zoom.SelectedItem!.ToString()!);
         BindToolbarAction(form, close, Keys.Escape, "Esc", () => form.Close());
-        form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.D0, "Ctrl+0", () => {
-            zoom.SelectedIndex = 0;
-            viewer.ZoomMode = Microsoft.Reporting.WinForms.ZoomMode.FullPage;
+        form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.D0, "Ctrl+0", () => SelectZoom("Fit page"));
+        form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.D1, "Ctrl+1", () => SelectZoom("Page width"));
+        form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.Oemplus, "Ctrl++", () => StepZoom(1));
+        form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.Add, "Ctrl++", () => StepZoom(1));
+        form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.OemMinus, "Ctrl+-", () => StepZoom(-1));
+        form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.Subtract, "Ctrl+-", () => StepZoom(-1));
+        var canvasMenu = new ContextMenuStrip();
+        canvasMenu.Items.Add("Zoom in (Ctrl++)", null, (_, _) => StepZoom(1));
+        canvasMenu.Items.Add("Zoom out (Ctrl+-)", null, (_, _) => StepZoom(-1));
+        canvasMenu.Items.Add(new ToolStripSeparator());
+        canvasMenu.Items.Add("Fit page (Ctrl+0)", null, (_, _) => SelectZoom("Fit page"));
+        canvasMenu.Items.Add("Page width (Ctrl+1)", null, (_, _) => SelectZoom("Page width"));
+        canvasMenu.Items.Add("100%", null, (_, _) => SelectZoom("100%"));
+        if (pageView is not null)
+        {
+            canvasMenu.Items.Add(new ToolStripSeparator());
+            var single = new ToolStripMenuItem("Single page");
+            var multiple = new ToolStripMenuItem("Multiple pages");
+            void ChooseView(int index)
+            {
+                if (!pageView.Enabled) return;
+                pageView.SelectedIndex = index;
+                Execute("change page view", () => {
+                    ApplyPageView();
+                    ReportLayoutStore.SetPreference("ReportPageView", pageView.SelectedIndex == 1 ? "Multiple" : "Single");
+                });
+            }
+            single.Click += (_, _) => ChooseView(0); multiple.Click += (_, _) => ChooseView(1);
+            canvasMenu.Items.Add(single); canvasMenu.Items.Add(multiple);
+            canvasMenu.Opening += (_, _) => {
+                single.Checked = pageView.SelectedIndex == 0; multiple.Checked = pageView.SelectedIndex == 1;
+                single.Enabled = multiple.Enabled = pageView.Enabled;
+            };
+        }
+        toolbar.Controls.Add(new Label {
+            AutoSize = true, Text = "Ctrl+wheel: zoom · Drag: scroll · Right-click: view options",
+            ForeColor = AppTheme.Text, Font = AppTheme.NormalFont,
+            Margin = new Padding(0, AppScale.Scale(8), 0, 0)
         });
-        form.ShortcutController.RegisterShortcut(zoom, Keys.Control | Keys.D1, "Ctrl+1", () => {
-            zoom.SelectedIndex = 1;
-            viewer.ZoomMode = Microsoft.Reporting.WinForms.ZoomMode.PageWidth;
-        });
+        interactions = new ReportPreviewInteractionFilter(form, surface, direction => Execute("zoom", () => StepZoom(direction)), canvasMenu);
         form.ShortcutController.RefreshHints();
         void SetReady(bool ready)
         {
             print.Enabled = pageSetup.Enabled = exportPdf.Enabled = zoom.Enabled = ready;
+            if (pageView is not null) pageView.Enabled = ready;
             if (!ready) { previous.Enabled = next.Enabled = false; page.Text = "Loading..."; }
         }
         SetReady(false);
@@ -284,6 +366,7 @@ internal static class RdlcReportPreview
                         viewer.ZoomMode = Microsoft.Reporting.WinForms.ZoomMode.FullPage;
                     else if (zoom.SelectedIndex == 1 && viewer.ZoomMode != Microsoft.Reporting.WinForms.ZoomMode.PageWidth)
                         viewer.ZoomMode = Microsoft.Reporting.WinForms.ZoomMode.PageWidth;
+                    Execute("show page view", ApplyPageView);
                     RefreshPageState();
                 }));
         };
