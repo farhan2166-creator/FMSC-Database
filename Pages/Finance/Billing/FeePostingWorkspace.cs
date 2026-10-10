@@ -7,7 +7,7 @@ public static class FeePostingWorkspace
     public static Control Create() =>
         new WorkspacePage(
             PageTitles.FeePosting,
-            "Add fee charges, check billing and cancel uncollected charges.",
+            "Create monthly bills after setting student fees. Check billing or cancel uncollected charges.",
             ("Post Monthly Fees", () => new FeePostingPage()),
             ("Post Additional Fee", () => new AdditionalFeePostingPage()),
             ("Billing Status", () => new BillingStatusReportPage()),

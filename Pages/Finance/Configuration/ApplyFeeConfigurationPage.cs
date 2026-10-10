@@ -108,7 +108,7 @@ public sealed class ApplyFeeConfigurationPage : V2Page
         root.Controls.Add(applyRow, 0, 1);
         root.Controls.Add(buttonRow, 0, 2);
         root.Controls.Add(Grid, 0, 3);
-        SetContent(root);
+        SetContent(root, UiText.Fees.StudentRateScope);
         FeeTypeCatalog.Changed += OnFeeTypesChanged;
         Disposed += (_, _) => FeeTypeCatalog.Changed -= OnFeeTypesChanged;
         Defer(LoadLookupsAsync);
@@ -550,7 +550,8 @@ public sealed class ApplyFeeConfigurationPage : V2Page
                 string resultMessage =
                     $"Applied saved rates for {appliedCampusName} / {appliedClassName} / {appliedFeeTypeName}, " +
                     $"effective {appliedEffectiveFrom:MMMM yyyy}.\n\n" +
-                    $"Total: {total:N0}\nSucceeded: {succeeded:N0}\nFailed: {failed:N0}";
+                    $"Total: {total:N0}\nSucceeded: {succeeded:N0}\nFailed: {failed:N0}" +
+                    "\n\n" + UiText.Fees.StudentRatesApplied;
                 if (failed > 0)
                 {
                     const int maxListed = 15;

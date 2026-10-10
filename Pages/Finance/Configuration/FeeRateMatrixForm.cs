@@ -49,7 +49,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
         ThemeRole = "Secondary"
     };
     private readonly ModernButton applyStudentsButton = new() {
-        Text = "Apply to Existing Students…",
+        Text = PageTitles.UpdateStudentFeeRates + "…",
         Width = AppScale.Scale(235),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Warning"
@@ -139,7 +139,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
                 pair.Key.ToolTipText = $"{details.Frequency}\n{details.Remarks}";
             }
         }
-        summaryLabel.Text = $"{changed} edited value(s), {editedDetails.Count} fee detail change(s). Save Grid to apply.";
+        summaryLabel.Text = $"{changed} edited value(s), {editedDetails.Count} fee detail change(s). Save Grid to store class rates.";
     }
     /* One confirmation per close gesture. */
     private bool discardConfirmed;
@@ -274,15 +274,18 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
             ForeColor = AppTheme.Text
         };
         var subtitle = new Label {
-            Text = "Edit amounts, then Save Grid. Use Edit Selected Fee for one class; Frequency changes the whole row. Update student fees separately.",
+            Text = UiText.Fees.MatrixScope,
             Dock = DockStyle.Top,
             AutoSize = false,
             AutoEllipsis = true,
-            Height = AppMetrics.TextHeight(AppTheme.NormalFont) + 8,
+            Height = AppMetrics.TextHeight(AppTheme.NormalFont) * 2 + 8,
             Font = AppTheme.NormalFont,
             ForeColor = AppTheme.MutedText
         };
         summaryTip.SetToolTip(subtitle, subtitle.Text);
+        summaryTip.SetToolTip(saveButton, "Save class rates. Existing student fees and bills stay unchanged.");
+        summaryTip.SetToolTip(editFeeButton, "Change the frequency and remarks for one class. The Frequency column changes the whole row.");
+        summaryTip.SetToolTip(applyStudentsButton, "Review and update eligible existing student fee rates. This does not create bills.");
         var campusLabel = new Label {
             Text = "Campus",
             AutoSize = true,
@@ -420,7 +423,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
             summaryLabel.Text = DbMessage.UserMessage(ex);
         }
     }
-    private async Task LoadGridAsync()
+    private async Task LoadGridAsync(string? savedMessage = null, int? savedCampusId = null)
     {
         int version = ++gridLoadVersion;
         grid.Columns.Clear();
@@ -512,9 +515,12 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
             BuildGridRows();
             /* The values just shown are the ones a close would have to throw away, so this is the baseline the guard compares against. */
             CaptureGridSnapshot();
-            summaryLabel.Text =
-                $"{feeTypeRows.Count} fee type(s) x {classes.Count} class(es). " +
-                "Edit an amount and Save Grid - blank cells are left unconfigured.";
+            // Show the save outcome only after a successful reload of the same campus.
+            // A newer load or a load error keeps its own status instead.
+            summaryLabel.Text = savedMessage is not null && savedCampusId == campusId
+                ? savedMessage
+                : $"{feeTypeRows.Count} fee type(s) × {classes.Count} class(es). " +
+                    "Save Grid stores class rates. Blank cells are left unconfigured.";
             saveButton.Enabled = true;
         }
         catch (Exception ex)
@@ -692,14 +698,14 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
         if (IsDirty())
         {
             ModernMessageDialog.Show(FindForm(), "Save the grid first, then apply the saved rates to existing students.",
-                "Apply to Existing Students", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                PageTitles.UpdateStudentFeeRates, MessageBoxButtons.OK, MessageBoxIcon.Information);
             grid.Focus();
             return;
         }
         if (campus.SelectedValue is null || existing.Count == 0)
         {
             ModernMessageDialog.Show(FindForm(), "Choose a campus with saved fee rates first.",
-                "Apply to Existing Students", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                PageTitles.UpdateStudentFeeRates, MessageBoxButtons.OK, MessageBoxIcon.Information);
             campus.Focus();
             return;
         }
@@ -710,11 +716,11 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
         if (scopes.Length == 0)
         {
             ModernMessageDialog.Show(FindForm(), "Only monthly and yearly fee rates can be applied to existing assignments.",
-                "Apply to Existing Students", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                PageTitles.UpdateStudentFeeRates, MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
         using var dialog = new ApplicationWindowForm {
-            Text = "Apply Saved Rates to Existing Students",
+            Text = PageTitles.UpdateStudentFeeRates,
             StartPosition = FormStartPosition.CenterParent,
             ClientSize = new Size(AppScale.Scale(1250), AppScale.Scale(650)),
             MinimumSize = new Size(AppScale.Scale(720), AppScale.Scale(440)),
@@ -867,10 +873,10 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
                             (string?)change.Remarks)))
                 });
             Applied = true;
-            summaryLabel.Text =
-                $"Saved: {string.Join(" and ", confirmParts)}." +
+            string savedMessage = UiText.Fees.MatrixSaved +
+                $" {string.Join(" and ", confirmParts)}." +
                 (unchangedCleared > 0 ? $" {unchangedCleared} cleared cell(s) were left unchanged." : "");
-            await LoadGridAsync();
+            await LoadGridAsync(savedMessage, campusId);
         }
         catch (Exception ex)
         {

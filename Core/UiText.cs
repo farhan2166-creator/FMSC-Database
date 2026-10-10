@@ -20,6 +20,16 @@ public static class UiText
         public const string SelectNone = "Select None";
     }
 
+    /// <summary>Guidance connecting fee setup, student rates and billing.</summary>
+    public static class Fees
+    {
+        public const string SetupSteps = "Define fee types → Save class rates → Update existing student fee rates if needed → Post monthly fees.";
+        public const string MatrixScope = "Save Grid saves class rates only. Use Update Student Fee Rates for existing students, then Fee Posting to create monthly bills.";
+        public const string MatrixSaved = "Class rates saved. Existing student fees and bills are unchanged.";
+        public const string StudentRateScope = "Updates existing student fee rates from the chosen month. To create monthly bills, use Fee Posting.";
+        public const string StudentRatesApplied = "No bills were created here. Use Fee Posting > Post Monthly Fees to create monthly bills.";
+    }
+
     /// <summary>Asking the operator for the thing an action needs before it can run. These are the sentences that appear on the most screens.</summary>
     public static class Prompts
     {

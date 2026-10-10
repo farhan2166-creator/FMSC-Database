@@ -33,7 +33,7 @@ public sealed class FeePostingPage : V2Page
     public FeePostingPage()
         : base(
             "Post Monthly Fees",
-            "Choose a month, review eligible fees and post the selected charges.")
+            "Create monthly bills from student fee rates. Review eligible fees and post the selected charges.")
     {
         // The grid must accept a tick. Every other column is made read-only in ConfigureGrid, so nothing but the tick column is editable.
         Grid.ReadOnly = false;
