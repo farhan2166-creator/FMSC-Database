@@ -1,0 +1,436 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
+namespace FMSC_SMS.Core;
+public static class HumanUi
+{
+    public static HumanCard Card(
+        string title,
+        string? subtitle = null,
+        Color? accent = null,
+        Control? accessory = null) =>
+        new(title, subtitle, accent, accessory);
+    /* The student pickers filter an in-memory list (StudentSearchCache), so there is no database round trip to wait out. */
+    public const int SearchDebounceMs = 120;
+    public static System.Windows.Forms.Timer CreateSearchDebounceTimer(Action onSearch, int intervalMs = SearchDebounceMs)
+    {
+        var timer = new System.Windows.Forms.Timer {
+            Interval = intervalMs
+        };
+        timer.Tick += (_, _) => {
+            timer.Stop();
+            onSearch();
+        };
+        return timer;
+    }
+    public static string StudentDisplay(
+        int admissionId,
+        string? studentName,
+        string? fatherName,
+        string? gender = null,
+        string? registrationNumber = null,
+        string? className = null,
+        string? sectionName = null)
+    {
+        string name = (studentName ?? string.Empty).Trim();
+        string father = (fatherName ?? string.Empty).Trim();
+        string registration = (registrationNumber ?? string.Empty).Trim();
+        string cls = (className ?? string.Empty).Trim();
+        string section = (sectionName ?? string.Empty).Trim();
+        string relation = gender?.Trim() switch {
+            string value when value.Equals("Male", StringComparison.OrdinalIgnoreCase) => "s/o",
+            string value when value.Equals("Female", StringComparison.OrdinalIgnoreCase) => "d/o",
+            _ => "child of"
+        };
+        string display =
+            string.IsNullOrWhiteSpace(father)
+                ? $"{AdmissionNumbers.ForId(admissionId)} - {name}"
+                : $"{AdmissionNumbers.ForId(admissionId)} - {name} {relation} {father}";
+        /* The registration number is a reporting label, not part of how an operator identifies a student, so it is no longer appended here. */
+        _ = registration;
+        // Disambiguates same-named siblings/twins (H1) in every quick-pick dropdown, not just the dedicated Student Search dialog.
+        string classSection =
+            string.IsNullOrWhiteSpace(cls)
+                ? string.Empty
+                : string.IsNullOrWhiteSpace(section)
+                    ? cls
+                    : $"{cls} - {section}";
+        if (!string.IsNullOrWhiteSpace(classSection))
+            display += $" ({classSection})";
+        return display;
+    }
+    /// <summary>Returns matching source rows without cloning the source table.</summary>
+    public static List<DataRow> FindStudentMatches(DataTable source, string? searchText, int maxRows = 0, Func<DataRow, bool>? additionalFilter = null)
+    {
+        string term = (searchText ?? string.Empty).Trim();
+        string rawTerm = term;
+        if (AdmissionNumbers.TryNormalize(term, out string normalizedNumber)) term = normalizedNumber;
+        bool numeric = AdmissionNumbers.TryNormalize(term, out _);
+        string[] words = term.Length == 0
+            ? Array.Empty<string>()
+              : rawTerm.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        DataColumn? admissionColumn = source.Columns.Contains("AdmissionNumber")
+            ? source.Columns["AdmissionNumber"]
+            : null;
+        DataColumn? nameColumn = source.Columns.Contains("StudentName")
+            ? source.Columns["StudentName"]
+            : null;
+        DataColumn? fatherColumn = source.Columns.Contains("FatherName")
+            ? source.Columns["FatherName"]
+            : null;
+        DataColumn? registrationColumn = source.Columns.Contains("RegistrationNumber")
+            ? source.Columns["RegistrationNumber"]
+            : null;
+        bool Contains(DataRow row, DataColumn? column, string word) =>
+            column is not null &&
+            row[column] != DBNull.Value &&
+            (Convert.ToString(row[column], CultureInfo.InvariantCulture) ?? string.Empty)
+                .IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0;
+        bool MatchesText(DataRow row)
+        {
+            foreach (string word in words)
+            {
+                if (!Contains(row, nameColumn, word) &&
+                    !Contains(row, fatherColumn, word) &&
+                    !Contains(row, registrationColumn, word) &&
+                    !Contains(row, admissionColumn, word))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        bool MatchesAdmissionPrefix(DataRow row)
+        {
+            if (admissionColumn is null || row[admissionColumn] == DBNull.Value)
+                return false;
+            string id = Convert.ToString(row[admissionColumn], CultureInfo.InvariantCulture) ?? string.Empty;
+            return id.StartsWith(term, StringComparison.OrdinalIgnoreCase);
+        }
+        string Text(DataRow row, DataColumn? column) =>
+            column is not null && row[column] != DBNull.Value
+                ? Convert.ToString(row[column], CultureInfo.InvariantCulture) ?? string.Empty
+                : string.Empty;
+        var matches = new List<DataRow>();
+        foreach (DataRow row in source.Rows)
+        {
+            if (additionalFilter is not null && !additionalFilter(row))
+                continue;
+            if (term.Length > 0 &&
+                !MatchesAdmissionPrefix(row) &&
+                !MatchesText(row))
+            {
+                continue;
+            }
+            matches.Add(row);
+        }
+        matches.Sort((left, right) => {
+            int ExactRank(DataRow row) =>
+                string.Equals(Text(row, admissionColumn), term, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(Text(row, registrationColumn), rawTerm, StringComparison.OrdinalIgnoreCase) ? 0 : 1;
+            if (term.Length > 0)
+            {
+                int exactOrder = ExactRank(left).CompareTo(ExactRank(right));
+                if (exactOrder != 0) return exactOrder;
+            }
+            if (numeric)
+            {
+                int prefixOrder = (MatchesAdmissionPrefix(left) ? 0 : 1)
+                    .CompareTo(MatchesAdmissionPrefix(right) ? 0 : 1);
+                if (prefixOrder != 0)
+                    return prefixOrder;
+            }
+            int idOrder = AdmissionNumbers.Compare(Text(left, admissionColumn), Text(right, admissionColumn));
+            if (idOrder != 0)
+                return idOrder;
+            int nameOrder = StringComparer.OrdinalIgnoreCase.Compare(
+                Text(left, nameColumn),
+                Text(right, nameColumn));
+            return nameOrder != 0
+                ? nameOrder
+                : StringComparer.OrdinalIgnoreCase.Compare(
+                    Text(left, fatherColumn),
+                    Text(right, fatherColumn));
+        });
+        if (maxRows > 0 && matches.Count > maxRows)
+            matches.RemoveRange(maxRows, matches.Count - maxRows);
+        return matches;
+    }
+    /// <summary>Filters students into a DataTable for callers that require one.</summary>
+    public static DataTable FilterStudentsByAdmissionIdOrName(DataTable source, string? searchText, int maxRows = 0)
+    {
+        List<DataRow> matches = FindStudentMatches(source, searchText, maxRows);
+        DataTable result = source.Clone();
+        foreach (DataRow row in matches)
+            result.ImportRow(row);
+        return result;
+    }
+    /// <summary>Position of the student whose admission id is exactly <paramref name="term"/> in a LookupBox filled from a student list (position 0 is the blank row), or -1.</summary>
+    public static int IndexOfAdmissionId(LookupBox box, string term)
+    {
+        if (!AdmissionNumbers.TryNormalize(term, out string wanted))
+            return -1;
+        for (int i = 0; i < box.Items.Count; i++)
+        {
+            if (box.Items[i] is DataRowView view &&
+                view.DataView.Table is { } table &&
+                table.Columns.Contains("AdmissionNumber") &&
+                view["AdmissionNumber"] != DBNull.Value &&
+                string.Equals(Convert.ToString(view["AdmissionNumber"]), wanted, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+        return -1;
+    }
+    /// <summary>Presentation only: it holds no state and takes no part in any form's data.</summary>
+    public static Label GroupHeading(string text)
+    {
+        var label = new Label {
+            Text = text,
+            Dock = DockStyle.Fill,
+            Font = UiDesignSystem.Typography.Caption,
+            ForeColor = AppTheme.Primary,
+            TextAlign = ContentAlignment.BottomLeft,
+            AutoEllipsis = true,
+            UseMnemonic = false,
+            Margin = new Padding(0),
+            Padding = new Padding(UiDesignSystem.Spacing.Xs, 0, 0, 2),
+            /* Re-tinted with the theme's accent when the theme changes. */
+            Tag = "ThemeAccentText"
+        };
+        label.Paint += (_, e) => {
+            using var pen = new Pen(AppTheme.Border);
+            e.Graphics.DrawLine(pen, 0, label.Height - 1, label.Width, label.Height - 1);
+        };
+        return label;
+    }
+    /// <summary>Presentation only: dims the caption of a field made by <see cref="Field"/> so a record-keeping reference (BISE enrolment, registration number) reads as secondary.</summary>
+    public static void MuteFieldCaption(Panel field)
+    {
+        foreach (Control control in field.Controls)
+        {
+            if (control is Label label &&
+                Equals(label.Tag, UiHelper.FieldCaptionTag))
+            {
+                label.ForeColor = AppTheme.MutedText;
+                label.Tag = "ThemeMutedText";
+                return;
+            }
+        }
+    }
+    /// <summary>Row height that fits <see cref="GroupHeading"/> with a little air above the fields.</summary>
+    public static int GroupHeadingHeight =>
+        Math.Max(16, AppMetrics.TextHeight(UiDesignSystem.Typography.Caption)) + UiDesignSystem.Spacing.Sm + 2;
+    public static Panel Field(string caption, Control control, bool required = false, bool fillHeight = true)
+    {
+        var panel = new TableLayoutPanel {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(0, 0, UiDesignSystem.Spacing.Sm, UiDesignSystem.Spacing.Sm),
+            Margin = new Padding(0)
+        };
+        int captionHeight = Math.Max(16, AppMetrics.TextHeight(UiDesignSystem.Typography.Caption));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, captionHeight));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        panel.Controls.Add(new Label {
+            Text = required ? caption + " *" : caption,
+            Dock = DockStyle.Fill,
+            Font = UiDesignSystem.Typography.Caption,
+            ForeColor = AppTheme.Text,
+            TextAlign = ContentAlignment.MiddleLeft,
+            AutoEllipsis = true,
+            /* No bottom padding: the label is exactly one line tall, so padding under the text left less than a line and clipped the descenders (Campus, (optional)). */
+            Padding = new Padding(UiDesignSystem.Spacing.Xs, 0, 0, 0),
+            Tag = UiHelper.FieldCaptionTag
+        }, 0, 0);
+        control.Height = AppMetrics.InputControlHeight;
+        // Single-line inputs (combo, date, numeric, one-line text) keep the standard input height. Only multiline text and non-input controls fill.
+        bool singleLineInput =
+            control is ModernComboBox ||
+            control is ModernDatePicker ||
+            control is ModernTextBox { Multiline: false };
+        if (fillHeight && !singleLineInput)
+        {
+            control.Dock = DockStyle.Fill;
+        }
+        else
+        {
+            control.Dock = DockStyle.Top;
+        }
+        /* Keep required-state metadata on the input so shared validation can discover it. */
+        UiAccessibility.Describe(
+            control,
+            string.IsNullOrWhiteSpace(control.AccessibleName)
+                ? UiAccessibility.CleanCaption(caption)
+                : null,
+            required ? "Required" : null);
+        panel.Controls.Add(control, 0, 1);
+        return panel;
+    }
+    public static ModernTextBox TextBox(bool multiline = false, int maxLength = 1000) => new() {
+        Multiline = multiline,
+        ScrollBars = multiline ? ScrollBars.Vertical : ScrollBars.None,
+        MaxLength = maxLength,
+        Height = multiline ? AppMetrics.MultilineInputHeight(78) : AppMetrics.InputControlHeight,
+        Dock = DockStyle.Fill
+    };
+    public static TableLayoutPanel ButtonRow(params Control[] buttons)
+    {
+        buttons = ActionButtonStyle.Ordered(buttons);
+        var row = new TableLayoutPanel {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 3,
+            RowCount = 1,
+            Margin = new Padding(0, UiDesignSystem.Spacing.Md, 0, UiDesignSystem.Spacing.Xs),
+            Padding = new Padding(0)
+        };
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        row.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var flow = new FlowLayoutPanel {
+            FlowDirection = FlowDirection.LeftToRight,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = true,
+            Margin = new Padding(0)
+        };
+        int minimumButtonWidth = AppScale.Scale(110);
+        int buttonWidth = buttons.Length == 0
+            ? 0
+            : buttons.Max(button => Math.Max(
+                minimumButtonWidth,
+                Math.Max(button.Width, AppMetrics.TextWidth(button.Text, button.Font, AppScale.Scale(32)))));
+        foreach (Control button in buttons)
+        {
+            if (button is ModernButton)
+                button.Height = Math.Max(AppMetrics.ButtonHeight, AppMetrics.TextHeight(button.Font) + AppScale.Scale(8));
+            if (buttonWidth > 0)
+                button.Width = buttonWidth;
+            flow.Controls.Add(button);
+        }
+        ActionButtonStyle.Arrange(flow);
+        row.Controls.Add(flow, 1, 0);
+        void FitButtons()
+        {
+            int available = Math.Max(1, row.ClientSize.Width - row.Padding.Horizontal);
+            if (flow.MaximumSize.Width != available)
+                flow.MaximumSize = new Size(available, 0);
+            int natural = buttons.Where(button => button.Visible || !row.Visible).Sum(button => button.Width + button.Margin.Horizontal);
+            int minimum = Math.Min(available, natural);
+            if (flow.MinimumSize.Width != minimum) flow.MinimumSize = new Size(minimum, 0);
+        }
+        row.SizeChanged += (_, _) => FitButtons();
+        row.VisibleChanged += (_, _) => FitButtons();
+        foreach (Control button in buttons)
+        {
+            button.VisibleChanged += (_, _) => FitButtons();
+            button.SizeChanged += (_, _) => FitButtons();
+        }
+        bool adjusting = false;
+        float? baselineHeight = null;
+        row.Layout += (_, _) => {
+            if (adjusting || row.Parent?.Parent is not HumanCard card || card.Parent is not TableLayoutPanel root) return;
+            int index = root.GetRow(card);
+            if (index < 0 || index >= root.RowStyles.Count || root.RowStyles[index].SizeType != SizeType.Absolute) return;
+            baselineHeight ??= root.RowStyles[index].Height;
+            float needed = baselineHeight.Value + Math.Max(0, row.Height + row.Margin.Vertical - AppMetrics.ButtonRowHeight);
+            if (Math.Abs(root.RowStyles[index].Height - needed) < 1) return;
+            adjusting = true;
+            try { root.RowStyles[index].Height = needed; }
+            finally { adjusting = false; }
+        };
+        return row;
+    }
+    public static ModernComboBox Combo() => new() {
+        DropDownStyle = ComboBoxStyle.DropDownList,
+        Height = AppMetrics.InputControlHeight,
+        Dock = DockStyle.None,
+        Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top
+    };
+    public static void SelectCurrentAcademicYear(ModernComboBox combo, DataTable table)
+    {
+        if (combo is null || table is null ||
+            !table.Columns.Contains("AcademicYearId") ||
+            !table.Columns.Contains("IsCurrent"))
+        {
+            combo!.SelectedIndex = -1; // Every caller passes a live combo; this keeps the existing behaviour exactly.
+            return;
+        }
+        DataRow? currentYear = table.AsEnumerable()
+            .FirstOrDefault(row =>
+                row["AcademicYearId"] != DBNull.Value &&
+                Convert.ToInt32(row["AcademicYearId"]) > 0 &&
+                row["IsCurrent"] != DBNull.Value &&
+                Convert.ToBoolean(row["IsCurrent"]));
+        combo.SelectedValue = currentYear?["AcademicYearId"] ?? 0;
+    }
+    public static ModernNumericTextBox Number(int max = 100000000) => new() {
+        Minimum = 0,
+        Maximum = max,
+        Height = AppMetrics.InputControlHeight,
+        Dock = DockStyle.Fill,
+        Font = AppTheme.NormalFont
+    };
+    public static ModernDatePicker Date() => new ModernDatePicker {
+        Format = DateTimePickerFormat.Custom,
+        CustomFormat = "dd-MMM-yyyy",
+        Height = AppMetrics.InputControlHeight,
+        Dock = DockStyle.Fill,
+        Font = AppTheme.NormalFont
+    };
+    public static DataGridView Grid(bool editable = false)
+    {
+        var grid = new KeyboardDataGridView {
+            Dock = DockStyle.Fill,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            AllowUserToResizeRows = false,
+            ReadOnly = !editable,
+            RowHeadersVisible = false,
+            BorderStyle = BorderStyle.None,
+            BackgroundColor = AppTheme.Surface,
+            CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+            EnableHeadersVisualStyles = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            MultiSelect = false,
+            AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.None,
+            ColumnHeadersHeight = AppMetrics.GridHeaderHeight,
+            RowTemplate = { Height = AppMetrics.GridRowHeight }
+        };
+        ApplyGridStyle(grid, AppTheme.Primary);
+        return grid;
+    }
+    public static void ApplyGridStyle(DataGridView grid, Color accent)
+    {
+        grid.BackgroundColor = AppTheme.Surface;
+        grid.BorderStyle = BorderStyle.None;
+        grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;
+        grid.GridColor = AppTheme.Border;
+        grid.EnableHeadersVisualStyles = false;
+        grid.RowHeadersVisible = false;
+        grid.AllowUserToResizeRows = false;
+        UiHelper.ApplyGridHeaderStyle(grid, accent);
+        grid.ColumnHeadersDefaultCellStyle.Padding =
+            new Padding(AppMetrics.SpacingSm, 0, AppMetrics.SpacingSm, 0);
+        grid.DefaultCellStyle.Font = AppTheme.NormalFont;
+        grid.DefaultCellStyle.ForeColor = AppTheme.Text;
+        grid.DefaultCellStyle.BackColor = AppTheme.Surface;
+        grid.DefaultCellStyle.SelectionBackColor = AppTheme.Tint(accent, 0.88f);
+        grid.DefaultCellStyle.SelectionForeColor = AppTheme.Text;
+        grid.DefaultCellStyle.Padding =
+            new Padding(AppMetrics.SpacingSm, 0, AppMetrics.SpacingSm, 0);
+        grid.AlternatingRowsDefaultCellStyle.BackColor = AppTheme.SurfaceSecondary;
+        grid.RowTemplate.Height = AppMetrics.GridRowHeight;
+        grid.ColumnHeadersHeight = AppMetrics.GridHeaderHeight;
+        UiHelper.ApplyGridPresentation(grid);
+    }
+    public static string Humanize(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return value;
+        var s = Regex.Replace(value, "([a-z])([A-Z])", "$1 $2").Replace("_", " ");
+        return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(s);
+    }
+}
