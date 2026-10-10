@@ -201,7 +201,7 @@ internal static class RdlcReportPreview
 
         BindToolbarAction(form, print, Keys.Control | Keys.P, "Ctrl+P", () => Execute("print", () =>
             RdlcReportPrinter.Print(form, viewer)));
-        BindToolbarAction(form, pageSetup, Keys.Control | Keys.Shift | Keys.P, "Ctrl+Shift+P", () => Execute("set up", () => viewer.PageSetupDialog()));
+        BindToolbarAction(form, pageSetup, Keys.Alt | Keys.P, "Alt+P", () => Execute("set up", () => viewer.PageSetupDialog()));
         BindToolbarAction(form, exportPdf, Keys.Control | Keys.E, "Ctrl+E", () => {
             Execute("export", () => {
                 using var dialog = new SaveFileDialog {

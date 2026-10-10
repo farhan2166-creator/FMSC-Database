@@ -1,4 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <ItemGroup>
+        <!-- Portable shortcut checks build separately with simulated controls. -->
+        <Compile Remove="Tests/**/*.cs" />
+    </ItemGroup>
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net8.0-windows</TargetFramework>

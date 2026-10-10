@@ -311,7 +311,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     }
     private void OnMainKeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Control && e.KeyCode == Keys.K)
+        if (e.KeyData == (Keys.Control | Keys.K))
         {
             e.SuppressKeyPress = true;
             ShowCommandPalette();
@@ -331,14 +331,13 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             return true;
         }
         if(keyData==(Keys.Control|Keys.K)) {ShowCommandPalette();return true;}
+        if(keyData == Keys.F1) { OpenHotKeysPageAfterAccountMenuCloses(); return true; }
         return base.ProcessCmdKey(ref msg,keyData);
     }
     private void RegisterNavigationShortcut(DashboardNavButton button,string caption)
     {
         var shortcut=AppHotKeys.DashboardNavigation.FirstOrDefault(s=>s.Caption==caption.Replace("&&","&"));
         if(shortcut.Caption is null)return;
-        int letter=button.Text.IndexOf(((char)(shortcut.Keys & Keys.KeyCode)).ToString(),StringComparison.OrdinalIgnoreCase);
-        if(letter>=0)button.Text=button.Text.Insert(letter,"&");
         navigationShortcutTargets[shortcut.Keys]=button;
         sidebarToolTip.SetToolTip(button,$"{shortcut.Caption} ({shortcut.Hint})");
         ShortcutController.RegisterShortcut(button,shortcut.Keys,shortcut.Hint,()=>button.PerformClick());

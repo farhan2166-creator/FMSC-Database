@@ -36,7 +36,7 @@ public static class TabStrip
         {
             string direct = index < 9 ? $"Ctrl+{index + 1}; " : string.Empty;
             tabs.TabPages[index].ToolTipText =
-                $"{tabs.TabPages[index].Text} ({direct}Ctrl+Tab / Ctrl+Shift+Tab)";
+                $"{tabs.TabPages[index].Text} ({direct}Ctrl+Tab / Ctrl+PageUp)";
         }
     }
     private static void DrawItem(object? sender, DrawItemEventArgs e)

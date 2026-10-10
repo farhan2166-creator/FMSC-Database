@@ -161,6 +161,10 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
             Clear();
             CaptureEditorBaseline();
         }, "Secondary");
+        // This editor's Clear action also starts a new record. Register that intent
+        // explicitly rather than treating every Clear Filters button as New.
+        if (!separateEntryAndRecords)
+            ShortcutController.RegisterShortcut(clear, Keys.Control | Keys.N, "Ctrl+N", clear.PerformClick);
         /* SetActionIcon must use the button's current caption. */
         SetActionIcon(saveActionText, "✓");
         SetActionIcon(clearActionText, "↺");

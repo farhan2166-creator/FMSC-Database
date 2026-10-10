@@ -11,6 +11,10 @@ internal sealed class PageActionShortcutController
     internal void ClearLocalShortcuts()=>_localShortcuts.Clear();
     internal void RegisterShortcut(Control target, Keys keys, string hint, Action execute)
     {
+        if (!AppHotKeys.IsValidShortcut(keys))
+            throw new ArgumentException("Shortcuts may use at most one modifier and one key.", nameof(keys));
+        if (_localShortcuts.Any(shortcut => shortcut.Keys == keys))
+            throw new ArgumentException("A shortcut is already registered in this scope.", nameof(keys));
         _localShortcuts.Add(new(target, keys, hint, execute));
         string existing = _toolTip.GetToolTip(target) ?? string.Empty;
         _toolTip.SetToolTip(target, string.IsNullOrEmpty(existing) ? hint : existing + " / " + hint);
@@ -50,7 +54,9 @@ internal sealed class PageActionShortcutController
         var local = _localShortcuts.FirstOrDefault(shortcut => shortcut.Keys == keyData);
         if (local is not null)
         {
-            if (!local.Target.IsDisposed && local.Target.Visible && local.Target.Enabled) local.Execute();
+            // Consume registered keys while unavailable so native viewers cannot bypass readiness.
+            if (local.Target.IsDisposed || !local.Target.Visible || !local.Target.Enabled) return true;
+            local.Execute();
             return true;
         }
         if (keyData == (Keys.Control | Keys.F) && SearchTarget() is { } search)
@@ -259,9 +265,23 @@ internal sealed class PageActionShortcutController
                     if (scoped.Count == 1) return scoped;
                     var scopedPrimary = primary.Where(button => IsWithin(button, region)).ToList();
                     if (scopedPrimary.Count == 1) return scopedPrimary;
+                    if (scoped.Count > 1) return scoped;
                 }
             }
             if (primary.Count == 1) return primary;
+        }
+        // Prefer actions in the focused editor for every command, not just Save.
+        if (matches.Count > 1)
+        {
+            Control focused = _root;
+            while (focused.Controls.Cast<Control>().FirstOrDefault(child => child.ContainsFocus) is { } child)
+                focused = child;
+            for (Control? region = focused.Parent; region is not null && region != _root; region = region.Parent)
+            {
+                var scoped = matches.Where(button => IsWithin(button, region)).ToList();
+                if (scoped.Count == 1) return scoped;
+                if (scoped.Count > 1) return scoped; // Never fall through to another editor.
+            }
         }
         return matches;
     }
@@ -271,6 +291,10 @@ internal sealed class PageActionShortcutController
             if (ReferenceEquals(current, root)) return true;
         return false;
     }
+
+    private static bool MatchesCaption(string caption, string prefix) =>
+        caption.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+        (caption.Length == prefix.Length || !char.IsLetterOrDigit(caption[prefix.Length]));
 
     private static void CollectButtons(Control root, string leadingWord, List<ModernButton> matches)
     {
@@ -283,7 +307,7 @@ internal sealed class PageActionShortcutController
                 int firstLetter = 0;
                 while (firstLetter < label.Length && !char.IsLetter(label[firstLetter]))
                     firstLetter++;
-                if (label[firstLetter..].StartsWith(leadingWord, StringComparison.OrdinalIgnoreCase) ||
+                if (MatchesCaption(label[firstLetter..], leadingWord) ||
                     leadingWord == "Print" && label.Contains(" / Print", StringComparison.OrdinalIgnoreCase))
                     matches.Add(button);
             }

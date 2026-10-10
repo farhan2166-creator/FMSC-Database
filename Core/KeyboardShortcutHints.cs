@@ -1,6 +1,6 @@
 namespace FMSC_SMS.Core;
 
-/// <summary>Non-activating key badges shown only while Ctrl is held in this application.</summary>
+/// <summary>Non-activating key badges shown only while Ctrl or Alt is held in this application.</summary>
 internal static class KeyboardShortcutHints
 {
     private static readonly HashSet<ApplicationWindowForm> Windows = new();
@@ -28,7 +28,7 @@ internal static class KeyboardShortcutHints
     {
         if (Form.ActiveForm is ApplicationWindowForm active && !active.IsDisposed && active.ContainsFocus)
             PageActionShortcutController.ActiveContent(active).Controller.RefreshHints();
-        if ((Control.ModifierKeys & Keys.Control)==0 || Form.ActiveForm is not ApplicationWindowForm window ||
+        if ((Control.ModifierKeys & (Keys.Control | Keys.Alt))==0 || Form.ActiveForm is not ApplicationWindowForm window ||
             window.IsDisposed || !window.Enabled || !window.ContainsFocus || !Windows.Contains(window))
         {
             Hide();
@@ -38,7 +38,7 @@ internal static class KeyboardShortcutHints
         var available=controller.AvailableHints().AsEnumerable();
         if(!ReferenceEquals(controller,window.ShortcutController))available=available.Concat(window.ShortcutController.LocalHints());
         var hints = available.GroupBy(hint => hint.Target)
-            .Select(group => (Target: group.Key, Key: string.Join(" / ", group.Select(hint => hint.Key)))).ToList();
+            .Select(group => (Target: group.Key, Key: string.Join(" / ", group.Select(hint => hint.Key).Distinct()))).ToList();
         string signature = string.Join("|", hints.Select(hint =>
             $"{hint.Target.GetHashCode()}:{hint.Target.RectangleToScreen(hint.Target.ClientRectangle)}:{hint.Key}"));
         if (ReferenceEquals(root, shownRoot) && signature == shownSignature) return;
