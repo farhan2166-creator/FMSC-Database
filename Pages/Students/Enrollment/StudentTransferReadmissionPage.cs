@@ -1081,6 +1081,8 @@ public sealed class StudentTransferReadmissionPage : V2Page
         int destinationSectionId = classSection.SelectedId;
         string destinationClassName = cls.Text;
         string destinationCampusName = campus.Text;
+        string destinationSectionName = classSection.Text;
+        string destinationYearName = year.Text;
         int currentCampusId = currentEnrollmentCampusId;
         int currentClassId = currentEnrollmentClassId;
         int currentSectionId = currentEnrollmentSectionId;
@@ -1233,6 +1235,39 @@ public sealed class StudentTransferReadmissionPage : V2Page
             }
         }
         isExecuting = true;
+        // Capture the submitted destination before awaiting the operation; the controls
+        // may change while it runs. Do not infer a final admission number or section.
+        string completionMessage = operation switch {
+            "Transfer Section" => $"Section transfer completed.\nDestination: {destinationSectionName}.",
+            "Transfer Class" => $"Class transfer completed.\nDestination class: {destinationClassName}.",
+            "Transfer Campus" => $"Campus transfer completed.\nDestination campus: {destinationCampusName}.",
+            "Re-Admit" => $"Readmission completed.\nDestination: {destinationCampusName} — {destinationSectionName} ({destinationYearName}).",
+            _ => "Student operation completed."
+        };
+        if (operation is "Transfer Class" or "Transfer Campus")
+        {
+            string feeChoice = feeDecision switch {
+                TransferFeeSyncDialog.FeeDecision.Keep => "Keep current fees",
+                TransferFeeSyncDialog.FeeDecision.NextMonth => "New fees from next month",
+                TransferFeeSyncDialog.FeeDecision.CurrentMonth => "New fees from this month (unbilled fees only)",
+                TransferFeeSyncDialog.FeeDecision.CustomMonth when feeEffectiveMonth is DateTime month =>
+                    $"New fees from {month:MMM yyyy}",
+                _ => ""
+            };
+            if (feeChoice.Length > 0)
+                completionMessage += "\nFee handling: " + feeChoice + ".";
+            if (replaceScheduledFees)
+                completionMessage += "\nSelected: replace unbilled scheduled rates and waivers from that month.";
+        }
+        else if (operation == "Re-Admit")
+        {
+            if (readmissionMonthlyStart is DateTime month)
+                completionMessage += $"\nMonthly fees start: {month:MMM yyyy}.";
+            if (chargeYearlyFees is bool charge)
+                completionMessage += charge
+                    ? "\nYearly fee decision: charge yearly fees."
+                    : "\nYearly fee decision: waive yearly fees for this enrollment.";
+        }
         SetStatus("Processing student lifecycle operation...");
         try
         {
@@ -1306,7 +1341,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
             });
             AdmissionNumbers.Invalidate();
             StudentSearchCache.Invalidate();
-            Info("Student lifecycle operation completed successfully." +
+            Info(completionMessage +
                 (string.IsNullOrEmpty(note) ? string.Empty : "\n\n" + note));
             LoadEnrollments();
             if (fixedOperation is not null) OperationCompleted?.Invoke(this, EventArgs.Empty);
