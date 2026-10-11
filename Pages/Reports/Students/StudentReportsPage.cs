@@ -1,5 +1,6 @@
 using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
+using FMSC_SMS.Pages.Students.Admissions;
 namespace FMSC_SMS.Pages.Reports.Students;
 /// <summary>One student report, built by the person using it. The four old pages remain only as shells that open this one on the matching preset.</summary>
 public partial class StudentReportsPage : V2Page
@@ -116,6 +117,8 @@ public partial class StudentReportsPage : V2Page
     private bool _suppress;
     private int _comparisonBaseYearId = -1;
     private bool _busyViews;
+    private bool _openingAdmissions;
+    private ModernButton? openAdmissionsButton;
     /* The rows as loaded (raw), the second year when comparing, and whether the outstanding balance was fetched with them. */
     private DataTable? _raw;
     private DataTable? _compareRaw;
@@ -138,12 +141,17 @@ public partial class StudentReportsPage : V2Page
         var viewReport = AddBusyAction("View Report", RunAsync, "Primary");
         var columnsButton = AddColumnsAction();
         var saveView = AddAction("Save View", (_, _) => SaveCurrentView(), "Secondary");
+        openAdmissionsButton = AddBusyAction("Open Admissions", OpenSelectedAdmissionsAsync, "Secondary");
+        openAdmissionsButton.Enabled = false;
+        openAdmissionsButton.EnabledChanged += (_, _) => {
+            if (openAdmissionsButton.Enabled && SelectedAdmissionId() <= 0) openAdmissionsButton.Enabled = false;
+        };
         var resetFilters = AddAction("Reset Filters", (_, _) => ResetFilters(), "Secondary");
         deleteViewButton = AddAction("Delete View", (_, _) => DeleteSelectedView(), "Secondary");
         var export = AddExportAction("FMSC_Student_Report");
         printButton = AddBusyAction("Print Preview", PreviewReportAsync, "Secondary");
         printButton.Enabled = false;
-        RelocateFromActions(viewReport, resetFilters, columnsButton, printButton, saveView, deleteViewButton, export);
+        RelocateFromActions(viewReport, resetFilters, columnsButton, printButton, saveView, deleteViewButton, export, openAdmissionsButton);
         exportButton = export;
         deleteViewButton.Enabled = false;
         foreach (var (key, text) in ModeChoices)
@@ -187,12 +195,63 @@ public partial class StudentReportsPage : V2Page
             printButton,
             saveView,
             deleteViewButton,
-            export);
+            export,
+            openAdmissionsButton);
         SetContent(root);
         Defer(BindLookupsAsync);
+        Grid.SelectionChanged += (_, _) => UpdateAdmissionsAction();
         WireEvents();
         UpdateEnabledState();
     }
+    private int SelectedAdmissionId()
+    {
+        if (_openingAdmissions || _mode != ModeList || _shape.Grouped ||
+            !CurrentUser.HasPermission("Students.View") ||
+            !(CurrentUser.HasPermission("Students.Admit") || CurrentUser.HasPermission("Students.Administer")) ||
+            _appliedSignature.Length == 0 || !string.Equals(_appliedSignature, FilterSignature(), StringComparison.Ordinal) ||
+            Grid.SelectedRows.Count != 1 || Grid.SelectedRows[0].DataBoundItem is not DataRowView selected ||
+            !selected.Row.Table.Columns.Contains("AdmissionId") || selected.Row.IsNull("AdmissionId")) return 0;
+        return Convert.ToInt32(selected.Row["AdmissionId"]);
+    }
+
+    private void UpdateAdmissionsAction()
+    {
+        if (openAdmissionsButton is not null) openAdmissionsButton.Enabled = SelectedAdmissionId() > 0;
+    }
+
+    private async Task OpenSelectedAdmissionsAsync()
+    {
+        int admissionId = SelectedAdmissionId();
+        if (admissionId <= 0) return;
+        _openingAdmissions = true;
+        UpdateAdmissionsAction();
+        try
+        {
+            using var dialog = new ApplicationWindowForm {
+                Text = "Admissions", StartPosition = FormStartPosition.CenterParent,
+                Size = new Size(AppScale.Scale(1200), AppScale.Scale(800)),
+                MinimumSize = new Size(AppScale.Scale(980), AppScale.Scale(620)),
+                BackColor = AppTheme.PageBackground
+            };
+            var page = new StudentAdmissionPage(preselectAdmissionId: admissionId) { Dock = DockStyle.Fill };
+            dialog.Controls.Add(page);
+            dialog.FormClosing += (_, args) => {
+                if (page.IsBusy)
+                {
+                    args.Cancel = true;
+                    ModernMessageDialog.ShowWarning(dialog, page.BusyMessage);
+                    return;
+                }
+                args.Cancel = !ModernMessageDialog.ConfirmDiscardIfDirty(dialog,
+                    () => page.HasUnsavedChanges, page.UnsavedChangesMessage);
+            };
+            dialog.ShowDialog(FindForm());
+            if (!IsDisposed) await RunAsync();
+        }
+        catch (Exception ex) { if (!IsDisposed) Fail(ex); }
+        finally { _openingAdmissions = false; if (!IsDisposed) UpdateAdmissionsAction(); }
+    }
+
     private static ModernComboBox NewCombo() => new() {
         DropDownStyle = ComboBoxStyle.DropDownList,
         Dock = DockStyle.Fill,
@@ -776,6 +835,7 @@ public partial class StudentReportsPage : V2Page
     {
         exportButton.Enabled = enabled;
         printButton.Enabled = enabled;
+        UpdateAdmissionsAction();
     }
     /* The report on screen goes stale the moment the filters no longer match the ones that produced it. */
     private void OnFilterChanged()
@@ -818,6 +878,7 @@ public partial class StudentReportsPage : V2Page
     }
     protected override void OnReportPageBound()
     {
+        UpdateAdmissionsAction();
         if (!_shape.Grouped)
             return;
         /* A grouped table is arranged by "Sort by", and ends in a Total row that a header click would shuffle into the middle. */
