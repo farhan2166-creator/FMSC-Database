@@ -16,7 +16,7 @@ public sealed class ClassSheetsPage : V2Page
     private readonly ModernButton previewButton;
     private readonly ModernButton selectAllButton, clearSelectionButton;
     private DataTable? placements, roster;
-    private bool rebinding, loading;
+    private bool rebinding, loading, changingSelection;
     private int rosterRevision;
     private Scope? loadedScope;
     private sealed record Scope(int Campus, int Year, int Class, int Section);
@@ -46,7 +46,7 @@ public sealed class ClassSheetsPage : V2Page
         monthField.Visible = false;
         for (int i = 0; i < inputs.Length; i++)
         {
-            var field = HumanUi.Field(inputs[i].Caption, inputs[i].Input, i < 4);
+            var field = HumanUi.Field(inputs[i].Caption, inputs[i].Input, i < 2);
             fieldOf[inputs[i].Input] = field;
             Control cell = field;
             if (inputs[i].Input == exam)
@@ -79,10 +79,14 @@ public sealed class ClassSheetsPage : V2Page
             HeaderText = "Student Name", ReadOnly = true, AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill });
         Grid.Columns.Add(new DataGridViewTextBoxColumn { Name = "FatherName", DataPropertyName = "FatherName",
             HeaderText = "Father Name", ReadOnly = true, Width = AppScale.Scale(220) });
+        foreach (string name in new[] { "ClassName", "SectionName" })
+            Grid.Columns.Add(new DataGridViewTextBoxColumn { Name = name, DataPropertyName = name,
+                HeaderText = name == "ClassName" ? "Class" : "Section", ReadOnly = true,
+                Width = AppScale.Scale(100), Visible = false });
         Grid.CurrentCellDirtyStateChanged += (_, _) => {
             if (Grid.IsCurrentCellDirty) Grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
         };
-        Grid.CellValueChanged += (_, _) => UpdateSelection();
+        Grid.CellValueChanged += (_, _) => { if (!changingSelection) UpdateSelection(); };
         // A shared busy action restores its button after completion. Recheck readiness
         // even if its temporary disabled state hid an invalidation during the await.
         previewButton.EnabledChanged += (_, _) => {
@@ -90,7 +94,7 @@ public sealed class ClassSheetsPage : V2Page
         };
         search.TextChanged += (_, _) => FilterStudents();
         var details = HumanUi.Card("Class and Sheet Details",
-            "Choose a class and section. Details below are used only for printing.");
+            "Choose a campus and year. Use All classes or All sections to print several together.");
         details.Content.Controls.Add(fields);
         var studentsCard = HumanUi.Card("Students to Print",
             "Uncheck students to exclude. Search narrows the list; checked hidden students remain included.");
@@ -105,7 +109,7 @@ public sealed class ClassSheetsPage : V2Page
         root.Controls.Add(studentsCard, 0, 2);
         SetContent(root, "Load students, choose who to print, then open Print Preview. Attendance is marked by hand on the printed sheet.");
         UpdateSheetFields();
-        UiHelper.SetGridPlaceholderMessage(Grid, "Choose a class and section, then press Load Students.");
+        UiHelper.SetGridPlaceholderMessage(Grid, "Choose a campus and year, then press Load Students.");
         foreach (var filter in new[] { campus, year, klass, section })
             filter.SelectedIndexChanged += (_, _) => InvalidateRoster();
         campus.UserSelectionChanged += (_, _) => BindClasses();
@@ -143,7 +147,7 @@ public sealed class ClassSheetsPage : V2Page
             foreach (DataRow row in placements.Rows)
                 if (campus.SelectedId > 0 && Convert.ToInt32(row["CampusId"]) == campus.SelectedId)
                     selected.ImportRow(row);
-            klass.Bind(selected.DefaultView.ToTable(true, "ClassId", "ClassName"), "ClassId", "ClassName");
+            klass.Bind(selected.DefaultView.ToTable(true, "ClassId", "ClassName"), "ClassId", "ClassName", "All classes");
         }
         finally { rebinding = false; }
         BindSections();
@@ -154,18 +158,18 @@ public sealed class ClassSheetsPage : V2Page
         if (rebinding || placements is null) return;
         var selected = placements.Clone();
         foreach (DataRow row in placements.Rows)
-            if (campus.SelectedId > 0 && klass.SelectedId > 0 &&
+            if (campus.SelectedId > 0 &&
                 Convert.ToInt32(row["CampusId"]) == campus.SelectedId &&
-                Convert.ToInt32(row["ClassId"]) == klass.SelectedId)
+                (klass.SelectedId == 0 || Convert.ToInt32(row["ClassId"]) == klass.SelectedId))
                 selected.ImportRow(row);
-        section.Bind(selected.DefaultView.ToTable(true, "SectionId", "SectionName"), "SectionId", "SectionName");
+        section.Bind(selected.DefaultView.ToTable(true, "SectionId", "SectionName"), "SectionId", "SectionName", "All sections");
     }
 
     private void InvalidateRoster()
     {
         bool hadRoster = roster is not null;
         rosterRevision++; loadedScope = null; roster = null; Grid.DataSource = null;
-        if (hadRoster) Info("Load students again for the selected class and section.");
+        if (hadRoster) Info("Load students again for the selected filters.");
         UpdateSelection();
     }
 
@@ -190,7 +194,9 @@ public sealed class ClassSheetsPage : V2Page
     {
         CommitSelection();
         if (roster is null || loading) return;
-        foreach (DataRow row in roster.Rows) row["Include"] = include;
+        changingSelection = true;
+        try { foreach (DataRow row in roster.Rows) row["Include"] = include; }
+        finally { changingSelection = false; }
         UpdateSelection();
     }
 
@@ -204,15 +210,15 @@ public sealed class ClassSheetsPage : V2Page
         previewButton.Enabled = CanPreviewSelection();
         selectAllButton.Enabled = clearSelectionButton.Enabled = current && roster!.Rows.Count > 0 && !loading;
         if (current && showStatus)
-            Info($"{count} of {roster!.Rows.Count} students selected. Select All and Clear Selection apply to the whole class list.");
+            Info($"{count} of {roster!.Rows.Count} students selected. Select All and Clear Selection apply to the whole loaded list.");
     }
 
     private async Task LoadStudentsAsync()
     {
         if (loading || !CurrentUser.HasPermission("Reports.View")) return;
         Scope scope = CurrentScope();
-        if (scope.Campus <= 0 || scope.Year <= 0 || scope.Class <= 0 || scope.Section <= 0)
-        { Warn("Choose a campus, academic year, class and section first."); return; }
+        if (scope.Campus <= 0 || scope.Year <= 0)
+        { Warn("Choose a campus and academic year first."); return; }
         InvalidateRoster(); int revision = rosterRevision;
         loading = true; UpdateSelection();
         try
@@ -224,8 +230,10 @@ public sealed class ClassSheetsPage : V2Page
                 DatabaseHelper.Bit("@IncludeFormerStudents", false), DatabaseHelper.Bit("@IncludeBalance", false));
             if (IsDisposed || revision != rosterRevision || scope != CurrentScope()) return;
             roster = ClassSheetData.CreateRoster(students); loadedScope = scope;
+            Grid.Columns["ClassName"].Visible = scope.Class == 0;
+            Grid.Columns["SectionName"].Visible = scope.Class == 0 || scope.Section == 0;
             Grid.DataSource = roster.DefaultView; FilterStudents();
-            if (roster.Rows.Count == 0) Warn("No active students were found in this class and section for the selected year.");
+            if (roster.Rows.Count == 0) Warn("No active students were found for the selected filters.");
         }
         catch (Exception ex) { if (!IsDisposed && revision == rosterRevision) Fail(ex); }
         finally { loading = false; if (!IsDisposed) UpdateSelection(showStatus: false); }
@@ -236,7 +244,7 @@ public sealed class ClassSheetsPage : V2Page
         if (loading || !CurrentUser.HasPermission("Reports.View")) return;
         CommitSelection();
         if (roster is null || loadedScope != CurrentScope())
-        { Warn("Load students for the selected class and section first."); return; }
+        { Warn("Load students for the selected filters first."); return; }
         // Snapshot includes every checked student, even when search hides a row.
         int revision = rosterRevision;
         var selected = roster.Copy();
@@ -252,9 +260,10 @@ public sealed class ClassSheetsPage : V2Page
             var school = await InstitutionProfile.GetNameAsync();
             if (IsDisposed || revision != rosterRevision) return;
             if (string.IsNullOrWhiteSpace(school)) { Warn("Check School Profile before printing class sheets."); return; }
-            var data = monthly ? MonthlyAttendanceSheetData.Create(selected, school, month, teacherText)
-                : ClassSheetData.Create(selected, school, examText, subjectText, dateText, teacherText,
-                    showFatherForMatchingNames: !attendance);
+            var data = ClassSheetBatchData.Create(selected, group => monthly
+                ? MonthlyAttendanceSheetData.Create(group, school, month, teacherText)
+                : ClassSheetData.Create(group, school, examText, subjectText, dateText, teacherText,
+                    showFatherForMatchingNames: !attendance));
             string title = monthly ? "Monthly Attendance Register" : attendance ? "Exam Attendance Sheet" : "Marks Sheet";
             string template = monthly ? "ClassMonthlyAttendanceSheet.rdlc" : attendance ? "ClassAttendanceSheet.rdlc" : "ClassMarksSheet.rdlc";
             RdlcReportPreview.Show(FindForm(), title,

@@ -187,4 +187,57 @@ Check(Regex.Matches(monthlyLongHtml, "Monthly Attendance Register").Count == 3 &
     Regex.Matches(monthlyLongHtml, "Page 3 of 3").Count == 1 && Regex.Matches(monthlyLongHtml, "Ms. Teacher").Count == 3,
     "Monthly headings and teacher lines repeat on each page");
 File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "MonthlyAttendanceLongPreview.html"), monthlyLongHtml);
+// Multiple placements must never share a page, even when their labels match.
+var batchRoster = ClassSheetData.CreateRoster(Students(63));
+foreach (string id in new[] { "CampusId", "AcademicYearId", "ClassId", "SectionId", "ClassOrder" })
+    batchRoster.Columns.Add(id, typeof(int));
+for (int i = 0; i < batchRoster.Rows.Count; i++)
+{
+    var row = batchRoster.Rows[i];
+    row["CampusId"] = row["AcademicYearId"] = 1;
+    row["ClassId"] = i < 32 ? 1 : 2;
+    row["SectionId"] = i < 31 ? 1 : i == 31 ? 2 : 3;
+    row["ClassOrder"] = i < 32 ? 1 : 2;
+    row["StudentName"] = "Same name";
+}
+batchRoster.Columns.Add("FatherName");
+foreach (DataRow row in batchRoster.Rows) row["FatherName"] = "Father";
+var batchMarks = ClassSheetBatchData.Create(batchRoster,
+    group => ClassSheetData.Create(group, "School", "", "", "", "", true));
+Check(batchMarks.Rows.Count == 5, "Three placements produce five separate pages");
+Check(batchMarks.AsEnumerable().Select(row => row.Field<int>("PageKey")).SequenceEqual(new[] { 1, 2, 3, 4, 5 }),
+    "Batch page keys are unique and sequential");
+Check((string)batchMarks.Rows[2]["Number01"] == "1" && (string)batchMarks.Rows[3]["Number01"] == "1",
+    "Numbering restarts for each placement");
+Check((string)batchMarks.Rows[2]["Name01"] == "Same name" &&
+    (string)batchMarks.Rows[0]["Name01"] == "Same name (Father)",
+    "Duplicate-name disambiguation stays within each placement");
+Check((string)batchMarks.Rows[2]["PageLabel"] == "Page 1 of 1 · 1 students",
+    "Page totals describe the placement, not the batch");
+foreach (string template in new[] { "ClassMarksSheet.rdlc", "ClassAttendanceSheet.rdlc" })
+{
+    using var batchReport = new LocalReport { ReportPath = Path.Combine(AppContext.BaseDirectory, "Reports", template) };
+    batchReport.DataSources.Add(new ReportDataSource("ClassSheetData", batchMarks));
+    string html = Encoding.UTF8.GetString(batchReport.Render("HTML4.0", null,
+        out _, out _, out _, out _, out var warnings));
+    Check(warnings.Length == 0 && Regex.Matches(html, "Page 1 of 1").Count == 2 &&
+        Regex.Matches(html, "Page 2 of 2").Count == 4,
+        template + " renders both copies with separate placement pagination");
+}
+batchRoster.Rows[31]["Include"] = false;
+var batchMonthly = ClassSheetBatchData.Create(batchRoster,
+    group => MonthlyAttendanceSheetData.Create(group, "School", new DateTime(2026, 2, 1), "Teacher"));
+Check(batchMonthly.Rows.Count == 120 && batchMonthly.AsEnumerable().Select(row => row.Field<int>("PageKey")).Distinct().Count() == 4,
+    "Unchecked placements disappear; monthly pages retain thirty rows per unique key");
+Check((string)batchMonthly.Rows[60]["SerialNumber"] == "1", "Monthly numbering restarts at next placement");
+monthlyReport.DataSources.Clear();
+monthlyReport.DataSources.Add(new ReportDataSource("ClassSheetData", batchMonthly));
+string batchHtml = Encoding.UTF8.GetString(monthlyReport.Render("HTML4.0", null,
+    out _, out _, out _, out _, out var batchWarnings));
+Check(batchWarnings.Length == 0 && Regex.Matches(batchHtml, "Monthly Attendance Register").Count == 4,
+    "Real monthly RDLC renders every batch page without warnings");
+File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "BatchMonthlyPreview.html"), batchHtml);
+foreach (DataRow row in batchRoster.Rows) row["Include"] = false;
+Check(ClassSheetBatchData.Create(batchRoster, group => ClassSheetData.Create(group, "School", "", "", "", "")).Rows.Count == 0,
+    "Empty batch selection produces no pages");
 Console.WriteLine($"PASS {checks} class-sheet checks, including all three RDLC templates processed with no warnings.");
