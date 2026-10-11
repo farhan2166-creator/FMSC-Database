@@ -109,6 +109,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
     }
     protected virtual Task PreviewClassOutstandingAsync() => Task.CompletedTask;
     protected virtual Task PreviewFeeRemindersAsync() => Task.CompletedTask;
+    protected override void OnWorkspaceStateRestoring() => _scopeEdited = true;
     protected abstract IEnumerable<SqlParameter> BuildParameters();
     protected virtual bool IsSummaryView => false;
     protected string ViewName => View.Text;

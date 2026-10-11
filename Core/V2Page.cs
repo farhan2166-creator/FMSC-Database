@@ -1217,8 +1217,12 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     }
     Dictionary<string, string> IWorkspaceStateHost.CaptureWorkspaceState() =>
         WorkspaceState.Capture(this);
-    void IWorkspaceStateHost.RestoreWorkspaceState(IReadOnlyDictionary<string, string> state) =>
+    void IWorkspaceStateHost.RestoreWorkspaceState(IReadOnlyDictionary<string, string> state)
+    {
+        OnWorkspaceStateRestoring();
         WorkspaceState.Restore(this, state);
+    }
+    protected virtual void OnWorkspaceStateRestoring() { }
     protected Task BindReportAsync(Func<DataTable> query) =>
         BindReportCoreAsync(() => Task.Run(query));
 
