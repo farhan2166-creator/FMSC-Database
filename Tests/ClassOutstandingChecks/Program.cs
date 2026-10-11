@@ -39,6 +39,14 @@ Check(data.AsEnumerable().Sum(row => row.Field<decimal>("Outstanding")) == 1225.
 Check(data.AsEnumerable().All(row => row.Field<string>("Remarks") == ""), "Remarks stay blank");
 Check(data.AsEnumerable().All(row => row.Field<string>("YearSelection") == "All academic years" && row.Field<string>("SchoolName") == "Sample School"), "Captured report context");
 Check(ClassOutstandingReportData.Create(source.Clone(), "School", "Year", DateTime.Today).Rows.Count == 0, "Empty reports have no artificial groups");
+var sameNames = source.AsEnumerable().Where(row => row.Field<int>("CampusId") == 1 &&
+    row.Field<int>("ClassId") == 1 && row.Field<int>("SectionId") == 1).Take(2).CopyToDataTable();
+sameNames.Rows[0]["StudentName"] = sameNames.Rows[1]["StudentName"] = "Same Student";
+sameNames.Rows[0]["FatherName"] = "Zulu Father"; sameNames.Rows[0]["AdmissionNumber"] = "001";
+sameNames.Rows[1]["FatherName"] = "Alpha Father"; sameNames.Rows[1]["AdmissionNumber"] = "999";
+var sortedNames = ClassOutstandingReportData.Create(sameNames, "School", "Year", DateTime.Today);
+Check(sortedNames.Rows[0].Field<string>("FatherName") == "Alpha Father" &&
+    sortedNames.Rows[1].Field<string>("FatherName") == "Zulu Father", "Father name sorts matching student names before admission number");
 string path = Path.Combine(AppContext.BaseDirectory, "Reports", "ClassOutstandingCharges.rdlc");
 XNamespace ns = "http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";
 var xml = XDocument.Load(path);

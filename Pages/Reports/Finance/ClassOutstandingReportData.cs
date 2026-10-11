@@ -52,6 +52,7 @@ internal static class ClassOutstandingReportData
         {
             int serial = 0;
             foreach (var student in group.OrderBy(row => Convert.ToString(row["StudentName"]), StringComparer.CurrentCultureIgnoreCase)
+                .ThenBy(row => Convert.ToString(row["FatherName"]), StringComparer.CurrentCultureIgnoreCase)
                 .ThenBy(row => Convert.ToString(row["AdmissionNumber"]), StringComparer.OrdinalIgnoreCase)
                 .ThenBy(row => Convert.ToInt32(row["AdmissionId"])))
             {
