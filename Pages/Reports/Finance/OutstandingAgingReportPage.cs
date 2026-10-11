@@ -40,6 +40,7 @@ public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
             var selected = selection.SelectedStudents;
             var requestedDate = selection.RequestedDate;
             string message = selection.Message;
+            bool printOnA4 = selection.PrintOnA4;
             var currentBalances = await ReadBalances();
             var school = await InstitutionProfile.GetPrintIdentityAsync();
             if (IsDisposed) return;
@@ -51,8 +52,9 @@ public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
             Info(selected.Count == data.Rows.Count ? $"{data.Rows.Count} fee reminders ready with refreshed balances."
                 : $"{data.Rows.Count} fee reminders ready. Students with no remaining balance were excluded.");
             string path = Path.Combine(AppContext.BaseDirectory, "Reports", "FeeReminder.rdlc");
-            RdlcReportPreview.Show(FindForm(), "Fee Reminders", path, "FeeReceiptData", data,
-                fitPageWidth: false, reportDefinition: ReceiptReportLayout.Definition(path, data, splitFeePeriod: false));
+            RdlcReportPreview.Show(FindForm(), printOnA4 ? "Fee Reminders — A4" : "Fee Reminders — Thermal", path, "FeeReceiptData", data,
+                fitPageWidth: printOnA4, reportDefinition: printOnA4 ? FeeReminderPrintLayout.A4Definition(path)
+                    : ReceiptReportLayout.Definition(path, data, splitFeePeriod: false));
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
     }

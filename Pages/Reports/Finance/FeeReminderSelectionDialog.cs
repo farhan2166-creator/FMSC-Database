@@ -7,6 +7,7 @@ internal sealed class FeeReminderSelectionDialog : ApplicationWindowForm
     private readonly DataTable roster;
     private readonly DataGridView students = HumanUi.Grid(editable: true);
     private readonly ModernTextBox message = HumanUi.TextBox(true, 500);
+    private readonly ModernComboBox paper = HumanUi.Combo();
     private readonly ModernDatePicker requestedDate = new() {
         Format = DateTimePickerFormat.Custom, CustomFormat = "dd-MMM-yyyy",
         Value = DateTime.Today, ShowCheckBox = true, Checked = false
@@ -15,10 +16,13 @@ internal sealed class FeeReminderSelectionDialog : ApplicationWindowForm
         .Select(row => row.Field<int>("AdmissionId")).ToHashSet();
     internal string Message => message.Text.Trim();
     internal DateTime? RequestedDate => requestedDate.Checked ? requestedDate.Value.Date : null;
+    internal bool PrintOnA4 => FeeReminderPrintLayout.UseA4(paper.SelectedIndex, SelectedStudents.Count);
 
     internal FeeReminderSelectionDialog(DataTable balances, string scope)
     {
         roster = FeeReminderReportData.CreateRoster(balances);
+        paper.Items.AddRange(new object[] { "Automatic (up to 10: thermal)", "Thermal — separate reminders", "A4 — three columns" });
+        paper.SelectedIndex = 0;
         Text = "Fee Reminders"; StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
         Size = new Size(AppScale.Scale(950), AppScale.Scale(650)); MinimumSize = new Size(760, 520);
         BackColor = AppTheme.PageBackground;
@@ -41,7 +45,8 @@ internal sealed class FeeReminderSelectionDialog : ApplicationWindowForm
         void UpdateSelection()
         {
             int selected = SelectedStudents.Count;
-            count.Text = $"{selected} of {roster.Rows.Count} students selected. Balances are refreshed before preview.";
+            string format = PrintOnA4 ? "A4, three columns" : "Thermal, separate reminders";
+            count.Text = $"{selected} of {roster.Rows.Count} students selected. {format}. Balances refresh before preview.";
             preview.Enabled = selected > 0;
         }
         void CommitSelection()
@@ -58,14 +63,17 @@ internal sealed class FeeReminderSelectionDialog : ApplicationWindowForm
             UpdateSelection();
         }
         all.Click += (_, _) => SelectAll(true); none.Click += (_, _) => SelectAll(false);
+        paper.SelectedIndexChanged += (_, _) => UpdateSelection();
         students.CurrentCellDirtyStateChanged += (_, _) => { if (students.IsCurrentCellDirty) students.CommitEdit(DataGridViewDataErrorContexts.Commit); };
         students.CellValueChanged += (_, _) => { if (!selectingAll) UpdateSelection(); };
         preview.Click += (_, _) => { CommitSelection(); if (SelectedStudents.Count > 0) DialogResult = DialogResult.OK; };
-        var options = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1 };
-        options.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, AppScale.Scale(250)));
+        var options = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
+        options.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, AppScale.Scale(270)));
+        options.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, AppScale.Scale(200)));
         options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        options.Controls.Add(HumanUi.Field("Pay by (optional)", requestedDate), 0, 0);
-        options.Controls.Add(HumanUi.Field("Message (optional)", message), 1, 0);
+        options.Controls.Add(HumanUi.Field("Paper format", paper), 0, 0);
+        options.Controls.Add(HumanUi.Field("Pay by (optional)", requestedDate), 1, 0);
+        options.Controls.Add(HumanUi.Field("Message (optional)", message), 2, 0);
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6, Padding = new Padding(AppMetrics.SpacingMd) };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -75,7 +83,7 @@ internal sealed class FeeReminderSelectionDialog : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight * 2));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
         root.Controls.Add(new Label { Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(0, 0, 0, AppMetrics.SpacingSm), Font = AppTheme.NormalFont,
-            Text = scope + "\nUncheck students to exclude. Reminders use receipt-printer paper. Printing does not change charges or their due dates." }, 0, 0);
+            Text = scope + "\nChoose students and paper format. Automatic uses A4 above 10 students. Printing does not change charges or due dates." }, 0, 0);
         root.Controls.Add(HumanUi.ButtonRow(all, none), 0, 1); root.Controls.Add(students, 0, 2);
         root.Controls.Add(count, 0, 3); root.Controls.Add(options, 0, 4); root.Controls.Add(HumanUi.ButtonRow(preview, cancel), 0, 5);
         Controls.Add(root); CancelButton = cancel;

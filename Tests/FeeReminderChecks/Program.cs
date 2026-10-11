@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using FMSC_SMS.Pages.Reports.Finance;
+using FMSC_SMS.Core;
 using Microsoft.Reporting.NETCore;
 
 int checks = 0;
@@ -71,4 +72,40 @@ Check(longWarnings.Length == 0 && longHtml.Contains(longName) && longHtml.Contai
 Check(longHtml.Contains("20-Oct-2026") && longHtml.Contains("School Contact") && longHtml.Contains("School Address"),
     "Requested date and school contact details render");
 File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "FeeReminderPreview.html"), longHtml);
+Check(!FeeReminderPrintLayout.UseA4(0, 1) && !FeeReminderPrintLayout.UseA4(0, 10)
+    && FeeReminderPrintLayout.UseA4(0, 11) && FeeReminderPrintLayout.UseA4(0, 100),
+    "Automatic protects large batches while keeping small batches thermal");
+Check(!FeeReminderPrintLayout.UseA4(1, 100) && FeeReminderPrintLayout.UseA4(2, 1),
+    "Explicit paper choices override automatic selection");
+string a4Definition = FeeReminderPrintLayout.A4Definition(path);
+var a4Xml = XDocument.Parse(a4Definition);
+Check(a4Xml.Descendants(ns + "PageWidth").Single().Value == "8.27in" &&
+    a4Xml.Descendants(ns + "PageHeight").Single().Value == "11.69in" &&
+    a4Xml.Descendants(ns + "Columns").Single().Value == "3", "A4 uses three columns on portrait A4");
+Check(!a4Xml.Descendants(ns + "PageBreak").Any(), "A4 reminders flow without one page break per student");
+Check(a4Xml.Descendants(ns + "Rectangle").Single().Element(ns + "KeepTogether")!.Value == "true",
+    "A4 keeps complete reminder blocks together where they fit");
+Check(XDocument.Load(path).Descendants(ns + "PageWidth").Single().Value == "2.28in",
+    "Choosing A4 does not modify the thermal template");
+using var a4Report = new LocalReport();
+a4Report.LoadReportDefinition(new StringReader(a4Definition));
+a4Report.DataSources.Add(new ReportDataSource("FeeReceiptData", entered));
+string a4LongHtml = Encoding.UTF8.GetString(a4Report.Render("HTML4.0", null,
+    out _, out _, out _, out _, out var a4LongWarnings));
+Check(a4LongWarnings.Length == 0 && a4LongHtml.Contains(longName) && a4LongHtml.Contains(longMessage)
+    && a4LongHtml.Contains("125.55") && a4LongHtml.Contains("20-Oct-2026"),
+    "A4 retains complete long names, messages, date and precise balance");
+var largeBalances = balances.Clone();
+for (int i = 1; i <= 100; i++) largeBalances.Rows.Add(i, i.ToString(), $"Batch Student {i:000}", $"Father {i:000}", i + .25m);
+var largeData = FeeReminderReportData.Create(largeBalances, Enumerable.Range(1, 100).ToHashSet(),
+    "School", "Contact", "Address", scope, prepared, null, "");
+a4Report.DataSources.Clear(); a4Report.DataSources.Add(new ReportDataSource("FeeReceiptData", largeData));
+string a4Html = Encoding.UTF8.GetString(a4Report.Render("HTML4.0", null,
+    out _, out _, out _, out _, out var a4Warnings));
+Check(a4Warnings.Length == 0 && Regex.Matches(a4Html, "FEE REMINDER").Count == 100,
+    "One hundred reminders render on A4 without duplicates or omissions");
+for (int i = 1; i <= 100; i++) Check(Regex.Matches(a4Html, $"Batch Student {i:000}(?![0-9])").Count == 1,
+    "Each selected student appears exactly once in the A4 batch");
+File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "FeeReminderA4Preview.html"), a4LongHtml);
+File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "FeeReminderA4BatchPreview.html"), a4Html);
 Console.WriteLine($"PASS {checks} fee reminder checks, including the real RDLC rendered without warnings.");
