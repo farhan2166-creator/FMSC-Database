@@ -7,13 +7,13 @@ namespace FMSC_SMS.Core;
 /// <summary>Sizes the receipt paper from its table content, keeping the configured paper width.</summary>
 internal static class ReceiptReportLayout
 {
-    internal static string Definition(string path, DataTable data, bool annualSheet = false)
+    internal static string Definition(string path, DataTable data, bool annualSheet = false, bool splitFeePeriod = true)
     {
         var document = XDocument.Load(path);
         XNamespace ns = document.Root!.Name.Namespace;
         var table = document.Descendants(ns + "Tablix").First();
         // Split only the fee header and detail cells; all other receipt rows keep their spans.
-        foreach (string name in new[] { "FeeHeader", "FeeDescription" })
+        foreach (string name in splitFeePeriod ? new[] { "FeeHeader", "FeeDescription" } : Array.Empty<string>())
         {
             var fee = table.Descendants(ns + "Textbox").Single(box => (string?)box.Attribute("Name") == name);
             var contents = fee.Parent!;
@@ -26,7 +26,7 @@ internal static class ReceiptReportLayout
             contents.ReplaceNodes(period);
             cell.ElementsAfterSelf(ns + "TablixCell").First().Add(new XElement(ns + "CellContents", fee));
         }
-        document.Descendants(ns + "DataSet").First().Element(ns + "Fields")!.Add(
+        if (splitFeePeriod) document.Descendants(ns + "DataSet").First().Element(ns + "Fields")!.Add(
             new XElement(ns + "Field", new XAttribute("Name", "FeePeriod"),
                 new XElement(ns + "DataField", "FeePeriod"),
                 new XElement(XName.Get("TypeName", "http://schemas.microsoft.com/SQLServer/reporting/reportdesigner"), "System.String")));
@@ -99,7 +99,8 @@ internal static class ReceiptReportLayout
                         {
                             string key = Regex.Match(expression, @"Fields!(\w+)\.Value").Groups[1].Value;
                             text = expression.StartsWith("=Format(")
-                                ? (Convert.ToDecimal(record[key]) * (expression.StartsWith("=Format(-") ? -1 : 1)).ToString("N0", CultureInfo.CurrentCulture)
+                                ? (Convert.ToDecimal(record[key]) * (expression.StartsWith("=Format(-") ? -1 : 1)).ToString(
+                                    expression.Contains("\"N2\"") ? "N2" : "N0", CultureInfo.CurrentCulture)
                                 : Convert.ToString(record[key]) ?? "";
                             if (expression.StartsWith("=IIf(")) text = Convert.ToBoolean(record[key]) ? "NET PAID" : "TOTAL PAID";
                             if ((string?)textBox.Attribute("Name") == "ReceiptHeading")

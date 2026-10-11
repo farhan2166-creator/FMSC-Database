@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <Using Include="System.Data" />
+    <PackageReference Include="ReportViewerCore.NETCore" Version="15.1.33" />
+    <Compile Include="../../Pages/Reports/Finance/FeeReminderReportData.cs" Link="FeeReminderReportData.cs" />
+    <Compile Include="../../Core/ReceiptReportData.cs" Link="ReceiptReportData.cs" />
+    <None Include="../../Pages/Reports/Templates/FeeReminder.rdlc" Link="Reports/FeeReminder.rdlc" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

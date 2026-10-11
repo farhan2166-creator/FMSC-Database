@@ -62,7 +62,10 @@ public abstract class CanonicalFinanceReportPage : V2Page
         _export = AddExportAction(exportName);
         var reportActions = new List<ModernButton> { run, _print };
         if (classOutstandingPrint)
+        {
             reportActions.Add(AddBusyAction("Class / Section A4", PreviewClassOutstandingAsync, "Secondary"));
+            reportActions.Add(AddBusyAction("Fee Reminders", PreviewFeeRemindersAsync, "Secondary"));
+        }
         reportActions.Add(_export);
         RelocateFromActions(reportActions.ToArray());
         Defer(BindLookupsAsync);
@@ -88,6 +91,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         UpdateViewControls();
     }
     protected virtual Task PreviewClassOutstandingAsync() => Task.CompletedTask;
+    protected virtual Task PreviewFeeRemindersAsync() => Task.CompletedTask;
     protected abstract IEnumerable<SqlParameter> BuildParameters();
     protected virtual bool IsSummaryView => false;
     protected string ViewName => View.Text;
