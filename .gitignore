@@ -300,3 +300,6 @@ RecoveryBackups/
 Database/*.mdf
 Database/*.ldf
 Database/*.bak
+
+# Local test tools and regression checks are kept on this PC only.
+/Tests/

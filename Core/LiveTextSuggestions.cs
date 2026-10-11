@@ -9,7 +9,7 @@ internal sealed class LiveTextSuggestions : IDisposable
     private ListBox? _list;
     private string[] _matches = Array.Empty<string>();
     private string _prefix = string.Empty;
-    private bool _applying, _queued, _editing;
+    private bool _applying, _queued, _editing, _appendOnEdit;
     internal LiveTextSuggestions(ModernTextBox host, TextBox input)
     {
         _host = host; _input = input;
@@ -24,6 +24,7 @@ internal sealed class LiveTextSuggestions : IDisposable
     {
         if (!Enabled || !_input.Focused || _input.ReadOnly) return;
         _editing = true;
+        _appendOnEdit = false;
         OnTextChanged(_input, EventArgs.Empty);
     }
     internal static string[] Matching(IEnumerable<string> source, string prefix) =>
@@ -44,13 +45,16 @@ internal sealed class LiveTextSuggestions : IDisposable
                 .Where(value => value.Length <= _input.MaxLength), _prefix);
             if (_matches.Length == 0) { Hide(); return; }
             ShowMatches();
-            Complete(_matches[0]);
+            // Deleting a selected suggestion or shortening a prefix must not
+            // immediately restore the removed text. Keep the matching list usable.
+            if (_appendOnEdit) Complete(_matches[0]);
         }));
     }
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (!Enabled) return;
         _editing = false;
+        _appendOnEdit = false;
         if (_popup?.Visible == true && (e.KeyCode == Keys.Down || e.KeyCode == Keys.Up))
         {
             int delta = e.KeyCode == Keys.Down ? 1 : -1;
@@ -65,12 +69,21 @@ internal sealed class LiveTextSuggestions : IDisposable
             finally { _applying = false; }
             Hide(); e.Handled = e.SuppressKeyPress = true;
         }
-        else if (!e.Alt && ((!e.Control && (e.KeyCode == Keys.Back || e.KeyCode == Keys.Delete ||
-                     e.KeyCode == Keys.Space ||
+        else if (!e.Alt && (e.KeyCode == Keys.Back || e.KeyCode == Keys.Delete ||
+                     (e.Control && e.KeyCode == Keys.X)))
+        {
+            // Includes Ctrl+Backspace/Delete and cutting a selected suffix.
+            _editing = true;
+        }
+        else if (!e.Alt && ((!e.Control && (e.KeyCode == Keys.Space ||
                      (e.KeyCode >= Keys.D0 && e.KeyCode <= Keys.Z) ||
                      (e.KeyCode >= Keys.NumPad0 && e.KeyCode <= Keys.Divide) ||
                      (e.KeyCode >= Keys.OemSemicolon && e.KeyCode <= Keys.OemBackslash))) ||
-                     (e.Control && (e.KeyCode == Keys.V || e.KeyCode == Keys.X)))) _editing = true;
+                     (e.Control && e.KeyCode == Keys.V)))
+        {
+            _editing = true;
+            _appendOnEdit = true;
+        }
     }
     private void Complete(string match)
     {
