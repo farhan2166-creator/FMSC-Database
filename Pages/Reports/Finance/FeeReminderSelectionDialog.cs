@@ -16,12 +16,12 @@ internal sealed class FeeReminderSelectionDialog : ApplicationWindowForm
         .Select(row => row.Field<int>("AdmissionId")).ToHashSet();
     internal string Message => message.Text.Trim();
     internal DateTime? RequestedDate => requestedDate.Checked ? requestedDate.Value.Date : null;
-    internal bool PrintOnA4 => FeeReminderPrintLayout.UseA4(paper.SelectedIndex, SelectedStudents.Count);
+    internal bool PrintOnA4 => paper.SelectedIndex == 2;
 
     internal FeeReminderSelectionDialog(DataTable balances, string scope)
     {
         roster = FeeReminderReportData.CreateRoster(balances);
-        paper.Items.AddRange(new object[] { "Automatic (up to 10: thermal)", "Thermal — separate reminders", "A4 — three columns" });
+        paper.Items.AddRange(new object[] { "Choose paper format", "Thermal — separate reminders", "A4 — three columns" });
         paper.SelectedIndex = 0;
         Text = "Fee Reminders"; StartPosition = FormStartPosition.CenterParent; ShowInTaskbar = false;
         Size = new Size(AppScale.Scale(950), AppScale.Scale(650)); MinimumSize = new Size(760, 520);
@@ -45,9 +45,10 @@ internal sealed class FeeReminderSelectionDialog : ApplicationWindowForm
         void UpdateSelection()
         {
             int selected = SelectedStudents.Count;
-            string format = PrintOnA4 ? "A4, three columns" : "Thermal, separate reminders";
+            string format = paper.SelectedIndex == 0 ? "Choose Thermal or A4 to preview"
+                : PrintOnA4 ? "A4, three columns" : "Thermal, separate reminders";
             count.Text = $"{selected} of {roster.Rows.Count} students selected. {format}. Balances refresh before preview.";
-            preview.Enabled = selected > 0;
+            preview.Enabled = selected > 0 && paper.SelectedIndex > 0;
         }
         void CommitSelection()
         {
@@ -66,12 +67,12 @@ internal sealed class FeeReminderSelectionDialog : ApplicationWindowForm
         paper.SelectedIndexChanged += (_, _) => UpdateSelection();
         students.CurrentCellDirtyStateChanged += (_, _) => { if (students.IsCurrentCellDirty) students.CommitEdit(DataGridViewDataErrorContexts.Commit); };
         students.CellValueChanged += (_, _) => { if (!selectingAll) UpdateSelection(); };
-        preview.Click += (_, _) => { CommitSelection(); if (SelectedStudents.Count > 0) DialogResult = DialogResult.OK; };
+        preview.Click += (_, _) => { CommitSelection(); if (SelectedStudents.Count > 0 && paper.SelectedIndex > 0) DialogResult = DialogResult.OK; };
         var options = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1 };
         options.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, AppScale.Scale(270)));
         options.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, AppScale.Scale(200)));
         options.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        options.Controls.Add(HumanUi.Field("Paper format", paper), 0, 0);
+        options.Controls.Add(HumanUi.Field("Paper format", paper, true), 0, 0);
         options.Controls.Add(HumanUi.Field("Pay by (optional)", requestedDate), 1, 0);
         options.Controls.Add(HumanUi.Field("Message (optional)", message), 2, 0);
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6, Padding = new Padding(AppMetrics.SpacingMd) };
@@ -83,7 +84,7 @@ internal sealed class FeeReminderSelectionDialog : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight * 2));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
         root.Controls.Add(new Label { Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(0, 0, 0, AppMetrics.SpacingSm), Font = AppTheme.NormalFont,
-            Text = scope + "\nChoose students and paper format. Automatic uses A4 above 10 students. Printing does not change charges or due dates." }, 0, 0);
+            Text = scope + "\nChoose students, then choose Thermal or A4. Printing does not change charges or due dates." }, 0, 0);
         root.Controls.Add(HumanUi.ButtonRow(all, none), 0, 1); root.Controls.Add(students, 0, 2);
         root.Controls.Add(count, 0, 3); root.Controls.Add(options, 0, 4); root.Controls.Add(HumanUi.ButtonRow(preview, cancel), 0, 5);
         Controls.Add(root); CancelButton = cancel;

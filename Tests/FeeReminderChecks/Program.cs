@@ -72,11 +72,6 @@ Check(longWarnings.Length == 0 && longHtml.Contains(longName) && longHtml.Contai
 Check(longHtml.Contains("20-Oct-2026") && longHtml.Contains("School Contact") && longHtml.Contains("School Address"),
     "Requested date and school contact details render");
 File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "FeeReminderPreview.html"), longHtml);
-Check(!FeeReminderPrintLayout.UseA4(0, 1) && !FeeReminderPrintLayout.UseA4(0, 10)
-    && FeeReminderPrintLayout.UseA4(0, 11) && FeeReminderPrintLayout.UseA4(0, 100),
-    "Automatic protects large batches while keeping small batches thermal");
-Check(!FeeReminderPrintLayout.UseA4(1, 100) && FeeReminderPrintLayout.UseA4(2, 1),
-    "Explicit paper choices override automatic selection");
 string a4Definition = FeeReminderPrintLayout.A4Definition(path);
 var a4Xml = XDocument.Parse(a4Definition);
 Check(a4Xml.Descendants(ns + "PageWidth").Single().Value == "8.27in" &&
