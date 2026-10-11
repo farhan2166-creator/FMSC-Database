@@ -301,7 +301,7 @@ internal sealed class PageActionShortcutController
         foreach (Control child in root.Controls)
         {
             if (child is ModernButton button && button.Visible &&
-                button.ThemeRole is not ("Navigation" or "TabInactive"))
+                button.ThemeRole is not ("Navigation" or "TabActive" or "TabInactive"))
             {
                 string label = (button.Text ?? string.Empty).TrimStart();
                 int firstLetter = 0;

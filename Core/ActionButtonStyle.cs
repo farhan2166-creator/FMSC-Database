@@ -16,7 +16,7 @@ internal static class ActionButtonStyle
     internal static string Role(string text, string fallback)
     {
         // Navigation, tabs and deliberately custom buttons have their own appearance.
-        if (fallback is "Navigation" or "TabInactive" or "Outline" or "Custom") return fallback;
+        if (fallback is "Navigation" or "TabActive" or "TabInactive" or "Outline" or "Custom") return fallback;
         string label = Label(text);
         bool Any(params string[] words) => words.Any(word => Starts(label, word));
         if (Any("Delete", "Remove", "Reverse", "Restore", "Destroy")) return UiDesignSystem.Actions.Danger;

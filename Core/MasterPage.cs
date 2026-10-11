@@ -285,7 +285,7 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
             recordsTab.Controls.Add(gridCard);
             _entryRecordsTabs.TabPages.AddRange(new[] { entryTab, recordsTab });
             _entryRecordsTabs.Selecting += (_, e) => { if (_saving) e.Cancel = true; };
-            host = _entryRecordsTabs;
+            host = TabStrip.CreateHost(_entryRecordsTabs);
         }
         else if (_splitEditorAndRecords)
         {

@@ -471,8 +471,8 @@ public sealed class StudentRecordChecksPage : V2Page
         enrollmentPanel.Visible = tab == CorrectionTab.Enrollment;
         statusFooter.Visible=tab==CorrectionTab.Status;
         enrollmentFooter.Visible=tab==CorrectionTab.Enrollment;
-        correctionStatusTab.ThemeRole = tab == CorrectionTab.Status ? "Primary" : "TabInactive";
-        correctionEnrollmentTab.ThemeRole = tab == CorrectionTab.Enrollment ? "Primary" : "TabInactive";
+        TabStrip.ApplyButtonTheme(correctionStatusTab, tab == CorrectionTab.Status);
+        TabStrip.ApplyButtonTheme(correctionEnrollmentTab, tab == CorrectionTab.Enrollment);
     }
     private void UpdateCorrectionHeader()
     {
@@ -658,9 +658,9 @@ public sealed class StudentRecordChecksPage : V2Page
         Grid.DefaultCellStyle.WrapMode=DataGridViewTriState.False;
         /* see gridModeVersion. The tab highlight is set here and the table is bound later, so the version is what keeps the two from disagreeing. */
         int modeVersion = ++gridModeVersion;
-        modeFindings.ThemeRole = mode == "Findings" ? "Primary" : "TabInactive";
-        modeEnrollments.ThemeRole = mode == "Enrollments" ? "Primary" : "TabInactive";
-        modeTimeline.ThemeRole = mode == "Timeline" ? "Primary" : "TabInactive";
+        TabStrip.ApplyButtonTheme(modeFindings, mode == "Findings");
+        TabStrip.ApplyButtonTheme(modeEnrollments, mode == "Enrollments");
+        TabStrip.ApplyButtonTheme(modeTimeline, mode == "Timeline");
         /* The enrollment form is the one that goes with the Enrollments list. */
         if (mode == "Enrollments")
             ShowCorrectionTab(CorrectionTab.Enrollment);

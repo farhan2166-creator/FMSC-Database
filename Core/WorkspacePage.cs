@@ -50,7 +50,7 @@ public sealed class WorkspacePage : UserControl, IUnsavedChanges, IWorkspaceStat
         _rootLayout = root;
         _header = BuildHeader(title, subtitle, titleLabelHeight);
         _tabs.Dock = DockStyle.Fill;
-        /* The strip itself (fonts, tab size, owner-drawn selected/inactive state) is shared with the Student Fees page's Assignments/Payments tabs - see TabStrip, which is where this drawing code now lives. */
+        // Use the admission-style button strip while retaining native tab state and shortcuts.
         TabStrip.Apply(_tabs, _accent);
         for (int i = 0; i < _pages.Count; i++)
         {
@@ -72,7 +72,7 @@ public sealed class WorkspacePage : UserControl, IUnsavedChanges, IWorkspaceStat
             if (IsBusy) e.Cancel = true;
         };
         root.Controls.Add(_header, 0, 0);
-        root.Controls.Add(_tabs, 0, 1);
+        root.Controls.Add(TabStrip.CreateHost(_tabs), 0, 1);
         Controls.Add(root);
         AppTheme.ThemeChanged += OnThemeChanged;
         Disposed += (_, _) =>
@@ -230,7 +230,7 @@ public sealed class WorkspacePage : UserControl, IUnsavedChanges, IWorkspaceStat
                 AppMetrics.PageHeaderContentHeightAllowance;
             _titleLabel.Font = AppTheme.PageTitleFont;
         }
-        _tabs.Font = AppTheme.ButtonFont;
+        TabStrip.Repaint(_tabs);
         ResumeLayout(true);
     }
     public void PrepareForEmbedding(bool keepActions = false)

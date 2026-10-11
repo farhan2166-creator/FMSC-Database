@@ -622,10 +622,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         foreach (var (candidateName, button)
                  in OperationButtons)
         {
-            button.ThemeRole =
-                candidateName == name
-                    ? "Primary"
-                    : "TabInactive";
+            TabStrip.ApplyButtonTheme(button, candidateName == name);
         }
         if (executeButton is not null)
         {

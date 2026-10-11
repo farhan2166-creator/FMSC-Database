@@ -34,6 +34,7 @@ public static class UiDesignSystem
         public const string Danger = "Danger";
         public const string Secondary = "Secondary";
         public const string Navigation = "Navigation";
+        public const string TabActive = "TabActive";
         public const string TabInactive = "TabInactive";
     }
 }

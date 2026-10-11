@@ -220,7 +220,14 @@ namespace FMSC_SMS.Core
                     // Preserve the semantic role across theme changes.
                     _themeRole = "Secondary";
                     return;
+                case "TabActive":
+                    _outline = false;
+                    FlatAppearance.BorderSize = 0;
+                    _normalColor = AppTheme.Primary;
+                    break;
                 case "TabInactive":
+                    _outline = false;
+                    FlatAppearance.BorderSize = 0;
                     _normalColor =
                         AppTheme.SurfaceSecondary;
                     ForeColor = AppTheme.Text;
@@ -280,7 +287,7 @@ namespace FMSC_SMS.Core
             base.OnParentChanged(e);
             if (Parent is not null && Height >= AppTheme.CompactButtonHeight &&
                 ActionButtonStyle.Role(Text, "Unspecified") != "Unspecified" &&
-                _themeRole is not ("Navigation" or "TabInactive" or "Outline" or "Custom"))
+                _themeRole is not ("Navigation" or "TabActive" or "TabInactive" or "Outline" or "Custom"))
             {
                 Height = AppMetrics.ButtonHeight;
                 Font = AppTheme.ButtonFont;

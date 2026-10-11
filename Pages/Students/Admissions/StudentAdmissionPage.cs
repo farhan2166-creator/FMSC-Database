@@ -1964,10 +1964,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private static void ApplyTabTheme(Button button, bool active)
     {
-        if (button is not ModernButton modern)
-            return;
-        modern.ThemeRole = active ? "Primary" : "TabInactive";
-        modern.ApplyTheme();
+        TabStrip.ApplyButtonTheme(button, active);
     }
     private void ShowPlacementSummary(bool editing)
     {
