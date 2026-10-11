@@ -32,6 +32,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
     private readonly string _scopePreferenceKey;
     private bool _scopeEdited;
     private bool _applyingScope;
+    private bool _runningReport;
     protected CanonicalFinanceReportPage(
         string title,
         string description,
@@ -85,6 +86,12 @@ public abstract class CanonicalFinanceReportPage : V2Page
         SetContent(ReportUi.CompactLayout(ReportUi.Bar(fields.ToArray()), Grid, title, () => {
             _scopeEdited = true;
             ReportLayoutStore.SetPreference(_scopePreferenceKey, "");
+            _displayed = null;
+            _appliedSignature = _filterSummary = string.Empty;
+            _print.Enabled = _export.Enabled = false;
+            _summary.Text = "Run the report to see totals.";
+            InvalidateReport();
+            SetStatus("Filters cleared. Choose filters, then press Run Report.");
         }, reportActions.ToArray()));
         Grid.Parent?.Controls.Add(_summary);
         Grid.BringToFront();
@@ -160,6 +167,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         _filterSummary.Length == 0 ? base.ReportExportSubtitle() : _filterSummary;
     private void FiltersChanged()
     {
+        if (_runningReport) return;
         if (_appliedSignature.Length == 0) return;
         bool current = string.Equals(_appliedSignature, Signature(), StringComparison.Ordinal);
         _print.Enabled = current;
@@ -188,6 +196,9 @@ public abstract class CanonicalFinanceReportPage : V2Page
         try
         {
             if (_usesDates && !ReportUi.ValidDateRange(_rangeValidator ??= CreateValidator(), From, To)) return;
+            _runningReport = true;
+            _print.Enabled = _export.Enabled = false;
+            _summary.Text = "Generating report…";
             SqlParameter[] parameters = BuildParameters().ToArray();
             DataTable? captured = null;
             DataTable? totals = null;
@@ -199,7 +210,11 @@ public abstract class CanonicalFinanceReportPage : V2Page
                 AppendAuthoritativeTotalRow(captured, totals);
                 return captured;
             });
-            if (!ReportLanded || captured is null) return;
+            if (!ReportLanded || captured is null)
+            {
+                if (!IsDisposed) _summary.Text = "Run the report again to see current totals.";
+                return;
+            }
             _displayed = captured.Copy();
             string totalsText = FormatTotals(totals);
             _summary.Text = totalsText;
@@ -210,7 +225,18 @@ public abstract class CanonicalFinanceReportPage : V2Page
             _print.Enabled = current;
             _export.Enabled = current;
         }
-        catch (Exception ex) { if (!IsDisposed) Fail(ex); }
+        catch (Exception ex)
+        {
+            if (!IsDisposed)
+            {
+                _displayed = null;
+                _appliedSignature = _filterSummary = string.Empty;
+                _print.Enabled = _export.Enabled = false;
+                _summary.Text = "Could not generate the report. Run Report to retry.";
+                Fail(ex);
+            }
+        }
+        finally { _runningReport = false; }
     }
     private static string FormatTotals(DataTable? totals)
     {

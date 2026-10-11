@@ -1279,7 +1279,18 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     private bool MarkReportGridFailed(CancellationTokenSource cts)
     {
         if (!cts.IsCancellationRequested && !IsDisposed)
+        {
+            // A failed refresh must not leave the previous rows looking like a
+            // successful result, or allow them to be restored through the pager.
+            _reportSource = null;
+            _reportPage = 0;
+            _reportLanded = false;
+            _reportStale = true;
+            Grid.DataSource = null;
+            SetReportPagerEnabled(false);
+            if (_reportPageLabel is not null) _reportPageLabel.Text = "Report unavailable";
             UiHelper.SetGridState(Grid, UiHelper.GridDisplayState.Failed, "Could not generate the report. Try again.");
+        }
         return false;
     }
     private void BindReportPage()
