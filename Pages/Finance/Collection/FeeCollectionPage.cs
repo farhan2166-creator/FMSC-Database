@@ -91,6 +91,12 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     private ModernButton? executeButton;
     private ModernButton? fullAmountButton;
     private ModernButton? printReceiptButton;
+    private ModernButton? nextStudentButton;
+    private readonly Label collectionResult = new() {
+        Dock = DockStyle.Top, AutoSize = true, Visible = false,
+        Font = AppTheme.NormalFont, ForeColor = AppTheme.Text,
+        Margin = new Padding(4, 8, 4, 4)
+    };
     private ModernButton? feeAssignmentsButton;
     private ModernButton? addChargeButton;
     private ModernButton? futureFeesButton;
@@ -223,6 +229,11 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 PrintReceiptAsync,
                 "Secondary");
         printReceiptButton.Enabled = false;
+        printReceiptButton.EnabledChanged += (_, _) => {
+            if (printReceiptButton.Enabled && (transactionBusy ||
+                (lastCollectionReceipt is null && lastGroupReceiptNumber is null)))
+                printReceiptButton.Enabled = false;
+        };
         // (Fee Assignments UI): contextual entry point, ("Add the Fee Assignments panel to the existing FeeCollectionPage as a first visible increment - no retirement, no navigation change").
         feeAssignmentsButton =
             AddAction(
@@ -286,6 +297,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 UiText.Certificates.NextStudent,
                 (_, _) => { if (transactionBusy) return; ClearPayment(); student.Focus(); },
                 "Secondary");
+        nextStudentButton = clear;
         RelocateFromActions(
             executeButton,
             printReceiptButton,
@@ -333,6 +345,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             charges.Rows.Clear();
             recentPayments.Rows.Clear();
             lastCollectionReceipt = null;
+            lastGroupReceiptNumber = null;
+            collectionResult.Text = ""; collectionResult.Visible = false;
             if (printReceiptButton is not null)
                 printReceiptButton.Enabled = false;
             if (feeAssignmentsButton is not null)
@@ -581,7 +595,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             "Payment", "Enter the amount received.");
         var summary = new TableLayoutPanel {
             Dock = DockStyle.Top, AutoSize = true,
-            ColumnCount = 1, RowCount = 10,
+            ColumnCount = 1, RowCount = 13,
             Padding = new Padding(0), Margin = new Padding(0)
         };
         summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -595,6 +609,10 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight + 2));
         summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 6));
         summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 6));
+        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 6));
+        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 6));
+        summary.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        summary.SizeChanged += (_, _) => collectionResult.MaximumSize = new Size(Math.Max(1, summary.ClientSize.Width - 8), 0);
         totalDue.Text = balance.Text = "0.00";
         suppressPaymentEvents = true;
         try { paymentAmount.Text = "0"; }
@@ -628,16 +646,18 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         summary.Controls.Add(HumanUi.Field("Remarks", remarks), 0, 7);
         fullAmountButton = AddAction("Use Full Amount", (_, _) => UseFullAmount(), "Secondary");
         var receiptActions = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 1,
             Margin = new Padding(0)
         };
-        receiptActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        receiptActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        receiptActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         receiptActions.Controls.Add(fullAmountButton, 0, 0);
-        receiptActions.Controls.Add(printReceiptButton!, 1, 0);
+
         summary.Controls.Add(receiptActions, 0, 8);
         summary.Controls.Add(executeButton!, 0, 9);
-        foreach (ModernButton button in new[] { fullAmountButton!, printReceiptButton!, executeButton! })
+        summary.Controls.Add(printReceiptButton!, 0, 10);
+        summary.Controls.Add(clear, 0, 11);
+        summary.Controls.Add(collectionResult, 0, 12);
+        foreach (ModernButton button in new[] { fullAmountButton!, printReceiptButton!, executeButton!, clear })
         {
             button.AutoSize = false;
             button.MinimumSize = Size.Empty;
@@ -661,7 +681,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             Padding = new Padding(0, 6, 0, 0), Margin = new Padding(0)
         };
         paymentHistoryButton!.Text = "Recent Payments";
-        foreach (Control button in new Control[] { studentFeesMenuButton!, paymentHistoryButton, clear })
+        foreach (Control button in new Control[] { studentFeesMenuButton!, paymentHistoryButton })
         {
             button.AutoSize = false;
             button.Dock = DockStyle.None;
@@ -2585,6 +2605,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         student.Enabled = false;
         enrollment.Enabled = false;
         siblings.Enabled = false;
+        if (printReceiptButton is not null) printReceiptButton.Enabled = false;
+        if (nextStudentButton is not null) nextStudentButton.Enabled = false;
         try
         {
             if (admissionId <= 0 ||
@@ -3022,8 +3044,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 Warn(
                     $"The collection completed for {posted} students, but " +
                     $"{distinctReceipts.Count} distinct receipt numbers came back, so " +
-                    "the family receipt cannot be reprinted by number. Print it now, " +
-                    "from Print Receipt, while it is still on screen.");
+                    "a single family receipt number could not be confirmed. " +
+                    "Check Recent Payments for receipt details.");
             }
             else
             {
@@ -3035,6 +3057,10 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                               $"family receipt: {singleReceipt}."
                             : $"{transactionType} completed successfully. Receipt: {singleReceipt}.");
             }
+            // A confirmed new payment replaces the previous payment's print context.
+            lastCollectionReceipt = null;
+            lastGroupReceiptNumber = null;
+            multiStudentReceiptNote = null;
             /* Receipt handling depends on whether this payment covered one student or several. */
             if (transactionType == "Collection" &&
                 !string.IsNullOrWhiteSpace(singleReceipt) &&
@@ -3083,6 +3109,12 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     /* The automatic report opening was removed on the operator's instruction, so this flow only prepares the reprint. */
                 }
             }
+            collectionResult.Text = string.IsNullOrWhiteSpace(singleReceipt)
+                ? "Payment recorded. Check Recent Payments for receipt details."
+                : $"Payment recorded. Receipt: {singleReceipt}. " +
+                  (lastCollectionReceipt is not null || lastGroupReceiptNumber is not null
+                    ? "Print Receipt, or choose Next Student." : "Check Recent Payments to print, or choose Next Student.");
+            collectionResult.Visible = true;
             int refreshVersion = ++loadVersion;
             // These refreshes read independent views of the same committed transaction.
             await Task.WhenAll(
@@ -3136,6 +3168,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 student.Enabled = studentWasEnabled;
                 enrollment.Enabled = enrollmentWasEnabled;
                 siblings.Enabled = siblingsWasEnabled;
+                if (nextStudentButton is not null) nextStudentButton.Enabled = true;
+                if (printReceiptButton is not null)
+                    printReceiptButton.Enabled = lastCollectionReceipt is not null || lastGroupReceiptNumber is not null;
             }
             /* After a collection that settled the student there is nothing left to collect, so the button goes quiet instead of inviting a second empty click. */
             UpdateProcessCollectionAvailability();
@@ -3389,6 +3424,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         admissionId = 0;
         enrollmentId = 0;
         lastCollectionReceipt = null;
+        lastGroupReceiptNumber = null;
+        multiStudentReceiptNote = null;
+        collectionResult.Text = ""; collectionResult.Visible = false;
         if (printReceiptButton is not null)
             printReceiptButton.Enabled = false;
         if (feeAssignmentsButton is not null)
@@ -3710,6 +3748,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     // Reprints the most recently completed Collection using the true, post-discount figures. See PrintPaymentReceipt's showActualAmount parameter, which still carries the parent path for when it is wanted again.
     private async Task PrintReceiptAsync()
     {
+        if (transactionBusy) return;
         if (lastCollectionReceipt is null && lastGroupReceiptNumber is null)
         {
             Warn(

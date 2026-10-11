@@ -1,0 +1,7 @@
+# Fee collection flow review
+
+Collect Payment, Print Receipt and Next Student now appear together in the scrollable Payment panel. Full-width buttons avoid squeezing Print Receipt into half of the narrow panel. A persistent inline result identifies the confirmed receipt and the available next step after balances reload. Printing remains explicit; collection confirmation and allocation rules are unchanged.
+
+Print and Next Student are unavailable while recording a collection. Starting another student or enrollment clears both single and family receipt context and the inline result. A confirmed new payment replaces the previous receipt context even when its own receipt number is unavailable. An unconfirmed family receipt result points to Recent Payments instead of promising an unavailable Print Receipt action.
+
+Validation: cross-target application build passed with zero warnings/errors; diff whitespace checks passed. No SQL or migration changes. WinForms interaction remains a Windows manual check: collect a single payment and a family payment, verify the inline receipt remains after refresh, open Print Receipt, return and choose Next Student, confirm focus returns to the student picker and Print Receipt is disabled; select another enrollment and verify no old family receipt can print. Check failed/cancelled collection, partial payment, repeat payment, missing receipt result, busy actions, keyboard order and narrow/high-DPI layouts with the Payment panel scroll bar. No automatic printing or new confirmation dialogs were added.
