@@ -48,6 +48,18 @@ public static class StudentSearchCache
         }
     }
 
+    internal static async Task<DataRow?> FindByAdmissionIdAsync(int admissionId)
+    {
+        if (admissionId <= 0) return null;
+        DataRow? Find(DataTable table) => table.AsEnumerable().FirstOrDefault(row =>
+            !row.IsNull("AdmissionId") && Convert.ToInt32(row["AdmissionId"]) == admissionId);
+        var found = Find(await GetAllAsync());
+        if (found is not null) return found;
+        // A student may have been added since a picker last loaded the list.
+        Invalidate();
+        return Find(await GetAllAsync());
+    }
+
     private static async Task<DataTable> LoadAsync(int generation)
     {
         DataTable table = await DatabaseHelper.QueryUserAsync(

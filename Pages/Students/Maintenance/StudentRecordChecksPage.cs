@@ -229,6 +229,16 @@ public sealed class StudentRecordChecksPage : V2Page
         root.Controls.Add(bodyLayout, 0, 1);
         SetContent(root);
     }
+    public StudentRecordChecksPage(int preloadAdmissionId) : this()
+    {
+        if (preloadAdmissionId > 0) Defer(async () => {
+            var found = await StudentSearchCache.FindByAdmissionIdAsync(preloadAdmissionId);
+            if (IsDisposed || student.SelectedId > 0 || !string.IsNullOrWhiteSpace(student.Text)) return;
+            if (found is null) { SetStatus("This student could not be found. Search for a student to continue.", true); return; }
+            student.SetStudent(found);
+            await LoadStudentSnapshot();
+        });
+    }
     private Control BuildResultsToolbar()
     {
         var toolbar = new FlowLayoutPanel {

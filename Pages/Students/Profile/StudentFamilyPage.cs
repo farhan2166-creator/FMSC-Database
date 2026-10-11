@@ -35,7 +35,8 @@ public sealed class StudentFamilyPage : V2Page
     private string currentHeadFatherName = string.Empty;
     private FamilyMemberCard? selectedCard;
     private int _familyLoadVersion;
-    public StudentFamilyPage() : base(
+    public StudentFamilyPage() : this(0) { }
+    public StudentFamilyPage(int preloadAdmissionId) : base(
         "Family / Siblings",
         "Manage family groups and siblings. Start a new family from Student Admissions > Fees & Siblings.")
     {
@@ -60,7 +61,9 @@ public sealed class StudentFamilyPage : V2Page
         student.RowFilter = row => familyAdmissionIds.Contains(GetInt(row, "AdmissionId"));
         student.SearchFailed += ex => Fail(ex);
         StudentSearchCache.Warm();
-        Load += async (_, _) => await LoadStudentsAsync();
+        Load += async (_, _) => await LoadStudentsAsync(
+            preserveAdmissionId: preloadAdmissionId > 0 ? preloadAdmissionId : null,
+            initialSelection: preloadAdmissionId > 0);
         var details = HumanUi.Card("Family / Siblings", "Pick a student who already has a family to view or manage it below.");
         var fields = new TableLayoutPanel {
             Dock = DockStyle.Fill,
@@ -109,7 +112,7 @@ public sealed class StudentFamilyPage : V2Page
         dt.Columns.Add("Display", typeof(string));
         return dt;
     }
-    private async Task LoadStudentsAsync(int? preserveAdmissionId = null)
+    private async Task LoadStudentsAsync(int? preserveAdmissionId = null, bool initialSelection = false)
     {
         try
         {
@@ -128,7 +131,9 @@ public sealed class StudentFamilyPage : V2Page
             if (IsDisposed) return;
             familyAdmissionIds = ids;
             DataRow? keep = null;
-            if (preserveAdmissionId is int keepId && ids.Contains(keepId))
+            if (initialSelection && preserveAdmissionId is int initialId)
+                keep = await StudentSearchCache.FindByAdmissionIdAsync(initialId);
+            else if (preserveAdmissionId is int keepId && ids.Contains(keepId))
             {
                 foreach (DataRow row in all.Rows)
                 {
@@ -139,6 +144,9 @@ public sealed class StudentFamilyPage : V2Page
                     }
                 }
             }
+            // Opening a profile link must not replace a choice made while it was loading.
+            if (IsDisposed || (initialSelection &&
+                (student.SelectedId > 0 || !string.IsNullOrWhiteSpace(student.Text)))) return;
             if (keep is not null)
             {
                 student.SetStudent(keep);
@@ -148,7 +156,9 @@ public sealed class StudentFamilyPage : V2Page
             {
                 student.Clear();
                 ClearMembersView();
-                SetStatus(ids.Count > 0
+                SetStatus(initialSelection
+                    ? "This student could not be found. Search for a student to continue."
+                    : ids.Count > 0
                     ? "Type a student's name or Admission Number to view their family."
                     : "No families exist yet. Start one from a student's Admission page (Fees & Siblings tab).");
             }

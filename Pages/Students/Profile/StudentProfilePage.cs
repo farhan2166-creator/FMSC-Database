@@ -243,18 +243,18 @@ public sealed class StudentProfilePage : V2Page
         };
         var recordRow = Row();
         recordRow.Controls.Add(
-            JumpButton("Open Admissions", () => new StudentAdmissionPage(navigate), title: PageTitles.Admissions));
+            JumpButton("Open Admissions", id => new StudentAdmissionPage(navigate, preselectAdmissionId: id), title: PageTitles.Admissions));
         recordRow.Controls.Add(
-            JumpButton("Open Family / Siblings", () => new StudentFamilyPage()));
+            JumpButton("Open Family / Siblings", id => new StudentFamilyPage(id)));
         recordRow.Controls.Add(
-            JumpButton("Open Photo", () => new StudentPhotoPage(), title: "Student Photo"));
+            JumpButton("Open Photo", id => new StudentPhotoPage(id), title: "Student Photo"));
         var lifecycleRow = Row();
         lifecycleRow.Controls.Add(
-            JumpButton("Open " + PageTitles.StudentRecordChecks, () => new StudentRecordChecksPage()));
+            JumpButton("Open " + PageTitles.StudentRecordChecks, id => new StudentRecordChecksPage(id)));
         lifecycleRow.Controls.Add(
             JumpButton(
                 "Open " + PageTitles.AnnualFeeReceipts,
-                () => new FMSC_SMS.Pages.Reports.Finance.AnnualFeeReceiptsPage(student.SelectedId),
+                id => new FMSC_SMS.Pages.Reports.Finance.AnnualFeeReceiptsPage(id),
                 module: "Finance"));
         feeHistoryButton.Height=AppTheme.CompactButtonHeight;
         feeHistoryButton.Margin=new Padding(0,0,UiDesignSystem.Spacing.Sm,0);
@@ -276,7 +276,7 @@ public sealed class StudentProfilePage : V2Page
     }
     private void UpdateFeeHistoryAvailability() => feeHistoryButton.Enabled=!loadingFeeHistory && student.SelectedId>0
         && CurrentUser.HasPermission("Fees.View") && CurrentUser.HasPermission("Fees.Statement.View");
-    private ModernButton JumpButton(string text, Func<Control> factory, string module = "Students", string? title = null)
+    private ModernButton JumpButton(string text, Func<int, Control> factory, string module = "Students", string? title = null)
     {
         var button = new ModernButton {
             Text = text,
@@ -291,9 +291,11 @@ public sealed class StudentProfilePage : V2Page
         AppMetrics.FitButtonWidth(button, minWidth: 150);
         button.SetOutlineColors(AppTheme.InputBorder, AppTheme.Primary, AppTheme.Surface);
         button.Click += (_, _) => {
+            int admissionId = student.SelectedId;
+            Func<Control> openPage = () => factory(admissionId);
             if (navigate is not null)
             {
-                navigate(factory, module, title ?? text.Replace("Open ", string.Empty));
+                navigate(openPage, module, title ?? text.Replace("Open ", string.Empty));
                 return;
             }
             using var dialog = new ApplicationWindowForm {
@@ -306,7 +308,7 @@ public sealed class StudentProfilePage : V2Page
                     AppScale.Scale(620)),
                 BackColor = AppTheme.PageBackground
             };
-            var control = factory();
+            var control = openPage();
             control.Dock = DockStyle.Fill;
             dialog.Controls.Add(control);
             dialog.ShowDialog(FindForm());
