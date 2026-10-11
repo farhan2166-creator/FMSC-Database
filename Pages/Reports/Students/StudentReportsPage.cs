@@ -10,6 +10,8 @@ public partial class StudentReportsPage : V2Page
     internal const string ModeStrength = "strength";
     internal const string ModeChanges = "changes";
     private const string ViewsKey = "students";
+    private const string LastScopeKey = "students.last-scope";
+    private bool _scopeEdited;
     private const string NotSet = "(not set)";
     private sealed class Choice
     {
@@ -199,6 +201,8 @@ public partial class StudentReportsPage : V2Page
             openAdmissionsButton);
         SetContent(root);
         Defer(BindLookupsAsync);
+        foreach (var lookup in new[] { campus, year, cls, section })
+            lookup.UserSelectionChanged += (_, _) => _scopeEdited = true;
         Grid.SelectionChanged += (_, _) => UpdateAdmissionsAction();
         WireEvents();
         UpdateEnabledState();
@@ -562,6 +566,8 @@ public partial class StudentReportsPage : V2Page
 
     private void ResetFilters()
     {
+        _scopeEdited = true;
+        ReportLayoutStore.SetPreference(LastScopeKey, "");
         ++_reportRevision;
         InvalidateReport();
         _raw = _compareRaw = null;
@@ -1055,12 +1061,40 @@ public partial class StudentReportsPage : V2Page
                 _suppress = false;
             }
             UpdateEnabledState();
+            if (!_scopeEdited && _reportRevision == 0)
+                RestoreLastScope();
         }
         catch (Exception ex)
         {
             if (!IsDisposed)
                 Fail(ex);
         }
+    }
+
+    private ReportScopeSelection CurrentScopeSelection() => new(campus.SelectedId, year.SelectedId, cls.SelectedId, section.SelectedId);
+
+    private void RestoreLastScope()
+    {
+        var saved = ReportScopeSelection.Read(ReportLayoutStore.GetPreference(LastScopeKey));
+        if (saved is null) return;
+        bool previous = _suppress;
+        _suppress = true;
+        try
+        {
+            SelectId(campus, saved.Campus);
+            SelectId(year, saved.Year);
+            SelectId(cls, 0); SelectId(section, 0);
+            RefreshClassSectionLists(classes: true, sections: true);
+            SelectId(cls, saved.Class);
+            RefreshClassSectionLists(classes: false, sections: true);
+            SelectId(section, saved.Class > 0 && cls.SelectedId == 0 ? 0 : saved.Section);
+            RefreshClassSectionLists(classes: true, sections: false);
+        }
+        finally { _suppress = previous; }
+        UpdateEnabledState();
+        bool matches = saved == CurrentScopeSelection();
+        SetStatus(matches ? "Last location filters restored. Review them, then press View Report."
+            : "Some saved filters are unavailable. Review the filters before running the report.", !matches);
     }
     // run
     /// <summary>Thrown when the outstanding-balance enrichment cannot be trusted, so the report must not be rendered. 0 - that reads as "owes nothing".</summary>
@@ -1094,6 +1128,7 @@ public partial class StudentReportsPage : V2Page
             /* BindReportAsync runs its query off the UI thread, so everything the controls hold is read here first. */
             RunArgs args = ReadArgs();
             ViewArgs view = ReadView();
+            var scopeToRemember = CurrentScopeSelection();
             string filterText = DescribeFilters(args);
             bool wantBalance = IsRegisterMode(_mode) && WantsBalance(view);
             int matched = 0;
@@ -1113,6 +1148,8 @@ public partial class StudentReportsPage : V2Page
             if (revision != _reportRevision || !ReportLanded)
                 return;
             _appliedSignature = requested;
+            if (!args.ByAdmissionId && ReportMatchesCurrentFilters(requested))
+                ReportLayoutStore.SetPreference(LastScopeKey, scopeToRemember.Serialize());
             SetReportActionsEnabled(ReportMatchesCurrentFilters(requested));
             ShowLandedStatus(args, matched);
         }
@@ -1354,6 +1391,7 @@ public partial class StudentReportsPage : V2Page
     }
     private async Task OnViewChosenAsync()
     {
+        _scopeEdited = true;
         if (_busyViews)
             return;
         string key = SelectedKey(views);

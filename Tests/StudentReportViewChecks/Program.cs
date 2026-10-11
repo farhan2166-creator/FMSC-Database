@@ -1,6 +1,7 @@
 using System.Data;
 using System.Text.RegularExpressions;
 using FMSC_SMS.Pages.Reports.Students;
+using FMSC_SMS.Core;
 
 int checks = 0;
 void Check(bool passed, string message)
@@ -83,4 +84,13 @@ Check(StudentReportQuickViews.FilterCompletion(unavailable, "any", true).Rows.Co
     "Unavailable fields are not invented as missing");
 Check(StudentReportQuickViews.All.Single(view => view.Key == "completion").Completion == "any",
     "Record Completion preset selects its visible record check");
+var rememberedScope = new ReportScopeSelection(2, 4, 6, 8);
+Check(ReportScopeSelection.Read(rememberedScope.Serialize()) == rememberedScope,
+    "Campus/year/class/section survive a saved preference round trip");
+Check(ReportScopeSelection.Read(new ReportScopeSelection(0, 0, 0, 0).Serialize()) == new ReportScopeSelection(0, 0, 0, 0),
+    "All selections retain zero IDs");
+foreach (string? invalid in new[] { null, "", "null", "not JSON", "[]", "{\"Campus\":-1}", "{\"Year\":2147483648}" })
+    Check(ReportScopeSelection.Read(invalid) is null, "Missing or invalid saved filters fall back safely");
+Check(ReportScopeSelection.Read("{\"Campus\":2,\"Year\":4,\"Class\":6,\"Section\":8,\"Search\":\"old student\"}") == rememberedScope,
+    "Location preferences do not restore old student searches or unrelated filters");
 Console.WriteLine($"PASS {checks} student report view checks.");
