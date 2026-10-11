@@ -108,10 +108,13 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
         fields.Controls.Add(HumanUi.Field("Amount",actionAmount),2,0);
         fields.Controls.Add(HumanUi.Field("Reason",reason,true),3,0);
         var adjustmentFields=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty };
+        adjustmentFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         adjustmentFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        adjustmentFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonRowHeight));
+        adjustmentFields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         adjustmentFields.Controls.Add(fields,0,0);
-        adjustmentFields.Controls.Add(HumanUi.ButtonRow(load,detailsButton,executeButton),0,1);
+        var adjustmentButtons=HumanUi.ButtonRow(load,detailsButton,executeButton);
+        adjustmentButtons.Dock=DockStyle.Top;
+        adjustmentFields.Controls.Add(adjustmentButtons,0,1);
         adjustmentCard.Content.Controls.Add(adjustmentFields);
         var historyCard=HumanUi.Card("Recorded Payments","Select the payment you want to review or adjust.",AppTheme.ModuleAccent("Finance"));
         payments.Dock=DockStyle.Fill;
@@ -126,6 +129,18 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
         paymentLayout.Controls.Add(adjustmentCard,0,0);
         paymentLayout.Controls.Add(historyCard,0,1);
         paymentLayout.Controls.Add(eligibilityNote,0,2);
+        void FitAdjustmentCard()
+        {
+            int height=adjustmentCard.Padding.Vertical+adjustmentCard.Header.Height+
+                adjustmentCard.Content.Padding.Vertical+AppMetrics.FieldRowHeight+
+                Math.Max(AppMetrics.ButtonRowHeight,adjustmentButtons.Height+adjustmentButtons.Margin.Vertical)+
+                AppMetrics.SpacingSm*2;
+            if (Math.Abs(paymentLayout.RowStyles[0].Height-height)>1)
+                paymentLayout.RowStyles[0].Height=height;
+        }
+        adjustmentButtons.SizeChanged+=(_,_)=>FitAdjustmentCard();
+        adjustmentButtons.Layout+=(_,_)=>FitAdjustmentCard();
+        FitAdjustmentCard();
         paymentLayout.SizeChanged+=(_,_)=>eligibilityNote.MaximumSize=new Size(Math.Max(1,paymentLayout.ClientSize.Width-12),0);
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill,

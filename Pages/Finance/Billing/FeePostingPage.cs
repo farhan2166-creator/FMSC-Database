@@ -9,7 +9,7 @@ public sealed class FeePostingPage : V2Page
     private const string PostColumn = "__Post";
     /// <summary>A tickable eligible charge. StudentFeeAssignmentId + BillingMonth is the same pair UX_BillingCharges_ActivePeriod keys on, so it identifies exactly the row that would be created.</summary>
     private readonly record struct PostingKey(int StudentFeeAssignmentId, DateTime BillingMonth);
-    private readonly LookupBox academicYear = new();
+    private readonly LookupBox academicYear = new() { Enabled = false, TabStop = false };
     /// <summary>The months that can still be posted. LookupBox keys are integers, so each month is keyed as yyyymm (see BillingMonthKey) and shown as text.</summary>
     private readonly LookupBox monthBox = new();
     private readonly LookupBox campus = new();
@@ -297,8 +297,7 @@ public sealed class FeePostingPage : V2Page
                 "GetFeeTypes");
             await Task.WhenAll(yearsTask, campusesTask, classesTask, sectionsTask, feeTypesTask);
             DataTable years = await yearsTask;
-            academicYear.Bind(years, "AcademicYearId", "YearName");
-            HumanUi.SelectCurrentAcademicYear(academicYear, years);
+            HumanUi.BindCurrentAcademicYear(academicYear, years);
             // Classes and Sections are global lists (they are not per-campus), so they are bound unscoped - the same as the Class/Section filters on the other fee pages.
             campus.Bind(await campusesTask, "CampusId", "CampusName");
             klass.Bind(await classesTask, "ClassId", "ClassName");

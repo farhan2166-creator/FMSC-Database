@@ -90,8 +90,7 @@ public sealed class AdditionalFeePostingPage : V2Page
                 "GetFeeTypes");
             await Task.WhenAll(yearsTask, campusesTask, classesTask, sectionsTask, feeTypesTask);
             DataTable years = await yearsTask;
-            year.Bind(years, "AcademicYearId", "YearName");
-            HumanUi.SelectCurrentAcademicYear(year, years);
+            HumanUi.BindCurrentAcademicYear(year, years);
             campus.Bind(await campusesTask, "CampusId", "CampusName", "All campuses");
             klass.Bind(await classesTask, "ClassId", "ClassName", "All classes");
             section.Bind(await sectionsTask, "SectionId", "SectionName", "All sections");

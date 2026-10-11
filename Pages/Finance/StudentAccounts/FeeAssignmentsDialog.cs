@@ -875,12 +875,14 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
             submitting = false;
         }
     }
-    /// <summary>The one value this form edits, compared with the value it was loaded with. A form whose save is already under way is never dirty.</summary>
+    /// <summary>Compare the editable amount and month periods, ignoring the date pickers' hidden day and time.</summary>
     private bool IsDirty() =>
         !savedSuccessfully &&
         DialogResult != DialogResult.OK &&
         (discountAmount.Text != initialDiscountAmountText ||
-         fromMonth.Value != initialFrom || throughMonth.Value != initialThrough);
+         fullWaiver.Checked ||
+         monthly && (fromMonth.Value.Year != initialFrom.Year || fromMonth.Value.Month != initialFrom.Month ||
+                     throughMonth.Value.Year != initialThrough.Year || throughMonth.Value.Month != initialThrough.Month));
     /// <summary>asks at most once for a close gesture. True when the caller may proceed with the close.</summary>
     private bool ConfirmDiscard()
     {

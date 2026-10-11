@@ -19,6 +19,8 @@ internal sealed class ApplicationTitleBar : Panel
     {
         owner = form;
         Dock = DockStyle.Top;
+        TabStop = false;
+        buttons.TabStop = false;
         // Match the native caption height, rather than adding a second application header.
         Height = SystemInformation.CaptionHeight;
         title.Text = form.Text;
@@ -27,6 +29,7 @@ internal sealed class ApplicationTitleBar : Panel
         if (form.Icon is not null) logo.Image = form.Icon.ToBitmap();
         foreach (var button in new[] { minimize, maximize, close })
         {
+            button.TakesFocus = false;
             button.AutoSize = false;
             button.Width = Math.Max(40, (int)Math.Round(44f * form.DeviceDpi / 96f));
             button.Height = Height;

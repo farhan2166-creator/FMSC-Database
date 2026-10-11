@@ -78,6 +78,19 @@ public class ApplicationWindowForm : Form
                     FormFlow.ScheduleInitialFocus(this, this, () => Visible);
             }));
     }
+    protected override bool ProcessTabKey(bool forward)
+    {
+        Control scope = PageActionShortcutController.ActiveContent(this).Root;
+        if (scope != this && scope.ContainsFocus)
+        {
+            Control focused = scope;
+            while (focused.Controls.Cast<Control>().FirstOrDefault(child => child.ContainsFocus) is { } child)
+                focused = child;
+            // Wrap within the open page before the shell can select its navigation controls.
+            return scope.SelectNextControl(focused, forward, true, true, true);
+        }
+        return base.ProcessTabKey(forward);
+    }
     protected override bool ProcessDialogKey(Keys keyData)
     {
         // Controls first handle Escape for their own open dropdown or edit.

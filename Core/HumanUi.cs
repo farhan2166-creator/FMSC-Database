@@ -256,6 +256,23 @@ public static class HumanUi
         Dock = DockStyle.None,
         Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top
     };
+    public static void BindCurrentAcademicYear(LookupBox combo, DataTable table)
+    {
+        combo.Enabled = false;
+        combo.TabStop = false;
+        DataTable currentYears = table.Clone();
+        DataRow? current = table.Columns.Contains("IsCurrent")
+            ? table.AsEnumerable().FirstOrDefault(row =>
+                !row.IsNull("IsCurrent") && Convert.ToBoolean(row["IsCurrent"]))
+            : null;
+        if (current is not null) currentYears.ImportRow(current);
+        combo.DataSource = null;
+        combo.KeyColumn = "AcademicYearId";
+        combo.DisplayMember = "YearName";
+        combo.ValueMember = "AcademicYearId";
+        combo.DataSource = currentYears;
+        combo.SelectedIndex = currentYears.Rows.Count == 1 ? 0 : -1;
+    }
     public static void SelectCurrentAcademicYear(ModernComboBox combo, DataTable table)
     {
         if (combo is null || table is null ||
