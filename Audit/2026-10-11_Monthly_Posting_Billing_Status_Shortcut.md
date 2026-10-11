@@ -1,7 +1,0 @@
-# Monthly posting: billing status shortcut
-
-Post Monthly Fees now includes Check Billing Status. It opens the existing read-only report with the current academic year, campus and selected billing month, and runs the status check after lookups load. The posting preview and selected fees remain on the original page. A month must be chosen, and Fees.Reports.View permission is required. Missing campus/year lookup IDs prevent an automatic report with broader filters.
-
-Behavior verified against Database/Reference/Definitions/dbo.GetBillingCycleStatus.sql: the date selects its calendar month. The scope covers eligible active, billing-ready enrollments with an applicable monthly assignment and billing start. An enrollment counts as billed when at least one non-cancelled monthly charge exists in that month. This is not a check that every assigned fee has been posted. The linked report guidance explains that class, section and fee-type filters are not applied, and that one posted fee does not mean all fees are posted.
-
-No procedures, posting rules, assignments, amounts, due dates or SQL migrations changed. Application cross-target build and diff checks passed. Windows manual checks remain: select month/campus/year and open the shortcut, compare the displayed filters and results with the standalone Billing Status report, check All campus/year choices, permissions, no month, removed lookup IDs, closing during loading, and returning to the unchanged posting selections. Change filters in the report and confirm old data cannot be exported as current.

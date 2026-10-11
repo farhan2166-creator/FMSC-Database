@@ -1,8 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
-  <ItemGroup>
-    <Compile Include="../../Core/ReportScopeSelection.cs" Link="ReportScopeSelection.cs" />
-    <Compile Include="../../Pages/Reports/Students/StudentReportQuickViews.cs" Link="StudentReportQuickViews.cs" />
-    <None Include="../../Pages/Reports/Students/StudentReportsPage.Shape.cs" Link="StudentReportsPage.Shape.cs" CopyToOutputDirectory="PreserveNewest" />
-  </ItemGroup>
-</Project>
