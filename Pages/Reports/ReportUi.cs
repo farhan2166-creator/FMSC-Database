@@ -92,7 +92,7 @@ internal static class ReportUi
     public static int FilterCardChromeHeight =>
         10 + 10 + AppMetrics.CardHeaderHeight() + 6 + 10;
     public static Control Layout(Control filters, DataGridView grid, string resultTitle = "Report Results", params Control[] actionButtons)
-        => BuildLayout(filters, grid, resultTitle, false, actionButtons);
+        => BuildLayout(filters, grid, resultTitle, true, actionButtons);
     public static Control CompactLayout(Control filters, DataGridView grid, string resultTitle, params Control[] actionButtons)
         => BuildLayout(filters, grid, resultTitle, true, actionButtons);
     private static Control BuildLayout(Control filters, DataGridView grid, string resultTitle, bool compact, params Control[] actionButtons)
@@ -185,11 +185,12 @@ internal static class ReportUi
         RefreshFilterState();
         int buttonRowHeight = 0;
         TableLayoutPanel? compactBody = null;
+        TableLayoutPanel? compactButtons = null;
         if (compact)
         {
             filterCard.Content.Controls.Remove(filters);
             compactBody = new TableLayoutPanel {
-                Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Dock = DockStyle.Top, AutoSize = false,
                 ColumnCount = 1, RowCount = actionButtons.Length > 0 ? 2 : 1,
                 Margin = Padding.Empty, Padding = Padding.Empty
             };
@@ -206,8 +207,11 @@ internal static class ReportUi
             buttonRow.Dock = DockStyle.Top;
             if (compactBody is not null)
             {
+                compactButtons = buttonRow;
+                buttonRow.AutoSize = false;
+                buttonRow.Dock = DockStyle.Fill;
                 buttonRow.Margin = new Padding(0, UiDesignSystem.Spacing.Xs, 0, 0);
-                compactBody.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                compactBody.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
                 compactBody.Controls.Add(buttonRow, 0, 1);
             }
             else filterCard.Content.Controls.Add(buttonRow);
@@ -222,6 +226,7 @@ internal static class ReportUi
             Padding = new Padding(0),
             Margin = new Padding(0)
         };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, filters.Height + FilterCardChromeHeight + buttonRowHeight));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(filterCard, 0, 0);
@@ -235,9 +240,23 @@ internal static class ReportUi
                 fitting = true;
                 try
                 {
+                    // Measure the button flow at the available width instead of feeding
+                    // the card's current height back into an autosized table.
+                    int bodyHeight = filters.Height;
+                    compactBody.RowStyles[0].Height = bodyHeight;
+                    if (compactButtons is not null)
+                    {
+                        var flow = compactButtons.Controls.OfType<FlowLayoutPanel>().Single();
+                        int width = Math.Max(1, filterCard.Content.ClientSize.Width -
+                            compactButtons.Padding.Horizontal);
+                        int buttonsHeight = flow.GetPreferredSize(new Size(width, 0)).Height +
+                            flow.Margin.Vertical + compactButtons.Padding.Vertical;
+                        compactBody.RowStyles[1].Height = buttonsHeight + compactButtons.Margin.Vertical;
+                        bodyHeight += buttonsHeight + compactButtons.Margin.Vertical;
+                    }
+                    compactBody.Height = bodyHeight;
                     int height = filterCard.Padding.Vertical + filterCard.Header.Height +
-                        filterCard.Content.Padding.Vertical + compactBody.GetPreferredSize(
-                            new Size(Math.Max(1, filterCard.Content.ClientSize.Width), 0)).Height;
+                        filterCard.Content.Padding.Vertical + bodyHeight;
                     if (Math.Abs(root.RowStyles[0].Height - height) > 1)
                         root.RowStyles[0].Height = height;
                 }
@@ -245,7 +264,11 @@ internal static class ReportUi
             }
             compactBody.SizeChanged += (_, _) => FitFilterCard();
             compactBody.Layout += (_, _) => FitFilterCard();
+            filters.SizeChanged += (_, _) => FitFilterCard();
+            filterCard.Content.SizeChanged += (_, _) => FitFilterCard();
             filterCard.Header.SizeChanged += (_, _) => FitFilterCard();
+            if (compactButtons is not null)
+                compactButtons.Layout += (_, _) => FitFilterCard();
             root.SizeChanged += (_, _) => FitFilterCard();
             FitFilterCard();
         }
