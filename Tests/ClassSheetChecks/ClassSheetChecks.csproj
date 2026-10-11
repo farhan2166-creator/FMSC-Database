@@ -8,6 +8,7 @@
   <ItemGroup>
     <PackageReference Include="ReportViewerCore.NETCore" Version="15.1.33" />
     <Compile Include="../../Pages/Reports/Students/ClassSheetData.cs" Link="ClassSheetData.cs" />
+    <Compile Include="../../Pages/Reports/Students/MonthlyAttendanceSheetData.cs" Link="MonthlyAttendanceSheetData.cs" />
     <None Include="../../Pages/Reports/Templates/Class*Sheet.rdlc" Link="Reports/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

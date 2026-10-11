@@ -6,6 +6,10 @@ public sealed class ClassSheetsPage : V2Page
 {
     private readonly LookupBox campus = new(), year = new(), klass = new(), section = new();
     private readonly ModernComboBox sheet = HumanUi.Combo();
+    private readonly ModernDatePicker attendanceMonth = new() {
+        Format = DateTimePickerFormat.Custom, CustomFormat = "MMMM yyyy", ShowUpDown = true,
+        Value = DateTime.Today
+    };
     private readonly ModernTextBox exam = HumanUi.TextBox(false, 100), subject = HumanUi.TextBox(false, 100),
         examDate = HumanUi.TextBox(false, 50), teacher = HumanUi.TextBox(false, 100),
         search = HumanUi.TextBox(false, 100);
@@ -19,9 +23,9 @@ public sealed class ClassSheetsPage : V2Page
     private Scope CurrentScope() => new(campus.SelectedId, year.SelectedId, klass.SelectedId, section.SelectedId);
 
     public ClassSheetsPage() : base("Class Marks & Attendance Sheets",
-        "Choose students and print two matching copies on each A4 page.")
+        "Choose students and print marks or attendance sheets.")
     {
-        sheet.Items.AddRange(new object[] { "Marks Sheet", "Exam Attendance Sheet" });
+        sheet.Items.AddRange(new object[] { "Marks Sheet", "Exam Attendance Sheet", "Monthly Attendance Register" });
         sheet.SelectedIndex = 0;
         var load = AddBusyAction("Load Students", LoadStudentsAsync, "Primary");
         previewButton = AddBusyAction("Print Preview", PreviewAsync, "Secondary");
@@ -37,8 +41,33 @@ public sealed class ClassSheetsPage : V2Page
             ("Sheet", sheet), ("Exam (optional)", exam), ("Subject / Paper (optional)", subject),
             ("Date (optional)", examDate), ("Teacher (optional)", teacher), ("Find Student", search)
         };
+        var fieldOf = new Dictionary<Control, Control>();
+        var monthField = HumanUi.Field("Month", attendanceMonth, true);
+        monthField.Visible = false;
         for (int i = 0; i < inputs.Length; i++)
-            fields.Controls.Add(HumanUi.Field(inputs[i].Caption, inputs[i].Input, i < 4), i % 4, i / 4);
+        {
+            var field = HumanUi.Field(inputs[i].Caption, inputs[i].Input, i < 4);
+            fieldOf[inputs[i].Input] = field;
+            Control cell = field;
+            if (inputs[i].Input == exam)
+            {
+                var host = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
+                host.Controls.Add(field); host.Controls.Add(monthField);
+                cell = host;
+            }
+            fields.Controls.Add(cell, i % 4, i / 4);
+        }
+        void UpdateSheetFields()
+        {
+            bool monthly = sheet.SelectedIndex == 2;
+            monthField.Visible = monthly;
+            fieldOf[exam].Visible = fieldOf[subject].Visible = fieldOf[examDate].Visible = !monthly;
+            if (monthly) monthField.BringToFront();
+            SetPageHeaderText(string.Empty, monthly
+                ? "Print a monthly class register with blank daily attendance cells on landscape A4."
+                : "Print two matching marks or exam attendance sheets on each A4 page.");
+        }
+        sheet.SelectedIndexChanged += (_, _) => UpdateSheetFields();
         examDate.PlaceholderText = "Leave blank to write by hand";
         search.PlaceholderText = "Name / admission number";
         Grid.AutoGenerateColumns = false; Grid.ReadOnly = false;
@@ -60,8 +89,8 @@ public sealed class ClassSheetsPage : V2Page
             if (previewButton.Enabled && !CanPreviewSelection()) previewButton.Enabled = false;
         };
         search.TextChanged += (_, _) => FilterStudents();
-        var details = HumanUi.Card("Class and Exam Details",
-            "Choose a class and section. Exam details may be left blank for handwriting.");
+        var details = HumanUi.Card("Class and Sheet Details",
+            "Choose a class and section. Details below are used only for printing.");
         details.Content.Controls.Add(fields);
         var studentsCard = HumanUi.Card("Students to Print",
             "Uncheck students to exclude. Search narrows the list; checked hidden students remain included.");
@@ -74,7 +103,8 @@ public sealed class ClassSheetsPage : V2Page
         root.Controls.Add(details, 0, 0);
         root.Controls.Add(HumanUi.ButtonRow(load, selectAllButton, clearSelectionButton, previewButton), 0, 1);
         root.Controls.Add(studentsCard, 0, 2);
-        SetContent(root, "Load students, choose who to print, then open Print Preview. Exam details and selections are not saved to the database.");
+        SetContent(root, "Load students, choose who to print, then open Print Preview. Attendance is marked by hand on the printed sheet.");
+        UpdateSheetFields();
         UiHelper.SetGridPlaceholderMessage(Grid, "Choose a class and section, then press Load Students.");
         foreach (var filter in new[] { campus, year, klass, section })
             filter.SelectedIndexChanged += (_, _) => InvalidateRoster();
@@ -211,6 +241,8 @@ public sealed class ClassSheetsPage : V2Page
         int revision = rosterRevision;
         var selected = roster.Copy();
         bool attendance = sheet.SelectedIndex == 1;
+        bool monthly = sheet.SelectedIndex == 2;
+        DateTime month = attendanceMonth.Value;
         string examText = exam.Text, subjectText = subject.Text, dateText = examDate.Text, teacherText = teacher.Text;
         if (!selected.AsEnumerable().Any(row => row.Field<bool>("Include")))
         { Warn("Select at least one student to print."); return; }
@@ -220,10 +252,13 @@ public sealed class ClassSheetsPage : V2Page
             var school = await InstitutionProfile.GetNameAsync();
             if (IsDisposed || revision != rosterRevision) return;
             if (string.IsNullOrWhiteSpace(school)) { Warn("Check School Profile before printing class sheets."); return; }
-            var data = ClassSheetData.Create(selected, school, examText, subjectText, dateText, teacherText,
-                showFatherForMatchingNames: !attendance);
-            RdlcReportPreview.Show(FindForm(), attendance ? "Exam Attendance Sheet" : "Marks Sheet",
-                Path.Combine(AppContext.BaseDirectory, "Reports", attendance ? "ClassAttendanceSheet.rdlc" : "ClassMarksSheet.rdlc"),
+            var data = monthly ? MonthlyAttendanceSheetData.Create(selected, school, month, teacherText)
+                : ClassSheetData.Create(selected, school, examText, subjectText, dateText, teacherText,
+                    showFatherForMatchingNames: !attendance);
+            string title = monthly ? "Monthly Attendance Register" : attendance ? "Exam Attendance Sheet" : "Marks Sheet";
+            string template = monthly ? "ClassMonthlyAttendanceSheet.rdlc" : attendance ? "ClassAttendanceSheet.rdlc" : "ClassMarksSheet.rdlc";
+            RdlcReportPreview.Show(FindForm(), title,
+                Path.Combine(AppContext.BaseDirectory, "Reports", template),
                 "ClassSheetData", data);
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }

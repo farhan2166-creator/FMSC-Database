@@ -71,7 +71,7 @@ public sealed class ReportsHomePage : V2Page
                         () => new StudentReportsPage()),
                     new(
                         "Class Marks & Attendance Sheets",
-                        "A4 class and section lists with blank marks or attendance fields. Two copies per page.",
+                        "Print marks, exam attendance or monthly attendance registers for a class and section.",
                         "Students",
                         () => new ClassSheetsPage())
                 });

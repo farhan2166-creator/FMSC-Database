@@ -131,4 +131,60 @@ foreach (string kind in new[] { "Marks", "Attendance" })
     Check(Regex.Matches(html, "Page 3 of 3").Count == 2, "Continuation footer on both copies");
     Check(html.Contains("Midterm") && html.Contains("English") && html.Contains("Ms. Teacher"), "Optional details rendered");
 }
-Console.WriteLine($"PASS {checks} class-sheet checks, including both RDLC templates processed with no warnings.");
+foreach (var (month, days) in new[] { (new DateTime(2025, 2, 15), 28), (new DateTime(2024, 2, 1), 29),
+    (new DateTime(2026, 4, 30), 30), (new DateTime(2026, 1, 1), 31) })
+{
+    var monthly = MonthlyAttendanceSheetData.Create(Students(31), "School", month, "Teacher");
+    Check(monthly.Rows.Count == 60 && monthly.AsEnumerable().Select(row => row.Field<int>("PageKey")).Distinct().Count() == 2,
+        "Monthly register keeps 30 rows per page including blank final rows");
+    for (int day = 1; day <= 31; day++)
+        Check(monthly.AsEnumerable().All(row => row.Field<bool>($"DayEnabled{day:00}") == (day <= days)),
+            "Nonexistent dates are disabled on every page");
+    Check((string)monthly.Rows[30]["SerialNumber"] == "31" && (string)monthly.Rows[31]["StudentName"] == "",
+        "Monthly register preserves continuation numbering and blank slots");
+}
+Check(MonthlyAttendanceSheetData.Create(Students(0), "School", DateTime.Today, "").Rows.Count == 0,
+    "Empty monthly roster produces no pages");
+var monthlyChoices = ClassSheetData.CreateRoster(Students(31));
+monthlyChoices.Rows[0]["Include"] = false;
+monthlyChoices.DefaultView.RowFilter = "StudentName LIKE '%031%'";
+var monthlyData = MonthlyAttendanceSheetData.Create(monthlyChoices, "Sample School", new DateTime(2026, 1, 15), "Ms. Teacher");
+Check(monthlyData.Rows.Count == 30 && (string)monthlyData.Rows[0]["StudentName"] == "Student 002" &&
+    (string)monthlyData.Rows[29]["StudentName"] == "Student 031", "Monthly register honors exclusions and checked hidden students");
+Check((string)monthlyData.Rows[0]["DayHeader01"] == "1\nThu" && monthlyData.Rows[0].Field<bool>("DayEnabled03"),
+    "Weekdays are correct and weekend dates remain available");
+string monthlyPath = Path.Combine(AppContext.BaseDirectory, "Reports", "ClassMonthlyAttendanceSheet.rdlc");
+XNamespace reportNs = "http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";
+var monthlyDefinition = XDocument.Load(monthlyPath);
+Check(monthlyDefinition.Descendants(reportNs + "PageWidth").Single().Value == "29.7cm" &&
+    monthlyDefinition.Descendants(reportNs + "PageHeight").Single().Value == "21cm", "Monthly attendance is landscape A4");
+Check(monthlyDefinition.Descendants(reportNs + "BreakLocation").Single().Value == "Between", "Monthly page groups have explicit breaks");
+using var monthlyReport = new LocalReport { ReportPath = monthlyPath };
+monthlyReport.DataSources.Add(new ReportDataSource("ClassSheetData", monthlyData));
+string monthlyHtml = Encoding.UTF8.GetString(monthlyReport.Render("HTML4.0", null,
+    out _, out _, out _, out _, out var monthlyWarnings));
+Check(monthlyWarnings.Length == 0, "Monthly RDLC processes without warnings");
+for (int serial = 2; serial <= 31; serial++)
+    Check(Regex.Matches(monthlyHtml, $"Student {serial:000}(?![0-9])").Count == 1, "Each selected student appears once on the monthly register");
+Check(!monthlyHtml.Contains("Student 001") && !monthlyHtml.Contains("Former student") && !monthlyHtml.Contains("No enrollment"),
+    "Monthly print excludes unchecked, former and unenrolled students");
+Check(monthlyHtml.Contains("January 2026") && monthlyHtml.Contains("Ms. Teacher") && monthlyHtml.Contains("Signature"),
+    "Monthly headings, teacher and signature render");
+File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "MonthlyAttendancePreview.html"), monthlyHtml);
+var monthlyLongData = MonthlyAttendanceSheetData.Create(Students(61), "Sample School", new DateTime(2025, 2, 1), "Ms. Teacher");
+const string monthlyLongName = "Muhammad Abdullah Abdul Rehman Khan Muhammad Ali Hassan";
+monthlyLongData.Rows[0]["StudentName"] = monthlyLongName;
+monthlyReport.DataSources.Clear();
+monthlyReport.DataSources.Add(new ReportDataSource("ClassSheetData", monthlyLongData));
+string monthlyLongHtml = Encoding.UTF8.GetString(monthlyReport.Render("HTML4.0", null,
+    out _, out _, out _, out _, out var monthlyLongWarnings));
+Check(monthlyLongWarnings.Length == 0 && Regex.Matches(monthlyLongHtml, monthlyLongName).Count == 1,
+    "Long student names render completely on the monthly register");
+for (int serial = 2; serial <= 61; serial++)
+    Check(Regex.Matches(monthlyLongHtml, $"Student {serial:000}(?![0-9])").Count == 1,
+        "Monthly continuation pages contain each student once");
+Check(Regex.Matches(monthlyLongHtml, "Monthly Attendance Register").Count == 3 &&
+    Regex.Matches(monthlyLongHtml, "Page 3 of 3").Count == 1 && Regex.Matches(monthlyLongHtml, "Ms. Teacher").Count == 3,
+    "Monthly headings and teacher lines repeat on each page");
+File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "MonthlyAttendanceLongPreview.html"), monthlyLongHtml);
+Console.WriteLine($"PASS {checks} class-sheet checks, including all three RDLC templates processed with no warnings.");
