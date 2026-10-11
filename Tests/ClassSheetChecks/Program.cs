@@ -52,6 +52,33 @@ var roster = Students(61);
 var data = ClassSheetData.Create(roster, "Sample School", "  Midterm  ", " English ", "", " Ms. Teacher ");
 Check((string)data.Rows[0]["Exam"] == "Midterm" && (string)data.Rows[0]["Teacher"] == "Ms. Teacher", "Optional details trimmed");
 Check((string)data.Rows[0]["ExamDate"] == "", "Date can remain blank");
+var twins = Students(3);
+twins.Columns.Add("FatherName");
+twins.Rows[0]["StudentName"] = "Same Student";
+twins.Rows[0]["FatherName"] = "Zafar Father";
+twins.Rows[1]["StudentName"] = "Same Student";
+twins.Rows[1]["FatherName"] = "Alpha Father";
+twins.Rows[2]["StudentName"] = "A Unique Student";
+twins.Rows[2]["FatherName"] = "Unique Father";
+var twinRoster = ClassSheetData.CreateRoster(twins);
+var twinMarks = ClassSheetData.Create(twinRoster, "School", "", "", "", "", showFatherForMatchingNames: true);
+Check((string)twinMarks.Rows[0]["Name01"] == "A Unique Student", "Unique names stay plain and sort first by student name");
+Check((string)twinMarks.Rows[0]["Name02"] == "Same Student (Alpha Father)" &&
+    (string)twinMarks.Rows[0]["Name03"] == "Same Student (Zafar Father)", "Matching names show fathers and sort by father within student name");
+Check((string)ClassSheetData.Create(twinRoster, "School", "", "", "", "").Rows[0]["Name02"] == "Same Student",
+    "Attendance retains plain student names");
+twinRoster.Rows[2]["Include"] = false;
+Check((string)ClassSheetData.Create(twinRoster, "School", "", "", "", "", true).Rows[0]["Name02"] == "Same Student",
+    "Excluded students do not trigger matching-name labels");
+twinRoster.Rows[2]["Include"] = true;
+twinRoster.Rows[2]["StudentName"] = " same student ";
+Check((string)ClassSheetData.Create(twinRoster, "School", "", "", "", "", true).Rows[0]["Name03"] == "same student (Zafar Father)",
+    "Matching-name detection ignores case and surrounding spaces");
+twinRoster.Rows[2]["FatherName"] = DBNull.Value;
+Check(ClassSheetData.Create(twinRoster, "School", "", "", "", "", true).Rows[0].ItemArray.Contains("same student"),
+    "Missing father name stays plain without empty brackets");
+Check((string)ClassSheetData.Create(Students(1), "School", "", "", "", "", true).Rows[0]["Name01"] == "Student 001",
+    "A roster without father information remains printable");
 foreach (string kind in new[] { "Marks", "Attendance" })
 {
     string path = Path.Combine(AppContext.BaseDirectory, "Reports", $"Class{kind}Sheet.rdlc");
@@ -85,6 +112,18 @@ foreach (string kind in new[] { "Marks", "Attendance" })
         out _, out _, out _, out _, out var longWarnings));
     Check(longWarnings.Length == 0 && Regex.Matches(longHtml, longName).Count == 2,
         "Long names and entered headers render in both copies");
+    using var twinReport = new LocalReport { ReportPath = path };
+    twinReport.DataSources.Add(new ReportDataSource("ClassSheetData",
+        ClassSheetData.Create(twins, "School", "", "", "", "", showFatherForMatchingNames: kind == "Marks")));
+    string twinHtml = Encoding.UTF8.GetString(twinReport.Render("HTML4.0", null,
+        out _, out _, out _, out _, out var twinWarnings));
+    Check(twinWarnings.Length == 0, "Matching student names render without warnings");
+    if (kind == "Marks")
+        Check(Regex.Matches(twinHtml, Regex.Escape("Same Student (Alpha Father)")).Count == 2 &&
+            Regex.Matches(twinHtml, Regex.Escape("Same Student (Zafar Father)")).Count == 2,
+            "Father names appear in both marks-sheet copies");
+    else Check(!twinHtml.Contains("Alpha Father") && !twinHtml.Contains("Zafar Father"),
+        "Attendance rendering retains plain names");
 
     for (int serial = 1; serial <= 61; serial++)
         Check(Regex.Matches(html, $"Student {serial:000}(?![0-9])").Count == 2, "Every student appears once in each copy");

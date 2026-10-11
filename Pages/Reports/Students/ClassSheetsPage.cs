@@ -220,7 +220,8 @@ public sealed class ClassSheetsPage : V2Page
             var school = await InstitutionProfile.GetNameAsync();
             if (IsDisposed || revision != rosterRevision) return;
             if (string.IsNullOrWhiteSpace(school)) { Warn("Check School Profile before printing class sheets."); return; }
-            var data = ClassSheetData.Create(selected, school, examText, subjectText, dateText, teacherText);
+            var data = ClassSheetData.Create(selected, school, examText, subjectText, dateText, teacherText,
+                showFatherForMatchingNames: !attendance);
             RdlcReportPreview.Show(FindForm(), attendance ? "Exam Attendance Sheet" : "Marks Sheet",
                 Path.Combine(AppContext.BaseDirectory, "Reports", attendance ? "ClassAttendanceSheet.rdlc" : "ClassMarksSheet.rdlc"),
                 "ClassSheetData", data);

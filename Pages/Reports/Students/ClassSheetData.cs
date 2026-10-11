@@ -20,12 +20,13 @@ internal static class ClassSheetData
 
     private static IEnumerable<DataRow> OrderedStudents(DataTable students) => students.AsEnumerable()
         .Where(row => !row.IsNull("EnrollmentId") && Convert.ToString(row["EnrollmentStatus"]) == "Active")
-        .OrderBy(row => Convert.ToString(row["StudentName"]), StringComparer.CurrentCultureIgnoreCase)
+        .OrderBy(row => (Convert.ToString(row["StudentName"]) ?? "").Trim(), StringComparer.CurrentCultureIgnoreCase)
+        .ThenBy(row => students.Columns.Contains("FatherName") ? Convert.ToString(row["FatherName"]) : "", StringComparer.CurrentCultureIgnoreCase)
         .ThenBy(row => Convert.ToString(row["AdmissionNumber"]), StringComparer.OrdinalIgnoreCase)
         .ThenBy(row => Convert.ToInt32(row["AdmissionId"]));
 
     internal static DataTable Create(DataTable students, string schoolName,
-        string exam, string subject, string examDate, string teacher)
+        string exam, string subject, string examDate, string teacher, bool showFatherForMatchingNames = false)
     {
         var data = new DataTable("ClassSheetData");
         data.Columns.Add("PageKey", typeof(int));
@@ -40,6 +41,18 @@ internal static class ClassSheetData
         var roster = OrderedStudents(students)
             .Where(row => !students.Columns.Contains("Include") || row.Field<bool>("Include"))
             .ToArray();
+        var matchingNames = roster.GroupBy(row => (Convert.ToString(row["StudentName"]) ?? "").Trim(),
+                StringComparer.CurrentCultureIgnoreCase)
+            .Where(group => group.Count() > 1).Select(group => group.Key)
+            .ToHashSet(StringComparer.CurrentCultureIgnoreCase);
+        string PrintedName(DataRow student)
+        {
+            string name = (Convert.ToString(student["StudentName"]) ?? "").Trim();
+            string father = students.Columns.Contains("FatherName")
+                ? (Convert.ToString(student["FatherName"]) ?? "").Trim() : "";
+            return showFatherForMatchingNames && matchingNames.Contains(name) && father.Length > 0
+                ? $"{name} ({father})" : name;
+        }
         int pages = (roster.Length + StudentsPerPage - 1) / StudentsPerPage;
         for (int page = 0; page < pages; page++)
         {
@@ -56,7 +69,7 @@ internal static class ClassSheetData
                 int index = page * StudentsPerPage + slot;
                 row[$"Number{slot + 1:00}"] = index < roster.Length ? (index + 1).ToString() : "";
                 row[$"Name{slot + 1:00}"] = index < roster.Length
-                    ? Convert.ToString(roster[index]["StudentName"]) ?? "" : "";
+                    ? PrintedName(roster[index]) : "";
             }
             data.Rows.Add(row);
         }
