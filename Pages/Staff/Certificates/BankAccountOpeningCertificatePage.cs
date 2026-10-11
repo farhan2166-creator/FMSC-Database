@@ -129,7 +129,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
-                "Select the staff member, fill in the bank details and designation, then create the certificate. Staff Name, Father Name and CNIC come from the staff record; every other field can be changed later by selecting a row below.");
+                "Select staff; enter bank details and designation to create. Names and CNIC come from the staff record; select a saved row to edit other details.");
         var fields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -434,11 +434,11 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges
         if (hasSelection)
         {
             SetStatus(
-                "Editing an existing certificate. Save your changes with Update Certificate, or click New to create another one for this staff member.");
+                "Editing certificate. Use Update Certificate to save, or New for another certificate.");
             return;
         }
         SetStatus(
-            "Fill in the bank, branch, designation and purpose, then create the certificate. Select any certificate below to edit or print it.");
+            "Enter bank, branch, designation and purpose to create. Select a saved certificate to edit or print.");
     }
     private async Task CreateCertificate()
     {

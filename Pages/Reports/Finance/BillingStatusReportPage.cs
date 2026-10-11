@@ -11,7 +11,7 @@ public sealed class BillingStatusReportPage : V2Page
     {
         requestedScope = (academicYearId, campusId, billingMonth.Date);
         SetPageHeaderText(string.Empty,
-            "Checks the chosen campus and year. Class, section and fee type are not filtered. One posted fee does not mean all fees are posted.");
+            "Checks campus and year only. Class, section and fee type are unfiltered; one posted fee does not mean all are posted.");
     }
     public BillingStatusReportPage()
         : base(

@@ -549,7 +549,7 @@ public sealed class BulkPromotionPage : V2Page
         destinationClass.Bind(dt, "ClassId", "ClassName");
         if (later.Count == 0)
         {
-            SetStatus($"There is no later class than '{sourceClass.Text}' in the same academic program, so it has nowhere to be promoted into. Only Hold Back applies.", true);
+            SetStatus($"No later class in this program after '{sourceClass.Text}'. Only Hold Back is available.", true);
             return;
         }
         destinationClass.SelectedValue = Convert.ToInt32(later[0]["ClassId"]);
@@ -570,7 +570,7 @@ public sealed class BulkPromotionPage : V2Page
             /* The empty choice is a real one - every section of the class - so it says so instead of "-- Select --". */
             sourceSection.Bind(dt, "SectionId", "Display", "All sections");
             if (dt.Rows.Count == 0)
-                SetStatus("The chosen source class has no section at this campus, so there is nobody to load. Check the campus and class.", true);
+                SetStatus("No sections for this class at this campus. Check campus and class.", true);
         }
         catch (Exception ex) { Fail(ex); }
     }
@@ -784,7 +784,7 @@ public sealed class BulkPromotionPage : V2Page
                 row["Selected"] = true; row["Decision"] = "PROMOTE";
             }
             candidatesGrid.DataSource = candidateData;
-            var baseStatus = $"{candidateData.Rows.Count:N0} candidate(s) loaded. Select the whole class or process a subset. Unselected students remain available for another batch.";
+            var baseStatus = $"{candidateData.Rows.Count:N0} candidates. Select all or a subset; unselected students remain for another batch.";
             if (destClassId > 0)
             {
                 try
@@ -794,7 +794,7 @@ public sealed class BulkPromotionPage : V2Page
                     if (gaps.Rows.Count > 0)
                     {
                         var missing = string.Join(" and ", gaps.AsEnumerable().Select(r => Convert.ToString(r["FeeTypeName"])));
-                        SetStatus($"{baseStatus} ⚠ Destination class '{destinationClass.Text}' has no {missing} fee configured for this campus — promoted students won't be billed for it until it's set up.", true);
+                        SetStatus($"{baseStatus} ⚠ Set up {missing} fees for '{destinationClass.Text}' at this campus to bill promoted students.", true);
                         return;
                     }
                 }

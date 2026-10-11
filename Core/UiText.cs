@@ -23,11 +23,11 @@ public static class UiText
     /// <summary>Guidance connecting fee setup, student rates and billing.</summary>
     public static class Fees
     {
-        public const string SetupSteps = "Define fee types → Save class rates → Update existing student fee rates if needed → Post monthly fees.";
-        public const string MatrixScope = "Save Grid saves class rates only. Use Update Student Fee Rates for existing students, then Fee Posting to create monthly bills.";
+        public const string SetupSteps = "Define fee types → Save class rates → Update student rates if needed → Post monthly fees.";
+        public const string MatrixScope = "Save Grid saves class rates. Use Update Student Fee Rates for existing students; Fee Posting creates bills.";
         public const string MatrixSaved = "Class rates saved. Existing student fees and bills are unchanged.";
-        public const string StudentRateScope = "Updates existing student fee rates from the chosen month. To create monthly bills, use Fee Posting.";
-        public const string StudentRatesApplied = "No bills were created here. Use Fee Posting > Post Monthly Fees to create monthly bills.";
+        public const string StudentRateScope = "Update student rates from the chosen month. Use Fee Posting to create bills.";
+        public const string StudentRatesApplied = "No bills created. Use Fee Posting > Post Monthly Fees.";
     }
 
     /// <summary>Asking the operator for the thing an action needs before it can run. These are the sentences that appear on the most screens.</summary>
@@ -77,7 +77,7 @@ public static class UiText
     public static class Reports
     {
         public const string MatchesFilters = "Report matches the current filters.";
-        public const string FiltersChanged = "Filters changed since this report was run. Run the report again before exporting.";
+        public const string FiltersChanged = "Filters changed. Run the report again before exporting.";
     }
     /// <summary>The nine certificate screens (character, leave, college leave, date of birth, no objection, provisional, regular student, sports, regular lecturer and bank account) are separate pages with the same shape.</summary>
     public static class Certificates
@@ -90,9 +90,9 @@ public static class UiText
         public const string MarkCollected = "Mark Collected";
         /// <summary>Window title of an existing certificate.</summary>
         public const string Update = "Update Certificate";
-        public const string StudentGuidance = "Select a student and complete the details. Create a certificate, or select a saved one to edit or print.";
-        public const string StaffGuidance = "Select a staff member and complete the details. Create a certificate, or select a saved one to edit or print.";
-        public const string IssueGuidance = "Select a student and create the certificate. Use the available actions to issue another copy, record collection or print.";
+        public const string StudentGuidance = "Select a student to create a certificate. Select a saved certificate to edit or print.";
+        public const string StaffGuidance = "Select staff to create a certificate. Select a saved certificate to edit or print.";
+        public const string IssueGuidance = "Select a student to create a certificate. Then issue again, mark collected or print.";
         public const string IssueHistoryGuidance = "See who issued and collected each copy, and when.";
         public const string Details = "Certificate Details";
         public const string Date = "Certificate Date";

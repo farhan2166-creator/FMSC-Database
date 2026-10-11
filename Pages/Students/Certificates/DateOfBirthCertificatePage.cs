@@ -363,7 +363,7 @@ public sealed class DateOfBirthCertificatePage : V2Page
         if (hasStudent && !currentDateOfBirth.HasValue && !hasCertificate)
         {
             SetStatus(
-                "This student does not have a date of birth on record. Update the student's record before creating a certificate.",
+                "Add the student's date of birth to their record before creating a certificate.",
                 true);
             return;
         }
@@ -376,23 +376,23 @@ public sealed class DateOfBirthCertificatePage : V2Page
         {
             if (!selectedIssueCollected)
             {
-                SetStatus("This certificate has been issued but not collected. Mark it collected before printing or issuing it again.");
+                SetStatus("Not collected. Use Mark Collected before printing or issuing again.");
                 return;
             }
             if (IsLatestSelectedIssue())
             {
-                SetStatus("This certificate issuance has been collected. You may print it or issue the certificate again.");
+                SetStatus("Collected. Print this copy or use Issue Again.");
                 return;
             }
-            SetStatus("This certificate issuance has already been collected. You may print it.");
+            SetStatus("Collected. You may print this copy.");
             return;
         }
         if (latestIssueCollected)
         {
-            SetStatus("The latest certificate issuance has been collected. Select an issuance to print or issue the certificate again.");
+            SetStatus("Latest copy collected. Select a copy to print, or use Issue Again.");
             return;
         }
-        SetStatus("The current certificate issuance has not yet been collected.");
+        SetStatus("Current copy not collected.");
     }
     private bool IsLatestIssueCollected()
     {

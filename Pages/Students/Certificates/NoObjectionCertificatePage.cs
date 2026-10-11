@@ -113,7 +113,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
-                "Find the student and set the certificate date, then create the NOC. Student Name and Father Name come from the student's record; Certificate Date can be changed later by selecting a row below.");
+                "Select student and date to create the NOC. Names come from the student record; select a saved row to edit its date.");
         var fields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -349,10 +349,10 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         if (hasSelection)
         {
             SetStatus(
-                "Editing an existing NOC. Save your changes with Update Certificate, or click New to create another one for this student.");
+                "Editing NOC. Use Update Certificate to save, or New for another certificate.");
             return;
         }
-        SetStatus("Confirm the certificate date, then create the NOC. Select any certificate below to edit or print it.");
+        SetStatus("Confirm the date to create the NOC. Select a saved NOC to edit or print.");
     }
     private async Task CreateCertificate()
     {

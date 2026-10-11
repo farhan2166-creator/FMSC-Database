@@ -169,7 +169,7 @@ public sealed class CharacterCertificatePage : V2Page
         root.Controls.Add(records, 0, 1);
         SetContent(
             root,
-            UiText.Certificates.IssueGuidance + " The certificate is for the current academic year.");
+            UiText.Certificates.IssueGuidance + " Current academic year only.");
         ApplyWorkflowState();
     }
     private void StudentChanged()
@@ -397,15 +397,15 @@ public sealed class CharacterCertificatePage : V2Page
         }
         if (!eligibleClass)
         {
-            SetStatus("Character certificates can only be issued after passing Class 10 (SSC) or Class 12 (HSSC).");
+            SetStatus("Requires passing Class 10 (SSC) or Class 12 (HSSC).");
             return;
         }
         if (!examTypeChosen)
         {
             SetStatus(
                 hasCertificate
-                    ? "Select an issuance and choose SSC or HSSC wording before printing. Exam wording is chosen for each print; it is not saved with the certificate."
-                    : "Select the exam type (SSC or HSSC) and complete the certificate information to create the current-year character certificate.");
+                    ? "Select a copy and SSC/HSSC wording to print. Wording applies to this print only."
+                    : "Choose SSC/HSSC and complete the details to create the current-year certificate.");
             return;
         }
         if (!canIssue)
@@ -418,27 +418,27 @@ public sealed class CharacterCertificatePage : V2Page
         if (!hasCertificate)
         {
             SetStatus(
-                $"Complete the certificate information and create the {ExamTypeLabels[examType.SelectedIndex]} character certificate for the current academic year.");
+                $"Complete the details to create the current-year {ExamTypeLabels[examType.SelectedIndex]} certificate.");
             return;
         }
         if (hasSelectedIssue)
         {
             if (!selectedIssueCollected)
             {
-                SetStatus("This certificate has been issued but not collected. Mark it collected before printing or issuing it again.");
+                SetStatus("Not collected. Use Mark Collected before printing or issuing again.");
                 return;
             }
             if (IsLatestSelectedIssue())
             {
-                SetStatus("This certificate issuance has been collected. You may print it or issue the certificate again.");
+                SetStatus("Collected. Print this copy or use Issue Again.");
                 return;
             }
-            SetStatus("This certificate issuance has already been collected. You may print it.");
+            SetStatus("Collected. You may print this copy.");
             return;
         }
         /* Finding 6 - one per student, not one per exam type: say that plainly instead of naming the exam type the certificate does not record. */
         SetStatus(
-            "This student already has a character certificate. Select it to print, or choose Issue Again for another copy.");
+            "Certificate already exists. Select it to print, or use Issue Again for another copy.");
     }
     private bool IsLatestIssueCollectedFor(int certificateRecordId)
     {

@@ -225,7 +225,7 @@ public sealed class AuditLogsPage : V2Page
             if (!string.Equals(requestedFilters, AuditFilterSignature(), StringComparison.Ordinal))
             {
                 Grid.DataSource = null;
-                SetStatus("Filters changed while the audit was running - click Run Audit again to see the history for the filters now selected.", true);
+                SetStatus("Filters changed during the audit. Use Run Audit again for current filters.", true);
                 return;
             }
             Bind(rows);

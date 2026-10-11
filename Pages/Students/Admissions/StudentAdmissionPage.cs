@@ -776,14 +776,15 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         /* Finding a student is a toolbar job, not a panel: the quick-find box and the full finder come first, then the admission actions, then collecting and printing. */
         quickStudent.Dock = DockStyle.None;
         quickStudent.Width = AppScale.Scale(320);
+        // Keep the finder width independent of status text and action visibility.
+        quickStudent.MinimumSize = new Size(AppScale.Scale(320), 0);
+        quickStudent.MaximumSize = new Size(AppScale.Scale(320), 0);
         quickStudent.Margin = new Padding(
             4,
             Math.Max(0, (AppTheme.CompactButtonHeight - AppMetrics.InputControlHeight) / 2),
             4,
             0);
         Actions.Controls.Add(quickStudent);
-        /* The toolbar has to hold every button AND the status text beside it, so the search box takes whatever width is left. */
-        Actions.Layout += (_, _) => FitQuickFindWidth();
         findButton = AddBusyAction(
             "Find Student",
             OpenStudentSearchDialog,
@@ -1988,22 +1989,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         admissionDate.Enabled = currentAdmissionId <= 0;
         UpdateAdmissionEntryFlow();
     }
-    private void FitQuickFindWidth()
-    {
-        if (Actions.IsDisposed || quickStudent.IsDisposed || Actions.ClientSize.Width <= 0)
-            return;
-        int others = 0;
-        foreach (Control control in Actions.Controls)
-        {
-            if (!ReferenceEquals(control, quickStudent) && control.Visible)
-                others += control.Width + control.Margin.Horizontal;
-        }
-        int available =
-            Actions.ClientSize.Width - others - quickStudent.Margin.Horizontal - 2;
-        int width = Math.Clamp(available, AppScale.Scale(150), AppScale.Scale(320));
-        if (quickStudent.Width != width)
-            quickStudent.Width = width;
-    }
     /// <summary>A thin divider between groups of toolbar controls.</summary>
     private void AddToolbarSeparator()
     {
@@ -2196,7 +2181,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 automaticAdmissionNumber = preview ?? string.Empty;
                 admissionIdValue.Text = automaticAdmissionNumber;
                 admissionIdValue.PlaceholderText = string.Empty;
-                SetStatus("Next admission number preview. Select an academic year to calculate the suggestion for the admission date.");
+                SetStatus("Select an academic year for the admission number.");
                 return;
             }
             var plan=await AdmissionNumberPolicy.LoadAsync(date,yearId,HistoricalAdmission);
@@ -2208,10 +2193,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             admissionIdValue.PlaceholderText=string.Empty;
             if(plan.Error is not null) SetStatus(plan.Error,true);
             else if(HistoricalAdmission) SetStatus(plan.Suggested is not null
-                ? $"Suggested admission number: {plan.Suggested}. Verify it against the physical register, or enter the unused number recorded there."
-                : "Enter the unused admission number verified from the physical register.");
-            else if(plan.Suggested is not null) SetStatus($"Suggested admission number: {plan.Suggested}. Retain it or enter another unused number within this date's register sequence.");
-            else SetStatus("No number can be suggested for this date. Enter an unused historical register number within the surrounding date boundaries.",true);
+                ? $"Suggested: {plan.Suggested}. Verify with the register."
+                : "Enter the verified register admission number.");
+            else if(plan.Suggested is not null) SetStatus($"Suggested admission no.: {plan.Suggested}. Edit if needed.");
+            else SetStatus("Enter an unused register number for this date.",true);
         }
         catch (Exception ex)
         {
@@ -3640,7 +3625,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             var pending = await DatabaseHelper.QueryUserAsync("GetPendingReturnAdmissions");
             if (IsDisposed || version != admissionLoadVersion || currentAdmissionId != admissionId) return;
             confirmReturnButton.Visible = pending.AsEnumerable().Any(row => GetIntColumn(row, "AdmissionId") == admissionId);
-            FitQuickFindWidth();
         }
         catch (Exception ex)
         {

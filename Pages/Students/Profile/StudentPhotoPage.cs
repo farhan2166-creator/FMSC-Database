@@ -129,7 +129,7 @@ public sealed class StudentPhotoPage : V2Page
                 student.SelectedId != chosenAdmissionId)
             {
                 SetStatus(
-                    "The selected student changed while the photo was being read, so it was not attached. Choose the photo again.",
+                    "Student changed while loading the photo. Photo not attached; choose it again.",
                     true);
                 return;
             }

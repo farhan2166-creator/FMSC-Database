@@ -121,7 +121,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
-                "Find the student, enter the sport and performance, then create the certificate. All fields can be changed later by selecting a row below.");
+                "Select student; enter sport and performance to create. Select a saved row to edit any field.");
         var fields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -371,10 +371,10 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         if (hasSelection)
         {
             SetStatus(
-                "Editing an existing sports certificate. Save your changes with Update Certificate, or click New to create another one for this student.");
+                "Editing sports certificate. Use Update Certificate to save, or New for another.");
             return;
         }
-        SetStatus("Enter the sport and performance, then create the certificate. Select any certificate below to edit or print it.");
+        SetStatus("Enter sport and performance to create. Select a saved certificate to edit or print.");
     }
     private async Task CreateCertificate()
     {

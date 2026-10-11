@@ -20,7 +20,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges
         "The daily closing amounts or notes have not been submitted.";
 
     public DailyCollectionClosingPage() : base("Daily Collection Closing",
-        "Compare recorded payments with the day’s cash and bank totals. Student payments stay the same.")
+        "Reconcile daily cash and bank totals. Student payments stay unchanged.")
     {
         day.Value = DateTime.Today;
         AddClosingAction("Load Day", LoadAsync, "Primary");
@@ -40,7 +40,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges
         layout.Controls.Add(HumanUi.Field("Closing Date", day), 0, 0);
         layout.Controls.Add(new Label {
             Dock = DockStyle.Fill, Font = AppTheme.NormalFont,
-            Text = "Enter today's net cash counted (exclude opening float) and net amounts confirmed for Bank, Card, Online and Other. Blank means unchecked, not zero.\nRefund and Correction rows show recorded adjustments only. Their actual cells stay blank; describe their cash/bank impact in Notes.\nLater payment changes require a new closing revision; earlier submitted records are retained."
+            Text = "Enter net cash counted (exclude opening float) and confirmed net Bank, Card, Online and Other amounts. Blank = unchecked, not zero.\nRefund/Correction: leave actual amounts blank; explain cash/bank impact in Notes.\nPayment changes need a new closing revision; previous submissions are retained."
         }, 0, 1);
         layout.Controls.Add(Grid, 0, 2);
         layout.Controls.Add(totals, 0, 3);
@@ -62,7 +62,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges
         notes.TextChanged += (_, _) => { if (!loading) { dirty = true; UpdateActions(); } };
         day.ValueChanged += (_, _) => {
             UpdateActions();
-            if (!Current) SetStatus("Date changed — load the selected day before submitting, approving or printing.", true);
+            if (!Current) SetStatus("Date changed. Load Day before submitting, approving or printing.", true);
             else ShowClosingStatus();
         };
         Defer(LoadAsync);

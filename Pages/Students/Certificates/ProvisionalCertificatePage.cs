@@ -181,7 +181,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
-                "Find the student, choose exam type/year, and fill in the board result. Student Name, Father Name and Date of Birth come from the student's record; everything else can be changed later by selecting a row below.");
+                "Choose student and exam type/year; enter board results. Names and birth date come from the student record; select a saved row to edit other details.");
         var fields =
             new TableLayoutPanel {
                 Dock = DockStyle.Top,
@@ -936,11 +936,11 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         if (hasSelection)
         {
             SetStatus(
-                "Editing an existing certificate. Save your changes with Update Certificate, or click New to create another one for this student.");
+                "Editing certificate. Use Update Certificate to save, or New for another certificate.");
             return;
         }
         SetStatus(
-            "Fill in the exam/board result and check the subjects passed, then create the certificate. Select any certificate below to edit or print it.");
+            "Enter the board result and check passed subjects to create. Select a saved certificate to edit or print.");
     }
     private async Task CreateCertificate()
     {

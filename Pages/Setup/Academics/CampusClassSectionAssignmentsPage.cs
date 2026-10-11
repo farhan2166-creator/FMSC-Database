@@ -627,7 +627,7 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
             updatingMatrix = false;
             UpdateAssignmentSummary();
         }
-        SetStatus("Assignments updated on screen. Apply Changes to save, or Reset Changes to restore saved assignments.");
+        SetStatus("Unsaved assignments. Use Apply Changes to save or Reset Changes to restore.");
     }
 
     private void ResetChanges()

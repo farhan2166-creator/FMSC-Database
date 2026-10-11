@@ -6,7 +6,7 @@ public sealed class DuplicateStudentAuditPage : V2Page
     public DuplicateStudentAuditPage()
         : base(
             "Find Duplicate Students",
-            "Find students with matching names, father’s names and birth dates, then review possible duplicates.")
+            "Review possible duplicates with matching names, father’s names and birth dates.")
     {
         Grid.MultiSelect = true;
         var scan = AddBusyAction("Scan for Duplicates", ScanAsync, "Primary");
@@ -35,7 +35,7 @@ public sealed class DuplicateStudentAuditPage : V2Page
         buttonRow.Margin = new Padding(0, 0, 0, UiDesignSystem.Spacing.Sm);
         var card = HumanUi.Card(
             "Open Candidate Pairs",
-            "Compare Student 1 and Student 2, then select rows to Confirm Duplicate or Dismiss. Nothing is merged or deleted automatically.");
+            "Compare both students; select rows to Confirm Duplicate or Dismiss. No automatic merging or deletion.");
         var gridHost = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
         gridHost.Controls.Add(Grid);
         var recordsLayout = new TableLayoutPanel {

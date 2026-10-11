@@ -452,10 +452,10 @@ public partial class StudentReportsPage : V2Page
     };
     /* The one line above the filters: what this report is for, and the next step. */
     private static string ModeHint(string key) => key switch {
-        ModeAdmissions => "Admissions: pick the dates admitted (and a campus, class or section if you want), then press View Report.",
-        ModeStrength => "Choose what to count: active enrollments, all recorded enrollments, or former enrollments. Select a year and optionally Compare To, then press View Report.",
-        ModeChanges => "Movement: pick the dates to look at, then press View Report. Group by Change type to see totals.",
-        _ => "Student list: press View Report for everyone, or narrow it with the boxes below. Use Columns to choose what to show."
+        ModeAdmissions => "Choose admission dates and optional campus/class/section filters, then View Report.",
+        ModeStrength => "Count active, all or former enrollments. Select a year and optional Compare To, then View Report.",
+        ModeChanges => "Choose movement dates, then View Report. Group by Change type for totals.",
+        _ => "Use View Report for all students or filter below. Use Columns to choose details."
     };
     private static string ModeTitle(string key) => key switch {
         ModeAdmissions => "Admissions",

@@ -114,7 +114,7 @@ public sealed class LeaveCertificatePage : V2Page
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
-                "Create a certificate for an active student or a former student without one. Creating it marks the student Left and records the first issue.");
+                "Create for an active student or former student without a certificate. Creation marks the student Left and records the first issue.");
         var fields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -549,15 +549,15 @@ public sealed class LeaveCertificatePage : V2Page
         {
             if (!selectedIssueCollected)
             {
-                SetStatus("This certificate has been issued but not collected. Mark it collected before printing or issuing it again.");
+                SetStatus("Not collected. Use Mark Collected before printing or issuing again.");
                 return;
             }
             if (IsLatestSelectedIssue())
             {
-                SetStatus("This certificate issuance has been collected. You may print it or issue the certificate again.");
+                SetStatus("Collected. Print this copy or use Issue Again.");
                 return;
             }
-            SetStatus("This certificate issuance has already been collected. You may print it.");
+            SetStatus("Collected. You may print this copy.");
             return;
         }
         if (!hasCertificateForThisLeaving)
@@ -600,10 +600,10 @@ public sealed class LeaveCertificatePage : V2Page
         }
         if (latestIssueCollected)
         {
-            SetStatus("The latest certificate issuance has been collected. Select an issuance to print or issue the certificate again.");
+            SetStatus("Latest copy collected. Select a copy to print, or use Issue Again.");
             return;
         }
-        SetStatus("The current certificate issuance has not yet been collected.");
+        SetStatus("Current copy not collected.");
     }
     /// <summary>Finding 4 - true when this student's CURRENT leaving episode already has a certificate of this type, which is exactly what dbo.CreateLeaveCertificate refuses (57013).</summary>
     private bool HasCertificateForCurrentEnrollment()

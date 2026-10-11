@@ -67,7 +67,7 @@ internal sealed class PromotionSectionMappingDialog : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppScale.Scale(55)));
         root.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonRowHeight));
-        root.Controls.Add(new Label { Dock=DockStyle.Fill,Text="Choose where each source section goes. You can change suggested matches or send multiple sections to one destination. Held-back students keep their existing class and section." },0,0);
+        root.Controls.Add(new Label { Dock=DockStyle.Fill,Text="Map each source section to a destination; multiple sections may share one. Held-back students keep their class and section." },0,0);
         root.Controls.Add(grid,0,1);
         var actions=HumanUi.ButtonRow(continueButton,cancel); actions.Dock=DockStyle.Fill; actions.Margin=Padding.Empty;
         root.Controls.Add(actions,0,2);

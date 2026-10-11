@@ -689,7 +689,7 @@ public sealed class StudentAccountStatementPage : V2Page
         if (current)
             SetStatus("Statement matches the current filters and student selection.");
         else
-            SetStatus("Filters or the student selection changed since this statement was loaded. Click Generate Statement again before exporting.", true);
+            SetStatus("Filters or student changed. Use Generate Statement again before exporting.", true);
     }
     private async Task BindContextLookups()
     {

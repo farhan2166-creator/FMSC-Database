@@ -14,7 +14,7 @@ public sealed class UnpostedFeesReportPage : V2Page
     public UnpostedFeesReportPage()
         : base(
             PageTitles.UnpostedFees,
-            "Review fees due by the selected date that have not been charged. This report makes no changes.")
+            "Review uncharged fees due by the selected date. Read-only report.")
     {
         Grid.MultiSelect = true;
         asOfDate.Value = DateTime.Today;

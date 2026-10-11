@@ -75,7 +75,7 @@ public sealed class PromotionHistoryPage : V2Page
         if (current)
             SetStatus("Batch history matches the current filters.");
         else
-            SetStatus("Filters changed since this history was loaded. Click Load again before exporting.", true);
+            SetStatus("Filters changed. Use Load again before exporting.", true);
     }
     private void BindLookups()
     {

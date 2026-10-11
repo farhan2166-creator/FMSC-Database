@@ -275,7 +275,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         probableAdmissionNumber.BackColor = AppTheme.SurfaceSecondary;
         probableAdmissionNumberField = HumanUi.Field("Probable New Admission Number", probableAdmissionNumber);
         UiAccessibility.Describe(probableAdmissionNumber, "Probable new admission number",
-            "Preview only. The final number is allotted when readmission is saved and can change if another admission is saved first.");
+            "Preview only. Number assigned on save; another admission may change it.");
         readmissionNumberChoice.SelectedIndexChanged += async (_, _) => {
             UpdateVisibility();
             await RefreshAdmissionNumberPreviewAsync();
@@ -331,7 +331,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         history.TabIndex = 2;
         SetContent(
             root,
-            "Choose a transfer within the same academic year, or Re-Admit for a returning student in a new year. Review the details before confirming.");
+            "Transfer within the same year; Re-Admit in a new year. Review before confirming.");
         if (fixedOperation is not null)
         {
             PrepareForEmbedding();

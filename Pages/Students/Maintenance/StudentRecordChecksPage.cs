@@ -455,7 +455,7 @@ public sealed class StudentRecordChecksPage : V2Page
         Grid.CurrentCell=null;Grid.ClearSelection();
         classSection.SelectedIndex=-1;academicYear.SelectedIndex=-1;enrollmentStatusCombo.SelectedItem="Active";
         enrollmentDate.Value=DateTime.Today;leavingDate.Checked=false;billingStartDate.Checked=false;allowLegacyDates.Checked=false;enrollmentReason.Clear();
-        enrollmentSelection.Text="Add a genuinely missing enrollment. Review existing records before creating.\nThis creates no fee assignments or bills; billing start is configured separately.";
+        enrollmentSelection.Text="Review existing records before adding a missing enrollment.\nNo fees or bills are created; configure billing start separately.";
         UpdateEnrollmentActions();OpenCorrections(CorrectionTab.Enrollment);
     }
     private async Task RepairDatesFromEditor()

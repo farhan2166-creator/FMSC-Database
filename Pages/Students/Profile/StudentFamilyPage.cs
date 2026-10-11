@@ -38,7 +38,7 @@ public sealed class StudentFamilyPage : V2Page
     public StudentFamilyPage() : this(0) { }
     public StudentFamilyPage(int preloadAdmissionId) : base(
         "Family / Siblings",
-        "Manage family groups and siblings. Start a new family from Student Admissions > Fees & Siblings.")
+        "Manage families and siblings. Create families in Student Admissions > Fees & Siblings.")
     {
         var refresh = AddBusyAction(UiText.Actions.Refresh, async () => {
             if (student.SelectedId <= 0) { Warn(UiText.Prompts.SelectStudent); return; }

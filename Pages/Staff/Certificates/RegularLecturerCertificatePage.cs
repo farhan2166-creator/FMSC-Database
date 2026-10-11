@@ -91,7 +91,7 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
-                "Select the staff member, confirm their designation and the subject taught, then create the certificate. Staff Name and Father Name come from the staff record; the rest can be changed later by selecting a row below.");
+                "Select staff; confirm designation and subject to create. Names come from the staff record; select a saved row to edit other details.");
         var fields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -375,11 +375,11 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
         if (hasSelection)
         {
             SetStatus(
-                "Editing an existing certificate. Save your changes with Update Certificate, or click New to create another one for this staff member.");
+                "Editing certificate. Use Update Certificate to save, or New for another certificate.");
             return;
         }
         SetStatus(
-            "Confirm designation, subject taught and the certificate date, then create the certificate. Select any certificate below to edit or print it.");
+            "Confirm designation, subject and date to create. Select a saved certificate to edit or print.");
     }
     private void CreateCertificate()
     {

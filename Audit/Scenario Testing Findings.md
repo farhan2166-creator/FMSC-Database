@@ -247,3 +247,23 @@ User decision: clicking Clear / New already authorizes discarding the current ed
 Busy/save guards and baseline recapture remain. Regular Student New Certificate bypasses the separate Next Student confirmation explicitly. Next Student/Next Staff Member, record selection, refresh/reload, page navigation and modal close confirmations retain their existing behavior. Reset actions clear the editor; they do not delete saved records or financial entries. Updated the admission button accessibility description to reflect immediate discard.
 
 Verification: reviewed the changed handlers and their callers, including Regular Student New's indirect ClearForm path; application build passed with zero warnings/errors and git diff whitespace check passed. No production database changes. Interactive WinForms verification was not performed.
+
+## Admission finder width consistency — 12 October 2026
+
+The admission toolbar search field was recalculated by FitQuickFindWidth during every Actions.Layout and after Confirm Return availability changed. Its width depended on current toolbar/status allocation and visible controls, making it change between 150 and 320 scaled pixels after actions. Removed this page-specific fitting logic and fixed the field's width/minimum/maximum width at 320 scaled pixels. The shared toolbar and status placement remain unchanged. Shortened admission-number guidance in its current status location.
+
+Verification: no remaining dynamic quickStudent width assignments or FitQuickFindWidth call sites; application build passed with zero warnings/errors; whitespace check passed. Narrow windows retain the shared toolbar's existing wrap behavior. No database changes. Interactive WinForms action/resize checks were not performed.
+
+## Cross-page field-width review — 12 October 2026
+
+Searched page/shared-control layout handlers and field Width/Size assignments for the admission pattern: resizing an input according to currently visible actions/status text. No additional instance of that rule was found. Reviewed certificate fields, shared master-record editor, report filters, Student Account Statement, fee tools and campus/class/section assignments.
+
+Certificate and master-editor column reflow depends on available container width, rather than save/clear status text. Provisional Certificate has explicit viewport-width breakpoints; report filter arrangement likewise depends on viewport width and a fixed field count. Student Account Statement avoids repeated reflow when its viewport size has not changed. Picker and combo item text measurement changes popup/dropdown width, not the input field width. Other reviewed layout handlers size cards, grids, labels or button rows.
+
+No further input-width code change was justified from this source review. The shared toolbar remains unchanged per the user's instruction. This does not certify runtime action stability on every page: scrollbar/container changes can still alter responsive widths, and interactive checks at fixed window size remain unperformed.
+
+## Concise guidance review — 12 October 2026
+
+Shortened shared fee/certificate/report guidance and page-specific hints across certificates, student reports, billing reports, daily closing, promotion, transfers, family records, duplicate review and student maintenance. Guidance stays in its existing location; shared layout controls and field sizing were not changed in this pass. Retained collection-before-printing rules, current-year certificate scope, saved certificate data provenance, fee effective-month restrictions, closing revisions and blank-versus-zero reconciliation guidance. Confirmation dialogs and payment recovery warnings were not changed.
+
+Verification: application build passed with zero warnings/errors; git diff whitespace check passed. Changes are wording only, with no database writes or business-logic changes. Interactive visual verification across the running pages was not performed.

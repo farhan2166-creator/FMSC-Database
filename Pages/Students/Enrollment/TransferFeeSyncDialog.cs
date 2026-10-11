@@ -188,7 +188,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
             summary.Controls.Add(value, 1, row);
         }
         var note = new Label {
-            Text = "Preview your choice below. Existing bills and payments stay unchanged; changed fees must start after their last billed month.",
+            Text = "Preview below. Bills and payments stay unchanged; new rates start after the last billed month.",
             Dock = DockStyle.Top,
             AutoSize = true,
             Font = AppTheme.NormalFont,

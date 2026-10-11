@@ -132,7 +132,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
-                "Date of Birth and Class come from the student's school record. Existing certificates retain the class recorded when they were issued.");
+                "Birth date and class come from the student record. Saved certificates keep their issued class.");
         var fields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -419,7 +419,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         if (!hasStudent)
         {
             SetStatus(
-                UiText.Prompts.SearchForStudent + " Students without a date of birth are not listed - add the date of birth on the student's record first.");
+                UiText.Prompts.SearchForStudent + " Students need a date of birth on record to appear here.");
             return;
         }
         if (hasSelection)
@@ -435,8 +435,8 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         SetStatus(
             !string.IsNullOrWhiteSpace(status) &&
             !string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase)
-                ? $"This student is marked {status}. Confirm the class, then create the certificate - you will be asked to confirm. Select any certificate below to edit or print it."
-                : "Confirm the class, then create the certificate. Select any certificate below to edit or print it.");
+                ? $"Student status: {status}. Confirm the class; creation requires confirmation. Select a saved certificate to edit or print."
+                : "Confirm the class to create. Select a saved certificate to edit or print.");
     }
     /// <summary>Finding 8 - the status of the selected student, from the row the picker was bound from. Empty when it is not known; no query is made.</summary>
     private string GetSelectedStudentStatus()
