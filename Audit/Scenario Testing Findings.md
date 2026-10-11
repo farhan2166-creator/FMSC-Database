@@ -228,3 +228,14 @@ The final outcomes follow below. Failed invariants are audit evidence, not produ
 | Report Charges detail/summary reconciliation | PASS |
 | Report Students detail/summary reconciliation | PASS |
 | Report Aging detail/summary reconciliation | PASS |
+
+## Action-button availability pass — 11 October 2026
+
+User requested that actions requiring data be disabled before their prerequisites exist, while retaining click-time validation.
+
+- Admissions: Collect Payment requires a saved student, navigation support and Fees.Collect permission. Print and enrollment Actions require a saved student; enrollment Actions also require the applicable permission. Add/find sibling requires a saved student and Students.Administer permission. These states are recalculated on initialization, load, save and clear/new, and disabled during saves. Existing click-time and individual menu-item guards remain.
+- Family/Siblings: Remove Selected Member requires a selected member card, rather than merely a loaded family. Add/remove are held during a family write and their availability is recalculated after it finishes, including after the selected card is cleared by reloading.
+- Student Account Statement: Generate Statement and Print Amounts Due require at least one included student, including students retained from earlier searches and family selections. Clearing selections or starting over disables both. Amounts Due stays disabled during its print preparation.
+- Reviewed certificate pages, duplicate-student resolution, campus/class/section assignment and fee collection already contain prerequisite-driven guards. This pass is not a claim that every action in every page has been manually exercised.
+
+Validation: application build passed with zero warnings/errors; git diff whitespace check passed. State transitions and permission guards were reviewed in source. No interactive WinForms checks or production database writes were performed for this pass.

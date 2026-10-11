@@ -280,6 +280,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly ContextMenuStrip printMenu = new StyledContextMenu();
     private readonly ContextMenuStrip enrollmentActionsMenu = new StyledContextMenu();
     private ModernButton? confirmReturnButton;
+    private ModernButton? collectPaymentButton;
+    private ModernButton? admissionPrintButton;
+    private ModernButton? enrollmentActionsButton;
     /// <summary>The admission form is the largest in the application and had no unsaved-changes protection at all.</summary>
     private List<AdmissionPart>? _admissionBaseline;
     /// <summary>One comparable piece of the form: what it is, for the diagnostic, and the value the operator can change.</summary>
@@ -806,7 +809,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             "Retain campus, academic year, class and section for Clear / New and Save & New. Student details and discounts are cleared.");
         AddToolbarSeparator();
         /* Collect the fee once the admission is saved, then print - the order the work happens in. */
-        ModernButton? enrollmentActionsButton = null;
         foreach (string operation in new[] { "Transfer Section", "Transfer Class", "Transfer Campus", "Re-Admit" })
         {
             var item = enrollmentActionsMenu.Items.Add(operation);
@@ -826,7 +828,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         confirmReturnButton = AddBusyAction("Confirm Return", OpenConfirmReturnAsync, "Success");
         confirmReturnButton.Visible = false;
         GateAction(confirmReturnButton, "Students.Administer");
-        var collectPaymentNow = AddAction(
+        collectPaymentButton = AddAction(
             "Collect Payment",
             (_, _) => CollectPaymentNow(),
             "Success");
@@ -842,15 +844,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             await RunBusyAsync(
                 "Preparing admission form…",
                 PrintAdmissionForm);
-        ModernButton? printButton = null;
-        printButton = AddAction(
+        admissionPrintButton = AddAction(
             "Print ▾",
-            (_, _) => printMenu.Show(printButton!, new Point(0, printButton!.Height)),
+            (_, _) => printMenu.Show(admissionPrintButton!, new Point(0, admissionPrintButton!.Height)),
             "Secondary");
         /* this page is reached with Students.Admit. New Admission and Clear are local and stay. */
         GateActionAny(saveButton, "Students.Admit", "Students.Administer");
         GateAction(saveAndNewButton, "Students.Admit");
-        GateAction(collectPaymentNow, "Fees.Collect");
+        GateAction(collectPaymentButton, "Fees.Collect");
         UseWrappingToolbar();
         SetActionButtonImage("Find Student", "⌕");
         SetActionButtonImage("Clear / New", "＋");
@@ -2022,6 +2023,15 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     /// <summary>Shows the student's status in the Student &amp; Family Information header: "New Admission" until a student is loaded, then the stored status, coloured by what it says…</summary>
     private void UpdateStudentWorkspace()
     {
+        bool savedStudentReady = currentAdmissionId > 0 && !saveBusy;
+        if (collectPaymentButton is not null)
+            collectPaymentButton.Enabled = savedStudentReady && _navigate is not null && CurrentUser.HasPermission("Fees.Collect");
+        if (admissionPrintButton is not null)
+            admissionPrintButton.Enabled = savedStudentReady;
+        if (enrollmentActionsButton is not null)
+            enrollmentActionsButton.Enabled = savedStudentReady &&
+                (CurrentUser.HasPermission("Enrollment.Manage") || CurrentUser.HasPermission("Students.Administer"));
+        findSiblingButton.Enabled = savedStudentReady && CurrentUser.HasPermission("Students.Administer");
         if (saveAndNewButton is not null)
             saveAndNewButton.Enabled = !saveBusy && currentAdmissionId <= 0;
         string text;
@@ -4063,6 +4073,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         if (saveBusy)
             return;
         saveBusy = true;
+        UpdateStudentWorkspace();
         savedAdmissionReadyForNext = false;
         if (saveButton is not null)
             saveButton.Enabled = false;

@@ -45,9 +45,9 @@ public sealed class StudentFamilyPage : V2Page
             await LoadFamilyForSelectedStudentAsync();
         }, "Secondary");
         /* adding a member writes a sibling link; the button is disabled while it runs so a double click cannot attempt it twice. */
-        var addMember = AddBusyAction("Add Member", AddMemberAsync, "Success");
+        var addMember = AddAction("Add Member", async (_, _) => await RunFamilyActionAsync(AddMemberAsync), "Success");
         /* removing a member deletes a sibling link, so it is guarded like adding one. */
-        var removeMember = AddBusyAction("Remove Selected Member", RemoveSelectedMemberAsync, "Danger");
+        var removeMember = AddAction("Remove Selected Member", async (_, _) => await RunFamilyActionAsync(RemoveSelectedMemberAsync), "Danger");
         /* The page is reachable with Students.Family, but adding and removing family members goes to procedures that require Students.Administer (dbo.AddStudentSibling / dbo.DeleteStudentSibling). */
         GateAction(addMember, "Students.Administer");
         GateAction(removeMember, "Students.Administer");
@@ -173,6 +173,22 @@ public sealed class StudentFamilyPage : V2Page
     /* Item 14 - an action GateAction has taken away stays taken away: that decision is the permission's, not this page's. */
     private readonly bool _canChangeFamily =
         CurrentUser.HasPermission("Students.Administer");
+    private bool familyActionBusy;
+    private async Task RunFamilyActionAsync(Func<Task> action)
+    {
+        if (familyActionBusy) return;
+        familyActionBusy = true;
+        try
+        {
+            using var busy = BeginBusy("Updating family…", _addMemberButton, _removeMemberButton, student);
+            await action();
+        }
+        finally
+        {
+            familyActionBusy = false;
+            if (!IsDisposed) SetFamilyActionsEnabled(currentMemberAdmissionIds.Count > 0);
+        }
+    }
     private void SetFamilyActionsEnabled(bool enabled)
     {
         if (!_canChangeFamily)
@@ -180,12 +196,12 @@ public sealed class StudentFamilyPage : V2Page
         if (_addMemberButton is not null &&
             !_addMemberButton.IsDisposed)
         {
-            _addMemberButton.Enabled = enabled;
+            _addMemberButton.Enabled = enabled && !familyActionBusy;
         }
         if (_removeMemberButton is not null &&
             !_removeMemberButton.IsDisposed)
         {
-            _removeMemberButton.Enabled = enabled;
+            _removeMemberButton.Enabled = enabled && !familyActionBusy && selectedCard is not null;
         }
     }
     private async Task LoadFamilyForSelectedStudentAsync()
@@ -297,6 +313,7 @@ public sealed class StudentFamilyPage : V2Page
         selectedCard?.SetSelected(false);
         selectedCard = card;
         card.SetSelected(true);
+        SetFamilyActionsEnabled(currentMemberAdmissionIds.Count > 0);
         SetStatus($"Selected {card.StudentName}. Use Remove Selected Member to remove them from this family.");
     }
     private static string BuildClassSection(DataRow row)

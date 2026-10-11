@@ -53,6 +53,8 @@ public sealed class StudentAccountStatementPage : V2Page
     private int contextLoadVersion;
     private FormValidator? statementDateValidator;
     private readonly ModernButton exportButton;
+    private ModernButton? generateStatementButton;
+    private ModernButton? printAmountsDueButton;
     /* The filter values that produced the statement currently in the grid. Empty until a statement has actually been loaded for this page. */
     private string _appliedFilterSignature = string.Empty;
     private readonly HashSet<int> manuallySelectedAdmissionIds =
@@ -169,6 +171,9 @@ public sealed class StudentAccountStatementPage : V2Page
             CreateFilterButton("Generate Statement", AppTheme.Success);
         var dueReportButton =
             CreateFilterButton("Print Amounts Due", AppTheme.Primary);
+        generateStatementButton = viewButton;
+        printAmountsDueButton = dueReportButton;
+        UpdateSelectionActions();
         var clearButton =
             CreateFilterButton("Start Over", AppTheme.MutedText);
         /* this is also the one place that takes off ticks the current list does not show, so the button says so rather than leaving the operator to hunt for them. */
@@ -676,6 +681,7 @@ public sealed class StudentAccountStatementPage : V2Page
     /* report the displayed statement as stale the moment the selection or dates no longer match the values that produced it. */
     private void OnFiltersChanged()
     {
+        UpdateSelectionActions();
         if (string.IsNullOrEmpty(_appliedFilterSignature))
             return;
         bool current = string.Equals(_appliedFilterSignature, FilterSignature(), StringComparison.Ordinal);
@@ -1056,10 +1062,12 @@ public sealed class StudentAccountStatementPage : V2Page
                 false;
         }
         SetStatus("Student and family selections cleared.");
+        UpdateSelectionActions();
     }
     /// <summary>The ticks survive a new search on purpose (search one family, tick it, search the next).</summary>
     private string SelectionCountText()
     {
+        UpdateSelectionActions();
         int includedTotal =
             GetSelectedAdmissionIds().Count;
         if (includedTotal == 0)
@@ -1078,6 +1086,12 @@ public sealed class StudentAccountStatementPage : V2Page
         return hidden > 0
             ? $" {includedTotal:N0} student(s) ticked in total ({hidden:N0} not shown in the current list)."
             : $" {includedTotal:N0} student(s) ticked in total.";
+    }
+    private void UpdateSelectionActions()
+    {
+        bool hasStudents = GetSelectedAdmissionIds().Count > 0;
+        if (generateStatementButton is not null) generateStatementButton.Enabled = hasStudents;
+        if (printAmountsDueButton is not null) printAmountsDueButton.Enabled = hasStudents && !printingDueReport;
     }
     private List<int> GetSelectedAdmissionIds()
     {
@@ -1565,6 +1579,7 @@ public sealed class StudentAccountStatementPage : V2Page
         if (printingDueReport || IsDisposed)
             return;
         printingDueReport = true;
+        UpdateSelectionActions();
         try
         {
             if (from.Checked && to.Checked && to.Value.Date < from.Value.Date)
@@ -1611,6 +1626,7 @@ public sealed class StudentAccountStatementPage : V2Page
         finally
         {
             printingDueReport = false;
+            UpdateSelectionActions();
         }
     }
     private sealed class DueReportRow
@@ -1981,6 +1997,7 @@ public sealed class StudentAccountStatementPage : V2Page
         _appliedFilterSignature =
             string.Empty;
         SetReportActionsEnabled(false);
+        UpdateSelectionActions();
         SetStatus(
             "Form cleared - every ticked student, including ticks carried over from earlier searches, "
             + "has been cleared. Click Search Students for all students, or use filters to narrow the results.");
