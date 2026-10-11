@@ -166,6 +166,7 @@ public partial class StudentReportsPage
         new("StudentName", "Student", "Identity", true),
         new("FatherName", "Father", "Identity", true),
         new("Gender", "Gender", "Personal", false),
+        new("MissingDetails", "Missing Details", "Personal", false),
         new("DateOfBirth", "Date of Birth", "Personal", true, ReportColumnKind.Date),
         new("Age", "Age", "Personal", false, ReportColumnKind.Number),
         new("BFormNumber", "B-Form No.", "Personal", false),
@@ -326,6 +327,8 @@ public partial class StudentReportsPage
         ViewArgs view = v with { GroupKey = groupKey };
         bool changes = v.Mode == ModeChanges;
         DataTable rows = changes ? FilterChanges(raw, view) : StudentReportQuickViews.FilterTransport(raw, view.Transport);
+        if (!changes && view.Mode == ModeList)
+            rows = StudentReportQuickViews.FilterCompletion(rows, view.Completion, view.CanViewDetails);
         if (groupKey == GroupNone)
         {
             DataTable list = changes

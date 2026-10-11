@@ -51,4 +51,36 @@ Check(StudentReportQuickViews.All.Single(view => view.Key == "transport").Transp
     "Transport preset selects the transport filter");
 Check(StudentReportQuickViews.All.Where(view => view.Key != "transport").All(view => view.Transport == ""),
     "Contact and register views reset transport filtering");
+var records = new DataTable();
+records.Columns.Add("AdmissionId", typeof(int));
+foreach (string column in new[] { "ContactNumber", "AlternateContactNumber", "DateOfBirth", "Address" }) records.Columns.Add(column);
+records.Rows.Add(1, "123", "", "2015-01-01", "Main Road");
+records.Rows.Add(2, " ", DBNull.Value, DBNull.Value, " ");
+records.Rows.Add(3, "", "456", "2015-01-01", "Main Road");
+records.Rows.Add(4, "123", "", "", "Main Road");
+var incomplete = StudentReportQuickViews.FilterCompletion(records, "any", true);
+Check(incomplete.AsEnumerable().Select(row => row.Field<int>("AdmissionId")).SequenceEqual(new[] { 2, 4 }),
+    "Any missing detail excludes complete records and accepts alternate contacts");
+Check((string)incomplete.Rows[0]["MissingDetails"] == "Contact number, Date of birth, Address",
+    "Missing details are concise and identify only checked fields");
+Check(StudentReportQuickViews.FilterCompletion(records, "contact", true).Rows.Count == 1,
+    "Contact check accepts an alternate number");
+Check(StudentReportQuickViews.FilterCompletion(records, "birth", true).Rows.Count == 2,
+    "Date of birth check finds blank and null dates");
+Check(StudentReportQuickViews.FilterCompletion(records, "address", true).Rows.Count == 1,
+    "Address check handles whitespace");
+var restricted = StudentReportQuickViews.FilterCompletion(records, "any", false);
+Check(restricted.Rows.Count == 2 && restricted.AsEnumerable().All(row => row.Field<string>("MissingDetails") == "Primary contact number"),
+    "Restricted details are never presented as missing; primary contact is labelled explicitly");
+Check(StudentReportQuickViews.FilterCompletion(records, "birth", false).Rows.Count == 0,
+    "A restricted birth check cannot infer missing dates");
+Check(StudentReportQuickViews.FilterCompletion(records, "", true).Rows.Count == 4,
+    "All records retains complete students");
+Check(!records.Columns.Contains("MissingDetails") && records.Rows.Count == 4,
+    "Completion checks do not alter source data");
+var unavailable = new DataTable(); unavailable.Columns.Add("AdmissionId", typeof(int)); unavailable.Rows.Add(1);
+Check(StudentReportQuickViews.FilterCompletion(unavailable, "any", true).Rows.Count == 0,
+    "Unavailable fields are not invented as missing");
+Check(StudentReportQuickViews.All.Single(view => view.Key == "completion").Completion == "any",
+    "Record Completion preset selects its visible record check");
 Console.WriteLine($"PASS {checks} student report view checks.");

@@ -48,7 +48,7 @@ public partial class StudentReportsPage : V2Page
         string ClientSearch,
         string YearName,
         string CompareName,
-        string Transport);
+        string Transport, string Completion, bool CanViewDetails);
     private sealed record LoadResult(DataTable Raw, DataTable? Compare, bool HasBalance);
     // Report choice and column layouts survive Reset Filters; arrangements return to the mode's preset.
     private readonly ModernComboBox mode = NewCombo();
@@ -57,6 +57,7 @@ public partial class StudentReportsPage : V2Page
     private readonly ModernComboBox sort = NewCombo();
     private readonly ModernComboBox views = NewCombo();
     private readonly ModernComboBox transportFilter = NewCombo();
+    private readonly ModernComboBox completionFilter = NewCombo();
     private readonly ModernComboBox strengthScope = NewCombo();
     // filters
     private readonly LookupBox campus = new();
@@ -159,6 +160,11 @@ public partial class StudentReportsPage : V2Page
             FillChoices(transportFilter, new[] {
                 new Choice("", "All students"), new Choice("yes", "Uses transport"), new Choice("no", "No transport")
             }, "");
+            var completionChoices = new List<Choice> { new("", "All records"), new("any", "Any missing detail"),
+                new("contact", CurrentUser.HasPermission("Students.View") ? "Missing contact number" : "Missing primary contact") };
+            if (CurrentUser.HasPermission("Students.View"))
+                completionChoices.AddRange(new[] { new Choice("birth", "Missing date of birth"), new Choice("address", "Missing address") });
+            FillChoices(completionFilter, completionChoices, "");
             RebuildGroupChoices();
             ApplyPreset(_mode, keepFilters: true);
             RefreshViewChoices(string.Empty);
@@ -225,12 +231,13 @@ public partial class StudentReportsPage : V2Page
         guide.Dock = DockStyle.Fill;
         host.Controls.Add(guide, 0, 0);
         host.SetColumnSpan(guide, FilterColumns);
-        /* How the report is arranged: always the same five, always first. */
+        /* Arrangement and record checks share the top row. */
         AddField("Report", mode, false);
         AddField("Group by", group, false);
         AddField("Split by", split, false);
         AddField("Sort by", sort, false);
         AddField("Views", views, false);
+        AddField("Record check", completionFilter, false);
         /* What goes into it: only the filters the chosen report uses are shown. */
         AddField("Campus", campus, true);
         AddField("Academic Year", year, true);
@@ -264,7 +271,7 @@ public partial class StudentReportsPage : V2Page
             if (!isFilter)
             {
                 _filterHost.SetCellPosition(field, new TableLayoutPanelCellPosition(arrange++, 1));
-                field.Visible = true;
+                field.Visible = shown;
                 continue;
             }
             if (!shown || filter >= FilterColumns * FilterRows)
@@ -293,6 +300,7 @@ public partial class StudentReportsPage : V2Page
         mode.SelectionChangeCommitted += async (_, _) => await OnModeChosenAsync();
         strengthScope.SelectedIndexChanged += (_, _) => OnFilterChanged();
         transportFilter.SelectedIndexChanged += (_, _) => OnFilterChanged();
+        completionFilter.SelectedIndexChanged += (_, _) => OnFilterChanged();
         group.SelectionChangeCommitted += (_, _) => {
             RebuildSplitChoices();
             RebuildSortChoices();
@@ -440,6 +448,7 @@ public partial class StudentReportsPage : V2Page
     private void ApplyPreset(string key, bool keepFilters)
     {
         SelectKey(transportFilter, "");
+        SelectKey(completionFilter, "");
         switch (key)
         {
             case ModeAdmissions:
@@ -563,6 +572,8 @@ public partial class StudentReportsPage : V2Page
         ShowField(status, register);
         ShowField(gender, !changes);
         ShowField(transportFilter, _mode == ModeList);
+        ShowField(completionFilter, _mode == ModeList);
+        completionFilter.Enabled = !byId;
         ShowField(changeType, changes);
         ShowField(search, register || changes);
         ShowField(limitDate, register || changes);
@@ -756,7 +767,7 @@ public partial class StudentReportsPage : V2Page
                 /* Admission Number is its own, independent filter: a search that is a whole number finds that one student whatever Campus / Year / Class / Section / Status say. */
                 if (TryAdmissionNumber(searchText, out _))
                     return $"{_mode}|id:{searchText}";
-                return $"{_mode}|{campus.SelectedId}|{(_mode == ModeList ? year.SelectedId : 0)}|{cls.SelectedId}|{section.SelectedId}|{SelectedText(status, "Name")}|{genderText}|{searchText}|{LimitOn}|{DateKey(from, LimitOn)}|{DateKey(to, LimitOn)}|{IncludeFormerStudentsOn}|{(_mode == ModeList ? SelectedKey(transportFilter) : "")}";
+                return $"{_mode}|{campus.SelectedId}|{(_mode == ModeList ? year.SelectedId : 0)}|{cls.SelectedId}|{section.SelectedId}|{SelectedText(status, "Name")}|{genderText}|{searchText}|{LimitOn}|{DateKey(from, LimitOn)}|{DateKey(to, LimitOn)}|{IncludeFormerStudentsOn}|{(_mode == ModeList ? SelectedKey(transportFilter) : "")}|{(_mode == ModeList ? SelectedKey(completionFilter) : "")}";
         }
     }
     /* Lets the shared report machinery compare the filters on screen with the ones a landing answered, so a report that arrives under changed filters is never treated as current. */
@@ -857,7 +868,9 @@ public partial class StudentReportsPage : V2Page
         _mode == ModeChanges ? search.Text.Trim() : string.Empty,
         SelectedText(year, "YearName"),
         compareYear.SelectedId > 0 ? SelectedText(compareYear, "YearName") : string.Empty,
-        _mode == ModeList && !TryAdmissionNumber(search.Text.Trim(), out _) ? SelectedKey(transportFilter) : "");
+        _mode == ModeList && !TryAdmissionNumber(search.Text.Trim(), out _) ? SelectedKey(transportFilter) : "",
+        _mode == ModeList && !TryAdmissionNumber(search.Text.Trim(), out _) ? SelectedKey(completionFilter) : "",
+        CurrentUser.HasPermission("Students.View"));
     private RunArgs ReadArgs()
     {
         string searchText = search.Text.Trim();
@@ -888,6 +901,9 @@ public partial class StudentReportsPage : V2Page
     private string DescribeFilters(RunArgs a)
     {
         var parts = new List<string>();
+        if (a.Mode == ModeList && !a.ByAdmissionId && SelectedKey(completionFilter).Length > 0)
+            parts.Add(completionFilter.Text + (CurrentUser.HasPermission("Students.View")
+                ? " (contact, date of birth and address only)" : " (primary contact only)"));
         if (a.Mode == ModeList && !a.ByAdmissionId && SelectedKey(transportFilter).Length > 0)
             parts.Add(SelectedKey(transportFilter) == "yes" ? "Uses transport" : "No transport");
         if (a.ByAdmissionId)
@@ -1225,6 +1241,7 @@ public partial class StudentReportsPage : V2Page
         ["to"] = to.Value.Date.ToString("yyyy-MM-dd"),
         ["inactive"] = inactive.Checked ? "1" : "0",
         ["transport"] = SelectedKey(transportFilter),
+        ["completion"] = SelectedKey(completionFilter),
         ["columns"] = string.Join(",", CurrentReportColumns())
     };
     private void SaveCurrentView()
@@ -1293,6 +1310,7 @@ public partial class StudentReportsPage : V2Page
             state["compare"] = "0";
             state["limit"] = state["inactive"] = "0";
             state["transport"] = ready.Transport;
+            state["completion"] = ready.Completion;
             state["columns"] = ready.Columns;
             ApplyState(state);
             await RunAsync();
@@ -1347,6 +1365,7 @@ public partial class StudentReportsPage : V2Page
             limitDate.Checked = Get(state, "limit") == "1";
             inactive.Checked = Get(state, "inactive") == "1";
             SelectKey(transportFilter, Get(state, "transport"));
+            SelectKey(completionFilter, Get(state, "completion"));
             if (DateTime.TryParse(Get(state, "from"), out var fromDate))
                 from.Value = fromDate;
             if (DateTime.TryParse(Get(state, "to"), out var toDate))
