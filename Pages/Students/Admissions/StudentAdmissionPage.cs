@@ -793,12 +793,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         newAdmissionButton = AddAction(
             "Clear / New",
             (_, _) => {
-                if (!ConfirmDiscardAdmission())
-                    return;
+                if (saveBusy) return;
                 StartNewAdmission();
             }, "Secondary");
         UiAccessibility.Describe(newAdmissionButton, "Clear and start a new admission",
-            "Clear student details and start a new admission. Confirm before discarding unsaved changes. Placement is retained when Keep placement is selected.");
+            "Discard current student entries and start a new admission. Placement is retained when Keep placement is selected.");
         /* Save writes the student record (and can create it), so it is guarded against a double submit. Clear is local; the print actions only read. */
         saveButton = AddBusyAction(
             UiText.Actions.Save,

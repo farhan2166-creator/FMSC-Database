@@ -239,3 +239,11 @@ User requested that actions requiring data be disabled before their prerequisite
 - Reviewed certificate pages, duplicate-student resolution, campus/class/section assignment and fee collection already contain prerequisite-driven guards. This pass is not a claim that every action in every page has been manually exercised.
 
 Validation: application build passed with zero warnings/errors; git diff whitespace check passed. State transitions and permission guards were reviewed in source. No interactive WinForms checks or production database writes were performed for this pass.
+
+## Explicit Clear / New actions — 12 October 2026
+
+User decision: clicking Clear / New already authorizes discarding the current editor, so these explicit actions should not ask again. Removed reset confirmations from the shared MasterPage Clear / New toolbar (covering record-editor pages), Admissions Clear / New, Current Employment Clear, Academic Program New, and New Certificate on NOC, Provisional, Sports, Regular Student, Regular Lecturer and Bank Account Opening certificate pages.
+
+Busy/save guards and baseline recapture remain. Regular Student New Certificate bypasses the separate Next Student confirmation explicitly. Next Student/Next Staff Member, record selection, refresh/reload, page navigation and modal close confirmations retain their existing behavior. Reset actions clear the editor; they do not delete saved records or financial entries. Updated the admission button accessibility description to reflect immediate discard.
+
+Verification: reviewed the changed handlers and their callers, including Regular Student New's indirect ClearForm path; application build passed with zero warnings/errors and git diff whitespace check passed. No production database changes. Interactive WinForms verification was not performed.

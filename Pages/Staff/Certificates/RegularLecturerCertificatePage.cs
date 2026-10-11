@@ -509,7 +509,6 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
     }
     private void StartNewCertificate()
     {
-        if (!ConfirmDiscard()) return;
         ClearCertificateSelection();
         ClearCertificateFields();
         Grid.ClearSelection();

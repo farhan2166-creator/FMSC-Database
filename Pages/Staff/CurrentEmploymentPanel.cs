@@ -68,17 +68,6 @@ public sealed class CurrentEmploymentPanel : HumanCard, IUnsavedChanges, IBusyPa
         !string.Equals(_appliedSignature, SnapshotSignature(), StringComparison.Ordinal);
     public string UnsavedChangesMessage =>
         "Current Employment has edits that have not been saved.";
-    /// <summary>asks only when there is something to lose, and says what the gesture costs. Returns true when the caller may proceed.</summary>
-    private bool ConfirmDiscardEmploymentEdits(string action)
-    {
-        if (!HasUnsavedChanges)
-            return true;
-        return ModernMessageDialog.Confirm(
-            FindForm(),
-            $"{UnsavedChangesMessage}{Environment.NewLine}{Environment.NewLine}" +
-            $"{action} and discards them. The saved employment record is not changed either way.",
-            UiText.Dialogs.UnsavedChanges);
-    }
     public CurrentEmploymentPanel()
         : base("Current Employment", "View or update the selected staff member’s current job.")
     {
@@ -125,9 +114,7 @@ public sealed class CurrentEmploymentPanel : HumanCard, IUnsavedChanges, IBusyPa
             }
         };
         clearButton.Click += (_, _) => {
-            /* Clear replaced the editor without a word, even when its contents were edits the operator had not saved. */
-            if (!ConfirmDiscardEmploymentEdits("Clearing the form"))
-                return;
+            if (_saving) return;
             ClearForm();
             /* and it re-armed an INSERT in silence: with _staffEmploymentId back at 0 the next Save adds a second employment record for the same staff member instead of updating the loaded… */
             if (_staffId > 0)

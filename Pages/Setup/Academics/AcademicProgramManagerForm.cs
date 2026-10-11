@@ -255,9 +255,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
     }
     private void BeginNewProgram()
     {
-        /* New clears every field, so it asks first. */
-        if (!ModernMessageDialog.ConfirmDiscardIfDirty(this, IsDirty))
-            return;
+        // New explicitly discards the editor. Selecting another program still asks.
         existing.SelectedIndexChanged -=
             Existing_SelectedIndexChanged;
         try

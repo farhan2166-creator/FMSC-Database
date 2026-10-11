@@ -153,10 +153,10 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
         /* A bare "Save" does not say what is being saved. Kept short by construction, so the existing action-bar width fitting still applies unchanged. */
         string saveActionText = "Save " + MasterEntityNaming.Singularize(NavigationTitle);
         var save = AddAction(saveActionText, Save, "Success");
-        /* It now asks first when there is something to lose, using the same confirmation the navigation guard shows when leaving the page. */
+        /* Clear / New explicitly discards the editor; record switching still asks. */
         string clearActionText = separateEntryAndRecords ? "Clear / New" : "Clear";
         var clear = AddAction(clearActionText, (_, _) => {
-            if (!ConfirmDiscardChanges())
+            if (_saving || !CanChangeRecord())
                 return;
             Clear();
             CaptureEditorBaseline();

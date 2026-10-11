@@ -471,7 +471,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     }
     private void StartNewCertificate()
     {
-        if (HasCertificateEdits && !Confirm("Discard the unsaved changes and start a new certificate?", "New Certificate")) return;
+        if (creatingCertificate) return;
         ClearCertificateSelection();
         certificateDate.Value =
             DateTime.Today;

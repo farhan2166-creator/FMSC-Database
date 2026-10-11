@@ -525,7 +525,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     }
     private void StartNewCertificate()
     {
-        if (HasCertificateEdits && !Confirm("Discard the unsaved changes and start a new certificate?", "New Certificate")) return;
+        if (creatingCertificate) return;
         ClearCertificateFields();
         ClearCertificateSelection();
         Grid.ClearSelection();

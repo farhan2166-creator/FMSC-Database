@@ -1182,7 +1182,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
     }
     private void StartNewCertificate()
     {
-        if (HasCertificateEdits && !Confirm("Discard the unsaved changes and start a new certificate?", "New Certificate")) return;
+        if (creatingCertificate) return;
         ClearCertificateSelection();
         ClearCertificateFields();
         Grid.ClearSelection();

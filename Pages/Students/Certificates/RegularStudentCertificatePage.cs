@@ -632,7 +632,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     private void StartNewCertificate()
     {
         if (creatingCertificate) return;
-        ClearForm();
+        ClearForm(confirmDiscard: false);
     }
     private void PrintSelected()
     {
@@ -721,11 +721,11 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         FormatCertificateGrid();
         ApplyWorkflowState();
     }
-    private void ClearForm()
+    private void ClearForm(bool confirmDiscard = true)
     {
         if (creatingCertificate) return;
-        if (HasCertificateEdits &&
-            !Confirm("Discard the unsaved changes and start a new certificate?", "New Certificate")) return;
+        if (confirmDiscard && HasCertificateEdits &&
+            !Confirm("Discard the unsaved changes and choose another student?", "Next Student")) return;
         suppressStudentChanged = true;
         try
         {

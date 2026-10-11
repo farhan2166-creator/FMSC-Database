@@ -603,7 +603,6 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges
     }
     private void StartNewCertificate()
     {
-        if (!ConfirmDiscard()) return;
         ClearCertificateSelection();
         ClearCertificateFields();
         Grid.ClearSelection();
