@@ -1,8 +1,15 @@
 using FMSC_SMS.Core;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
-public sealed class RegularStudentCertificatePage : V2Page
+public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
+    public bool HasUnsavedChanges => HasCertificateEdits;
+    public string UnsavedChangesMessage => "Discard the unsaved certificate changes?";
+    public bool IsBusy => creatingCertificate;
+    public string BusyMessage => "Please wait for the certificate to finish saving.";
+    private bool restoringCertificateSelection;
+    private bool HasCertificateEdits => selectedRegularStudentCertificateId > 0 &&
+        (className.Text.Trim() != savedClassName.Trim() || certificateDate.Value.Date != savedCertificateDate);
     private readonly StudentPicker student = new();
     private readonly ModernTextBox dateOfBirth =
         HumanUi.TextBox(false, 150);
@@ -101,6 +108,8 @@ public sealed class RegularStudentCertificatePage : V2Page
         StudentSearchCache.Warm();
         /* dbo.Create...Certificate refuses a student with no date of birth (58505), so such students are not offered. */
         student.RowFilter = row => !row.IsNull("DateOfBirth");
+        student.SelectionChangeGuard = _ => !creatingCertificate &&
+            (!HasCertificateEdits || Confirm("Discard the unsaved certificate changes and choose another student?", UiText.Dialogs.UnsavedChanges));
         student.UserSelectionChanged +=
             (_, _) => {
                 if (suppressStudentChanged)
@@ -332,7 +341,7 @@ public sealed class RegularStudentCertificatePage : V2Page
     }
     private void GridSelectionChanged(object? sender, EventArgs e)
     {
-        if (loadingCertificates || Grid.CurrentRow is null || Grid.SelectedRows.Count == 0)
+        if (restoringCertificateSelection || loadingCertificates || Grid.CurrentRow is null || Grid.SelectedRows.Count == 0)
         {
             return;
         }
@@ -352,6 +361,13 @@ public sealed class RegularStudentCertificatePage : V2Page
                 SetStatus("The selected regular student certificate contains invalid data.", true);
                 return;
             }
+            restoringCertificateSelection = true;
+            try
+            {
+                if (!ConfirmCertificateSelection(FindForm(), Grid, "RegularStudentCertificateId",
+                    selectedRegularStudentCertificateId, regularStudentCertificateId, HasCertificateEdits)) return;
+            }
+            finally { restoringCertificateSelection = false; }
             selectedRegularStudentCertificateId =
                 regularStudentCertificateId;
             savedClassName = GetString(row,"ClassName");
@@ -382,8 +398,7 @@ public sealed class RegularStudentCertificatePage : V2Page
             student.SelectedId > 0;
         bool hasSelection =
             selectedRegularStudentCertificateId > 0;
-        bool dirty = hasSelection && (className.Text.Trim() != savedClassName.Trim()
-            || certificateDate.Value.Date != savedCertificateDate);
+        bool dirty = HasCertificateEdits;
         student.Enabled = !creatingCertificate;
         dateOfBirth.Enabled = false;
         dateOfBirth.ReadOnly = true;
@@ -709,7 +724,7 @@ public sealed class RegularStudentCertificatePage : V2Page
     private void ClearForm()
     {
         if (creatingCertificate) return;
-        if (selectedRegularStudentCertificateId > 0 && certificateDate.Value.Date != savedCertificateDate &&
+        if (HasCertificateEdits &&
             !Confirm("Discard the unsaved changes and start a new certificate?", "New Certificate")) return;
         suppressStudentChanged = true;
         try

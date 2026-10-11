@@ -23,3 +23,11 @@ The application cross-builds for Windows with zero warnings and errors. All elev
 - Review generic reports and the existing receipt, reminder, class-sheet and class-summary previews, including multi-page results and a sample print/export.
 
 Native WinForms layout, printing devices and live database behavior require this Windows review; cloud build and portable checks do not exercise them.
+
+## Certificate edits and student search
+
+Sports, No Objection, Provisional and Regular Student certificate pages expose existing-record edits to the application's leave/close guard. Switching students or certificates asks before discarding edits; selecting the same certificate preserves those edits. Declining a record switch restores the selected row. Certificate creation exposes its busy state to the navigation guard. Regular Student's New action now includes class-name edits in its discard check.
+
+Student search ranks exact student/father names before name prefixes and substring matches, retaining official admission/registration priority, admission normalization, scope filters, natural admission ordering and ambiguous picker highlights. StudentSearchChecks covers the production matching and picker-result code.
+
+On Windows, edit an existing certificate on each of these four pages and try another student, another certificate, the same certificate, New, Refresh, another tab/page and app close. Check Cancel preserves both fields and selected identity; accepting discards edits; saving clears the warning. Confirm page navigation is blocked during creation. Search for an exact name also contained in longer names, a father name, mixed student/father words, an admission number with leading zeros and duplicate admission results. Review with a restricted account. Database rules and permissions were not changed.

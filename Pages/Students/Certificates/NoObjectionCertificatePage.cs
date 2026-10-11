@@ -1,8 +1,13 @@
 using FMSC_SMS.Core;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
-public sealed class NoObjectionCertificatePage : V2Page
+public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
+    public bool HasUnsavedChanges => HasCertificateEdits;
+    public string UnsavedChangesMessage => "Discard the unsaved certificate changes?";
+    public bool IsBusy => creatingCertificate;
+    public string BusyMessage => "Please wait for the certificate to finish saving.";
+    private bool creatingCertificate;
     private readonly StudentPicker student = new();
     private readonly ModernDatePicker certificateDate =
         HumanUi.Date();
@@ -51,6 +56,7 @@ public sealed class NoObjectionCertificatePage : V2Page
                 (student, student.Enabled),
                 (Grid, Grid.Enabled)
             };
+            creatingCertificate = true;
             createCertificateButton.Enabled = false;
             foreach (var (control, _) in heldDuringCreate)
                 control.Enabled = false;
@@ -60,6 +66,7 @@ public sealed class NoObjectionCertificatePage : V2Page
             }
             finally
             {
+                creatingCertificate = false;
                 foreach (var (control, wasEnabled) in heldDuringCreate)
                 {
                     if (!control.IsDisposed)
@@ -83,6 +90,8 @@ public sealed class NoObjectionCertificatePage : V2Page
         TrackStudentSearchStatus(student);
         /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
         StudentSearchCache.Warm();
+        student.SelectionChangeGuard = _ => !creatingCertificate &&
+            (!HasCertificateEdits || Confirm("Discard the unsaved certificate changes and choose another student?", UiText.Dialogs.UnsavedChanges));
         student.UserSelectionChanged +=
             (_, _) => {
                 if (suppressStudentChanged)
@@ -293,6 +302,8 @@ public sealed class NoObjectionCertificatePage : V2Page
                 SetStatus("The selected NOC contains invalid data.", true);
                 return;
             }
+            if (!ConfirmCertificateSelection(FindForm(), Grid, "NoObjectionCertificateId",
+                selectedNoObjectionCertificateId, noObjectionCertificateId, HasCertificateEdits)) return;
             selectedNoObjectionCertificateId =
                 noObjectionCertificateId;
             DateTime? certDate =

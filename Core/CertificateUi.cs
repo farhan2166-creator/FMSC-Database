@@ -2,6 +2,29 @@ namespace FMSC_SMS.Core;
 /// <summary>Small shared mechanics used by the certificate screens; certificate-specific business rules stay on their pages.</summary>
 internal static class CertificateUi
 {
+    internal static bool ConfirmCertificateSelection(IWin32Window? owner, DataGridView grid,
+        string idColumn, int currentId, int requestedId, bool hasEdits)
+    {
+        if (!hasEdits) return true;
+        if (requestedId == currentId) return false;
+        if (ModernMessageDialog.Confirm(owner,
+            "Discard the unsaved certificate changes and select another certificate?",
+            UiText.Dialogs.UnsavedChanges)) return true;
+        if (grid.Columns.Contains(idColumn))
+        {
+            foreach (DataGridViewRow row in grid.Rows)
+            {
+                if (row.IsNewRow || !int.TryParse(Convert.ToString(row.Cells[idColumn].Value), out int id) || id != currentId) continue;
+                grid.ClearSelection();
+                var cell = row.Cells.Cast<DataGridViewCell>().FirstOrDefault(c => c.OwningColumn.Visible);
+                if (cell is not null) grid.CurrentCell = cell;
+                row.Selected = true;
+                break;
+            }
+        }
+        return false;
+    }
+
     public static Panel Field(string caption, Control control, bool required = false, bool fillHeight = true)
     {
         Panel field = HumanUi.Field(caption, control, required, fillHeight);
