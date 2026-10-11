@@ -123,3 +123,14 @@ The user reported Backspace could not shorten fields populated with database sug
 The change is in Core\LiveTextSuggestions.cs and therefore covers the ModernTextBox fields using custom SuggestAppend suggestions, including Father Occupation, Address, Place of Birth, Previous School and Caste/Tribe on admissions. No database data or procedures changed for this fix.
 
 Validation: application build passed with zero warnings/errors. Tests\LiveTextSuggestions\LiveTextSuggestions.Tests.csproj runs the production suggestion logic with simulated controls and a deferred event queue; 14 checks passed for repeated deletion, deleting a selected suffix, Ctrl deletion, cut, paste, queued edits, source refresh, middle edits, casing, Escape and explicit arrow selection. This is a portable control-logic regression test, not interactive WinForms keyboard automation.
+
+## Cross-form suggestion-control review
+
+Repository-wide search found all configured SuggestAppend text fields use ModernTextBox, which routes them to the fixed LiveTextSuggestions class. Besides admission fields, the fix therefore applies to:
+
+- Character Certificate: Remarks (multiline).
+- Leave Certificate: Academic Record, Attendance Record and Remarks.
+- College Leave Certificate: Academic Record, Attendance Record and Remarks.
+- Sports Certificate: Sport Name and Performance.
+
+No separate SuggestAppend implementation was found in other application pages. ModernComboBox exposes native autocomplete, but no page configures it in the current source. StudentPicker/StaffPicker use searchable lists rather than appended text; their key handlers do not intercept Backspace/Delete. Reviewed name/numeric keypress filters allow control characters, including Backspace. No additional page-specific code change was needed. This is source verification; certificates were not interactively exercised in WinForms during this review. The shared 14-case regression and successful app build remain the validation evidence for the fix.
