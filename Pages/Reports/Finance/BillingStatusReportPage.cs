@@ -6,6 +6,13 @@ public sealed class BillingStatusReportPage : V2Page
     private readonly LookupBox year = new();
     private readonly LookupBox campus = new();
     private readonly ModernDatePicker asOfDate = HumanUi.Date();
+    private (int Year, int Campus, DateTime Month)? requestedScope;
+    public BillingStatusReportPage(int academicYearId, int campusId, DateTime billingMonth) : this()
+    {
+        requestedScope = (academicYearId, campusId, billingMonth.Date);
+        SetPageHeaderText(string.Empty,
+            "Checks the chosen campus and year. Class, section and fee type are not filtered. One posted fee does not mean all fees are posted.");
+    }
     public BillingStatusReportPage()
         : base(
             "Billing Status",
@@ -49,13 +56,29 @@ public sealed class BillingStatusReportPage : V2Page
             Task<DataTable> yearsTask = DatabaseHelper.QueryUserAsync("GetAcademicYears");
             Task<DataTable> campusesTask = DatabaseHelper.QueryUserAsync("GetCampuses");
             await Task.WhenAll(yearsTask, campusesTask);
+            if (IsDisposed) return;
             year.Bind(await yearsTask, "AcademicYearId", "YearName");
             campus.Bind(await campusesTask, "CampusId", "CampusName");
+            if (requestedScope is { } scope)
+            {
+                year.SelectedValue = scope.Year;
+                campus.SelectedValue = scope.Campus;
+                asOfDate.Value = scope.Month;
+                if (year.SelectedIndex < 0 || campus.SelectedIndex < 0)
+                {
+                    if (year.SelectedIndex < 0) year.SelectedIndex = 0;
+                    if (campus.SelectedIndex < 0) campus.SelectedIndex = 0;
+                    Warn("A selected campus or year is unavailable. Review the filters, then click View Status.");
+                    return;
+                }
+                await ViewStatusAsync();
+            }
         }
-        catch (Exception ex) { Fail(ex); }
+        catch (Exception ex) { if (!IsDisposed) Fail(ex); }
     }
     private async Task ViewStatusAsync()
     {
+        if (!CurrentUser.HasPermission("Fees.Reports.View")) return;
         /* The filters this run is for, re-checked once the query returns. */
         string requestedFilters = FilterSignature();
         try
@@ -69,6 +92,7 @@ public sealed class BillingStatusReportPage : V2Page
                 DatabaseHelper.Int("@AcademicYearId", academicYearId),
                 DatabaseHelper.Int("@CampusId", campusId),
                 DatabaseHelper.Date("@AsOfDate", asOf)));
+            if (IsDisposed) return;
             /* BindReportAsync has already bound whatever came back, so a run whose filters moved while it was loading would otherwise leave one campus/year's rows on screen under a different selection. */
             if (!string.Equals(requestedFilters, FilterSignature(), StringComparison.Ordinal))
             {
@@ -80,7 +104,7 @@ public sealed class BillingStatusReportPage : V2Page
             _appliedFilterSignature = requestedFilters;
             ConfigureStatusGrid();
         }
-        catch (Exception ex) { Fail(ex); }
+        catch (Exception ex) { if (!IsDisposed) Fail(ex); }
     }
     private void ConfigureStatusGrid()
     {

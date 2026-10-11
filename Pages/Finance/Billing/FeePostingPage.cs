@@ -1,5 +1,6 @@
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Reports;
+using FMSC_SMS.Pages.Reports.Finance;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Billing;
 /// <summary>Manual Monthly Fee Posting - the operator decides what fee to post, for which month, and for whom. Re-clicking Post is therefore harmless - the second click posts nothing.</summary>
@@ -52,7 +53,9 @@ public sealed class FeePostingPage : V2Page
             "Post Selected Fees",
             PostSelectedAsync,
             "Success");
-        RelocateFromActions(loadPreview, postButton);
+        var checkBilling = AddAction("Check Billing Status", (_, _) => OpenBillingStatus(), "Secondary");
+        checkBilling.Enabled = CurrentUser.HasPermission("Fees.Reports.View");
+        RelocateFromActions(loadPreview, postButton, checkBilling);
         Defer(BindLookupsAsync);
         // The entries carry a count, so the open list is wider than the field.
         monthBox.DropDownWidth = AppScale.Scale(320);
@@ -74,7 +77,23 @@ public sealed class FeePostingPage : V2Page
         klass.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
         section.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
         feeType.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
-        SetContent(ReportUi.Layout(filters, Grid, "Post Monthly Fees", loadPreview, postButton));
+        SetContent(ReportUi.Layout(filters, Grid, "Post Monthly Fees", loadPreview, postButton, checkBilling));
+    }
+    private void OpenBillingStatus()
+    {
+        if (!CurrentUser.HasPermission("Fees.Reports.View")) return;
+        DateTime? month = BillingMonthKey.ToMonth(monthBox.SelectedId);
+        if (month is null) { Warn("Choose a billing month before checking its billing status."); return; }
+        using var dialog = new ApplicationWindowForm {
+            Text = "Billing Status", StartPosition = FormStartPosition.CenterParent,
+            Size = new Size(AppScale.Scale(1100), AppScale.Scale(700)),
+            MinimumSize = new Size(AppScale.Scale(900), AppScale.Scale(550)),
+            BackColor = AppTheme.PageBackground
+        };
+        dialog.Controls.Add(new BillingStatusReportPage(academicYear.SelectedId, campus.SelectedId, month.Value) {
+            Dock = DockStyle.Fill
+        });
+        dialog.ShowDialog(FindForm());
     }
     /// <summary>every filter the preview query is built from, in one comparable string, read from the live controls.</summary>
     private string FilterSignature() =>
