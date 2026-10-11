@@ -1,6 +1,7 @@
 using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 using FMSC_SMS.Pages.Students.Admissions;
+using FMSC_SMS.Pages.Reports.Finance;
 namespace FMSC_SMS.Pages.Reports.Students;
 /// <summary>One student report, built by the person using it. The four old pages remain only as shells that open this one on the matching preset.</summary>
 public partial class StudentReportsPage : V2Page
@@ -141,6 +142,7 @@ public partial class StudentReportsPage : V2Page
         _mode = startMode;
         search.PlaceholderText = "Admission Number / student name";
         var viewReport = AddBusyAction("View Report", RunAsync, "Primary");
+        var classSummary = AddBusyAction("Class Summary A4", PreviewClassSummaryAsync, "Secondary");
         var columnsButton = AddColumnsAction();
         var saveView = AddAction("Save View", (_, _) => SaveCurrentView(), "Secondary");
         openAdmissionsButton = AddBusyAction("Open Admissions", OpenSelectedAdmissionsAsync, "Secondary");
@@ -153,7 +155,7 @@ public partial class StudentReportsPage : V2Page
         var export = AddExportAction("FMSC_Student_Report");
         printButton = AddBusyAction("Print Preview", PreviewReportAsync, "Secondary");
         printButton.Enabled = false;
-        RelocateFromActions(viewReport, resetFilters, columnsButton, printButton, saveView, deleteViewButton, export, openAdmissionsButton);
+        RelocateFromActions(viewReport, resetFilters, columnsButton, printButton, saveView, deleteViewButton, export, openAdmissionsButton, classSummary);
         exportButton = export;
         deleteViewButton.Enabled = false;
         foreach (var (key, text) in ModeChoices)
@@ -198,7 +200,8 @@ public partial class StudentReportsPage : V2Page
             saveView,
             deleteViewButton,
             export,
-            openAdmissionsButton);
+            openAdmissionsButton,
+            classSummary);
         SetContent(root);
         Defer(BindLookupsAsync);
         foreach (var lookup in new[] { campus, year, cls, section })
@@ -207,6 +210,37 @@ public partial class StudentReportsPage : V2Page
         WireEvents();
         UpdateEnabledState();
     }
+    private async Task PreviewClassSummaryAsync()
+    {
+        if (!CurrentUser.HasPermission("Reports.View")) return;
+        int campusId = campus.SelectedId, yearId = year.SelectedId;
+        string scope = $"Campus: {(campusId == 0 ? "All campuses" : campus.Text)} | Academic year: {(yearId == 0 ? "All years" : year.Text)}";
+        DateTime generated = DateTime.Now;
+        try
+        {
+            var studentsTask = DatabaseHelper.QueryUserAsync("GetStudentRegister",
+                DatabaseHelper.Int("@CampusId", campusId), DatabaseHelper.Int("@AcademicYearId", yearId),
+                DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0),
+                DatabaseHelper.P("@EnrollmentStatus", "Active"), DatabaseHelper.Bit("@IncludeFormerStudents", true),
+                DatabaseHelper.Bit("@IncludeBalance", false));
+            var balancesTask = Task.Run(() => DatabaseHelper.QuerySql(ClassOutstandingReportData.Query,
+                DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@CampusId", campusId),
+                DatabaseHelper.Int("@AcademicYearId", yearId), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0)));
+            var schoolTask = InstitutionProfile.GetNameAsync();
+            await Task.WhenAll(studentsTask, balancesTask, schoolTask);
+            if (IsDisposed) return;
+            if (campusId != campus.SelectedId || yearId != year.SelectedId)
+            { Warn("Campus or year changed. Open Class Summary A4 again for the selected filters."); return; }
+            string school = await schoolTask;
+            if (string.IsNullOrWhiteSpace(school)) { Warn("Check School Profile before printing the summary."); return; }
+            var data = ClassSectionSummaryData.Create(await studentsTask, await balancesTask, school, scope, generated);
+            if (data.Rows.Count == 0) { Info("No active students or outstanding charges were found for this campus and year."); return; }
+            RdlcReportPreview.Show(FindForm(), "Class & Section Summary",
+                Path.Combine(AppContext.BaseDirectory, "Reports", "ClassSectionSummary.rdlc"), "ClassSummaryData", data);
+        }
+        catch (Exception ex) { if (!IsDisposed) Fail(ex); }
+    }
+
     private int SelectedAdmissionId()
     {
         if (_openingAdmissions || _mode != ModeList || _shape.Grouped ||
