@@ -130,16 +130,9 @@ internal static class ReceiptReportLayout
         document.Root.Element(ns + "Body")!.Element(ns + "Height")!.Value = "0.01in";
         if (annualSheet)
         {
-            table.Descendants(ns + "PageBreak").Remove();
-            page.Element(ns + "PageWidth")!.Value = "8.27in";
-            page.Element(ns + "PageHeight")!.Value = "11.69in";
-            foreach (string margin in new[] { "LeftMargin", "RightMargin", "TopMargin", "BottomMargin" })
-                page.Element(ns + margin)!.Value = "0.4in";
-            page.Element(ns + "Style")!.AddBeforeSelf(
-                new XElement(ns + "Columns",3),new XElement(ns + "ColumnSpacing","0.2in"));
-            document.Root.Element(ns + "Width")!.Value = "2.35in";
             var footer = table.Descendants(ns + "Textbox").Last();
             footer.Element(ns + "Style")!.Element(ns + "PaddingBottom")!.Value = "8pt";
+            AnnualReceiptReportLayout.Apply(document);
         }
         return document.ToString();
     }
