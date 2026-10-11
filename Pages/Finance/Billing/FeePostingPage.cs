@@ -144,6 +144,11 @@ public sealed class FeePostingPage : V2Page
     /// <summary>Rebuilds the Billing Month list for the chosen Academic Year and filters: only months that still have at least one eligible, unposted charge.</summary>
     private async Task RefreshMonthsAsync()
     {
+        // User decision (2026-10-11, scenario audit SC-02): academic-year month
+        // eligibility is handled by this C# workflow. The DropDownList is bound only
+        // to GetPostableMonths' bounded year list; filter changes invalidate the preview,
+        // and PostSelectedAsync rechecks that scope before sending its captured month.
+        // Do not add SQL changes solely for a direct call bypassing this workflow.
         int version = ++monthsLoadVersion;
         // Read on the UI thread, before the await.
         int previousKey = monthBox.SelectedId;
@@ -501,7 +506,8 @@ public sealed class FeePostingPage : V2Page
                 Warn("Load the eligible fees first, then choose what to post.");
                 return;
             }
-            /* The rows and the month must come from the same filter set. @BillingMonth is read live below. */
+            // The captured preview month and rows must still match the bounded month
+            // selection; a changed year/month requires a new preview before posting.
             if (!string.Equals(
                     appliedFilterSignature,
                     FilterSignature(),

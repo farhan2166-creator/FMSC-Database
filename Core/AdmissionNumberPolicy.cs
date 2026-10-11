@@ -42,7 +42,7 @@ internal static class AdmissionNumberPolicy
         // Existing records use their original admission date, independently of current enrollment.
         return Calculate(data.Tables[1], date, date, date);
     });
-    internal static Task<AdmissionNumberPlan> LoadAsync(DateTime date,int yearId) => Task.Run(()=> {
+    internal static Task<AdmissionNumberPlan> LoadAsync(DateTime date,int yearId,bool verifiedHistoricalRegister = false) => Task.Run(()=> {
         using var connection=DatabaseHelper.GetConnection();
         DatabaseHelper.OpenConnection(connection);
         using var command=new SqlCommand("""
@@ -55,10 +55,10 @@ internal static class AdmissionNumberPolicy
         using(var adapter=new SqlDataAdapter(command)) adapter.Fill(data);
         if(data.Tables[0].Rows.Count!=1) return new AdmissionNumberPlan(null,null,null,new(),"Select an academic year before assigning an admission number.");
         var year=data.Tables[0].Rows[0];
-        return Calculate(data.Tables[1],date,Convert.ToDateTime(year["StartDate"]),Convert.ToDateTime(year["EndDate"]));
+        return Calculate(data.Tables[1],date,Convert.ToDateTime(year["StartDate"]),Convert.ToDateTime(year["EndDate"]),verifiedHistoricalRegister);
     });
 
-    internal static AdmissionNumberPlan Calculate(DataTable students,DateTime date,DateTime start,DateTime end)
+    internal static AdmissionNumberPlan Calculate(DataTable students,DateTime date,DateTime start,DateTime end,bool verifiedHistoricalRegister = false)
     {
         var used=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var dated=new List<(DateTime Date,string Number)>();
@@ -74,6 +74,10 @@ internal static class AdmissionNumberPolicy
         var order=Comparer<string>.Create(AdmissionNumbers.Compare);
         string? lower=dated.Where(item=>item.Date<date.Date).Select(item=>item.Number).OrderByDescending(number=>number,order).FirstOrDefault();
         string? upper=dated.Where(item=>item.Date>date.Date).Select(item=>item.Number).OrderBy(number=>number,order).FirstOrDefault();
+        // User decision (2026-10-11): a verified historical physical-register number
+        // may conflict with legacy admission-date order. Keep normalization, uniqueness
+        // and date/year checks; ordinary admissions still enforce chronological bounds.
+        if(verifiedHistoricalRegister) { lower=null; upper=null; }
         if(lower is not null && upper is not null && AdmissionNumbers.Compare(lower,upper)>=0)
             return new(null,lower,upper,used,"Existing register numbers conflict with admission-date order. Review the surrounding records before saving.");
         string? anchor=dated.Where(item=>item.Date<=date.Date).OrderByDescending(item=>item.Date)

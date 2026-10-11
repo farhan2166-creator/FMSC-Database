@@ -2614,6 +2614,29 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     {
         if (transactionBusy)
             return;
+        try
+        {
+            var pending = CollectionRecoveryJournal.ReadPending();
+            if (pending is not null)
+            {
+                if (Confirm(
+                    "A previous collection was interrupted and may already have been recorded.\n\n" +
+                    pending.Summary + $"\nStarted: {pending.StartedUtc.ToLocalTime():dd-MMM-yyyy HH:mm}\n\n" +
+                    "Check Payment History and receipts for every student listed above. " +
+                    "Have you checked those records and established whether this collection was recorded?\n\n" +
+                    "Yes clears this recovery notice and the current entries. It does not record a payment.",
+                    "Review Interrupted Collection", defaultYes: false))
+                {
+                    CollectionRecoveryJournal.ClearReviewed(pending.Id);
+                    ClearPayment();
+                    Warn("Recovery review acknowledged. Select the student again to load current balances before entering a new collection.");
+                }
+                return;
+            }
+        }
+        catch (Exception ex) { Fail(ex); return; }
+        bool collectionCommitted = false;
+        string confirmedReceipt = string.Empty;
         transactionBusy = true;
         if (fullAmountButton is not null) fullAmountButton.Enabled = false;
         if (executeButton is not null)
@@ -2965,6 +2988,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             }
             /* A failure on the third child left the first two children's money committed while the operator was told the collection had failed. */
             DataTable result;
+            string recoverySummary = description + "\r\nStudents: " + string.Join(", ",
+                allocationLines.Select(group => $"{WhoIs(group.Key)} [AdmissionId {group.Key}]"));
             var billDiscountEdits = charges.Rows.Cast<DataGridViewRow>()
                 .Where(r => !r.IsNewRow && r.Cells["GrossAmount"].Tag is decimal original &&
                     original != GetDecimal(r.Cells["AppliedDiscount"].Value))
@@ -2982,6 +3007,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     await CollectionDiscountWriter.CollectAsync(
                         "ProcessFeeTransaction",
                         billDiscountEdits,
+                        recoverySummary,
                         DatabaseHelper.Int("@AdmissionId", single.Key),
                         DatabaseHelper.Int(
                             "@EnrollmentId",
@@ -3009,6 +3035,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     await CollectionDiscountWriter.CollectAsync(
                         "ProcessFamilyFeeTransaction",
                         billDiscountEdits,
+                        recoverySummary,
                         DatabaseHelper.P(
                             "@TransactionType",
                             transactionType),
@@ -3042,6 +3069,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                                                 g.Value.Rows)))
                         });
             }
+            collectionCommitted = true;
+            lastCollectionReceipt = null;
+            lastGroupReceiptNumber = null;
             var receipts = new List<string>();
             foreach (DataRow row in result.Rows)
             {
@@ -3061,6 +3091,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             string singleReceipt = distinctReceipts.Count == 1
                 ? distinctReceipts[0]
                 : string.Empty;
+            confirmedReceipt = string.Join(", ", distinctReceipts);
             bool isFamilyCollection = posted > 1;
             bool receiptNumberMissing =
                 isFamilyCollection && singleReceipt.Length == 0;
@@ -3184,7 +3215,26 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         }
         catch (Exception ex)
         {
-            Fail(ex);
+            if (collectionCommitted)
+            {
+                AppExceptionHandler.LogNonFatal(ex, "Refreshing a confirmed fee collection");
+                // The old allocation must not remain collectible if only the display
+                // failed after commit. Preserve a prepared receipt, but drop stale bills.
+                charges.Rows.Clear();
+                familyProposal.Rows.Clear();
+                string message = "The payment was recorded" +
+                    (confirmedReceipt.Length > 0 ? $". Receipt: {confirmedReceipt}" : string.Empty) +
+                    ", but the screen could not finish refreshing. Check Payment History before another collection; do not repeat this payment.";
+                collectionResult.Text = message; collectionResult.Visible = true;
+                Warn(message);
+            }
+            else if (ex is CollectionOutcomeUnknownException)
+            {
+                AppExceptionHandler.LogNonFatal(ex, "Unconfirmed fee collection outcome");
+                collectionResult.Text = ex.Message; collectionResult.Visible = true;
+                Warn(ex.Message);
+            }
+            else Fail(ex);
         }
         finally
         {

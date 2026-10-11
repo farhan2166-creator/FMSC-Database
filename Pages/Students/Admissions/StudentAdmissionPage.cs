@@ -2190,7 +2190,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 SetStatus("Next admission number preview. Select an academic year to calculate the suggestion for the admission date.");
                 return;
             }
-            var plan=await AdmissionNumberPolicy.LoadAsync(date,yearId);
+            var plan=await AdmissionNumberPolicy.LoadAsync(date,yearId,HistoricalAdmission);
             if(IsDisposed || saveBusy || version!=admissionNumberVersion || currentAdmissionId>0 || date!=admissionDate.Value.Date || yearId!=Year.SelectedId) return;
             admissionNumberPlan=plan;
             // Refresh the proposal on date/year changes, keeping the final number editable.
@@ -2198,6 +2198,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             admissionIdValue.Text = automaticAdmissionNumber;
             admissionIdValue.PlaceholderText=string.Empty;
             if(plan.Error is not null) SetStatus(plan.Error,true);
+            else if(HistoricalAdmission) SetStatus(plan.Suggested is not null
+                ? $"Suggested admission number: {plan.Suggested}. Verify it against the physical register, or enter the unused number recorded there."
+                : "Enter the unused admission number verified from the physical register.");
             else if(plan.Suggested is not null) SetStatus($"Suggested admission number: {plan.Suggested}. Retain it or enter another unused number within this date's register sequence.");
             else SetStatus("No number can be suggested for this date. Enter an unused historical register number within the surrounding date boundaries.",true);
         }
@@ -4100,7 +4103,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         using var numberingInputs=BeginBusy(string.Empty,admissionDate,Year,admissionIdValue);
         try
         {
-            admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId);
+            admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId,HistoricalAdmission);
             /* UX - every problem is marked on its own field at once (border + a few words on the caption), the first one takes focus. */
             if (!ValidateAdmissionInline(isNew: true))
                 return;
@@ -4226,7 +4229,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 admissionParameters.Add(DatabaseHelper.P("@VerifiedWithdrawalDate", firstWithdrawalDate.Checked ? firstWithdrawalDate.Value.Date : null));
             }
             bool savedHistorical = HistoricalAdmission;
-            admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId);
+            admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId,savedHistorical);
             if(admissionNumberPlan.Validate(admissionIdValue.Text) is { } numberingProblem)
             {
                 Warn(numberingProblem);

@@ -64,6 +64,10 @@ internal static class FeeAssignmentPosting
     }
     internal static DataTable PendingThrough(int enrollmentId, DateTime throughMonth)
     {
+        // User decision (2026-10-11, SC-02): the contextual monthly-posting workflow
+        // also gets its selectable months from GetPostableMonths' academic-year bounds.
+        // PendingStudentFeesDialog presents only those months; it cannot type an extra
+        // out-of-year month into PostReviewedAsync. No SQL alteration is required.
         var enrollment = DatabaseHelper.QuerySql("""
             EXEC dbo.RequirePermission @UserId, N'Fees.Collect';
             SELECT AcademicYearId FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId;
