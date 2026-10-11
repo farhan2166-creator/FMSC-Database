@@ -173,12 +173,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly ModernTextBox viewSection = PlacementViewField();
     private readonly ModernTextBox viewTransport = PlacementViewField();
     private readonly PictureBox photoPreview = new() {
+        TabStop = false,
         Dock = DockStyle.Fill,
         SizeMode = PictureBoxSizeMode.Zoom,
         BackColor = AppTheme.Surface,
         BorderStyle = BorderStyle.FixedSingle
     };
     private readonly Label photoInfo = new() {
+        TabStop = false,
         Dock = DockStyle.Fill,
         AutoSize = false,
         TextAlign = ContentAlignment.TopCenter,
@@ -186,7 +188,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         ForeColor = AppTheme.MutedText,
         Margin = new Padding(0, 4, 0, 4)
     };
-    private readonly Button choosePhotoButton = new ModernButton {
+    private readonly ModernButton choosePhotoButton = new() {
+        TakesFocus = false,
         Text = "Choose Photo...",
         Width = AppScale.Scale(150),
         Height = AppMetrics.ButtonHeight,
@@ -195,7 +198,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         ImageAlign = ContentAlignment.MiddleLeft,
         TextImageRelation = TextImageRelation.ImageBeforeText
     };
-    private readonly Button removePhotoButton = new ModernButton {
+    private readonly ModernButton removePhotoButton = new() {
+        TakesFocus = false,
         Text = "Remove Photo",
         Width = AppScale.Scale(150),
         Height = AppMetrics.ButtonHeight,
@@ -1085,6 +1089,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             0,
             3);
         var photoPanel = new TableLayoutPanel {
+            TabStop = false,
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 4,
@@ -1111,11 +1116,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 100));
         var photoCaption =
             HumanUi.GroupHeading("Photo");
+        photoCaption.TabStop = false;
         photoPreview.Dock = DockStyle.Fill;
         photoPreview.Margin = new Padding(0,4,0,4);
         photoPreview.SizeMode =
             PictureBoxSizeMode.Zoom;
         var photoButtons = new TableLayoutPanel {
+            TabStop = false,
             Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 2,
@@ -1127,9 +1134,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         photoButtons.RowStyles.Add(new RowStyle(SizeType.Percent,50F));
         choosePhotoButton.Dock = removePhotoButton.Dock = DockStyle.Fill;
         choosePhotoButton.Margin = removePhotoButton.Margin = new Padding(0,2,0,2);
-        /* Photo actions are mouse actions and do not interrupt the keyboard data-entry path. */
-        choosePhotoButton.TabStop = false;
-        removePhotoButton.TabStop = false;
+        // Photo controls stay outside the Tab / Enter path from details to placement.
         photoButtons.Controls.Add(choosePhotoButton,0,0);
         photoButtons.Controls.Add(removePhotoButton,0,1);
         photoPanel.Controls.Add(
