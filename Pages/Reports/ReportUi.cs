@@ -240,8 +240,8 @@ internal static class ReportUi
                 fitting = true;
                 try
                 {
-                    // Measure the button flow at the available width instead of feeding
-                    // the card's current height back into an autosized table.
+                    // Calculate wrapping from the buttons themselves. A flow panel's
+                    // preferred height can retain a narrow startup width constraint.
                     int bodyHeight = filters.Height;
                     compactBody.RowStyles[0].Height = bodyHeight;
                     if (compactButtons is not null)
@@ -249,7 +249,7 @@ internal static class ReportUi
                         var flow = compactButtons.Controls.OfType<FlowLayoutPanel>().Single();
                         int width = Math.Max(1, filterCard.Content.ClientSize.Width -
                             compactButtons.Padding.Horizontal);
-                        int buttonsHeight = flow.GetPreferredSize(new Size(width, 0)).Height +
+                        int buttonsHeight = WrappedButtonHeight(flow, width, !root.Visible) +
                             flow.Margin.Vertical + compactButtons.Padding.Vertical;
                         compactBody.RowStyles[1].Height = buttonsHeight + compactButtons.Margin.Vertical;
                         bodyHeight += buttonsHeight + compactButtons.Margin.Vertical;
@@ -270,9 +270,34 @@ internal static class ReportUi
             if (compactButtons is not null)
                 compactButtons.Layout += (_, _) => FitFilterCard();
             root.SizeChanged += (_, _) => FitFilterCard();
+            root.VisibleChanged += (_, _) => FitFilterCard();
             FitFilterCard();
         }
         return root;
+    }
+    private static int WrappedButtonHeight(FlowLayoutPanel flow, int availableWidth, bool includeHidden)
+    {
+        int width = Math.Max(1, availableWidth - flow.Padding.Horizontal);
+        int usedWidth = 0, rowHeight = 0, totalHeight = 0;
+        foreach (Control button in flow.Controls)
+        {
+            if (!includeHidden && !button.Visible) continue;
+            int buttonWidth = button.Width + button.Margin.Horizontal;
+            int buttonHeight = button.Height + button.Margin.Vertical;
+            if (usedWidth > 0 && usedWidth + buttonWidth > width)
+            {
+                totalHeight += rowHeight;
+                usedWidth = rowHeight = 0;
+            }
+            usedWidth += buttonWidth;
+            rowHeight = Math.Max(rowHeight, buttonHeight);
+            if (flow.GetFlowBreak(button))
+            {
+                totalHeight += rowHeight;
+                usedWidth = rowHeight = 0;
+            }
+        }
+        return totalHeight + rowHeight + flow.Padding.Vertical;
     }
     private static IEnumerable<Control> Descendants(Control root)
     {
