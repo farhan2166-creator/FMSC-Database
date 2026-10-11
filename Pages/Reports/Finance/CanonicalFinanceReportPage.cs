@@ -29,6 +29,9 @@ public abstract class CanonicalFinanceReportPage : V2Page
     private DataTable? _displayed;
     private string _appliedSignature = string.Empty;
     private string _filterSummary = string.Empty;
+    private readonly string _scopePreferenceKey;
+    private bool _scopeEdited;
+    private bool _applyingScope;
     protected CanonicalFinanceReportPage(
         string title,
         string description,
@@ -46,6 +49,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         _procedure = procedure;
         _usesDates = usesDates;
         _usesYear = usesYear;
+        _scopePreferenceKey = $"finance.{exportName}.last-scope";
         if (usesDates)
         {
             From.ShowCheckBox = To.ShowCheckBox = true;
@@ -78,7 +82,10 @@ public abstract class CanonicalFinanceReportPage : V2Page
         if (paymentMethod) fields.Add(("Payment Method", PaymentMethod));
         if (grouping) fields.Add(("Group Summary By", GroupBy));
         UiHelper.SetGridPlaceholderMessage(Grid, UiText.EmptyGrid.RunReport);
-        SetContent(ReportUi.CompactLayout(ReportUi.Bar(fields.ToArray()), Grid, title, reportActions.ToArray()));
+        SetContent(ReportUi.CompactLayout(ReportUi.Bar(fields.ToArray()), Grid, title, () => {
+            _scopeEdited = true;
+            ReportLayoutStore.SetPreference(_scopePreferenceKey, "");
+        }, reportActions.ToArray()));
         Grid.Parent?.Controls.Add(_summary);
         Grid.BringToFront();
         View.SelectedIndexChanged += (_, _) => { UpdateViewControls(); FiltersChanged(); };
@@ -87,7 +94,10 @@ public abstract class CanonicalFinanceReportPage : V2Page
         From.ValueChanged += (_, _) => FiltersChanged();
         To.ValueChanged += (_, _) => FiltersChanged();
         foreach (var lookup in new[] { Campus, Year, Class, Section })
-            lookup.SelectedIndexChanged += (_, _) => FiltersChanged();
+            lookup.SelectedIndexChanged += (_, _) => {
+                if (!_applyingScope) _scopeEdited = true;
+                FiltersChanged();
+            };
         UpdateViewControls();
     }
     protected virtual Task PreviewClassOutstandingAsync() => Task.CompletedTask;
@@ -106,12 +116,37 @@ public abstract class CanonicalFinanceReportPage : V2Page
             Task<DataTable> classesTask = DatabaseHelper.QueryUserAsync("GetClasses");
             Task<DataTable> sectionsTask = ReportUi.SectionFilterListAsync();
             await Task.WhenAll(campusesTask, yearsTask, classesTask, sectionsTask);
-            Campus.Bind(await campusesTask, "CampusId", "CampusName", "All");
-            Year.Bind(await yearsTask, "AcademicYearId", "YearName", "All");
-            Class.Bind(await classesTask, "ClassId", "ClassName", "All");
-            Section.Bind(await sectionsTask, "SectionId", "SectionName", "All");
+            if (IsDisposed) return;
+            _applyingScope = true;
+            try
+            {
+                Campus.Bind(await campusesTask, "CampusId", "CampusName", "All");
+                Year.Bind(await yearsTask, "AcademicYearId", "YearName", "All");
+                Class.Bind(await classesTask, "ClassId", "ClassName", "All");
+                Section.Bind(await sectionsTask, "SectionId", "SectionName", "All");
+                if (!_scopeEdited && _appliedSignature.Length == 0) RestoreLastScope();
+            }
+            finally { _applyingScope = false; }
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
+    }
+    private ReportScopeSelection CurrentScope() => new(Campus.SelectedId, _usesYear ? Year.SelectedId : 0, Class.SelectedId, Section.SelectedId);
+    private void RestoreLastScope()
+    {
+        var saved = ReportScopeSelection.Read(ReportLayoutStore.GetPreference(_scopePreferenceKey));
+        if (saved is null) return;
+        void Select(LookupBox box, int id)
+        {
+            if (id > 0) box.SelectedValue = id;
+            if (box.SelectedId <= 0) box.SelectedIndex = 0;
+        }
+        Select(Campus, saved.Campus);
+        if (_usesYear) Select(Year, saved.Year);
+        Select(Class, saved.Class);
+        Select(Section, saved.Section);
+        bool matches = saved == CurrentScope();
+        SetStatus(matches ? "Last location filters restored. Review them, then press Run Report."
+            : "Some saved filters are unavailable. Review them before running the report.", !matches);
     }
     private void UpdateViewControls()
     {
@@ -147,7 +182,9 @@ public abstract class CanonicalFinanceReportPage : V2Page
     }
     private async Task RunAsync()
     {
+        _scopeEdited = true;
         string requested = Signature();
+        ReportScopeSelection scopeToRemember = CurrentScope();
         try
         {
             if (_usesDates && !ReportUi.ValidDateRange(_rangeValidator ??= CreateValidator(), From, To)) return;
@@ -169,6 +206,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
             _filterSummary = summary + "   " + totalsText;
             _appliedSignature = requested;
             bool current = ReportMatchesCurrentFilters(requested);
+            if (current) ReportLayoutStore.SetPreference(_scopePreferenceKey, scopeToRemember.Serialize());
             _print.Enabled = current;
             _export.Enabled = current;
         }

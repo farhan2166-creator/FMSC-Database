@@ -95,7 +95,9 @@ internal static class ReportUi
         => BuildLayout(filters, grid, resultTitle, true, actionButtons);
     public static Control CompactLayout(Control filters, DataGridView grid, string resultTitle, params Control[] actionButtons)
         => BuildLayout(filters, grid, resultTitle, true, actionButtons);
-    private static Control BuildLayout(Control filters, DataGridView grid, string resultTitle, bool compact, params Control[] actionButtons)
+    public static Control CompactLayout(Control filters, DataGridView grid, string resultTitle, Action filtersCleared, params Control[] actionButtons)
+        => BuildLayout(filters, grid, resultTitle, true, actionButtons, filtersCleared);
+    private static Control BuildLayout(Control filters, DataGridView grid, string resultTitle, bool compact, Control[] actionButtons, Action? filtersCleared = null)
     {
         var clear = new ModernButton {
             Text = "Clear Filters",
@@ -170,6 +172,7 @@ internal static class ReportUi
                 }
             }
             RefreshFilterState();
+            filtersCleared?.Invoke();
         };
         foreach (Control control in Descendants(filters))
         {
