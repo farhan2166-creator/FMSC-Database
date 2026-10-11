@@ -130,6 +130,8 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
             _text.SelectAll();
         };
         _text.LostFocus += (_, _) => {
+            if (_selectedId > 0 && _text.Text == _committedText)
+                ShowTextStart();
             Invalidate();
             if (IsHandleCreated &&
                 !IsDisposed)
@@ -344,6 +346,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
             _selectedId = admissionId;
             _committedText =
                 _text.Text;
+            ShowTextStart();
         }
         finally
         {
@@ -530,10 +533,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
                 entry.Id;
             _committedText =
                 _text.Text;
-            _text.SelectionStart =
-                _text.TextLength;
-            _text.SelectionLength =
-                0;
+            ShowTextStart();
         }
         finally
         {
@@ -543,10 +543,17 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
         HidePopup();
         if (!_text.Focused)
             _text.Focus();
+        ShowTextStart();
         Invalidate();
         UserSelectionChanged?.Invoke(
             this,
             EventArgs.Empty);
+    }
+    private void ShowTextStart()
+    {
+        _text.SelectionStart = 0;
+        _text.SelectionLength = 0;
+        _text.ScrollToCaret();
     }
     private void OnListMouseDown(
         object? sender,
