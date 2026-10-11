@@ -54,6 +54,11 @@ public sealed class ClassSheetsPage : V2Page
             if (Grid.IsCurrentCellDirty) Grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
         };
         Grid.CellValueChanged += (_, _) => UpdateSelection();
+        // A shared busy action restores its button after completion. Recheck readiness
+        // even if its temporary disabled state hid an invalidation during the await.
+        previewButton.EnabledChanged += (_, _) => {
+            if (previewButton.Enabled && !CanPreviewSelection()) previewButton.Enabled = false;
+        };
         search.TextChanged += (_, _) => FilterStudents();
         var details = HumanUi.Card("Class and Exam Details",
             "Choose a class and section. Exam details may be left blank for handwriting.");
@@ -159,11 +164,14 @@ public sealed class ClassSheetsPage : V2Page
         UpdateSelection();
     }
 
+    private bool CanPreviewSelection() => !loading && roster is not null && loadedScope == CurrentScope()
+        && roster.AsEnumerable().Any(row => row.Field<bool>("Include"));
+
     private void UpdateSelection(bool showStatus = true)
     {
         int count = roster?.AsEnumerable().Count(row => row.Field<bool>("Include")) ?? 0;
         bool current = roster is not null && loadedScope == CurrentScope();
-        previewButton.Enabled = current && count > 0 && !loading;
+        previewButton.Enabled = CanPreviewSelection();
         selectAllButton.Enabled = clearSelectionButton.Enabled = current && roster!.Rows.Count > 0 && !loading;
         if (current && showStatus)
             Info($"{count} of {roster!.Rows.Count} students selected. Select All and Clear Selection apply to the whole class list.");

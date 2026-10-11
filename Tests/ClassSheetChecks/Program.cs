@@ -71,6 +71,21 @@ foreach (string kind in new[] { "Marks", "Attendance" })
     string html = Encoding.UTF8.GetString(report.Render("HTML4.0", null,
         out _, out _, out _, out _, out var warnings));
     Check(warnings.Length == 0, "No report processing warnings");
+    Check(definition.Descendants(ns + "Textbox").Where(box =>
+        ((string?)box.Attribute("Name"))?.Contains("Cell1") == true)
+        .All(box => box.Element(ns + "CanGrow")?.Value == "true"), "Student name cells allow complete wrapped names");
+    var longRoster = Students(1);
+    const string longName = "Muhammad Abdullah Abdul Rehman Khan Muhammad Ali Hassan";
+    longRoster.Rows[0]["StudentName"] = longName;
+    var longData = ClassSheetData.Create(longRoster, "Sample School", "Annual Examination for the Academic Session",
+        "English Language and Literature", "Friday, 12 October 2026", "Teacher Name With Several Words");
+    using var longReport = new LocalReport { ReportPath = path };
+    longReport.DataSources.Add(new ReportDataSource("ClassSheetData", longData));
+    string longHtml = Encoding.UTF8.GetString(longReport.Render("HTML4.0", null,
+        out _, out _, out _, out _, out var longWarnings));
+    Check(longWarnings.Length == 0 && Regex.Matches(longHtml, longName).Count == 2,
+        "Long names and entered headers render in both copies");
+
     for (int serial = 1; serial <= 61; serial++)
         Check(Regex.Matches(html, $"Student {serial:000}(?![0-9])").Count == 2, "Every student appears once in each copy");
     Check(!html.Contains("Former student") && !html.Contains("No enrollment"), "Excluded students are absent");
