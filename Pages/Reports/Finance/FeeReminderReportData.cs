@@ -6,6 +6,18 @@ namespace FMSC_SMS.Pages.Reports.Finance;
 
 internal static class FeeReminderReportData
 {
+    internal static void ApplySearch(DataTable roster, string search)
+    {
+        const string matchColumn = "SearchMatch";
+        if (!roster.Columns.Contains(matchColumn)) roster.Columns.Add(matchColumn, typeof(bool));
+        string term = search.Trim();
+        foreach (DataRow row in roster.Rows)
+            row[matchColumn] = term.Length == 0 || new[] { "StudentName", "FatherName", "AdmissionNumber" }
+                .Any(column => (Convert.ToString(row[column]) ?? "").Contains(term, StringComparison.CurrentCultureIgnoreCase));
+        // Search text is compared as literal text, never inserted into a filter expression.
+        roster.DefaultView.RowFilter = term.Length == 0 ? "" : matchColumn + " = true";
+    }
+
     internal static DataTable CreateRoster(DataTable balances)
     {
         var roster = new DataTable();

@@ -103,4 +103,36 @@ for (int i = 1; i <= 100; i++) Check(Regex.Matches(a4Html, $"Batch Student {i:00
     "Each selected student appears exactly once in the A4 batch");
 File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "FeeReminderA4Preview.html"), a4LongHtml);
 File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "FeeReminderA4BatchPreview.html"), a4Html);
+var searchRoster = FeeReminderReportData.CreateRoster(largeBalances);
+foreach (DataRow row in searchRoster.Rows) row["Include"] = false;
+FeeReminderReportData.ApplySearch(searchRoster, " student 001 ");
+Check(searchRoster.DefaultView.Count == 1 && searchRoster.DefaultView[0].Row.Field<int>("AdmissionId") == 1,
+    "Student search trims text and matches names without regard to case");
+foreach (DataRowView row in searchRoster.DefaultView) row["Include"] = true;
+FeeReminderReportData.ApplySearch(searchRoster, "Father 002");
+foreach (DataRowView row in searchRoster.DefaultView) row["Include"] = true;
+Check(searchRoster.DefaultView.Count == 1 && searchRoster.AsEnumerable().Where(row => row.Field<bool>("Include"))
+    .Select(row => row.Field<int>("AdmissionId")).SequenceEqual(new[] { 1, 2 }),
+    "Adding shown matches preserves checked students hidden by the next search");
+FeeReminderReportData.ApplySearch(searchRoster, "100");
+Check(searchRoster.DefaultView.Count == 1 && searchRoster.DefaultView[0].Row.Field<int>("AdmissionId") == 100,
+    "Admission numbers are searchable");
+FeeReminderReportData.ApplySearch(searchRoster, "No matching student");
+Check(searchRoster.DefaultView.Count == 0 && searchRoster.AsEnumerable().Count(row => row.Field<bool>("Include")) == 2,
+    "A search with no results does not clear selections");
+var checkedIds = searchRoster.AsEnumerable().Where(row => row.Field<bool>("Include"))
+    .Select(row => row.Field<int>("AdmissionId")).ToHashSet();
+Check(FeeReminderReportData.Create(largeBalances, checkedIds, "School", "", "", scope, prepared, null, "").Rows.Count == 2,
+    "Preview still includes checked students when search displays no rows");
+FeeReminderReportData.ApplySearch(searchRoster, "");
+Check(searchRoster.DefaultView.Count == 100 && searchRoster.AsEnumerable().Count(row => row.Field<bool>("Include")) == 2,
+    "Clearing search restores the whole list and retains selections");
+searchRoster.Rows[0]["StudentName"] = "O'Brien [A]%*";
+foreach (string term in new[] { "O'Brien", "[A]", "%", "*" })
+{
+    FeeReminderReportData.ApplySearch(searchRoster, term);
+    Check(searchRoster.DefaultView.Count == 1, "Search punctuation is treated literally: " + term);
+}
+Check(largeBalances.Rows.Count == 100 && largeBalances.Rows[0].Field<string>("StudentName") == "Batch Student 001",
+    "Searching and selecting do not modify source balances");
 Console.WriteLine($"PASS {checks} fee reminder checks, including the real RDLC rendered without warnings.");
