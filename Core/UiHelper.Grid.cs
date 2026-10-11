@@ -6,6 +6,7 @@ namespace FMSC_SMS.Core
         {
             if (grid == null)
                 return;
+            ApplyGridRowMetrics(grid);
             if (grid is not KeyboardDataGridView) grid.StandardTab = true;
             grid.CellFormatting -= GridCellFormatting;
             grid.CellFormatting += GridCellFormatting;
@@ -41,6 +42,26 @@ namespace FMSC_SMS.Core
             grid.Disposed += GridFitDisposed;
             ApplyGridColumnPresentation(grid);
             ScheduleColumnFit(grid);
+        }
+        /// <summary>Use the shared row spacing for existing, bound and manually added rows.
+        /// Wrapped content may grow beyond this height, but short text must not collapse it.</summary>
+        private static void ApplyGridRowMetrics(DataGridView grid, int startIndex = 0, int? rowCount = null)
+        {
+            int height = AppMetrics.GridRowHeight;
+            grid.RowTemplate.MinimumHeight = height;
+            grid.RowTemplate.Height = height;
+            int endIndex = Math.Min(grid.Rows.Count, startIndex + (rowCount ?? grid.Rows.Count));
+            bool fixedHeight = grid.AutoSizeRowsMode == DataGridViewAutoSizeRowsMode.None;
+            for (int index = Math.Max(0, startIndex); index < endIndex; index++)
+            {
+                // Avoid unsharing rows that already have the standard dimensions.
+                DataGridViewRow shared = grid.Rows.SharedRow(index);
+                if (shared.MinimumHeight == height && (!fixedHeight || shared.Height == height))
+                    continue;
+                DataGridViewRow row = grid.Rows[index];
+                row.MinimumHeight = height;
+                if (fixedHeight) row.Height = height;
+            }
         }
         /* One small object per grid, held weakly so it goes away with the grid. */
         private sealed class GridLook
@@ -254,6 +275,7 @@ namespace FMSC_SMS.Core
                     look.HoverRow = -1;
                 /* A bind is the answer to "waiting / loading / failed": from here on the grid shows its rows, or its ordinary "No records found." message. */
                 GridStates.Remove(grid);
+                ApplyGridRowMetrics(grid);
                 ApplyGridColumnPresentation(grid);
                 if (grid.AutoSizeColumnsMode == DataGridViewAutoSizeColumnsMode.None)
                     ScheduleColumnFit(grid);
@@ -875,6 +897,7 @@ namespace FMSC_SMS.Core
             if (sender is DataGridView grid)
             {
                 GridStates.Remove(grid);
+                ApplyGridRowMetrics(grid, e.RowIndex, e.RowCount);
                 if (grid.DataSource is null)
                     ScheduleColumnFit(grid);
             }
