@@ -21,9 +21,9 @@ internal static class GridReportPreview
         bool landscape = source.Columns.Count > 6;
         double width = landscape ? 10.67 : 7.25;
         string Inch(double value) => value.ToString("0.####", CultureInfo.InvariantCulture) + "in";
-        var weights = source.Columns.Cast<DataColumn>().Select(column =>
-            Math.Clamp(Math.Max(column.ColumnName.Length, source.AsEnumerable().Take(100)
-                .Select(row => Convert.ToString(row[column])?.Length ?? 0).DefaultIfEmpty(0).Max()), 8, 32)).ToArray();
+        var weights = source.Columns.Cast<DataColumn>().Select((column, index) =>
+            Math.Clamp(Math.Max(column.ColumnName.Length, data.AsEnumerable().Take(100)
+                .Select(row => row.Field<string>(index)?.Length ?? 0).DefaultIfEmpty(0).Max()), 8, 32)).ToArray();
         double totalWeight = weights.Sum();
         XElement Text(string name, string value, bool bold = false, string align = "Left", string size = "8pt") =>
             E("Textbox", new XAttribute("Name", name), E("CanGrow", true), E("CanShrink", true),
@@ -33,12 +33,16 @@ internal static class GridReportPreview
         var header = new List<XElement>(); var details = new List<XElement>();
         for (int index = 0; index < source.Columns.Count; index++)
         {
-            bool numeric = source.Columns[index].DataType == typeof(decimal) || source.Columns[index].DataType == typeof(int) || source.Columns[index].DataType == typeof(long);
-            var heading = Text("Heading" + index, source.Columns[index].ColumnName, true, numeric ? "Right" : "Left");
+            bool numeric = Type.GetTypeCode(source.Columns[index].DataType) is
+                TypeCode.Byte or TypeCode.SByte or TypeCode.Int16 or TypeCode.UInt16 or
+                TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Int64 or TypeCode.UInt64 or
+                TypeCode.Single or TypeCode.Double or TypeCode.Decimal;
+            string alignment = numeric ? "Right" : source.Columns[index].DataType == typeof(DateTime) ? "Center" : "Left";
+            var heading = Text("Heading" + index, source.Columns[index].ColumnName, true, alignment);
             heading.Element(ns + "Style")!.Add(E("BackgroundColor", "#E8F1EE"),
                 E("BottomBorder", E("Style", "Solid"), E("Width", "0.75pt"), E("Color", "#1F6F5F")));
             header.Add(E("TablixCell", E("CellContents", heading)));
-            var detail = Text("Value" + index, "=Fields!C" + index + ".Value", false, numeric ? "Right" : "Left");
+            var detail = Text("Value" + index, "=Fields!C" + index + ".Value", false, alignment);
             detail.Descendants(ns + "FontWeight").First().Value = "=IIf(Left(Fields!C0.Value, 5) = \"TOTAL\" Or Left(Fields!C0.Value, 3) = \"NET\", \"Bold\", \"Normal\")";
             detail.Element(ns + "Style")!.Add(E("BottomBorder", E("Style", "Solid"), E("Width", "0.25pt"), E("Color", "#D8E2E7")),
                 E("BackgroundColor", "=IIf(RowNumber(Nothing) Mod 2 = 0, \"#F6F9FA\", \"White\")"));
