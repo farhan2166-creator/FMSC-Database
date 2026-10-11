@@ -1,0 +1,16 @@
+# Established release packaging decision
+
+The user supplies the latest detached `FMSC_DB.mdf` and `FMSC_DB_log.ldf` in the
+`Database` folder adjacent to the project folder (`../Database`) when preparing
+a release package. The publish configuration validates and ships that pair.
+This is an established, user-owned release preparation step.
+
+Do not treat the absence of those files during development or a readiness review
+as a release blocker, an overlooked requirement, or something to repeatedly ask
+the user to provide. Check their presence and validity when actually preparing
+or validating the release package.
+
+Assess database migration requirements against the intended deployment scenario
+and the supplied snapshot. An empty migration folder alone does not establish
+that a release is blocked. Installation, existing-database upgrades, and recovery
+testing are separate verification questions; report concrete findings about them.

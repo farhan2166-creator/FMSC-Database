@@ -81,7 +81,10 @@
 	<!-- Staff assignment scheduling was intentionally retired on 2026-10-03; employment
 	     history remains active. CleanupArchive contains historical SQL only and must
 	     remain outside Migrations and active deployment migrations. -->
-	<!-- Database snapshots are optional for app-only updates. When supplied in the adjacent
+	<!-- Established user decision (see AGENTS.md): the user places the latest detached MDF/LDF
+	     in ../Database when preparing a release package. Their absence during development
+	     is expected and must not be reported as a release-readiness blocker.
+	     Database snapshots are optional for app-only updates. When supplied in the adjacent
 	     Database folder (or DeploymentDatabaseDirectory), validate and copy both detached files.
 	     Fresh installations still require a compatible snapshot; existing live data is preserved. -->
 	<!-- Validate installer, prerequisite, migrations and any supplied database snapshot before publishing. -->
