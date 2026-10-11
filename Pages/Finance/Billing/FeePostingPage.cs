@@ -31,6 +31,12 @@ public sealed class FeePostingPage : V2Page
     /* Guards RefreshMonthsAsync: only the newest request may land. */
     private int monthsLoadVersion;
     private ModernButton postButton = null!;
+    private readonly Label postingOutcome = new() {
+        Dock = DockStyle.Top, Visible = false,
+        Height = AppMetrics.TextHeight(AppTheme.NormalFont) * 2 + 12,
+        Padding = new Padding(8, 6, 8, 6), Font = AppTheme.NormalFont,
+        BackColor = AppTheme.SurfaceSecondary
+    };
     public FeePostingPage()
         : base(
             "Post Monthly Fees",
@@ -78,6 +84,8 @@ public sealed class FeePostingPage : V2Page
         section.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
         feeType.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
         SetContent(ReportUi.Layout(filters, Grid, "Post Monthly Fees", loadPreview, postButton, checkBilling));
+        Grid.Parent?.Controls.Add(postingOutcome);
+        Grid.BringToFront();
     }
     private void OpenBillingStatus()
     {
@@ -523,9 +531,11 @@ public sealed class FeePostingPage : V2Page
                 .Count();
             string month = loadedMonth.ToString("MMMM yyyy");
             int postingYearId = academicYear.SelectedId;
+            string scopeText = $"Academic year: {academicYear.Text}\nCampus: {campus.Text}; Class: {klass.Text}; Section: {section.Text}";
             int reversedCount=chosen.Count(row=>Convert.ToString(row["EligibilityNote"])!.StartsWith("Previously reversed",StringComparison.Ordinal));
             if (!Confirm(
                     $"Post {chosen.Count:N0} fee(s) for {students:N0} student(s) for {month}?" +
+                    $"\n\n{scopeText}" +
                     $"\n\nTotal net payable: Rs. {net:N0}\n\n" +
                     "Only the ticked rows are posted. Fees already posted for this month " +
                     $"are untouched, and nothing is posted for any month other than {month}."+
@@ -557,7 +567,10 @@ public sealed class FeePostingPage : V2Page
                 DatabaseHelper.P("@Reason", $"Posted from Post Monthly Fees for {month}."));
             int created = 0;
             int notPosted = 0;
-            if (result.Rows.Count > 0)
+            bool countsAvailable = result.Rows.Count > 0 && result.Columns.Contains("ChargesCreated")
+                && result.Columns.Contains("RowsNotPosted") && !result.Rows[0].IsNull("ChargesCreated")
+                && !result.Rows[0].IsNull("RowsNotPosted");
+            if (countsAvailable)
             {
                 DataRow summary = result.Rows[0];
                 if (result.Columns.Contains("ChargesCreated"))
@@ -566,15 +579,21 @@ public sealed class FeePostingPage : V2Page
                     notPosted = Convert.ToInt32(summary["RowsNotPosted"]);
             }
             /* report the attempt alongside the server's own counts, so a partial posting cannot read as a complete one. */
-            string resultText =
+            string resultText = countsAvailable ?
                 $"Post result for {month}: selected {chosen.Count:N0} fee row(s); " +
                 $"posted {created:N0} charge(s)" +
                 (notPosted > 0
                     ? $"; NOT posted {notPosted:N0} row(s) - already posted, or no longer eligible. " +
                       "The server reports those two reasons as one figure; re-check the eligible " +
                       "list below for detail."
-                    : "; nothing selected was left unposted.");
-            SetStatus(resultText, notPosted > 0);
+                    : "; nothing selected was left unposted.")
+                : $"Posting returned for {month}, but the server did not return counts. Review the refreshed eligible fees.";
+            postingOutcome.Text = countsAvailable
+                ? $"Last posting — {month}: {created:N0} charge(s) posted; {notPosted:N0} not posted.\nSelected: {chosen.Count:N0} fee(s) for {students:N0} student(s), net Rs. {net:N0}."
+                : resultText;
+            postingOutcome.ForeColor = AppTheme.StatusText(notPosted > 0 || !countsAvailable ? AppTheme.Warning : AppTheme.Success);
+            postingOutcome.Visible = true;
+            SetStatus(resultText, notPosted > 0 || !countsAvailable);
             // Refresh the month list first: a month that is now fully posted leaves it, which is what stops the operator picking it again.
             int postedKey = BillingMonthKey.From(loadedMonth);
             await RefreshMonthsAsync();
@@ -589,7 +608,7 @@ public sealed class FeePostingPage : V2Page
                     resultText +
                     $" {month} has nothing left to post for these filters, so it has " +
                     "been removed from the Billing Month list.",
-                    notPosted > 0);
+                    notPosted > 0 || !countsAvailable);
             }
         }
         catch (Exception ex)
