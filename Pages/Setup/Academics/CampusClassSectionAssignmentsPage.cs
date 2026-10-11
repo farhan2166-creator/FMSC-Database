@@ -73,17 +73,17 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
             HumanUi.Field("Campus", campus, true);
         var campusLayout =
             new TableLayoutPanel {
-                Dock = DockStyle.Top,
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Dock = DockStyle.Fill,
                 ColumnCount = 2,
                 RowCount = 1,
+                Height = AppMetrics.FieldRowHeight,
                 MinimumSize = new Size(0, AppMetrics.FieldRowHeight),
                 Margin = Padding.Empty,
                 Padding = Padding.Empty
             };
         campusLayout.ColumnStyles.Add(
             new ColumnStyle(SizeType.Percent, 50));
+        campusLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         campusLayout.ColumnStyles.Add(
             new ColumnStyle(SizeType.Percent, 50));
         campusLayout.Controls.Add(campusField, 0, 0);
@@ -105,12 +105,22 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
             Margin = Padding.Empty, Padding = Padding.Empty
         };
         matrixLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        matrixLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var controlsRow = new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight);
+        matrixLayout.RowStyles.Add(controlsRow);
         matrixLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         matrixLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         matrixLayout.Controls.Add(campusLayout, 0, 0);
         matrixLayout.Controls.Add(assignmentSummary, 0, 1);
         matrixLayout.Controls.Add(matrix, 0, 2);
+        // Bound the toolbar to its actual controls instead of the field panel's
+        // default preferred height, while allowing wrapped buttons on narrow windows.
+        campusLayout.SizeChanged += (_, _) => {
+            int toolsWidth = Math.Max(1, campusLayout.ClientSize.Width / 2);
+            int rowHeight = Math.Max(AppMetrics.FieldRowHeight,
+                bulkTools.GetPreferredSize(new Size(toolsWidth, 0)).Height);
+            if ((int)controlsRow.Height != rowHeight)
+                controlsRow.Height = rowHeight;
+        };
         matrixCard.Content.Controls.Add(matrixLayout);
         SetContent(matrixCard);
         UpdateAssignmentSummary();
