@@ -28,7 +28,7 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
     private bool matrixReady;
     private readonly Dictionary<(int ClassId, int SectionId), bool> savedAssignments = new();
     private readonly Label assignmentSummary = new() {
-        Dock = DockStyle.Fill, AutoSize = true, Font = AppTheme.NormalFont,
+        Dock = DockStyle.Fill, AutoSize = false, Font = AppTheme.NormalFont,
         ForeColor = AppTheme.MutedText, Padding = new Padding(4, 6, 4, 6)
     };
     private readonly List<ModernButton> matrixActions = new();
@@ -90,12 +90,12 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
         var matrixCard =
             HumanUi.Card("Class & Section Assignments", "Click and drag to check or uncheck a range. Ctrl+click toggles separate cells; Shift+click extends a range. Click a class name or section heading to toggle its group. Apply Changes saves your assignments.");
         var bulkTools = new FlowLayoutPanel {
-            Dock = DockStyle.Fill, AutoSize = true, WrapContents = true,
+            Dock = DockStyle.Fill, AutoSize = false, WrapContents = true,
             Margin = Padding.Empty, Padding = new Padding(8, AppScale.Scale(22), 0, 4)
         };
         foreach (var button in new[] { applyButton }.Concat(matrixActions))
         {
-            button.AutoSize = true;
+            button.AutoSize = false;
             button.Margin = new Padding(0, 2, 8, 2);
             bulkTools.Controls.Add(button);
         }
@@ -107,23 +107,47 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
         matrixLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         var controlsRow = new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight);
         matrixLayout.RowStyles.Add(controlsRow);
-        matrixLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var summaryRow = new RowStyle(SizeType.Absolute,
+            AppMetrics.TextHeight(assignmentSummary.Font) + assignmentSummary.Padding.Vertical
+            + assignmentSummary.Margin.Vertical);
+        matrixLayout.RowStyles.Add(summaryRow);
         matrixLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         matrixLayout.Controls.Add(campusLayout, 0, 0);
         matrixLayout.Controls.Add(assignmentSummary, 0, 1);
         matrixLayout.Controls.Add(matrix, 0, 2);
-        // Bound the toolbar to its actual controls instead of the field panel's
-        // default preferred height, while allowing wrapped buttons on narrow windows.
-        campusLayout.SizeChanged += (_, _) => {
-            int toolsWidth = Math.Max(1, campusLayout.ClientSize.Width / 2);
-            int rowHeight = Math.Max(AppMetrics.FieldRowHeight,
-                bulkTools.GetPreferredSize(new Size(toolsWidth, 0)).Height);
+        // Calculate wrapping directly: FlowLayoutPanel's preferred height can retain
+        // the temporary narrow layout used while the page is being initialized.
+        void UpdateControlsRowHeight()
+        {
+            int toolsWidth = campusLayout.ClientSize.Width / 2 - bulkTools.Padding.Horizontal;
+            if (toolsWidth <= 0) return;
+            int usedWidth = 0, lineHeight = 0, toolsHeight = bulkTools.Padding.Vertical;
+            foreach (Control button in bulkTools.Controls)
+            {
+                Size size = button.Size;
+                int width = size.Width + button.Margin.Horizontal;
+                int height = size.Height + button.Margin.Vertical;
+                if (usedWidth > 0 && usedWidth + width > toolsWidth)
+                {
+                    toolsHeight += lineHeight;
+                    usedWidth = 0;
+                    lineHeight = 0;
+                }
+                usedWidth += width;
+                lineHeight = Math.Max(lineHeight, height);
+            }
+            int rowHeight = Math.Max(AppMetrics.FieldRowHeight, toolsHeight + lineHeight);
             if ((int)controlsRow.Height != rowHeight)
                 controlsRow.Height = rowHeight;
-        };
+            summaryRow.Height = AppMetrics.TextHeight(assignmentSummary.Font)
+                + assignmentSummary.Padding.Vertical + assignmentSummary.Margin.Vertical;
+        }
+        campusLayout.SizeChanged += (_, _) => UpdateControlsRowHeight();
+        bulkTools.Layout += (_, _) => UpdateControlsRowHeight();
         matrixCard.Content.Controls.Add(matrixLayout);
         SetContent(matrixCard);
         UpdateAssignmentSummary();
+        Defer(UpdateControlsRowHeight);
     }
     private void BuildMatrix()
     {
