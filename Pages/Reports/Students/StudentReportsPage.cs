@@ -47,7 +47,8 @@ public partial class StudentReportsPage : V2Page
         string ChangeType,
         string ClientSearch,
         string YearName,
-        string CompareName);
+        string CompareName,
+        string Transport);
     private sealed record LoadResult(DataTable Raw, DataTable? Compare, bool HasBalance);
     // Report choice and column layouts survive Reset Filters; arrangements return to the mode's preset.
     private readonly ModernComboBox mode = NewCombo();
@@ -55,6 +56,7 @@ public partial class StudentReportsPage : V2Page
     private readonly ModernComboBox split = NewCombo();
     private readonly ModernComboBox sort = NewCombo();
     private readonly ModernComboBox views = NewCombo();
+    private readonly ModernComboBox transportFilter = NewCombo();
     private readonly ModernComboBox strengthScope = NewCombo();
     // filters
     private readonly LookupBox campus = new();
@@ -154,6 +156,9 @@ public partial class StudentReportsPage : V2Page
                 new Choice("left", "Former enrollments only")
             }, "active");
             SelectKey(mode, _mode);
+            FillChoices(transportFilter, new[] {
+                new Choice("", "All students"), new Choice("yes", "Uses transport"), new Choice("no", "No transport")
+            }, "");
             RebuildGroupChoices();
             ApplyPreset(_mode, keepFilters: true);
             RefreshViewChoices(string.Empty);
@@ -225,7 +230,7 @@ public partial class StudentReportsPage : V2Page
         AddField("Group by", group, false);
         AddField("Split by", split, false);
         AddField("Sort by", sort, false);
-        AddField("My views", views, false);
+        AddField("Views", views, false);
         /* What goes into it: only the filters the chosen report uses are shown. */
         AddField("Campus", campus, true);
         AddField("Academic Year", year, true);
@@ -235,6 +240,7 @@ public partial class StudentReportsPage : V2Page
         AddField("Section", section, true);
         AddField("Status", status, true);
         AddField("Gender", gender, true);
+        AddField("Transport", transportFilter, true);
         AddField("Change type", changeType, true);
         AddField("Search", search, true);
         AddField(string.Empty, limitDate, true);
@@ -286,6 +292,7 @@ public partial class StudentReportsPage : V2Page
     {
         mode.SelectionChangeCommitted += async (_, _) => await OnModeChosenAsync();
         strengthScope.SelectedIndexChanged += (_, _) => OnFilterChanged();
+        transportFilter.SelectedIndexChanged += (_, _) => OnFilterChanged();
         group.SelectionChangeCommitted += (_, _) => {
             RebuildSplitChoices();
             RebuildSortChoices();
@@ -432,6 +439,7 @@ public partial class StudentReportsPage : V2Page
     /// <summary>A preset is only a starting arrangement: how to group, how to sort, and which switches to throw.</summary>
     private void ApplyPreset(string key, bool keepFilters)
     {
+        SelectKey(transportFilter, "");
         switch (key)
         {
             case ModeAdmissions:
@@ -554,6 +562,7 @@ public partial class StudentReportsPage : V2Page
         ShowField(section, !changes);
         ShowField(status, register);
         ShowField(gender, !changes);
+        ShowField(transportFilter, _mode == ModeList);
         ShowField(changeType, changes);
         ShowField(search, register || changes);
         ShowField(limitDate, register || changes);
@@ -565,6 +574,7 @@ public partial class StudentReportsPage : V2Page
         cls.Enabled = !byId && cls.Items.Count > 1;
         section.Enabled = !byId && section.Items.Count > 1;
         status.Enabled = gender.Enabled = limitDate.Enabled = !byId;
+        transportFilter.Enabled = !byId;
         compareYear.Enabled = strength && year.SelectedId > 0 && compareYear.Items.Count > 1;
         from.Enabled = to.Enabled = !byId && LimitOn;
         inactive.Enabled = !byId && status.SelectedId == 0;
@@ -576,7 +586,7 @@ public partial class StudentReportsPage : V2Page
             foreach (var label in field.Controls.OfType<Label>())
                 label.ForeColor = control.Enabled ? AppTheme.Text : AppTheme.MutedText;
         }
-        foreach (var control in new Control[] { campus, year, status, gender, limitDate })
+        foreach (var control in new Control[] { campus, year, status, gender, limitDate, transportFilter })
             Explain(control, "Clear the Admission Number search to use this filter.");
         Explain(cls, byId ? "Clear the Admission Number search to use this filter." : "No classes are available for the selected campus and section.");
         Explain(section, byId ? "Clear the Admission Number search to use this filter." : "No sections are available for the selected campus and class.");
@@ -594,6 +604,8 @@ public partial class StudentReportsPage : V2Page
         string chosen = SelectedKey(mode);
         if (chosen.Length == 0 || chosen == _mode)
             return;
+        SelectKey(views, "");
+        deleteViewButton.Enabled = false;
         SwitchMode(chosen, applyPreset: true);
         await RunAsync();
     }
@@ -744,7 +756,7 @@ public partial class StudentReportsPage : V2Page
                 /* Admission Number is its own, independent filter: a search that is a whole number finds that one student whatever Campus / Year / Class / Section / Status say. */
                 if (TryAdmissionNumber(searchText, out _))
                     return $"{_mode}|id:{searchText}";
-                return $"{_mode}|{campus.SelectedId}|{(_mode == ModeList ? year.SelectedId : 0)}|{cls.SelectedId}|{section.SelectedId}|{SelectedText(status, "Name")}|{genderText}|{searchText}|{LimitOn}|{DateKey(from, LimitOn)}|{DateKey(to, LimitOn)}|{IncludeFormerStudentsOn}";
+                return $"{_mode}|{campus.SelectedId}|{(_mode == ModeList ? year.SelectedId : 0)}|{cls.SelectedId}|{section.SelectedId}|{SelectedText(status, "Name")}|{genderText}|{searchText}|{LimitOn}|{DateKey(from, LimitOn)}|{DateKey(to, LimitOn)}|{IncludeFormerStudentsOn}|{(_mode == ModeList ? SelectedKey(transportFilter) : "")}";
         }
     }
     /* Lets the shared report machinery compare the filters on screen with the ones a landing answered, so a report that arrives under changed filters is never treated as current. */
@@ -815,7 +827,9 @@ public partial class StudentReportsPage : V2Page
     protected override string ReportExportTitle() =>
         _shape.Grouped && _lastView is not null
             ? $"{ModeTitle(_lastView.Mode)} - by {GroupText(_lastView.GroupKey)}"
-            : ModeTitle(_mode);
+            : _mode == ModeList
+                ? StudentReportQuickViews.All.FirstOrDefault(view => "ready:" + view.Key == SelectedKey(views))?.Name ?? ModeTitle(_mode)
+                : ModeTitle(_mode);
     protected override string ReportExportSubtitle()
     {
         string text = string.Join("  |  ", new[] { _filterText, _countText }.Where(t => t.Length > 0));
@@ -842,7 +856,8 @@ public partial class StudentReportsPage : V2Page
         SelectedText(changeType, "Name"),
         _mode == ModeChanges ? search.Text.Trim() : string.Empty,
         SelectedText(year, "YearName"),
-        compareYear.SelectedId > 0 ? SelectedText(compareYear, "YearName") : string.Empty);
+        compareYear.SelectedId > 0 ? SelectedText(compareYear, "YearName") : string.Empty,
+        _mode == ModeList && !TryAdmissionNumber(search.Text.Trim(), out _) ? SelectedKey(transportFilter) : "");
     private RunArgs ReadArgs()
     {
         string searchText = search.Text.Trim();
@@ -873,6 +888,8 @@ public partial class StudentReportsPage : V2Page
     private string DescribeFilters(RunArgs a)
     {
         var parts = new List<string>();
+        if (a.Mode == ModeList && !a.ByAdmissionId && SelectedKey(transportFilter).Length > 0)
+            parts.Add(SelectedKey(transportFilter) == "yes" ? "Uses transport" : "No transport");
         if (a.ByAdmissionId)
         {
             parts.Add($"Admission Number {a.AdmissionNumber}");
@@ -1176,10 +1193,12 @@ public partial class StudentReportsPage : V2Page
         {
             views.Items.Clear();
             views.Items.Add(new Choice(string.Empty, "(none)"));
+            foreach (var view in StudentReportQuickViews.All)
+                views.Items.Add(new Choice("ready:" + view.Key, view.Name));
             foreach (var view in ReportLayoutStore.GetViews(ViewsKey))
-                views.Items.Add(new Choice(view.Name, view.Name));
-            SelectKey(views, selectKey);
-            deleteViewButton.Enabled = SelectedKey(views).Length > 0;
+                views.Items.Add(new Choice("saved:" + view.Name, "My view: " + view.Name));
+            SelectKey(views, selectKey.Length > 0 ? "saved:" + selectKey : "");
+            deleteViewButton.Enabled = SelectedSavedViewName().Length > 0;
         }
         finally
         {
@@ -1205,11 +1224,14 @@ public partial class StudentReportsPage : V2Page
         ["from"] = from.Value.Date.ToString("yyyy-MM-dd"),
         ["to"] = to.Value.Date.ToString("yyyy-MM-dd"),
         ["inactive"] = inactive.Checked ? "1" : "0",
+        ["transport"] = SelectedKey(transportFilter),
         ["columns"] = string.Join(",", CurrentReportColumns())
     };
     private void SaveCurrentView()
     {
-        string suggestion = SelectedKey(views);
+        string suggestion = SelectedSavedViewName();
+        if (suggestion.Length == 0 && views.SelectedItem is Choice choice && choice.Key.StartsWith("ready:", StringComparison.Ordinal))
+            suggestion = choice.Text;
         string? name = ReportNameDialog.Prompt(
             FindForm(),
             "Save view",
@@ -1237,7 +1259,7 @@ public partial class StudentReportsPage : V2Page
     }
     private void DeleteSelectedView()
     {
-        string name = SelectedKey(views);
+        string name = SelectedSavedViewName();
         if (name.Length == 0)
             return;
         if (!ModernMessageDialog.Confirm(
@@ -1256,8 +1278,26 @@ public partial class StudentReportsPage : V2Page
     {
         if (_busyViews)
             return;
-        string name = SelectedKey(views);
+        string key = SelectedKey(views);
+        string name = SelectedSavedViewName();
         deleteViewButton.Enabled = name.Length > 0;
+        var ready = StudentReportQuickViews.All.FirstOrDefault(view => "ready:" + view.Key == key);
+        if (ready is not null)
+        {
+            // Keep the chosen campus/year/class/section; start with a straightforward active-student list.
+            var state = CaptureState();
+            state["mode"] = ModeList;
+            state["group"] = state["split"] = GroupNone;
+            state["sort"] = "name";
+            state["search"] = state["status"] = state["gender"] = "";
+            state["compare"] = "0";
+            state["limit"] = state["inactive"] = "0";
+            state["transport"] = ready.Transport;
+            state["columns"] = ready.Columns;
+            ApplyState(state);
+            await RunAsync();
+            return;
+        }
         if (name.Length == 0)
             return;
         var view = ReportLayoutStore.GetViews(ViewsKey)
@@ -1267,6 +1307,8 @@ public partial class StudentReportsPage : V2Page
         ApplyState(view.State);
         await RunAsync();
     }
+    private string SelectedSavedViewName() => SelectedKey(views).StartsWith("saved:", StringComparison.Ordinal)
+        ? SelectedKey(views)[6..] : "";
     private static string Get(IReadOnlyDictionary<string, string> state, string key, string fallback = "") =>
         state.TryGetValue(key, out var value) ? value : fallback;
     private static int GetInt(IReadOnlyDictionary<string, string> state, string key) =>
@@ -1304,6 +1346,7 @@ public partial class StudentReportsPage : V2Page
             search.Text = Get(state, "search");
             limitDate.Checked = Get(state, "limit") == "1";
             inactive.Checked = Get(state, "inactive") == "1";
+            SelectKey(transportFilter, Get(state, "transport"));
             if (DateTime.TryParse(Get(state, "from"), out var fromDate))
                 from.Value = fromDate;
             if (DateTime.TryParse(Get(state, "to"), out var toDate))

@@ -325,7 +325,7 @@ public partial class StudentReportsPage
         string groupKey = ValidGroupKey(v.Mode, v.GroupKey);
         ViewArgs view = v with { GroupKey = groupKey };
         bool changes = v.Mode == ModeChanges;
-        DataTable rows = changes ? FilterChanges(raw, view) : raw;
+        DataTable rows = changes ? FilterChanges(raw, view) : StudentReportQuickViews.FilterTransport(raw, view.Transport);
         if (groupKey == GroupNone)
         {
             DataTable list = changes
