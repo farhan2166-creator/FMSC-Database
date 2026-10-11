@@ -454,10 +454,11 @@ namespace FMSC_SMS.Core
                     HumanizeColumnHeader(column.HeaderText);
                 if (name == "AdmissionNumber")
                     column.SortMode = DataGridViewColumnSortMode.Programmatic;
-                if (column.ValueType == typeof(DateTime) ||
+                if (string.IsNullOrEmpty(column.DefaultCellStyle.Format) &&
+                    (column.ValueType == typeof(DateTime) ||
                     column.ValueType == typeof(DateTime?) ||
                     name.EndsWith("Date", StringComparison.OrdinalIgnoreCase) ||
-                    name.EndsWith("At", StringComparison.OrdinalIgnoreCase))
+                    name.EndsWith("At", StringComparison.OrdinalIgnoreCase)))
                 {
                     bool hasTime =
                         name.EndsWith("At", StringComparison.OrdinalIgnoreCase) ||
@@ -475,7 +476,7 @@ namespace FMSC_SMS.Core
                     column.DefaultCellStyle.Alignment =
                         DataGridViewContentAlignment.MiddleRight;
                 }
-                /* UX - money reads the same everywhere: thousands separators and two decimals, only on real decimal columns the page has not formatted itself. */
+                /* Apply the default money format only when the page has not supplied one. */
                 if (string.IsNullOrEmpty(column.DefaultCellStyle.Format) &&
                     (column.ValueType == typeof(decimal) || column.ValueType == typeof(decimal?)) &&
                     IsMoneyColumnName(name))
@@ -526,6 +527,9 @@ namespace FMSC_SMS.Core
             name.Contains("Fine", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Total", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Charge", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Outstanding", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Refund", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Collection", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Payable", StringComparison.OrdinalIgnoreCase);
         /// <summary>UX - true when a grid is meant to be typed into: the grid is not read-only and at least one visible column accepts edits.</summary>
         private static bool IsEditableGrid(DataGridView grid)
@@ -626,6 +630,9 @@ namespace FMSC_SMS.Core
                 header.Equals("Admission No", StringComparison.OrdinalIgnoreCase))
                 column.HeaderText = "Adm. No.";
             if (!IsCenteredGridValue(column)) return;
+            // Keep the right alignment applied to amounts and measurements above,
+            // and preserve alignment supplied by a page for its specific columns.
+            if (column.DefaultCellStyle.Alignment != DataGridViewContentAlignment.NotSet) return;
             column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
         }
