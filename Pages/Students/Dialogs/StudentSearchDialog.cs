@@ -333,31 +333,20 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
             searchButton.Enabled = false;
             resetButton.Enabled = false;
             /* made a numeric search obey the filters on screen, so a campus + an admission number from another campus returned nothing. */
-            DataTable raw = isAdmissionIdSearch
-                ? await DatabaseHelper.QueryUserAsync(
-                    "GetStudents",
-                    DatabaseHelper.Int("@CampusId", campusId),
-                    DatabaseHelper.Int("@AcademicYearId", academicYearId),
-                    DatabaseHelper.Int("@ClassId", classId),
-                    DatabaseHelper.Int("@ClassSectionId", 0),
-                    DatabaseHelper.P("@Search", admissionNumber),
-                    DatabaseHelper.Bit("@IncludeFormerStudents", statusIndex == 0))
-                : await DatabaseHelper.QueryUserAsync(
-                    "GetStudents",
-                    DatabaseHelper.Int("@CampusId", campusId),
-                    DatabaseHelper.Int("@AcademicYearId", academicYearId),
-                    DatabaseHelper.Int("@ClassId", classId),
-                    DatabaseHelper.Int("@ClassSectionId", 0),
-                    DatabaseHelper.P("@Search", string.IsNullOrWhiteSpace(searchText) ? null : searchText),
-                    DatabaseHelper.Bit("@IncludeFormerStudents", statusIndex == 0));
+            DataTable raw = await DatabaseHelper.QueryUserAsync(
+                "GetStudents",
+                DatabaseHelper.Int("@CampusId", campusId),
+                DatabaseHelper.Int("@AcademicYearId", academicYearId),
+                DatabaseHelper.Int("@ClassId", classId),
+                DatabaseHelper.Int("@ClassSectionId", 0),
+                DatabaseHelper.P("@Search", null),
+                DatabaseHelper.Bit("@IncludeFormerStudents", statusIndex == 0));
             if (IsDisposed || version != searchVersion || !string.Equals(filterSignature, FilterSignature(), StringComparison.Ordinal)) return;
-            IEnumerable<DataRow> candidates = isAdmissionIdSearch
-                ? raw.Rows.Cast<DataRow>()
-                : HumanUi.FindStudentMatches(raw, searchText);
+            IEnumerable<DataRow> candidates = HumanUi.FindStudentMatches(raw, searchText);
             var filtered = new List<DataRow>();
             foreach (DataRow row in candidates)
             {
-                if (isAdmissionIdSearch && !string.Equals(AdmissionNumbers.Read(row), admissionNumber, StringComparison.OrdinalIgnoreCase))
+                if (isAdmissionIdSearch && !AdmissionNumbers.Read(row).StartsWith(admissionNumber, StringComparison.OrdinalIgnoreCase))
                     continue;
                 if (statusIndex != 0 &&
                     !string.Equals(GetTextColumn(row, "Status"), "Active", StringComparison.OrdinalIgnoreCase))
@@ -385,7 +374,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
                     openButton.Enabled = true;
                 }
                 status.Text = isAdmissionIdSearch
-                    ? $"No student found for Admission Number {admissionNumber}."
+                    ? $"No student found with an Admission Number starting with {admissionNumber}."
                     : "No students match the selected criteria.";
                 return;
             }
@@ -394,7 +383,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
             ShowSelectedDetails();
             status.Text = filtered.Count == 1
                 ? (isAdmissionIdSearch
-                    ? $"Admission Number {admissionNumber} found. Press Enter to open it."
+                    ? $"1 student found with an Admission Number starting with {admissionNumber}. Press Enter to open it."
                         + (filtersSetOnScreen ? " Campus, Year, Class and Status are not applied to an Admission Number search." : string.Empty)
                     : "1 student found. Press Enter to open the record.")
                 : $"{filtered.Count:N0} student(s) found. The first one is selected - "

@@ -408,7 +408,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
                     0),
                 DatabaseHelper.P(
                     "@Search",
-                    text),
+                    null),
                 DatabaseHelper.Bit("@IncludeFormerStudents", true));
             List<DataRow> matches = HumanUi.FindStudentMatches(raw, text);
             var display = new DataTable();

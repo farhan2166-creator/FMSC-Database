@@ -595,7 +595,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             "Payment", "Enter the amount received.");
         var summary = new TableLayoutPanel {
             Dock = DockStyle.Top, AutoSize = true,
-            ColumnCount = 1, RowCount = 13,
+            ColumnCount = 1, RowCount = 12,
             Padding = new Padding(0), Margin = new Padding(0)
         };
         summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -607,7 +607,6 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(40, AppScale.ControlSizeScale)));
         summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight + 2));
         summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight + 2));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 6));
         summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 6));
         summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 6));
         summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 6));
@@ -646,17 +645,18 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         summary.Controls.Add(HumanUi.Field("Remarks", remarks), 0, 7);
         fullAmountButton = AddAction("Use Full Amount", (_, _) => UseFullAmount(), "Secondary");
         var receiptActions = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 1,
+            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
             Margin = new Padding(0)
         };
-        receiptActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        receiptActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        receiptActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         receiptActions.Controls.Add(fullAmountButton, 0, 0);
+        receiptActions.Controls.Add(printReceiptButton!, 1, 0);
 
-        summary.Controls.Add(receiptActions, 0, 8);
-        summary.Controls.Add(executeButton!, 0, 9);
-        summary.Controls.Add(printReceiptButton!, 0, 10);
-        summary.Controls.Add(clear, 0, 11);
-        summary.Controls.Add(collectionResult, 0, 12);
+        summary.Controls.Add(executeButton!, 0, 8);
+        summary.Controls.Add(receiptActions, 0, 9);
+        summary.Controls.Add(clear, 0, 10);
+        summary.Controls.Add(collectionResult, 0, 11);
         foreach (ModernButton button in new[] { fullAmountButton!, printReceiptButton!, executeButton!, clear })
         {
             button.AutoSize = false;

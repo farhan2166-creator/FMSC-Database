@@ -9,9 +9,6 @@ internal static class StudentSearchMatcher
         string rawTerm = term;
         if (AdmissionNumbers.TryNormalize(term, out string normalizedNumber)) term = normalizedNumber;
         bool numeric = AdmissionNumbers.TryNormalize(term, out _);
-        string[] words = term.Length == 0
-            ? Array.Empty<string>()
-              : rawTerm.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
         DataColumn? admissionColumn = source.Columns.Contains("AdmissionNumber")
             ? source.Columns["AdmissionNumber"]
             : null;
@@ -24,24 +21,16 @@ internal static class StudentSearchMatcher
         DataColumn? registrationColumn = source.Columns.Contains("RegistrationNumber")
             ? source.Columns["RegistrationNumber"]
             : null;
-        bool Contains(DataRow row, DataColumn? column, string word) =>
+        bool StartsWith(DataRow row, DataColumn? column, string prefix) =>
             column is not null &&
             row[column] != DBNull.Value &&
             (Convert.ToString(row[column], CultureInfo.InvariantCulture) ?? string.Empty)
-                .IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0;
+                .TrimStart().StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
         bool MatchesText(DataRow row)
         {
-            foreach (string word in words)
-            {
-                if (!Contains(row, nameColumn, word) &&
-                    !Contains(row, fatherColumn, word) &&
-                    !Contains(row, registrationColumn, word) &&
-                    !Contains(row, admissionColumn, word))
-                {
-                    return false;
-                }
-            }
-            return true;
+            return StartsWith(row, nameColumn, rawTerm) ||
+                StartsWith(row, fatherColumn, rawTerm) ||
+                StartsWith(row, registrationColumn, rawTerm);
         }
         bool MatchesAdmissionPrefix(DataRow row)
         {

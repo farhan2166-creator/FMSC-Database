@@ -105,12 +105,13 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
             new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
         backupFields.RowStyles.Add(
             new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
+        backupFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         backupFields.Controls.Add(
             HumanUi.Field("Backup Folder", backupFolder),
             0,
             0);
         backupFields.Controls.Add(
-            HumanUi.ButtonRow(chooseBackupButton, backupNowButton),
+            CreateActionRow(chooseBackupButton, backupNowButton),
             0,
             1);
         backupCard.Content.Controls.Add(backupFields);
@@ -144,6 +145,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                 new RowStyle(SizeType.Absolute, restoreStatusHeight));
             restoreFields.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
+            restoreFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             restoreStatusHeadline = new Label {
                 Dock = DockStyle.Top,
                 Height = AppMetrics.TextHeight(AppTheme.FontSmallBold),
@@ -180,7 +182,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                 0,
                 1);
             restoreFields.Controls.Add(
-                HumanUi.ButtonRow(chooseRestoreButton!, restoreButton!),
+                CreateActionRow(chooseRestoreButton!, restoreButton!),
                 0,
                 2);
             restoreCard.Content.Controls.Add(restoreFields);
@@ -205,6 +207,28 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         /* LoadHistoryAsync opens the gate for the deferred load; this closes it first so no frame is painted in which Restore or Locate Missing File looks usable before the history has… */
         CloseHistoryDependentActions();
         Defer(LoadHistoryAsync);
+    }
+    static TableLayoutPanel CreateActionRow(params ModernButton[] buttons)
+    {
+        var row = new TableLayoutPanel {
+            Dock = DockStyle.Fill,
+            ColumnCount = buttons.Length,
+            RowCount = 1,
+            Margin = new Padding(0),
+            Padding = new Padding(0, AppMetrics.SpacingXs, 0, AppMetrics.SpacingXs)
+        };
+        row.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        for (int column = 0; column < buttons.Length; column++)
+        {
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / buttons.Length));
+            ModernButton button = buttons[column];
+            button.AutoSize = false;
+            button.MinimumSize = Size.Empty;
+            button.Dock = DockStyle.Fill;
+            button.Margin = new Padding(AppMetrics.SpacingXs, 0, AppMetrics.SpacingXs, 0);
+            row.Controls.Add(button, column, 0);
+        }
+        return row;
     }
     /// <summary>True only while the actions that read the backup history may be used at all.</summary>
     bool HistoryDependentActionsUsable =>
