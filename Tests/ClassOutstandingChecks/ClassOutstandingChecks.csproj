@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ReportViewerCore.NETCore" Version="15.1.33" />
+    <Compile Include="../../Pages/Reports/Finance/ClassOutstandingReportData.cs" Link="ClassOutstandingReportData.cs" />
+    <None Include="../../Pages/Reports/Templates/ClassOutstandingCharges.rdlc" Link="Reports/ClassOutstandingCharges.rdlc" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

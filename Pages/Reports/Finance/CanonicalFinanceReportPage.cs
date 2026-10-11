@@ -39,7 +39,8 @@ public abstract class CanonicalFinanceReportPage : V2Page
         bool usesDates,
         bool usesYear,
         bool paymentMethod,
-        bool grouping)
+        bool grouping,
+        bool classOutstandingPrint = false)
         : base(title, description)
     {
         _procedure = procedure;
@@ -59,7 +60,11 @@ public abstract class CanonicalFinanceReportPage : V2Page
         var run = AddBusyAction("Run Report", RunAsync, "Primary");
         _print = AddBusyAction(UiText.Actions.Print, PrintAsync, "Secondary");
         _export = AddExportAction(exportName);
-        RelocateFromActions(run, _print, _export);
+        var reportActions = new List<ModernButton> { run, _print };
+        if (classOutstandingPrint)
+            reportActions.Add(AddBusyAction("Class / Section A4", PreviewClassOutstandingAsync, "Secondary"));
+        reportActions.Add(_export);
+        RelocateFromActions(reportActions.ToArray());
         Defer(BindLookupsAsync);
         var fields = new List<(string, Control)> { ("View", View) };
         if (usesDates) { fields.Add(("From (optional)", From)); fields.Add(("To (optional)", To)); }
@@ -70,7 +75,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         if (paymentMethod) fields.Add(("Payment Method", PaymentMethod));
         if (grouping) fields.Add(("Group Summary By", GroupBy));
         UiHelper.SetGridPlaceholderMessage(Grid, UiText.EmptyGrid.RunReport);
-        SetContent(ReportUi.CompactLayout(ReportUi.Bar(fields.ToArray()), Grid, title, run, _print, _export));
+        SetContent(ReportUi.CompactLayout(ReportUi.Bar(fields.ToArray()), Grid, title, reportActions.ToArray()));
         Grid.Parent?.Controls.Add(_summary);
         Grid.BringToFront();
         View.SelectedIndexChanged += (_, _) => { UpdateViewControls(); FiltersChanged(); };
@@ -82,6 +87,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
             lookup.SelectedIndexChanged += (_, _) => FiltersChanged();
         UpdateViewControls();
     }
+    protected virtual Task PreviewClassOutstandingAsync() => Task.CompletedTask;
     protected abstract IEnumerable<SqlParameter> BuildParameters();
     protected virtual bool IsSummaryView => false;
     protected string ViewName => View.Text;
