@@ -142,12 +142,31 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
             summaryRow.Height = AppMetrics.TextHeight(assignmentSummary.Font)
                 + assignmentSummary.Padding.Vertical + assignmentSummary.Margin.Vertical;
         }
-        campusLayout.SizeChanged += (_, _) => UpdateControlsRowHeight();
-        bulkTools.Layout += (_, _) => UpdateControlsRowHeight();
+        bool controlsLayoutQueued = false;
+        void QueueControlsLayout()
+        {
+            if (controlsLayoutQueued || !matrixLayout.IsHandleCreated || matrixLayout.IsDisposed)
+                return;
+            controlsLayoutQueued = true;
+            matrixLayout.BeginInvoke(new Action(() => {
+                controlsLayoutQueued = false;
+                if (matrixLayout.IsDisposed) return;
+                // Changing row styles inside a Layout/SizeChanged callback leaves
+                // the current table pass using its old row sizes until another event.
+                UpdateControlsRowHeight();
+                int[] rowHeights = matrixLayout.GetRowHeights();
+                if (rowHeights.Length >= 2 &&
+                    (rowHeights[0] != (int)controlsRow.Height || rowHeights[1] != (int)summaryRow.Height))
+                    matrixLayout.PerformLayout();
+            }));
+        }
+        campusLayout.SizeChanged += (_, _) => QueueControlsLayout();
+        bulkTools.Layout += (_, _) => QueueControlsLayout();
+        matrixLayout.HandleCreated += (_, _) => QueueControlsLayout();
         matrixCard.Content.Controls.Add(matrixLayout);
         SetContent(matrixCard);
         UpdateAssignmentSummary();
-        Defer(UpdateControlsRowHeight);
+        Defer(QueueControlsLayout);
     }
     private void BuildMatrix()
     {
