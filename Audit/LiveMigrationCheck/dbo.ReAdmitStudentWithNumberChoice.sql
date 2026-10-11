@@ -1,0 +1,64 @@
+CREATE   PROCEDURE dbo.ReAdmitStudentWithNumberChoice
+ @UserId int,
+ @AdmissionId int,
+ @CampusId int,
+ @AcademicYearId int,
+ @ClassSectionId int,
+ @EnrollmentDate date,
+ @Reason nvarchar(500),
+ @UsesTransport bit,
+ @MonthlyStartMonth date = NULL,
+ @ChargeYearlyFees bit = NULL,
+ @ReviewedRates nvarchar(max) = NULL,
+ @AllotNewAdmissionNumber bit = 0
+AS
+BEGIN
+ SET NOCOUNT ON;
+ SET XACT_ABORT ON;
+ EXEC dbo.RequirePermission @UserId, N'Students.Administer';
+ IF @AllotNewAdmissionNumber IS NULL
+    THROW 57110, 'Choose whether to retain or allot an admission number.', 1;
+ BEGIN TRY
+  BEGIN TRANSACTION;
+  -- Use the existing allocator, shared with new admissions, to avoid competing sequences.
+  DECLARE @NewAdmissionNumber varchar(40);
+  IF @AllotNewAdmissionNumber = 1
+    EXEC dbo.ReserveAdmissionNumber @AdmissionNumber = @NewAdmissionNumber OUTPUT;
+
+  DECLARE @OriginalRegistrationNumber nvarchar(100), @OriginalAdmissionNumber varchar(40);
+  SELECT @OriginalRegistrationNumber = RegistrationNumber, @OriginalAdmissionNumber = AdmissionNumber
+    FROM dbo.Students WITH (UPDLOCK, HOLDLOCK) WHERE AdmissionId = @AdmissionId;
+  IF @OriginalAdmissionNumber IS NULL
+    THROW 57111, 'Select an existing student for readmission.', 1;
+
+  EXEC dbo.ReAdmitStudent
+    @UserId = @UserId, @AdmissionId = @AdmissionId, @CampusId = @CampusId,
+    @AcademicYearId = @AcademicYearId, @ClassSectionId = @ClassSectionId,
+    @EnrollmentDate = @EnrollmentDate, @Reason = @Reason, @UsesTransport = @UsesTransport,
+    @MonthlyStartMonth = @MonthlyStartMonth, @ChargeYearlyFees = @ChargeYearlyFees,
+    @ReviewedRates = @ReviewedRates;
+
+  IF @AllotNewAdmissionNumber = 1
+  BEGIN
+    IF @NewAdmissionNumber IS NULL OR @NewAdmissionNumber = @OriginalAdmissionNumber
+      THROW 57112, 'A new admission number could not be allotted.', 1;
+    -- Reuse existing validation, uniqueness protection and number-change audit logging.
+    EXEC dbo.SetStudentAdmissionNumber @UserId = @UserId, @AdmissionId = @AdmissionId,
+      @AdmissionNumber = @NewAdmissionNumber;
+  END;
+
+  IF NOT EXISTS (SELECT 1 FROM dbo.Students WHERE AdmissionId = @AdmissionId
+      AND (RegistrationNumber = @OriginalRegistrationNumber
+        OR (RegistrationNumber IS NULL AND @OriginalRegistrationNumber IS NULL)))
+    THROW 57113, 'Readmission must retain the student identity and registration number.', 1;
+  IF @AllotNewAdmissionNumber = 0 AND NOT EXISTS
+      (SELECT 1 FROM dbo.Students WHERE AdmissionId = @AdmissionId AND AdmissionNumber = @OriginalAdmissionNumber)
+    THROW 57114, 'Readmission must retain the selected admission number.', 1;
+  COMMIT TRANSACTION;
+ END TRY
+ BEGIN CATCH
+  IF XACT_STATE() <> 0 ROLLBACK TRANSACTION;
+  THROW;
+ END CATCH;
+END;
+

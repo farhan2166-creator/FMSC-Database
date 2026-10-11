@@ -247,8 +247,13 @@ internal static class ReportUi
                     if (compactButtons is not null)
                     {
                         var flow = compactButtons.Controls.OfType<FlowLayoutPanel>().Single();
-                        int width = Math.Max(1, filterCard.Content.ClientSize.Width -
-                            compactButtons.Padding.Horizontal);
+                        // The inner panel can still have its startup width while the
+                        // table is laying out. Use the owning row's available width
+                        // so that startup wrapping does not leave a tall empty card.
+                        int width = Math.Max(1, root.ClientSize.Width - root.Padding.Horizontal -
+                            filterCard.Margin.Horizontal - filterCard.Padding.Horizontal -
+                            filterCard.Content.Padding.Horizontal - compactBody.Padding.Horizontal -
+                            compactButtons.Margin.Horizontal - compactButtons.Padding.Horizontal);
                         int buttonsHeight = WrappedButtonHeight(flow, width, !root.Visible) +
                             flow.Margin.Vertical + compactButtons.Padding.Vertical;
                         compactBody.RowStyles[1].Height = buttonsHeight + compactButtons.Margin.Vertical;
@@ -270,6 +275,7 @@ internal static class ReportUi
             if (compactButtons is not null)
                 compactButtons.Layout += (_, _) => FitFilterCard();
             root.SizeChanged += (_, _) => FitFilterCard();
+            root.Layout += (_, _) => FitFilterCard();
             root.VisibleChanged += (_, _) => FitFilterCard();
             FitFilterCard();
         }

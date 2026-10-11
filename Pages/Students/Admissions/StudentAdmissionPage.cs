@@ -625,6 +625,30 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         if (preselectAdmissionId > 0) Defer(() => LoadStudentForEditAsync(preselectAdmissionId));
     }
     internal override bool FocusEntryField() => name.Visible && name.Enabled && name.Focus();
+    protected override bool ProcessDialogKey(Keys keyData)
+    {
+        if (tab1Panel.Visible && (keyData == Keys.Tab || keyData == (Keys.Tab | Keys.Shift)))
+        {
+            // Cross the separate details and placement cards in entry order,
+            // focusing the native input inside each wrapped control.
+            Control[] entryOrder = { altContact, admissionDate, Campus, Year, Class, Section, transport };
+            int current = Array.FindIndex(entryOrder, control => control.ContainsFocus);
+            if (current >= 0)
+            {
+                bool forward = keyData == Keys.Tab;
+                int step = forward ? 1 : -1;
+                for (int next = current + step; next >= 0 && next < entryOrder.Length; next += step)
+                    if (MasterEditorFocusNavigator.FocusInside(entryOrder[next])) return true;
+                if (forward)
+                {
+                    SwitchTab(1);
+                    if (!MasterEditorFocusNavigator.FocusInside(feeGrid)) tab2Button.Focus();
+                    return true;
+                }
+            }
+        }
+        return base.ProcessDialogKey(keyData);
+    }
     protected override void Dispose(bool disposing)
     {
         if (disposing)

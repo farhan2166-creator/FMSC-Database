@@ -1,0 +1,128 @@
+
+-- ConfirmPromotedAdmission
+CREATE   PROCEDURE dbo.ConfirmPromotedAdmission
+@UserId INT, @EnrollmentId INT, @ReturnDate DATE, @UsesTransport BIT, @FeeChoices dbo.ReturnFeeChoiceType READONLY
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Students.Administer';
+    IF @ReturnDate IS NULL
+       OR @ReturnDate > CONVERT (DATE, SYSDATETIME())
+        THROW 53010, 'Enter a valid return date that is not in the future.', 1;
+    IF EXISTS (SELECT 1
+               FROM   @FeeChoices
+               WHERE  Amount < 0
+                      OR DiscountAmount < 0
+                      OR DiscountAmount > Amount)
+        THROW 53011, 'Each fee amount and discount must be valid.', 1;
+    BEGIN TRANSACTION;
+    DECLARE @AdmissionId AS INT, @AcademicYearId AS INT, @ClassSectionId AS INT, @EnrollmentDate AS DATE, @BillingReady AS BIT, @YearEnd AS DATE, @CampusId AS INT, @ClassId AS INT;
+    SELECT @AdmissionId = E.AdmissionId,
+           @AcademicYearId = E.AcademicYearId,
+           @ClassSectionId = E.ClassSectionId,
+           @EnrollmentDate = E.EnrollmentDate,
+           @BillingReady = E.BillingReady
+    FROM   dbo.Enrollments AS E WITH (UPDLOCK, HOLDLOCK)
+    WHERE  E.EnrollmentId = @EnrollmentId
+           AND E.Status = N'Active';
+    IF @AdmissionId IS NULL
+       OR @BillingReady <> 0
+        THROW 53012, 'This promoted enrollment is not awaiting return confirmation.', 1;
+    SELECT @YearEnd = AY.EndDate
+    FROM   dbo.AcademicYears AS AY
+    WHERE  AY.AcademicYearId = @AcademicYearId;
+    IF @ReturnDate < @EnrollmentDate
+       OR @ReturnDate > @YearEnd
+        THROW 53013, 'Return date must be within the promoted academic year.', 1;
+    SELECT @CampusId = CCS.CampusId,
+           @ClassId = CCS.ClassId
+    FROM   dbo.CampusClassSections AS CCS
+    WHERE  CCS.ClassSectionId = @ClassSectionId;
+    IF EXISTS (SELECT 1
+               FROM   dbo.StudentFeeAssignments AS SFA
+                      INNER JOIN
+                      dbo.FeeTypes AS FT
+                      ON FT.FeeTypeId = SFA.FeeTypeId
+               WHERE  SFA.EnrollmentId = @EnrollmentId
+                      AND SFA.CancelledAt IS NULL
+                      AND FT.IsMandatory = 1
+                      AND NOT EXISTS (SELECT 1
+                                      FROM   @FeeChoices AS C
+                                      WHERE  C.FeeTypeId = SFA.FeeTypeId))
+       OR EXISTS (SELECT 1
+                  FROM   @FeeChoices AS C
+                  WHERE  NOT EXISTS (SELECT 1
+                                     FROM   dbo.StudentFeeAssignments AS SFA
+                                            INNER JOIN
+                                            dbo.FeeTypes AS FT
+                                            ON FT.FeeTypeId = SFA.FeeTypeId
+                                     WHERE  SFA.EnrollmentId = @EnrollmentId
+                                            AND SFA.CancelledAt IS NULL
+                                            AND FT.IsMandatory = 1
+                                            AND SFA.FeeTypeId = C.FeeTypeId))
+        THROW 53014, 'Review every mandatory class fee before confirming return.', 1;
+    UPDATE SFA
+    SET    Amount         = C.Amount,
+           DiscountAmount = C.DiscountAmount,
+           UpdatedAt      = SYSDATETIME()
+    FROM   dbo.StudentFeeAssignments AS SFA
+           INNER JOIN
+           @FeeChoices AS C
+           ON C.FeeTypeId = SFA.FeeTypeId
+    WHERE  SFA.EnrollmentId = @EnrollmentId
+           AND SFA.CancelledAt IS NULL;
+    IF @UsesTransport = 1
+        BEGIN
+            IF NOT EXISTS (SELECT 1
+                           FROM   dbo.FeeConfigurations AS FC
+                                  INNER JOIN
+                                  dbo.FeeTypes AS FT
+                                  ON FT.FeeTypeId = FC.FeeTypeId
+                           WHERE  FC.CampusId = @CampusId
+                                  AND FC.ClassId = @ClassId
+                                  AND FC.Frequency = N'Monthly'
+                                  AND FT.IsTransportLinked = 1)
+                THROW 53015, 'Transport cannot be selected without a monthly class fee.', 1;
+            INSERT dbo.StudentFeeAssignments (EnrollmentId, AdmissionId, FeeTypeId, Amount, DiscountAmount, Frequency, Remarks)
+            SELECT @EnrollmentId,
+                   @AdmissionId,
+                   FC.FeeTypeId,
+                   FC.Amount,
+                   0,
+                   FC.Frequency,
+                   N'Chosen at return admission'
+            FROM   dbo.FeeConfigurations AS FC
+                   INNER JOIN
+                   dbo.FeeTypes AS FT
+                   ON FT.FeeTypeId = FC.FeeTypeId
+            WHERE  FC.CampusId = @CampusId
+                   AND FC.ClassId = @ClassId
+                   AND FT.IsTransportLinked = 1
+                   AND NOT EXISTS (SELECT 1
+                                   FROM   dbo.StudentFeeAssignments AS SFA
+                                   WHERE  SFA.EnrollmentId = @EnrollmentId
+                                          AND SFA.FeeTypeId = FC.FeeTypeId
+                                          AND SFA.EffectiveTo IS NULL);
+        END
+    DECLARE @CutoffDay AS INT = (SELECT TOP (1) FeeProrationCutoffDay
+                                 FROM   dbo.SchoolProfile);
+    DECLARE @BillingStartDate AS DATE = CASE WHEN @CutoffDay BETWEEN 1 AND 28
+                                                  AND DAY(@ReturnDate) >= @CutoffDay THEN DATEADD(month, 1, DATEFROMPARTS(YEAR(@ReturnDate), MONTH(@ReturnDate), 1)) ELSE @ReturnDate END;
+    UPDATE dbo.Enrollments
+    SET    BillingReady      = 1,
+           ReturnConfirmedAt = CONVERT (DATETIME2 (0), @ReturnDate),
+           BillingStartDate  = @BillingStartDate,
+           UsesTransport     = @UsesTransport
+    WHERE  EnrollmentId = @EnrollmentId;
+    EXECUTE dbo.PostEnrollmentOpeningCharges @EnrollmentId = @EnrollmentId;
+    INSERT  dbo.EnrollmentHistory (EnrollmentId, AdmissionId, ActionType, ActionDate, OldClassSectionId, NewClassSectionId, OldStatus, NewStatus, Remarks, UserId)
+    VALUES                       (@EnrollmentId, @AdmissionId, N'ReturnConfirmed', @ReturnDate, @ClassSectionId, @ClassSectionId, N'Active', N'Active', N'Admission confirmed after promotion', @UserId);
+    COMMIT TRANSACTION;
+    SELECT @EnrollmentId AS EnrollmentId,
+           @AdmissionId AS AdmissionId,
+           @BillingStartDate AS BillingStartDate;
+END
+
+
+

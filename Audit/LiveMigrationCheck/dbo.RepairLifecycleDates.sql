@@ -1,0 +1,95 @@
+CREATE   PROCEDURE dbo.RepairLifecycleDates
+ @UserId int,@AdmissionId int,@ExpectedSnapshot nvarchar(max),@Changes nvarchar(max),@Reason nvarchar(500),
+ @AllowLegacyExceptions bit=0,@KeepFinancialHistory bit=0,
+ @CertificateChanges nvarchar(max)=N'[]',@UpdateWithdrawal bit=0,@NewWithdrawalDate date=NULL
+AS
+BEGIN
+ SET NOCOUNT ON; SET XACT_ABORT ON;
+ EXEC dbo.RequirePermission @UserId,N'Students.Administer';
+ IF NULLIF(LTRIM(RTRIM(@Reason)),N'') IS NULL THROW 57200,'A reason is required for this repair.',1;
+ IF ISJSON(@Changes)<>1 THROW 57201,'Reload the date repair before saving.',1;
+ BEGIN TRY
+  BEGIN TRANSACTION;
+  DECLARE @Locked int,@Actual nvarchar(max),@AdmissionDate date,@Status nvarchar(30),@Withdrawal date;
+  SELECT @Status=Status,@AdmissionDate=AdmissionDate,@Withdrawal=WithdrawalDate FROM dbo.Students WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@AdmissionId;
+  IF @Status IS NULL THROW 57201,'The student no longer exists.',1;
+  SELECT @Locked=COUNT(*) FROM dbo.Enrollments WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@AdmissionId;
+  SELECT @Locked=COUNT(*) FROM dbo.LeaveCertificates WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@AdmissionId;
+  EXEC dbo.GetLifecycleRepairSnapshot @AdmissionId,@Actual OUTPUT;
+  IF @ExpectedSnapshot IS NULL OR @Actual<>@ExpectedSnapshot THROW 57202,'Records changed while this repair was open. Reload and review again.',1;
+  DECLARE @Dates TABLE(EnrollmentId int PRIMARY KEY,EnrollmentDate date NOT NULL,LeavingDate date NULL,BillingStartDate date NULL);
+  INSERT @Dates SELECT EnrollmentId,EnrollmentDate,LeavingDate,BillingStartDate FROM OPENJSON(@Changes)
+   WITH(EnrollmentId int,EnrollmentDate date,LeavingDate date,BillingStartDate date);
+  IF EXISTS(SELECT EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId EXCEPT SELECT EnrollmentId FROM @Dates)
+    OR EXISTS(SELECT EnrollmentId FROM @Dates EXCEPT SELECT EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId)
+   THROW 57203,'Review every enrollment belonging to this student together.',1;
+  IF EXISTS(SELECT 1 FROM @Dates WHERE LeavingDate<EnrollmentDate)
+   THROW 57204,'A leaving date cannot precede its enrollment start. Correct the start date as well if it is wrong.',1;
+  IF EXISTS(SELECT 1 FROM @Dates WHERE EnrollmentDate>CONVERT(date,SYSDATETIME()) OR LeavingDate>CONVERT(date,SYSDATETIME()))
+   THROW 57205,'Historical enrollment and leaving dates cannot be in the future.',1;
+  IF EXISTS(SELECT 1 FROM @Dates D JOIN dbo.Enrollments E ON E.EnrollmentId=D.EnrollmentId
+     WHERE E.Status=N'Active' AND D.LeavingDate IS NOT NULL)
+   THROW 57206,'An active enrollment cannot have a leaving date. Correct its status separately if necessary.',1;
+  IF EXISTS(SELECT 1 FROM @Dates D JOIN dbo.LeaveCertificates L ON L.EnrollmentId=D.EnrollmentId WHERE D.LeavingDate IS NULL)
+   THROW 57207,'An enrollment with a leave certificate needs a leaving date.',1;
+  IF @AllowLegacyExceptions=0 AND (EXISTS(SELECT 1 FROM @Dates D WHERE D.EnrollmentDate<@AdmissionDate)
+    OR EXISTS(SELECT 1 FROM @Dates A JOIN @Dates B ON A.EnrollmentId<B.EnrollmentId
+      WHERE A.EnrollmentDate<=ISNULL(B.LeavingDate,'99991231') AND B.EnrollmentDate<=ISNULL(A.LeavingDate,'99991231'))
+    OR EXISTS(SELECT 1 FROM @Dates D JOIN dbo.Enrollments E ON E.EnrollmentId=D.EnrollmentId JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId
+      WHERE D.EnrollmentDate<Y.StartDate OR D.EnrollmentDate>Y.EndDate OR D.LeavingDate>Y.EndDate))
+   THROW 57208,'Dates overlap, precede admission, or fall outside an academic year. Correct them or explicitly acknowledge a legacy exception.',1;
+  SELECT @Locked=COUNT(*) FROM dbo.BillingCharges WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@AdmissionId;
+  IF @KeepFinancialHistory=0 AND EXISTS(SELECT 1 FROM dbo.BillingCharges WHERE AdmissionId=@AdmissionId)
+   THROW 57209,'Explicitly acknowledge that existing bills and payments retain their original dates and amounts.',1;
+  DECLARE @Before nvarchar(max)=@Actual,@Changed int;
+  UPDATE E SET EnrollmentDate=D.EnrollmentDate,LeavingDate=D.LeavingDate,BillingStartDate=D.BillingStartDate,UpdatedAt=SYSDATETIME()
+   FROM dbo.Enrollments E JOIN @Dates D ON D.EnrollmentId=E.EnrollmentId
+   WHERE E.EnrollmentDate<>D.EnrollmentDate OR ISNULL(E.LeavingDate,'19000101')<>ISNULL(D.LeavingDate,'19000101')
+     OR ISNULL(E.BillingStartDate,'19000101')<>ISNULL(D.BillingStartDate,'19000101');
+  SET @Changed=@@ROWCOUNT;
+  DECLARE @SelectedCertificates TABLE(LeaveRecordId int PRIMARY KEY,LeaveDate date NOT NULL);
+  IF ISJSON(@CertificateChanges)<>1 THROW 57210,'Reload and review the certificate corrections.',1;
+  INSERT @SelectedCertificates SELECT LeaveRecordId,LeaveDate FROM OPENJSON(@CertificateChanges)
+   WITH(LeaveRecordId int,LeaveDate date);
+  IF EXISTS(SELECT 1 FROM @SelectedCertificates C LEFT JOIN dbo.LeaveCertificates L ON L.LeaveRecordId=C.LeaveRecordId
+      WHERE L.LeaveRecordId IS NULL OR L.AdmissionId<>@AdmissionId)
+   THROW 57211,'A selected certificate does not belong to this student.',1;
+  IF EXISTS(SELECT 1 FROM @SelectedCertificates WHERE LeaveDate>CONVERT(date,SYSDATETIME()))
+   THROW 57212,'A historical certificate leave date cannot be in the future.',1;
+  IF @AllowLegacyExceptions=0 AND EXISTS(SELECT 1 FROM @SelectedCertificates C JOIN dbo.LeaveCertificates L ON L.LeaveRecordId=C.LeaveRecordId
+      JOIN @Dates D ON D.EnrollmentId=L.EnrollmentId WHERE D.LeavingDate IS NULL OR C.LeaveDate<>D.LeavingDate)
+   THROW 57213,'A selected certificate date differs from its enrollment leave date. Correct both, or explicitly acknowledge a legacy exception.',1;
+  UPDATE L SET LeaveDate=C.LeaveDate FROM dbo.LeaveCertificates L JOIN @SelectedCertificates C ON C.LeaveRecordId=L.LeaveRecordId WHERE L.LeaveDate<>C.LeaveDate;
+  DECLARE @Certificates int=@@ROWCOUNT,@FinalWithdrawal date=@Withdrawal;
+  IF @UpdateWithdrawal=1
+  BEGIN
+   IF @NewWithdrawalDate>CONVERT(date,SYSDATETIME()) THROW 57214,'A withdrawal date cannot be in the future.',1;
+   IF @Status=N'Active' AND @NewWithdrawalDate IS NOT NULL THROW 57215,'An active student cannot have a withdrawal date. Correct the student status separately.',1;
+   IF @AllowLegacyExceptions=0 AND @NewWithdrawalDate IS NOT NULL AND (@NewWithdrawalDate<@AdmissionDate OR
+      NOT EXISTS(SELECT 1 FROM @Dates D JOIN dbo.Enrollments E ON E.EnrollmentId=D.EnrollmentId WHERE E.Status=N'Left' AND D.LeavingDate=@NewWithdrawalDate))
+    THROW 57217,'The withdrawal date does not match a departure. Review the enrollment dates, or explicitly acknowledge a legacy exception.',1;
+   SET @FinalWithdrawal=@NewWithdrawalDate;
+   UPDATE dbo.Students SET WithdrawalDate=@FinalWithdrawal,UpdatedAt=SYSDATETIME() WHERE AdmissionId=@AdmissionId
+     AND ISNULL(WithdrawalDate,'19000101')<>ISNULL(@FinalWithdrawal,'19000101');
+   IF @@ROWCOUNT>0
+    INSERT dbo.StudentStatusHistory(AdmissionId,OldStatus,NewStatus,Reason,EffectiveDate,Remarks,CreatedBy)
+     VALUES(@AdmissionId,@Status,@Status,N'Withdrawal date repaired',ISNULL(@FinalWithdrawal,CONVERT(date,SYSDATETIME())),@Reason,@UserId);
+  END;
+  INSERT dbo.EnrollmentHistory(EnrollmentId,AdmissionId,ActionType,ActionDate,OldClassSectionId,NewClassSectionId,OldStatus,NewStatus,Remarks,UserId)
+   SELECT E.EnrollmentId,@AdmissionId,N'CORRECTION',CONVERT(date,SYSDATETIME()),E.ClassSectionId,E.ClassSectionId,E.Status,E.Status,
+    LEFT(N'Lifecycle dates reviewed: '+@Reason,500),@UserId FROM dbo.Enrollments E JOIN @Dates D ON D.EnrollmentId=E.EnrollmentId
+    WHERE EXISTS(SELECT 1 FROM OPENJSON(@Before,'$.Enrollments') WITH(EnrollmentId int,EnrollmentDate date,LeavingDate date,BillingStartDate date) O
+      WHERE O.EnrollmentId=E.EnrollmentId AND (O.EnrollmentDate<>D.EnrollmentDate OR ISNULL(O.LeavingDate,'19000101')<>ISNULL(D.LeavingDate,'19000101')
+        OR ISNULL(O.BillingStartDate,'19000101')<>ISNULL(D.BillingStartDate,'19000101')));
+  DECLARE @Operation uniqueidentifier=NEWID(),@After nvarchar(max),@Audit nvarchar(max);
+  EXEC dbo.GetLifecycleRepairSnapshot @AdmissionId,@After OUTPUT;
+  SET @Audit=(SELECT JSON_QUERY(@After) Records,@Reason Reason,@AllowLegacyExceptions LegacyException,
+    JSON_QUERY(@CertificateChanges) SelectedCertificateCorrections,@UpdateWithdrawal WithdrawalCorrectionSelected,
+    N'Existing charges, payments, original history entries and creation/issuance timestamps retained.' FinancialHistory FOR JSON PATH,WITHOUT_ARRAY_WRAPPER);
+  INSERT dbo.AuditOperations(OperationId,UserId,OperationType,CorrelationNote) VALUES(@Operation,@UserId,N'LIFECYCLE_DATE_REPAIR',CONVERT(nvarchar(200),@AdmissionId));
+  EXEC dbo.WriteAuditLog @OperationId=@Operation,@UserId=@UserId,@TableName=N'Enrollments',@RecordId=NULL,@Action=N'CORRECTION',@OldValues=@Before,@NewValues=@Audit;
+  COMMIT;
+  SELECT @Changed EnrollmentsChanged,@Certificates CertificatesUpdated,@FinalWithdrawal WithdrawalDate;
+ END TRY BEGIN CATCH IF XACT_STATE()<>0 ROLLBACK; THROW; END CATCH;
+END;
+

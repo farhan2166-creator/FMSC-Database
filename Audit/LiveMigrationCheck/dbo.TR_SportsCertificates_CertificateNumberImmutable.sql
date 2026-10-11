@@ -1,0 +1,19 @@
+
+CREATE TRIGGER dbo.TR_SportsCertificates_CertificateNumberImmutable
+ON dbo.SportsCertificates AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF UPDATE(CertificateNumber)
+       AND EXISTS
+       (
+           SELECT 1
+           FROM inserted AS I
+           INNER JOIN deleted AS D ON D.SportsCertificateId = I.SportsCertificateId
+           WHERE D.CertificateNumber IS NOT NULL
+             AND (I.CertificateNumber IS NULL OR I.CertificateNumber <> D.CertificateNumber)
+       )
+        THROW 59210, 'A certificate number is issued once and cannot be changed.', 1;
+END;
+

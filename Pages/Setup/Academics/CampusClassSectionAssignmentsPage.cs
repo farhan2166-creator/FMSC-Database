@@ -69,29 +69,29 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
                 LoadCampusMatrix();
             };
         Defer(BindLookups);
-        var contextCard =
-            HumanUi.Card("Campus", "Select a campus to configure its class and section assignments.");
         var campusField =
             HumanUi.Field("Campus", campus, true);
         var campusLayout =
             new TableLayoutPanel {
                 Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 ColumnCount = 2,
                 RowCount = 1,
-                Height = AppMetrics.FieldRowHeight,
-                Padding = new Padding(0)
+                MinimumSize = new Size(0, AppMetrics.FieldRowHeight),
+                Margin = Padding.Empty,
+                Padding = Padding.Empty
             };
         campusLayout.ColumnStyles.Add(
             new ColumnStyle(SizeType.Percent, 50));
         campusLayout.ColumnStyles.Add(
             new ColumnStyle(SizeType.Percent, 50));
         campusLayout.Controls.Add(campusField, 0, 0);
-        contextCard.Content.Controls.Add(campusLayout);
         var matrixCard =
             HumanUi.Card("Class & Section Assignments", "Click and drag to check or uncheck a range. Ctrl+click toggles separate cells; Shift+click extends a range. Click a class name or section heading to toggle its group. Apply Changes saves your assignments.");
         var bulkTools = new FlowLayoutPanel {
             Dock = DockStyle.Fill, AutoSize = true, WrapContents = true,
-            Margin = Padding.Empty, Padding = new Padding(0, 4, 0, 4)
+            Margin = Padding.Empty, Padding = new Padding(8, AppScale.Scale(22), 0, 4)
         };
         foreach (var button in new[] { applyButton }.Concat(matrixActions))
         {
@@ -99,6 +99,7 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
             button.Margin = new Padding(0, 2, 8, 2);
             bulkTools.Controls.Add(button);
         }
+        campusLayout.Controls.Add(bulkTools, 1, 0);
         var matrixLayout = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3,
             Margin = Padding.Empty, Padding = Padding.Empty
@@ -107,25 +108,11 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
         matrixLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         matrixLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         matrixLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        matrixLayout.Controls.Add(bulkTools, 0, 0);
+        matrixLayout.Controls.Add(campusLayout, 0, 0);
         matrixLayout.Controls.Add(assignmentSummary, 0, 1);
         matrixLayout.Controls.Add(matrix, 0, 2);
         matrixCard.Content.Controls.Add(matrixLayout);
-        var root =
-            new TableLayoutPanel {
-                Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 2,
-                Padding = new Padding(0),
-                Margin = new Padding(0)
-            };
-        root.RowStyles.Add(
-            new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(1)));
-        root.RowStyles.Add(
-            new RowStyle(SizeType.Percent, 100));
-        root.Controls.Add(contextCard, 0, 0);
-        root.Controls.Add(matrixCard, 0, 1);
-        SetContent(root);
+        SetContent(matrixCard);
         UpdateAssignmentSummary();
     }
     private void BuildMatrix()

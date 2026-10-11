@@ -1,0 +1,16 @@
+
+-- GetActiveClearanceChecklistItems
+CREATE   PROCEDURE dbo.GetActiveClearanceChecklistItems
+@UserId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Students.View';
+    SELECT   ItemId,
+             ItemText
+    FROM     dbo.ClearanceChecklistItems
+    ORDER BY DisplayOrder, ItemId;
+END
+
+
+

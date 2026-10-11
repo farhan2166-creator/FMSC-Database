@@ -1,0 +1,7 @@
+name is_disabled
+---- -----------
+GuardClosedEnrollmentCharges 0
+GuardFeeAssignmentPeriods 0
+name definition
+---- ----------
+DF_CampusClassSections_IsActive ((1))

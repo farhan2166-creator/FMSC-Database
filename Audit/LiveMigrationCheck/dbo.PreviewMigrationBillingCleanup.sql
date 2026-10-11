@@ -1,0 +1,40 @@
+
+
+CREATE PROCEDURE dbo.PreviewMigrationBillingCleanup
+    @UserId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission @UserId, N'System.Setup';
+
+    SELECT
+        E.EnrollmentId,
+        E.AdmissionId,
+        S.StudentName,
+        S.RegistrationNumber,
+        E.EnrollmentDate,
+        CMP.CampusName,
+        CLS.ClassName
+    FROM dbo.Enrollments E
+    INNER JOIN dbo.Students S
+        ON S.AdmissionId = E.AdmissionId
+    INNER JOIN dbo.CampusClassSections CCS
+        ON CCS.ClassSectionId = E.ClassSectionId
+    INNER JOIN dbo.Campuses CMP
+        ON CMP.CampusId = CCS.CampusId
+    INNER JOIN dbo.Classes CLS
+        ON CLS.ClassId = CCS.ClassId
+    WHERE E.Status = N'Active'
+      AND E.BillingStartDate IS NULL
+      AND NOT EXISTS
+      (
+          SELECT 1
+          FROM dbo.StudentFeeAssignments SFA
+          INNER JOIN dbo.BillingCharges BC
+              ON BC.StudentFeeAssignmentId = SFA.StudentFeeAssignmentId
+          WHERE SFA.EnrollmentId = E.EnrollmentId
+      )
+    ORDER BY S.RegistrationNumber;
+END;
+

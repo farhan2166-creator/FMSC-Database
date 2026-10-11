@@ -1,0 +1,42 @@
+
+/* =====================================================================
+   4. dbo.GetRegularLecturerCertificateRecords - grid of certificates for
+      a staff member (page always loads this scoped to the selected
+      staff member, same convention as
+      GetRegularStudentCertificateRecords).
+   ===================================================================== */
+
+CREATE   PROCEDURE dbo.GetRegularLecturerCertificateRecords
+    @UserId INT,
+    @StaffId INT = 0
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Certificates.Create';
+
+    SELECT
+        RLC.RegularLecturerCertificateId,
+        RLC.StaffId,
+
+        RLC.StaffName,
+        RLC.FatherName,
+        RLC.RoleTitle,
+        RLC.SubjectTaught,
+        RLC.CertificateDate,
+
+        RLC.CreatedAt,
+        RLC.UpdatedAt
+
+    FROM dbo.RegularLecturerCertificates AS RLC
+
+    WHERE
+        @StaffId = 0
+        OR RLC.StaffId = @StaffId
+
+    ORDER BY
+        RLC.RegularLecturerCertificateId DESC;
+END;
+
