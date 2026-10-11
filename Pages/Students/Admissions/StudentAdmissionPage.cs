@@ -110,6 +110,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly ModernDatePicker admissionDate = HumanUi.Date();
     private int admissionNumberVersion;
     private AdmissionNumberPlan? admissionNumberPlan;
+    private AdmissionNumberPlan? existingAdmissionNumberPlan;
+    private readonly LinkLabel correctAdmissionNumber = new() {
+        Text = "Review", AutoSize = true, Visible = false,
+        LinkColor = AppTheme.Danger, Anchor = AnchorStyles.None, Margin = Padding.Empty
+    };
     private readonly ModernTextBox registrationNo = HumanUi.TextBox(false, SchemaLengths.RegistrationNumber);
     private readonly ModernTextBox enrolmentNo = HumanUi.TextBox(false, SchemaLengths.BiseEnrolmentNumber);
     private readonly Label admissionIdCaption = new() {
@@ -128,7 +133,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         Height = AppMetrics.InputControlHeight,
         MaxLength = 40,
         Font = AppTheme.NormalFont,
-        PlaceholderText = "Assigned on save"
+        PlaceholderText = string.Empty
     };
     private readonly ModernComboBox transport = HumanUi.Combo();
     private bool UsesTransport =>
@@ -987,6 +992,23 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         admissionNumberHost.Resize += (_, _) => AlignAdmissionNumber();
         admissionIdentity.Controls.Add(admissionNumberHost, 1, 0);
         AlignAdmissionNumber();
+        admissionIdentity.ColumnCount = 3;
+        admissionIdentity.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        admissionIdentity.Controls.Add(correctAdmissionNumber, 2, 0);
+        admissionIdValue.TextChanged += (_, _) => UpdateAdmissionNumberWarning();
+        correctAdmissionNumber.LinkClicked += (_, _) => {
+            var plan = existingAdmissionNumberPlan;
+            if (plan is null) return;
+            string problem = plan.Validate(admissionIdValue.Text) ?? "Review this admission number.";
+            if (plan.Suggested is not { } suggestion) {
+                MessageBox.Show(this, problem + "\n\nNo safe number can be suggested. Review the surrounding admission records; you can leave this number unchanged.",
+                    "Admission Number Review", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (MessageBox.Show(this, problem + $"\n\nUse suggested admission number {suggestion}? Save the student to apply the correction.",
+                "Admission Number Review", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+                admissionIdValue.Text = suggestion;
+        };
         identityRow.Controls.Add(admissionIdentity, 3, 0);
 
         studentGuardianCard.Header.Controls.Add(identityRow);
@@ -2102,17 +2124,39 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private void UpdateAdmissionIdDisplay()
     {
+        existingAdmissionNumberPlan = null;
+        UpdateAdmissionNumberWarning();
         if (currentAdmissionId > 0)
         {
             admissionIdValue.Text = AdmissionNumbers.ForId(currentAdmissionId);
             admissionIdValue.PlaceholderText = string.Empty;
+            Defer(CheckExistingAdmissionNumberAsync);
         }
         else
         {
             admissionIdValue.Clear();
-            admissionIdValue.PlaceholderText = "Assigned on save";
+            admissionIdValue.PlaceholderText = string.Empty;
             Defer(ShowNextAdmissionNumberAsync);
         }
+    }
+    private void UpdateAdmissionNumberWarning()
+    {
+        bool warning = currentAdmissionId > 0 && existingAdmissionNumberPlan is { } plan && plan.Validate(admissionIdValue.Text) is not null;
+        admissionIdValue.ForeColor = warning ? AppTheme.Danger : AppTheme.Text;
+        correctAdmissionNumber.Visible = warning;
+        admissionIdValue.AccessibleDescription = warning ? "Admission number does not fit the original admission date. Review is optional." : string.Empty;
+    }
+    private async Task CheckExistingAdmissionNumberAsync()
+    {
+        int id = currentAdmissionId;
+        if (id <= 0 || IsDisposed) return;
+        try {
+            var plan = await AdmissionNumberPolicy.LoadExistingAsync(id);
+            if (IsDisposed || currentAdmissionId != id) return;
+            existingAdmissionNumberPlan = plan;
+            UpdateAdmissionNumberWarning();
+        }
+        catch (Exception ex) { if (!IsDisposed && currentAdmissionId == id) Fail(ex); }
     }
     private async Task ShowNextAdmissionNumberAsync()
     {
@@ -2123,12 +2167,21 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         admissionNumberPlan=null;
         try
         {
+            if (yearId <= 0)
+            {
+                string? preview = await AdmissionNumberPolicy.PreviewNextAsync();
+                if (IsDisposed || saveBusy || version != admissionNumberVersion || currentAdmissionId > 0 || date != admissionDate.Value.Date || yearId != Year.SelectedId) return;
+                admissionIdValue.Text = preview ?? string.Empty;
+                admissionIdValue.PlaceholderText = string.Empty;
+                SetStatus("Next admission number preview. Select an academic year to calculate the suggestion for the admission date.");
+                return;
+            }
             var plan=await AdmissionNumberPolicy.LoadAsync(date,yearId);
             if(IsDisposed || saveBusy || version!=admissionNumberVersion || currentAdmissionId>0 || date!=admissionDate.Value.Date || yearId!=Year.SelectedId) return;
             admissionNumberPlan=plan;
             // Refresh the proposal on date/year changes, keeping the final number editable.
             admissionIdValue.Text=plan.Suggested ?? "";
-            admissionIdValue.PlaceholderText=plan.Error ?? "Enter a historical register number";
+            admissionIdValue.PlaceholderText=string.Empty;
             if(plan.Error is not null) SetStatus(plan.Error,true);
             else if(plan.Suggested is not null) SetStatus($"Suggested admission number: {plan.Suggested}. Retain it or enter another unused number within this date's register sequence.");
             else SetStatus("No number can be suggested for this date. Enter an unused historical register number within the surrounding date boundaries.",true);

@@ -19,6 +19,29 @@ internal sealed record AdmissionNumberPlan(string? Suggested, string? Lower, str
 
 internal static class AdmissionNumberPolicy
 {
+    internal static Task<string?> PreviewNextAsync() => Task.Run(() => {
+        using var connection = DatabaseHelper.GetConnection();
+        DatabaseHelper.OpenConnection(connection);
+        using var command = new SqlCommand("dbo.GetNextAdmissionNumber", connection) { CommandType = CommandType.StoredProcedure };
+        command.Parameters.Add(DatabaseHelper.Int("@UserId", CurrentUser.UserId));
+        return Convert.ToString(command.ExecuteScalar());
+    });
+    internal static Task<AdmissionNumberPlan?> LoadExistingAsync(int admissionId) => Task.Run(() => {
+        using var connection = DatabaseHelper.GetConnection();
+        DatabaseHelper.OpenConnection(connection);
+        using var command = new SqlCommand("""
+            EXEC dbo.RequirePermission @UserId,N'Students.Administer';
+            SELECT AdmissionDate FROM dbo.Students WHERE AdmissionId=@AdmissionId;
+            SELECT AdmissionDate,AdmissionNumber FROM dbo.Students WHERE AdmissionId<>@AdmissionId;
+            """, connection);
+        command.Parameters.AddRange(new[] { DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@AdmissionId", admissionId) });
+        var data = new DataSet();
+        using (var adapter = new SqlDataAdapter(command)) adapter.Fill(data);
+        if (data.Tables[0].Rows.Count != 1 || data.Tables[0].Rows[0].IsNull("AdmissionDate")) return null;
+        DateTime date = Convert.ToDateTime(data.Tables[0].Rows[0]["AdmissionDate"]);
+        // Existing records use their original admission date, independently of current enrollment.
+        return Calculate(data.Tables[1], date, date, date);
+    });
     internal static Task<AdmissionNumberPlan> LoadAsync(DateTime date,int yearId) => Task.Run(()=> {
         using var connection=DatabaseHelper.GetConnection();
         DatabaseHelper.OpenConnection(connection);
