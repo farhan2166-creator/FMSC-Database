@@ -13,6 +13,11 @@ internal sealed class PendingStudentFeesDialog : ApplicationWindowForm
     private DataTable preview = new();
     private bool busy;
     private string resultNote = "";
+    private bool historical;
+    private string yearName = "";
+    private readonly ModernTextBox historicalReason = HumanUi.TextBox(false, 400);
+    private readonly Label scopeNotice = new() { Dock=DockStyle.Fill };
+    private readonly RowStyle reasonRow = new(SizeType.Absolute,0);
     public bool ReviewCompleted { get; private set; }
     public bool PostingMade { get; private set; }
     public PendingStudentFeesDialog(int enrollmentId)
@@ -43,19 +48,22 @@ internal sealed class PendingStudentFeesDialog : ApplicationWindowForm
         };
         grid.CellValueChanged+=(_,_)=>UpdateTotal();
         var close=new ModernButton { Text=UiText.Actions.Close, AutoSize=true, DialogResult=DialogResult.OK };
-        var root=new TableLayoutPanel { Dock=DockStyle.Fill, ColumnCount=1, RowCount=5, Padding=new Padding(AppScale.Scale(16)) };
+        var root=new TableLayoutPanel { Dock=DockStyle.Fill, ColumnCount=1, RowCount=6, Padding=new Padding(AppScale.Scale(16)) };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppScale.Scale(40)));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppScale.Scale(60)));
+        root.RowStyles.Add(reasonRow);
         root.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppScale.Scale(30)));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonRowHeight));
         root.Controls.Add(HumanUi.Field("Billing month",month),0,0);
-        root.Controls.Add(new Label { Text="Choose a month; click a row to select it. Reposting a reversed fee creates a new charge. Monthly fees only.", Dock=DockStyle.Fill },0,1);
-        root.Controls.Add(grid,0,2); root.Controls.Add(status,0,3);
-        var actions=HumanUi.ButtonRow(refresh,post,close); actions.Dock=DockStyle.Fill; root.Controls.Add(actions,0,4);
+        root.Controls.Add(scopeNotice,0,1);
+        root.Controls.Add(HumanUi.Field("Reason for historical posting",historicalReason,true),0,2);
+        root.Controls.Add(grid,0,3); root.Controls.Add(status,0,4);
+        var actions=HumanUi.ButtonRow(refresh,post,close); actions.Dock=DockStyle.Fill; root.Controls.Add(actions,0,5);
         Controls.Add(root);
         month.SelectedIndexChanged+=async(_,_)=> { if(!busy) await LoadMonthAsync(); };
         refresh.Click+=async(_,_)=>await LoadMonthsAsync();
+        historicalReason.TextChanged+=(_,_)=>UpdateTotal();
         post.Click+=async(_,_)=>await PostAsync();
         Shown+=async(_,_)=>await LoadMonthsAsync();
         FormClosing+=(_,e)=> {
@@ -64,7 +72,7 @@ internal sealed class PendingStudentFeesDialog : ApplicationWindowForm
     }
     private void ToggleRow(int index)
     {
-        if(busy || !ReviewCompleted || index<0 || index>=grid.Rows.Count) return;
+        if(busy || !ReviewCompleted || historical && !CurrentUser.IsAdministrator || index<0 || index>=grid.Rows.Count) return;
         var cell=grid.Rows[index].Cells["Post"];
         cell.Value=cell.Value is not true;
         UpdateTotal();
@@ -77,6 +85,21 @@ internal sealed class PendingStudentFeesDialog : ApplicationWindowForm
         SetBusy(true);
         bool loaded=false;
         try {
+            var scope=await Task.Run(()=>DatabaseHelper.QuerySql("""
+                EXEC dbo.RequirePermission @UserId,N'Fees.Collect';
+                SELECT A.YearName,A.IsCurrent FROM dbo.Enrollments E
+                JOIN dbo.AcademicYears A ON A.AcademicYearId=E.AcademicYearId WHERE E.EnrollmentId=@EnrollmentId;
+                """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@EnrollmentId",enrollmentId)));
+            if(scope.Rows.Count!=1) throw new InvalidOperationException("The enrollment no longer exists.");
+            historical=!Convert.ToBoolean(scope.Rows[0]["IsCurrent"]);
+            yearName=Convert.ToString(scope.Rows[0]["YearName"]) ?? "";
+            reasonRow.Height=historical && CurrentUser.IsAdministrator ? AppMetrics.FieldRowHeight : 0;
+            historicalReason.Enabled=historical && CurrentUser.IsAdministrator;
+            scopeNotice.Text=$"Academic year: {yearName}. Monthly fees only.\r\n"+
+                (historical ? CurrentUser.IsAdministrator
+                    ? "Historical posting: review the month and amount, then enter a reason. Admission charges stay unchanged."
+                    : "Historical fees are view-only. An administrator must review and post them."
+                    : "Choose a month; click a row to select it. Reposting a reversed fee creates a new charge.");
             var pending=await FeeAssignmentPosting.PendingThroughAsync(enrollmentId,DateTime.MaxValue.Date);
             month.Items.Clear();
             foreach(var date in pending.AsEnumerable().Select(row=>Convert.ToDateTime(row["BillingMonth"])).Distinct().OrderBy(date=>date)) month.Items.Add(new MonthChoice(date));
@@ -128,21 +151,25 @@ internal sealed class PendingStudentFeesDialog : ApplicationWindowForm
         if(!ReviewCompleted) { status.Text="Review not loaded. Refresh before posting."; post.Enabled=false; return; }
         var selected=Selected();
         status.Text=resultNote+$"{preview.Rows.Count} pending; {selected.Rows.Count} selected — Rs. {selected.AsEnumerable().Sum(row=>Convert.ToDecimal(row["NetAmount"])):N0}";
-        post.Enabled=!busy && selected.Rows.Count>0;
+        post.Enabled=!busy && selected.Rows.Count>0 && (!historical ||
+            CurrentUser.IsAdministrator && !string.IsNullOrWhiteSpace(historicalReason.Text));
     }
     private async Task PostAsync()
     {
         if(busy) return;
         var selected=Selected(); if(selected.Rows.Count==0) return;
+        if(historical && (!CurrentUser.IsAdministrator || string.IsNullOrWhiteSpace(historicalReason.Text))) return;
+        string reason=historicalReason.Text.Trim();
         DateTime date=Convert.ToDateTime(selected.Rows[0]["BillingMonth"]);
         decimal total=selected.AsEnumerable().Sum(row=>Convert.ToDecimal(row["NetAmount"]));
         string details=string.Join("\r\n",selected.AsEnumerable().Select(row =>
             $"{row["FeeTypeName"]}: Rs. {Convert.ToDecimal(row["NetAmount"]):N0}" +
             (Convert.ToString(row["ReviewNote"])!.StartsWith("Previously reversed") ? " (reposting a reversed fee)" : "")));
-        if(!ModernMessageDialog.Confirm(this,$"Post {selected.Rows.Count} selected fee(s) for {date:MMMM yyyy}?\r\n\r\n{details}\r\n\r\nTotal: Rs. {total:N0}","Post Selected Fees",defaultYes:false)) return;
+        if(!ModernMessageDialog.Confirm(this,$"Academic year: {yearName}\r\nPost {selected.Rows.Count} selected fee(s) for {date:MMMM yyyy}?\r\n\r\n{details}\r\n\r\nTotal: Rs. {total:N0}"+
+            (historical ? $"\r\nHistorical posting reason: {reason}" : ""),"Post Selected Fees",defaultYes:false)) return;
         SetBusy(true);
         try {
-            int created=await FeeAssignmentPosting.PostReviewedAsync(selected);
+            int created=await FeeAssignmentPosting.PostReviewedAsync(selected,reason);
             PostingMade=true;
             resultNote=$"Posted {created} fee(s), {date:MMM yyyy}, Rs. {total:N0}.  ";
         }

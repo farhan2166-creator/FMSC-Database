@@ -14,6 +14,36 @@ namespace FMSC_SMS.Core
         private const int TextInsetRight = 8;
         private const int MultilineVerticalInset = 8;
         private bool _isHovered;
+        private bool _blendWithParent;
+        private Control? _backgroundParent;
+        public bool BlendWithParent
+        {
+            get => _blendWithParent;
+            set { _blendWithParent = value; UpdateBlendedBackground(); Invalidate(); }
+        }
+        private void UpdateBlendedBackground()
+        {
+            if (!_blendWithParent) return;
+            Control? parent = Parent;
+            while (parent is not null && parent.BackColor.A < 255) parent = parent.Parent;
+            Color color = parent?.BackColor ?? AppTheme.SectionHeaderBackground;
+            if (BackColor != color) BackColor = color;
+            if (_inner is not null) _inner.BackColor = color;
+        }
+        private void ParentBackgroundChanged(object? sender, EventArgs e) => UpdateBlendedBackground();
+        protected override void OnParentChanged(EventArgs e)
+        {
+            if (_backgroundParent is not null) _backgroundParent.BackColorChanged -= ParentBackgroundChanged;
+            base.OnParentChanged(e);
+            _backgroundParent = Parent;
+            if (_backgroundParent is not null) _backgroundParent.BackColorChanged += ParentBackgroundChanged;
+            UpdateBlendedBackground();
+        }
+        public HorizontalAlignment TextAlign
+        {
+            get => _inner.TextAlign;
+            set => _inner.TextAlign = value;
+        }
         public int CornerRadius
         {
             get => _radius;
@@ -72,6 +102,7 @@ namespace FMSC_SMS.Core
             _inner.ForeColor = AppTheme.Text;
             _inner.BackColor = AppTheme.SurfaceElevated;
             UiTheme.ApplyControl(this);
+            UpdateBlendedBackground();
             Reposition();
             Invalidate();
             _inner.Invalidate();
@@ -81,6 +112,7 @@ namespace FMSC_SMS.Core
             if (disposing)
             {
                 _liveSuggestions?.Dispose();
+                if (_backgroundParent is not null) _backgroundParent.BackColorChanged -= ParentBackgroundChanged;
                 AppTheme.ThemeChanged -= OnThemeChanged;
             }
             base.Dispose(disposing);
@@ -233,6 +265,7 @@ namespace FMSC_SMS.Core
             base.OnBackColorChanged(e);
             if (_inner != null)
                 _inner.BackColor = BackColor;
+            UpdateBlendedBackground();
             Invalidate();
         }
         protected override void OnEnabledChanged(EventArgs e)
@@ -274,6 +307,15 @@ namespace FMSC_SMS.Core
         }
         protected override void OnPaint(PaintEventArgs e)
         {
+            if (_blendWithParent)
+            {
+                if (_invalid || _inner.Focused)
+                {
+                    using var underline = new Pen(_invalid ? AppTheme.Danger : AppTheme.BorderFocus, 1.5F);
+                    e.Graphics.DrawLine(underline, 8, Height - 2, Math.Max(8, Width - 8), Height - 2);
+                }
+                return;
+            }
             e.Graphics.SmoothingMode =
                 SmoothingMode.AntiAlias;
             var rect =

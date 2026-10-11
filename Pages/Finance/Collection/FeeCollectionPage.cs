@@ -459,6 +459,32 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             Width = AppScale.Scale(205),
             Height = AppMetrics.ButtonHeight
         };
+        var reverseChargeButton = new ModernButton {
+            Text = "Reverse Charge",
+            ThemeRole = "Danger",
+            Width = AppScale.Scale(150),
+            Height = AppMetrics.ButtonHeight,
+            Enabled = false
+        };
+        void UpdateReverseChargeButton() => reverseChargeButton.Enabled =
+            !transactionBusy && charges.Enabled && charges.CurrentRow is { } row &&
+            GetLong(row.Cells["BillingChargeId"].Value) > 0;
+        charges.SelectionChanged += (_, _) => UpdateReverseChargeButton();
+        charges.EnabledChanged += (_, _) => UpdateReverseChargeButton();
+        charges.DataBindingComplete += (_, _) => UpdateReverseChargeButton();
+        reverseChargeButton.Click += async (_, _) => {
+            if (transactionBusy || charges.CurrentRow is not { } row) return;
+            await ReverseChargeAsync(row.Index);
+            UpdateReverseChargeButton();
+        };
+        var chargeActions = new FlowLayoutPanel {
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false, Margin = Padding.Empty, Padding = Padding.Empty
+        };
+        allocationButton.Margin = new Padding(0,0,AppMetrics.SpacingSm,0);
+        reverseChargeButton.Margin = Padding.Empty;
+        chargeActions.Controls.Add(allocationButton);
+        chargeActions.Controls.Add(reverseChargeButton);
         manualAllocation = false;
         charges.Columns["Pay"].Visible = false;
         charges.Columns["Amount"].ReadOnly = true;
@@ -474,8 +500,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         var chargeCard =
             HumanUi.Card(
                 "Outstanding Charges",
-                "Payments are allocated automatically. Adjust Allocation is available when you need to pay specific charges.", AppTheme.ModuleAccent("Finance"), allocationButton);
-        chargeCard.Header.Controls.SetChildIndex(allocationButton, chargeCard.Header.Controls.Count - 1);
+                "Select a charge to reverse it. Use Adjust Allocation to pay specific charges.", AppTheme.ModuleAccent("Finance"), chargeActions);
+        chargeCard.Header.Controls.SetChildIndex(chargeActions, chargeCard.Header.Controls.Count - 1);
         chargeCard.Content.Controls.Add(
             charges);
         /* It now opens from the Payment History button, so both of those keep the width. */
@@ -3343,6 +3369,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     /// <summary>Reverses exactly one charge, through dbo.ReverseBillingCharge (FMSC_FIX_082), then reloads what the reversal invalidated. The procedure itself decides whether the reversal is allowed - this method never guesses.</summary>
     private async Task ReverseChargeAsync(int rowIndex)
     {
+        if (transactionBusy) return;
         if (rowIndex < 0 || rowIndex >= charges.Rows.Count)
             return;
         DataGridViewRow row =

@@ -436,15 +436,7 @@ namespace FMSC_SMS.Core
             };
             if (Enabled && _isPressed)
                 textRect.Offset(0, 1);
-            string caption=Text.Replace("&","&&");
-            if(ShortcutLetter is char letter) {
-                int index=Text.IndexOf(letter.ToString(),StringComparison.OrdinalIgnoreCase);
-                if(index>=0) {
-                    string before=Text[..index].Replace("&","&&");
-                    caption=before+"&"+Text[index..].Replace("&","&&");
-                }
-            }
-            TextRenderer.DrawText(e.Graphics, caption, Font, textRect, textColor, alignmentFlags | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(e.Graphics, Text, Font, textRect, textColor, alignmentFlags | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         }
         protected override void Dispose(bool disposing)
         {

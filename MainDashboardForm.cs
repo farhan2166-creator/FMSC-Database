@@ -661,7 +661,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         AddModule(
             flow,
             "finance.png",
-            "Fees && Billing",
+            "Fees & Billing",
             AppTheme.Primary,
             new NavigationItem[]
             {
@@ -771,7 +771,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Academic Years",
                 "Calendar.Manage"),
             new(
-                "Classes && Sections",
+                "Classes & Sections",
                 () => new ClassesAndSectionsWorkspacePage(),
                 "School Setup",
                 PageTitles.ClassesSections,

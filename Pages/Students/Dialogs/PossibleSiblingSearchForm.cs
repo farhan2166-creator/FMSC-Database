@@ -62,8 +62,8 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        Width = AppScale.Scale(900, AppScale.ControlSizeScale);
-        Height = AppScale.Scale(610, AppScale.ControlSizeScale);
+        Width = AppScale.Scale(1120, AppScale.ControlSizeScale);
+        Height = AppScale.Scale(740, AppScale.ControlSizeScale);
         BackColor = AppTheme.PageBackground;
         ForeColor = AppTheme.Text;
         Font = AppTheme.NormalFont;
@@ -84,11 +84,10 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         };
         var searchCard = BuildSearchCard();
         var resultsCard = BuildResultsCard();
-        var selectedCard = BuildSelectedCard();
+        var selectedCard = (HumanCard)BuildSelectedCard();
         var actionRow = HumanUi.ButtonRow(addButton, closeButton);
-        actionRow.Margin = new Padding(
-            0,
-            AppScale.Scale(4, AppScale.ControlSizeScale), 0, 0);
+        actionRow.Dock = DockStyle.Fill;
+        actionRow.Margin = Padding.Empty;
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
@@ -111,7 +110,10 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         root.RowStyles.Add(
             new RowStyle(
                 SizeType.Absolute,
-                AppScale.Scale(118, AppScale.ControlSizeScale)));
+                selectedCard.Padding.Vertical + selectedCard.Header.Height +
+                selectedCard.Content.Padding.Vertical +
+                2 * (AppMetrics.TextHeight(AppTheme.ButtonFont) +
+                AppMetrics.TextHeight(AppTheme.NormalFont) + AppMetrics.SpacingMd * 2)));
         root.RowStyles.Add(
             new RowStyle(
                 SizeType.Absolute,
@@ -208,28 +210,17 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
             AppTheme.ModuleAccent("Students"));
         var details = new TableLayoutPanel {
             Dock = DockStyle.Fill,
-            ColumnCount = 7,
-            RowCount = 1,
+            ColumnCount = 4,
+            RowCount = 2,
             Margin = new Padding(0),
             Padding = new Padding(0)
         };
-        /* Admission Number first: it is what identifies a student. The registration number is only a reporting label and follows the names. */
-        details.ColumnStyles.Add(
-            new ColumnStyle(SizeType.Percent, 10));
-        details.ColumnStyles.Add(
-            new ColumnStyle(SizeType.Percent, 22));
-        details.ColumnStyles.Add(
-            new ColumnStyle(SizeType.Percent, 16));
-        details.ColumnStyles.Add(
-            new ColumnStyle(SizeType.Percent, 16));
-        details.ColumnStyles.Add(
-            new ColumnStyle(SizeType.Percent, 12));
-        details.ColumnStyles.Add(
-            new ColumnStyle(SizeType.Percent, 12));
-        details.ColumnStyles.Add(
-            new ColumnStyle(SizeType.Percent, 12));
+        for (int column = 0; column < 4; column++)
+            details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        details.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        details.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         details.Controls.Add(
-            BuildDetailBlock("Admission Number", selectedAdmissionId), 0, 0);
+            BuildDetailBlock("Adm. No.", selectedAdmissionId), 0, 0);
         details.Controls.Add(
             BuildDetailBlock("Student", selectedStudent), 1, 0);
         details.Controls.Add(
@@ -237,11 +228,11 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         details.Controls.Add(
             BuildDetailBlock("Registration", selectedRegistration), 3, 0);
         details.Controls.Add(
-            BuildDetailBlock("Class", selectedClass), 4, 0);
+            BuildDetailBlock("Class", selectedClass), 0, 1);
         details.Controls.Add(
-            BuildDetailBlock("Section", selectedSection), 5, 0);
+            BuildDetailBlock("Section", selectedSection), 1, 1);
         details.Controls.Add(
-            BuildDetailBlock("Status", selectedStatus), 6, 0);
+            BuildDetailBlock("Status", selectedStatus), 2, 1);
         card.Content.Controls.Add(details);
         return card;
     }
@@ -259,7 +250,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         root.RowStyles.Add(
             new RowStyle(
                 SizeType.Absolute,
-                AppScale.Scale(22, AppScale.ControlSizeScale)));
+                AppMetrics.TextHeight(AppTheme.ButtonFont) + AppMetrics.SpacingXs));
         root.RowStyles.Add(
             new RowStyle(SizeType.Percent, 100));
         var captionLabel = new Label {

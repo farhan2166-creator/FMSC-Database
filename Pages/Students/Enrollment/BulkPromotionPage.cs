@@ -587,11 +587,13 @@ public sealed class BulkPromotionPage : V2Page
             var dt = new DataTable();
             dt.Columns.Add("ClassSectionId", typeof(int)); dt.Columns.Add("Display", typeof(string));
             foreach (DataRow row in raw.Rows) dt.Rows.Add(Convert.ToInt32(row["ClassSectionId"]), $"{row["ClassName"]} — {row["SectionName"]}");
+            if (dt.Rows.Count>0) dt.Rows.Add(-1,"All sections — keep matching sections");
+            if (raw.Rows.Count>0) dt.Rows.Add(-2,"Choose destination sections…");
             destinationSection.Bind(dt, "ClassSectionId", "Display");
             /* Say why the list is empty instead of leaving a blank combo: the class is real but has no section placed at this campus yet. */
             if (dt.Rows.Count == 0)
                 Warn($"The chosen destination class has no section at this campus. Add one under {PageTitles.CampusAssignments}, or choose another class.");
-            else if (dt.Rows.Count == 1)
+            else if (raw.Rows.Count == 1)
                 destinationSection.SelectedValue = Convert.ToInt32(dt.Rows[0]["ClassSectionId"]);
         }
         catch (Exception ex) { Fail(ex); }
@@ -740,7 +742,7 @@ public sealed class BulkPromotionPage : V2Page
             return "Choose the destination academic year.";
         if (promote > 0 && destinationClass.SelectedId <= 0)
             return "Choose the destination class for the students being promoted.";
-        if (promote > 0 && destinationSection.SelectedId <= 0)
+        if (promote > 0 && destinationSection.SelectedId == 0)
             return "Choose the destination section for the students being promoted.";
         return null;
     }
@@ -879,7 +881,11 @@ public sealed class BulkPromotionPage : V2Page
                 promoteCount > 0
                     ? destinationTable
                     : destinationYearField;
-            if (!ValidateRequiredInputs(requiredDestination))
+            if (destinationSection.SelectedId < 0 && promoteCount>0)
+            {
+                if (destinationClass.SelectedId<=0) { Warn("Choose the destination class."); return; }
+            }
+            else if (!ValidateRequiredInputs(requiredDestination))
                 return;
             /* The effective date is checked here so the refusal is plain. */
             DateTime effective = effectiveDate.Value.Date;
@@ -926,19 +932,33 @@ public sealed class BulkPromotionPage : V2Page
                     // Non-critical; the server still hard-blocks promotion if fees are genuinely missing, so a failed check here should not stop the flow.
                 }
             }
-            /* Say where the students are going (audit D5): counts alone let a wrong destination class or year through unnoticed. */
+            Dictionary<int,int> sectionMapping=new();
+            string mappingSummary="";
+            if(destinationSection.SelectedId<0 && promoteCount>0)
+            {
+                var destinations=await DatabaseHelper.QueryUserAsync("GetClassSections",
+                    DatabaseHelper.Int("@CampusId",sourceCampus.SelectedId),
+                    DatabaseHelper.Int("@ClassId",destinationClass.SelectedId),DatabaseHelper.Int("@SectionId",0));
+                destinations.Columns.Add("Display",typeof(string));
+                foreach(DataRow row in destinations.Rows) row["Display"]=$"{row["ClassName"]} — {row["SectionName"]}";
+                using var mappingDialog=new PromotionSectionMappingDialog(selected,destinations,destinationSection.SelectedId==-1);
+                if(mappingDialog.ShowDialog(FindForm())!=DialogResult.OK) return;
+                sectionMapping=new Dictionary<int,int>(mappingDialog.Mapping);
+                mappingSummary=mappingDialog.Summary+"\n";
+            }
+            /* Show the user-reviewed destinations before any enrollment is changed. */
             string from =
                 $"From: {sourceCampus.Text} · {sourceClass.Text} · " +
                 (sourceSection.SelectedId > 0 ? sourceSection.Text : "all sections") +
                 $" · {sourceYear.Text}\n";
             string to = promoteCount > 0
-                ? $"To: {destinationSection.Text} · {destinationYear.Text}\n"
+                ? $"To: {destinationClass.Text} · {destinationSection.Text} · {destinationYear.Text}\n"
                 : $"To: {destinationYear.Text} (held-back students stay in their current class)\n";
             var confirm =
                 ModernMessageDialog.Show(
                     feeWarning +
                     $"Process {selected.Count:N0} student(s)?\n\n" +
-                    from + to +
+                    from + to + mappingSummary +
                     $"Effective date: {effective:dd-MMM-yyyy}\n\n" +
                     $"Promote: {promoteCount:N0}\n" +
                     $"Hold Back: {holdCount:N0}\n\n" +
@@ -970,8 +990,13 @@ public sealed class BulkPromotionPage : V2Page
                         "dbo.BulkPromotionDecisionType",
                     Value = decisions
                 };
-            /* dbo.BulkPromoteStudents returns its own single-row result (PromotionBatchId, ProcessedCount, PromotedCount, HeldBackCount). Nothing about which rows are processed changes: the same procedure is called with the same parameters. */
-            DataTable result = await DatabaseHelper.QueryUserAsync(
+            /* Section mappings use the existing promotion procedure per source section inside one transaction. */
+            DataTable result = destinationSection.SelectedId < 0
+                ? await MatchingSectionPromotion.RunAsync(decisions,sourceYear.SelectedId,destinationYear.SelectedId,
+                    sourceCampus.SelectedId,sourceClass.SelectedId,sourceSection.SelectedId,destinationClass.SelectedId,
+                    effectiveDate.Value.Date,remarks.Text.Trim(),sectionMapping,
+                    selected.ToDictionary(row=>Convert.ToInt32(row["AdmissionId"]),row=>Convert.ToInt32(row["SectionId"])))
+                : await DatabaseHelper.QueryUserAsync(
                 "BulkPromoteStudents",
                 DatabaseHelper.Int(
                     "@UserId",

@@ -4,8 +4,8 @@ namespace FMSC_SMS.Pages.Finance.StudentAccounts;
 
 internal static class FeeAssignmentPosting
 {
-    internal static Task<int> PostReviewedAsync(DataTable selected) => Task.Run(() => PostReviewed(selected));
-    private static int PostReviewed(DataTable selected)
+    internal static Task<int> PostReviewedAsync(DataTable selected, string? reason = null) => Task.Run(() => PostReviewed(selected, reason));
+    private static int PostReviewed(DataTable selected, string? reason)
     {
         if (selected.Rows.Count == 0) throw new InvalidOperationException("Select at least one fee.");
         var months = selected.AsEnumerable().Select(row => Convert.ToDateTime(row["BillingMonth"])).Distinct().ToArray();
@@ -24,7 +24,9 @@ internal static class FeeAssignmentPosting
             WHERE EnrollmentId=@EnrollmentId AND BillingMonth=@Month AND ChargeKind=N'Monthly' AND Status<>N'Cancelled';
             SELECT DISTINCT FeeTypeId FROM dbo.BillingCharges WITH(UPDLOCK,HOLDLOCK)
             WHERE EnrollmentId=@EnrollmentId AND BillingMonth=@Month AND ChargeKind=N'Monthly' AND Status=N'Cancelled';
-            SELECT AcademicYearId FROM dbo.Enrollments WITH(UPDLOCK,HOLDLOCK) WHERE EnrollmentId=@EnrollmentId;
+            SELECT E.AcademicYearId,A.IsCurrent FROM dbo.Enrollments E WITH(UPDLOCK,HOLDLOCK)
+            JOIN dbo.AcademicYears A WITH(UPDLOCK,HOLDLOCK) ON A.AcademicYearId=E.AcademicYearId
+            WHERE E.EnrollmentId=@EnrollmentId;
             """, connection, transaction);
         validate.Parameters.AddRange(new[] { DatabaseHelper.Int("@UserId", CurrentUser.UserId),
             DatabaseHelper.Int("@EnrollmentId", enrollmentId), DatabaseHelper.Date("@Month", months[0]) });
@@ -32,6 +34,9 @@ internal static class FeeAssignmentPosting
         using (var adapter = new SqlDataAdapter(validate)) adapter.Fill(current);
         if (current.Tables[3].Rows.Count != 1) throw new InvalidOperationException("The enrollment no longer exists.");
         int academicYearId = Convert.ToInt32(current.Tables[3].Rows[0]["AcademicYearId"]);
+        bool historical = !Convert.ToBoolean(current.Tables[3].Rows[0]["IsCurrent"]);
+        if (historical && (!CurrentUser.IsAdministrator || string.IsNullOrWhiteSpace(reason)))
+            throw new InvalidOperationException("Posting fees outside the current academic year requires an administrator and a reason.");
         if (selected.AsEnumerable().Any(row => Convert.ToInt32(row["AcademicYearId"]) != academicYearId))
             throw new InvalidOperationException("The enrollment's academic year changed. Refresh the review; nothing was posted.");
         foreach (DataRow expected in selected.Rows) {
@@ -50,7 +55,7 @@ internal static class FeeAssignmentPosting
         using var post = new SqlCommand("PostSelectedMonthlyFees", connection, transaction) { CommandType = CommandType.StoredProcedure };
         post.Parameters.AddRange(new[] { DatabaseHelper.Int("@AcademicYearId", academicYearId), DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Date("@BillingMonth", months[0]),
             new SqlParameter("@Selection", SqlDbType.Structured) { TypeName="dbo.PostingSelectionType", Value=Tvp.PostingSelectionsFromPreview(selected,_=>true) },
-            DatabaseHelper.P("@Reason", "Explicitly reviewed monthly fee posting from student fee changes.") });
+            DatabaseHelper.P("@Reason", historical ? "Historical posting: " + reason!.Trim() : "Explicitly reviewed monthly fee posting from student fee changes.") });
         int created;
         using (var reader = post.ExecuteReader()) { reader.Read(); created = Convert.ToInt32(reader["ChargesCreated"]); }
         if (created != selected.Rows.Count) throw new InvalidOperationException("Eligibility changed. Nothing was posted; refresh the review.");

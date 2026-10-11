@@ -78,7 +78,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         TextImageRelation = TextImageRelation.ImageBeforeText
     };
     private readonly Button tab2Button = new ModernButton {
-        Text = "Fees && Siblings",
+        Text = "Fees & Siblings",
         Height = AppMetrics.ButtonHeight,
         Image = UiHelper.CreateGlyphIcon("Rs", AppTheme.Primary, 17),
         ImageAlign = ContentAlignment.MiddleLeft,
@@ -108,6 +108,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly ModernTextBox prevSchool = HumanUi.TextBox(false, SchemaLengths.StudentPreviousSchool);
     private readonly ModernTextBox casteTribe = HumanUi.TextBox(false, SchemaLengths.StudentCasteTribe);
     private readonly ModernDatePicker admissionDate = HumanUi.Date();
+    private int admissionNumberVersion;
+    private AdmissionNumberPlan? admissionNumberPlan;
     private readonly ModernTextBox registrationNo = HumanUi.TextBox(false, SchemaLengths.RegistrationNumber);
     private readonly ModernTextBox enrolmentNo = HumanUi.TextBox(false, SchemaLengths.BiseEnrolmentNumber);
     private readonly Label admissionIdCaption = new() {
@@ -782,7 +784,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             UiText.Actions.Save,
             Save,
             "Success");
-        saveAndNewButton = AddBusyAction("Save && New", SaveAndStartNextAsync, "Success");
+        saveAndNewButton = AddBusyAction("Save & New", SaveAndStartNextAsync, "Success");
         UiAccessibility.Describe(keepPlacement, "Keep placement for the next student",
             "Retain campus, academic year, class and section for Clear / New and Save & New. Student details and discounts are cleared.");
         AddToolbarSeparator();
@@ -843,6 +845,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     (_, _) => Defer(LoadFeeStructure);
         Year.SelectedIndexChanged +=
             (_, _) => Defer(LoadFeeStructure);
+        Year.SelectedIndexChanged += (_, _) => Defer(ShowNextAdmissionNumberAsync);
+        admissionDate.ValueChanged += (_, _) => Defer(ShowNextAdmissionNumberAsync);
         Class.SelectedIndexChanged +=
             (_, _) => Defer(LoadFeeStructure);
         addFeeButton.Click +=
@@ -951,16 +955,38 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         admissionIdentity.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         admissionIdCaption.AutoSize = true;
         admissionIdCaption.Dock = DockStyle.Fill;
-        admissionIdCaption.Font = AppTheme.BodyBoldFont;
+        admissionIdCaption.Text = "Admission No.";
+        admissionIdCaption.Font = AppTheme.NormalFont;
+        admissionIdCaption.ForeColor = AppTheme.MutedText;
+        admissionIdCaption.Padding = Padding.Empty;
         admissionIdCaption.Margin = new Padding(0, 0, UiDesignSystem.Spacing.Sm, 0);
         admissionIdCaption.TextAlign = ContentAlignment.MiddleLeft;
         admissionIdValue.Dock = DockStyle.None;
-        admissionIdValue.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        admissionIdValue.Anchor = AnchorStyles.None;
         admissionIdValue.Font = AppTheme.BodyBoldFont;
         admissionIdValue.Height = AppMetrics.InputControlHeight;
+        admissionIdValue.MaximumSize = new Size(AppScale.Scale(140), 0);
+        admissionIdValue.CornerRadius = 0;
+        admissionIdValue.BlendWithParent = true;
+        admissionIdValue.TextAlign = HorizontalAlignment.Center;
+        admissionIdValue.AccessibleName = "Admission Number";
         admissionIdValue.Margin = Padding.Empty;
         admissionIdentity.Controls.Add(admissionIdCaption, 0, 0);
-        admissionIdentity.Controls.Add(admissionIdValue, 1, 0);
+        var admissionNumberHost = new Panel {
+            Dock = DockStyle.Fill, Margin = Padding.Empty,
+            BackColor = Color.Transparent
+        };
+        admissionNumberHost.Controls.Add(admissionIdValue);
+        void AlignAdmissionNumber()
+        {
+            int width = Math.Min(AppScale.Scale(140), admissionNumberHost.ClientSize.Width);
+            int height = Math.Min(AppMetrics.InputControlHeight, admissionNumberHost.ClientSize.Height);
+            admissionIdValue.SetBounds(0, Math.Max(0, (admissionNumberHost.ClientSize.Height - height) / 2),
+                Math.Max(0, width), Math.Max(0, height));
+        }
+        admissionNumberHost.Resize += (_, _) => AlignAdmissionNumber();
+        admissionIdentity.Controls.Add(admissionNumberHost, 1, 0);
+        AlignAdmissionNumber();
         identityRow.Controls.Add(admissionIdentity, 3, 0);
 
         studentGuardianCard.Header.Controls.Add(identityRow);
@@ -1581,7 +1607,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             cell.Value = "";
             cell.ReadOnly = true;
             cell.ToolTipText = hasPayments
-                ? "This fee has already been billed - remove it from Fee Collection instead."
+                ? "This fee already has a posted charge. In Fee Collection, right-click the unpaid charge and choose 'Reverse this charge…'. If money was collected, review it in Student Fee Corrections first."
                 : isMandatory
                     ? "This fee is mandatory and can't be removed here."
                     : isTransportLinked
@@ -1827,7 +1853,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             feeLayout.Controls.Add(feeStatus, 0, 0);
             feeLayout.Controls.Add(feeGrid, 0, 1);
             var manageFees = new ModernButton {
-                Text = "Fee Discounts && Transport",
+                Text = "Fee Discounts & Transport",
                 AutoSize = true,
                 ThemeRole = "Secondary"
             };
@@ -2090,16 +2116,26 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private async Task ShowNextAdmissionNumberAsync()
     {
-        int version = admissionLoadVersion;
+        if(currentAdmissionId>0 || IsDisposed || saveBusy) return;
+        int version = ++admissionNumberVersion;
+        DateTime date=admissionDate.Value.Date;
+        int yearId=Year.SelectedId;
+        admissionNumberPlan=null;
         try
         {
-            DataTable next = await DatabaseHelper.QueryUserAsync("GetNextAdmissionNumber");
-            if (!IsDisposed && version == admissionLoadVersion && currentAdmissionId == 0 && next.Rows.Count > 0)
-                admissionIdValue.PlaceholderText = "Next: " + AdmissionNumbers.Read(next.Rows[0]);
+            var plan=await AdmissionNumberPolicy.LoadAsync(date,yearId);
+            if(IsDisposed || saveBusy || version!=admissionNumberVersion || currentAdmissionId>0 || date!=admissionDate.Value.Date || yearId!=Year.SelectedId) return;
+            admissionNumberPlan=plan;
+            // Refresh the proposal on date/year changes, keeping the final number editable.
+            admissionIdValue.Text=plan.Suggested ?? "";
+            admissionIdValue.PlaceholderText=plan.Error ?? "Enter a historical register number";
+            if(plan.Error is not null) SetStatus(plan.Error,true);
+            else if(plan.Suggested is not null) SetStatus($"Suggested admission number: {plan.Suggested}. Retain it or enter another unused number within this date's register sequence.");
+            else SetStatus("No number can be suggested for this date. Enter an unused historical register number within the surrounding date boundaries.",true);
         }
         catch (Exception ex)
         {
-            if (!IsDisposed && version == admissionLoadVersion && currentAdmissionId == 0) Fail(ex);
+            if (!IsDisposed && version == admissionNumberVersion && currentAdmissionId == 0) Fail(ex);
         }
     }
     private void ConfigureFieldSuggestions()
@@ -2504,8 +2540,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     {
         FormValidator v = admissionValidator ??= CreateValidator();
         v.Begin();
-        bool validNumber() => (isNew && !HistoricalAdmission && string.IsNullOrWhiteSpace(admissionIdValue.Text)) || AdmissionNumbers.TryNormalize(admissionIdValue.Text, out _);
-        v.Check(admissionIdValue, validNumber(), "Use a number such as 1 or 1a", validNumber);
+        bool validNumber() => AdmissionNumbers.TryNormalize(admissionIdValue.Text, out _) &&
+            (!isNew || admissionNumberPlan?.Validate(admissionIdValue.Text) is null && admissionNumberPlan is not null);
+        v.Check(admissionIdValue, validNumber(), isNew ? admissionNumberPlan?.Validate(admissionIdValue.Text) ?? "Wait for the admission number suggestion, then enter a valid number." : "Use a number such as 1 or 1a", validNumber);
+        if(isNew && admissionNumberPlan?.Error is { } dateError)
+            v.Check(admissionDate,false,dateError);
         static string NameProblem(string text)
         {
             string trimmed = text.Trim();
@@ -3990,8 +4029,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private async Task SaveNewAdmissionAsync()
     {
+        using var numberingInputs=BeginBusy(string.Empty,admissionDate,Year,admissionIdValue);
         try
         {
+            admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId);
             /* UX - every problem is marked on its own field at once (border + a few words on the caption), the first one takes focus. */
             if (!ValidateAdmissionInline(isNew: true))
                 return;
@@ -4117,6 +4158,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 admissionParameters.Add(DatabaseHelper.P("@VerifiedWithdrawalDate", firstWithdrawalDate.Checked ? firstWithdrawalDate.Value.Date : null));
             }
             bool savedHistorical = HistoricalAdmission;
+            admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId);
+            if(admissionNumberPlan.Validate(admissionIdValue.Text) is { } numberingProblem)
+            {
+                Warn(numberingProblem);
+                return;
+            }
+            if(!AdmissionNumbers.TryNormalize(admissionIdValue.Text,out string cleanAdmissionNumber)) return;
+            admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber").Value=cleanAdmissionNumber;
             var result = await DatabaseHelper.QueryUserAsync(savedHistorical ? "AdmitHistoricalStudent" : "AdmitStudent", admissionParameters.ToArray());
             int newAdmissionId = 0;
             if (result.Rows.Count > 0 &&

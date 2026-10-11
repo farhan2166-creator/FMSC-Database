@@ -3,7 +3,7 @@ namespace FMSC_SMS.Core;
 /// <summary>Single source of truth for the keyboard shortcuts shown and handled by the UI.</summary>
 internal static class AppHotKeys
 {
-    internal static string PlainCaption(string caption)=>caption.Replace("&&","\0").Replace("&","").Replace("\0","&");
+    internal static string PlainCaption(string caption)=>caption.Replace("&&","&");
     internal sealed record ActionShortcut(
         string Action,
         string DisplayKey,

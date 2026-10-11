@@ -67,7 +67,7 @@ public sealed class LoginForm : ApplicationWindowForm
         brandLayout.RowStyles.Add(
             new RowStyle(SizeType.Percent, 32F));
         var schoolTitle = new Label {
-            Text = "Fahim Model \nSchool && College",
+            Text = "Fahim Model \nSchool & College",
             Dock = DockStyle.Fill,
             Font = AppTheme.PageTitleFont,
             ForeColor = Color.White,

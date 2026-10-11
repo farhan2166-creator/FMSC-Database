@@ -76,7 +76,7 @@ public sealed class RolesPage : V2Page
     readonly bool canManageRoles =
         CurrentUser.HasPermission("System.Roles.Manage");
     public RolesPage()
-        : base("Roles && Permissions", "Choose which tasks each access role can perform.")
+        : base("Roles & Permissions", "Choose which tasks each access role can perform.")
     {
         newRoleButton.Enabled = canManageRoles;
         editRoleButton.Enabled = false;

@@ -82,6 +82,9 @@ internal static class UiTheme
     internal static void ApplyControl(Control control)
     {
         if (control.IsDisposed) return;
+        // Captions contain literal punctuation; shortcuts are handled separately.
+        if (control is Label label) label.UseMnemonic = false;
+        if (control is ButtonBase action) action.UseMnemonic = false;
         var style = Capture(control);
         style.Applying = true;
         try
