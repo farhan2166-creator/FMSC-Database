@@ -67,7 +67,7 @@ internal static class ReportUi
             AppMetrics.InputControlHeight + 6;
         var table = new TableLayoutPanel {
             Dock = DockStyle.Top,
-            Height = rowHeight,
+            Height = rowHeight + 8,
             ColumnCount = columns,
             RowCount = 1,
             Padding = new Padding(0, 4, 0, 4)
@@ -82,6 +82,36 @@ internal static class ReportUi
             fieldControl.Margin = new Padding(0);
             table.Controls.Add(fieldControl, i, 0);
         }
+        var fieldPanels = table.Controls.Cast<Control>().ToArray();
+        bool arranging = false;
+        void ArrangeFields()
+        {
+            if (arranging || table.IsDisposed) return;
+            var arrangement = ReportFilterArrangement.For(fields.Length,
+                table.ClientSize.Width - table.Padding.Horizontal, AppScale.Scale(150));
+            if (table.ColumnCount == arrangement.Columns && table.RowCount == arrangement.Rows) return;
+            arranging = true;
+            table.SuspendLayout();
+            try
+            {
+                table.RowCount = Math.Max(table.RowCount, arrangement.Rows);
+                table.ColumnCount = arrangement.Columns;
+                table.ColumnStyles.Clear();
+                for (int i = 0; i < arrangement.Columns; i++)
+                    table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / arrangement.Columns));
+                for (int i = 0; i < fieldPanels.Length; i++)
+                    table.SetCellPosition(fieldPanels[i], new TableLayoutPanelCellPosition(
+                        i % arrangement.Columns, i / arrangement.Columns));
+                table.RowCount = arrangement.Rows;
+                table.RowStyles.Clear();
+                for (int i = 0; i < arrangement.Rows; i++)
+                    table.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
+                table.Height = rowHeight * arrangement.Rows + table.Padding.Vertical;
+            }
+            finally { table.ResumeLayout(true); arranging = false; }
+        }
+        table.SizeChanged += (_, _) => ArrangeFields();
+        table.HandleCreated += (_, _) => ArrangeFields();
         return table;
     }
     public static void BindSimple(LookupBox box, DataTable table, string id, string text)
@@ -198,9 +228,8 @@ internal static class ReportUi
                 Margin = Padding.Empty, Padding = Padding.Empty
             };
             compactBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            compactBody.RowStyles.Add(new RowStyle(SizeType.Absolute, filters.Height + filters.Padding.Vertical));
+            compactBody.RowStyles.Add(new RowStyle(SizeType.Absolute, filters.Height));
             filters.Margin = Padding.Empty;
-            filters.Height += filters.Padding.Vertical;
             compactBody.Controls.Add(filters, 0, 0);
             filterCard.Content.Controls.Add(compactBody);
         }
@@ -270,16 +299,30 @@ internal static class ReportUi
                 }
                 finally { fitting = false; }
             }
-            compactBody.SizeChanged += (_, _) => FitFilterCard();
-            compactBody.Layout += (_, _) => FitFilterCard();
-            filters.SizeChanged += (_, _) => FitFilterCard();
-            filterCard.Content.SizeChanged += (_, _) => FitFilterCard();
-            filterCard.Header.SizeChanged += (_, _) => FitFilterCard();
+            bool fitQueued = false;
+            void QueueFit()
+            {
+                if (fitQueued || !root.IsHandleCreated || root.IsDisposed) return;
+                fitQueued = true;
+                root.BeginInvoke(new Action(() => {
+                    fitQueued = false;
+                    if (root.IsDisposed) return;
+                    FitFilterCard();
+                    int[] heights = root.GetRowHeights();
+                    if (heights.Length > 0 && heights[0] != (int)root.RowStyles[0].Height)
+                        root.PerformLayout();
+                }));
+            }
+            compactBody.SizeChanged += (_, _) => QueueFit();
+            compactBody.Layout += (_, _) => QueueFit();
+            filters.SizeChanged += (_, _) => QueueFit();
+            filterCard.Content.SizeChanged += (_, _) => QueueFit();
+            filterCard.Header.SizeChanged += (_, _) => QueueFit();
             if (compactButtons is not null)
-                compactButtons.Layout += (_, _) => FitFilterCard();
-            root.SizeChanged += (_, _) => FitFilterCard();
-            root.Layout += (_, _) => FitFilterCard();
-            root.VisibleChanged += (_, _) => FitFilterCard();
+                compactButtons.Layout += (_, _) => QueueFit();
+            root.SizeChanged += (_, _) => QueueFit();
+            root.HandleCreated += (_, _) => QueueFit();
+            root.VisibleChanged += (_, _) => QueueFit();
             FitFilterCard();
         }
         return root;
