@@ -542,7 +542,6 @@ public sealed class WelcomePage : UserControl
             "Bulk Promotion" => "↑",
             "Promotion History" => "◷",
             PageTitles.StudentRecordChecks => "●",
-            "Annual Fee Ledger" => "☰",
             "Reports" => "▤",
             _ => "•"
         };

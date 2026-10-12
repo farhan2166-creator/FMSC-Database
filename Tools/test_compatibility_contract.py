@@ -4,6 +4,7 @@ These compare the embedded contract to actual DACPAC metadata. They do not execu
 DatabaseCompatibility.Validate against SQL Server or test Windows role workflows.
 """
 import copy
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -16,7 +17,9 @@ from update_compatibility_contract import CONTRACT, NS, parts, refresh
 ARTIFACT_PATH = Path(sys.argv.pop(1))
 ARTIFACT = ARTIFACT_PATH.read_bytes()
 with zipfile.ZipFile(ARTIFACT_PATH) as archive:
-    MODEL = ET.fromstring(archive.read("model.xml"))
+    MODEL_BYTES = archive.read("model.xml")
+    MODEL = ET.fromstring(MODEL_BYTES)
+    ORIGIN = ET.fromstring(archive.read("Origin.xml"))
 ELEMENTS = MODEL.findall("d:Model/d:Element", NS)
 CONTRACT_DATA = json.loads(CONTRACT.read_text())
 
@@ -70,6 +73,25 @@ class ContractChecks(unittest.TestCase):
             element = next(e for e in parent if e.get("Name") == name)
             parent.remove(element)
             self.assertNotEqual(CONTRACT_DATA, refresh(copy.deepcopy(CONTRACT_DATA), model, ARTIFACT))
+
+    def test_retired_procedure_parameters_are_not_retained(self):
+        model = copy.deepcopy(MODEL)
+        parent = model.find("d:Model", NS)
+        parent.remove(next(e for e in parent if e.get("Name") == "[dbo].[ReAdmitStudentWithNumberChoice]"))
+        updated = refresh(copy.deepcopy(CONTRACT_DATA), model, ARTIFACT)
+        self.assertFalse(any(p["objectName"] == "ReAdmitStudentWithNumberChoice" for p in updated["parameters"]))
+
+    def test_package_checksum_and_procedure_count(self):
+        self.assertEqual(hashlib.sha256(MODEL_BYTES).hexdigest().upper(),
+                         ORIGIN.find("d:Checksums/d:Checksum", NS).text)
+        self.assertEqual(sum(e.get("Type") == "SqlProcedure" for e in ELEMENTS),
+                         int(ORIGIN.find("d:Server/d:ObjectCounts/d:Procedure", NS).text))
+
+    def test_legacy_ledger_is_retired(self):
+        self.assertFalse(any(e.get("Name") == "[dbo].[GetStudentAnnualFeeLedger]" for e in ELEMENTS))
+        self.assertFalse(any(o["name"] == "GetStudentAnnualFeeLedger" for o in CONTRACT_DATA["objects"]))
+        self.assertFalse(any(p["objectName"] == "GetStudentAnnualFeeLedger" for p in CONTRACT_DATA["parameters"]))
+        self.assertFalse((CONTRACT.parent.parent / "Pages/Reports/Templates/StudentAnnualFeeLedger.rdlc").exists())
 
 
 if __name__ == "__main__":

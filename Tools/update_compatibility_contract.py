@@ -60,10 +60,11 @@ def refresh(contract, model, artifact):
     contract["objects"] = [dict(schema=parts(e.get("Name"))[0], name=parts(e.get("Name"))[1],
                                 type=object_types[e.get("Type")])
                            for e in elements if e.get("Type") in object_types]
-    # Keep function return/signature requirements, regenerate every procedure parameter.
+    # Keep existing function signatures, regenerate procedures, discard retired signatures.
     procedures = [e for e in elements if e.get("Type") == "SqlProcedure"]
-    names = {parts(e.get("Name"))[1] for e in procedures}
-    parameters = [p for p in contract["parameters"] if p["objectName"] not in names]
+    functions = {parts(e.get("Name"))[1] for e in elements if e.get("Type") in
+                 ("SqlScalarFunction", "SqlInlineTableValuedFunction", "SqlMultiStatementTableValuedFunction")}
+    parameters = [p for p in contract["parameters"] if p["objectName"] in functions]
     for e in procedures:
         schema, name = parts(e.get("Name"))
         for parameter in e.findall("d:Relationship[@Name='Parameters']/d:Entry/d:Element", NS):

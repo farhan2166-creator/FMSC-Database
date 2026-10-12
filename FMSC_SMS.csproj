@@ -77,6 +77,9 @@
 		<None Update="Installer\Install FMSC_SMS.bat">
 			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
 		</None>
+		<None Update="Installer\RemoveLegacyAnnualFeeLedger.sql">
+			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+		</None>
 	</ItemGroup>
 	<!-- Staff assignment scheduling was intentionally retired on 2026-10-03; employment
 	     history remains active. CleanupArchive contains historical SQL only and must

@@ -63,10 +63,19 @@ The owner chose **Option 1: retain the existing snapshot/revision workflow**. Pe
 
 The owner chose **Option 1: retain current assignment-level auditing**. Removing a fee assignment or changing its nonmonthly discount continues to record the existing assignment-level audit event; no additional per-charge before/after detail is required for these operations. Existing collection-time charge auditing and financial-integrity protections remain unchanged. The difference in audit granularity is an accepted traceability policy, not a pending implementation defect. BL-09 is resolved. No application or SQL code changed for this decision.
 
-### Policy decisions still pending
+### BL-10 removal — 12 October 2026
 
-1. **BL-03 — trust boundary:** Are Windows/LocalDB access permissions the accepted security boundary, or must application roles resist another local process connecting to SQL?
-2. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
+The owner authorized removing the legacy ledger if redundant. Repository-wide C# and report searches found no active caller of `GetStudentAnnualFeeLedger`, `StudentAnnualFeeLedger.rdlc` or `AnnualFeeLedgerData`. The DACPAC model contained no other SQL object referencing the procedure. The current Annual Fee Receipts screen uses `GetStudentAnnualFeeReceipts` and `FeePaymentReceipt.rdlc`, which remain unchanged.
+
+Removed the unused RDLC template and obsolete dashboard label alias. Removed only `dbo.GetStudentAnnualFeeLedger` from the schema-only `FMSC.dacpac`, preserving every other model element and the original metadata/content-type members. The package model checksum and procedure/parameter inventory counts were updated. The resulting artifact has 227 procedures and SHA-256 `5d9aca87fd5df6a9b2a24cf9fa3da0723ffc5bb3a0396434fee5609877c52018`. This is an offline amendment of the original schema artifact, not a new live-database export. The compatibility contract was regenerated and no longer requires the retired procedure or its three parameters. The generator now discards retired procedure signatures instead of retaining them as if they were function requirements.
+
+`Installer/RemoveLegacyAnnualFeeLedger.sql` supplies an optional, idempotent cleanup for existing databases. It rejects system databases, checks the expected FMSC/version-3 schema, refuses removal when a catalog-tracked SQL dependency exists, and drops only the unused procedure inside a transaction. It does not delete tables or school records. The publish configuration includes this script. Deploy the updated application compatibility contract before running the cleanup; older application builds may still require the procedure. No schema-version bump is needed for this unused-object retirement, and older databases containing the extra procedure remain compatible with the updated application.
+
+Verification: Windows-targeted application build passed with zero warnings and errors; ten offline contract/artifact regression tests and generator `--check` passed; ZIP integrity/model checksum and remaining model elements were checked; no active C#/RDLC references remain; whitespace checks passed. Native DacFx load/deployment, release packaging, external tools and execution of the SQL cleanup on a disposable or live database were not tested. No live database was connected or changed. BL-10 is resolved for the repository/schema artifact; existing-database physical cleanup is supplied but remains unexecuted.
+
+### Deferred security decision
+
+**BL-03:** The owner deferred security architecture changes and chose to leave the current Windows/LocalDB trust model unchanged for now. Revisit only if protection against other local SQL clients is required.
 
 ## Executive summary
 
