@@ -15,6 +15,16 @@ public sealed class StaffManagementPage : UserControl, IUnsavedChanges, IBusyPag
         BackColor = AppTheme.PageBackground;
         staff = new StaffProfilePage();
         staff.PrepareForEmbedding(keepActions: true);
+        var overview = new StaffEmploymentOverview();
+        staff.AddEmploymentOverview(overview);
+        overview.CanOpenEditor = () => {
+            if (staff.IsBusy) return false;
+            if (!staff.HasUnsavedChanges) return true;
+            ModernMessageDialog.ShowWarning(this,
+                "Save or clear your changes to staff details before editing employment.");
+            return false;
+        };
+        overview.EmploymentChanged += staff.RefreshStaffRecords;
         StaffProfilePage.Selection? selected = null;
         var context = new Label {
             Dock = DockStyle.Fill, AutoEllipsis = true,
@@ -32,25 +42,28 @@ public sealed class StaffManagementPage : UserControl, IUnsavedChanges, IBusyPag
             Padding = new Padding(UiDesignSystem.Spacing.Md, 0, UiDesignSystem.Spacing.Md, 0)
         };
         employmentButton.ApplyTheme();
-        staff.StaffSelected += selection => {
+        staff.StaffSelected += async selection => {
             selected = selection;
             context.Text = $"Employment for: {selection.StaffName} · Staff No. {selection.StaffNumber}";
             context.ForeColor = AppTheme.Text;
             employmentButton.Enabled = true;
+            await overview.SelectStaffAsync(selection);
         };
-        staff.StaffSaved += selection => {
+        staff.StaffSaved += async selection => {
             selected = selection;
             context.Text = $"Saved staff: {selection.StaffName} · Staff No. {selection.StaffNumber}. Open Employment for this staff member, or enter a new staff member below.";
             context.ForeColor = AppTheme.Text;
             employmentButton.Enabled = true;
+            await overview.SelectStaffAsync(selection);
         };
-        staff.StaffSelectionCleared += () => {
+        staff.StaffSelectionCleared += async () => {
             selected = null;
             context.Text = "Save a new staff member or choose one from Staff Records to manage employment.";
             context.ForeColor = AppTheme.MutedText;
             employmentButton.Enabled = false;
+            await overview.SelectStaffAsync(null);
         };
-        employmentButton.Click += (_, _) => {
+        employmentButton.Click += async (_, _) => {
             if (selected is null || staff.IsBusy) return;
             if (staff.HasUnsavedChanges)
             {
@@ -61,6 +74,7 @@ public sealed class StaffManagementPage : UserControl, IUnsavedChanges, IBusyPag
             using var dialog = new StaffEmploymentDialog(selected);
             dialog.EmploymentChanged += staff.RefreshStaffRecords;
             dialog.ShowDialog(FindForm());
+            if (!IsDisposed) await overview.SelectStaffAsync(selected);
         };
         var toolbar = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,

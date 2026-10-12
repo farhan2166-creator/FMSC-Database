@@ -84,7 +84,7 @@ public partial class MasterPage
                     ? AppMetrics.MultilineInputHeight(72) + UiDesignSystem.Spacing.Sm + (UiDesignSystem.Spacing.Xs * 2)
                     : AppMetrics.InputControlHeight + UiDesignSystem.Spacing.Sm + (UiDesignSystem.Spacing.Xs * 2);
             _editor.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, rowHeight));
+                new RowStyle(SizeType.Absolute, rowHeight + EditorValidationHeight));
             for (int column = 0;
                  column < rowFields.Length;
                  column++)
@@ -178,6 +178,21 @@ public partial class MasterPage
             caption,
             0,
             0);
+        if (ReserveEditorValidationSpace)
+        {
+            panel.RowCount = 2;
+            panel.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute, EditorValidationHeight));
+            var message = new Label {
+                Dock = DockStyle.Fill, Margin = Padding.Empty,
+                Font = AppTheme.SmallFont, ForeColor = AppTheme.Danger,
+                TextAlign = ContentAlignment.MiddleLeft, UseMnemonic = false,
+                Visible = false, AccessibleRole = AccessibleRole.Alert
+            };
+            panel.Controls.Add(message, 1, 1);
+            panel.SetColumnSpan(message, 2);
+            _editorValidationLabels[control] = message;
+        }
         if (field.ManageDialogFactory is null)
         {
             panel.Controls.Add(

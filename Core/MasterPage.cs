@@ -7,6 +7,15 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
     public string BusyMessage => "Please wait for the record to finish saving.";
     protected virtual bool CanChangeRecord() => true;
     protected virtual bool CanSaveRecord() => true;
+    protected virtual bool ReserveEditorValidationSpace => false;
+    private int EditorValidationHeight => ReserveEditorValidationSpace ? AppMetrics.TextHeight(AppTheme.SmallFont) + 4 : 0;
+    private readonly Dictionary<Control, Label> _editorValidationLabels = new();
+    protected void BindEditorValidationMessages(FormValidator validator)
+    {
+        foreach (var pair in _editorValidationLabels)
+            validator.BindMessageLabel(pair.Key, pair.Value);
+    }
+    protected virtual void LayoutRecordColumns() => MasterGridLayout.Apply(Grid, IsBooleanGridColumn);
     protected int EditorRecordId => _id;
     protected virtual async Task<int> SaveRecordAsync(SqlParameter[] parameters)
     {
@@ -20,6 +29,26 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
     {
         if (_entryRecordsTabs is not null)
             _entryRecordsTabs.SelectedIndex = showRecords ? 1 : 0;
+    }
+    protected bool EditRecordById(int id)
+    {
+        if (_recordSearchBox is not null) _recordSearchBox.Clear();
+        ApplyRecordSearch();
+        foreach (DataGridViewRow row in Grid.Rows)
+        {
+            if (row.IsNewRow || Convert.ToString(FindRowId(row)) != id.ToString(CultureInfo.InvariantCulture)) continue;
+            if (!LoadRow(row)) return false;
+            ShowRecordsTab(false);
+            return true;
+        }
+        return false;
+    }
+    protected void AddEditorSection(Control section)
+    {
+        if (_editor?.Parent is not Panel content) return;
+        section.Dock = DockStyle.Top;
+        content.Controls.Add(section);
+        section.BringToFront();
     }
     private void RestoreEditorSelection()
     {
@@ -233,6 +262,7 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
                 rowFields.Any(field => field.Multiline)
                     ? AppMetrics.MultilineInputHeight(72) + UiDesignSystem.Spacing.Sm + (UiDesignSystem.Spacing.Xs * 2)
                     : AppMetrics.InputControlHeight + UiDesignSystem.Spacing.Sm + (UiDesignSystem.Spacing.Xs * 2);
+            rowHeight += EditorValidationHeight;
             editorRowsHeight += rowHeight;
             editor.RowStyles.Add(
                 new RowStyle(

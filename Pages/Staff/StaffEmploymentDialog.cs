@@ -5,7 +5,7 @@ internal sealed class StaffEmploymentDialog : ApplicationWindowForm
 {
     public event Action? EmploymentChanged;
 
-    internal StaffEmploymentDialog(StaffProfilePage.Selection staff)
+    internal StaffEmploymentDialog(StaffProfilePage.Selection staff, int? employmentId = null)
     {
         Text = $"Employment — {staff.StaffName} · Staff No. {staff.StaffNumber}";
         StartPosition = FormStartPosition.CenterParent;
@@ -15,6 +15,7 @@ internal sealed class StaffEmploymentDialog : ApplicationWindowForm
         MinimumSize = new Size(AppScale.Scale(650), AppScale.Scale(500));
         BackColor = AppTheme.Surface;
         var jobs = new StaffEmploymentPage(() => staff.Id) { Dock = DockStyle.Fill };
+        if (employmentId is int id) jobs.EditOnLoad(id);
         jobs.PrepareForEmbedding(keepActions: true);
         jobs.EmploymentChanged += () => EmploymentChanged?.Invoke();
         Controls.Add(jobs);

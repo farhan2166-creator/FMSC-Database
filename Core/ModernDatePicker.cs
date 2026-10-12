@@ -182,7 +182,10 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
             BackColor = AppTheme.Surface, DropShadowEnabled = true
         };
         _popup = popup;
-        popup.Items.Add(new ToolStripControlHost(selector) { Margin = Padding.Empty, Padding = Padding.Empty });
+        popup.Items.Add(new ToolStripControlHost(selector) {
+            AutoSize = false, Size = selector.Size,
+            Margin = Padding.Empty, Padding = Padding.Empty
+        });
         selector.DateChosen += date => {
             ApplyCalendarDate(date);
             popup.Close();

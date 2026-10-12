@@ -16,7 +16,7 @@ public partial class MasterPage
         BeginInvoke(
             new Action(() => {
                 _gridLayoutPending = false;
-                MasterGridLayout.Apply(Grid, IsBooleanGridColumn);
+                LayoutRecordColumns();
             }));
     }
     private DataTable SortForDisplay(

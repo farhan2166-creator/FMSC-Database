@@ -113,6 +113,9 @@ internal sealed class DateSelectionPanel : UserControl
         Controls.Add(layout);
         Size = new Size(Math.Max(AppScale.Scale(360), calendar.SingleMonthSize.Width + Padding.Horizontal),
             (int)layout.RowStyles.Cast<RowStyle>().Sum(row => row.Height) + Padding.Vertical);
+        // The docked layout has no intrinsic preferred size. Preserve its calculated
+        // bounds when ToolStripControlHost measures it for the dropdown.
+        MinimumSize = Size;
 
         year.TextChanged += (_, _) => {
             if (year.Text.Length == 4 && ValidYear(out _)) Navigate();
@@ -133,6 +136,8 @@ internal sealed class DateSelectionPanel : UserControl
         };
         today.Click += (_, _) => DateChosen?.Invoke(DateTime.Today);
     }
+    public override Size GetPreferredSize(Size proposedSize) => MinimumSize;
+
     private bool CommitYear()
     {
         if (!ValidYear(out _))

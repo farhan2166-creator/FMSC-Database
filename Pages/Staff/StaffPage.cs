@@ -10,6 +10,20 @@ public sealed class StaffProfilePage : MasterPage
     public Func<bool>? ContextChangeGuard { get; set; }
     protected override bool CanChangeRecord() => ContextChangeGuard?.Invoke() != false;
     private FormValidator? _staffValidator;
+    protected override bool ReserveEditorValidationSpace => true;
+    private FormValidator StaffValidator
+    {
+        get
+        {
+            if (_staffValidator is null)
+            {
+                _staffValidator = CreateValidator();
+                BindEditorValidationMessages(_staffValidator);
+            }
+            return _staffValidator;
+        }
+    }
+    protected override void LayoutRecordColumns() => UiHelper.FitColumnsToWidth(Grid);
     private string _savedStaffNumber = string.Empty;
     protected override string NewRecordHeaderTitle => "New Staff Member";
     protected override string NewRecordHeaderSubtitle => "Staff number is assigned automatically when saved.";
@@ -18,24 +32,17 @@ public sealed class StaffProfilePage : MasterPage
     protected override bool CanSaveRecord()
     {
         if (EditorRecordId != _lastNotifiedStaffId && !CanChangeRecord()) return false;
-        _staffValidator ??= CreateValidator();
+        _staffValidator = StaffValidator;
         _staffValidator.Begin();
         _staffValidator.RequiredFields(this);
         if (TryGetEditorControl("CNIC", out var cnic) && cnic is not null)
             _staffValidator.Rule(cnic, () => NationalIdentityNumber.TryNormalizeOptional(cnic.Text, out _), "Enter 13 digits, with or without CNIC hyphens.");
         foreach (string key in new[] { "ContactNumber", "AlternateContactNumber" })
             if (TryGetEditorControl(key, out var phone) && phone is not null)
-                _staffValidator.Rule(phone, () => IsValidPhone(phone.Text), "Enter 7–15 digits; spaces, +, hyphens and parentheses are allowed.");
+                _staffValidator.Rule(phone, () => PakistanPhoneNumber.IsValidOptional(phone.Text), PakistanPhoneNumber.ValidationMessage);
         if (TryGetEditorControl("DateOfBirth", out var dob) && dob is ModernDatePicker date)
             _staffValidator.Rule(date, () => !date.Checked || date.Value.Date <= DateTime.Today, "Date of birth cannot be in the future.");
         return _staffValidator.Finish();
-    }
-    private static bool IsValidPhone(string input)
-    {
-        string text = input.Trim();
-        if (text.Length == 0) return true;
-        return System.Text.RegularExpressions.Regex.IsMatch(text, @"\A\+?[0-9 ()-]+\z") &&
-            text.Count(c => c is >= '0' and <= '9') is >= 7 and <= 15;
     }
     protected override async Task<int> SaveRecordAsync(SqlParameter[] parameters)
     {
@@ -45,6 +52,7 @@ public sealed class StaffProfilePage : MasterPage
     }
     private int _lastNotifiedStaffId;
     internal void RefreshStaffRecords() => Reload();
+    internal void AddEmploymentOverview(Control overview) => AddEditorSection(overview);
     public StaffProfilePage() : base(
         "Staff",
         "Manage staff details and contact information.",
@@ -58,7 +66,7 @@ public sealed class StaffProfilePage : MasterPage
             new FieldSpec("Gender", "Gender", FieldKind.ComboString, Options: new[] { "Male", "Female", "Other" }),
             new FieldSpec("CNIC", "CNIC"),
             new FieldSpec("ContactNumber", "Contact"),
-            new FieldSpec("AlternateContactNumber", "Alternate Contact"),
+            new FieldSpec("AlternateContactNumber", "Alt. Contact"),
             new FieldSpec("Address", "Address"),
             new FieldSpec("Qualification", "Qualification"),
             new FieldSpec("Specialization", "Specialization")
@@ -89,10 +97,10 @@ public sealed class StaffProfilePage : MasterPage
             text.PlaceholderText = "Automatic on save";
         }
         if (TryGetEditorControl("CNIC", out var cnic) && cnic is ModernTextBox identity)
-            identity.PlaceholderText = "12345-1234567-1";
+            NationalIdentityInput.Attach(identity);
         foreach (string key in new[] { "ContactNumber", "AlternateContactNumber" })
             if (TryGetEditorControl(key, out var phone) && phone is ModernTextBox contact)
-                contact.PlaceholderText = "0300 1234567 or +92 300 1234567";
+                PhoneNumberInput.Attach(contact, () => StaffValidator);
     }
     protected override void AfterSave(int id, Dictionary<string, object?> values)
     {
