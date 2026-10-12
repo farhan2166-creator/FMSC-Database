@@ -33,6 +33,7 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
     protected bool EditRecordById(int id)
     {
         if (_recordSearchBox is not null) _recordSearchBox.Clear();
+        _staffRecordPicker?.Clear();
         ApplyRecordSearch();
         foreach (DataGridViewRow row in Grid.Rows)
         {
@@ -42,6 +43,31 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
             return true;
         }
         return false;
+    }
+    protected bool ConfirmEditorRecordChange() => ConfirmDiscardChanges();
+    protected void AddEditorHeaderIdentity(Label identity)
+    {
+        if (_editorCard is null) return;
+        identity.Dock = DockStyle.Right;
+        _editorCard.Header.Controls.Add(identity);
+        _editorCard.Header.Controls.SetChildIndex(identity, _editorCard.Header.Controls.Count - 1);
+    }
+    protected void ReplaceEditorInputWithFinder(string key, Control finder, string caption)
+    {
+        if (_editorCard is null || !_controls.TryGetValue(key, out var input) || input.Parent is not TableLayoutPanel field) return;
+        var position = field.GetPositionFromControl(input);
+        int span = field.GetColumnSpan(input);
+        finder.Dock = input.Dock;
+        finder.Margin = input.Margin;
+        finder.TabIndex = input.TabIndex;
+        field.Controls.Remove(input);
+        input.Visible = false;
+        _editorCard.Content.Controls.Add(input);
+        field.Controls.Add(finder, position.Column, position.Row);
+        field.SetColumnSpan(finder, span);
+        if (field.Controls.OfType<Label>().FirstOrDefault(label => Equals(label.Tag, UiHelper.FieldCaptionTag)) is Label title)
+            title.Text = caption;
+        UiAccessibility.Describe(finder, caption);
     }
     protected void AddEditorSection(Control section)
     {

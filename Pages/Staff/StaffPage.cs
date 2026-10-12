@@ -10,6 +10,12 @@ public sealed class StaffProfilePage : MasterPage
     public Func<bool>? ContextChangeGuard { get; set; }
     protected override bool CanChangeRecord() => ContextChangeGuard?.Invoke() != false;
     private FormValidator? _staffValidator;
+    private readonly StaffPicker _quickStaff = new();
+    private readonly Label _staffIdentity = new() {
+        Width = AppScale.Scale(260), Font = AppTheme.BodyBoldFont,
+        ForeColor = AppTheme.Text, TextAlign = ContentAlignment.MiddleRight,
+        AutoEllipsis = true, UseMnemonic = false, Text = "Staff No.: Assigned on save"
+    };
     protected override bool ReserveEditorValidationSpace => true;
     private FormValidator StaffValidator
     {
@@ -95,7 +101,17 @@ public sealed class StaffProfilePage : MasterPage
             text.ReadOnly = true;
             text.TabStop = false;
             text.PlaceholderText = "Automatic on save";
+            text.TextChanged += (_, _) => _staffIdentity.Text = "Staff No.: " +
+                (string.IsNullOrWhiteSpace(text.Text) ? "Assigned on save" : text.Text);
+            ReplaceEditorInputWithFinder("StaffNumber", _quickStaff, "Find Staff");
         }
+        AddEditorHeaderIdentity(_staffIdentity);
+        _quickStaff.SelectionChangeGuard = _ => ConfirmEditorRecordChange();
+        _quickStaff.UserSelectionChanged += (_, _) => {
+            if (!EditRecordById(_quickStaff.SelectedId))
+                Warn("This staff record is no longer available. Refresh Staff Records.");
+        };
+        _quickStaff.SearchFailed += ex => Fail(ex);
         if (TryGetEditorControl("CNIC", out var cnic) && cnic is ModernTextBox identity)
             NationalIdentityInput.Attach(identity);
         foreach (string key in new[] { "ContactNumber", "AlternateContactNumber" })
@@ -121,9 +137,15 @@ public sealed class StaffProfilePage : MasterPage
     protected override void EditorCleared(bool afterSave)
     {
         base.EditorCleared(afterSave);
+        _quickStaff.Clear();
         if (afterSave) return;
         _lastNotifiedStaffId = 0;
         StaffSelectionCleared?.Invoke();
+    }
+    protected override void RecordsLoaded(DataTable table)
+    {
+        base.RecordsLoaded(table);
+        _quickStaff.SetSource(table);
     }
     protected override void RecordLoaded(DataGridViewRow loadedRow)
     {
@@ -131,6 +153,8 @@ public sealed class StaffProfilePage : MasterPage
         {
             var row = loadedRow;
             if (row is null) return;
+            _quickStaff.SetStaff(EditorRecordId, string.Join(" - ", new[] { CellText(row, "StaffNumber"), CellText(row, "StaffName") }
+                .Where(value => !string.IsNullOrWhiteSpace(value))));
             int id = 0;
             foreach (DataGridViewCell cell in row.Cells)
             {

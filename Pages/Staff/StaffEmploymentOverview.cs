@@ -28,13 +28,14 @@ internal sealed class StaffEmploymentOverview : UserControl
         jobCard.Header.Controls.SetChildIndex(editJob, jobCard.Header.Controls.Count - 1);
         historyCard.Header.Controls.SetChildIndex(addJob, historyCard.Header.Controls.Count - 1);
         details = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 0,
-            AutoScroll = true, Margin = Padding.Empty
+            Dock = DockStyle.Top, ColumnCount = 2, RowCount = 0,
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Margin = Padding.Empty
         };
-        details.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,
-            Math.Max(AppScale.Scale(150), TextRenderer.MeasureText("Employment Type", AppTheme.FieldCaptionFont).Width + 12)));
-        details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        jobCard.Content.Controls.Add(details);
+        details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        var detailScroll = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+        detailScroll.Controls.Add(details);
+        jobCard.Content.Controls.Add(detailScroll);
         history = new DataGridView {
             Dock = DockStyle.Fill, AutoGenerateColumns = false,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
@@ -134,22 +135,38 @@ internal sealed class StaffEmploymentOverview : UserControl
         activeId = Convert.ToInt32(active["StaffEmploymentId"]);
         editJob.Enabled = canManage;
         ClearDetails();
+        int index = 0;
         foreach (var (key, caption) in new[] {
             ("Designation", "Designation"), ("Department", "Department"),
             ("EmploymentType", "Employment Type"), ("HireDate", "Hire Date"),
             ("Status", "Status"), ("Remarks", "Remarks") })
         {
-            int row = details.RowCount++;
-            details.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            details.Controls.Add(new Label {
+            int row = index / 2;
+            int column = index % 2;
+            if (row >= details.RowCount)
+            {
+                details.RowCount = row + 1;
+                details.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            }
+            var field = new TableLayoutPanel {
+                Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1, RowCount = 2,
+                Margin = new Padding(0, 0, column == 0 ? AppMetrics.SpacingMd : 0, AppMetrics.SpacingSm)
+            };
+            field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            field.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            field.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            field.Controls.Add(new Label {
                 Text = caption, AutoSize = true, Font = AppTheme.FieldCaptionFont,
-                ForeColor = AppTheme.Text, Margin = new Padding(0, 4, 8, 4)
-            }, 0, row);
-            details.Controls.Add(new Label {
+                Dock = DockStyle.Fill, ForeColor = AppTheme.Text, Margin = new Padding(0, 0, 0, 2)
+            }, 0, 0);
+            field.Controls.Add(new Label {
                 Text = CellText(active, key) is { Length: > 0 } value ? value : "—",
                 AutoSize = true, Dock = DockStyle.Fill, Font = AppTheme.NormalFont,
-                ForeColor = AppTheme.Text, UseMnemonic = false, Margin = new Padding(0, 4, 0, 4)
-            }, 1, row);
+                ForeColor = AppTheme.Text, UseMnemonic = false, Margin = Padding.Empty
+            }, 0, 1);
+            details.Controls.Add(field, column, row);
+            index++;
         }
     }
 
@@ -165,7 +182,7 @@ internal sealed class StaffEmploymentOverview : UserControl
     {
         ClearDetails();
         details.RowCount = 1;
-        details.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        details.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(80)));
         var message = new Label {
             Text = text, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
             ForeColor = AppTheme.MutedText, Font = AppTheme.NormalFont
