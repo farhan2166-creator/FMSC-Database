@@ -42,7 +42,7 @@ public sealed class AdmissionReviewListPage : V2Page
         this.navigate=navigate;this.pending=pending;this.openRegistration=openRegistration;
         AddBusyAction("Refresh",RefreshAsync,"Secondary");
         var open=AddBusyAction(pending?"Open Registration":"Open Admission",OpenSelectedAsync,"Primary");GateActionAny(open,"Students.Admit","Students.Administer");
-        if(pending){reviewRegistration=AddBusyAction("Review / Confirm",ReviewRegistrationAsync,"Secondary");GateAction(reviewRegistration,"Students.Admit");reviewRegistration.Enabled=false;Grid.SelectionChanged+=(_,_)=>reviewRegistration.Enabled=Grid.CurrentRow?.DataBoundItem is DataRowView;}
+        if(pending){reviewRegistration=AddBusyAction("Review / Confirm",ReviewRegistrationAsync,"Secondary");GateAction(reviewRegistration,"Students.Admit");reviewRegistration.Enabled=false;Grid.SelectionChanged+=(_,_)=>reviewRegistration.Enabled=CurrentUser.HasPermission("Students.Admit")&&Grid.CurrentRow?.DataBoundItem is DataRowView;}
         if(!pending){goLive=AddBusyAction("Finish Setup / Go Live",async()=>{using var dialog=new LegacyGoLiveDialog();dialog.ShowDialog(FindForm());if(dialog.Changed)await RefreshAsync();},"Success");GateAction(goLive,"Students.Administer");goLive.Visible=false;}
         var card=HumanUi.Card(pending?"Registrations Awaiting Completion":"Legacy Records",pending?"Payments and family links remain attached when admission is completed.":"Changes to student details, placement or fees clear the verification mark.");card.Content.Controls.Add(Grid);
         var filters=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1};filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,65));filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,35));

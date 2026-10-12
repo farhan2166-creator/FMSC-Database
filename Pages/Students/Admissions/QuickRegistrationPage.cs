@@ -37,6 +37,7 @@ internal sealed class QuickRegistrationFormPage : V2Page
     private DataTable placements = new(), rates = new();
     private int savedStudent, familyAnchor, loadVersion, defaultAcademicYear;
     private string savedStatus="";
+    private string[] savedBasics=Array.Empty<string>();
     private bool busy, loadingFamily, loadingFees, feesLoaded;
     private readonly FormValidator validator;
     private readonly ModernButton save, next, bill, collect;
@@ -72,6 +73,8 @@ internal sealed class QuickRegistrationFormPage : V2Page
         fees.DataError+=(_,e)=>{e.ThrowException=false;SetStatus("Enter a valid discount amount.");};
         fees.CurrentCellDirtyStateChanged+=(_,_)=>{if(fees.IsCurrentCellDirty&&fees.CurrentCell is DataGridViewCheckBoxCell)fees.CommitEdit(DataGridViewDataErrorContexts.Commit);};
         fees.CellValueChanged+=(_,_)=>UpdateTotal();
+        fees.CellEndEdit+=(_,_)=>{if(fees.CurrentRow?.DataBoundItem is DataRowView row)row.EndEdit();UpdateTotal();};
+        foreach(var input in new[]{name,parent,contact,address})input.TextChanged+=(_,_)=>PendingEditChanged();
         var feeCard=HumanUi.Card("Opening Bill", "Configured fees are shared with Admission. Review sibling discounts before saving.");
         var feeContent=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};feeContent.RowStyles.Add(new RowStyle(SizeType.Percent,100));feeContent.RowStyles.Add(new RowStyle(SizeType.AutoSize));feeContent.Controls.Add(fees,0,0);feeContent.Controls.Add(total,0,1);feeCard.Content.Controls.Add(feeContent);
         var details=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1};details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));details.Controls.Add(shared,0,0);details.Controls.Add(child,1,0);
@@ -144,7 +147,10 @@ internal sealed class QuickRegistrationFormPage : V2Page
         rates=data;fees.DataSource=rates;
     }
     private bool ReadyToSave=>!busy&&!loadingFamily&&!loadingFees&&feesLoaded&&(savedStudent==0||savedStatus=="Pending")&&(family.SelectedId<=0||family.SelectedId==familyAnchor);
-    private void UpdateActions(){save.Enabled=ReadyToSave&&CurrentUser.HasPermission("Students.Admit");save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!busy&&savedStudent>0;bill.Enabled=!busy&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!busy&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.Collect");
+    private string[] BasicValues()=>new[]{name.Text.Trim(),parent.Text.Trim(),contact.Text.Trim(),address.Text.Trim()};
+    private bool HasPendingChanges=>savedStudent>0&&savedStatus=="Pending"&&savedBasics.Length==4&&(!savedBasics.SequenceEqual(BasicValues())||rates.AsEnumerable().Any(r=>Convert.ToDecimal(r["Discount"])!=Convert.ToDecimal(r["OriginalDiscount"])));
+    private void PendingEditChanged(){UpdateActions();if(!busy&&HasPendingChanges)SetStatus("Save changes before printing or collecting payment.");}
+    private void UpdateActions(){save.Enabled=ReadyToSave&&CurrentUser.HasPermission("Students.Admit");save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!busy&&savedStudent>0;bill.Enabled=!busy&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!busy&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.Collect");
         bool editing=!busy&&(savedStudent==0||savedStatus=="Pending");family.Enabled=year.Enabled=placement.Enabled=joining.Enabled=editing&&savedStudent==0;
         name.ReadOnly=parent.ReadOnly=contact.ReadOnly=address.ReadOnly=!editing;fees.ReadOnly=!editing;
         // Switching grid ReadOnly can reset individual column/cell flags.
@@ -152,7 +158,7 @@ internal sealed class QuickRegistrationFormPage : V2Page
         foreach(DataGridViewColumn column in fees.Columns)column.ReadOnly=column.Name switch{
             "Discount"=>!CurrentUser.HasPermission("Fees.Adjust"),"Include"=>savedStudent>0,_=>true};
         foreach(DataGridViewRow row in fees.Rows)if(row.DataBoundItem is DataRowView data)row.Cells["Include"].ReadOnly=savedStudent>0||Convert.ToBoolean(data.Row["IsMandatory"]);}
-    private void UpdateTotal(){if(!rates.Columns.Contains("Include")){total.Text="Bill Total: Rs. 0";return;}decimal amount=rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["Include"])).Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));total.Text=$"Bill Total: Rs. {amount:N0}";}
+    private void UpdateTotal(){if(!rates.Columns.Contains("Include")){total.Text="Bill Total: Rs. 0";return;}decimal amount=rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["Include"])).Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));total.Text=$"Bill Total: Rs. {amount:N0}";PendingEditChanged();}
     private void ClearChild()
     {
         if(busy)return;
@@ -185,6 +191,7 @@ internal sealed class QuickRegistrationFormPage : V2Page
                 new SqlParameter("@AdmissionDiscounts",SqlDbType.Structured){TypeName="dbo.AdmissionFeeDiscountType",Value=Tvp.AdmissionFeeDiscounts(selected.Where(r=>Convert.ToDecimal(r["Discount"])>0).Select(r=>(Convert.ToInt32(r["FeeTypeId"]),Convert.ToDecimal(r["Discount"]))))}};
             foreach(string key in new[]{"DateOfBirth","PlaceOfBirth","Gender","BFormNumber","Religion","BloodGroup","AlternateContactNumber","PreviousSchool","FatherOccupation"})args.Add(DatabaseHelper.P("@"+key,null));
             var result=await DatabaseHelper.QueryUserAsync("AdmitStudent",args.ToArray());savedStudent=Convert.ToInt32(result.Rows[0]["AdmissionId"]);savedStatus="Pending";familyAnchor=familyAnchor>0?familyAnchor:savedStudent;StudentSearchCache.Invalidate();
+            savedBasics=BasicValues();foreach(DataRow rate in rates.Rows)rate["OriginalDiscount"]=rate["Discount"];
             string reference=result.Columns.Contains("QuickReference")?Convert.ToString(result.Rows[0]["QuickReference"])??"":$"QR-{savedStudent}";
             SetStatus($"Saved {reference}. Print the family bill, collect payment or add another child.");
         }catch(Exception ex){Fail(ex);}finally{busy=false;UpdateActions();}
@@ -207,7 +214,7 @@ internal sealed class QuickRegistrationFormPage : V2Page
                 JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId
                 WHERE E.AdmissionId=@Admission AND E.Status IN(N'Pending',N'Active') AND A.CancelledAt IS NULL ORDER BY F.DisplayOrder,F.FeeTypeName;
                 """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Admission",id)));
-            if(IsDisposed||version!=loadVersion)return;SetRates(stored);loadingFees=false;feesLoaded=true;UpdateTotal();
+            if(IsDisposed||version!=loadVersion)return;savedBasics=BasicValues();SetRates(stored);loadingFees=false;feesLoaded=true;UpdateTotal();
             string reference=Convert.ToString(r["QuickReference"])??"";
             if(savedStatus=="Pending")SetStatus($"{reference} · Pending. Save edits here; review and confirm from Pending Registrations.");
             else SetStatus(savedStatus=="Active"?$"Admitted · Admission {r["AdmissionNumber"]} · Registration {r["RegistrationNumber"]}":"Registration cancelled. History is retained.");

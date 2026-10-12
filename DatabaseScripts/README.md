@@ -15,7 +15,8 @@ User decisions, 2026-10-12:
 - Confirmed operational academic years cannot be edited. Movement uses Promotion, Transfer or Re-admission. Audited genuine date corrections remain available.
 - Student Data Review combines legacy progress, record issues/history and possible duplicates. It opens Admission for editing. Duplicate review does not automatically merge or delete students.
 - After Go Live completes, its action and legacy setup tab disappear permanently, using the saved database completion state on every reopen. Quick Registration is available only from Dashboard Quick Actions, not the navigation sidebar.
-- Quick Registration has a Registration Form tab and a separate Pending Registrations tab. The pending list searches temporary references, child/parent names and contact numbers; Open Registration or a double-click opens its editable review form. Returning to the list refreshes it, so confirmed and cancelled records disappear from the pending list.
+- Quick Registration has a Registration Form tab and a separate Pending Registrations tab. The pending list searches temporary references, child/parent names and contact numbers. Open Registration or a double-click loads the Registration Form for editing basic details and discounts. Selecting a row enables Review / Confirm on the pending list; the Registration Form has no confirmation action. Returning to the list refreshes it, so confirmed and cancelled records disappear from the pending list.
+- The opening-bill grid shows configured fee, editable discount (with Fees.Adjust permission), and calculated net amount. Save Changes persists pending edits through the audited details/discount transaction and updates unpaid charges. Printing and collection wait until pending edits are saved; existing paid charges remain protected by the financial procedures.
 
 Apply PlacementConfirmation.sql, StudentCorrectionGuards.sql, then
 AdmissionWorkflow.sql, in that order in one transaction on the compatible
