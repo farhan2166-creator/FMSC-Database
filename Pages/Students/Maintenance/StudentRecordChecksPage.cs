@@ -25,7 +25,7 @@ public sealed class StudentRecordChecksPage : V2Page
         Margin = new Padding(0, 4, 4, 4)
     };
     private readonly ModernButton modeEnrollments = new() {
-        Text = "Enrollments",
+        Text = "Placements",
         Dock = DockStyle.Fill,
         ThemeRole = "TabInactive",
         Margin = new Padding(0, 4, 4, 4)
@@ -94,7 +94,7 @@ public sealed class StudentRecordChecksPage : V2Page
         Margin = new Padding(0, 4, 4, 4)
     };
     private readonly ModernButton correctionEnrollmentTab = new() {
-        Text = "Enrollment",
+        Text = "Placement",
         Dock = DockStyle.Fill,
         ThemeRole = "TabInactive",
         Margin = new Padding(0, 4, 0, 4)
@@ -126,15 +126,17 @@ public sealed class StudentRecordChecksPage : V2Page
     private int correctionPanelWidth;
     private int bodyGap;
     private bool CanCorrect => CurrentUser.HasPermission("Students.Administer");
-    public StudentRecordChecksPage()
+    private readonly Action<Func<Control>, string, string>? navigate;
+    public StudentRecordChecksPage(Action<Func<Control>, string, string>? navigate = null)
         : base(
             PageTitles.StudentRecordChecks,
-            "Select a student, review issues or enrollments, then choose the record to correct.")
+            "Review discrepancies, then open Admission to correct the student record.")
     {
+        this.navigate = navigate;
         /* all three of these write corrections, so each is guarded against a double submit. Scan and Export only read. */
         var scan = AddBusyAction("Scan", () => SetGridMode("Findings"), "Primary");
         var saveStatus = AddBusyAction("Save Status", SaveStatus, "Success");
-        var saveEnrollment = saveEnrollmentAction = AddBusyAction("Save Enrollment", SaveEnrollment, "Success");
+        var saveEnrollment = saveEnrollmentAction = AddBusyAction("Save Placement", SaveEnrollment, "Success");
         var addEnrollment = addEnrollmentAction = AddBusyAction("Create Missing Record", AddEnrollment, "Success");
         var repairDates=repairDatesAction=AddBusyAction("Review Dates",()=>RepairDatesFromEditor(),"Secondary");
         newEnrollmentAction.Click+=(_,_)=>BeginMissingEnrollment();
@@ -155,7 +157,6 @@ public sealed class StudentRecordChecksPage : V2Page
         modeTimeline.Click += async (_, _) => await SetGridMode("Timeline");
         Grid.CurrentCellChanged += (_, _) => OnGridSelectionChanged();
         Grid.CellContentClick += (_, e) => OnGridCellContentClick(e);
-        Grid.CellClick += (_, e) => OnGridCellClick(e);
         Grid.CellFormatting += (_, e) => OnGridCellFormatting(e);
         rowFilter.TextChanged += (_, _) => ApplyRowFilter();
         correctionStatusTab.Click += (_, _) => ShowCorrectionTab(CorrectionTab.Status);
@@ -228,6 +229,13 @@ public sealed class StudentRecordChecksPage : V2Page
         root.Controls.Add(studentBar, 0, 0);
         root.Controls.Add(bodyLayout, 0, 1);
         SetContent(root);
+        // Admission owns corrections; this page remains a diagnostic/history view.
+        correctionPanel.Visible = false;
+        bodyLayout.ColumnStyles[1].Width = 0;
+        bodyLayout.SetColumnSpan(resultsCard, 2);
+        newEnrollmentAction.Visible = false;
+        var openAdmission = AddAction("Open Admission", (_, _) => OpenAdmissionForCorrection(), "Primary");
+        GateActionAny(openAdmission, "Students.Admit", "Students.Administer");
     }
     public StudentRecordChecksPage(int preloadAdmissionId) : this()
     {
@@ -378,7 +386,7 @@ public sealed class StudentRecordChecksPage : V2Page
         form.RowStyles.Add(new RowStyle(SizeType.Absolute, fieldHeight));
         form.RowStyles.Add(new RowStyle(SizeType.Absolute, reasonHeight));
         form.Height = hintHeight + fieldHeight + reasonHeight;
-        var hint = CorrectionHint("Correct overall status here. For an existing departure, use Enrollment → Correct Leaving Date.");
+        var hint = CorrectionHint("Correct overall status here. For an existing departure, use Placement → Correct Leaving Date.");
         form.Controls.Add(hint, 0, 0);
         form.SetColumnSpan(hint, 2);
         form.Controls.Add(HumanUi.Field("Student Status", statusCombo, fillHeight: false), 0, 1);
@@ -402,7 +410,7 @@ public sealed class StudentRecordChecksPage : V2Page
         form.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.NormalFont)*3+12));
         form.RowStyles.Add(new RowStyle(SizeType.Absolute, reasonHeight));
         form.Height = hintHeight + 4 * fieldHeight + AppMetrics.TextHeight(AppTheme.NormalFont)*3+12 + reasonHeight;
-        enrollmentSelection.Text="Edit the active enrollment, then Save Enrollment.\nSelect a Left record to correct its leaving date.";
+        enrollmentSelection.Text="Edit the active placement, then Save Placement.\nSelect a Left record to correct its leaving date.";
         form.Controls.Add(enrollmentSelection, 0, 0);
         form.SetColumnSpan(enrollmentSelection, 2);
         var section = HumanUi.Field("Campus / Class / Section", classSection, fillHeight: false);
@@ -433,20 +441,20 @@ public sealed class StudentRecordChecksPage : V2Page
         saveEnrollmentAction.Visible=!creatingEnrollment;saveEnrollmentAction.Enabled=selected && editable && CanCorrect;
         bool active=selected && Convert.ToString(record?["Status"])=="Active";
         repairDatesAction.Visible=selected && (active || Convert.ToString(record?["Status"])=="Left");
-        repairDatesAction.Text=active?"Correct Enrollment Dates":"Correct Leaving Date";
+        repairDatesAction.Text=active?"Correct Placement Dates":"Correct Leaving Date";
         repairDatesAction.Enabled=selected && CanCorrect && (!active || CurrentUser.HasPermission("Fees.Adjust"));
         SetToolTip(repairDatesAction,active
-            ? "Review enrollment dates and affected charges together. Requires student administration and fee-adjustment permissions."
+            ? "Review placement dates and affected charges together. Requires student administration and fee-adjustment permissions."
             : "Review this departure, its linked certificates and applicable withdrawal date together.");
         foreach(Control control in new Control[]{enrollmentDate,leavingDate,billingStartDate,allowLegacyDates,classSection,enrollmentStatusCombo,enrollmentReason})control.Enabled=editable && CanCorrect;
-        if(selected && !editable)enrollmentSelection.Text=$"Enrollment {selectedEnrollmentId} — {record?["Status"]}\n" +
+        if(selected && !editable)enrollmentSelection.Text=$"Placement {selectedEnrollmentId} — {record?["Status"]}\n" +
             (Convert.ToString(record?["Status"])=="Left"?"Use Correct Leaving Date to review its departure.":"This historical record is view only.");
         addEnrollmentAction.Visible=creatingEnrollment;addEnrollmentAction.Enabled=creatingEnrollment && CanCorrect;
-        newEnrollmentAction.Visible=gridMode=="Enrollments" && !creatingEnrollment;newEnrollmentAction.Enabled=student.SelectedId>0 && CanCorrect;
+        newEnrollmentAction.Visible=false;newEnrollmentAction.Enabled=false;
         academicYear.Enabled=creatingEnrollment;
         billingStartDate.Enabled=!creatingEnrollment && editable && CanCorrect;
         allowLegacyDates.Enabled=!creatingEnrollment && editable && CanCorrect;
-        if(!selected && !creatingEnrollment)enrollmentSelection.Text="Edit the active enrollment, then Save Enrollment.\nSelect a Left record to correct its leaving date.";
+        if(!selected && !creatingEnrollment)enrollmentSelection.Text="Edit the active placement, then Save Placement.\nSelect a Left record to correct its leaving date.";
     }
     private void BeginMissingEnrollment()
     {
@@ -455,7 +463,7 @@ public sealed class StudentRecordChecksPage : V2Page
         Grid.CurrentCell=null;Grid.ClearSelection();
         classSection.SelectedIndex=-1;academicYear.SelectedIndex=-1;enrollmentStatusCombo.SelectedItem="Active";
         enrollmentDate.Value=DateTime.Today;leavingDate.Checked=false;billingStartDate.Checked=false;allowLegacyDates.Checked=false;enrollmentReason.Clear();
-        enrollmentSelection.Text="Review existing records before adding a missing enrollment.\nNo fees or bills are created; configure billing start separately.";
+        enrollmentSelection.Text="Review existing records before adding a missing placement.\nNo fees or bills are created; configure billing start separately.";
         UpdateEnrollmentActions();OpenCorrections(CorrectionTab.Enrollment);
     }
     private async Task RepairDatesFromEditor()
@@ -777,12 +785,12 @@ public sealed class StudentRecordChecksPage : V2Page
         foreach(DataRow row in findings.Rows) {
             string rule=Convert.ToString(row["RuleCode"])??"";
             row["SuggestedAction"]=rule switch {
-                "CERTIFICATE_ENROLLMENT_DATE_MISMATCH" or "WITHDRAWAL_ENROLLMENT_DATE_MISMATCH" => "Enrollment → select the record → Review Dates. Choose the certificate and withdrawal corrections needed",
-                "LEAVING_BEFORE_ENROLLMENT" or "ENROLLMENT_DATE_OVERLAP" => "Enrollment → Review Dates. Compare the old and current enrollment dates before applying corrections",
-                "ENROLLMENT_BEFORE_ADMISSION" => "Compare First Admission with the enrollment start. Use Enrollment → Review Dates if the start date is wrong",
-                "STU_ACTIVE_NO_ENROLLMENT" => "Enrollment → Add Missing Record. Create only the missing historical enrollment",
-                "LEAVECERT_STATUS_MISMATCH" => "Review History and Student Status. An older certificate may belong to a closed enrollment; confirm before changing the current status",
-                _ => (Convert.ToString(row["SuggestedAction"])??"").Replace("Repair Lifecycle Dates","Enrollment → Review Dates")
+                "CERTIFICATE_ENROLLMENT_DATE_MISMATCH" or "WITHDRAWAL_ENROLLMENT_DATE_MISMATCH" => "Admission → Actions → Placement History / Corrections → Correct Billing / Leaving Dates",
+                "LEAVING_BEFORE_ENROLLMENT" or "ENROLLMENT_DATE_OVERLAP" => "Open Admission to review placement dates and the appropriate correction",
+                "ENROLLMENT_BEFORE_ADMISSION" => "Open Admission and compare First Admission with placement start date",
+                "STU_ACTIVE_NO_ENROLLMENT" => "Admission → Actions → Placement History → Add verified missing placement",
+                "LEAVECERT_STATUS_MISMATCH" => "Review History and Student Status. An older certificate may belong to a previous placement; confirm before changing the current status",
+                _ => "Open Admission to review this discrepancy and choose the appropriate correction"
             };
         }
     }
@@ -866,7 +874,7 @@ public sealed class StudentRecordChecksPage : V2Page
         if (student.SelectedId <= 0)
         {
             Grid.DataSource = null;
-            Warn("Select a student to see their academic enrolment history.");
+            Warn("Select a student to see their academic placement history.");
             return;
         }
         try
@@ -1043,7 +1051,7 @@ public sealed class StudentRecordChecksPage : V2Page
         }
         selectedEnrollmentId = enrollmentId;
         creatingEnrollment=false;
-        enrollmentSelection.Text=$"Enrollment {enrollmentId} — {match["Status"]}\nEdit fields and reason, then Save Enrollment";
+        enrollmentSelection.Text=$"Placement {enrollmentId} — {match["Status"]}\nEdit fields and reason, then Save Placement";
         allowLegacyDates.Checked=false;
         billingStartDate.Checked=match.Table.Columns.Contains("BillingStartDate") && match["BillingStartDate"]!=DBNull.Value;
         if(billingStartDate.Checked)billingStartDate.Value=Convert.ToDateTime(match["BillingStartDate"]);
@@ -1067,129 +1075,26 @@ public sealed class StudentRecordChecksPage : V2Page
             classSection.SelectedValue = Convert.ToInt32(match["ClassSectionId"]);
         enrollmentReason.Clear();
     }
-    /* (#9) - invalidates an in-flight QuickFix. It is entered fire-and-forget, so two Fix clicks can interleave. */
-    private int quickFixVersion;
-    private async Task QuickFix(DataRow finding)
+    private Task QuickFix(DataRow finding)
     {
-        int version = ++quickFixVersion;
-        try
+        OpenAdmissionForCorrection(Convert.ToInt32(finding["AdmissionId"]));
+        return Task.CompletedTask;
+    }
+    private void OpenAdmissionForCorrection(int admissionId = 0)
+    {
+        if (admissionId <= 0) admissionId = student.SelectedId;
+        if (admissionId <= 0) { Warn(UiText.Prompts.SelectStudent); return; }
+        if (!CurrentUser.HasPermission("Students.Admit") && !CurrentUser.HasPermission("Students.Administer"))
+        { Warn("Opening Admission requires admission or student administration permission."); return; }
+        int selected = admissionId;
+        if (navigate is not null)
+            navigate(() => new FMSC_SMS.Pages.Students.Admissions.StudentAdmissionPage(navigate, selected), "Students", PageTitles.Admissions);
+        else
         {
-            int admissionId = Convert.ToInt32(finding["AdmissionId"]);
-            string ruleCode = Convert.ToString(finding["RuleCode"]) ?? string.Empty;
-            string suggestedAction = Convert.ToString(finding["SuggestedAction"]) ?? string.Empty;
-            int? relatedEnrollmentId =
-                finding.Table.Columns.Contains("RelatedEnrollmentId") &&
-                finding["RelatedEnrollmentId"] != DBNull.Value
-                    ? Convert.ToInt32(finding["RelatedEnrollmentId"])
-                    : null;
-            string? suggestedStatus =
-                finding.Table.Columns.Contains("SuggestedStatus") &&
-                finding["SuggestedStatus"] != DBNull.Value
-                    ? Convert.ToString(finding["SuggestedStatus"])
-                    : null;
-            DateTime? suggestedWithdrawalDate =
-                finding.Table.Columns.Contains("SuggestedWithdrawalDate") &&
-                finding["SuggestedWithdrawalDate"] != DBNull.Value
-                    ? Convert.ToDateTime(finding["SuggestedWithdrawalDate"])
-                    : null;
-            if (student.SelectedId != admissionId)
-                await SelectStudentByAdmissionId(admissionId);
-            /* (#9) - the finding's student must still be the selected one after that await. */
-            if (IsDisposed ||
-                version != quickFixVersion ||
-                student.SelectedId != admissionId)
-            {
-                return;
-            }
-            /* Which form the finding is fixed in; it is opened once the editors are filled. */
-            CorrectionTab? openTab = null;
-            switch (ruleCode)
-            {
-                case "CERTIFICATE_ENROLLMENT_DATE_MISMATCH":
-                case "LEAVING_BEFORE_ENROLLMENT":
-                case "WITHDRAWAL_ENROLLMENT_DATE_MISMATCH":
-                case "ENROLLMENT_DATE_OVERLAP":
-                case "ENROLLMENT_BEFORE_ADMISSION":
-                    await RepairDates(relatedEnrollmentId??0);return;
-                case "STU_ACTIVE_NO_ENROLLMENT":
-                    await SetGridMode("Enrollments");
-                    BeginMissingEnrollment();
-                    enrollmentStatusCombo.SelectedItem = "Active";
-                    enrollmentDate.Value = DateTime.Today;
-                    leavingDate.Checked = false;
-                    enrollmentReason.Text = "Creating missing active enrollment (Console quick fix).";
-                    openTab = CorrectionTab.Enrollment;
-                    break;
-                case "STU_LEFT_ACTIVE_ENROLLMENT":
-                    await SetGridMode("Enrollments");
-                    if (relatedEnrollmentId is > 0)
-                        SelectEnrollmentRow(relatedEnrollmentId.Value);
-                    enrollmentStatusCombo.SelectedItem = suggestedStatus ?? "Left";
-                    leavingDate.Value = suggestedWithdrawalDate ?? DateTime.Today;
-                    leavingDate.Checked = true;
-                    enrollmentReason.Text = "Closing active enrollment to match Left status (Console quick fix).";
-                    openTab = CorrectionTab.Enrollment;
-                    break;
-                case "MULTI_ACTIVE_ENROLLMENT":
-                case "FEE_ASSIGNMENT_ORPHANED":
-                    await SetGridMode("Enrollments");
-                    if (relatedEnrollmentId is > 0)
-                        SelectEnrollmentRow(relatedEnrollmentId.Value);
-                    openTab = CorrectionTab.Enrollment;
-                    break;
-                case "DANGLING_PROMOTION":
-                    await SetGridMode("Enrollments");
-                    if (relatedEnrollmentId is > 0)
-                        SelectEnrollmentRow(relatedEnrollmentId.Value);
-                    enrollmentReason.Clear();
-                    openTab = CorrectionTab.Enrollment;
-                    break;
-                case "LEAVECERT_STATUS_MISMATCH":
-                    /* Re-checked here as well: the cases below write the status editor directly, and this is the pair that Save Status then commits. */
-                    if (IsDisposed ||
-                        version != quickFixVersion ||
-                        student.SelectedId != admissionId)
-                    {
-                        return;
-                    }
-                    await SetGridMode("Timeline");
-                    statusReason.Clear();
-                    openTab = CorrectionTab.Status;
-                    break;
-                case "WITHDRAWAL_DATE_MISMATCH" when suggestedStatus is not null:
-                    if (IsDisposed ||
-                        version != quickFixVersion ||
-                        student.SelectedId != admissionId)
-                    {
-                        return;
-                    }
-                    statusCombo.SelectedItem = suggestedStatus;
-                    statusReason.Text = "Withdrawal date already recorded; aligning status (Console quick fix).";
-                    openTab = CorrectionTab.Status;
-                    break;
-                case "WITHDRAWAL_DATE_MISMATCH" when suggestedWithdrawalDate.HasValue:
-                    withdrawalDate.Value = suggestedWithdrawalDate.Value;
-                    withdrawalDate.Checked = true;
-                    statusReason.Text = "Backfilling withdrawal date from closed enrollment (Console quick fix).";
-                    openTab = CorrectionTab.Status;
-                    break;
-                case "WITHDRAWAL_DATE_MISMATCH":
-                    Warn("No closed enrollment date to suggest here - enter the withdrawal date manually.");
-                    openTab = CorrectionTab.Status;
-                    break;
-                case "STATUS_HISTORY_MISMATCH":
-                    if (suggestedStatus is not null)
-                        statusCombo.SelectedItem = suggestedStatus;
-                    statusReason.Text = "Reconciling with the last recorded status history entry (Console quick fix).";
-                    openTab = CorrectionTab.Status;
-                    break;
-            }
-            if (openTab is { } tabToOpen)
-                OpenCorrections(tabToOpen);
-            if (!string.IsNullOrWhiteSpace(suggestedAction))
-                Info(suggestedAction);
+            using var host = new ApplicationWindowForm { Text = PageTitles.Admissions, WindowState = FormWindowState.Maximized, StartPosition = FormStartPosition.CenterParent };
+            host.Controls.Add(new FMSC_SMS.Pages.Students.Admissions.StudentAdmissionPage(preselectAdmissionId: selected) { Dock = DockStyle.Fill });
+            host.ShowDialog(FindForm());
         }
-        catch (Exception ex) { Fail(ex); }
     }
     private async Task SelectStudentByAdmissionId(int admissionId)
     {
@@ -1258,7 +1163,7 @@ public sealed class StudentRecordChecksPage : V2Page
                 StudentSearchCache.Invalidate();await LoadStudentSnapshot();await SetGridMode("Enrollments");
                 SelectEnrollmentRow(targetEnrollmentId);await ReportCorrectionAsync(admissionId,correction.ResultMessage);return;
             }
-            if(target!=null && Convert.ToString(target["Status"])!="Active") {Warn("Select a Left enrollment to correct a departure, or an active enrollment to review its dates.");return;}
+            if(target!=null && Convert.ToString(target["Status"])!="Active") {Warn("Select a Left placement to correct a departure, or an active placement to review its dates.");return;}
             using var dialog=new LifecycleDateRepairDialog(admissionId,data,targetEnrollmentId,proposedStart,proposedLeave,clearLeave,initialReason,focused);
             if(dialog.ShowDialog(FindForm())!=DialogResult.OK)return;
             StudentSearchCache.Invalidate();await LoadStudentSnapshot();await SetGridMode("Enrollments");
@@ -1325,14 +1230,14 @@ public sealed class StudentRecordChecksPage : V2Page
             var active=enrollmentReview.AsEnumerable().Where(row=>Convert.ToString(row["Status"])=="Active")
                 .OrderByDescending(row=>Convert.ToInt32(row["EnrollmentId"])).ToArray();
             if(status=="Active" && oldStatus=="Left" && active.Length==0) {
-                Warn("This student has no active enrollment. Use Readmission to bring them back into a class; status repair cannot create that enrollment.");return;
+                Warn("This student has no active placement. Use Readmission to bring them back into a class; status repair cannot create that placement.");return;
             }
             object proposedWithdrawal=withdrawalDate.Checked?withdrawalDate.Value.Date:DBNull.Value;
             bool noChange=oldStatus==status && Equals(current.Rows[0]["WithdrawalDate"],proposedWithdrawal);
             string relatedEffect=noChange?"These values already match; no record changes are expected.":status=="Left" && active.Length>0
-                ? $"The latest active enrollment ({active[0]["EnrollmentId"]}) will close as Left. Its leaving date will be " +
+                ? $"The latest active placement ({active[0]["EnrollmentId"]}) will close as Left. Its leaving date will be " +
                     (withdrawalDate.Checked?withdrawalDate.Value.ToString("dd MMM yyyy"):"today because no withdrawal date is recorded") + "."
-                : "Existing enrollment records will not be changed by this status correction.";
+                : "Existing placement records will not be changed by this status correction.";
             if(!Confirm($"Student: {student.Text}\nStatus: {oldStatus} → {status}\n" +
                 (withdrawalDate.Checked?$"Withdrawal date: {withdrawalDate.Value:dd MMM yyyy}\n":"Withdrawal date will be cleared.\n") +
                 relatedEffect + "\n\nBills, payments and certificates stay unchanged. The database will check the correction before saving.\n" +
@@ -1362,11 +1267,11 @@ public sealed class StudentRecordChecksPage : V2Page
     private async Task ReconcileDatesFromEditor()
     {
         if(!CanCorrect || !CurrentUser.HasPermission("Fees.Adjust")) {
-            Warn("Correcting enrollment dates and billing requires student administration and fee-adjustment permissions.");return;
+            Warn("Correcting placement dates and billing requires student administration and fee-adjustment permissions.");return;
         }
         int enrollmentId=selectedEnrollmentId,admissionId=student.SelectedId;
         var current=enrollmentsRaw.AsEnumerable().FirstOrDefault(row=>Convert.ToInt32(row["EnrollmentId"])==enrollmentId);
-        if(current is null || Convert.ToString(current["Status"])!="Active") {Warn("Select an active enrollment to correct its start and billing dates.");return;}
+        if(current is null || Convert.ToString(current["Status"])!="Active") {Warn("Select an active placement to correct its start and billing dates.");return;}
         using var correction=new EnrollmentDateCorrectionDialog(student.Text,enrollmentId,current,enrollmentDate.Value.Date,
             billingStartDate.Checked?billingStartDate.Value.Date:null,enrollmentReason.Text.Trim(),allowLegacyDates.Checked);
         if(correction.ShowDialog(FindForm())!=DialogResult.OK)return;
@@ -1383,7 +1288,7 @@ public sealed class StudentRecordChecksPage : V2Page
             if (selectedEnrollmentId <= 0)
             {
                 Warn(
-                    "Select an academic enrolment row first, or use Add Missing Record " +
+                    "Select an academic placement row first, or use Add Missing Record " +
                     "to create a new one.");
                 return;
             }
@@ -1393,16 +1298,16 @@ public sealed class StudentRecordChecksPage : V2Page
                 return;
             }
             var original=enrollmentsRaw.AsEnumerable().FirstOrDefault(row=>Convert.ToInt32(row["EnrollmentId"])==selectedEnrollmentId);
-            if(original==null || Convert.ToString(original["Status"])!="Active") {Warn("Closed enrollments are view only.");return;}
+            if(original==null || Convert.ToString(original["Status"])!="Active") {Warn("Previous placements are view only.");return;}
             bool statusOrPlacementChanged=Convert.ToString(original["Status"])!=Convert.ToString(enrollmentStatusCombo.SelectedItem) ||
                 (classSection.SelectedId>0 && Convert.ToInt32(original["ClassSectionId"])!=classSection.SelectedId);
             if(!statusOrPlacementChanged) {
-                if(leavingDate.Checked) {Warn("An active enrollment cannot have a leaving date. Choose its departure status first.");return;}
+                if(leavingDate.Checked) {Warn("An active placement cannot have a leaving date. Choose its departure status first.");return;}
                 await ReconcileDatesFromEditor();return;
             }
             if(Convert.ToDateTime(original["EnrollmentDate"]).Date!=enrollmentDate.Value.Date ||
                 !Equals(original["BillingStartDate"],billingStartDate.Checked?(object)billingStartDate.Value.Date:DBNull.Value)) {
-                Warn("Use Correct Enrollment Dates to save the date changes first, then save the status or placement correction.");return;
+                Warn("Use Correct Placement Dates to save the date changes first, then save the status or placement correction.");return;
             }
             int correctedEnrollmentId=selectedEnrollmentId;
             string newStatus=(enrollmentStatusCombo.SelectedItem as string)??Convert.ToString(original["Status"])!;
@@ -1415,12 +1320,12 @@ public sealed class StudentRecordChecksPage : V2Page
             var current=currentRecords.AsEnumerable().FirstOrDefault(row=>Convert.ToInt32(row["EnrollmentId"])==correctedEnrollmentId);
             string[] reviewedFields={"Status","ClassSectionId","EnrollmentDate","LeavingDate","BillingStartDate"};
             if(current==null || reviewedFields.Any(field=>!Equals(current[field],original[field]))) {
-                Warn("This enrollment changed since it was loaded. Refresh and review it before saving.");return;
+                Warn("This placement changed since it was loaded. Refresh and review it before saving.");return;
             }
-            if(newStatus=="Left" && !newLeave.HasValue) {Warn("Enter a leaving date before marking this enrollment Left.");return;}
-            if(newLeave.HasValue && newLeave.Value<newStart) {Warn("Leaving date cannot be before enrollment start.");return;}
+            if(newStatus=="Left" && !newLeave.HasValue) {Warn("Enter a leaving date before marking this placement Left.");return;}
+            if(newLeave.HasValue && newLeave.Value<newStart) {Warn("Leaving date cannot be before placement start date.");return;}
             if(newStatus=="Promoted" && !currentRecords.AsEnumerable().Any(row=>Convert.ToInt32(row["EnrollmentId"])!=correctedEnrollmentId && Convert.ToString(row["Status"])=="Active")) {
-                Warn("Use Promotion to create the destination enrollment before marking this record Promoted.");return;
+                Warn("Use Promotion to create the destination placement before marking this record Promoted.");return;
             }
             string oldPlacement=$"{current["CampusName"]} / {current["ClassName"]} / {current["SectionName"]}";
             string oldLeave=current["LeavingDate"] is DateTime previousLeave?previousLeave.ToString("dd MMM yyyy"):"not recorded";
@@ -1435,7 +1340,7 @@ public sealed class StudentRecordChecksPage : V2Page
                 $"Leaving date: {oldLeave} → {proposedLeave}\n" +
                 $"\n{studentEffect}\n" +
                 "Fee assignments, bills, payments and certificates stay unchanged. A placement correction does not apply new fee rates.\n" +
-                $"Reason: {reason}\n\nSave this enrollment correction?","Confirm Enrollment Correction"))return;
+                $"Reason: {reason}\n\nSave this placement correction?","Confirm Placement Correction"))return;
             var saved=DatabaseHelper.Query(
                 "CorrectEnrollmentStatus",
                 DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@EnrollmentId",correctedEnrollmentId),
@@ -1451,8 +1356,8 @@ public sealed class StudentRecordChecksPage : V2Page
             StudentSearchCache.Invalidate();
             SelectEnrollmentRow(correctedEnrollmentId);
             await ReportCorrectionAsync(correctedAdmissionId,Convert.ToBoolean(saved.Rows[0]["Changed"])
-                ? $"Enrollment {correctedEnrollmentId} corrected: status {saved.Rows[0]["Status"]}, placement {newPlacement}. Fee assignments and bills were not changed."
-                : "No enrollment changes were needed.");
+                ? $"Placement {correctedEnrollmentId} corrected: status {saved.Rows[0]["Status"]}, placement {newPlacement}. Fee assignments and bills were not changed."
+                : "No placement changes were needed.");
         }
         catch (Exception ex) { Fail(ex); }
     }
@@ -1461,7 +1366,7 @@ public sealed class StudentRecordChecksPage : V2Page
         int correctedAdmissionId=student.SelectedId;
         try
         {
-            if(!creatingEnrollment || selectedEnrollmentId>0) {Warn("Use Add Missing Record first to start a separate historical enrollment");return;}
+            if(!creatingEnrollment || selectedEnrollmentId>0) {Warn("Use Add Missing Record first to start a separate historical placement");return;}
             if (student.SelectedId <= 0)
             {
                 Warn(UiText.Prompts.SelectStudent);
@@ -1469,12 +1374,12 @@ public sealed class StudentRecordChecksPage : V2Page
             }
             if (classSection.SelectedId <= 0)
             {
-                Warn("Select a class section for the new academic enrolment.");
+                Warn("Select a class section for the new academic placement.");
                 return;
             }
             if (academicYear.SelectedId <= 0)
             {
-                Warn("Select an academic year for the new academic enrolment.");
+                Warn("Select an academic year for the new academic placement.");
                 return;
             }
             if (string.IsNullOrWhiteSpace(enrollmentReason.Text))
@@ -1490,14 +1395,14 @@ public sealed class StudentRecordChecksPage : V2Page
             var existingRecords=await DatabaseHelper.QueryUserAsync("GetStudentEnrollmentsForLifecycle",DatabaseHelper.Int("@AdmissionId",correctedAdmissionId));
             if(IsDisposed || student.SelectedId!=correctedAdmissionId)return;
             bool hasActive=existingRecords.AsEnumerable().Any(row=>Convert.ToString(row["Status"])=="Active");
-            if(newStatus=="Active" && hasActive) {Warn("An active enrollment already exists. Select and correct it instead of creating another.");return;}
-            if(newStatus=="Promoted" && !hasActive) {Warn("A Promoted record requires an existing active destination enrollment. Review the student's enrollments first.");return;}
-            if(newStatus=="Left" && !newLeave.HasValue) {Warn("Enter the leaving date for the missing Left enrollment.");return;}
-            if(newLeave.HasValue && newLeave.Value<newStart) {Warn("Leaving date cannot be before enrollment start.");return;}
+            if(newStatus=="Active" && hasActive) {Warn("An active placement already exists. Select and correct it instead of creating another.");return;}
+            if(newStatus=="Promoted" && !hasActive) {Warn("A Promoted record requires an existing active destination placement. Review the student's placements first.");return;}
+            if(newStatus=="Left" && !newLeave.HasValue) {Warn("Enter the leaving date for the missing Left placement.");return;}
+            if(newLeave.HasValue && newLeave.Value<newStart) {Warn("Leaving date cannot be before placement start date.");return;}
             var overlapping=existingRecords.AsEnumerable().Where(row=>
                 Convert.ToDateTime(row["EnrollmentDate"])<=(newLeave??DateTime.MaxValue) &&
                 newStart<=(row["LeavingDate"] is DateTime end?end:DateTime.MaxValue)).ToArray();
-            string recordReview=overlapping.Length==0?"No overlapping enrollment dates were found.":
+            string recordReview=overlapping.Length==0?"No overlapping placement dates were found.":
                 $"Review carefully: {overlapping.Length} existing record(s) overlap these dates: " +
                 string.Join(", ",overlapping.Take(6).Select(row=>$"{row["EnrollmentId"]} ({row["YearName"]}, {row["Status"]})")) +
                 (overlapping.Length>6?" and more.":".") + " Do not create a duplicate record.";
@@ -1506,9 +1411,9 @@ public sealed class StudentRecordChecksPage : V2Page
                 : "The student's overall status and withdrawal date stay unchanged.";
             if(!Confirm($"Student: {student.Text}\nYear: {newYearName}\nPlacement: {newPlacementName}\nStatus: {newStatus}\nStart: {newStart:dd MMM yyyy}\n" +
                 (newLeave.HasValue?$"Leave: {newLeave.Value:dd MMM yyyy}\n":"Leave: not recorded\n") +
-                $"\nExisting enrollments: {existingRecords.Rows.Count}. {recordReview}\n\n{statusEffect}\n" +
-                "This creates the enrollment and its correction history only. No fee assignments or bills are created. Existing bills, payments and certificates stay unchanged.\n" +
-                $"Reason: {correctionReason}\n\nCreate this missing enrollment?","Confirm Missing Enrollment"))return;
+                $"\nExisting placements: {existingRecords.Rows.Count}. {recordReview}\n\n{statusEffect}\n" +
+                "This creates the placement and its correction history only. No fee assignments or bills are created. Existing bills, payments and certificates stay unchanged.\n" +
+                $"Reason: {correctionReason}\n\nCreate this missing placement?","Confirm Missing Placement"))return;
             var created=DatabaseHelper.Query(
                 "CorrectEnrollmentStatus",
                 DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@AdmissionId",correctedAdmissionId),
@@ -1524,7 +1429,7 @@ public sealed class StudentRecordChecksPage : V2Page
             await LoadStudentSnapshot();
             StudentSearchCache.Invalidate();
             SelectEnrollmentRow(createdId);
-            await ReportCorrectionAsync(correctedAdmissionId,$"Missing enrollment {createdId} created for {newYearName}, status {created.Rows[0]["Status"]}. No fee assignments or bills were created.");
+            await ReportCorrectionAsync(correctedAdmissionId,$"Missing placement {createdId} created for {newYearName}, status {created.Rows[0]["Status"]}. No fee assignments or bills were created.");
         }
         catch (Exception ex) { Fail(ex); }
     }

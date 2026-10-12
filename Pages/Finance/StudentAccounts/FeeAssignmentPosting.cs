@@ -32,13 +32,13 @@ internal static class FeeAssignmentPosting
             DatabaseHelper.Int("@EnrollmentId", enrollmentId), DatabaseHelper.Date("@Month", months[0]) });
         var current = new DataSet();
         using (var adapter = new SqlDataAdapter(validate)) adapter.Fill(current);
-        if (current.Tables[3].Rows.Count != 1) throw new InvalidOperationException("The enrollment no longer exists.");
+        if (current.Tables[3].Rows.Count != 1) throw new InvalidOperationException("The placement no longer exists.");
         int academicYearId = Convert.ToInt32(current.Tables[3].Rows[0]["AcademicYearId"]);
         bool historical = !Convert.ToBoolean(current.Tables[3].Rows[0]["IsCurrent"]);
         if (historical && (!CurrentUser.IsAdministrator || string.IsNullOrWhiteSpace(reason)))
             throw new InvalidOperationException("Posting fees outside the current academic year requires an administrator and a reason.");
         if (selected.AsEnumerable().Any(row => Convert.ToInt32(row["AcademicYearId"]) != academicYearId))
-            throw new InvalidOperationException("The enrollment's academic year changed. Refresh the review; nothing was posted.");
+            throw new InvalidOperationException("The placement's academic year changed. Refresh the review; nothing was posted.");
         foreach (DataRow expected in selected.Rows) {
             bool reversed = current.Tables[2].AsEnumerable().Any(row => Convert.ToInt32(row["FeeTypeId"]) == Convert.ToInt32(expected["FeeTypeId"]));
             bool reviewedReversal = selected.Columns.Contains("ReviewNote") && Convert.ToString(expected["ReviewNote"])!.StartsWith("Previously reversed");
@@ -72,7 +72,7 @@ internal static class FeeAssignmentPosting
             EXEC dbo.RequirePermission @UserId, N'Fees.Collect';
             SELECT AcademicYearId FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId;
             """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@EnrollmentId", enrollmentId));
-        if (enrollment.Rows.Count == 0) throw new InvalidOperationException("The enrollment no longer exists.");
+        if (enrollment.Rows.Count == 0) throw new InvalidOperationException("The placement no longer exists.");
         var months = DatabaseHelper.QueryUser("GetPostableMonths",
             DatabaseHelper.Int("@AcademicYearId", Convert.ToInt32(enrollment.Rows[0]["AcademicYearId"])),
             DatabaseHelper.Int("@CampusId", 0), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0),
@@ -105,7 +105,7 @@ internal static class FeeAssignmentPosting
             EXEC dbo.RequirePermission @UserId, N'Fees.Collect';
             SELECT AcademicYearId FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId;
             """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@EnrollmentId", enrollmentId));
-        if (enrollment.Rows.Count == 0) throw new InvalidOperationException("The enrollment no longer exists.");
+        if (enrollment.Rows.Count == 0) throw new InvalidOperationException("The placement no longer exists.");
         return Convert.ToInt32(enrollment.Rows[0]["AcademicYearId"]);
     }
     private static DataTable Select(DataSet result, int enrollmentId)

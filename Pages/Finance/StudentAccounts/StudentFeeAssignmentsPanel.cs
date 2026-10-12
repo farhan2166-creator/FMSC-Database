@@ -317,12 +317,12 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             foreach(DataGridViewRow row in grid.Rows) {
                 row.Cells["Status"].Value="Historical";
                 row.DefaultCellStyle.ForeColor=AppTheme.MutedText;
-                row.Cells["Status"].ToolTipText="Enrollment has ended. Preserved fee schedules do not authorize posting after the leave month.";
+                row.Cells["Status"].ToolTipText="Placement has ended. Preserved fee schedules do not authorize posting after the leave month.";
             }
         UpdateButtonStates();
         int active = grid.Rows.Cast<DataGridViewRow>()
             .Count(r => Convert.ToString(r.Cells["Status"].Value) == "Active");
-        hint.Text = grid.Rows.Count == 0 ? "No fees are assigned to this enrollment yet."
+        hint.Text = grid.Rows.Count == 0 ? "No fees are assigned to this placement yet."
             : grid.Rows.Cast<DataGridViewRow>().Any(r => r.Tag is true)
                 ? "Some fee periods overlap. Review these before making further changes."
                 : FeeAssignmentPresentation.CompactSummary(assignments, ReferenceMonth);

@@ -34,7 +34,7 @@ public static class UiText
     public static class Prompts
     {
         public const string SelectStudent = "Select a student first.";
-        public const string SelectStudentAndEnrollment = "Select a student and academic enrolment first.";
+        public const string SelectStudentAndEnrollment = "Select a student and academic placement first.";
         public const string SearchForStudent = "Search for and select a student.";
         public const string SelectCampusAndClass = "Select a campus and class first.";
         public const string SearchingStudents = "Searching students...";

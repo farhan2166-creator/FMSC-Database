@@ -11,6 +11,8 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPage
 {
     protected override int ActionStatusWidth => 120;
+    private ToolStripItem? confirmPlacementAction;
+    private int pendingPlacementId;
     private static readonly Padding AdmissionDetailsCardPadding =
         new(2, 4, 2, 2);
     private static readonly string[] MandatoryFeeTypeCodes = { "TUITION", "ADMISSION" };
@@ -140,7 +142,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly ModernComboBox transport = HumanUi.Combo();
     private bool UsesTransport =>
         string.Equals(transport.Text, "Yes", StringComparison.OrdinalIgnoreCase);
-    private readonly CheckBox assignFirstPlacement = new() { Text = "Record verified first enrollment", AutoSize = true };
+    private readonly CheckBox assignFirstPlacement = new() { Text = "Record verified first placement", AutoSize = true };
     private readonly ModernComboBox firstPlacementStatus = HumanUi.Combo();
     private readonly ModernDatePicker firstEnrollmentDate = HumanUi.Date();
     private readonly ModernDatePicker firstWithdrawalDate = HumanUi.Date();
@@ -817,13 +819,23 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         enrollmentActionsMenu.Opening += (_, _) => {
             foreach (ToolStripItem item in enrollmentActionsMenu.Items)
                 item.Enabled = currentAdmissionId > 0 && !saveBusy &&
+                    pendingPlacementId == 0 &&
                     (item.Text != "Re-Admit" || !string.Equals(_workspaceStudentStatus.Trim(), "Active", StringComparison.OrdinalIgnoreCase)) &&
                     CurrentUser.HasPermission(item.Text == "Re-Admit" ? "Students.Administer" : "Enrollment.Manage");
         };
+        enrollmentActionsMenu.Items.Add(new ToolStripSeparator());
+        var correctPlacement = enrollmentActionsMenu.Items.Add("Placement History / Corrections");
+        correctPlacement.Click += async (_, _) => await OpenPlacementCorrectionAsync();
+        enrollmentActionsMenu.Opening += (_, _) => correctPlacement.Enabled = currentAdmissionId > 0 && !saveBusy && CurrentUser.HasPermission("Students.Administer");
+        confirmPlacementAction = enrollmentActionsMenu.Items.Add("Confirm Placement");
+        confirmPlacementAction.Visible = false;
+        confirmPlacementAction.Click += async (_, _) => await ConfirmPlacementAsync();
+        enrollmentActionsMenu.Opening += (_, _) => confirmPlacementAction.Enabled = pendingPlacementId > 0 && !saveBusy &&
+            (CurrentUser.HasPermission("Students.Admit") || CurrentUser.HasPermission("Students.Administer"));
         enrollmentActionsButton = AddAction("Actions ▾",
             (_, _) => enrollmentActionsMenu.Show(enrollmentActionsButton!, new Point(0, enrollmentActionsButton!.Height)),
             "Secondary");
-        UiAccessibility.Describe(enrollmentActionsButton, "Student enrollment actions",
+        UiAccessibility.Describe(enrollmentActionsButton, "Student placement actions",
             "Transfer section, class or campus, or readmit the saved student.");
         confirmReturnButton = AddBusyAction("Confirm Return", OpenConfirmReturnAsync, "Success");
         confirmReturnButton.Visible = false;
@@ -1285,14 +1297,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         placementEditGrid.RowStyles[0].Height = AdmissionFieldRowHeight;
         placementEditGrid.RowStyles[2].Height = 0;
         placementEditGrid.Controls.Add(AdmissionField("First Admission", admissionDate, true), 0, 0);
-        placementEditGrid.Controls.Add(AdmissionField("Current Enrollment", editEnrollmentDate), 1, 0);
+        placementEditGrid.Controls.Add(AdmissionField("Placement Start Date", editEnrollmentDate), 1, 0);
         placementEditGrid.Controls.Add(AdmissionField("Campus", Campus, true), 2, 0);
         placementEditGrid.Controls.Add(AdmissionField("Academic Year", Year, true), 3, 0);
         placementEditGrid.Controls.Add(AdmissionField("Class", Class, true), 0, 1);
         placementEditGrid.Controls.Add(AdmissionField("Section", Section, true), 1, 1);
         placementEditGrid.Controls.Add(AdmissionField("Transport", transport), 2, 1);
         firstPlacementStatusField = AdmissionField("Verified status", firstPlacementStatus, true);
-        firstEnrollmentDateField = AdmissionField("Enrollment date (confirm)", firstEnrollmentDate, true);
+        firstEnrollmentDateField = AdmissionField("Placement Start Date", firstEnrollmentDate, true);
         firstWithdrawalDateField = AdmissionField("Withdrawal date (if known)", firstWithdrawalDate);
         placementEditGrid.Controls.Add(firstPlacementStatusField, 0, 2);
         placementEditGrid.Controls.Add(firstEnrollmentDateField, 1, 2);
@@ -1304,7 +1316,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         placementViewGrid.RowStyles[0].Height = AdmissionFieldRowHeight;
         placementViewGrid.Visible = false;
         placementViewGrid.Controls.Add(AdmissionField("First Admission", viewAdmissionDate), 0, 0);
-        placementViewGrid.Controls.Add(AdmissionField("Current Enrollment", viewEnrollmentDate), 1, 0);
+        placementViewGrid.Controls.Add(AdmissionField("Placement Start Date", viewEnrollmentDate), 1, 0);
         placementViewGrid.Controls.Add(AdmissionField("Campus", viewCampus), 2, 0);
         var enrollmentYearField = AdmissionField("Current Academic Year", viewYear);
         viewYearCaption = enrollmentYearField.Controls.OfType<Label>().FirstOrDefault();
@@ -1975,7 +1987,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         registrationNo.Visible = !locked;
         viewRegistrationNo.Visible = locked;
         assignFirstPlacement.Visible = missing || currentAdmissionId <= 0;
-        assignFirstPlacement.Text = currentAdmissionId <= 0 ? "Historical record (no fees)" : "Record verified first enrollment";
+        assignFirstPlacement.Text = currentAdmissionId <= 0 ? "Historical record (no fees)" : "Record verified first placement";
         bool review = missing || HistoricalAdmission;
         firstPlacementStatusField.Visible = review;
         firstEnrollmentDateField.Visible = review;
@@ -2110,6 +2122,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private void StartNewAdmission()
     {
+        pendingPlacementId = 0;
+        if (confirmPlacementAction is not null) confirmPlacementAction.Visible = false;
         currentAdmissionId = 0;
         _workspaceStudentStatus = string.Empty;
         _editEnrollmentId = 0;
@@ -2285,7 +2299,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         if (enrollmentId <= 0)
         {
             feeStatus.Text =
-                "No active enrollment is available for fee assignments.";
+                "No active placement is available for fee assignments.";
             return;
         }
         try
@@ -2646,7 +2660,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             bool left = firstPlacementStatus.Text == "Left";
             v.Check(firstPlacementStatus, _workspaceStudentStatus != "Left" || left, "Use Left for a historical left student");
             v.Check(firstWithdrawalDate, !firstWithdrawalDate.Checked || (left && firstWithdrawalDate.Value.Date >= firstEnrollmentDate.Value.Date && firstWithdrawalDate.Value.Date <= DateTime.Today),
-                "Withdrawal must follow enrollment, not future");
+                "Withdrawal must follow placement, not future");
         }
         v.Check(contact, IsValidOptionalPhone(contact.Text),
             PakistanPhoneNumber.ValidationMessage, () => IsValidOptionalPhone(contact.Text));
@@ -2683,9 +2697,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         transport.Enabled = placementUnlocked;
         placementGuidance.Text = HistoricalAdmission
             ? "Historical record: confirm the register number, placement and dates. No fees are generated."
-            : missing ? "No enrollment: tick verified first enrollment, then confirm placement and dates. No fees are generated."
+            : missing ? "No placement: tick verified first placement, then confirm placement and dates. No fees are generated."
             : currentAdmissionId > 0
-                ? "Placement is recorded. Use Student Lifecycle / corrections to change it."
+                ? "Use Actions → Placement History / Corrections to review placement."
                 : placementUnlocked ? "Choose Campus, Academic Year, Class and Section in order."
                     : "Complete the required student and family fields above to unlock academic placement.";
         placementGuidance.ForeColor = placementUnlocked
@@ -2710,6 +2724,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private int admissionLoadVersion;
     private async Task LoadStudentForEditAsync(int admissionId)
     {
+        pendingPlacementId = -1; // Fail closed while placement confirmation state is loading.
+        if (confirmPlacementAction is not null) confirmPlacementAction.Visible = false;
         if (confirmReturnButton is not null) confirmReturnButton.Visible = false;
         int version = ++admissionLoadVersion;
         /* Item 11 - a photo chosen but not yet saved belongs to the record this load is replacing. */
@@ -3044,7 +3060,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             {
                 feeGrid.DataSource = null;
                 feeStatus.Text =
-                    "This student has no current enrollment.";
+                    "This student has no current placement.";
             }
             /* Item 4 - every await in this tail can finish after the operator has moved to another student (or cleared the form). */
             if (IsDisposed ||
@@ -3357,6 +3373,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private void CollectPaymentNow()
     {
+        if (pendingPlacementId > 0) { SetStatus("Review and Confirm Placement before collecting payment."); return; }
         if (currentAdmissionId <= 0)
         {
             Warn("Save this admission first, then you can collect payment.");
@@ -3386,7 +3403,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 await GetActiveEnrollmentIdAsync(currentAdmissionId);
             if (enrollmentId <= 0)
             {
-                Warn("No enrollment was found for this student.");
+                Warn("No placement was found for this student.");
                 return;
             }
             /* A print action writing to the ledger is wrong on its own terms: the operator was looking at a document, not posting fees. */
@@ -3616,18 +3633,43 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private async Task RefreshConfirmReturnAvailabilityAsync(int admissionId, int version)
     {
-        if (confirmReturnButton is null || !CurrentUser.HasPermission("Students.Administer")) return;
+        if (confirmReturnButton is null) return;
         try
         {
-            var pending = await DatabaseHelper.QueryUserAsync("GetPendingReturnAdmissions");
+            var placement = await Task.Run(() => DatabaseHelper.QuerySql("""
+                EXEC dbo.RequireAnyPermission @UserId,N'Students.Admit',N'Students.Administer';
+                SELECT TOP(1) EnrollmentId,PlacementConfirmedAt FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId
+                ORDER BY CASE WHEN Status=N'Active' THEN 0 ELSE 1 END,EnrollmentDate DESC,EnrollmentId DESC;
+                """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@AdmissionId", admissionId)));
             if (IsDisposed || version != admissionLoadVersion || currentAdmissionId != admissionId) return;
-            confirmReturnButton.Visible = pending.AsEnumerable().Any(row => GetIntColumn(row, "AdmissionId") == admissionId);
+            pendingPlacementId = placement.Rows.Count > 0 && placement.Rows[0]["PlacementConfirmedAt"] == DBNull.Value
+                ? Convert.ToInt32(placement.Rows[0]["EnrollmentId"]) : 0;
+            if (confirmPlacementAction is not null) confirmPlacementAction.Visible = pendingPlacementId > 0;
+            if (pendingPlacementId > 0) SetStatus($"Draft · {AdmissionNumbers.ForId(admissionId)}");
+            if (CurrentUser.HasPermission("Students.Administer"))
+            {
+                var pending = await DatabaseHelper.QueryUserAsync("GetPendingReturnAdmissions");
+                if (IsDisposed || version != admissionLoadVersion || currentAdmissionId != admissionId) return;
+                confirmReturnButton.Visible = pending.AsEnumerable().Any(row => GetIntColumn(row, "AdmissionId") == admissionId);
+            }
         }
         catch (Exception ex)
         {
             if (!IsDisposed && version == admissionLoadVersion)
                 AppExceptionHandler.LogNonFatal(ex, "Checking promoted student return eligibility");
         }
+    }
+
+    private async Task ConfirmPlacementAsync()
+    {
+        if (currentAdmissionId <= 0 || pendingPlacementId <= 0 || saveBusy) return;
+        if (HasUnsavedChanges) { SetStatus("Save changes before confirming placement."); return; }
+        int admissionId = currentAdmissionId;
+        await RunBusyAsync("Confirming placement…", async () => {
+            if (await StudentPlacementConfirmation.ConfirmAsync(FindForm(), pendingPlacementId,
+                $"{AdmissionNumbers.ForId(admissionId)} · {name.Text}"))
+                if (!IsDisposed && currentAdmissionId == admissionId) await LoadStudentForEditAsync(admissionId);
+        });
     }
 
     private async Task OpenConfirmReturnAsync()
@@ -3638,6 +3680,16 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         using var dialog = new ConfirmReturnAdmissionDialog(admissionId);
         dialog.ShowDialog(FindForm());
         if (!IsDisposed && currentAdmissionId == admissionId) await LoadStudentForEditAsync(admissionId);
+    }
+
+    private async Task OpenPlacementCorrectionAsync()
+    {
+        if (currentAdmissionId <= 0 || saveBusy || !CurrentUser.HasPermission("Students.Administer")) return;
+        if (HasUnsavedChanges) { SetStatus("Save personal-detail changes before correcting placement."); return; }
+        int admissionId = currentAdmissionId;
+        using var dialog = new StudentPlacementCorrectionDialog(admissionId, name.Text);
+        dialog.ShowDialog(FindForm());
+        if (dialog.Changed && !IsDisposed && currentAdmissionId == admissionId) await LoadStudentForEditAsync(admissionId);
     }
 
     private async Task OpenEnrollmentActionAsync(string operation)
@@ -3651,7 +3703,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         if (HasUnsavedChanges)
         {
-            SetStatus("Save your admission changes before opening an enrollment action.");
+            SetStatus("Save your admission changes before opening a placement action.");
             return;
         }
         int admissionId = currentAdmissionId;
@@ -4278,7 +4330,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if (photoSaved)
             {
                 Info(
-                    (savedHistorical ? "Historical student and verified placement saved. No fees were generated." : "Student admitted successfully.")
+                    (savedHistorical ? "Historical student and draft placement saved. No fees were generated." : "Student saved. Review the placement and fees, then use Actions → Confirm Placement.")
                     + (typedDiscounts.Count > 0
                         ? " The typed fee discount(s) have been saved."
                         : string.Empty)
@@ -4420,7 +4472,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             AddSuggestionIfNew(placeOfBirthInput, placeOfBirthInput.Text);
             AddSuggestionIfNew(casteTribe, casteTribe.Text);
             Info(
-                AssigningFirstPlacement ? "Student details and verified first enrollment saved. No fees were generated." : "Student details and fee discounts updated successfully.");
+                AssigningFirstPlacement ? "Student details and verified first placement saved. No fees were generated." : "Student details and fee discounts updated successfully.");
             /* The save is committed by now, so a reload that fails is only a stale screen. */
             try
             {
@@ -4552,6 +4604,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     {
         /* any student load still in flight belongs to the form this clear is replacing, so it must not land on the cleared page. */
         admissionLoadVersion++;
+        pendingPlacementId = 0;
+        if (confirmPlacementAction is not null) confirmPlacementAction.Visible = false;
         if (confirmReturnButton is not null) confirmReturnButton.Visible = false;
         feeStructureLoadVersion++;
         admissionValidator?.ClearAll();

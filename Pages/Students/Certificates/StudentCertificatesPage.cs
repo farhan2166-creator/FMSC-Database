@@ -52,7 +52,7 @@ public sealed class StudentCertificatesPage : V2Page
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.3333f));
         for (int i = 0; i < 3; i++)
             grid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.3333f));
-        AddCard(grid, 0, 0, "Regular Student", "Proof of current enrollment", () => new RegularStudentCertificatePage());
+        AddCard(grid, 0, 0, "Regular Student", "Proof of current placement", () => new RegularStudentCertificatePage());
         AddCard(grid, 1, 0, "Character", "Student character certificate", () => new CharacterCertificatePage());
         AddCard(grid, 2, 0, "Leave", "Student leave certificate", () => new LeaveCertificatePage());
         AddCard(grid, 0, 1, "College Leaving", "College leaving certificate", () => new CollegeLeaveCertificatePage());

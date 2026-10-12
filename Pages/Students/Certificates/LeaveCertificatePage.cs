@@ -570,7 +570,7 @@ public sealed class LeaveCertificatePage : V2Page
             // Finding 4 - say where the rows in the list come from.
             string earlierEpisodeNote =
                 hasCertificate
-                    ? "A leave certificate from an earlier enrolment is listed below; it stays there for printing. "
+                    ? "A leave certificate from an earlier placement is listed below; it stays there for printing. "
                     : string.Empty;
             if (studentIsLeft)
             {
@@ -698,7 +698,7 @@ public sealed class LeaveCertificatePage : V2Page
             /* Finding 4 - scoped to this leaving episode, exactly as dbo.CreateLeaveCertificate scopes its own refusal. */
             if (HasCertificateForCurrentEnrollment())
             {
-                Warn("This student already has a leave certificate for this enrolment.");
+                Warn("This student already has a leave certificate for this placement.");
                 return;
             }
             DataRow[] matches =
@@ -778,7 +778,7 @@ public sealed class LeaveCertificatePage : V2Page
                       "• record the original certificate issuance\n\n" +
                       UiText.Dialogs.Continue
                     : "Creating this leave certificate will:\n\n" +
-                      "• mark the student's current enrollment as Left\n" +
+                      "• mark the student's current placement as Left\n" +
                       "• mark the student as Left\n" +
                       "• save the leave certificate record\n" +
                       "• record the original certificate issuance\n\n" +

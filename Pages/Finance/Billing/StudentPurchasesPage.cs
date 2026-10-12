@@ -31,7 +31,7 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
         identity.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
         identity.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         identity.Controls.Add(HumanUi.Field("Student / Admission Number", student, true), 0, 0);
-        identity.Controls.Add(HumanUi.Field("Class / Enrollment", enrollment, true), 1, 0);
+        identity.Controls.Add(HumanUi.Field("Class / Placement", enrollment, true), 1, 0);
         clear.Margin = Padding.Empty;
         refresh.Margin = new Padding(AppMetrics.SpacingSm, 0, 0, 0);
         var tools = new FlowLayoutPanel {
@@ -43,7 +43,7 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
         };
         tools.Controls.Add(clear);
         tools.Controls.Add(refresh);
-        var studentPanel = HumanUi.Card("Student", "Choose a student and their active enrollment.",
+        var studentPanel = HumanUi.Card("Student", "Choose a student and their active placement.",
             accent: AppTheme.ModuleAccent("Finance"), accessory: tools);
         studentPanel.Content.Controls.Add(identity);
         var history = HumanUi.Card("Recent Charges", "Latest purchases, balances and payment status.",
@@ -167,7 +167,7 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
                 if (active.Rows.Count > 0) enrollment.SelectedValue = active.Rows[0]["EnrollmentId"];
             }
             finally { binding = false; }
-            if (active.Rows.Count == 0) { SetStatus("This student has no active enrollment."); return; }
+            if (active.Rows.Count == 0) { SetStatus("This student has no active placement."); return; }
             await LoadEnrollmentAsync(version);
             if (!IsDisposed && version == selectionVersion && student.ContainsFocus) entry.FocusFee();
         }
@@ -183,7 +183,7 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
         if (id <= 0) return;
         await entry.LoadStudentAsync(id);
         if (IsDisposed || version != selectionVersion) return;
-        SetStatus(entry.PostButton.Enabled ? "Ready." : "This enrollment is not ready for additional charges.");
+        SetStatus(entry.PostButton.Enabled ? "Ready." : "This placement is not ready for additional charges.");
         await LoadRecentAsync(id, version);
     }
 

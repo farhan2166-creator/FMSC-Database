@@ -7,7 +7,7 @@ internal sealed class EnrollmentDateCorrectionDialog : ApplicationWindowForm
     private readonly ModernDatePicker start = HumanUi.Date();
     private readonly ModernDatePicker billing = HumanUi.Date();
     private readonly ModernTextBox reason = HumanUi.TextBox(true, 500);
-    private readonly CheckBox legacy = new() { Text = "Acknowledge dates outside admission / academic year or overlapping enrollment history", AutoSize = true };
+    private readonly CheckBox legacy = new() { Text = "Acknowledge dates outside admission / academic year or overlapping placement history", AutoSize = true };
     private readonly ModernTextBox impact = HumanUi.TextBox(true, 0);
     private readonly ModernButton review = new() { Text = "Review Correction", ThemeRole = "Secondary" };
     private readonly ModernButton apply = new() { Text = "Apply Correction", ThemeRole = "Warning", Enabled = false };
@@ -22,7 +22,7 @@ internal sealed class EnrollmentDateCorrectionDialog : ApplicationWindowForm
 
     internal EnrollmentDateCorrectionDialog(string studentLabel, int enrollmentId, DataRow current, DateTime proposedStart, DateTime? proposedBilling, string initialReason, bool allowLegacy)
     {
-        Text = "Correct Enrollment Dates";
+        Text = "Correct Placement Dates";
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(AppScale.Scale(840), AppScale.Scale(600));
         MinimumSize = new Size(AppScale.Scale(720), AppScale.Scale(520));
@@ -31,13 +31,13 @@ internal sealed class EnrollmentDateCorrectionDialog : ApplicationWindowForm
         reason.Text = initialReason; legacy.Checked = allowLegacy;
         impact.ReadOnly = true; impact.Dock = DockStyle.Fill;
         var guidance = new Label { Dock = DockStyle.Fill, AutoSize = true,
-            Text = $"{studentLabel}\nEnrollment {enrollmentId} — {current["YearName"]}\nLoaded enrollment start: {Convert.ToDateTime(current["EnrollmentDate"]):dd MMM yyyy}; billing start: " +
+            Text = $"{studentLabel}\nEnrollment {enrollmentId} — {current["YearName"]}\nLoaded placement start date: {Convert.ToDateTime(current["EnrollmentDate"]):dd MMM yyyy}; billing start: " +
                 (current["BillingStartDate"] is DateTime currentBilling ? currentBilling.ToString("dd MMM yyyy") : "not set") +
                 ".\nReview the date and billing changes together. Status, placement and payments stay unchanged." };
         var fields = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2 };
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         fields.RowStyles.Add(new RowStyle(SizeType.Percent, 50)); fields.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-        fields.Controls.Add(HumanUi.Field("Enrollment start", start), 0, 0);
+        fields.Controls.Add(HumanUi.Field("Placement Start Date", start), 0, 0);
         fields.Controls.Add(HumanUi.Field("Billing start", billing), 1, 0);
         fields.Controls.Add(HumanUi.Field("Reason", reason, true), 0, 1); fields.SetColumnSpan(fields.GetControlFromPosition(0, 1)!, 2);
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(14) };
@@ -74,7 +74,7 @@ internal sealed class EnrollmentDateCorrectionDialog : ApplicationWindowForm
                 plan = preview.Rows[0];
                 reviewedStart = start.Value.Date; reviewedBilling = billing.Checked ? billing.Value.Date : null;
                 reviewedReason = reason.Text.Trim(); reviewedLegacy = legacy.Checked;
-                impact.Text = $"Enrollment start: {start.Value:dd MMM yyyy}\r\nBilling start: " +
+                impact.Text = $"Placement Start Date: {start.Value:dd MMM yyyy}\r\nBilling start: " +
                     (billing.Checked ? billing.Value.ToString("dd MMM yyyy") : "not set") +
                     $"\r\n\r\nCancel {plan["CancelCount"]} charge(s): Rs. {Convert.ToDecimal(plan["CancelledAmount"]):0.##}" +
                     $"\r\nAdd {plan["AddCount"]} charge(s): Rs. {Convert.ToDecimal(plan["AddedAmount"]):0.##}" +
@@ -100,7 +100,7 @@ internal sealed class EnrollmentDateCorrectionDialog : ApplicationWindowForm
                     DatabaseHelper.P("@BillingStartDate", BillingValue()), DatabaseHelper.P("@Reason", reason.Text.Trim()),
                     DatabaseHelper.Bit("@AllowLegacyExceptions", legacy.Checked), DatabaseHelper.Bit("@Preview", false),
                     DatabaseHelper.P("@ExpectedSnapshot", Convert.ToString(plan["Snapshot"])));
-                ResultMessage = $"Enrollment dates corrected: {result.Rows[0]["CancelledCharges"]} charge(s) cancelled, {result.Rows[0]["AddedCharges"]} added. Payments unchanged.";
+                ResultMessage = $"Placement dates corrected: {result.Rows[0]["CancelledCharges"]} charge(s) cancelled, {result.Rows[0]["AddedCharges"]} added. Payments unchanged.";
                 DialogResult = DialogResult.OK;
             }
             catch (Exception ex) { plan = null; impact.Text = DbMessage.UserMessage(ex) + " Review again before applying."; }

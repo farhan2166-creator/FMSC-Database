@@ -164,9 +164,9 @@ public partial class StudentReportsPage : V2Page
         try
         {
             FillChoices(strengthScope, new[] {
-                new Choice("active", "Active enrollments"),
-                new Choice("history", "All recorded enrollments"),
-                new Choice("left", "Former enrollments only")
+                new Choice("active", "Active placements"),
+                new Choice("history", "All recorded placements"),
+                new Choice("left", "Former placements only")
             }, "active");
             SelectKey(mode, _mode);
             FillChoices(transportFilter, new[] {
@@ -339,7 +339,7 @@ public partial class StudentReportsPage : V2Page
         AddField("Campus", campus, true);
         AddField("Academic Year", year, true);
         AddField("Compare To", compareYear, true);
-        AddField("Count enrollments", strengthScope, true);
+        AddField("Count placements", strengthScope, true);
         AddField("Class", cls, true);
         AddField("Section", section, true);
         AddField("Status", status, true);
@@ -453,7 +453,7 @@ public partial class StudentReportsPage : V2Page
     /* The one line above the filters: what this report is for, and the next step. */
     private static string ModeHint(string key) => key switch {
         ModeAdmissions => "Choose admission dates and optional campus/class/section filters, then View Report.",
-        ModeStrength => "Count active, all or former enrollments. Select a year and optional Compare To, then View Report.",
+        ModeStrength => "Count active, all or former placements. Select a year and optional Compare To, then View Report.",
         ModeChanges => "Choose movement dates, then View Report. Group by Change type for totals.",
         _ => "Use View Report for all students or filter below. Use Columns to choose details."
     };
@@ -1017,7 +1017,7 @@ public partial class StudentReportsPage : V2Page
         if (a.Mode != ModeChanges)
         {
             if (a.Mode == ModeStrength)
-                parts.Add($"Enrollments: {(a.Status.Length == 0 ? "All recorded" : a.Status == "Left" ? "Former" : "Active")}");
+                parts.Add($"Placements: {(a.Status.Length == 0 ? "All recorded" : a.Status == "Left" ? "Former" : "Active")}");
             if (a.YearId > 0)
                 parts.Add($"Year: {SelectedText(year, "YearName")}");
             if (a.Mode == ModeStrength && a.CompareYearId > 0)
@@ -1236,7 +1236,7 @@ public partial class StudentReportsPage : V2Page
         if (args is { Mode: ModeStrength } && matched == 0 && (_compareRaw is null || _compareRaw.Rows.Count == 0))
         {
             string scope = args.Status.Length == 0 ? "recorded" : args.Status == "Left" ? "former" : "active";
-            string message = $"No {scope} enrollments match these filters. Change Count enrollments or Academic Year to see another scope.";
+            string message = $"No {scope} placements match these filters. Change Count placements or Academic Year to see another scope.";
             UiHelper.SetGridEmptyMessage(Grid, message);
             SetStatus(message);
             return;

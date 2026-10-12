@@ -416,7 +416,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         var context =
             HumanUi.Card(
                 "Student & Collection Date",
-                "Choose the student once; the current academic enrolment and outstanding charges load automatically.");
+                "Choose the student once; the current academic placement and outstanding charges load automatically.");
         /* Keep the transaction header compact. Payment details belong beside the amount being collected, not beside the student identity, so method / reference / remarks live in the checkout card below. */
         var contextGrid =
             new TableLayoutPanel {
@@ -440,7 +440,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             0);
         contextGrid.Controls.Add(
             HumanUi.Field(
-                "Academic Enrolment",
+                "Academic Placement",
                 enrollment,
                 true),
             1,
@@ -1504,8 +1504,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             RefreshEnteredPaymentAllocation();
             SetStatus(
                 dt.Rows.Count == 1
-                    ? "Current enrollment loaded."
-                    : "Current enrollment loaded. Other outstanding enrollments are available.");
+                    ? "Current placement loaded."
+                    : "Current placement loaded. Other outstanding placements are available.");
         }
         catch (Exception ex)
         {
@@ -1926,7 +1926,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 if(!active) name += " — pending fees";
                 string label = memberEnrollmentId > 0
                     ? name
-                    : $"{name}  - no active enrollment";
+                    : $"{name}  - no active placement";
                 payingFor[memberAdmissionId] = (memberEnrollmentId, GetText(row, "StudentName"));
                 /* A CheckedListBox sorts its items by default, so Items[i] is NOT the i-th thing added. Storing the id on the item removes the assumption entirely. */
                 siblings.Items.Add(new SiblingChoice(memberAdmissionId, label), false);
@@ -1977,7 +1977,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         {
             if (info.EnrollmentId <= 0)
             {
-                Warn($"{info.Name} has no active enrollment, so there are no fees to collect for them.");
+                Warn($"{info.Name} has no active placement, so there are no fees to collect for them.");
                 return;
             }
             int before = CountChargesFor(memberAdmissionId);
@@ -3328,7 +3328,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         var card =
             HumanUi.Card(
                 "Payment History",
-                $"Payments for this enrollment, newest first. Use {PageTitles.StudentFeeCorrections} to correct, refund or reverse.");
+                $"Payments for this placement, newest first. Use {PageTitles.StudentFeeCorrections} to correct, refund or reverse.");
         recentPayments.Dock =
             DockStyle.Fill;
         card.Content.Controls.Add(
@@ -3435,15 +3435,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             Warn("That row is not a posted charge, so there is nothing to reverse.");
             return;
         }
-        var placement=await Task.Run(()=>DatabaseHelper.QuerySql("""
-            EXEC dbo.RequirePermission @UserId,N'Fees.Collect';
-            SELECT E.Status FROM dbo.BillingCharges B JOIN dbo.Enrollments E ON E.EnrollmentId=B.EnrollmentId
-            WHERE B.BillingChargeId=@ChargeId;
-            """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.P("@ChargeId",chargeId)));
-        if(placement.Rows.Count==0 || Convert.ToString(placement.Rows[0]["Status"])!="Active") {
-            Warn("This charge belongs to a closed enrollment. It stays in history and can still be collected, but cannot be reversed here.");
-            return;
-        }
+        // Closed enrollment does not make an erroneous unpaid charge permanent.
+        // The audited procedure checks payment state and requires a reason.
         string chargeName =
             GetText(
                 row.Cells["FeeTypeName"].Value);
@@ -3860,7 +3853,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         {
             Warn(
                 "The collection being reprinted is no longer on screen. " +
-                "Print the receipt before changing the student or enrollment.");
+                "Print the receipt before changing the student or placement.");
             return;
         }
         var snapshot = receiptSnapshot;

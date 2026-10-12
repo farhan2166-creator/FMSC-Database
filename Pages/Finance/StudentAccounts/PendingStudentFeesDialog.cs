@@ -90,7 +90,7 @@ internal sealed class PendingStudentFeesDialog : ApplicationWindowForm
                 SELECT A.YearName,A.IsCurrent FROM dbo.Enrollments E
                 JOIN dbo.AcademicYears A ON A.AcademicYearId=E.AcademicYearId WHERE E.EnrollmentId=@EnrollmentId;
                 """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@EnrollmentId",enrollmentId)));
-            if(scope.Rows.Count!=1) throw new InvalidOperationException("The enrollment no longer exists.");
+            if(scope.Rows.Count!=1) throw new InvalidOperationException("The placement no longer exists.");
             historical=!Convert.ToBoolean(scope.Rows[0]["IsCurrent"]);
             yearName=Convert.ToString(scope.Rows[0]["YearName"]) ?? "";
             reasonRow.Height=historical && CurrentUser.IsAdministrator ? AppMetrics.FieldRowHeight : 0;

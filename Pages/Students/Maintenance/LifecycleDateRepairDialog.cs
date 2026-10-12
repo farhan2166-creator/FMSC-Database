@@ -33,7 +33,7 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
         Size=new Size(Math.Min(AppScale.Scale(1250),area.Width-24),Math.Min(AppScale.Scale(790),area.Height-24));
         MinimumSize=new Size(Math.Min(950,area.Width-24),Math.Min(680,area.Height-24));
         var note=new Label {Dock=DockStyle.Fill,AutoSize=true,
-            Text=$"{student["AdmissionNumber"]} - {student["StudentName"]}  |  {student["Status"]}  |  Admission: {Convert.ToDateTime(student["AdmissionDate"]):dd MMM yyyy}\nSelect any old or current enrollment and edit its dates below. Choose certificate and withdrawal corrections separately; nothing follows automatically."};
+            Text=$"{student["AdmissionNumber"]} - {student["StudentName"]}  |  {student["Status"]}  |  Admission: {Convert.ToDateTime(student["AdmissionDate"]):dd MMM yyyy}\nSelect any old or current placement and edit its dates below. Choose certificate and withdrawal corrections separately; nothing follows automatically."};
         grid.AutoGenerateColumns=false;grid.ReadOnly=false;grid.AllowUserToAddRows=false;grid.AllowUserToDeleteRows=false;
         grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.None;
         grid.DefaultCellStyle.WrapMode=DataGridViewTriState.True;grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.AllCells;
@@ -91,13 +91,13 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
             certEdits=certificatePreview.AsEnumerable().Count(r=>Convert.ToBoolean(r["Apply"]) && !Equals(r["LeaveDate"],r["ProposedLeaveDate"]));
             var invalid=dates.AsEnumerable().FirstOrDefault(r=>r["LeavingDate"]!=DBNull.Value && Convert.ToDateTime(r["LeavingDate"])<Convert.ToDateTime(r["EnrollmentDate"]));
             bool withdrawalEdited=updateWithdrawal.Checked && !Equals(student["WithdrawalDate"],withdrawalDate.Checked?(object)withdrawalDate.Value.Date:DBNull.Value);
-            impact.Text=invalid!=null?$"Enrollment {invalid["EnrollmentId"]}: leave date is before its start date. Correct both dates if necessary":
-                $"Changes: {edits} enrollment(s), {certEdits} certificate(s), withdrawal {(withdrawalEdited?"changed":"unchanged")}\nUnselected certificate dates, bills, payments and original history remain as recorded";
+            impact.Text=invalid!=null?$"Placement {invalid["EnrollmentId"]}: leave date is before its start date. Correct both dates if necessary":
+                $"Changes: {edits} placement(s), {certEdits} certificate(s), withdrawal {(withdrawalEdited?"changed":"unchanged")}\nUnselected certificate dates, bills, payments and original history remain as recorded";
             int mismatches=certificatePreview.AsEnumerable().Count(c=>{
                 var record=dates.AsEnumerable().FirstOrDefault(r=>c["EnrollmentId"]!=DBNull.Value && Equals(r["EnrollmentId"],c["EnrollmentId"]));
                 return record!=null && !Equals(record["LeavingDate"],Convert.ToBoolean(c["Apply"])?c["ProposedLeaveDate"]:c["LeaveDate"]);
             });
-            if(invalid==null && mismatches>0)impact.Text+=$"\n{mismatches} certificate date(s) will still differ from the enrollment — select their corrections if needed";
+            if(invalid==null && mismatches>0)impact.Text+=$"\n{mismatches} certificate date(s) will still differ from the placement — select their corrections if needed";
             if(focused && invalid==null)
                 impact.Text=$"Billing starts: {(SelectedRow()?["BillingStartDate"] is DateTime billing?billing.ToString("dd MMM yyyy"):"not set")}\nExisting charges keep their dates and amounts."+
                     (mismatches>0?"\nA linked certificate has a different leaving date; use Review Dates to correct it.":"");
@@ -141,7 +141,7 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
         DataRow? SelectedRow()=> (grid.CurrentRow?.DataBoundItem as DataRowView)?.Row;
         void LoadEditor() {
             var row=SelectedRow();if(row==null)return;loadingEditor=true;
-            selectedRecord.Text=$"Editing enrollment {row["EnrollmentId"]} — {row["Status"]} — {row["Placement"]}";
+            selectedRecord.Text=$"Editing placement {row["EnrollmentId"]} — {row["Status"]} — {row["Placement"]}";
             bool editable=Convert.ToString(row["Status"])=="Active";
             startDate.Enabled=leaveDate.Enabled=billingDate.Enabled=editable;
             if(!editable)selectedRecord.Text+=" — view only";
@@ -162,11 +162,11 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
         grid.CurrentCellChanged+=(_,_)=>LoadEditor();startDate.ValueChanged+=(_,_)=>SaveEditor();leaveDate.ValueChanged+=(_,_)=>SaveEditor();billingDate.ValueChanged+=(_,_)=>SaveEditor();
         var withdrawalPanel=new FlowLayoutPanel {Dock=DockStyle.Fill,AutoSize=true,WrapContents=false};
         withdrawalPanel.Controls.Add(updateWithdrawal);withdrawalPanel.Controls.Add(withdrawalDate);
-        var useEnrollmentDate=new ModernButton {Text="Use Enrollment Leave Date",Width=AppMetrics.TextWidth("Use Enrollment Leave Date",AppTheme.ButtonFont,44),Height=AppMetrics.ButtonHeight};
+        var useEnrollmentDate=new ModernButton {Text="Use Placement Leave Date",Width=AppMetrics.TextWidth("Use Placement Leave Date",AppTheme.ButtonFont,44),Height=AppMetrics.ButtonHeight};
         useEnrollmentDate.Click+=(_,_)=>{
             if(certificates.CurrentRow?.DataBoundItem is not DataRowView certificate)return;
             var linked=dates.AsEnumerable().FirstOrDefault(r=>Equals(r["EnrollmentId"],certificate.Row["EnrollmentId"]));
-            if(linked==null || linked["LeavingDate"]==DBNull.Value) {impact.Text="Set a leave date on the linked enrollment first";return;}
+            if(linked==null || linked["LeavingDate"]==DBNull.Value) {impact.Text="Set a leave date on the linked placement first";return;}
             certificate.Row["ProposedLeaveDate"]=linked["LeavingDate"];certificate.Row["Apply"]=true;UpdateImpact();
         };
         var certificateHeading=new FlowLayoutPanel {Dock=DockStyle.Fill,AutoSize=true,WrapContents=false};
@@ -185,10 +185,10 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
         root.Controls.Add(impact,0,8);root.Controls.Add(HumanUi.ButtonRow(save,cancel),0,9);
         Controls.Add(root);CancelButton=cancel;UpdateImpact();FormFlow.OrderTableFields(root);
         if(focused && selected!=null) {
-            Text="Correct Enrollment Dates";
+            Text="Correct Placement Dates";
             MinimumSize=new Size(AppScale.Scale(720),AppScale.Scale(460));
             Size=new Size(AppScale.Scale(820),AppScale.Scale(520));
-            note.Text=$"{student["AdmissionNumber"]} — {student["StudentName"]}\nReview the selected enrollment dates before saving.";
+            note.Text=$"{student["AdmissionNumber"]} — {student["StudentName"]}\nReview the selected placement dates before saving.";
             save.Text="Save Dates";
             finances.Text="Keep existing charges and payments unchanged";
             impact.Text="";

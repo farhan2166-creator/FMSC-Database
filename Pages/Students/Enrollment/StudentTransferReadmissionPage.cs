@@ -297,7 +297,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         var actionCard = HumanUi.Card(
             fixedOperation ?? "Lifecycle Action",
             fixedOperation is null
-                ? "Only the actions valid for the selected enrollment are enabled, with just the fields each one needs."
+                ? "Only the actions valid for the selected placement are enabled, with just the fields each one needs."
                 : fixedOperation == "Re-Admit" ? "Choose the returning student's placement and admission number."
                 : "Choose the destination and effective date.");
         actionCard.Content.Controls.Add(actionFieldsTable);
@@ -310,7 +310,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         operationField.TabIndex = 0;
         actionFieldsTable.TabIndex = 1;
         actionButtonRow.TabIndex = 2;
-        var history = HumanUi.Card("Academic Enrolment History", "Academic history remains attached to the same enrolment for transfers.");
+        var history = HumanUi.Card("Academic Placement History", "Academic history remains attached to the same placement for transfers.");
         history.Content.Controls.Add(Grid);
         root.RowStyles.Add(
             new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(1)));
@@ -376,7 +376,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         t.Controls.Add(
             HumanUi.Field("Student", student, true), 0, 0);
         t.Controls.Add(
-            HumanUi.Field("Current Academic Enrolment", enrollment, true), 1, 0);
+            HumanUi.Field("Current Academic Placement", enrollment, true), 1, 0);
         foreach (Control field in t.Controls)
             field.TabIndex = t.GetColumn(field);
         return t;
@@ -600,7 +600,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
             if (!enabled.Contains(fixedOperation))
                 SetStatus(fixedOperation == "Re-Admit"
                     ? "Readmission is available for students who have left or are inactive."
-                    : "Transfers require an active enrollment.");
+                    : "Transfers require an active placement.");
             return;
         }
         if (executeButton is not null) executeButton.Enabled = enabled.Count > 0;
@@ -1067,7 +1067,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         }
         if (selectedOperation != "Re-Admit" && enrollment.SelectedId <= 0)
         {
-            Warn("Select the current active enrollment first.");
+            Warn("Select the current active placement first.");
             return;
         }
         string operation = selectedOperation;
@@ -1090,7 +1090,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         if (operation != "Re-Admit" && selectedEnrollment is not null &&
             selectedEnrollment["EnrollmentDate"] != DBNull.Value && transferDate.Date < Convert.ToDateTime(selectedEnrollment["EnrollmentDate"]).Date)
         {
-            Warn("Transfer date cannot be before the enrollment date.");
+            Warn("Transfer date cannot be before the placement date.");
             return;
         }
         string remarksText = remarks.Text.Trim();
@@ -1174,7 +1174,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
             if ((operation == "Transfer Class" && currentCampusId <= 0) ||
                 (operation == "Transfer Campus" && currentClassId <= 0))
             {
-                Alert("The student's current placement could not be determined. Reselect the enrollment and try again.");
+                Alert("The student's current placement could not be determined. Reselect the placement and try again.");
                 return;
             }
             isExecuting = true;
@@ -1264,7 +1264,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
             if (chargeYearlyFees is bool charge)
                 completionMessage += charge
                     ? "\nYearly fee decision: charge yearly fees."
-                    : "\nYearly fee decision: waive yearly fees for this enrollment.";
+                    : "\nYearly fee decision: waive yearly fees for this placement.";
         }
         SetStatus("Processing student lifecycle operation...");
         try

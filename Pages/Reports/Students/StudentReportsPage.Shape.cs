@@ -71,7 +71,7 @@ public partial class StudentReportsPage
     {
         ("gender", "Gender", "Gender"),
         ("status", "Student status", "StudentStatus"),
-        ("enrol", "Enrolment status", "EnrollmentStatus"),
+        ("enrol", "Placement status", "EnrollmentStatus"),
         ("transport", "Transport", "Transport"),
         ("program", "Program", "ProgramType")
     };

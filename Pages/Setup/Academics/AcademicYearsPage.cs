@@ -63,7 +63,7 @@ public sealed class AcademicYearsPage : MasterPage
         deleteDisplayField: "YearName",
         usageCountProcedure: "GetAcademicYearUsageCount",
         usageCountIdParameter: "@AcademicYearId",
-        usageCountLabel: "enrollment record(s)",
+        usageCountLabel: "placement record(s)",
         deleteBlockedProcedure: "GetAcademicYearDeleteBlockedIds")
     {
         WireYearDateDefaults();

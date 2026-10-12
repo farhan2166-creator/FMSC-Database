@@ -105,6 +105,15 @@ public static class DbMessage
             .Replace("The INSERT statement conflicted with the FOREIGN KEY constraint", "This record is linked to another record and cannot be changed this way", StringComparison.OrdinalIgnoreCase)
             .Replace("The DELETE statement conflicted with the REFERENCE constraint", "This record is still being used by another record", StringComparison.OrdinalIgnoreCase)
             .Replace("String or binary data would be truncated", "Some information is too long for the database field", StringComparison.OrdinalIgnoreCase);
+        // Translate database business messages at the presentation boundary; schema names stay unchanged.
+        text = System.Text.RegularExpressions.Regex.Replace(text,
+            @"\b(?:academic\s+)?enroll?ment(s)?\b", match => {
+                string replacement = match.Groups[1].Success ? "placements" : "placement";
+                return char.IsUpper(match.Value[0])
+                    ? char.ToUpperInvariant(replacement[0]) + replacement[1..]
+                    : replacement;
+            }, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        text = text.Replace("a placement", "a placement", StringComparison.OrdinalIgnoreCase);
         return text.Trim();
     }
 }

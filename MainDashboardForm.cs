@@ -647,7 +647,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             Section("RECORD CHECKS"),
             new(
                 PageTitles.StudentRecordChecks,
-                () => new StudentRecordChecksPage(),
+                () => new StudentRecordChecksPage((factory, module, title) => NavigateTo(factory, module, title)),
                 "Students",
                 PageTitles.StudentRecordChecks,
                 "Students.View"),

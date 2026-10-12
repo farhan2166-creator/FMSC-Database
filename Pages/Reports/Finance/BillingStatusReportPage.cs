@@ -1,6 +1,6 @@
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Reports.Finance;
-/// <summary>Read-only: dbo.GetBillingCycleStatus reports, per academic year and campus, how many active enrollments already have a charge for the month and how many do not.</summary>
+/// <summary>Read-only: dbo.GetBillingCycleStatus reports, per academic year and campus, how many active placements already have a charge for the month and how many do not.</summary>
 public sealed class BillingStatusReportPage : V2Page
 {
     private readonly LookupBox year = new();
@@ -113,7 +113,7 @@ public sealed class BillingStatusReportPage : V2Page
         HideColumn("AcademicYearId");
         HideColumn("CampusId");
         SetHeader("BillingMonth", "Billing Month", 140);
-        SetHeader("TotalActiveEnrollments", "Total Active Enrolments", 190);
+        SetHeader("TotalActiveEnrollments", "Total Active Placements", 190);
         SetHeader("BilledThisMonth", "Students With Fees Posted", 200);
         SetHeader("RemainingToBill", "Students Without Fees Posted", 220);
         Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;

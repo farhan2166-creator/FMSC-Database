@@ -199,7 +199,7 @@ public sealed class StudentProfilePage : V2Page
         feeHistoryActions.Dock=DockStyle.Bottom;
         timelineCard.Content.Controls.Add(feeHistoryActions);
         // BOTTOM: Enrollment & Academic Context Full width
-        var contextCard = HumanUi.Card("Academic Enrolment", "Current campus, class, section and status.");
+        var contextCard = HumanUi.Card("Academic Placement", "Current campus, class, section and status.");
         contextCard.Margin = new Padding(0, AppScale.Scale(4), 0, 0);
         contextCard.Content.Controls.Add(contextGrid);
         // Layout

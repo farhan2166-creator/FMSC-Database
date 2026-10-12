@@ -156,7 +156,7 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
                 DatabaseHelper.Int("@EnrollmentId", enrollmentId),
                 DatabaseHelper.Bit("@IncludeAvailableFees", true));
             if (feeData.Tables.Count != 2)
-                throw new InvalidOperationException("The enrollment fee options could not be loaded completely.");
+                throw new InvalidOperationException("The placement fee options could not be loaded completely.");
             var currentlyOpen = feeData.Tables[0];
             var openFeeTypeIds = currentlyOpen.AsEnumerable()
                 .Where(r => r["EffectiveTo"] == DBNull.Value ||
@@ -205,7 +205,7 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
                     transportOnly ? "Transport is already assigned, or no monthly transport rate is configured for this class."
                     : configured != null
                         ? "Every recurring class fee is already assigned. Use Add Charge in Fee Collection for books, examinations, and other purchases."
-                        : "Every fee type is already assigned to this enrollment.";
+                        : "Every fee type is already assigned to this placement.";
             }
         }
         catch (Exception ex)

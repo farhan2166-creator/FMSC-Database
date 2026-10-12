@@ -143,7 +143,7 @@ public sealed class MigrationBillingCleanupPage : V2Page
                         ? 0
                         : Convert.ToInt32(row["MigrationBillingCleanupEnrollmentCount"]);
                 statusBanner.Text =
-                    $"Already run on {completedAt:dd-MMM-yyyy HH:mm} by {byUser} - {count} enrollment(s) updated. This cannot be run again.";
+                    $"Already run on {completedAt:dd-MMM-yyyy HH:mm} by {byUser} - {count} placement(s) updated. This cannot be run again.";
                 statusBanner.ForeColor = AppTheme.Text;
                 statusBanner.BackColor = AppTheme.SurfaceSecondary;
                 grid.DataSource = null;
@@ -254,9 +254,9 @@ public sealed class MigrationBillingCleanupPage : V2Page
             Info(
                 "Billing start setup finished.\n\n" +
                 $"Students listed: {previewedCount:N0}\n" +
-                $"Enrollment records updated: {processed:N0}\n\n" +
+                $"Placement records updated: {processed:N0}\n\n" +
                 (processed < previewedCount
-                    ? "The student and enrollment totals differ. Check the billing start dates " +
+                    ? "The student and placement totals differ. Check the billing start dates " +
                       "in Student Record Checks before continuing.\n\n"
                     : "") +
                 "This page is now locked and cannot be run again.");

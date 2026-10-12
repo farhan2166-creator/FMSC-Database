@@ -16,14 +16,14 @@ internal sealed class ReadmissionFeeDecisionDialog : ApplicationWindowForm
             choices.Rows.Add(month,month.ToString("MMMM yyyy"));
         months.DataSource=choices; months.SelectedIndex=-1;
         var charge=new RadioButton {Text="Charge yearly fees",AutoSize=true};
-        var waive=new RadioButton {Text="Waive yearly fees for this enrollment",AutoSize=true};
+        var waive=new RadioButton {Text="Waive yearly fees for this placement",AutoSize=true};
         var annual=new FlowLayoutPanel {Dock=DockStyle.Fill,AutoSize=true}; annual.Controls.Add(charge); annual.Controls.Add(waive);
         var grid=HumanUi.Grid(true); grid.AutoGenerateColumns=false;
         foreach(var column in new[]{("FeeTypeName","Fee"),("Frequency","Frequency"),("Amount","New rate")})
             grid.Columns.Add(new DataGridViewTextBoxColumn {DataPropertyName=column.Item1,HeaderText=column.Item2,ReadOnly=true});
         grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.None; grid.DataSource=rates;
         grid.Columns[2].DefaultCellStyle.Format="N0";
-        var note=new Label {Dock=DockStyle.Fill,AutoSize=true,Text=$"Old enrollment balance: Rs. {oldDebt:N0} — remains collectible.\nExisting charges for {enrollmentDate:MMM yyyy}: Rs. {oldMonthCharges:N0}.\nChoose when new monthly fees start and whether yearly fees apply. Existing bills and payments stay unchanged."};
+        var note=new Label {Dock=DockStyle.Fill,AutoSize=true,Text=$"Old placement balance: Rs. {oldDebt:N0} — remains collectible.\nExisting charges for {enrollmentDate:MMM yyyy}: Rs. {oldMonthCharges:N0}.\nChoose when new monthly fees start and whether yearly fees apply. Existing bills and payments stay unchanged."};
         if (!string.IsNullOrWhiteSpace(admissionNumberSummary))
             note.Text = admissionNumberSummary + "\nThe student record and registration number stay the same.\n\n" + note.Text;
         var impact=new Label {Dock=DockStyle.Fill,AutoSize=true};

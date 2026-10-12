@@ -147,7 +147,7 @@ internal sealed class LeaveFeeReviewBar : TableLayoutPanel
                 Convert.ToDecimal(row["NetAmount"]).ToString("N0"),Convert.ToDecimal(row["Balance"]).ToString("N0"),
                 Convert.ToString(row["Status"])=="PartiallyPaid"?"Partially paid":Convert.ToDecimal(row["NetAmount"])==0?"No fee":Convert.ToString(row["Status"])=="Open"?"Unpaid":row["Status"]);
             grid.Rows[index].Tag=(id,can);
-            if(!can) grid.Rows[index].Cells["Reverse"]=new DataGridViewTextBoxCell {Value="—",ToolTipText="Closed enrollment charges stay unchanged. Paid/partial charges use payment review."};
+            if(!can) grid.Rows[index].Cells["Reverse"]=new DataGridViewTextBoxCell {Value="—",ToolTipText="Previous placement charges stay unchanged. Paid/partial charges use payment review."};
         }
         grid.ClearSelection();
         }

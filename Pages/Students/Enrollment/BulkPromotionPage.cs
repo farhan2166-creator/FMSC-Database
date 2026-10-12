@@ -780,7 +780,7 @@ public sealed class BulkPromotionPage : V2Page
             if (!candidateData.Columns.Contains("Decision")) candidateData.Columns.Add("Decision", typeof(string));
             foreach (DataRow row in candidateData.Rows)
             {
-                // Every active enrollment defaults to PROMOTE; staff can flip individual students to HOLD as needed.
+                // Every active placement defaults to PROMOTE; staff can flip individual students to HOLD as needed.
                 row["Selected"] = true; row["Decision"] = "PROMOTE";
             }
             candidatesGrid.DataSource = candidateData;
@@ -964,7 +964,7 @@ public sealed class BulkPromotionPage : V2Page
                     $"Effective date: {effective:dd-MMM-yyyy}\n\n" +
                     $"Promote: {promoteCount:N0}\n" +
                     $"Hold Back: {holdCount:N0}\n\n" +
-                    "A new enrollment will be created in the destination academic year for each processed student.",
+                    "A new placement will be created in the destination academic year for each processed student.",
                     "Confirm Bulk Promotion",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question);
@@ -1041,7 +1041,7 @@ public sealed class BulkPromotionPage : V2Page
                     "students were actually processed.\n\n" +
                     $"Ticked as Promote: {promoteCount:N0}\n" +
                     $"Ticked as Hold Back: {holdCount:N0}\n\n" +
-                    "Reload the candidate list and check the students' enrollments before assuming " +
+                    "Reload the candidate list and check the students' placements before assuming " +
                     "the promotion was applied - do not simply retry.");
                 await LoadCandidates();
                 return;
@@ -1077,7 +1077,7 @@ public sealed class BulkPromotionPage : V2Page
                 /* The server's figures do not line up with what was ticked, so report them without claiming anything about the selection. */
                 outcome +=
                     $"\n\nThe server's figures do not match the ticked selection exactly. " +
-                    "Check the students' enrollments before relying on this result.";
+                    "Check the students' placements before relying on this result.";
                 string mismatch = outcome;
                 reportOutcome = () => Warn(mismatch);
             }

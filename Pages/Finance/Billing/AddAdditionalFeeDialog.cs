@@ -180,7 +180,7 @@ public sealed class AdditionalFeeEntry : UserControl
                 DatabaseHelper.Int("@EnrollmentId", selectedEnrollmentId)));
             if (IsDisposed || version != loadVersion) return;
             if (dates.Rows.Count == 0)
-                throw new InvalidOperationException("The selected enrollment is no longer available.");
+                throw new InvalidOperationException("The selected placement is no longer available.");
             ConfigureChargeDates(Convert.ToDateTime(dates.Rows[0]["ChargeStartDate"]));
             var loadedOptions = await DatabaseHelper.QueryUserAsync(
                 "GetAdditionalFeeOptions", DatabaseHelper.Int("@EnrollmentId", selectedEnrollmentId));
@@ -190,7 +190,7 @@ public sealed class AdditionalFeeEntry : UserControl
             post.Enabled = earliestChargeDate <= DateTime.Today && options.Rows.Count > 0;
             SetEntryEnabled(post.Enabled);
             if (options.Rows.Count == 0)
-                dateNote.Text = "This enrollment is not ready for additional charges.";
+                dateNote.Text = "This placement is not ready for additional charges.";
         }
         catch (Exception ex)
         {
@@ -206,7 +206,7 @@ public sealed class AdditionalFeeEntry : UserControl
         chargeDate.MinDate = DateTimePicker.MinimumDateTime;
         chargeDate.Value = DateTime.Today < startDate.Date ? startDate.Date : DateTime.Today;
         chargeDate.MinDate = startDate.Date;
-        dateNote.Text = $"Charge date must be on or after {startDate:dd-MMM-yyyy} (enrollment start), and not in the future.";
+        dateNote.Text = $"Charge date must be on or after {startDate:dd-MMM-yyyy} (placement start date), and not in the future.";
     }
     private void SetEntryEnabled(bool enabled)
     {
@@ -227,7 +227,7 @@ public sealed class AdditionalFeeEntry : UserControl
                 && chargeDate.Value.Date <= DateTime.Today,
             earliestChargeDate.HasValue
                 ? $"Choose a date from {earliestChargeDate.Value:dd-MMM-yyyy} through today"
-                : "Wait for the enrollment dates to load");
+                : "Wait for the placement dates to load");
         if (!validator.Finish())
             return;
         busy = true;

@@ -73,19 +73,19 @@ internal sealed class LeavingDateCorrectionDialog : ApplicationWindowForm
             ResetReview();
             if (string.IsNullOrWhiteSpace(reason.Text)) { outcome.Text = "Enter a reason for this correction."; return; }
             if (date.Value.Date > DateTime.Today || date.Value.Date < Convert.ToDateTime(target["EnrollmentDate"]).Date)
-            { outcome.Text = "Leaving date must not be in the future or before enrollment start."; return; }
+            { outcome.Text = "Leaving date must not be in the future or before placement start date."; return; }
             if (hasFinancialHistory && !keepFinances.Checked)
             { outcome.Text = "This student has financial history. Acknowledge that existing bills and payments will stay unchanged before reviewing."; return; }
             var changes = new DataTable();
             changes.Columns.Add("Record"); changes.Columns.Add("Current Date"); changes.Columns.Add("Corrected Date");
-            changes.Rows.Add($"Enrollment {enrollmentId}", ShowDate(target["LeavingDate"]), date.Value.ToString("dd MMM yyyy"));
+            changes.Rows.Add($"Placement {enrollmentId}", ShowDate(target["LeavingDate"]), date.Value.ToString("dd MMM yyyy"));
             foreach (var certificate in linkedCertificates)
                 changes.Rows.Add($"Certificate {certificate["CertificateNumber"]}", ShowDate(certificate["LeaveDate"]), date.Value.ToString("dd MMM yyyy"));
             if (updateWithdrawal)
                 changes.Rows.Add("Student withdrawal", ShowDate(student["WithdrawalDate"]), date.Value.ToString("dd MMM yyyy"));
             records.DataSource = changes;
-            outcome.Text = "Apply will save these related date changes together. The database will validate every enrollment before saving.\n" +
-                $"Existing bills on this enrollment: {target["Charges"]}; outstanding: Rs. {Convert.ToDecimal(target["Outstanding"]):0.##}. These amounts will not change.\n" +
+            outcome.Text = "Apply will save these related date changes together. The database will validate every placement before saving.\n" +
+                $"Existing bills on this placement: {target["Charges"]}; outstanding: Rs. {Convert.ToDecimal(target["Outstanding"]):0.##}. These amounts will not change.\n" +
                 "No bills will be created or cancelled. Certificate creation/issuance dates and original history stay unchanged." +
                 (updateWithdrawal ? "" : "\nThe student's current withdrawal date and overall status stay unchanged.");
             reviewed = true; apply.Enabled = true;
@@ -107,7 +107,7 @@ internal sealed class LeavingDateCorrectionDialog : ApplicationWindowForm
                         LeaveRecordId = Convert.ToInt32(row["LeaveRecordId"]), LeaveDate = date.Value.Date
                     }))), DatabaseHelper.Bit("@UpdateWithdrawal", updateWithdrawal),
                     DatabaseHelper.P("@NewWithdrawalDate", updateWithdrawal ? date.Value.Date : (object)DBNull.Value));
-                ResultMessage = $"Leaving date correction saved: {result.Rows[0]["EnrollmentsChanged"]} enrollment(s), {result.Rows[0]["CertificatesUpdated"]} certificate(s). Bills and payments unchanged.";
+                ResultMessage = $"Leaving date correction saved: {result.Rows[0]["EnrollmentsChanged"]} placement(s), {result.Rows[0]["CertificatesUpdated"]} certificate(s). Bills and payments unchanged.";
                 DialogResult = DialogResult.OK;
             }
             catch (Exception ex) { reviewed = false; outcome.Text = DbMessage.UserMessage(ex) + " Close and reopen the correction if records changed."; }

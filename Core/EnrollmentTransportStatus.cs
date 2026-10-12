@@ -4,7 +4,7 @@ internal static class EnrollmentTransportStatus
 {
     internal static string Read(int enrollmentId)
     {
-        if(enrollmentId<=0) return "No enrollment";
+        if(enrollmentId<=0) return "No placement";
         var rows=DatabaseHelper.QuerySql("""
             EXEC dbo.RequirePermission @UserId,N'Students.View';
             SELECT S.EffectiveFrom,S.EffectiveTo FROM dbo.StudentFeeAssignments S

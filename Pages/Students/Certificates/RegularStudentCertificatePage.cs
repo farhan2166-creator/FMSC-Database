@@ -53,7 +53,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         Width = AppScale.Scale(120)
     };
     public RegularStudentCertificatePage()
-        : base("Regular Student Certificate", "Record and print regular student (proof of enrollment) certificates.")
+        : base("Regular Student Certificate", "Record and print regular student (proof of placement) certificates.")
     {
         className.MaxLength = 100;
         className.ReadOnly = true;
