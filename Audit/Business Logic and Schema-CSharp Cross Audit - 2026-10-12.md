@@ -55,12 +55,15 @@ User guidance now explains this behavior in the page's existing help text, confi
 
 Verification: Windows-targeted application cross-build passed with zero warnings and errors; whitespace checks passed. Interactive WinForms layout and live database execution were not performed for this wording-only pass.
 
+### BL-08 decision — 12 October 2026
+
+The owner chose **Option 1: retain the existing snapshot/revision workflow**. Permitted late or backdated payments and adjustments remain subject to their existing validation and authorization; approved dates are not hard-locked. If an entry changes an approved day's payment snapshot, the closing is marked Needs review and a revised closing must be reviewed, submitted and approved again. Existing snapshot checks at approval and print time remain in force. No administrator-only reopen workflow is required. BL-08 is resolved as an accepted financial-closing policy. No application or SQL code changed for this decision.
+
 ### Policy decisions still pending
 
 1. **BL-03 — trust boundary:** Are Windows/LocalDB access permissions the accepted security boundary, or must application roles resist another local process connecting to SQL?
-2. **BL-08 — daily closing:** Permit late/backdated entries with stale detection and revised approval, or seal approved dates until an administrator reopens them?
-3. **BL-09 — audit detail:** Keep assignment-level auditing, or add correlated per-charge before/after details? The user explicitly deferred this item to policy discussion.
-4. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
+2. **BL-09 — audit detail:** Keep assignment-level auditing, or add correlated per-charge before/after details? The user explicitly deferred this item to policy discussion.
+3. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
 
 ## Executive summary
 
