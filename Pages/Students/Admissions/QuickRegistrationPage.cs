@@ -39,10 +39,16 @@ internal sealed class QuickRegistrationFormPage : V2Page
     private int savedStudent, familyAnchor, loadVersion, familyLoadVersion, defaultAcademicYear;
     internal int SavedRegistrationId=>savedStudent;
     private string savedStatus="";
+    private string familyReference="";
     private string[] savedBasics=Array.Empty<string>();
     private bool busy, loadingFamily, loadingFees, feesLoaded;
     private readonly FormValidator validator;
     private readonly ModernButton save, next, bill, collect;
+    private readonly ModernButton linkFamily = new(){Text="Link Existing Family",ThemeRole="Secondary",AutoSize=true};
+    private readonly HumanCard registrationCard;
+    private readonly TableLayoutPanel registrationContent;
+    private readonly TableLayoutPanel root;
+    private readonly Control familyField;
     internal QuickRegistrationFormPage(Action<Func<Control>, string, string> navigate, int preselectRegistrationId=0)
         : base("Quick Registration", "Save basic details and issue the family bill. Review and confirm from Pending Registrations.")
     {
@@ -52,14 +58,18 @@ internal sealed class QuickRegistrationFormPage : V2Page
         next=AddAction("Add Another Child", (_,_)=>ClearChild(), "Secondary");
         bill=AddBusyAction("Print Family Bill", PrintBillAsync, "Secondary");
         collect=AddAction("Collect Payment",(_,_)=>navigate(()=>new FMSC_SMS.Pages.Finance.Collection.FeeCollectionPage(savedStudent),"Fees & Billing","Fee Collection"),"Primary");
-        AddAction("New Family",(_,_)=> { if(busy)return; ++familyLoadVersion;loadingFamily=false;familyAnchor=0;family.Clear();parent.Clear();contact.Clear();address.Clear();ClearChild(); },"Secondary");
+        AddAction("New Family",(_,_)=> { if(busy)return; ++familyLoadVersion;loadingFamily=false;familyAnchor=0;familyReference="";family.Clear();parent.Clear();contact.Clear();address.Clear();ShowFamilyPicker(false);ClearChild(); },"Secondary");
         GateAction(save,"Students.Admit"); GateAction(collect,"Fees.Collect");
         PhoneNumberInput.Attach(contact,()=>validator);
-        var shared=HumanUi.Card("Parent / Family", "Link siblings. Copied details are editable for this child.");
-        var sharedFields=Fields(("Existing family member",family,false,2),("Parent name",parent,true,1),("Contact",contact,true,1),("Address",address,false,2));
-        shared.Content.Controls.Add(sharedFields);
-        var child=HumanUi.Card("Child / Intended Placement", "Temporary reference now; official numbers on confirmation.");
-        child.Content.Controls.Add(Fields(("Student name",name,true,2),("Joining date",joining,true,1),("Academic year",year,true,1),("Campus / Class / Section",placement,true,2)));
+        registrationCard=HumanUi.Card("Registration Details", "Enter a child, or link an existing family.",accessory:linkFamily);
+        registrationContent=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};
+        registrationContent.RowStyles.Add(new RowStyle(SizeType.Absolute,0));
+        registrationContent.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        familyField=HumanUi.Field("Find a family member",family);familyField.Visible=false;familyField.TabIndex=0;
+        registrationContent.Controls.Add(familyField,0,0);
+        var fields=Fields(("Student name",name,true,1),("Joining date",joining,true,1),("Academic year",year,true,1),("Campus / Class / Section",placement,true,1),("Parent name",parent,true,1),("Primary phone",contact,true,1),("Address",address,false,2));
+        fields.TabIndex=1;registrationContent.Controls.Add(fields,0,1);registrationCard.Content.Controls.Add(registrationContent);
+        linkFamily.Click+=(_,_)=>{ShowFamilyPicker(!familyField.Visible);if(familyField.Visible)family.Focus();};
         fees.Columns.Add(new DataGridViewCheckBoxColumn { Name="Include",DataPropertyName="Include",HeaderText="Include",Width=65 });
         fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Fee",DataPropertyName="FeeTypeName",HeaderText="Fee",ReadOnly=true,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill });
         fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Frequency",DataPropertyName="Frequency",HeaderText="Frequency",ReadOnly=true,Width=100 });
@@ -79,26 +89,32 @@ internal sealed class QuickRegistrationFormPage : V2Page
         foreach(var input in new[]{name,parent,contact,address})input.TextChanged+=(_,_)=>PendingEditChanged();
         var feeCard=HumanUi.Card("Opening Bill", "Configured fees are shared with Admission. Review sibling discounts before saving.");
         var feeContent=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};feeContent.RowStyles.Add(new RowStyle(SizeType.Percent,100));feeContent.RowStyles.Add(new RowStyle(SizeType.AutoSize));feeContent.Controls.Add(fees,0,0);feeContent.Controls.Add(total,0,1);feeCard.Content.Controls.Add(feeContent);
-        var details=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1};details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));details.Controls.Add(shared,0,0);details.Controls.Add(child,1,0);
-        var root=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2 };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(3)));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.Controls.Add(details,0,0);root.Controls.Add(feeCard,0,1);SetContent(root);
+        root=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2 };
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(4)));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.Controls.Add(registrationCard,0,0);root.Controls.Add(feeCard,0,1);SetContent(root);
         family.UserSelectionChanged+=async(_,_)=>await LoadFamilyAsync();
-        family.SelectionCleared+=(_,_)=>{++familyLoadVersion;familyAnchor=0;loadingFamily=false;UpdateActions();};
+        family.SelectionCleared+=(_,_)=>{++familyLoadVersion;familyAnchor=0;familyReference="";loadingFamily=false;parent.Clear();contact.Clear();address.Clear();UpdateActions();};
         placement.SelectedIndexChanged+=async(_,_)=>await LoadFeesAsync();
         Load+=async(_,_)=>{await LoadLookupsAsync();if(preselectRegistrationId>0)await LoadRegistrationAsync(preselectRegistrationId);};UpdateActions();
     }
     private static TableLayoutPanel Fields(params (string Label,Control Input,bool Required,int Span)[] fields)
     {
-        var grid=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=3};
+        int rows=(fields.Sum(field=>field.Span)+1)/2;
+        var grid=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=rows};
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
-        for(int row=0;row<3;row++)grid.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
+        for(int row=0;row<rows;row++)grid.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
         int cell=0;
         for(int i=0;i<fields.Length;i++){
             var field=HumanUi.Field(fields[i].Label,fields[i].Input,fields[i].Required);field.TabIndex=i;
             grid.Controls.Add(field,cell%2,cell/2);grid.SetColumnSpan(field,fields[i].Span);cell+=fields[i].Span;
         }
         return grid;
+    }
+    private void ShowFamilyPicker(bool visible){
+        familyField.Visible=visible;
+        registrationContent.RowStyles[0].Height=visible?AppMetrics.FieldRowHeight:0;
+        root.RowStyles[0].Height=AppMetrics.FieldCardHeight(4)+(visible?AppMetrics.FieldRowHeight:0);
+        linkFamily.Text=visible?"Hide Family Search":"Link Existing Family";
     }
     private async Task LoadLookupsAsync()
     {
@@ -122,6 +138,8 @@ internal sealed class QuickRegistrationFormPage : V2Page
             var data=await DatabaseHelper.QueryUserAsync("GetStudentDetails",DatabaseHelper.Int("@AdmissionId",selected));
             if(IsDisposed||version!=familyLoadVersion||selected!=family.SelectedId||data.Rows.Count==0)return;
             var r=data.Rows[0];familyAnchor=selected;parent.Text=Convert.ToString(r["FatherName"]);contact.Text=Convert.ToString(r["ContactNumber"]);address.Text=Convert.ToString(r["Address"]);
+            familyReference=Convert.ToString(r.IsNull("AdmissionNumber")?r["QuickReference"]:r["AdmissionNumber"])??"";
+            ShowFamilyPicker(false);name.Focus();
         }catch(Exception ex){if(version==familyLoadVersion&&selected==family.SelectedId){familyAnchor=0;Fail(ex);}}
         finally{if(!IsDisposed&&version==familyLoadVersion){loadingFamily=false;UpdateActions();}}
     }
@@ -162,7 +180,13 @@ internal sealed class QuickRegistrationFormPage : V2Page
     private void PendingEditChanged(){UpdateActions();if(!busy&&HasPendingChanges)SetStatus("Save changes before printing or collecting payment.");}
     private void UpdateActions(){save.Enabled=ReadyToSave&&CurrentUser.HasPermission("Students.Admit");save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!busy&&savedStudent>0;bill.Enabled=!busy&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!busy&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.Collect");
         bool editing=!busy&&(savedStudent==0||savedStatus=="Pending");family.Enabled=year.Enabled=placement.Enabled=joining.Enabled=editing&&savedStudent==0;
-        name.ReadOnly=parent.ReadOnly=contact.ReadOnly=address.ReadOnly=!editing;fees.ReadOnly=!editing;
+        name.ReadOnly=contact.ReadOnly=address.ReadOnly=!editing;
+        parent.ReadOnly=!editing||familyAnchor>0||loadingFamily;
+        linkFamily.Enabled=editing&&savedStudent==0&&familyAnchor==0&&!loadingFamily;
+        registrationCard.SetHeaderText("Registration Details",familyAnchor>0
+            ? $"Linked family · {familyReference} · Parent corrections in Admission / Review."
+            : "Enter a child, or link an existing family.");
+        fees.ReadOnly=!editing;
         // Switching grid ReadOnly can reset individual column/cell flags.
         // Restore the edit policy after every busy or saved-state transition.
         foreach(DataGridViewColumn column in fees.Columns)column.ReadOnly=column.Name switch{
@@ -197,8 +221,14 @@ internal sealed class QuickRegistrationFormPage : V2Page
         if(savedStudent>0){await SavePendingAsync();return;}
         busy=true;UpdateActions();using var hold=BeginBusy("Saving registration…",family,parent,contact,address,name,year,placement,joining,fees);
         try{
-            // Parent/contact/address are this child's editable copy. The family
-            // anchor links siblings; it never updates existing family records.
+            // Re-read the family parent before saving. The copied contact/address
+            // belong to this child; a linked parent cannot be renamed here.
+            if(familyAnchor>0){
+                var anchor=await DatabaseHelper.QueryUserAsync("GetStudentDetails",DatabaseHelper.Int("@AdmissionId",familyAnchor));
+                if(anchor.Rows.Count==0){Warn("The linked family record could not be found. Choose the family again.");return;}
+                string parentName=Convert.ToString(anchor.Rows[0]["FatherName"])?.Trim()??"";
+                if(parent.Text.Trim()!=parentName){parent.Text=parentName;Warn("The linked parent name has changed. Review it and save again. Correct parent details in Admission / Review.");return;}
+            }
             var args=new List<SqlParameter>{DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Bit("@QuickRegistration",true),DatabaseHelper.P("@FamilyStudentId",familyAnchor>0?familyAnchor:null),
                 DatabaseHelper.Date("@AdmissionDate",joining.Value.Date),DatabaseHelper.Int("@AdmissionCampusId",Convert.ToInt32(row["CampusId"])),DatabaseHelper.Int("@AcademicYearId",year.SelectedId),DatabaseHelper.Int("@ClassSectionId",placement.SelectedId),
                 DatabaseHelper.P("@StudentName",name.Text.Trim()),DatabaseHelper.P("@FatherName",parent.Text.Trim()),DatabaseHelper.P("@ContactNumber",contact.Text.Trim()),DatabaseHelper.P("@Address",address.Text.Trim()),DatabaseHelper.P("@Disability","No"),DatabaseHelper.Bit("@UsesTransport",selected.Any(r=>Convert.ToBoolean(r["IsTransportLinked"]))),
@@ -211,6 +241,7 @@ internal sealed class QuickRegistrationFormPage : V2Page
             savedStudent=Convert.ToInt32(result.Rows[0]["AdmissionId"]);savedStatus="Pending";familyAnchor=familyAnchor>0?familyAnchor:savedStudent;StudentSearchCache.Invalidate();
             savedBasics=BasicValues();foreach(DataRow rate in rates.Rows)rate["OriginalDiscount"]=rate["Discount"];
             string reference=result.Columns.Contains("QuickReference")?Convert.ToString(result.Rows[0]["QuickReference"])??"":$"QR-{savedStudent}";
+            if(familyAnchor==savedStudent)familyReference=reference;
             SetStatus($"Saved {reference}. Print the family bill, collect payment or add another child.");
         }catch(Exception ex){Fail(ex);}finally{busy=false;UpdateActions();}
     }
@@ -220,7 +251,7 @@ internal sealed class QuickRegistrationFormPage : V2Page
         try{
             var data=await DatabaseHelper.QueryUserAsync("GetStudentDetails",DatabaseHelper.Int("@AdmissionId",id));
             if(IsDisposed||data.Rows.Count==0)return;var r=data.Rows[0];
-            ++familyLoadVersion;loadingFamily=false;savedStudent=id;savedStatus=Convert.ToString(r["Status"])??"";family.Clear();familyAnchor=id;
+            ++familyLoadVersion;loadingFamily=false;savedStudent=id;savedStatus=Convert.ToString(r["Status"])??"";family.Clear();familyAnchor=id;ShowFamilyPicker(false);
             parent.Text=Convert.ToString(r["FatherName"]);contact.Text=Convert.ToString(r["ContactNumber"]);address.Text=Convert.ToString(r["Address"]);name.Text=Convert.ToString(r["StudentName"]);
             joining.Value=Convert.ToDateTime(r["AdmissionDate"]);
             year.SelectedValue=r["AcademicYearId"];placement.SelectedValue=r["ClassSectionId"];
@@ -236,6 +267,7 @@ internal sealed class QuickRegistrationFormPage : V2Page
                 """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Admission",id)));
             if(IsDisposed||version!=loadVersion)return;savedBasics=BasicValues();SetRates(stored);loadingFees=false;feesLoaded=true;UpdateTotal();
             string reference=Convert.ToString(r["QuickReference"])??"";
+            familyReference=Convert.ToString(r.IsNull("AdmissionNumber")?r["QuickReference"]:r["AdmissionNumber"])??"";
             if(savedStatus=="Pending")SetStatus($"{reference} · Pending. Save edits here; review and confirm from Pending Registrations.");
             else SetStatus(savedStatus=="Active"?$"Admitted · Admission {r["AdmissionNumber"]} · Registration {r["RegistrationNumber"]}":"Registration cancelled. History is retained.");
         }catch(Exception ex){Fail(ex);}finally{busy=false;UpdateActions();}
@@ -247,7 +279,9 @@ internal sealed class QuickRegistrationFormPage : V2Page
             var current=await DatabaseHelper.QueryUserAsync("GetStudentDetails",DatabaseHelper.Int("@AdmissionId",savedStudent));
             if(current.Rows.Count==0||Convert.ToString(current.Rows[0]["Status"])!="Pending"){Warn("This registration is no longer pending. Refresh the list before editing.");return;}
             var row=current.Rows[0];
-            var args=new List<SqlParameter>{DatabaseHelper.Int("@AdmissionId",savedStudent),DatabaseHelper.P("@StudentName",name.Text.Trim()),DatabaseHelper.P("@FatherName",parent.Text.Trim()),DatabaseHelper.P("@ContactNumber",contact.Text.Trim()),DatabaseHelper.P("@Address",address.Text.Trim())};
+            // Preserve the current stored parent even if another workspace has
+            // corrected it since this registration was opened.
+            var args=new List<SqlParameter>{DatabaseHelper.Int("@AdmissionId",savedStudent),DatabaseHelper.P("@StudentName",name.Text.Trim()),DatabaseHelper.P("@FatherName",row["FatherName"]),DatabaseHelper.P("@ContactNumber",contact.Text.Trim()),DatabaseHelper.P("@Address",address.Text.Trim())};
             foreach(string key in new[]{"DateOfBirth","Gender","BFormNumber","Religion","BloodGroup","AlternateContactNumber","PreviousSchool","PlaceOfBirth","FatherOccupation","Disability","BiseEnrolmentNumber","CasteTribe"})args.Add(DatabaseHelper.P("@"+key,row[key]));
             args.Add(new SqlParameter("@Discounts",SqlDbType.Structured){TypeName="dbo.StudentFeeDiscountType",Value=Tvp.StudentFeeDiscounts(rates.AsEnumerable().Where(r=>Convert.ToDecimal(r["Discount"])!=Convert.ToDecimal(r["OriginalDiscount"])).Select(r=>(Convert.ToInt32(r["StudentFeeAssignmentId"]),Convert.ToDecimal(r["Discount"]))))});
             await DatabaseHelper.ExecuteUserAsync("SaveStudentDetailsWithFirstEnrollment",args.ToArray());StudentSearchCache.Invalidate();changed=true;
