@@ -35,6 +35,7 @@ public sealed class StaffEmploymentPage : MasterPage
     }
     private readonly Func<int>? _staffProvider;
     private DataTable? _selectionSnapshot;
+    private bool _chooseInitialView = true;
     public StaffEmploymentPage() : base("Staff Employment", "Manage staff jobs and employment history.", "GetStaffEmployment", "SaveStaffEmployment", new[] { new FieldSpec("StaffId", "Staff", FieldKind.ComboInt, Required: true, LookupProcedure: "GetStaff", LookupIdColumn: "StaffId", LookupTextColumn: "StaffName"), new FieldSpec("Designation", "Designation", Required: true), new FieldSpec("Department", "Department"), new FieldSpec("EmploymentType", "Employment Type"), new FieldSpec("HireDate", "Hire Date", FieldKind.Date, Required: true), new FieldSpec("LeavingDate", "Leaving Date", FieldKind.Date), new FieldSpec("Remarks", "Remarks") }, v => new[] { DatabaseHelper.P("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@StaffEmploymentId", Convert.ToInt32(v["Id"] ?? 0)), DatabaseHelper.Int("@StaffId", Convert.ToInt32(v["StaffId"] ?? 0)), DatabaseHelper.P("@Designation", v["Designation"]), DatabaseHelper.P("@Department", v["Department"]), DatabaseHelper.P("@EmploymentType", v["EmploymentType"]), DatabaseHelper.Date("@HireDate", (DateTime)v["HireDate"]!), DatabaseHelper.P("@LeavingDate", v["LeavingDate"]), DatabaseHelper.P("@Remarks", v["Remarks"]) }, savePermission: "Staff.Manage") { }
     // Constructor that binds the page to a selected StaffId provider so the records shown reflect the currently selected staff member in a parent page (e.g. StaffManagementPage).
     public StaffEmploymentPage(Func<int> staffIdProvider)
@@ -115,6 +116,15 @@ public sealed class StaffEmploymentPage : MasterPage
             if (records.Rows.Count > 0) records = ordered.CopyToDataTable();
         }
         return records;
+    }
+    protected override void RecordsLoaded(DataTable table)
+    {
+        base.RecordsLoaded(table);
+        if (!_chooseInitialView || _staffProvider is null) return;
+        _chooseInitialView = false;
+        // Start with existing jobs when present; an empty history starts at Add
+        // Employment. Later refreshes must not switch tabs while the operator works.
+        ShowRecordsTab(table.Rows.Count > 0);
     }
     private void ApplySelectedStaff()
     {

@@ -38,6 +38,18 @@ public sealed class StaffManagementPage : UserControl, IUnsavedChanges, IBusyPag
             context.ForeColor = AppTheme.Text;
             employmentButton.Enabled = true;
         };
+        staff.StaffSaved += selection => {
+            selected = selection;
+            context.Text = $"Saved staff: {selection.StaffName} · Staff No. {selection.StaffNumber}. Open Employment for this staff member, or enter a new staff member below.";
+            context.ForeColor = AppTheme.Text;
+            employmentButton.Enabled = true;
+        };
+        staff.StaffSelectionCleared += () => {
+            selected = null;
+            context.Text = "Save a new staff member or choose one from Staff Records to manage employment.";
+            context.ForeColor = AppTheme.MutedText;
+            employmentButton.Enabled = false;
+        };
         employmentButton.Click += (_, _) => {
             if (selected is null || staff.IsBusy) return;
             if (staff.HasUnsavedChanges)

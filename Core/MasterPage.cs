@@ -14,6 +14,13 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
         return _id;
     }
     protected virtual void RecordLoaded(DataGridViewRow row) { }
+    protected virtual void EditorCleared(bool afterSave) { }
+    protected virtual void RecordsLoaded(DataTable table) { }
+    protected void ShowRecordsTab(bool showRecords)
+    {
+        if (_entryRecordsTabs is not null)
+            _entryRecordsTabs.SelectedIndex = showRecords ? 1 : 0;
+    }
     private void RestoreEditorSelection()
     {
         Grid.ClearSelection();
@@ -153,7 +160,9 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
         /* A bare "Save" does not say what is being saved. Kept short by construction, so the existing action-bar width fitting still applies unchanged. */
         string saveActionText = "Save " + MasterEntityNaming.Singularize(NavigationTitle);
         var save = AddAction(saveActionText, Save, "Success");
-        /* Clear / New explicitly discards the editor; record switching still asks. */
+        /* Owner decision: Clear / New deliberately discards edits immediately, without
+           an unsaved-change confirmation. Keep confirmations for record switching
+           and leaving the page; do not add one to this explicit discard action. */
         string clearActionText = separateEntryAndRecords ? "Clear / New" : "Clear";
         var clear = AddAction(clearActionText, (_, _) => {
             if (_saving || !CanChangeRecord())

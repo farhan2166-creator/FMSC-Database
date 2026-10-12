@@ -5,6 +5,8 @@ public sealed class StaffProfilePage : MasterPage
 {
     public sealed record Selection(int Id, string StaffNumber, string StaffName);
     public event Action<Selection>? StaffSelected;
+    public event Action<Selection>? StaffSaved;
+    public event Action? StaffSelectionCleared;
     public Func<bool>? ContextChangeGuard { get; set; }
     protected override bool CanChangeRecord() => ContextChangeGuard?.Invoke() != false;
     private FormValidator? _staffValidator;
@@ -96,7 +98,7 @@ public sealed class StaffProfilePage : MasterPage
     {
         try
         {
-            StaffSelected?.Invoke(new Selection(
+            StaffSaved?.Invoke(new Selection(
                 id,
                 _savedStaffNumber,
                 Convert.ToString(values["StaffName"]) ?? string.Empty));
@@ -107,6 +109,13 @@ public sealed class StaffProfilePage : MasterPage
             FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException41, "StaffPage: AfterSave fallback");
         }
         base.AfterSave(id, values);
+    }
+    protected override void EditorCleared(bool afterSave)
+    {
+        base.EditorCleared(afterSave);
+        if (afterSave) return;
+        _lastNotifiedStaffId = 0;
+        StaffSelectionCleared?.Invoke();
     }
     protected override void RecordLoaded(DataGridViewRow loadedRow)
     {

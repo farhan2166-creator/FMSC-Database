@@ -5,6 +5,9 @@ namespace FMSC_SMS.Core;
 public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInput
 {
     private readonly InnerDatePicker _inner;
+    private DateTimePickerFormat _format = DateTimePickerFormat.Custom;
+    private string? _customFormat = "dd-MMM-yyyy";
+    private ToolStripDropDown? _popup;
     private bool _invalid;
     private int _radius =
         Math.Max(1, AppTheme.ControlRadius - 2);
@@ -20,6 +23,9 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
             ForeColor = AppTheme.Text,
             CalendarMonthBackground = AppTheme.SurfaceElevated
         };
+        _inner.OpenCalendar = OpenCalendar;
+        _inner.StateChanged = RefreshDisplayFormat;
+        _inner.ValueChanged += (_, _) => RefreshDisplayFormat();
         _inner.GotFocus += (_, _) => {
             OnGotFocus(EventArgs.Empty);
             Invalidate();
@@ -83,29 +89,31 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
     {
         if (disposing)
         {
+            _popup?.Dispose();
             AppTheme.ThemeChanged -= OnThemeChanged;
         }
         base.Dispose(disposing);
     }
     public bool TimeOnly
     {
-        get => _inner.Format == DateTimePickerFormat.Custom &&
+        get => _format == DateTimePickerFormat.Custom &&
                _inner.ShowUpDown &&
-               string.Equals(_inner.CustomFormat, "hh:mm tt", StringComparison.Ordinal);
+               string.Equals(_customFormat, "hh:mm tt", StringComparison.Ordinal);
         set
         {
             if (value)
             {
-                _inner.Format = DateTimePickerFormat.Custom;
-                _inner.CustomFormat = "hh:mm tt";
+                _format = DateTimePickerFormat.Custom;
+                _customFormat = "hh:mm tt";
                 _inner.ShowUpDown = true;
             }
             else
             {
-                _inner.Format = DateTimePickerFormat.Custom;
-                _inner.CustomFormat = "dd-MMM-yyyy";
+                _format = DateTimePickerFormat.Custom;
+                _customFormat = "dd-MMM-yyyy";
                 _inner.ShowUpDown = false;
             }
+            RefreshDisplayFormat();
             Reposition();
             Invalidate();
         }
@@ -133,14 +141,14 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
     }
     public DateTimePickerFormat Format
     {
-        get => _inner.Format;
-        set => _inner.Format = value;
+        get => _format;
+        set { _format = value; RefreshDisplayFormat(); }
     }
     [AllowNull]
     public string CustomFormat
     {
-        get => _inner.CustomFormat!; // Only non-null formats are ever assigned here, and no caller reads this getter.
-        set => _inner.CustomFormat = value;
+        get => _customFormat!;
+        set { _customFormat = value; RefreshDisplayFormat(); }
     }
     public bool ShowUpDown
     {
@@ -150,12 +158,48 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
     public bool ShowCheckBox
     {
         get => _inner.ShowCheckBox;
-        set => _inner.ShowCheckBox = value;
+        set { _inner.ShowCheckBox = value; RefreshDisplayFormat(); }
     }
     public bool Checked
     {
         get => _inner.Checked;
-        set => _inner.Checked = value;
+        set { _inner.Checked = value; RefreshDisplayFormat(); }
+    }
+    private void RefreshDisplayFormat()
+    {
+        bool empty = _inner.ShowCheckBox && !_inner.Checked;
+        _inner.Format = empty ? DateTimePickerFormat.Custom : _format;
+        _inner.CustomFormat = empty ? "'Not entered'" : _customFormat;
+    }
+    private void OpenCalendar()
+    {
+        if (!Enabled || _inner.ShowUpDown || _format == DateTimePickerFormat.Time) return;
+        if (_popup is { Visible: true }) { _popup.Close(); return; }
+        _popup?.Dispose();
+        var selector = new DateSelectionPanel(Value, MinDate, MaxDate, ShowCheckBox);
+        var popup = new ToolStripDropDown {
+            Padding = Padding.Empty, AutoSize = true,
+            BackColor = AppTheme.Surface, DropShadowEnabled = true
+        };
+        _popup = popup;
+        popup.Items.Add(new ToolStripControlHost(selector) { Margin = Padding.Empty, Padding = Padding.Empty });
+        selector.DateChosen += date => {
+            ApplyCalendarDate(date);
+            popup.Close();
+        };
+        selector.DateCleared += () => { Checked = false; popup.Close(); };
+        popup.Closed += (_, _) => { if (!IsDisposed) _inner.Focus(); };
+        popup.Show(this, new Point(0, Height));
+        selector.FocusYear();
+    }
+    private void ApplyCalendarDate(DateTime date)
+    {
+        // Keep any time component carried by a date/time field, including
+        // boundary times. The selection changes only the calendar date.
+        DateTime selected = date.Date.Add(Value.TimeOfDay);
+        selected = selected < MinDate ? MinDate : selected > MaxDate ? MaxDate : selected;
+        Value = selected;
+        if (ShowCheckBox) Checked = true;
     }
     public Color CalendarMonthBackground
     {
@@ -302,8 +346,26 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
     }
     private sealed class InnerDatePicker : DateTimePicker
     {
+        internal Action? OpenCalendar;
+        internal Action? StateChanged;
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            base.OnMouseUp(e);
+            StateChanged?.Invoke();
+        }
+        protected override void OnKeyUp(KeyEventArgs e)
+        {
+            base.OnKeyUp(e);
+            StateChanged?.Invoke();
+        }
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            if (!ShowUpDown && Format != DateTimePickerFormat.Time &&
+                (keyData == Keys.F4 || keyData == (Keys.Alt | Keys.Down)))
+            {
+                OpenCalendar?.Invoke();
+                return true;
+            }
             if (keyData == Keys.Enter && FormFlow.TryAdvance(this))
                 return true;
             return base.ProcessCmdKey(ref msg, keyData);
@@ -340,6 +402,17 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
         }
         protected override void WndProc(ref Message m)
         {
+            const int WM_LBUTTONDOWN = 0x0201;
+            if (m.Msg == WM_LBUTTONDOWN && !ShowUpDown && Format != DateTimePickerFormat.Time)
+            {
+                int x = (short)((long)m.LParam & 0xffff);
+                int arrowWidth = SystemInformation.VerticalScrollBarWidth + 4;
+                if (x >= ClientSize.Width - arrowWidth)
+                {
+                    OpenCalendar?.Invoke();
+                    return;
+                }
+            }
             if (m.Msg == WM_NCPAINT ||
                 m.Msg == WM_NCACTIVATE)
             {
@@ -347,6 +420,10 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
                 return;
             }
             base.WndProc(ref m);
+            // Checkbox changes do not consistently raise ValueChanged. Refresh
+            // after the native date-change notification as well as mouse/keys.
+            const int WM_REFLECT_NOTIFY = 0x204e;
+            if (m.Msg == WM_REFLECT_NOTIFY) StateChanged?.Invoke();
         }
     }
 }

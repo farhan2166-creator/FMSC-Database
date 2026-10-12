@@ -994,12 +994,18 @@ public partial class MasterPage
                 _id,
                 values);
 
-            Info(
-                "Record saved successfully.");
-            Clear();
+            Clear(afterSave: true);
             /* what is on screen now matches the database, so the page is no longer dirty and leaving it must not prompt. */
             CaptureEditorBaseline();
-            await ReloadAsync();
+            bool refreshed = await ReloadAsync();
+            if (!IsDisposed)
+            {
+                string entity = MasterEntityNaming.Singularize(NavigationTitle);
+                if (refreshed)
+                    Info($"{entity} saved successfully. Ready for a new record.");
+                else
+                    Warn($"{entity} saved successfully, but the records list could not refresh. Refresh the records before continuing.");
+            }
             /* UX - the editor is empty and ready for the next record: the cursor goes back to its first field instead of nowhere. */
             focusAfterSave = null;
             focusNewRecord = true;
@@ -1038,7 +1044,7 @@ public partial class MasterPage
         Dictionary<string, object?> values)
     {
     }
-    private void Clear()
+    private void Clear(bool afterSave = false)
     {
         _id = 0;
         foreach (var field in _fields)
@@ -1110,6 +1116,7 @@ public partial class MasterPage
         _editorCard?.SetHeaderText(
             NewRecordHeaderTitle,
             NewRecordHeaderSubtitle);
+        EditorCleared(afterSave);
         FocusFirstEditorField();
     }
     private string GenerateInternalCode(

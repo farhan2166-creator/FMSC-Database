@@ -1086,7 +1086,7 @@ public partial class MasterPage
     /// operator) as the clean starting state of the editor.
     /// </summary>
     protected void CaptureContextBaseline() => CaptureEditorBaseline();
-    protected async Task ReloadAsync()
+    protected async Task<bool> ReloadAsync()
     {
         MasterReloadSession.Ticket ticket = _reloadSession.Begin();
         try
@@ -1101,6 +1101,8 @@ public partial class MasterPage
             {
                 _deleteBlockedIds = blocked;
                 Bind(table);
+                RecordsLoaded(table);
+                return true;
             }
         }
         catch (Exception ex)
@@ -1108,6 +1110,7 @@ public partial class MasterPage
             if (!IsDisposed && _reloadSession.IsCurrent(ticket))
                 Fail(ex);
         }
+        return false;
     }
     private bool IsOrderColumn(
         int columnIndex)

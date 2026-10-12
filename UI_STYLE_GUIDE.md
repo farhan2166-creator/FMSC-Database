@@ -1,5 +1,17 @@
 # UI wording and action style
 
+Owner decision, 12 October 2026: the current Fee Collection layout is accepted.
+Keep its existing layout and payment flow; revisit only for a demonstrated issue
+or an explicit owner request. Clear/New deliberately discards edits immediately
+without an unsaved-change confirmation; record switching and navigation retain
+their existing confirmations.
+
+Shared date fields support direct year/month navigation through the calendar
+arrow, F4 or Alt+Down. Navigation applies only when a day is picked, Use Date is
+clicked or Enter is pressed; Escape/outside-click cancels. Unchecked optional
+dates display “Not entered”. Month-only and time spinners keep their existing
+entry behavior, and every picker retains its date limits.
+
 Use `Core/UiText.cs` for repeated captions and instructions, and `Core/PageTitles.cs`
 for titles shared with navigation. `Core/ActionButtonStyle.cs` sets action colours
 for both directly created buttons and page action helpers.

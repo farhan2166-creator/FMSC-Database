@@ -720,6 +720,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
             Padding = new Padding(0, 8, 0, 0), Margin = new Padding(0)
         };
+        // Owner-reviewed layout (12 October 2026): Fee Collection is accepted as
+        // displayed. Keep its 78/22 split; do not widen/rearrange it based only
+        // on a speculative clipping concern without a demonstrated problem.
         workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 78));
         workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22));
         workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
