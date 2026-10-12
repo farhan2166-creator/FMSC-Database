@@ -39,15 +39,18 @@ This section supersedes the original open findings below where noted. Revalidati
 
 The Windows-targeted application cross-build passed with zero warnings and errors. `Tools/test_admission_number_policy.py` compiled the production `AdmissionNumberPolicy` and `AdmissionNumbers` against synthetic records and passed **15 checks**: unchanged chronological suggestions; valid overrides below/above bounds; optional review; normalized duplicates; malformed numbers; valid in-order entry; conflicting legacy bounds without an unsafe suggestion; manual entry under conflicting bounds; out-of-year/future dates; historical exceptions; and case-insensitive suffix duplicates. No SQL connection was opened. Interactive Windows admission saves and concurrent SQL execution were not exercised.
 
+### BL-05 decision — 12 October 2026
+
+The owner chose **Option 1: retain the current behavior**. Historical records may be saved as Left with an unknown/blank withdrawal date, without requiring an additional reason or source field. Supplied dates must still be on or after enrollment and not in the future. No date is inferred or filled automatically. BL-05 is resolved as an accepted historical-record policy, not a defect requiring implementation changes. No application or SQL code changed for this decision.
+
 ### Policy decisions still pending
 
 1. **BL-03 — trust boundary:** Are Windows/LocalDB access permissions the accepted security boundary, or must application roles resist another local process connecting to SQL?
-2. **BL-05 — historical withdrawal:** Require a known withdrawal date, or permit Unknown with an explicit reason/source?
-3. **BL-06 — nonmonthly/direct-call discounts:** Should an edited discount update already-posted unpaid charges, or require prospective effective dates/explicit adjustments? The monthly UI already preserves billed months.
-4. **BL-07 — rate application:** Keep best-effort per-assignment progress, or require all-or-nothing application for a selected scope? If partial progress stays, decide whether durable failed-ID tracking is required.
-5. **BL-08 — daily closing:** Permit late/backdated entries with stale detection and revised approval, or seal approved dates until an administrator reopens them?
-6. **BL-09 — audit detail:** Keep assignment-level auditing, or add correlated per-charge before/after details? The user explicitly deferred this item to policy discussion.
-7. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
+2. **BL-06 — nonmonthly/direct-call discounts:** Should an edited discount update already-posted unpaid charges, or require prospective effective dates/explicit adjustments? The monthly UI already preserves billed months.
+3. **BL-07 — rate application:** Keep best-effort per-assignment progress, or require all-or-nothing application for a selected scope? If partial progress stays, decide whether durable failed-ID tracking is required.
+4. **BL-08 — daily closing:** Permit late/backdated entries with stale detection and revised approval, or seal approved dates until an administrator reopens them?
+5. **BL-09 — audit detail:** Keep assignment-level auditing, or add correlated per-charge before/after details? The user explicitly deferred this item to policy discussion.
+6. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
 
 ## Executive summary
 
