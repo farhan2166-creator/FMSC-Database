@@ -43,14 +43,17 @@ The Windows-targeted application cross-build passed with zero warnings and error
 
 The owner chose **Option 1: retain the current behavior**. Historical records may be saved as Left with an unknown/blank withdrawal date, without requiring an additional reason or source field. Supplied dates must still be on or after enrollment and not in the future. No date is inferred or filled automatically. BL-05 is resolved as an accepted historical-record policy, not a defect requiring implementation changes. No application or SQL code changed for this decision.
 
+### BL-06 decision — 12 October 2026
+
+The owner chose **Option 1: retain the current behavior**. Editing a nonmonthly fee assignment's discount may update its existing noncancelled charges without completed payment allocations, capped by each charge's gross amount. Charges with completed payment allocations remain excluded; closed-enrollment safeguards remain in force. Monthly UI discount edits continue using their existing prospective period workflow and preserve billed months. No new effective-date restriction or adjustment workflow is required for nonmonthly edits. BL-06 is resolved as an accepted discount policy; BL-09's separate charge-level audit-detail decision remains pending. No application or SQL code changed for this decision.
+
 ### Policy decisions still pending
 
 1. **BL-03 — trust boundary:** Are Windows/LocalDB access permissions the accepted security boundary, or must application roles resist another local process connecting to SQL?
-2. **BL-06 — nonmonthly/direct-call discounts:** Should an edited discount update already-posted unpaid charges, or require prospective effective dates/explicit adjustments? The monthly UI already preserves billed months.
-3. **BL-07 — rate application:** Keep best-effort per-assignment progress, or require all-or-nothing application for a selected scope? If partial progress stays, decide whether durable failed-ID tracking is required.
-4. **BL-08 — daily closing:** Permit late/backdated entries with stale detection and revised approval, or seal approved dates until an administrator reopens them?
-5. **BL-09 — audit detail:** Keep assignment-level auditing, or add correlated per-charge before/after details? The user explicitly deferred this item to policy discussion.
-6. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
+2. **BL-07 — rate application:** Keep best-effort per-assignment progress, or require all-or-nothing application for a selected scope? If partial progress stays, decide whether durable failed-ID tracking is required.
+3. **BL-08 — daily closing:** Permit late/backdated entries with stale detection and revised approval, or seal approved dates until an administrator reopens them?
+4. **BL-09 — audit detail:** Keep assignment-level auditing, or add correlated per-charge before/after details? The user explicitly deferred this item to policy discussion.
+5. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
 
 ## Executive summary
 
