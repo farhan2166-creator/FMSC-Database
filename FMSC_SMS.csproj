@@ -77,13 +77,7 @@
 		<None Update="Installer\Install FMSC_SMS.bat">
 			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
 		</None>
-		<None Update="Installer\RemoveLegacyAnnualFeeLedger.sql">
-			<CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-		</None>
 	</ItemGroup>
-	<!-- Staff assignment scheduling was intentionally retired on 2026-10-03; employment
-	     history remains active. CleanupArchive contains historical SQL only and must
-	     remain outside Migrations and active deployment migrations. -->
 	<!-- Established user decision (see AGENTS.md): the user places the latest detached MDF/LDF
 	     in ../Database when preparing a release package. Their absence during development
 	     is expected and must not be reported as a release-readiness blocker.
@@ -99,7 +93,7 @@
 			<LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == '' AND Exists('$(MSBuildProjectDirectory)\..\LocalDB\SqlLocalDB.msi')">$(MSBuildProjectDirectory)\..\LocalDB\SqlLocalDB.msi</LocalDbMsiPath>
 			<LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == ''">$(MSBuildProjectDirectory)\..\Tools\SqlLocalDB.msi</LocalDbMsiPath>
 			<!-- Baseline schema version a fresh install already has. -->
-			<!-- The frozen current database is the data-bearing version-1 baseline. -->
+			<!-- The current complete schema and school data form the version-1 release baseline. -->
 			<BaselineDatabaseVersion>1</BaselineDatabaseVersion>
 			<_InstallerScript>$(MSBuildProjectDirectory)\Installer\core.ps1</_InstallerScript>
 			<_InstallerText>$([System.IO.File]::ReadAllText('$(_InstallerScript)'))</_InstallerText>
