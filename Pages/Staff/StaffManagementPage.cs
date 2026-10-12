@@ -23,7 +23,10 @@ public sealed class StaffManagementPage : UserControl, IUnsavedChanges, IBusyPag
             Text = "Save a new staff member or choose one from Staff Records to manage employment."
         };
         var employmentButton = new ModernButton {
-            Text = "Employment", AutoSize = true, Dock = DockStyle.Fill,
+            Text = "Employment", AutoSize = false, Anchor = AnchorStyles.Right,
+            Height = AppMetrics.ButtonHeight,
+            Width = Math.Max(AppScale.Scale(160),
+                AppMetrics.TextWidth("Employment", AppTheme.ButtonFont, UiDesignSystem.Spacing.Md * 2 + AppMetrics.SpacingSm)),
             ThemeRole = "Secondary", Enabled = false,
             Margin = new Padding(UiDesignSystem.Spacing.Md, 0, 0, 0),
             Padding = new Padding(UiDesignSystem.Spacing.Md, 0, UiDesignSystem.Spacing.Md, 0)
@@ -55,13 +58,16 @@ public sealed class StaffManagementPage : UserControl, IUnsavedChanges, IBusyPag
             Margin = Padding.Empty
         };
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,
+            employmentButton.Width + employmentButton.Margin.Horizontal));
+        toolbar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         toolbar.Controls.Add(context, 0, 0);
         toolbar.Controls.Add(employmentButton, 1, 0);
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
             Margin = Padding.Empty, Padding = Padding.Empty
         };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,
             AppMetrics.ButtonRowHeight + UiDesignSystem.Spacing.Sm * 2));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
