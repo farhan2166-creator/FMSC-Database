@@ -42,7 +42,7 @@ public sealed class ApplyFeeConfigurationPage : V2Page
     internal ApplyFeeConfigurationPage(int? campusId, SavedFeeScope[]? scopes)
         : base(
             PageTitles.UpdateStudentFeeRates,
-            "Review which student fees will change, then choose the month the new rates start.")
+            "Choose when the new rates start, then review which student fees can change.")
     {
         matrixCampusId = campusId;
         matrixScopes = scopes;
@@ -50,7 +50,7 @@ public sealed class ApplyFeeConfigurationPage : V2Page
         previewButton = AddAction("Review Fee Changes", async (_, _) => {
             if (previewButton.Enabled && !applying) await PreviewAsync();
         }, "Secondary");
-        /* Apply Saved Rates writes the new fee amount to every already-enrolled student the preview listed. */
+        /* Apply Saved Rates updates eligible student fees from the chosen month and reports each outcome. */
         applyButton = AddAction("Apply Saved Rates", async (_, _) => {
             if (applyButton.Enabled && !applying) await ApplyAsync();
         }, "Warning");
@@ -513,7 +513,8 @@ public sealed class ApplyFeeConfigurationPage : V2Page
                           "the chosen month or a later month. Choose a later start month to include them.\r\n\r\n"
                         : "\r\n") +
                     "The New Amount column shows the rates to apply. Existing fee bills and payments will not change. " +
-                    "The new rates are used when future fees are posted, starting from the chosen month.";
+                    "The new rates are used when future fees are posted, starting from the chosen month. " +
+                    "Eligible fees will still update if others cannot. Review any unsuccessful updates afterwards.";
                 if (!Confirm(previewMessage, "Confirm Student Fee Changes", defaultYes: false))
                     return;
                 /* everything the write sends and everything the result reports is captured here, before the await. */
@@ -565,6 +566,8 @@ public sealed class ApplyFeeConfigurationPage : V2Page
                     "\n\n" + UiText.Fees.StudentRatesApplied;
                 if (failed > 0)
                 {
+                    resultMessage += "\n\nSuccessful updates remain saved. Review the errors before trying again. " +
+                        "For existing-bill conflicts, choose a month after the last billed month, then choose Review Fee Changes.";
                     const int maxListed = 15;
                     var lines = failures.AsEnumerable()
                         .Take(maxListed)

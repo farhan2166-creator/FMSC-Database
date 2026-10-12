@@ -26,7 +26,7 @@ public static class UiText
         public const string SetupSteps = "Define fee types → Save class rates → Update student rates if needed → Post monthly fees.";
         public const string MatrixScope = "Save Grid saves class rates. Use Update Student Fee Rates for existing students; Fee Posting creates bills.";
         public const string MatrixSaved = "Class rates saved. Existing student fees and bills are unchanged.";
-        public const string StudentRateScope = "Update student rates from the chosen month. Use Fee Posting to create bills.";
+        public const string StudentRateScope = "New rates start from the chosen month. Existing bills stay unchanged. Eligible fees can update even if others cannot.";
         public const string StudentRatesApplied = "No bills created. Use Fee Posting > Post Monthly Fees.";
     }
 

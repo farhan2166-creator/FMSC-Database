@@ -47,13 +47,20 @@ The owner chose **Option 1: retain the current behavior**. Historical records ma
 
 The owner chose **Option 1: retain the current behavior**. Editing a nonmonthly fee assignment's discount may update its existing noncancelled charges without completed payment allocations, capped by each charge's gross amount. Charges with completed payment allocations remain excluded; closed-enrollment safeguards remain in force. Monthly UI discount edits continue using their existing prospective period workflow and preserve billed months. No new effective-date restriction or adjustment workflow is required for nonmonthly edits. BL-06 is resolved as an accepted discount policy; BL-09's separate charge-level audit-detail decision remains pending. No application or SQL code changed for this decision.
 
+### BL-07 decision and guidance — 12 October 2026
+
+The owner accepted the existing **effective-from month plus partial application** policy. New rates apply from the selected month; existing bills and payments remain unchanged. Eligible assignments can update while other assignments are rejected. Students with bills in the chosen month or later need a later start month and a fresh review; other validation failures still require their own resolution. No all-or-nothing transaction or new retry workflow is required.
+
+User guidance now explains this behavior in the page's existing help text, confirmation and partial-result message. Successful updates remain saved, unsuccessful updates must be reviewed, and a later month is suggested specifically for existing-bill conflicts rather than as a cure for every failure. The page subtitle now follows the actual sequence: choose the start month, then review. No layout, SQL calls, rate calculations, effective periods or transaction behavior changed. BL-07 is resolved as an accepted policy with clearer user guidance.
+
+Verification: Windows-targeted application cross-build passed with zero warnings and errors; whitespace checks passed. Interactive WinForms layout and live database execution were not performed for this wording-only pass.
+
 ### Policy decisions still pending
 
 1. **BL-03 — trust boundary:** Are Windows/LocalDB access permissions the accepted security boundary, or must application roles resist another local process connecting to SQL?
-2. **BL-07 — rate application:** Keep best-effort per-assignment progress, or require all-or-nothing application for a selected scope? If partial progress stays, decide whether durable failed-ID tracking is required.
-3. **BL-08 — daily closing:** Permit late/backdated entries with stale detection and revised approval, or seal approved dates until an administrator reopens them?
-4. **BL-09 — audit detail:** Keep assignment-level auditing, or add correlated per-charge before/after details? The user explicitly deferred this item to policy discussion.
-5. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
+2. **BL-08 — daily closing:** Permit late/backdated entries with stale detection and revised approval, or seal approved dates until an administrator reopens them?
+3. **BL-09 — audit detail:** Keep assignment-level auditing, or add correlated per-charge before/after details? The user explicitly deferred this item to policy discussion.
+4. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
 
 ## Executive summary
 
