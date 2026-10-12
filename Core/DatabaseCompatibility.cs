@@ -39,6 +39,45 @@ internal static class DatabaseCompatibility
                 ([schema] nvarchar(128),name nvarchar(128),[type] varchar(2)) R
             WHERE OBJECT_ID(QUOTENAME(R.[schema])+'.'+QUOTENAME(R.name),R.[type]) IS NULL;
             INSERT @Problems
+            SELECT CONCAT('Missing/incompatible trigger safeguard: ',R.[schema],'.',R.name)
+            FROM OPENJSON(@Requirements,'$.triggers') WITH
+                ([schema] nvarchar(128),name nvarchar(128),parentSchema nvarchar(128),parentName nvarchar(128),
+                 events nvarchar(50),insteadOf bit) R
+            WHERE NOT EXISTS
+                (SELECT 1 FROM sys.triggers T
+                 WHERE T.object_id=OBJECT_ID(QUOTENAME(R.[schema])+'.'+QUOTENAME(R.name),'TR')
+                   AND T.parent_id=OBJECT_ID(QUOTENAME(R.parentSchema)+'.'+QUOTENAME(R.parentName))
+                   AND T.is_disabled=0 AND T.is_instead_of_trigger=R.insteadOf
+                   AND (SELECT STRING_AGG(CONVERT(nvarchar(max),E.type_desc),',') WITHIN GROUP(ORDER BY E.type_desc)
+                        FROM sys.trigger_events E WHERE E.object_id=T.object_id)=R.events);
+            INSERT @Problems
+            SELECT CONCAT('Missing/inactive check constraint: ',R.[schema],'.',R.objectName,' ',R.name)
+            FROM OPENJSON(@Requirements,'$.checkConstraints') WITH
+                ([schema] nvarchar(128),objectName nvarchar(128),name nvarchar(128)) R
+            WHERE NOT EXISTS
+                (SELECT 1 FROM sys.check_constraints C
+                 WHERE C.parent_object_id=OBJECT_ID(QUOTENAME(R.[schema])+'.'+QUOTENAME(R.objectName))
+                   AND C.name=R.name AND C.is_disabled=0 AND C.is_not_trusted=0);
+            INSERT @Problems
+            SELECT CONCAT('Missing/incompatible foreign key: ',R.[schema],'.',R.objectName,' (',R.columns,')')
+            FROM OPENJSON(@Requirements,'$.foreignKeys') WITH
+                ([schema] nvarchar(128),objectName nvarchar(128),referencedSchema nvarchar(128),referencedObject nvarchar(128),
+                 columns nvarchar(max),referencedColumns nvarchar(max),deleteAction int,updateAction int) R
+            WHERE NOT EXISTS
+                (SELECT 1 FROM sys.foreign_keys F
+                 WHERE F.parent_object_id=OBJECT_ID(QUOTENAME(R.[schema])+'.'+QUOTENAME(R.objectName))
+                   AND F.referenced_object_id=OBJECT_ID(QUOTENAME(R.referencedSchema)+'.'+QUOTENAME(R.referencedObject))
+                   AND F.is_disabled=0 AND F.is_not_trusted=0
+                   AND F.delete_referential_action=R.deleteAction AND F.update_referential_action=R.updateAction
+                   AND (SELECT STRING_AGG(CONVERT(nvarchar(max),C.name),',') WITHIN GROUP(ORDER BY K.constraint_column_id)
+                        FROM sys.foreign_key_columns K JOIN sys.columns C
+                          ON C.object_id=K.parent_object_id AND C.column_id=K.parent_column_id
+                        WHERE K.constraint_object_id=F.object_id)=R.columns
+                   AND (SELECT STRING_AGG(CONVERT(nvarchar(max),C.name),',') WITHIN GROUP(ORDER BY K.constraint_column_id)
+                        FROM sys.foreign_key_columns K JOIN sys.columns C
+                          ON C.object_id=K.referenced_object_id AND C.column_id=K.referenced_column_id
+                        WHERE K.constraint_object_id=F.object_id)=R.referencedColumns);
+            INSERT @Problems
             SELECT CONCAT('Missing/incompatible column: ',R.[schema],'.',R.objectName,'.',R.name)
             FROM OPENJSON(@Requirements,'$.columns') WITH
                 ([schema] nvarchar(128),objectName nvarchar(128),name nvarchar(128),

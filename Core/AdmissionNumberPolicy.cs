@@ -46,7 +46,7 @@ internal static class AdmissionNumberPolicy
         using var connection=DatabaseHelper.GetConnection();
         DatabaseHelper.OpenConnection(connection);
         using var command=new SqlCommand("""
-            EXEC dbo.RequirePermission @UserId,N'Students.Administer';
+            EXEC dbo.RequirePermission @UserId,N'Students.Admit';
             SELECT StartDate,EndDate FROM dbo.AcademicYears WHERE AcademicYearId=@YearId;
             SELECT AdmissionDate,AdmissionNumber FROM dbo.Students;
             """,connection);

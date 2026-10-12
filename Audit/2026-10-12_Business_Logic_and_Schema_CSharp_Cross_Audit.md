@@ -7,9 +7,47 @@
 **Assessment type:** Read-only static code/schema cross-audit. **No application/database code changed. No live database modified. No build, execution, or integration test performed.**  
 **Confidence guide:** CONFIRMED = directly established behavior/coverage gap in source or DACPAC; CONDITIONAL = consequence depends on threat model or explicitly chosen business policy; TEST NEEDED = plausible runtime scenario, not demonstrated as a defect.
 
+## Revalidation and approved fixes — 12 October 2026
+
+This section supersedes the original open findings below where noted. Revalidation used GitHub main `6159807d385bdfe5d91d6ce97ac6f3967a418655` and the same DACPAC blob. The application source was unchanged from the original audited SHA; the later commits added audit documents only.
+
+### Fixes implemented
+
+- **BL-01 — fixed in C#.** `AdmissionNumberPolicy.LoadAsync` now requires `Students.Admit`, matching new-admission SQL and number preview. `LoadExistingAsync` retains `Students.Administer`. Historical admission still requires `Enrollment.Manage` at its existing SQL boundary; discount authorization is unchanged.
+- **BL-02 — compatibility coverage gap addressed.** The embedded contract now includes all 57 tables, 228 procedures, 22 triggers and every procedure parameter from the approved DACPAC, including both transfer arguments. The three CertificateNumberCounters columns are explicitly checked. Startup/restore validation additionally checks each trigger's enabled state, parent, event set and AFTER/INSTEAD OF mode; all 71 foreign-key shapes and referential actions, including unnamed keys; and all 40 named check constraints. Foreign keys and checks must be enabled and trusted.
+- `Tools/update_compatibility_contract.py` refreshes this coverage deterministically from the approved DACPAC, records its SHA-256, and supports `--check` without writing. It preserves the independently maintained existing column, table-type, function-signature and uniqueness requirements. No existing procedure parameter changed its expected type/length/precision/scale/output shape. Unknown new parameter types fail generation.
+- These changes detect schema drift; they do not repair live databases, change business procedure definitions or require a new schema version. They do not fingerprint procedure/trigger bodies or compare check-expression semantics. Objects with the correct structure but altered implementations remain outside this compatibility check's protection.
+
+### Revalidation corrections
+
+- **BL-02 qualification:** CertificateNumberCounters was absent from the original object/column inventory but its primary-key shape was already covered by the uniqueness contract. It was not wholly unchecked.
+- **BL-06 scope narrowed:** Monthly UI discounts use `FeeDiscountPeriod.Save`, which rejects already-billed months and changes future assignment periods. The September/October monthly example below is a direct-procedure-call possibility, not a reproduced normal UI path. The no-date-boundary procedure remains reachable for nonmonthly UI discounts and direct calls. Closed-enrollment triggers still protect historical closed records.
+- **BL-07:** Partial results are intentional; current C# already retains confirmed group counts, identifies interrupted results as unknown and requires fresh review before retrying. Further atomicity/retry changes require a policy decision.
+- **BL-10:** No current C# caller of `GetStudentAnnualFeeLedger` or its legacy template was found. `AnnualFeeReceiptsPage` uses `GetStudentAnnualFeeReceipts` and receipt output instead. A current application rendering defect is not established.
+- Correct DACPAC counts are **71 foreign keys and 57 primary keys**. The original counts excluded two unnamed foreign keys and five unnamed primary keys.
+
+### Verification of this fix pass
+
+- Windows-targeted application cross-build passed with **zero warnings and errors**: `DOTNET_CLI_HOME=/workspace NUGET_PACKAGES=/workspace/.nuget/packages /workspace/.dotnet/dotnet build --no-restore -p:EnableWindowsTargeting=true -v minimal`.
+- `python Tools/update_compatibility_contract.py FMSC.dacpac --check` passed against the exact approved artifact.
+- `python Tools/test_compatibility_contract.py FMSC.dacpac` passed **seven offline regression tests**: table/procedure coverage; all procedure parameter names; transfer parameter shapes; certificate counter columns; trigger/constraint counts including unnamed foreign keys; deterministic generation; and schema drift detection by the generator.
+- Existing expected parameter shapes were compared before/after and none changed. `git diff --check` passed.
+- **Limits:** Offline tests verify the contract and generator, not SQL execution of startup/restore validation. No SQL Server clone was available in this workspace; the container daemon was inaccessible. Removing/disabling safeguards on a disposable database and exercising the limited-admission Windows role path still require runtime verification. No school data, SQL definitions, DACPAC, installer or migration files were changed.
+
+### Policy decisions still pending
+
+1. **BL-03 — trust boundary:** Are Windows/LocalDB access permissions the accepted security boundary, or must application roles resist another local process connecting to SQL?
+2. **BL-04 — admission chronology:** Must ordinary date/number ordering be enforced atomically in SQL, with explicit historical-register exceptions, or remain an operator preflight rule?
+3. **BL-05 — historical withdrawal:** Require a known withdrawal date, or permit Unknown with an explicit reason/source?
+4. **BL-06 — nonmonthly/direct-call discounts:** Should an edited discount update already-posted unpaid charges, or require prospective effective dates/explicit adjustments? The monthly UI already preserves billed months.
+5. **BL-07 — rate application:** Keep best-effort per-assignment progress, or require all-or-nothing application for a selected scope? If partial progress stays, decide whether durable failed-ID tracking is required.
+6. **BL-08 — daily closing:** Permit late/backdated entries with stale detection and revised approval, or seal approved dates until an administrator reopens them?
+7. **BL-09 — audit detail:** Keep assignment-level auditing, or add correlated per-charge before/after details? The user explicitly deferred this item to policy discussion.
+8. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
+
 ## Executive summary
 
-The current DACPAC was successfully decoded and its compressed model.xml read. It reports no exported data. Its schema model contains **57 tables, 228 stored procedures, 22 DML triggers, 69 foreign keys, 40 check constraints, 52 primary-key constraints, 18 unique constraints, and 69 index objects** (plus functions and one view). The complete 354-entry repository tree was inventoried. Representative high-risk WinForms C# modules were inspected and traced into actual SQL bodies, parameters, triggers, indexes, and the embedded schema compatibility specification.
+The current DACPAC was successfully decoded and its compressed model.xml read. It reports no exported data. Its schema model contains **57 tables, 228 stored procedures, 22 DML triggers, 71 foreign keys, 40 check constraints, 57 primary-key constraints, 18 unique constraints, and 69 index objects** (plus functions and one view). The complete 354-entry repository tree was inventoried. Representative high-risk WinForms C# modules were inspected and traced into actual SQL bodies, parameters, triggers, indexes, and the embedded schema compatibility specification.
 
 **No conclusion of safe/unsafe deployment can be made from static review alone.** The most actionable confirmed issues are (1) a contradictory authorization check during ordinary new admission, and (2) the application compatibility contract omitting procedures and trigger safeguards that the current application relies upon. Other points involve business policy, financial traceability, and multi-user behavior, and are explicitly classified below instead of being called proven corruptions.
 
