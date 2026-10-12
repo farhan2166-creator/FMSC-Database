@@ -449,7 +449,9 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             root.RowStyles[0].Height=Math.Max(AppMetrics.TextHeight(AppTheme.ButtonFont)+8,height);
         return height;
     }
-    /// <summary>For dense entry pages: wrap actions and give status its own line.</summary>
+    /// <summary>Space reserved for action-bar status before buttons wrap.</summary>
+    protected virtual int ActionStatusWidth => 240;
+    /// <summary>For dense entry pages: allow actions to wrap within the available width.</summary>
     protected void UseWrappingToolbar()
     {
         EnsureActionBar();
@@ -489,7 +491,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 }
                 bool hasStatus=StatusLabel.Parent==layout && !string.IsNullOrWhiteSpace(StatusLabel.Text);
                 int neededWidth=buttons.Sum(c=>c.Width+c.Margin.Horizontal)+Actions.Padding.Horizontal;
-                int reserve=hasStatus?Math.Min(AppScale.Scale(240),width/3):0;
+                int reserve=hasStatus?Math.Min(AppScale.Scale(ActionStatusWidth),width/3):0;
                 int actionWidth=hasActions?Math.Min(neededWidth,Math.Max(1,width-reserve)):0;
                 if(!hasStatus && hasActions)actionWidth=width;
                 layout.ColumnStyles[0].Width=actionWidth;

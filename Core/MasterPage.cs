@@ -8,6 +8,8 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
     protected virtual bool CanChangeRecord() => true;
     protected virtual bool CanSaveRecord() => true;
     protected virtual bool ReserveEditorValidationSpace => false;
+    protected virtual int EditorFieldGap => UiDesignSystem.Spacing.Sm;
+    protected virtual int EditorInputVerticalInset => UiDesignSystem.Spacing.Xs;
     private int EditorValidationHeight => ReserveEditorValidationSpace ? AppMetrics.TextHeight(AppTheme.SmallFont) + 4 : 0;
     private readonly Dictionary<Control, Label> _editorValidationLabels = new();
     protected void BindEditorValidationMessages(FormValidator validator)
@@ -286,8 +288,8 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
             fieldIndex += rowFields.Length;
             int rowHeight =
                 rowFields.Any(field => field.Multiline)
-                    ? AppMetrics.MultilineInputHeight(72) + UiDesignSystem.Spacing.Sm + (UiDesignSystem.Spacing.Xs * 2)
-                    : AppMetrics.InputControlHeight + UiDesignSystem.Spacing.Sm + (UiDesignSystem.Spacing.Xs * 2);
+                    ? AppMetrics.MultilineInputHeight(72) + EditorFieldGap + (EditorInputVerticalInset * 2)
+                    : AppMetrics.InputControlHeight + EditorFieldGap + (EditorInputVerticalInset * 2);
             rowHeight += EditorValidationHeight;
             editorRowsHeight += rowHeight;
             editor.RowStyles.Add(

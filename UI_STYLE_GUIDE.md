@@ -12,6 +12,12 @@ clicked or Enter is pressed; Escape/outside-click cancels. Unchecked optional
 dates display “Not entered”. Month-only and time spinners keep their existing
 entry behavior, and every picker retains its date limits.
 
+All single-line fields use `AppMetrics.InputControlHeight` through
+`HumanUi.ApplyFieldInputLayout` (normally via `HumanUi.Field`). Field containers
+own the spacing; do not add input margins that shrink the available height or
+override single-line inputs to fill taller cells. Multiline fields keep their
+own height or fill the area reserved for longer text.
+
 Use `Core/UiText.cs` for repeated captions and instructions, and `Core/PageTitles.cs`
 for titles shared with navigation. `Core/ActionButtonStyle.cs` sets action colours
 for both directly created buttons and page action helpers.

@@ -10,6 +10,7 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Admissions;
 public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPage
 {
+    protected override int ActionStatusWidth => 120;
     private static readonly Padding AdmissionDetailsCardPadding =
         new(2, 4, 2, 2);
     private static readonly string[] MandatoryFeeTypeCodes = { "TUITION", "ADMISSION" };
@@ -699,7 +700,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     {
         var field = HumanUi.Field(caption, input, required);
         ((TableLayoutPanel)field).ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        input.Dock = DockStyle.Fill;
         field.Padding = new Padding(0, 0, UiDesignSystem.Spacing.Sm, UiDesignSystem.Spacing.Xs);
         foreach (Control child in field.Controls) child.Margin = Padding.Empty;
         return field;
@@ -2122,8 +2122,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         SwitchTab(0);
         SetStatus(
             keepPlacement.Checked && Campus.SelectedId > 0
-                ? "Ready for the next student. Placement retained; enter fresh student and family details."
-                : "Start with student and family details.");
+                ? "New · Placement kept"
+                : "New admission");
     }
     private void UpdateAdmissionIdDisplay()
     {
@@ -3071,9 +3071,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             UpdateStudentWorkspace();
             SwitchTab(0);
             SetStatus(
-                $"Editing {name.Text} • Admission Number {AdmissionNumbers.ForId(admissionId)}"
+                $"Editing · {AdmissionNumbers.ForId(admissionId)}"
                 + (valuesNotInList.Count > 0
-                    ? $" • stored {string.Join(" and ", valuesNotInList)} is not in the list - pick a value before saving."
+                    ? $" · Select valid {string.Join(" and ", valuesNotInList)} before saving."
                     : string.Empty));
         }
         finally
@@ -4634,7 +4634,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         UiHelper.ReplacePictureImage(photoPreview, null);
         photoInfo.Text = string.Empty;
         SetStatus(
-            "Start with student and family details.");
+            "New admission");
         UpdateStudentWorkspace();
         SwitchTab(0);
         UpdateAdmissionEntryFlow();

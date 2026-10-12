@@ -81,8 +81,8 @@ public partial class MasterPage
             fieldIndex += rowFields.Length;
             int rowHeight =
                 rowFields.Any(field => field.Multiline)
-                    ? AppMetrics.MultilineInputHeight(72) + UiDesignSystem.Spacing.Sm + (UiDesignSystem.Spacing.Xs * 2)
-                    : AppMetrics.InputControlHeight + UiDesignSystem.Spacing.Sm + (UiDesignSystem.Spacing.Xs * 2);
+                    ? AppMetrics.MultilineInputHeight(72) + EditorFieldGap + (EditorInputVerticalInset * 2)
+                    : AppMetrics.InputControlHeight + EditorFieldGap + (EditorInputVerticalInset * 2);
             _editor.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, rowHeight + EditorValidationHeight));
             for (int column = 0;
@@ -115,7 +115,7 @@ public partial class MasterPage
                 0,
                 0,
                 0,
-                UiDesignSystem.Spacing.Sm),
+                EditorFieldGap),
             Padding = new Padding(0),
             GrowStyle = TableLayoutPanelGrowStyle.FixedSize,
             TabStop = false
@@ -166,12 +166,12 @@ public partial class MasterPage
             control,
             field.Caption,
             field.Required ? "Required" : null);
-        control.Dock = DockStyle.Fill;
+        HumanUi.ApplyFieldInputLayout(control);
         control.Margin = new Padding(
             0,
-            UiDesignSystem.Spacing.Xs,
+            EditorInputVerticalInset,
             0,
-            UiDesignSystem.Spacing.Xs);
+            EditorInputVerticalInset);
         control.TabStop = true;
         _controls[field.Key] = control;
         panel.Controls.Add(

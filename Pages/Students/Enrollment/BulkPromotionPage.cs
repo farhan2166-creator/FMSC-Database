@@ -794,7 +794,7 @@ public sealed class BulkPromotionPage : V2Page
                     if (gaps.Rows.Count > 0)
                     {
                         var missing = string.Join(" and ", gaps.AsEnumerable().Select(r => Convert.ToString(r["FeeTypeName"])));
-                        SetStatus($"{baseStatus} ⚠ Set up {missing} fees for '{destinationClass.Text}' at this campus to bill promoted students.", true);
+                        SetStatus($"{baseStatus} ⚠ Set up {missing} fees for '{destinationClass.Text}' at this campus before promotion.", true);
                         return;
                     }
                 }
@@ -908,29 +908,32 @@ public sealed class BulkPromotionPage : V2Page
                 Warn("The effective date must fall within the destination academic year.");
                 return;
             }
-            string feeWarning = string.Empty;
-            if (promoteCount > 0 &&
-                destinationClass.SelectedId > 0)
+            // Both promoted and held-back students receive a new enrollment.
+            // Check every destination class before asking the user to confirm.
+            int feeCampusId = sourceCampus.SelectedId;
+            string feeCampusName = sourceCampus.Text;
+            var feeClasses = new Dictionary<int, string>();
+            if (promoteCount > 0)
+                feeClasses[destinationClass.SelectedId] = destinationClass.Text;
+            if (holdCount > 0)
+                feeClasses[sourceClass.SelectedId] = sourceClass.Text;
+            var missingFeeMessages = new List<string>();
+            foreach (var feeClass in feeClasses)
             {
-                try
+                int feeClassId = feeClass.Key;
+                var gaps = await Task.Run(() => QueryFeeGaps(feeCampusId, feeClassId));
+                if (gaps.Rows.Count > 0)
                 {
-                    /* Read on the UI thread, used on the pool thread - never a control in the lambda. */
-                    int feeCampusId = sourceCampus.SelectedId;
-                    int feeClassId = destinationClass.SelectedId;
-                    var gaps = await Task.Run(() => QueryFeeGaps(feeCampusId, feeClassId));
-                    if (gaps.Rows.Count > 0)
-                    {
-                        var missing = string.Join(" and ", gaps.AsEnumerable().Select(r => Convert.ToString(r["FeeTypeName"])));
-                        feeWarning =
-                            $"⚠ WARNING: Destination class '{destinationClass.Text}' has no {missing} fee configured for this campus.\n" +
-                            "Promoted students will not be billed for it until fee setup is completed.\n\n";
-                    }
+                    string missing = string.Join(", ", gaps.AsEnumerable().Select(r => Convert.ToString(r["FeeTypeName"])));
+                    missingFeeMessages.Add($"{feeCampusName} · {feeClass.Value}: {missing}");
                 }
-                catch (Exception nonFatalException73)
-                {
-                    FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException73, "BulkPromotionPage: ProcessSelected fallback");
-                    // Non-critical; the server still hard-blocks promotion if fees are genuinely missing, so a failed check here should not stop the flow.
-                }
+            }
+            if (missingFeeMessages.Count > 0)
+            {
+                Warn("Promotion cannot proceed because required fee rates are missing:\n\n" +
+                    string.Join("\n", missingFeeMessages) +
+                    $"\n\nOpen {PageTitles.FeeRateSetup}, configure these fees for the listed campus and classes, then retry promotion.");
+                return;
             }
             Dictionary<int,int> sectionMapping=new();
             string mappingSummary="";
@@ -956,7 +959,6 @@ public sealed class BulkPromotionPage : V2Page
                 : $"To: {destinationYear.Text} (held-back students stay in their current class)\n";
             var confirm =
                 ModernMessageDialog.Show(
-                    feeWarning +
                     $"Process {selected.Count:N0} student(s)?\n\n" +
                     from + to + mappingSummary +
                     $"Effective date: {effective:dd-MMM-yyyy}\n\n" +

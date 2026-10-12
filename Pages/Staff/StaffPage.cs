@@ -17,6 +17,8 @@ public sealed class StaffProfilePage : MasterPage
         AutoEllipsis = true, UseMnemonic = false, Text = "Staff No.: Assigned on save"
     };
     protected override bool ReserveEditorValidationSpace => true;
+    protected override int EditorFieldGap => AppMetrics.SpacingXs;
+    protected override int EditorInputVerticalInset => 0;
     private FormValidator StaffValidator
     {
         get

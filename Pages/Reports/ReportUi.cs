@@ -48,14 +48,7 @@ internal static class ReportUi
             ForeColor = AppTheme.Text,
             TextAlign = ContentAlignment.MiddleLeft
         }, 0, 0);
-        control.Margin = new Padding(0);
-        if (control is ModernComboBox ||
-            control is ModernDatePicker ||
-            control is ModernTextBox { Multiline: false })
-        {
-            control.Height = AppMetrics.InputControlHeight;
-            control.Dock = DockStyle.Top;
-        }
+        HumanUi.ApplyFieldInputLayout(control);
         panel.Controls.Add(control, 0, 1);
         return panel;
     }

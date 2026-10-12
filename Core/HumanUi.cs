@@ -148,22 +148,10 @@ public static class HumanUi
             AutoEllipsis = true,
             /* No bottom padding: the label is exactly one line tall, so padding under the text left less than a line and clipped the descenders (Campus, (optional)). */
             Padding = new Padding(UiDesignSystem.Spacing.Xs, 0, 0, 0),
+            Margin = Padding.Empty,
             Tag = UiHelper.FieldCaptionTag
         }, 0, 0);
-        control.Height = AppMetrics.InputControlHeight;
-        // Single-line inputs (combo, date, numeric, one-line text) keep the standard input height. Only multiline text and non-input controls fill.
-        bool singleLineInput =
-            control is ModernComboBox ||
-            control is ModernDatePicker ||
-            control is ModernTextBox { Multiline: false };
-        if (fillHeight && !singleLineInput)
-        {
-            control.Dock = DockStyle.Fill;
-        }
-        else
-        {
-            control.Dock = DockStyle.Top;
-        }
+        ApplyFieldInputLayout(control, fillHeight);
         /* Keep required-state metadata on the input so shared validation can discover it. */
         UiAccessibility.Describe(
             control,
@@ -173,6 +161,29 @@ public static class HumanUi
             required ? "Required" : null);
         panel.Controls.Add(control, 0, 1);
         return panel;
+    }
+    /// <summary>One sizing rule for field builders: the container owns spacing,
+    /// single-line inputs retain their standard height, and multiline content may grow.</summary>
+    internal static void ApplyFieldInputLayout(Control control, bool fillHeight = true)
+    {
+        control.Margin = Padding.Empty;
+        // Single-line inputs (combo, date, numeric, one-line text) keep the standard input height. Only multiline text and non-input controls fill.
+        bool singleLineInput =
+            control is ModernComboBox ||
+            control is ModernDatePicker ||
+            control is StudentPicker ||
+            control is ModernTextBox { Multiline: false };
+        if (singleLineInput) control.Height = AppMetrics.InputControlHeight;
+        if (fillHeight && !singleLineInput)
+        {
+            control.Dock = DockStyle.Fill;
+        }
+        else
+        {
+            control.MinimumSize = new Size(control.MinimumSize.Width,
+                Math.Max(control.MinimumSize.Height, control.Height));
+            control.Dock = DockStyle.Top;
+        }
     }
     public static ModernTextBox TextBox(bool multiline = false, int maxLength = 1000) => new() {
         Multiline = multiline,
