@@ -1,12 +1,12 @@
 # Admission workflow (v1 baseline)
 
-User decisions, 2026-10-12:
+User decisions, updated 2026-10-13:
 
 - Admission is the single workspace for student details and legacy placement corrections.
 - Direct Admission activates the placement and posts opening fees atomically on Save. A new admission does not require a separate Confirm Placement step.
 - Optional Quick Registration creates a pending student and placement, assigns a QR reference, and issues reviewed opening charges. No official admission or registration number is allocated yet. Its own pending picker and review workspace handle unfinished records; pending registrations are excluded from the Admission workspace.
 - Pending registrations can receive payments, including family collection. They are excluded from normal monthly posting, promotion and official certificates.
-- Choosing an existing family member copies parent/contact/address into the new child form. Those values remain editable for that child; edits retain the selected sibling link and never update older family records. New Family explicitly clears the link and shared entry details.
+- Quick Registration uses one Registration Details section ordered student, placement, parent/contact, then address. Link Existing Family opens its searchable picker. Choosing a family member copies parent/contact/address and locks the parent name. Saving checks the linked parent against the current stored name; pending saves preserve the stored parent. Contact/address edits affect this child only. Add Another Child clears child details and fees while retaining the family; New Family clears the link and shared details.
 - Confirm Admission in Quick Registration review allocates both the official admission number and registration number, then activates the same student/placement. Family links, bills and payments are retained without reposting charges. Confirmation and Cancel Registration are offered only inside Quick Registration, never on the Admission form.
 - Mark as Left closes an admitted placement without requiring payment or a certificate. Valid outstanding dues remain collectible. Later-month charges must be reviewed before departure.
 - Cancel Registration is available only for pending quick registrations. It preserves history and reverses eligible unpaid bills; paid allocations require fee corrections/refunds first. Once an official admission number is allocated, cancellation is refused. Use Mark as Left for departure and the correction workspaces for details or fees.
@@ -18,21 +18,24 @@ User decisions, 2026-10-12:
 - Quick Registration has a Registration Form tab and a separate Pending Registrations tab. The pending list searches temporary references, child/parent names and contact numbers. Open Registration or a double-click loads the Registration Form for editing basic details and discounts. Selecting a row enables Review / Confirm on the pending list; the Registration Form has no confirmation action. Returning to the list refreshes it, so confirmed and cancelled records disappear from the pending list.
 - The opening-bill grid shows configured fee, editable discount (with Fees.Adjust permission), and calculated net amount. Save Changes persists pending edits through the audited details/discount transaction and updates unpaid charges. Printing and collection wait until pending edits are saved; existing paid charges remain protected by the financial procedures.
 
-Apply PlacementConfirmation.sql, StudentCorrectionGuards.sql, then
-AdmissionWorkflow.sql, in that order in one transaction on the compatible
-development baseline. The first two scripts represent earlier contracts;
-AdmissionWorkflow.sql applies the final decisions above. Do not apply an earlier
-script on its own over the final schema. Existing records are initially marked
-for legacy review; schema installation does not run Go Live or change their
-placement dates, admission numbers, fees or payments.
+## Database delivery
+
+The user supplies the latest detached FMSC_DB.mdf and matching FMSC_DB_log.ldf
+in ../Database when preparing a release. That snapshot already contains the
+current schema, procedures and guards. The applied development upgrade scripts
+have been removed; deployment and validation do not reference them.
+
+Legacy verification and Go Live are operator actions on the current database;
+supplying the snapshot does not run Go Live or change school records.
 
 The live development schema, runtime compatibility contract and FMSC.dacpac
 include this workflow. Application and database schema versions remain v1.
-Recovery backups are private local files under the ignored Tests directory.
+Local recovery backups, when retained, belong in the ignored RecoveryBackups directory.
 
 Run Validation/AdmissionWorkflowChecks.ps1 and
 Validation/StudentCorrectionChecks.ps1 on Windows with LocalDB. Each restores
-a disposable database copy, performs all record writes there, then drops it.
+a disposable copy of the current database, checks the already-installed workflow,
+performs all record writes there, then drops it. They do not apply upgrade scripts.
 No test students or payments are inserted into the live school database.
 
 Release packaging continues to use the latest user-supplied detached MDF/LDF

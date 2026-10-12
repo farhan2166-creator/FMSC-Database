@@ -31,9 +31,8 @@ try{
  $taskLogPath=(Join-Path $taskDir 'checks_log.ldf').Replace("'","''")
  [void](Query "RESTORE DATABASE [$taskName] FROM DISK=@Path WITH MOVE N'$taskDataName' TO N'$taskDataPath',MOVE N'$taskLogName' TO N'$taskLogPath'" @{Path=$taskBackup})
  $taskCreated=$true;$script:taskConnection.Dispose();$script:taskConnection=Connect $taskName
- foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $taskRoot 'DatabaseScripts/AdmissionWorkflow.sql')),'(?im)^GO\s*$')){
-  if(-not [string]::IsNullOrWhiteSpace($batch)){[void](Query $batch)}
- }
+ # Validate the current supplied snapshot directly; no historical upgrades are applied.
+ [void](Query "IF COL_LENGTH(N'dbo.Enrollments',N'PlacementConfirmedAt') IS NULL OR OBJECT_ID(N'dbo.CompleteQuickAdmission',N'P') IS NULL THROW 59990,'Use the current database snapshot with the admission workflow already installed.',1;")
  $taskContext=Query "SELECT TOP(1) Y.AcademicYearId,CS.ClassSectionId,CS.CampusId FROM dbo.AcademicYears Y CROSS JOIN dbo.CampusClassSections CS WHERE CONVERT(date,GETDATE()) BETWEEN Y.StartDate AND Y.EndDate ORDER BY CS.ClassSectionId;"
  $taskYear=[int]$taskContext.Rows[0].AcademicYearId;$taskPlacement=[int]$taskContext.Rows[0].ClassSectionId;$taskCampus=[int]$taskContext.Rows[0].CampusId
  [void](Query "INSERT dbo.FeeConfigurations(CampusId,ClassId,FeeTypeId,Amount,Frequency) SELECT CS.CampusId,CS.ClassId,F.FeeTypeId,2000,CASE WHEN F.FeeTypeCode=N'TUITION' THEN N'Monthly' ELSE N'Yearly' END FROM dbo.CampusClassSections CS CROSS JOIN dbo.FeeTypes F WHERE CS.ClassSectionId=$taskPlacement AND F.IsMandatory=1 AND NOT EXISTS(SELECT 1 FROM dbo.FeeConfigurations C WHERE C.CampusId=CS.CampusId AND C.ClassId=CS.ClassId AND C.FeeTypeId=F.FeeTypeId);")
