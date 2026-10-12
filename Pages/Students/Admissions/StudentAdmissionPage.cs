@@ -1012,7 +1012,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         correctAdmissionNumber.LinkClicked += (_, _) => {
             var plan = existingAdmissionNumberPlan;
             if (plan is null) return;
-            string problem = plan.Validate(admissionIdValue.Text) ?? "Review this admission number.";
+            string problem = plan.Review(admissionIdValue.Text) ?? "Review this admission number.";
             if (plan.Suggested is not { } suggestion) {
                 MessageBox.Show(this, problem + "\n\nNo safe number can be suggested. Review the surrounding admission records; you can leave this number unchanged.",
                     "Admission Number Review", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -2145,7 +2145,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private void UpdateAdmissionNumberWarning()
     {
-        bool warning = currentAdmissionId > 0 && existingAdmissionNumberPlan is { } plan && plan.Validate(admissionIdValue.Text) is not null;
+        bool warning = currentAdmissionId > 0 && existingAdmissionNumberPlan is { } plan && plan.Review(admissionIdValue.Text) is not null;
         admissionIdValue.ForeColor = warning ? AppTheme.Danger : AppTheme.Text;
         correctAdmissionNumber.Visible = warning;
         admissionIdValue.AccessibleDescription = warning ? "Admission number does not fit the original admission date. Review is optional." : string.Empty;

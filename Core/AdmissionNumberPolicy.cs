@@ -11,8 +11,18 @@ internal sealed record AdmissionNumberPlan(string? Suggested, string? Lower, str
         if(Error is not null) return Error;
         if(!AdmissionNumbers.TryNormalize(text,out string number)) return "Enter a valid admission number.";
         if(Used.Contains(number)) return "This admission number is already in use.";
-        if(Lower is not null && AdmissionNumbers.Compare(number,Lower)<=0) return $"For this date, the number must follow {Lower}.";
-        if(Upper is not null && AdmissionNumbers.Compare(number,Upper)>=0) return $"For this date, the number must come before {Upper}.";
+        return null;
+    }
+
+    // Chronology guides suggestions and optional record review, never save eligibility.
+    internal string? Review(string text)
+    {
+        if(Validate(text) is { } problem) return problem;
+        AdmissionNumbers.TryNormalize(text,out string number);
+        if(Lower is not null && Upper is not null && AdmissionNumbers.Compare(Lower,Upper)>=0)
+            return "Existing register numbers conflict with admission-date order. No chronological number can be suggested; you can enter an unused number.";
+        if(Lower is not null && AdmissionNumbers.Compare(number,Lower)<=0) return $"Suggested date order: after {Lower}.";
+        if(Upper is not null && AdmissionNumbers.Compare(number,Upper)>=0) return $"Suggested date order: before {Upper}.";
         return null;
     }
 }
@@ -74,12 +84,13 @@ internal static class AdmissionNumberPolicy
         var order=Comparer<string>.Create(AdmissionNumbers.Compare);
         string? lower=dated.Where(item=>item.Date<date.Date).Select(item=>item.Number).OrderByDescending(number=>number,order).FirstOrDefault();
         string? upper=dated.Where(item=>item.Date>date.Date).Select(item=>item.Number).OrderBy(number=>number,order).FirstOrDefault();
-        // User decision (2026-10-11): a verified historical physical-register number
-        // may conflict with legacy admission-date order. Keep normalization, uniqueness
-        // and date/year checks; ordinary admissions still enforce chronological bounds.
+        // User decision (2026-10-12): chronology assists the suggestion only.
+        // Manual numbers must be valid and unique, with valid dates/year, but may
+        // override chronological advice. Verified historical suggestions retain
+        // their existing exception to surrounding date order.
         if(verifiedHistoricalRegister) { lower=null; upper=null; }
         if(lower is not null && upper is not null && AdmissionNumbers.Compare(lower,upper)>=0)
-            return new(null,lower,upper,used,"Existing register numbers conflict with admission-date order. Review the surrounding records before saving.");
+            return new(null,lower,upper,used,null);
         string? anchor=dated.Where(item=>item.Date<=date.Date).OrderByDescending(item=>item.Date)
             .ThenByDescending(item=>item.Number,order).Select(item=>item.Number).FirstOrDefault();
         string? suggestion=null;
@@ -101,6 +112,6 @@ internal static class AdmissionNumberPolicy
             }
         }
         var plan=new AdmissionNumberPlan(suggestion,lower,upper,used,null);
-        return suggestion is not null && plan.Validate(suggestion) is not null ? plan with { Suggested=null } : plan;
+        return suggestion is not null && plan.Review(suggestion) is not null ? plan with { Suggested=null } : plan;
     }
 }

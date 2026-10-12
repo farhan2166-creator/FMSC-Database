@@ -14,6 +14,7 @@ This section supersedes the original open findings below where noted. Revalidati
 ### Fixes implemented
 
 - **BL-01 — fixed in C#.** `AdmissionNumberPolicy.LoadAsync` now requires `Students.Admit`, matching new-admission SQL and number preview. `LoadExistingAsync` retains `Students.Administer`. Historical admission still requires `Enrollment.Manage` at its existing SQL boundary; discount authorization is unchanged.
+- **BL-04 — resolved by the owner's policy and implemented in C#.** Chronological date/number ordering is suggestion assistance, not a save rule. A manually entered valid, unused number can override the proposal for an ordinary admission. Conflicting legacy date order suppresses a chronological suggestion without blocking manual entry. Existing-record chronology review remains optional. Mandatory format, normalized uniqueness, future-date and academic-year checks remain. SQL continues enforcing uniqueness; no SQL chronology rule was added.
 - **BL-02 — compatibility coverage gap addressed.** The embedded contract now includes all 57 tables, 228 procedures, 22 triggers and every procedure parameter from the approved DACPAC, including both transfer arguments. The three CertificateNumberCounters columns are explicitly checked. Startup/restore validation additionally checks each trigger's enabled state, parent, event set and AFTER/INSTEAD OF mode; all 71 foreign-key shapes and referential actions, including unnamed keys; and all 40 named check constraints. Foreign keys and checks must be enabled and trusted.
 - `Tools/update_compatibility_contract.py` refreshes this coverage deterministically from the approved DACPAC, records its SHA-256, and supports `--check` without writing. It preserves the independently maintained existing column, table-type, function-signature and uniqueness requirements. No existing procedure parameter changed its expected type/length/precision/scale/output shape. Unknown new parameter types fail generation.
 - These changes detect schema drift; they do not repair live databases, change business procedure definitions or require a new schema version. They do not fingerprint procedure/trigger bodies or compare check-expression semantics. Objects with the correct structure but altered implementations remain outside this compatibility check's protection.
@@ -34,16 +35,19 @@ This section supersedes the original open findings below where noted. Revalidati
 - Existing expected parameter shapes were compared before/after and none changed. `git diff --check` passed.
 - **Limits:** Offline tests verify the contract and generator, not SQL execution of startup/restore validation. No SQL Server clone was available in this workspace; the container daemon was inaccessible. Removing/disabling safeguards on a disposable database and exercising the limited-admission Windows role path still require runtime verification. No school data, SQL definitions, DACPAC, installer or migration files were changed.
 
+### BL-04 verification — 12 October 2026
+
+The Windows-targeted application cross-build passed with zero warnings and errors. `Tools/test_admission_number_policy.py` compiled the production `AdmissionNumberPolicy` and `AdmissionNumbers` against synthetic records and passed **15 checks**: unchanged chronological suggestions; valid overrides below/above bounds; optional review; normalized duplicates; malformed numbers; valid in-order entry; conflicting legacy bounds without an unsafe suggestion; manual entry under conflicting bounds; out-of-year/future dates; historical exceptions; and case-insensitive suffix duplicates. No SQL connection was opened. Interactive Windows admission saves and concurrent SQL execution were not exercised.
+
 ### Policy decisions still pending
 
 1. **BL-03 — trust boundary:** Are Windows/LocalDB access permissions the accepted security boundary, or must application roles resist another local process connecting to SQL?
-2. **BL-04 — admission chronology:** Must ordinary date/number ordering be enforced atomically in SQL, with explicit historical-register exceptions, or remain an operator preflight rule?
-3. **BL-05 — historical withdrawal:** Require a known withdrawal date, or permit Unknown with an explicit reason/source?
-4. **BL-06 — nonmonthly/direct-call discounts:** Should an edited discount update already-posted unpaid charges, or require prospective effective dates/explicit adjustments? The monthly UI already preserves billed months.
-5. **BL-07 — rate application:** Keep best-effort per-assignment progress, or require all-or-nothing application for a selected scope? If partial progress stays, decide whether durable failed-ID tracking is required.
-6. **BL-08 — daily closing:** Permit late/backdated entries with stale detection and revised approval, or seal approved dates until an administrator reopens them?
-7. **BL-09 — audit detail:** Keep assignment-level auditing, or add correlated per-charge before/after details? The user explicitly deferred this item to policy discussion.
-8. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
+2. **BL-05 — historical withdrawal:** Require a known withdrawal date, or permit Unknown with an explicit reason/source?
+3. **BL-06 — nonmonthly/direct-call discounts:** Should an edited discount update already-posted unpaid charges, or require prospective effective dates/explicit adjustments? The monthly UI already preserves billed months.
+4. **BL-07 — rate application:** Keep best-effort per-assignment progress, or require all-or-nothing application for a selected scope? If partial progress stays, decide whether durable failed-ID tracking is required.
+5. **BL-08 — daily closing:** Permit late/backdated entries with stale detection and revised approval, or seal approved dates until an administrator reopens them?
+6. **BL-09 — audit detail:** Keep assignment-level auditing, or add correlated per-charge before/after details? The user explicitly deferred this item to policy discussion.
+7. **BL-10 — legacy ledger:** Is that unused ledger retained for an external consumer requiring nonstandard academic-year lengths? No current UI defect is established.
 
 ## Executive summary
 
@@ -274,3 +278,4 @@ Use a **disposable restored database and disposable test users**; do not run the
 ## Recommendation for the next step (not performed)
 
 First correct/test the limited-admission role path (BL-01) and make the runtime schema compatibility contract complete (BL-02), then decide the locally trusted workstation/database threat boundary (BL-03). Before any financial schema changes, approve explicit policies for historical date uncertainty, retroactive discounts, partial bulk rate changes, and reopening approved closing periods. Execute the prioritized scenarios on a disposable clone and compare financial/lifecycle invariants after each operation. Make small, separately verified fixes only after these decisions; this report itself makes no changes.
+
