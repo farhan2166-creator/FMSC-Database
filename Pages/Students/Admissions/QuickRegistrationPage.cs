@@ -14,6 +14,7 @@ public sealed class QuickRegistrationPage : UserControl
         var pending=new FMSC_SMS.Pages.Students.Maintenance.AdmissionReviewListPage(navigate,true,async id=>{
             tabs.SelectedTab=formTab;await form.OpenRegistrationAsync(id);
         }){Dock=DockStyle.Fill};
+        pending.RegistrationReviewed+=async id=>{if(form.SavedRegistrationId==id)await form.OpenRegistrationAsync(id);};
         formTab.Controls.Add(form);pendingTab.Controls.Add(pending);
         tabs.TabPages.Add(formTab);tabs.TabPages.Add(pendingTab);
         TabStrip.Apply(tabs,AppTheme.ModuleAccent("Students"));Controls.Add(TabStrip.CreateHost(tabs));
@@ -35,7 +36,8 @@ internal sealed class QuickRegistrationFormPage : V2Page
     private readonly DataGridView fees = new() { Dock=DockStyle.Fill, AllowUserToAddRows=false, AllowUserToDeleteRows=false, AutoGenerateColumns=false, RowHeadersVisible=false };
     private readonly Label total=new(){Dock=DockStyle.Fill,AutoSize=true,Font=AppTheme.ButtonFont,TextAlign=ContentAlignment.MiddleRight,Padding=new Padding(8),Text="Bill Total: Rs. 0"};
     private DataTable placements = new(), rates = new();
-    private int savedStudent, familyAnchor, loadVersion, defaultAcademicYear;
+    private int savedStudent, familyAnchor, loadVersion, familyLoadVersion, defaultAcademicYear;
+    internal int SavedRegistrationId=>savedStudent;
     private string savedStatus="";
     private string[] savedBasics=Array.Empty<string>();
     private bool busy, loadingFamily, loadingFees, feesLoaded;
@@ -50,7 +52,7 @@ internal sealed class QuickRegistrationFormPage : V2Page
         next=AddAction("Add Another Child", (_,_)=>ClearChild(), "Secondary");
         bill=AddBusyAction("Print Family Bill", PrintBillAsync, "Secondary");
         collect=AddAction("Collect Payment",(_,_)=>navigate(()=>new FMSC_SMS.Pages.Finance.Collection.FeeCollectionPage(savedStudent),"Fees & Billing","Fee Collection"),"Primary");
-        AddAction("New Family",(_,_)=> { if(busy)return; familyAnchor=0;family.Clear();parent.Clear();contact.Clear();address.Clear();ClearChild(); },"Secondary");
+        AddAction("New Family",(_,_)=> { if(busy)return; ++familyLoadVersion;loadingFamily=false;familyAnchor=0;family.Clear();parent.Clear();contact.Clear();address.Clear();ClearChild(); },"Secondary");
         GateAction(save,"Students.Admit"); GateAction(collect,"Fees.Collect");
         PhoneNumberInput.Attach(contact,()=>validator);
         var shared=HumanUi.Card("Parent / Family", "Link siblings. Copied details are editable for this child.");
@@ -67,7 +69,7 @@ internal sealed class QuickRegistrationFormPage : V2Page
         fees.Columns["Amount"].DefaultCellStyle.Format=fees.Columns["Discount"].DefaultCellStyle.Format=fees.Columns["NetAmount"].DefaultCellStyle.Format="N0";
         fees.CellValidating+=(_,e)=>{
             if(e.RowIndex<0||fees.Columns[e.ColumnIndex].Name!="Discount")return;
-            bool valid=decimal.TryParse(Convert.ToString(e.FormattedValue),out decimal discount)&&discount>=0&&discount<=Convert.ToDecimal(rates.Rows[e.RowIndex]["Amount"]);
+            bool valid=fees.Rows[e.RowIndex].DataBoundItem is DataRowView row&&decimal.TryParse(Convert.ToString(e.FormattedValue),out decimal discount)&&discount>=0&&discount<=Convert.ToDecimal(row["Amount"]);
             e.Cancel=!valid;if(!valid)SetStatus("A discount must be between zero and its fee amount.");
         };
         fees.DataError+=(_,e)=>{e.ThrowException=false;SetStatus("Enter a valid discount amount.");};
@@ -82,7 +84,7 @@ internal sealed class QuickRegistrationFormPage : V2Page
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(3)));
         root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.Controls.Add(details,0,0);root.Controls.Add(feeCard,0,1);SetContent(root);
         family.UserSelectionChanged+=async(_,_)=>await LoadFamilyAsync();
-        family.SelectionCleared+=(_,_)=>{familyAnchor=0;loadingFamily=false;UpdateActions();};
+        family.SelectionCleared+=(_,_)=>{++familyLoadVersion;familyAnchor=0;loadingFamily=false;UpdateActions();};
         placement.SelectedIndexChanged+=async(_,_)=>await LoadFeesAsync();
         Load+=async(_,_)=>{await LoadLookupsAsync();if(preselectRegistrationId>0)await LoadRegistrationAsync(preselectRegistrationId);};UpdateActions();
     }
@@ -112,15 +114,16 @@ internal sealed class QuickRegistrationFormPage : V2Page
     private async Task LoadFamilyAsync()
     {
         if(busy)return;
+        int version=++familyLoadVersion;
         if(family.SelectedId<=0){familyAnchor=0;loadingFamily=false;UpdateActions();return;}
         loadingFamily=true;UpdateActions();
         int selected=family.SelectedId;
         try {
             var data=await DatabaseHelper.QueryUserAsync("GetStudentDetails",DatabaseHelper.Int("@AdmissionId",selected));
-            if(IsDisposed||selected!=family.SelectedId||data.Rows.Count==0)return;
+            if(IsDisposed||version!=familyLoadVersion||selected!=family.SelectedId||data.Rows.Count==0)return;
             var r=data.Rows[0];familyAnchor=selected;parent.Text=Convert.ToString(r["FatherName"]);contact.Text=Convert.ToString(r["ContactNumber"]);address.Text=Convert.ToString(r["Address"]);
-        }catch(Exception ex){if(selected==family.SelectedId){familyAnchor=0;Fail(ex);}}
-        finally{if(selected==family.SelectedId){loadingFamily=false;UpdateActions();}}
+        }catch(Exception ex){if(version==familyLoadVersion&&selected==family.SelectedId){familyAnchor=0;Fail(ex);}}
+        finally{if(!IsDisposed&&version==familyLoadVersion){loadingFamily=false;UpdateActions();}}
     }
     private async Task LoadFeesAsync()
     {
@@ -132,10 +135,16 @@ internal sealed class QuickRegistrationFormPage : V2Page
             var data=await Task.Run(()=>DatabaseHelper.QuerySql("""
                 EXEC dbo.RequirePermission @UserId,N'Students.Admit';
                 SELECT F.FeeTypeId,F.FeeTypeName,F.IsMandatory,F.IsTransportLinked,C.Amount,C.Frequency,CONVERT(bit,F.IsMandatory) [Include],CONVERT(decimal(12,2),0) Discount
-                FROM dbo.CampusClassSections P JOIN dbo.FeeConfigurations C ON C.CampusId=P.CampusId AND C.ClassId=P.ClassId
-                JOIN dbo.FeeTypes F ON F.FeeTypeId=C.FeeTypeId WHERE P.ClassSectionId=@Placement ORDER BY F.DisplayOrder,F.FeeTypeName;
+                FROM dbo.CampusClassSections P CROSS JOIN dbo.FeeTypes F
+                LEFT JOIN dbo.FeeConfigurations C ON C.CampusId=P.CampusId AND C.ClassId=P.ClassId AND C.FeeTypeId=F.FeeTypeId
+                WHERE P.ClassSectionId=@Placement AND (F.IsMandatory=1 OR C.FeeTypeId IS NOT NULL) ORDER BY F.DisplayOrder,F.FeeTypeName;
                 """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Placement",selectedPlacement)));
-            if(IsDisposed||version!=loadVersion)return;SetRates(data);feesLoaded=true;
+            if(IsDisposed||version!=loadVersion)return;
+            var missing=data.AsEnumerable().Where(r=>r.IsNull("Amount")).ToArray();
+            string missingNames=string.Join(", ",missing.Select(r=>Convert.ToString(r["FeeTypeName"])));
+            foreach(var row in missing)data.Rows.Remove(row);
+            SetRates(data);feesLoaded=missing.Length==0;
+            if(!feesLoaded)SetStatus("Configure the required class fees before saving: "+missingNames+".");
             foreach(DataGridViewRow row in fees.Rows)if(Convert.ToBoolean(((DataRowView)row.DataBoundItem).Row["IsMandatory"]))row.Cells["Include"].ReadOnly=true;
             UpdateTotal();
         }catch(Exception ex){if(version==loadVersion)Fail(ex);}
@@ -144,6 +153,7 @@ internal sealed class QuickRegistrationFormPage : V2Page
     private void SetRates(DataTable data){
         data.Columns.Add("NetAmount",typeof(decimal),"Amount - Discount");
         data.Columns.Add("OriginalDiscount",typeof(decimal));foreach(DataRow row in data.Rows)row["OriginalDiscount"]=row["Discount"];
+        if(!data.Columns.Contains("HasPayments"))data.Columns.Add(new DataColumn("HasPayments",typeof(bool)){DefaultValue=false});
         rates=data;fees.DataSource=rates;
     }
     private bool ReadyToSave=>!busy&&!loadingFamily&&!loadingFees&&feesLoaded&&(savedStudent==0||savedStatus=="Pending")&&(family.SelectedId<=0||family.SelectedId==familyAnchor);
@@ -157,7 +167,12 @@ internal sealed class QuickRegistrationFormPage : V2Page
         // Restore the edit policy after every busy or saved-state transition.
         foreach(DataGridViewColumn column in fees.Columns)column.ReadOnly=column.Name switch{
             "Discount"=>!CurrentUser.HasPermission("Fees.Adjust"),"Include"=>savedStudent>0,_=>true};
-        foreach(DataGridViewRow row in fees.Rows)if(row.DataBoundItem is DataRowView data)row.Cells["Include"].ReadOnly=savedStudent>0||Convert.ToBoolean(data.Row["IsMandatory"]);}
+        foreach(DataGridViewRow row in fees.Rows)if(row.DataBoundItem is DataRowView data){
+            row.Cells["Include"].ReadOnly=savedStudent>0||Convert.ToBoolean(data.Row["IsMandatory"]);
+            bool paid=Convert.ToBoolean(data.Row["HasPayments"]);
+            row.Cells["Discount"].ReadOnly=paid||!CurrentUser.HasPermission("Fees.Adjust");
+            row.Cells["Discount"].ToolTipText=paid?"This fee has a payment. Use Fee Corrections to adjust it.":"";
+        }}
     private void UpdateTotal(){if(!rates.Columns.Contains("Include")){total.Text="Bill Total: Rs. 0";return;}decimal amount=rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["Include"])).Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));total.Text=$"Bill Total: Rs. {amount:N0}";PendingEditChanged();}
     private void ClearChild()
     {
@@ -190,7 +205,10 @@ internal sealed class QuickRegistrationFormPage : V2Page
                 new SqlParameter("@SelectedFeeTypeIds",SqlDbType.Structured){TypeName="dbo.FeeTypeIdList",Value=Tvp.FeeTypeIds(selected.Select(r=>Convert.ToInt32(r["FeeTypeId"])))},
                 new SqlParameter("@AdmissionDiscounts",SqlDbType.Structured){TypeName="dbo.AdmissionFeeDiscountType",Value=Tvp.AdmissionFeeDiscounts(selected.Where(r=>Convert.ToDecimal(r["Discount"])>0).Select(r=>(Convert.ToInt32(r["FeeTypeId"]),Convert.ToDecimal(r["Discount"]))))}};
             foreach(string key in new[]{"DateOfBirth","PlaceOfBirth","Gender","BFormNumber","Religion","BloodGroup","AlternateContactNumber","PreviousSchool","FatherOccupation"})args.Add(DatabaseHelper.P("@"+key,null));
-            var result=await DatabaseHelper.QueryUserAsync("AdmitStudent",args.ToArray());savedStudent=Convert.ToInt32(result.Rows[0]["AdmissionId"]);savedStatus="Pending";familyAnchor=familyAnchor>0?familyAnchor:savedStudent;StudentSearchCache.Invalidate();
+            // Nested fee operations can return their own result sets first.
+            var results=await DatabaseHelper.QueryUserSetAsync("AdmitStudent",args.ToArray());
+            var result=results.Tables.Cast<DataTable>().Last(t=>t.Columns.Contains("AdmissionId")&&t.Columns.Contains("QuickReference")&&t.Rows.Count>0);
+            savedStudent=Convert.ToInt32(result.Rows[0]["AdmissionId"]);savedStatus="Pending";familyAnchor=familyAnchor>0?familyAnchor:savedStudent;StudentSearchCache.Invalidate();
             savedBasics=BasicValues();foreach(DataRow rate in rates.Rows)rate["OriginalDiscount"]=rate["Discount"];
             string reference=result.Columns.Contains("QuickReference")?Convert.ToString(result.Rows[0]["QuickReference"])??"":$"QR-{savedStudent}";
             SetStatus($"Saved {reference}. Print the family bill, collect payment or add another child.");
@@ -202,14 +220,16 @@ internal sealed class QuickRegistrationFormPage : V2Page
         try{
             var data=await DatabaseHelper.QueryUserAsync("GetStudentDetails",DatabaseHelper.Int("@AdmissionId",id));
             if(IsDisposed||data.Rows.Count==0)return;var r=data.Rows[0];
-            savedStudent=id;savedStatus=Convert.ToString(r["Status"])??"";family.Clear();familyAnchor=id;
+            ++familyLoadVersion;loadingFamily=false;savedStudent=id;savedStatus=Convert.ToString(r["Status"])??"";family.Clear();familyAnchor=id;
             parent.Text=Convert.ToString(r["FatherName"]);contact.Text=Convert.ToString(r["ContactNumber"]);address.Text=Convert.ToString(r["Address"]);name.Text=Convert.ToString(r["StudentName"]);
             joining.Value=Convert.ToDateTime(r["AdmissionDate"]);
             year.SelectedValue=r["AcademicYearId"];placement.SelectedValue=r["ClassSectionId"];
             int version=++loadVersion;
             var stored=await Task.Run(()=>DatabaseHelper.QuerySql("""
                 EXEC dbo.RequirePermission @UserId,N'Students.View';
-                SELECT A.StudentFeeAssignmentId,F.FeeTypeId,F.FeeTypeName,F.IsMandatory,F.IsTransportLinked,A.Amount,A.Frequency,CONVERT(bit,1) [Include],A.DiscountAmount Discount
+                SELECT A.StudentFeeAssignmentId,F.FeeTypeId,F.FeeTypeName,F.IsMandatory,F.IsTransportLinked,A.Amount,A.Frequency,CONVERT(bit,1) [Include],A.DiscountAmount Discount,
+                CONVERT(bit,CASE WHEN EXISTS(SELECT 1 FROM dbo.BillingCharges B JOIN dbo.FeePaymentAllocations PA ON PA.BillingChargeId=B.BillingChargeId
+                    JOIN dbo.FeePayments FP ON FP.FeePaymentId=PA.FeePaymentId WHERE B.StudentFeeAssignmentId=A.StudentFeeAssignmentId AND FP.Status=N'Completed') THEN 1 ELSE 0 END) HasPayments
                 FROM dbo.StudentFeeAssignments A JOIN dbo.FeeTypes F ON F.FeeTypeId=A.FeeTypeId
                 JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId
                 WHERE E.AdmissionId=@Admission AND E.Status IN(N'Pending',N'Active') AND A.CancelledAt IS NULL ORDER BY F.DisplayOrder,F.FeeTypeName;
@@ -246,10 +266,10 @@ internal sealed class QuickRegistrationFormPage : V2Page
             var data=await Task.Run(()=>DatabaseHelper.QuerySql("""
                 EXEC dbo.RequirePermission @UserId,N'Fees.View';
                 DECLARE @Family int=(SELECT FamilyId FROM dbo.FamilyMembers WHERE AdmissionId=@Admission);
-                SELECT COALESCE(S.AdmissionNumber,S.QuickReference) Reference,S.StudentName,F.FeeTypeName,B.BillingMonth,B.DiscountAmount,dbo.GetFeeChargeBalance(B.BillingChargeId) Due
+                SELECT COALESCE(S.AdmissionNumber,S.QuickReference) Reference,S.StudentName,F.FeeTypeName,F.DisplayOrder FeeDisplayOrder,B.BillingMonth,B.DiscountAmount,dbo.GetFeeChargeBalance(B.BillingChargeId) Due
                 FROM dbo.Students S JOIN dbo.BillingCharges B ON B.AdmissionId=S.AdmissionId JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
                 WHERE (S.AdmissionId=@Admission OR S.AdmissionId IN(SELECT AdmissionId FROM dbo.FamilyMembers WHERE FamilyId=@Family))
-                AND B.Status<>N'Cancelled' AND dbo.GetFeeChargeBalance(B.BillingChargeId)>0 ORDER BY S.AdmissionId,B.BillingChargeId;
+                AND B.Status<>N'Cancelled' AND dbo.GetFeeChargeBalance(B.BillingChargeId)>0 ORDER BY S.AdmissionId,B.BillingMonth,F.DisplayOrder,F.FeeTypeName,B.BillingChargeId;
                 """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Admission",savedStudent)));
             if(data.Rows.Count==0){Warn("There are no outstanding charges for this family.");return;}
             var institution=await InstitutionProfile.GetPrintIdentityAsync();

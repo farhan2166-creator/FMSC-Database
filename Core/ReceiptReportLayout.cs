@@ -12,6 +12,18 @@ internal static class ReceiptReportLayout
         var document = XDocument.Load(path);
         XNamespace ns = document.Root!.Name.Namespace;
         var table = document.Descendants(ns + "Tablix").First();
+        if(data.Columns.Contains("FamilyRowKind")){
+            splitFeePeriod=false;
+            var fields=document.Descendants(ns+"DataSet").First().Element(ns+"Fields")!;
+            foreach(string key in new[]{"FamilyRowKind","FamilyAmountText"})
+                fields.Add(new XElement(ns+"Field",new XAttribute("Name",key),new XElement(ns+"DataField",key)));
+            var description=table.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="FeeDescription");
+            description.Descendants(ns+"TextRun").First().Element(ns+"Style")!.Add(new XElement(ns+"FontWeight","=IIf(Fields!FamilyRowKind.Value = \"Fee\", \"Normal\", \"Bold\")"));
+            table.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="LineAmount").Descendants(ns+"Value").First().Value="=Fields!FamilyAmountText.Value";
+            table.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="FeeHeader").Descendants(ns+"Value").First().Value="Student / Month / Fee";
+            table.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="AmountHeader").Descendants(ns+"Value").First().Value="Due (Rs.)";
+            foreach(var value in table.Descendants(ns+"Value").Where(value=>value.Value=="TOTAL PAID"))value.Value="TOTAL DUE";
+        }
         foreach (var label in document.Descendants(ns + "Textbox").Where(box => (string?)box.Attribute("Name") == "AdmissionNumberTextLabel"))
             label.Descendants(ns + "Value").First().Value = "=IIf(InStr(CStr(First(Fields!AdmissionNumberText.Value, \"ReceiptPageGroup\")), \"QR-\") > 0, \"Registration #\", \"Admission #\")";
         // Split only the fee header and detail cells; all other receipt rows keep their spans.
@@ -114,7 +126,9 @@ internal static class ReceiptReportLayout
                             if ((string?)textBox.Attribute("Name") == "CampusHeading") text = "(" + text + ")";
                         }
                         float points = float.Parse(textBox.Descendants(ns + "FontSize").First().Value.Replace("pt", ""), CultureInfo.InvariantCulture);
-                        using var font = new Font("Segoe UI", points, textBox.Descendants(ns + "FontWeight").Any(weight => weight.Value == "Bold") ? FontStyle.Bold : FontStyle.Regular);
+                        bool bold=textBox.Descendants(ns + "FontWeight").Any(weight => weight.Value == "Bold")
+                            || (data.Columns.Contains("FamilyRowKind")&&(string?)textBox.Attribute("Name")=="FeeDescription"&&Convert.ToString(record["FamilyRowKind"])!="Fee");
+                        using var font = new Font("Segoe UI", points, bold ? FontStyle.Bold : FontStyle.Regular);
                         var style = textBox.Element(ns + "Style");
                         double PaddingPoints(string name) => double.Parse(
                             (style?.Element(ns + name)?.Value ?? "0pt").Replace("pt", ""),CultureInfo.InvariantCulture);
