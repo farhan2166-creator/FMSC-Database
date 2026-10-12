@@ -644,18 +644,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Promotion",
                 "Promotion History",
                 "Enrollment.Manage"),
-            Section("RECORD CHECKS"),
+            Section("ADMISSION & DATA REVIEW"),
             new(
                 PageTitles.StudentRecordChecks,
-                () => new StudentRecordChecksPage((factory, module, title) => NavigateTo(factory, module, title)),
+                () => new StudentDataReviewPage((factory, module, title) => NavigateTo(factory, module, title)),
                 "Students",
                 PageTitles.StudentRecordChecks,
-                "Students.View"),
-            new(
-                "Find Duplicate Students",
-                () => new DuplicateStudentAuditPage(),
-                "Students",
-                "Find Duplicate Students",
                 "Students.View"),
             });
         AddModule(

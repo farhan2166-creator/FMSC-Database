@@ -3,7 +3,7 @@ namespace FMSC_SMS.Pages.Students.Maintenance;
 /// <summary>Runs a fuzzy (soundex-based) name/father-name + exact-DOB sweep across all admitted students and surfaces candidate pairs for manual review, in the same "detect -> review -> decide" spirit as StudentRecordChecksPage.</summary>
 public sealed class DuplicateStudentAuditPage : V2Page
 {
-    public DuplicateStudentAuditPage()
+    public DuplicateStudentAuditPage(Action<Func<Control>,string,string>? navigate = null)
         : base(
             "Find Duplicate Students",
             "Review possible duplicates with matching names, father’s names and birth dates.")
@@ -28,9 +28,13 @@ public sealed class DuplicateStudentAuditPage : V2Page
         dismiss.Enabled = false;
         Grid.SelectionChanged += (_, _) => UpdateResolveButtons();
         var export = AddExportAction("FMSC_Duplicate_Student_Candidates");
+        var openFirst=AddAction("Open First Record",(_,_)=>OpenRecord("AdmissionId",navigate),"Secondary");
+        var openSecond=AddAction("Open Second Record",(_,_)=>OpenRecord("AdmissionId2",navigate),"Secondary");
+        GateActionAny(openFirst,"Students.Admit","Students.Administer");GateActionAny(openSecond,"Students.Admit","Students.Administer");
+        RelocateFromActions(openFirst,openSecond);
         RelocateFromActions(scan, confirm, dismiss, export);
         Defer(LoadAsync);
-        var buttonRow = HumanUi.ButtonRow(scan, confirm, dismiss, export);
+        var buttonRow = HumanUi.ButtonRow(scan, openFirst, openSecond, confirm, dismiss, export);
         buttonRow.Dock = DockStyle.Fill;
         buttonRow.Margin = new Padding(0, 0, 0, UiDesignSystem.Spacing.Sm);
         var card = HumanUi.Card(
@@ -64,6 +68,14 @@ public sealed class DuplicateStudentAuditPage : V2Page
     }
     private readonly ModernButton _confirmButton;
     private readonly ModernButton _dismissButton;
+    private void OpenRecord(string key,Action<Func<Control>,string,string>? navigate)
+    {
+        if(Grid.CurrentRow?.DataBoundItem is not DataRowView row){Warn("Select a candidate pair first.");return;}
+        int admission=Convert.ToInt32(row[key]);
+        Func<Control> factory=()=>new Admissions.StudentAdmissionPage(navigate,admission);
+        if(navigate is not null)navigate(factory,"Students",PageTitles.Admissions);
+        else {using var window=new ApplicationWindowForm{Text=PageTitles.Admissions,WindowState=FormWindowState.Maximized};var page=factory();page.Dock=DockStyle.Fill;window.Controls.Add(page);window.ShowDialog(FindForm());}
+    }
     protected override void OnReportPageBound()
     {
         // Keep the bound review data for selection and export, but show only the identifying details needed to compare the two students at a glance.

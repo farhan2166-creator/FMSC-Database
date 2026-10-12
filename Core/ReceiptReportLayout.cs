@@ -12,6 +12,8 @@ internal static class ReceiptReportLayout
         var document = XDocument.Load(path);
         XNamespace ns = document.Root!.Name.Namespace;
         var table = document.Descendants(ns + "Tablix").First();
+        foreach (var label in document.Descendants(ns + "Textbox").Where(box => (string?)box.Attribute("Name") == "AdmissionNumberTextLabel"))
+            label.Descendants(ns + "Value").First().Value = "=IIf(InStr(CStr(First(Fields!AdmissionNumberText.Value, \"ReceiptPageGroup\")), \"QR-\") > 0, \"Registration #\", \"Admission #\")";
         // Split only the fee header and detail cells; all other receipt rows keep their spans.
         foreach (string name in splitFeePeriod ? new[] { "FeeHeader", "FeeDescription" } : Array.Empty<string>())
         {
@@ -102,7 +104,11 @@ internal static class ReceiptReportLayout
                                 ? (Convert.ToDecimal(record[key]) * (expression.StartsWith("=Format(-") ? -1 : 1)).ToString(
                                     expression.Contains("\"N2\"") ? "N2" : "N0", CultureInfo.CurrentCulture)
                                 : Convert.ToString(record[key]) ?? "";
-                            if (expression.StartsWith("=IIf(")) text = Convert.ToBoolean(record[key]) ? "NET PAID" : "TOTAL PAID";
+                            if (expression.StartsWith("=IIf(") && key == "ShowAdjustments")
+                                text = Convert.ToBoolean(record[key]) ? "NET PAID" : "TOTAL PAID";
+                            if ((string?)textBox.Attribute("Name") == "AdmissionNumberTextLabel")
+                                text = (Convert.ToString(record["AdmissionNumberText"]) ?? "").Contains("QR-",StringComparison.OrdinalIgnoreCase)
+                                    ? "Registration #" : "Admission #";
                             if ((string?)textBox.Attribute("Name") == "ReceiptHeading")
                                 text += " (" + CultureInfo.InvariantCulture.TextInfo.ToTitleCase(Convert.ToString(record["CopyLabel"])!.ToLowerInvariant()) + ")";
                             if ((string?)textBox.Attribute("Name") == "CampusHeading") text = "(" + text + ")";

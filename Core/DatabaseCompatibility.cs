@@ -119,7 +119,7 @@ internal static class DatabaseCompatibility
                 (SELECT 1 FROM sys.indexes I JOIN sys.index_columns IC ON IC.object_id=I.object_id AND IC.index_id=I.index_id
                  JOIN sys.columns C ON C.object_id=IC.object_id AND C.column_id=IC.column_id
                  WHERE I.object_id=OBJECT_ID('dbo.Students') AND I.is_unique=1 AND I.is_disabled=0
-                   AND I.has_filter=0 AND IC.key_ordinal=1 AND C.name='AdmissionNumber'
+                   AND I.has_filter=1 AND I.filter_definition='([AdmissionNumber] IS NOT NULL)' AND IC.key_ordinal=1 AND C.name='AdmissionNumber'
                    AND NOT EXISTS(SELECT 1 FROM sys.index_columns K WHERE K.object_id=I.object_id AND K.index_id=I.index_id AND K.key_ordinal>1))
                 INSERT @Problems VALUES(N'Missing unique admission-number constraint/index.');
             SELECT COUNT(*) AS ProblemCount FROM @Problems;

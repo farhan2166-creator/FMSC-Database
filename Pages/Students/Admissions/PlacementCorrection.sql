@@ -50,7 +50,7 @@ BEGIN TRY
    @OldLeave=LeavingDate,@OldBilling=BillingStartDate,@Ready=BillingReady
   FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId AND AdmissionId=@AdmissionId;
   IF @OldYear IS NULL THROW 59616,'The selected enrollment no longer exists. Reload Admission.',1;
-  IF EXISTS(SELECT 1 FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId AND PlacementConfirmedAt IS NOT NULL)
+  IF EXISTS(SELECT 1 FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId AND PlacementConfirmedAt IS NOT NULL) AND NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@AdmissionId AND LegacySetupPending=1)
    THROW 59621,'This placement is confirmed. Use Promotion, Transfer or Re-admission for movement; use the date correction action for a genuine date error.',1;
   IF EXISTS(SELECT 1 FROM dbo.LeaveCertificates WHERE EnrollmentId=@EnrollmentId)
    AND (@OldYear<>@YearId OR @OldPlacement<>@PlacementId OR @OldStart<>@StartDate OR @OldStatus<>@Status OR ISNULL(@OldLeave,'19000101')<>ISNULL(@LeaveDate,'19000101'))

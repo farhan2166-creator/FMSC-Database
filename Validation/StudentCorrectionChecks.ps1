@@ -54,6 +54,7 @@ try{
  $expected=Query "IF COL_LENGTH(N'dbo.Enrollments',N'PlacementConfirmedAt') IS NULL SELECT COUNT(*) Total,COUNT(*) Confirmed FROM dbo.Enrollments; ELSE EXEC(N'SELECT COUNT(*) Total,COALESCE(SUM(CASE WHEN PlacementConfirmedAt IS NOT NULL THEN 1 ELSE 0 END),0) Confirmed FROM dbo.Enrollments;');"
  Run-Batches (Join-Path $taskRoot 'DatabaseScripts/PlacementConfirmation.sql')
  Run-Batches (Join-Path $taskRoot 'DatabaseScripts/StudentCorrectionGuards.sql')
+ Run-Batches (Join-Path $taskRoot 'DatabaseScripts/AdmissionWorkflow.sql')
  $existing=Query 'SELECT COUNT(*) Total,COALESCE(SUM(CASE WHEN PlacementConfirmedAt IS NOT NULL THEN 1 ELSE 0 END),0) Confirmed FROM dbo.Enrollments;'
  Assert ($existing.Rows[0].Total -eq $expected.Rows[0].Total -and $existing.Rows[0].Confirmed -eq $expected.Rows[0].Confirmed) 'Existing placement confirmation states are preserved'
  # The real reported scenario is exercised on a disposable database copy only.
@@ -134,12 +135,10 @@ try{
 '@ @{Number=([string](920000000+(Get-Random -Minimum 1 -Maximum 9999999)))}
  $actualStudent=[int]$actual.Rows[0].AdmissionId
  $newDraft=Query "SELECT EnrollmentId,PlacementConfirmedAt,BillingReady,(SELECT COUNT(*) FROM dbo.BillingCharges B WHERE B.EnrollmentId=E.EnrollmentId) Charges FROM dbo.Enrollments E WHERE AdmissionId=$actualStudent;"
- Assert ($newDraft.Rows[0].PlacementConfirmedAt -eq [DBNull]::Value -and -not $newDraft.Rows[0].BillingReady -and $newDraft.Rows[0].Charges -eq 0) 'Actual admission saves draft and fee setup without posting bills'
+ Assert ($newDraft.Rows[0].PlacementConfirmedAt -is [DateTime] -and $newDraft.Rows[0].BillingReady -and $newDraft.Rows[0].Charges -gt 0) 'Actual admission saves active placement and opening bills'
  $actualEnrollment=[int]$newDraft.Rows[0].EnrollmentId
- $actualPlan=Query "EXEC dbo.ConfirmStudentPlacement @UserId=1,@EnrollmentId=$actualEnrollment;"
- [void](Query "EXEC dbo.ConfirmStudentPlacement @UserId=1,@EnrollmentId=$actualEnrollment,@Preview=0,@ExpectedSnapshot=@Snapshot;" @{Snapshot=$actualPlan.Rows[0].Snapshot})
  $actualBills=Query "SELECT BillingChargeId FROM dbo.BillingCharges WHERE EnrollmentId=$actualEnrollment AND Status=N'Open';"
- Assert ($actualBills.Rows.Count -ge 2) 'Actual admission opening charges are posted at explicit confirmation'
+ Assert ($actualBills.Rows.Count -ge 2) 'Actual admission opening charges are posted by Save'
  $allocatedCharge=[long]$actualBills.Rows[0].BillingChargeId
  [void](Query @"
  INSERT dbo.FeePayments(AdmissionId,EnrollmentId,PaymentDate,ReceiptNumber,TotalAmount,PaymentMethod,Status,CreatedByUserId)

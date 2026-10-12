@@ -501,6 +501,11 @@ public sealed class WelcomePage : UserControl
         var actions = new (string Text, string Module, Func<Control> Factory, string Permission)[]
         {
         (PageTitles.Admissions, "Students", () => new StudentAdmissionPage(), "Students.Admit"),
+        ("Quick Registration", "Students", () => new QuickRegistrationPage((factory, module, title) =>
+        {
+            if (navigateInModule is not null) navigateInModule(factory, module, title);
+            else navigate(factory);
+        }), "Students.Admit"),
         ("Fee Collection", "Finance", () => new FeeCollectionPage(), "Fees.Collect"),
         ("Student Profile", "Students", () => new StudentProfilePage(), "Students.View"),
         ("Student Reports", "Students", () => new StudentReportsPage(), "Students.View"),

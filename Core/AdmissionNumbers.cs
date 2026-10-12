@@ -44,7 +44,7 @@ public static class AdmissionNumbers
                 return _numbers;
             generation = _generation;
         }
-        using var cmd = new SqlCommand("SELECT AdmissionId, AdmissionNumber FROM dbo.Students;", cn);
+        using var cmd = new SqlCommand("SELECT AdmissionId, COALESCE(AdmissionNumber,QuickReference,'') FROM dbo.Students;", cn);
         using var reader = cmd.ExecuteReader();
         var result = new Dictionary<int, string>();
         while (reader.Read()) result[reader.GetInt32(0)] = reader.GetString(1);
@@ -78,11 +78,11 @@ public static class AdmissionNumbers
         foreach (var key in keys)
         {
             string name = Regex.Replace(key.ColumnName, "AdmissionId", "AdmissionNumber", RegexOptions.IgnoreCase);
-            if (table.Columns.Contains(name)) continue;
-            table.Columns.Add(name, typeof(string));
+            if (table.Columns.Contains(name) && table.AsEnumerable().All(row => row[name] is not DBNull && !string.IsNullOrWhiteSpace(Convert.ToString(row[name])))) continue;
+            if (!table.Columns.Contains(name)) table.Columns.Add(name, typeof(string));
             numbers ??= Numbers(cn);
             foreach (DataRow row in table.Rows)
-                if (int.TryParse(Convert.ToString(row[key]), out int id)) row[name] = numbers.GetValueOrDefault(id, string.Empty);
+                if ((row[name] is DBNull || string.IsNullOrWhiteSpace(Convert.ToString(row[name]))) && int.TryParse(Convert.ToString(row[key]), out int id)) row[name] = numbers.GetValueOrDefault(id, string.Empty);
         }
         AddSortColumns(table);
     }
@@ -97,13 +97,13 @@ public static class AdmissionNumbers
         foreach (var key in keys)
         {
             string name = Regex.Replace(key.ColumnName, "AdmissionId", "AdmissionNumber", RegexOptions.IgnoreCase);
-            if (table.Columns.Contains(name)) continue;
+            if (table.Columns.Contains(name) && table.AsEnumerable().All(row => row[name] is not DBNull && !string.IsNullOrWhiteSpace(Convert.ToString(row[name])))) continue;
             numbers ??= await NumbersAsync(cn, token).ConfigureAwait(false);
-            table.Columns.Add(name, typeof(string));
+            if (!table.Columns.Contains(name)) table.Columns.Add(name, typeof(string));
             foreach (DataRow row in table.Rows)
             {
                 token.ThrowIfCancellationRequested();
-                if (int.TryParse(Convert.ToString(row[key]), out int id))
+                if ((row[name] is DBNull || string.IsNullOrWhiteSpace(Convert.ToString(row[name]))) && int.TryParse(Convert.ToString(row[key]), out int id))
                     row[name] = numbers.GetValueOrDefault(id, string.Empty);
             }
         }
@@ -119,7 +119,7 @@ public static class AdmissionNumbers
                 return _numbers;
             generation = _generation;
         }
-        using var cmd = new SqlCommand("SELECT AdmissionId, AdmissionNumber FROM dbo.Students;", cn);
+        using var cmd = new SqlCommand("SELECT AdmissionId, COALESCE(AdmissionNumber,QuickReference,'') FROM dbo.Students;", cn);
         using var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false);
         var result = new Dictionary<int, string>();
         while (await reader.ReadAsync(token).ConfigureAwait(false))

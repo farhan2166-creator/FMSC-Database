@@ -595,12 +595,15 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private int _feeScopeClassId;
     private readonly Action<Func<Control>, string, string>? _navigate;
     /// <param name="navigate">The shell's page-switch callback, unchanged.</param>
+    private readonly bool registrationReview;
+    internal event Action? RegistrationFinished;
     public StudentAdmissionPage(
-        Action<Func<Control>, string, string>? navigate = null, int preselectAdmissionId = 0)
+        Action<Func<Control>, string, string>? navigate = null, int preselectAdmissionId = 0, bool registrationReview = false)
     : base(
-        PageTitles.Admissions,
-        AdmissionContextSubtitle)
+        registrationReview ? "Review Registration" : PageTitles.Admissions,
+        registrationReview ? "Complete the details, save, then confirm admission. Official numbers are assigned on confirmation." : AdmissionContextSubtitle)
     {
+        this.registrationReview = registrationReview;
         firstPlacementStatus.Items.AddRange(new object[] { "Active", "Left" });
         viewEnrollmentDate.Text=editEnrollmentDate.Text="-";
         RecordTextPolicy.WireInput(name, "@StudentName");
@@ -647,6 +650,17 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         FormFlow.EnterMovesToNext(this);
         FormFlow.OrderTableFields(tab1Panel);
+        quickStudent.RowFilter = row => Convert.ToString(row["Status"]) != "Pending" && Convert.ToString(row["Status"]) != "Cancelled";
+        if (registrationReview)
+        {
+            quickStudent.Visible = findButton!.Visible = newAdmissionButton!.Visible = saveAndNewButton!.Visible = false;
+            enrollmentActionsButton!.Visible = collectPaymentButton!.Visible = admissionPrintButton!.Visible = keepPlacement.Visible = false;
+            var confirm = AddBusyAction("Confirm Admission", CompleteRegistrationAsync, "Success");
+            GateAction(confirm, "Students.Admit");
+            var cancel = AddBusyAction("Cancel Registration", () => CloseAdmissionAsync(true), "Warning");
+            GateAction(cancel, "Students.Administer");
+            admissionIdCaption.Text = "Temp Reference";
+        }
         if (preselectAdmissionId > 0) Defer(() => LoadStudentForEditAsync(preselectAdmissionId));
     }
     internal override bool FocusEntryField() => name.Visible && name.Enabled && name.Focus();
@@ -819,14 +833,24 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         enrollmentActionsMenu.Opening += (_, _) => {
             foreach (ToolStripItem item in enrollmentActionsMenu.Items)
                 item.Enabled = currentAdmissionId > 0 && !saveBusy &&
-                    pendingPlacementId == 0 &&
+                    pendingPlacementId == 0 && !IsPendingRegistration && !legacySetupPending &&
                     (item.Text != "Re-Admit" || !string.Equals(_workspaceStudentStatus.Trim(), "Active", StringComparison.OrdinalIgnoreCase)) &&
                     CurrentUser.HasPermission(item.Text == "Re-Admit" ? "Students.Administer" : "Enrollment.Manage");
         };
         enrollmentActionsMenu.Items.Add(new ToolStripSeparator());
         var correctPlacement = enrollmentActionsMenu.Items.Add("Placement History / Corrections");
         correctPlacement.Click += async (_, _) => await OpenPlacementCorrectionAsync();
-        enrollmentActionsMenu.Opening += (_, _) => correctPlacement.Enabled = currentAdmissionId > 0 && !saveBusy && CurrentUser.HasPermission("Students.Administer");
+        enrollmentActionsMenu.Opening += (_, _) => correctPlacement.Enabled = currentAdmissionId > 0 && !IsPendingRegistration && !saveBusy && CurrentUser.HasPermission("Students.Administer");
+        var verifyLegacy = enrollmentActionsMenu.Items.Add("Mark Legacy Record Verified");
+        verifyLegacy.Click += async (_, _) => await VerifyLegacyAsync();
+        var markLeft = enrollmentActionsMenu.Items.Add("Mark as Left");
+        markLeft.Click += async (_, _) => await CloseAdmissionAsync(false);
+        enrollmentActionsMenu.Opening += (_, _) => {
+            verifyLegacy.Visible = legacySetupPending && currentAdmissionId > 0;
+            verifyLegacy.Enabled = !saveBusy && CurrentUser.HasPermission("Students.Administer");
+            markLeft.Visible = _workspaceStudentStatus == "Active" && currentAdmissionId > 0;
+            markLeft.Enabled = !saveBusy && CurrentUser.HasPermission("Students.Administer");
+        };
         confirmPlacementAction = enrollmentActionsMenu.Items.Add("Confirm Placement");
         confirmPlacementAction.Visible = false;
         confirmPlacementAction.Click += async (_, _) => await ConfirmPlacementAsync();
@@ -2023,7 +2047,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             admissionPrintButton.Enabled = savedStudentReady;
         if (enrollmentActionsButton is not null)
             enrollmentActionsButton.Enabled = savedStudentReady &&
-                (CurrentUser.HasPermission("Enrollment.Manage") || CurrentUser.HasPermission("Students.Administer"));
+                (CurrentUser.HasPermission("Students.Admit") || CurrentUser.HasPermission("Enrollment.Manage") || CurrentUser.HasPermission("Students.Administer"));
         findSiblingButton.Enabled = savedStudentReady && CurrentUser.HasPermission("Students.Administer");
         if (saveAndNewButton is not null)
             saveAndNewButton.Enabled = !saveBusy && currentAdmissionId <= 0;
@@ -2069,7 +2093,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         try
         {
             using var dialog =
-                new StudentSearchDialog(this);
+                new StudentSearchDialog(this, officialAdmissionsOnly:true);
             if (dialog.ShowDialog(this) != DialogResult.OK)
             {
                 return;
@@ -2148,7 +2172,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         {
             admissionIdValue.Text = AdmissionNumbers.ForId(currentAdmissionId);
             admissionIdValue.PlaceholderText = string.Empty;
-            Defer(CheckExistingAdmissionNumberAsync);
+            if (!IsPendingRegistration) Defer(CheckExistingAdmissionNumberAsync);
         }
         else
         {
@@ -2616,7 +2640,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     {
         FormValidator v = admissionValidator ??= CreateValidator();
         v.Begin();
-        bool validNumber() => AdmissionNumbers.TryNormalize(admissionIdValue.Text, out _) &&
+        bool validNumber() => IsPendingRegistration || AdmissionNumbers.TryNormalize(admissionIdValue.Text, out _) &&
             (!isNew || admissionNumberPlan?.Validate(admissionIdValue.Text) is null && admissionNumberPlan is not null);
         v.Check(admissionIdValue, validNumber(), isNew ? admissionNumberPlan?.Validate(admissionIdValue.Text) ?? "Wait for the admission number suggestion, then enter a valid number." : "Use a number such as 1 or 1a", validNumber);
         if(isNew && admissionNumberPlan?.Error is { } dateError)
@@ -2766,6 +2790,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 return;
             }
             DataRow row = dt.Rows[0];
+            if (!registrationReview && Convert.ToString(row["Status"]) == "Pending")
+            {
+                if (_navigate is not null) _navigate(() => new QuickRegistrationPage(_navigate, admissionId), "Students", "Quick Registration");
+                else Warn("This is a pending registration. Review and confirm it in Dashboard Quick Registration.");
+                return;
+            }
+            legacySetupPending = row.Table.Columns.Contains("LegacySetupPending") && Convert.ToBoolean(row["LegacySetupPending"]);
             currentAdmissionId =
                 admissionId;
             _workspaceStudentStatus =
@@ -3111,8 +3142,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         /* and this is the point at which the page knows WHICH record it is showing, so the header says so rather than looking like a blank form. */
         string loadedStudent = name.Text.Trim();
         SetPageHeaderText(
-            "Edit Student",
-            $"Student: {loadedStudent} (Admission Number {AdmissionNumbers.ForId(admissionId)}) - saving updates this student.");
+            registrationReview ? "Review Registration" : "Edit Student",
+            registrationReview ? $"{loadedStudent} · {AdmissionNumbers.ForId(admissionId)} · Save details, then confirm official admission."
+                : $"Student: {loadedStudent} (Admission Number {AdmissionNumbers.ForId(admissionId)}) - saving updates this student.");
         /* this is the point at which the form has settled on a record. */
         CaptureAdmissionBaseline();
         Defer(() => RefreshConfirmReturnAvailabilityAsync(admissionId, version));
@@ -3642,15 +3674,15 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 ORDER BY CASE WHEN Status=N'Active' THEN 0 ELSE 1 END,EnrollmentDate DESC,EnrollmentId DESC;
                 """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@AdmissionId", admissionId)));
             if (IsDisposed || version != admissionLoadVersion || currentAdmissionId != admissionId) return;
-            pendingPlacementId = placement.Rows.Count > 0 && placement.Rows[0]["PlacementConfirmedAt"] == DBNull.Value
+            pendingPlacementId = !IsPendingRegistration && !legacySetupPending && placement.Rows.Count > 0 && placement.Rows[0]["PlacementConfirmedAt"] == DBNull.Value
                 ? Convert.ToInt32(placement.Rows[0]["EnrollmentId"]) : 0;
-            if (confirmPlacementAction is not null) confirmPlacementAction.Visible = pendingPlacementId > 0;
+            if (confirmPlacementAction is not null) confirmPlacementAction.Visible = false;
             if (pendingPlacementId > 0) SetStatus($"Draft · {AdmissionNumbers.ForId(admissionId)}");
             if (CurrentUser.HasPermission("Students.Administer"))
             {
                 var pending = await DatabaseHelper.QueryUserAsync("GetPendingReturnAdmissions");
                 if (IsDisposed || version != admissionLoadVersion || currentAdmissionId != admissionId) return;
-                confirmReturnButton.Visible = pending.AsEnumerable().Any(row => GetIntColumn(row, "AdmissionId") == admissionId);
+                confirmReturnButton.Visible = !legacySetupPending && !IsPendingRegistration && pending.AsEnumerable().Any(row => GetIntColumn(row, "AdmissionId") == admissionId);
             }
         }
         catch (Exception ex)
@@ -3672,6 +3704,36 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         });
     }
 
+    private async Task CompleteRegistrationAsync()
+    {
+        if (!registrationReview || !IsPendingRegistration || currentAdmissionId <= 0 || saveBusy) return;
+        if (HasUnsavedChanges) { SetStatus("Save the completed details first, then Confirm Admission."); return; }
+        if (!HasRequiredAdmissionDetails() || string.IsNullOrWhiteSpace(contact.Text)) { Warn("Complete the required student and contact details before official admission."); return; }
+        string suggestion = await AdmissionNumberPolicy.PreviewNextAsync() ?? "";
+        using var dialog = new CompleteAdmissionDialog(suggestion, name.Text);
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK) return;
+        await RunBusyAsync("Completing admission…", async () => {
+            await DatabaseHelper.ExecuteUserAsync("CompleteQuickAdmission", DatabaseHelper.Int("@AdmissionId", currentAdmissionId), DatabaseHelper.P("@AdmissionNumber", dialog.AdmissionNumber));
+            StudentSearchCache.Invalidate(); await LoadStudentForEditAsync(currentAdmissionId);
+        });
+        if (!IsPendingRegistration) RegistrationFinished?.Invoke();
+    }
+    private async Task VerifyLegacyAsync()
+    {
+        if (HasUnsavedChanges) { SetStatus("Save corrections before marking this legacy record verified."); return; }
+        await RunBusyAsync("Verifying legacy record…", async () => {
+            await DatabaseHelper.ExecuteUserAsync("VerifyLegacyStudent", DatabaseHelper.Int("@AdmissionId", currentAdmissionId));
+            SetStatus("Legacy record verified. Later edits to details, placement or fees require verification again.");
+        });
+    }
+    private async Task CloseAdmissionAsync(bool cancel)
+    {
+        if (currentAdmissionId <= 0 || saveBusy || (cancel && (!registrationReview || !IsPendingRegistration))) return;
+        if (HasUnsavedChanges) { SetStatus("Save changes before closing this record."); return; }
+        using var dialog = new CloseAdmissionDialog(currentAdmissionId,name.Text,cancel);
+        dialog.ShowDialog(FindForm());
+        if (dialog.Changed){await LoadStudentForEditAsync(currentAdmissionId);if(cancel)RegistrationFinished?.Invoke();}
+    }
     private async Task OpenConfirmReturnAsync()
     {
         if (currentAdmissionId <= 0 || saveBusy || !CurrentUser.HasPermission("Students.Administer")) return;
@@ -4100,9 +4162,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         return table;
     }
+    private bool IsPendingRegistration => _workspaceStudentStatus == "Pending";
+    private bool legacySetupPending;
     private async Task Save()
     {
-        if (saveBusy)
+        if (saveBusy || (registrationReview && (!IsPendingRegistration || currentAdmissionId <= 0)))
             return;
         saveBusy = true;
         UpdateStudentWorkspace();
@@ -4330,7 +4394,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if (photoSaved)
             {
                 Info(
-                    (savedHistorical ? "Historical student and draft placement saved. No fees were generated." : "Student saved. Review the placement and fees, then use Actions → Confirm Placement.")
+                    (savedHistorical ? "Historical student saved for legacy review. No fees were generated." : "Student admitted. Placement and opening fees are ready.")
                     + (typedDiscounts.Count > 0
                         ? " The typed fee discount(s) have been saved."
                         : string.Empty)
@@ -4371,7 +4435,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             DatabaseHelper.P("@PlacementStatus", AssigningFirstPlacement ? firstPlacementStatus.Text : null),
             DatabaseHelper.P("@PlacementLeavingDate", AssigningFirstPlacement && firstWithdrawalDate.Checked ? firstWithdrawalDate.Value.Date : null),
             DatabaseHelper.Bit("@PlacementUsesTransport", AssigningFirstPlacement && UsesTransport),
-            DatabaseHelper.P("@AdmissionNumber", admissionIdValue.Text.Trim()),
+            DatabaseHelper.P("@AdmissionNumber", IsPendingRegistration ? null : admissionIdValue.Text.Trim()),
             DatabaseHelper.Int(
                 "@AdmissionId",
                 admissionId),

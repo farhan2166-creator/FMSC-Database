@@ -41,11 +41,13 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         Margin = new Padding(0)
     };
     private int searchVersion;
+    private readonly bool officialAdmissionsOnly;
     public int SelectedAdmissionId { get; private set; }
     public string? NewAdmissionNumber { get; private set; }
     private string? missingAdmissionNumber;
-    public StudentSearchDialog(IWin32Window? owner = null)
+    public StudentSearchDialog(IWin32Window? owner = null, bool officialAdmissionsOnly = false)
     {
+        this.officialAdmissionsOnly = officialAdmissionsOnly;
         Text = "Find Student";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
@@ -346,6 +348,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
             var filtered = new List<DataRow>();
             foreach (DataRow row in candidates)
             {
+                if (officialAdmissionsOnly && GetTextColumn(row,"Status") is "Pending" or "Cancelled") continue;
                 if (isAdmissionIdSearch && !AdmissionNumbers.Read(row).StartsWith(admissionNumber, StringComparison.OrdinalIgnoreCase))
                     continue;
                 if (statusIndex != 0 &&

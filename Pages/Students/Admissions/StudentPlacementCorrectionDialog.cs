@@ -5,7 +5,8 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 /// <summary>One reviewed correction path for current and verified legacy placement.</summary>
 internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
 {
-    private readonly LookupBox record = new(), year = new(), placement = new();
+    private readonly LookupBox record = new(), year = new();
+    private readonly PlacementPicker placement = new();
     private readonly ModernComboBox status = new();
     private readonly ModernDatePicker start = HumanUi.Date(), leave = HumanUi.Date(), billing = HumanUi.Date();
     private readonly ModernTextBox reason = HumanUi.TextBox(true, 500), impact = HumanUi.TextBox(true, 0);
@@ -20,7 +21,8 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
     private DataTable enrollments = new();
     private DataRow? plan;
     private bool busy, loading;
-    private bool Confirmed => SelectedRecord()?["PlacementConfirmedAt"] is DateTime;
+    private bool legacySetupPending;
+    private bool Confirmed => !legacySetupPending && SelectedRecord()?["PlacementConfirmedAt"] is DateTime;
     private bool HasPlacementEdits => SelectedRecord() is DataRow current &&
         (year.SelectedId != Convert.ToInt32(current["AcademicYearId"]) || placement.SelectedId != Convert.ToInt32(current["ClassSectionId"]) ||
          status.Text != Convert.ToString(current["Status"]) || start.Value.Date != Convert.ToDateTime(current["EnrollmentDate"]).Date ||
@@ -106,12 +108,12 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         SetBusy(true); loading = true;
         try
         {
+            var student = await DatabaseHelper.QueryUserAsync("GetStudentDetails", DatabaseHelper.Int("@AdmissionId", admission));
+            legacySetupPending = student.Rows.Count > 0 && Convert.ToBoolean(student.Rows[0]["LegacySetupPending"]);
             enrollments = await DatabaseHelper.QueryUserAsync("GetStudentEnrollmentsForLifecycle", DatabaseHelper.Int("@AdmissionId", admission));
             var years = await DatabaseHelper.QueryUserAsync("GetAcademicYears");
             var placements = await DatabaseHelper.QueryUserAsync("GetClassSections", DatabaseHelper.Int("@CampusId", 0), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0));
-            placements.Columns.Add("CorrectionDisplay", typeof(string));
-            foreach (DataRow row in placements.Rows) row["CorrectionDisplay"] = $"{row["CampusName"]} · {row["ClassName"]} · {row["SectionName"]}";
-            year.Bind(years, "AcademicYearId", "YearName"); placement.Bind(placements, "ClassSectionId", "CorrectionDisplay");
+            year.Bind(years, "AcademicYearId", "YearName"); placement.Bind(placements);
             var choices = new DataTable(); choices.Columns.Add("Id", typeof(int)); choices.Columns.Add("Display");
             foreach (DataRow row in enrollments.Rows) choices.Rows.Add(row["EnrollmentId"], $"{row["YearName"]} · {row["ClassName"]} · {row["SectionName"]} ({row["Status"]})");
             choices.Rows.Add(-1, "Add verified missing placement");
@@ -142,7 +144,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         foreach (Control field in fields.Controls) field.Visible = !Confirmed || field.Contains(record);
         fields.SetColumnSpan(record.Parent!, Confirmed ? 2 : 1);
         legacy.Visible = review.Visible = apply.Visible = !Confirmed;
-        confirm.Visible = !Confirmed && record.SelectedId > 0;
+        confirm.Visible = false;
         dates.Visible = Confirmed;
         Text = Confirmed ? "Placement History / Dates" : "Review Student Placement";
         if (Confirmed) impact.Text = $"Confirmed placement\r\n{record.Text}\r\n\r\nUse Promotion to move to another academic year, Transfer to change campus/class/section, or Re-admission when returning after leaving.\r\n\r\nFor a genuine date error, use Correct Dates below.";
@@ -164,7 +166,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
                 "\r\nBilling starts: " + (billing.Checked ? billing.Value.ToString("dd MMM yyyy") : "placement start date") +
                 $"\r\n\r\nReverse {plan["CancelCount"]} out-of-period unpaid charge(s): Rs. {Convert.ToDecimal(plan["CancelledAmount"]):N0}." +
                 $"\r\nKeep {plan["RetainedCharges"]} valid charge(s). Existing fee rates and payments are preserved." +
-                (Convert.ToBoolean(plan["Creating"]) ? "\r\nThis records a draft only. No fees or bills are created. Review and Confirm Placement in Admission when ready." :
+                (Convert.ToBoolean(plan["Creating"]) ? "\r\nThis records a draft only. No fees or bills are created. Mark the legacy record verified in Admission when ready." :
                 "\r\nNo new charges are posted. Review fee setup in Admission after correcting placement.") +
                 (Convert.ToInt32(plan["BlockedCount"]) > 0 ? $"\r\n\r\n{plan["BlockedCount"]} affected charge(s) have payments. Resolve those in Fee Corrections, then review again." :
                 "\r\n\r\nApply saves the correction and listed reversals together, with your reason in history.");
