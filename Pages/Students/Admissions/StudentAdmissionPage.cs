@@ -1152,7 +1152,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         guardianGrid.Controls.Add(
             AdmissionField(
                 "Primary Phone",
-                contact),
+                contact,
+                registrationReview),
             3,
             0);
         var addressField = AdmissionField(
@@ -2636,7 +2637,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
     }
     /// <summary>UX - the admission's own rules, checked all at once and shown on the fields themselves (danger-coloured border plus a few words on the caption).</summary>
-    private bool ValidateAdmissionInline(bool isNew)
+    private bool ValidateAdmissionInline(bool isNew, bool confirmingRegistration = false)
     {
         FormValidator v = admissionValidator ??= CreateValidator();
         v.Begin();
@@ -2657,13 +2658,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         v.Check(name, NameProblem(name.Text).Length == 0,
             NameProblem(name.Text), () => NameProblem(name.Text).Length == 0);
         bool detailsComplete = true;
-        if (isNew)
+        if (isNew || confirmingRegistration)
         {
             detailsComplete = HasRequiredAdmissionDetails();
             v.Required(gender, "Select one");
             v.Required(fatherName);
             v.Required(address);
             v.Required(placeOfBirthInput);
+            if (confirmingRegistration) v.Required(contact);
         }
         v.Check(dob,
             !(dob.Checked && dob.Value.Date > admissionDate.Value.Date),
@@ -3707,8 +3709,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private async Task CompleteRegistrationAsync()
     {
         if (!registrationReview || !IsPendingRegistration || currentAdmissionId <= 0 || saveBusy) return;
+        // Confirmation requires the full admission details, even though saving a
+        // pending registration allows the operator to complete them in stages.
+        if (!ValidateAdmissionInline(isNew: false, confirmingRegistration: true)) return;
         if (HasUnsavedChanges) { SetStatus("Save the completed details first, then Confirm Admission."); return; }
-        if (!HasRequiredAdmissionDetails() || string.IsNullOrWhiteSpace(contact.Text)) { Warn("Complete the required student and contact details before official admission."); return; }
         string suggestion = await AdmissionNumberPolicy.PreviewNextAsync() ?? "";
         using var dialog = new CompleteAdmissionDialog(suggestion, name.Text);
         if (dialog.ShowDialog(FindForm()) != DialogResult.OK) return;
