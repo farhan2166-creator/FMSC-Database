@@ -87,6 +87,7 @@
 	     Fresh installations still require a compatible snapshot; existing live data is preserved. -->
 	<!-- Validate installer, prerequisite, migrations and any supplied database snapshot before publishing. -->
 	<Target Name="ValidateDeploymentAssets" BeforeTargets="PrepareForPublish">
+        <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Installer\VerifySchemaArtifact.ps1&quot; -ProjectDirectory &quot;$(MSBuildProjectDirectory)&quot;" />
 		<PropertyGroup>
 			<DeploymentDatabaseDirectory Condition="'$(DeploymentDatabaseDirectory)' == ''">$(MSBuildProjectDirectory)\..\Database</DeploymentDatabaseDirectory>
 			<DeploymentMigrationDirectory Condition="'$(DeploymentMigrationDirectory)' == ''">$(MSBuildProjectDirectory)\Migrations</DeploymentMigrationDirectory>

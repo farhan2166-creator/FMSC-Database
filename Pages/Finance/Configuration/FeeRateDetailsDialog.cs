@@ -5,7 +5,7 @@ namespace FMSC_SMS.Pages.Finance.Configuration;
 /// <summary>Edits one matrix cell; the matrix's Save Grid owns the database write.</summary>
 internal sealed class FeeRateDetailsDialog : ApplicationWindowForm
 {
-    private readonly ModernNumericTextBox amount = new() { Minimum = 0, Maximum = 1000000000, DecimalPlaces = 2, ThousandsSeparator = true, Dock = DockStyle.Fill };
+    private readonly ModernNumericTextBox amount = new() { Minimum = 0, Maximum = 1000000000, WholeRupeesOnly = true, DecimalPlaces = 2, ThousandsSeparator = true, Dock = DockStyle.Fill };
     private readonly ModernComboBox frequency = HumanUi.Combo();
     private readonly ModernTextBox remarks = HumanUi.TextBox(false, 500);
     internal decimal Amount => amount.Value;
@@ -28,7 +28,13 @@ internal sealed class FeeRateDetailsDialog : ApplicationWindowForm
         remarks.Text = remarksValue;
         var apply = new ModernButton { Text = "Use in Grid", Width = AppScale.Scale(140), Height = AppMetrics.ButtonHeight, ThemeRole = "Success" };
         var cancel = new ModernButton { Text = UiText.Actions.Cancel, Width = AppScale.Scale(100), Height = AppMetrics.ButtonHeight, ThemeRole = "Secondary", DialogResult = DialogResult.Cancel };
-        apply.Click += (_, _) => { DialogResult = DialogResult.OK; Close(); };
+        apply.Click += (_, _) => {
+            if(!WholeRupees.IsWhole(amount.Value)){
+                ModernMessageDialog.Show(this,"Enter a whole-rupee fee. Fractions are not rounded.","Fee Amount",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+                amount.Focus();return;
+            }
+            DialogResult = DialogResult.OK; Close();
+        };
         var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(16) };
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));

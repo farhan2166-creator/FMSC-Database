@@ -614,7 +614,7 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
             return;
         /* UX - checked in the order the fields appear on screen, and each failure lands the cursor in the field that needs fixing. */
         validator.Begin();
-        bool amountParsed = InputParse.TryAmount(newAmount.Text, out decimal amount) && amount >= 0;
+        bool amountParsed = InputParse.TryWholeAmount(newAmount.Text, out decimal amount) && amount >= 0;
         if (!amountParsed)
             validator.Fail(newAmount, "Enter 0 or more, e.g. 1500");
         else if (amount < currentDiscount)
@@ -835,9 +835,9 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         if (submitting || savedSuccessfully)
             return;
         validator.Begin();
-        bool discountParsed = InputParse.TryAmount(discountAmount.Text, out decimal discount) && discount >= 0;
+        bool discountParsed = InputParse.TryWholeAmount(discountAmount.Text, out decimal discount) && discount >= 0 && WholeRupees.IsWhole(discount);
         if (!discountParsed)
-            validator.Fail(discountAmount, "Enter 0 or more (0 = none)");
+            validator.Fail(discountAmount, "Enter whole rupees, 0 or more (0 = none)");
         else if (discount > standardAmount)
             validator.Fail(discountAmount, $"Not above the fee (Rs. {standardAmount:0.##})");
         if (!validator.Finish())

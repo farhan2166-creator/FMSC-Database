@@ -44,7 +44,8 @@ try{
  [void](Query "RESTORE DATABASE [$taskDb] FROM DISK=@Path WITH MOVE N'$dataName' TO N'$dataPath',MOVE N'$logName' TO N'$logPath';" @{Path=$backup})
  $taskCreated=$true
  $script:taskConnection=Open-Db $taskDb
- # Validate the current supplied snapshot directly; no historical upgrades are applied.
+ [void](Query (Get-Content -Raw (Join-Path $taskRoot 'Migrations/2.sql')))
+ # Validate the admission workflow on the migrated disposable clone.
  [void](Query "IF COL_LENGTH(N'dbo.Enrollments',N'PlacementConfirmedAt') IS NULL OR OBJECT_ID(N'dbo.CompleteQuickAdmission',N'P') IS NULL THROW 59990,'Use the current database snapshot with the admission workflow already installed.',1;")
  # The real reported scenario is exercised on a disposable database copy only.
  $charge=Query 'SELECT * FROM dbo.BillingCharges WHERE BillingChargeId=1 AND AdmissionId=6589;'

@@ -42,11 +42,11 @@ public sealed class AdditionalFeeEntry : UserControl
     private Guid requestId = Guid.NewGuid();
     private readonly LookupBox feeType = new();
     private readonly ModernNumericTextBox amount = new() {
-        Minimum = 0, Maximum = 100000000, DecimalPlaces = 2,
+        Minimum = 0, Maximum = 100000000, WholeRupeesOnly = true, DecimalPlaces = 2,
         ThousandsSeparator = true, TrimTrailingZeros = true, Dock = DockStyle.Fill
     };
     private readonly ModernNumericTextBox discount = new() {
-        Minimum = 0, Maximum = 100000000, DecimalPlaces = 2,
+        Minimum = 0, Maximum = 100000000, WholeRupeesOnly = true, DecimalPlaces = 2,
         ThousandsSeparator = true, TrimTrailingZeros = true, Dock = DockStyle.Fill
     };
     private readonly ModernDatePicker chargeDate = HumanUi.Date();
@@ -218,9 +218,9 @@ public sealed class AdditionalFeeEntry : UserControl
         if (busy || !post.Enabled || enrollmentId <= 0) return;
         validator.Begin();
         validator.Required(feeType, "Choose a fee");
-        validator.Rule(amount, () => amount.Value > 0, UiText.Validation.EnterAmount);
+        validator.Rule(amount, () => amount.Value > 0 && WholeRupees.IsWhole(amount.Value), "Enter a positive whole-rupee amount");
         if (amount.Value > 0)
-            validator.Rule(discount, () => discount.Value <= amount.Value, "More than the amount");
+            validator.Rule(discount, () => discount.Value >= 0 && discount.Value <= amount.Value && WholeRupees.IsWhole(discount.Value), "Enter a whole-rupee discount no greater than the amount");
         validator.Required(reason, "Describe the charge");
         validator.Rule(chargeDate,
             () => earliestChargeDate.HasValue && chargeDate.Value.Date >= earliestChargeDate.Value

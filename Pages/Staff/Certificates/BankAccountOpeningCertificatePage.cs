@@ -68,6 +68,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges
         purpose.PlaceholderText =
             "e.g. for his/her salary purpose";
         purpose.MaxLength = 200;
+        monthlyIncome.WholeRupeesOnly = true;
         monthlyIncome.DecimalPlaces = 0;
         monthlyIncome.ThousandsSeparator = true;
         /* dbo.CreateBankAccountOpeningCertificate has no duplicate guard, and the certificate table has no unique constraint on (AdmissionId, ...). */

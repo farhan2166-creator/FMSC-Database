@@ -1824,11 +1824,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 text,
                 System.Globalization.NumberStyles.Number,
                 System.Globalization.CultureInfo.CurrentCulture,
-                out decimal discount))
+                out decimal discount) || !WholeRupees.IsWhole(discount))
         {
             e.Cancel = true;
             feeGrid.Rows[e.RowIndex]
-                .ErrorText = "Enter a valid discount amount.";
+                .ErrorText = "Enter a valid whole-rupee discount amount.";
             return;
         }
         decimal amount = Convert.ToDecimal(
@@ -1871,7 +1871,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         if (!decimal.TryParse(
                 Convert.ToString(row.Cells["DiscountAmount"].Value),
-                out decimal discount))
+                out decimal discount) || !WholeRupees.IsWhole(discount))
         {
             return;
         }
@@ -2560,9 +2560,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                             Convert.ToString(discountValue),
                             System.Globalization.NumberStyles.Number,
                             System.Globalization.CultureInfo.CurrentCulture,
-                            out discount))
+                            out discount) || !WholeRupees.IsWhole(discount))
                     {
-                        Warn("One or more fee discounts are invalid.");
+                        Warn("One or more fee discounts are invalid. Enter whole rupees.");
                         return false;
                     }
                 }
@@ -2620,9 +2620,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                         Convert.ToString(discountValue),
                         System.Globalization.NumberStyles.Number,
                         System.Globalization.CultureInfo.CurrentCulture,
-                        out decimal discount))
+                        out decimal discount) || !WholeRupees.IsWhole(discount))
                 {
-                    Warn("One or more fee discounts are invalid.");
+                    Warn("One or more fee discounts are invalid. Enter whole rupees.");
                     return false;
                 }
                 if (discount > 0)

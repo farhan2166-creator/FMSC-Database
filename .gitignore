@@ -303,3 +303,15 @@ Database/*.bak
 
 # Local test tools and regression checks are kept on this PC only.
 /Tests/
+
+# Keep audit regression source; generated clone files and test outputs stay ignored.
+!/Tests/
+/Tests/*
+!/Tests/AuditFixChecks/
+!/Tests/QuickRegistrationSqlChecks/
+/Tests/AuditFixChecks/*
+!/Tests/AuditFixChecks/*.cs
+!/Tests/AuditFixChecks/*.csproj
+/Tests/QuickRegistrationSqlChecks/*
+!/Tests/QuickRegistrationSqlChecks/*.cs
+!/Tests/QuickRegistrationSqlChecks/*.csproj

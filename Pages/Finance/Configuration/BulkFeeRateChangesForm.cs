@@ -418,6 +418,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
             }
             int sign = directionIncrease.Checked ? 1 : -1;
             bool percentage = typePercentage.Checked;
+            if(!percentage)WholeRupees.Require(magnitude);
             int roundTo = roundingScope.SelectedIndex switch {
                 1 => 10,
                 2 => 50,
@@ -479,6 +480,8 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
                         }
                         if (roundTo > 0)
                             newAmount = Math.Round(newAmount / roundTo, MidpointRounding.AwayFromZero) * roundTo;
+                        if(!WholeRupees.IsWhole(newAmount))
+                            throw new ArgumentException("This adjustment produces fractional fees. Select an explicit rounding option or change the adjustment; rates are not rounded automatically.");
                         plan.Add(new PlanRow {
                             FeeConfigurationId = Convert.ToInt32(row["FeeConfigurationId"]),
                             CampusId = c.Id,

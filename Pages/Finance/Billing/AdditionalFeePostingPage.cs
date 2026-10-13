@@ -5,7 +5,7 @@ public sealed class AdditionalFeePostingPage : V2Page
 {
     private readonly LookupBox year = new(), campus = new(), klass = new(), section = new(), fee = new();
     private readonly ModernDatePicker date = HumanUi.Date();
-    private readonly ModernNumericTextBox amount = new() { Minimum = 0, Maximum = 100000000, DecimalPlaces = 0, Dock = DockStyle.Fill };
+    private readonly ModernNumericTextBox amount = new() { Minimum = 0, Maximum = 100000000, WholeRupeesOnly = true, DecimalPlaces = 0, Dock = DockStyle.Fill };
     private readonly ModernTextBox reason = HumanUi.TextBox(false, 500);
     private readonly DataGridView students = HumanUi.Grid(true);
     private readonly HashSet<int> selected = new();
@@ -146,9 +146,9 @@ public sealed class AdditionalFeePostingPage : V2Page
             return;
         students.EndEdit();
         if (candidates is null || selected.Count == 0 || fee.SelectedId <= 0 ||
-            amount.Value <= 0 || string.IsNullOrWhiteSpace(reason.Text))
+            amount.Value <= 0 || !WholeRupees.IsWhole(amount.Value) || string.IsNullOrWhiteSpace(reason.Text))
         {
-            Warn("Select students and a fee, then enter an amount and reason.");
+            Warn("Select students and a fee, then enter a whole-rupee amount and reason.");
             return;
         }
         int count = selected.Count;

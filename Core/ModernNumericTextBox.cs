@@ -62,6 +62,8 @@ namespace FMSC_SMS.Core
                 RefreshDisplay();
             }
         }
+        // Preserve a fractional draft so write validation can reject it, never round it.
+        public bool WholeRupeesOnly { get; set; }
         public decimal Increment { get; set; } = 1m;
         public bool TrimTrailingZeros
         {
@@ -92,7 +94,7 @@ namespace FMSC_SMS.Core
                 v = _minimum;
             if (v > _maximum)
                 v = _maximum;
-            return Math.Round(v, _decimalPlaces, MidpointRounding.AwayFromZero);
+            return WholeRupeesOnly ? v : Math.Round(v, _decimalPlaces, MidpointRounding.AwayFromZero);
         }
         private void RefreshDisplay()
         {
@@ -106,6 +108,7 @@ namespace FMSC_SMS.Core
             string format = _thousandsSeparator ? "#,0" : "0";
             if (_decimalPlaces > 0)
                 format += "." + new string(_trimTrailingZeros ? '#' : '0', _decimalPlaces);
+            if (WholeRupeesOnly && !WholeRupees.IsWhole(v)) format = _thousandsSeparator ? "#,0.############################" : "0.############################";
             return v.ToString(format, CultureInfo.InvariantCulture);
         }
         private void FilterKeyPress(object? sender, KeyPressEventArgs e)
@@ -123,7 +126,7 @@ namespace FMSC_SMS.Core
                 return;
             }
             if (ch == '.' &&
-                _decimalPlaces > 0 &&
+                (_decimalPlaces > 0 || WholeRupeesOnly) &&
                 !Text.Contains('.'))
             {
                 return;

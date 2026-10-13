@@ -80,9 +80,9 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
         if (savingGrid || grid.CurrentCell is not { } source || !source.OwningColumn.Name.StartsWith("CL_", StringComparison.Ordinal)) return;
         if (!grid.EndEdit()) return;
         string text = Convert.ToString(source.Value)?.Trim() ?? "";
-        if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount) || amount < 0)
+        if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount) || amount < 0 || !WholeRupees.IsWhole(amount))
         {
-            source.ErrorText = "Enter a valid amount of zero or more before filling selected cells.";
+            source.ErrorText = "Enter a whole-rupee amount of zero or more before filling selected cells.";
             return;
         }
         foreach (var cell in SelectedAmountCells().ToArray()) cell.Value = FormatAmount(amount);
@@ -672,9 +672,9 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
         editedDetails.TryGetValue(key, out var details);
         string text = Convert.ToString(cell.Value)?.Trim() ?? "";
         decimal value = 0;
-        if (text.Length > 0 && (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value) || value < 0 || value > 1000000000))
+        if (text.Length > 0 && (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value) || value < 0 || value > 1000000000 || !WholeRupees.IsWhole(value)))
         {
-            cell.ErrorText = "Enter a valid amount between 0 and 1,000,000,000.";
+            cell.ErrorText = "Enter a whole-rupee amount between 0 and 1,000,000,000.";
             grid.Focus();
             return;
         }
@@ -800,10 +800,10 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
                         NumberStyles.Number,
                         CultureInfo.InvariantCulture,
                         out decimal amount) ||
-                    amount < 0)
+                    amount < 0 || !WholeRupees.IsWhole(amount))
                 {
                     cell.Style.BackColor = AppTheme.Tint(AppTheme.Danger, 0.85f);
-                    cell.ErrorText = "Enter a valid, non-negative amount or leave blank.";
+                    cell.ErrorText = "Enter a non-negative whole-rupee amount or leave blank.";
                     firstInvalidCell ??= cell;
                     invalidCount++;
                     continue;

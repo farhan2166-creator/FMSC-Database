@@ -965,10 +965,10 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             var row = charges.Rows[e.RowIndex];
             decimal previous = row.Cells["AppliedDiscount"].Tag is decimal old ? old : 0m;
             decimal maximum = GetDecimal(row.Cells["Balance"].Value)+previous;
-            if (!InputParse.TryAmount(Convert.ToString(e.FormattedValue), out decimal value) || value<0m || value>maximum)
+            if (!InputParse.TryWholeAmount(Convert.ToString(e.FormattedValue), out decimal value) || value<0m || value>maximum)
             {
                 e.Cancel=true;
-                row.ErrorText=$"Enter a discount between 0 and {maximum:0.##}.";
+                row.ErrorText=$"Enter a whole-rupee discount between 0 and {maximum:0.##}.";
             }
             else row.ErrorText=string.Empty;
         };
@@ -2689,9 +2689,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 string raw = input.Text.Trim();
                 if (raw.Length > 0 &&
                     (!decimal.TryParse(raw, System.Globalization.NumberStyles.Number,
-                        System.Globalization.CultureInfo.InvariantCulture, out decimal entered) || entered < 0m))
+                        System.Globalization.CultureInfo.InvariantCulture, out decimal entered) || entered < 0m || !WholeRupees.IsWhole(entered)))
                 {
-                    MarkCollectionField(input, "Enter a valid amount of zero or more");
+                    MarkCollectionField(input, "Enter a whole-rupee amount of zero or more");
                     return;
                 }
             }

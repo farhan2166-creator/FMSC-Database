@@ -8,7 +8,7 @@ public static class Tvp
         t.Columns.Add("Amount", typeof(decimal));
         foreach (var r in rows)
             t.Rows.Add(r.chargeId, r.amount);
-        return t;
+        return WholeRupees.ValidateTable(t);
     }
     /// <summary>The allocation table for one whole family collection, matching dbo.FamilyFeeAllocationType. Discount lines stay negative, exactly as they are in the per-student table, so dbo.ProcessFeeTransaction keeps receiving the same shape it always did.</summary>
     public static DataTable FamilyAllocations(
@@ -22,7 +22,7 @@ public static class Tvp
         foreach (var g in groups)
             foreach (var a in g.allocations)
                 t.Rows.Add(g.admissionId, g.enrollmentId, a.chargeId, a.amount);
-        return t;
+        return WholeRupees.ValidateTable(t);
     }
     /// <summary>( / ) - the whole fee-configuration plan for dbo.ApplyFeeConfigurationPlan, matching dbo.FeeConfigurationPlanType column for column.</summary>
     public static DataTable FeeConfigurationPlan(
@@ -52,7 +52,7 @@ public static class Tvp
                 r.amount,
                 (object?)r.frequency ?? DBNull.Value,
                 (object?)r.remarks ?? DBNull.Value);
-        return t;
+        return WholeRupees.ValidateTable(t);
     }
     public static DataTable Enrollments(IEnumerable<int> ids)
     {
@@ -60,7 +60,7 @@ public static class Tvp
         t.Columns.Add("EnrollmentId", typeof(int));
         foreach (var i in ids)
             t.Rows.Add(i);
-        return t;
+        return WholeRupees.ValidateTable(t);
     }
     public static DataTable FeeTypeIds(IEnumerable<int> ids)
     {
@@ -68,7 +68,7 @@ public static class Tvp
         t.Columns.Add("FeeTypeId", typeof(int));
         foreach (var i in ids)
             t.Rows.Add(i);
-        return t;
+        return WholeRupees.ValidateTable(t);
     }
     public static DataTable AdmissionIds(IEnumerable<int> ids)
     {
@@ -76,7 +76,7 @@ public static class Tvp
         t.Columns.Add("AdmissionId", typeof(int));
         foreach (var i in ids)
             t.Rows.Add(i);
-        return t;
+        return WholeRupees.ValidateTable(t);
     }
     /// <summary>rows for dbo.StudentFeeDiscountType, consumed by the current edit API, dbo.SaveStudentDetailsWithFirstEnrollment. One row means "this assignment keeps this discount".</summary>
     public static DataTable StudentFeeDiscounts(IEnumerable<(int studentFeeAssignmentId, decimal discountAmount)> rows)
@@ -86,7 +86,7 @@ public static class Tvp
         t.Columns.Add("DiscountAmount", typeof(decimal));
         foreach (var r in rows)
             t.Rows.Add(r.studentFeeAssignmentId, r.discountAmount);
-        return t;
+        return WholeRupees.ValidateTable(t);
     }
     public static DataTable AdmissionFeeDiscounts(IEnumerable<(int feeTypeId, decimal discount)> rows)
     {
@@ -95,7 +95,7 @@ public static class Tvp
         t.Columns.Add("DiscountAmount", typeof(decimal));
         foreach (var r in rows)
             t.Rows.Add(r.feeTypeId, r.discount);
-        return t;
+        return WholeRupees.ValidateTable(t);
     }
     public static DataTable ReturnFeeChoices(
         IEnumerable<(int feeTypeId, decimal amount, decimal discount)> rows)
@@ -106,7 +106,7 @@ public static class Tvp
         t.Columns.Add("DiscountAmount", typeof(decimal));
         foreach (var r in rows)
             t.Rows.Add(r.feeTypeId, r.amount, r.discount);
-        return t;
+        return WholeRupees.ValidateTable(t);
     }
     public static DataTable ManualChargeSelection(IEnumerable<int> enrollmentIds)
     {
@@ -114,7 +114,7 @@ public static class Tvp
         t.Columns.Add("EnrollmentId", typeof(int));
         foreach (var id in enrollmentIds.Distinct())
             t.Rows.Add(id);
-        return t;
+        return WholeRupees.ValidateTable(t);
     }
     /// <summary>Rows for dbo.PostingSelectionType, consumed by dbo.PostSelectedMonthlyFees. BillingMonth is sent as the first of its month because the procedure's duplicate rule and filtered unique index are both keyed on the month value itself.</summary>
     public static DataTable PostingSelections(IEnumerable<(int enrollmentId, int feeTypeId, DateTime billingMonth)> rows)
@@ -128,7 +128,7 @@ public static class Tvp
                 r.enrollmentId,
                 r.feeTypeId,
                 new DateTime(r.billingMonth.Year, r.billingMonth.Month, 1));
-        return t;
+        return WholeRupees.ValidateTable(t);
     }
     /// <summary>Builds dbo.PostingSelectionType from preview rows. If a column the selection needs is missing, that must be stated in terms of the preview, not as a DataRow indexer error.</summary>
     public static DataTable PostingSelectionsFromPreview(DataTable preview, Func<DataRow, bool> include)
