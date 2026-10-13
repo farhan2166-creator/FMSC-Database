@@ -41,4 +41,5 @@ var removed=original.Copy();removed.Rows.RemoveAt(1);Assert(QuickRegistrationQuo
 var missing=original.Copy();missing.Rows[0]["Amount"]=DBNull.Value;Assert(QuickRegistrationQuote.Create(missing)!=quote,"Missing configuration invalidates quote");
 Console.WriteLine($"PASS: {checks} production money/TVP and quotation regression checks.");
 Console.WriteLine($"PASS: {RemainingFindingChecks.Run()} role, literal search and working-area checks.");
+Console.WriteLine($"PASS: {CompatibilityGuidanceChecks.Run()} database compatibility guidance checks.");
 if(args.Contains("--profile-search"))ReviewFilterProfile.Run();

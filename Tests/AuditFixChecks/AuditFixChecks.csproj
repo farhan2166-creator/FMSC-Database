@@ -13,6 +13,7 @@
     <Compile Include="../../Core/Tvp.cs" Link="Tvp.cs" />
     <Compile Include="../../Core/AdmissionReviewFilter.cs" Link="AdmissionReviewFilter.cs" />
     <Compile Include="../../Core/WorkingAreaLayout.cs" Link="WorkingAreaLayout.cs" />
+    <Compile Include="../../Core/DatabaseCompatibilityFailure.cs" Link="DatabaseCompatibilityFailure.cs" />
     <Using Include="System.Drawing" />
     <Using Include="System.Data" />
   </ItemGroup>

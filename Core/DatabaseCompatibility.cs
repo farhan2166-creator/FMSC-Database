@@ -2,21 +2,17 @@ using Microsoft.Data.SqlClient;
 
 namespace FMSC_SMS.Core;
 
-internal sealed class DatabaseCompatibilityException : InvalidOperationException
-{
-    internal DatabaseCompatibilityException(string message) : base(message) { }
-}
-
 /// <summary>Shared startup/restore contract for the current application schema.</summary>
 internal static class DatabaseCompatibility
 {
-    private static readonly string Requirements = LoadRequirements();
+    private static readonly Lazy<string> Requirements = new(LoadRequirements);
 
     private static string LoadRequirements()
     {
         using var stream = typeof(DatabaseCompatibility).Assembly.GetManifestResourceStream(
             "FMSC_SMS.Core.DatabaseCompatibilityRequirements.json")
-            ?? throw new DatabaseCompatibilityException("The application's database compatibility definition is missing.");
+            ?? throw new DatabaseCompatibilityException(new(DatabaseCompatibilityIssue.ApplicationDefinition,
+                DatabaseHelper.RequiredDatabaseSchemaVersion, Details: "The application's database compatibility definition is missing."));
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }
@@ -24,12 +20,30 @@ internal static class DatabaseCompatibility
     internal static void Validate(SqlConnection connection)
     {
         using (var capability = new SqlCommand("SELECT compatibility_level FROM sys.databases WHERE database_id=DB_ID();", connection))
-            if (Convert.ToInt32(capability.ExecuteScalar()) < 130)
-                throw new DatabaseCompatibilityException("This database is incompatible: SQL compatibility level 130 or later is required.");
+        {
+            int level = Convert.ToInt32(capability.ExecuteScalar());
+            if (level < 130)
+                throw new DatabaseCompatibilityException(new(DatabaseCompatibilityIssue.SqlCompatibility,
+                    DatabaseHelper.RequiredDatabaseSchemaVersion, SqlCompatibilityLevel: level));
+        }
         using var versionCommand = new SqlCommand("""
-            SELECT TOP(1) CONVERT(nvarchar(50),VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;
+            IF OBJECT_ID(N'dbo.DatabaseVersion',N'U') IS NULL
+                SELECT CAST(NULL AS nvarchar(50));
+            ELSE
+                SELECT TOP(1) CONVERT(nvarchar(50),VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;
             """, connection) { CommandTimeout = 30 };
-        string? version = Convert.ToString(versionCommand.ExecuteScalar());
+        string? version;
+        try { version = Convert.ToString(versionCommand.ExecuteScalar())?.Trim(); }
+        catch (SqlException ex) when (ex.Number is 207 or 208)
+        {
+            throw new DatabaseCompatibilityException(new(DatabaseCompatibilityIssue.SchemaVersion,
+                DatabaseHelper.RequiredDatabaseSchemaVersion, Details: "The database version table or its required columns are missing. " + ex.Message));
+        }
+        // Report older/newer versions before querying the current release's structural manifest.
+        if (!string.Equals(version, DatabaseHelper.RequiredDatabaseSchemaVersion, StringComparison.OrdinalIgnoreCase))
+            throw new DatabaseCompatibilityException(new(DatabaseCompatibilityIssue.SchemaVersion,
+                DatabaseHelper.RequiredDatabaseSchemaVersion, version,
+                "The latest dbo.DatabaseVersion entry does not match the required schema version."));
         using var command = new SqlCommand("""
             SET NOCOUNT ON;
             DECLARE @Problems TABLE (Problem nvarchar(400));
@@ -130,7 +144,7 @@ internal static class DatabaseCompatibility
             SELECT COUNT(*) AS ProblemCount FROM @Problems;
             SELECT TOP(12) Problem FROM @Problems ORDER BY Problem;
             """, connection) { CommandTimeout = 30 };
-        command.Parameters.Add("@Requirements", SqlDbType.NVarChar, -1).Value = Requirements;
+        command.Parameters.Add("@Requirements", SqlDbType.NVarChar, -1).Value = Requirements.Value;
         using (var reader = command.ExecuteReader())
         {
             reader.Read();
@@ -139,14 +153,9 @@ internal static class DatabaseCompatibility
             var problems = new List<string>();
             while (reader.Read()) problems.Add(reader.GetString(0));
             if (count > 0)
-                throw new DatabaseCompatibilityException(
-                    "This database is incompatible with this application. Required schema features are missing or incompatible.\n" +
-                    $"Restored schema version {version ?? "unknown"}; this application requires {DatabaseHelper.RequiredDatabaseSchemaVersion}.\n\n" +
-                    string.Join("\n", problems) + (count > problems.Count ? $"\n({count - problems.Count} more)" : "") +
-                    "\n\nUse a backup from the current release or contact support for the required database updates.");
+                throw new DatabaseCompatibilityException(new(DatabaseCompatibilityIssue.SchemaStructure,
+                    DatabaseHelper.RequiredDatabaseSchemaVersion, version,
+                    string.Join("\n", problems) + (count > problems.Count ? $"\n({count - problems.Count} more)" : "")));
         }
-
-        if (!string.Equals(version, DatabaseHelper.RequiredDatabaseSchemaVersion, StringComparison.OrdinalIgnoreCase))
-            throw new DatabaseCompatibilityException($"This database is incompatible: schema version {(string.IsNullOrWhiteSpace(version) ? "unknown" : version)}; this application requires {DatabaseHelper.RequiredDatabaseSchemaVersion}.");
     }
 }

@@ -5,11 +5,11 @@ namespace FMSC_SMS.Core;
 internal sealed class DatabaseConnectionForm : ApplicationWindowForm
 {
     internal static bool IsConnectionProblem(Exception ex) =>
-        ex is DatabaseRecoveryException || ex is Microsoft.Data.SqlClient.SqlException sql &&
+        ex is DatabaseRecoveryException or DatabaseCompatibilityException || ex is Microsoft.Data.SqlClient.SqlException sql &&
         (DatabaseHelper.IsConnectionFailure(sql) || sql.Number is 4060 or 911) ||
         ex.InnerException is not null && IsConnectionProblem(ex.InnerException);
     private readonly bool _startup;
-    private readonly Label _message = new() { Dock = DockStyle.Fill, AutoSize = false };
+    private readonly Label _message = new() { Dock = DockStyle.Top, AutoSize = true };
     private readonly Label _status = new() { Dock = DockStyle.Fill, AutoSize = false };
     private readonly ProgressBar _progress = new() { Dock = DockStyle.Fill, Style = ProgressBarStyle.Marquee };
     private readonly ModernButton _reconnect = new() { Text = "Reconnect", ThemeRole = "Primary" };
@@ -32,7 +32,7 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(AppScale.S(800), AppScale.S(380));
+        ClientSize = new Size(AppScale.S(800), AppScale.S(440));
         Font = AppTheme.NormalFont;
         BackColor = AppTheme.PageBackground;
         AutoScaleMode = AutoScaleMode.Dpi;
@@ -72,7 +72,12 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         _status.Margin = Padding.Empty;
         _progress.Margin = Padding.Empty;
         state.Controls.Add(_status, 0, 0);
-        state.Controls.Add(_message, 0, 1);
+        // Keep the explanation readable when DPI or the working area leaves less room.
+        var explanation = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Margin = Padding.Empty };
+        explanation.Controls.Add(_message);
+        explanation.SizeChanged += (_, _) => _message.MaximumSize = new Size(
+            Math.Max(1, explanation.ClientSize.Width - SystemInformation.VerticalScrollBarWidth), 0);
+        state.Controls.Add(explanation, 0, 1);
         state.Controls.Add(_progress, 0, 2);
         connectionCard.Content.Controls.Add(state);
         var actionHost = new TableLayoutPanel {
@@ -129,9 +134,12 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
             root.SuspendLayout();
             detailsCard.Visible = detailsExpanded;
             root.RowStyles[4].Height = detailsExpanded ? AppScale.S(200) : 0;
-            ClientSize = new Size(ClientSize.Width, AppScale.S(detailsExpanded ? 580 : 380));
+            ClientSize = new Size(ClientSize.Width, AppScale.S(detailsExpanded ? 640 : 440));
             detailsLink.Text = detailsExpanded ? "Hide connection details" : "Show connection details";
             root.ResumeLayout(true);
+            var fitted = WorkingAreaLayout.Fit(Bounds, MinimumSize, Screen.FromControl(this).WorkingArea);
+            MinimumSize = fitted.MinimumSize;
+            Bounds = fitted.Bounds;
         };
         FormClosing += (_, e) => { if (_busy) e.Cancel = true; };
         Shown += async (_, _) => await ConnectAsync(false);
@@ -157,8 +165,8 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         {
             var result = await Task.Run(() => {
                 DatabaseHelper.RefreshDatabaseConnection(restart);
-                bool connected = DatabaseHelper.TestConnection(out string message);
-                return (connected, message);
+                bool connected = DatabaseHelper.TestConnection(out string message, out var compatibilityFailure);
+                return (connected, message, compatibilityFailure);
             });
             if (IsDisposed) return;
             if (result.connected)
@@ -170,35 +178,32 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
                 _details.Text = ConnectionDetails(string.Empty);
                 if (_startup) { SetBusy(false); DialogResult = DialogResult.OK; Close(); }
             }
-            else ShowFailure(result.message);
+            else ShowFailure(result.message, compatibilityFailure: result.compatibilityFailure);
         }
         catch (Exception ex)
         {
             AppExceptionHandler.LogNonFatal(ex, "School records connection recovery");
-            if (!IsDisposed) ShowFailure(ex is DatabaseRecoveryException recovery ? recovery.Message : DbMessage.UserMessage(ex), ex.ToString());
+            if (!IsDisposed) ShowFailure(ex is DatabaseRecoveryException recovery ? recovery.Message : DbMessage.UserMessage(ex),
+                ex.ToString(), (ex as DatabaseCompatibilityException)?.Failure);
         }
         finally { if (!IsDisposed) SetBusy(false); }
     }
 
-    private void ShowFailure(string message, string details = "")
+    private void ShowFailure(string message, string details = "", DatabaseCompatibilityFailure? compatibilityFailure = null)
     {
-        _incompatibleDatabase = IsCompatibilityFailure(message);
+        _incompatibleDatabase = compatibilityFailure is not null;
         _repair.Visible = !_incompatibleDatabase && (LocalDatabaseEngine.FindTool() is null || message.Contains("database engine", StringComparison.OrdinalIgnoreCase) || message.Contains("LocalDB", StringComparison.OrdinalIgnoreCase));
         if (_incompatibleDatabase)
         {
-            _status.Text = "School data update needed";
-            _message.Text = "Your saved school data needs an update before FMSC can open it. " +
-                "Ask the administrator to update it or restore a compatible backup, then choose Reconnect. " +
-                "Restart Connection will not resolve this issue.";
+            _status.Text = compatibilityFailure!.Title;
+            _message.Text = compatibilityFailure.ConnectionMessage;
             _details.Text = ConnectionDetails(message + "\r\n" + details);
             return;
         }
         _status.Text = "Connection needs attention";
         _message.Text = !File.Exists(DatabaseHelper.DatabaseFile)
             ? "Your saved school data file could not be found. Contact your administrator to restore access to the school records."
-            : message.Contains("schema version", StringComparison.OrdinalIgnoreCase) || message.Contains("admission-number update", StringComparison.OrdinalIgnoreCase)
-                ? "Your school data is not compatible with this application version. Contact your administrator."
-                : message.Contains("approved database", StringComparison.OrdinalIgnoreCase) || message.Contains("not FMSC_DB", StringComparison.OrdinalIgnoreCase)
+            : message.Contains("approved database", StringComparison.OrdinalIgnoreCase) || message.Contains("not FMSC_DB", StringComparison.OrdinalIgnoreCase)
                     ? "FMSC found different school data. Your records have not been replaced. Ask the administrator to connect the correct school records."
                     : message.Contains("Error", StringComparison.OrdinalIgnoreCase)
                         ? "FMSC could not connect to your saved records. Choose Reconnect first. If it still fails, try Restart Connection. "
@@ -207,12 +212,6 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         _details.Text = ConnectionDetails(message + "\r\n" + details);
         if (_repair.Visible) _message.Text += " Choose Repair Connection to reinstall the required connection software. Internet access and Windows administrator approval are required.";
     }
-
-    internal static bool IsCompatibilityFailure(string message) =>
-        message.Contains("incompatible", StringComparison.OrdinalIgnoreCase) ||
-        message.Contains("not compatible", StringComparison.OrdinalIgnoreCase) ||
-        message.Contains("schema version", StringComparison.OrdinalIgnoreCase) ||
-        message.Contains("admission-number update", StringComparison.OrdinalIgnoreCase);
 
     private async Task RepairDependenciesAsync()
     {
@@ -241,7 +240,7 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
     private static string ConnectionDetails(string problem)
     {
         string endpoint = LocalDatabaseEngine.CurrentEndpoint ?? "Unavailable";
-        return $"{problem}\r\n\r\nSchool data: {DatabaseHelper.DatabaseFile}\r\nConnection: {endpoint}\r\nDiagnostic log: {AppExceptionHandler.LogPath}";
+        return $"{problem}\r\n\r\nRequired database schema version: {DatabaseHelper.RequiredDatabaseSchemaVersion}\r\nSchool data: {DatabaseHelper.DatabaseFile}\r\nConnection: {endpoint}\r\nDiagnostic log: {AppExceptionHandler.LogPath}";
     }
 
 }

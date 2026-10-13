@@ -1350,6 +1350,10 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             theme.DropDownItems.Add(item);
         }
         menu.Items.Add(theme);
+        menu.Items.Add(new ToolStripMenuItem("About FMSC", null, (_, _) => {
+            using var about = new AboutForm();
+            about.ShowDialog(this);
+        }));
         menu.Items.Add(
             new ToolStripSeparator());
         menu.Items.Add(

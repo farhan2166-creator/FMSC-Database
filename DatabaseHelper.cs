@@ -72,12 +72,7 @@ public static class DatabaseHelper
             if (exists)
             {
                 /* An attached database with the right NAME is not proof it is the right database. */
-                if (!TryVerifyDatabaseIdentity(out var identityProblem))
-                {
-                    throw new InvalidOperationException(
-                        "The attached FMSC_DB is not the database this application requires." +
-                        $"\n\n{identityProblem}");
-                }
+                VerifyDatabaseIdentity();
                 return;
             }
         }
@@ -136,47 +131,46 @@ FOR ATTACH;";
         }
     }
     /// <summary>The single definition of "this connection is the FMSC database".</summary>
-    private static bool TryVerifyDatabaseIdentity(out string message)
+    private static void VerifyDatabaseIdentity()
     {
-        message = string.Empty;
-        try
+        using var cn = new SqlConnection(ConnectionString);
+        OpenWithStartupRetry(cn);
+        using (var cmd = new SqlCommand("SELECT DB_NAME(), physical_name FROM sys.database_files WHERE file_id=1;", cn))
+        using (var r = cmd.ExecuteReader())
         {
-            using var cn = new SqlConnection(ConnectionString);
-            OpenWithStartupRetry(cn);
-            using (var cmd = new SqlCommand("SELECT DB_NAME(), physical_name FROM sys.database_files WHERE file_id=1;", cn))
-            using (var r = cmd.ExecuteReader())
-            {
-                if (!r.Read())
-                    throw new Core.DatabaseCompatibilityException("The database did not return its identity information.");
-                string? name = Convert.ToString(r.GetValue(0));
-                string? path = Convert.ToString(r.GetValue(1));
-                if (!string.Equals(name, DatabaseName, StringComparison.OrdinalIgnoreCase))
-                    throw new Core.DatabaseCompatibilityException("The connected database is not FMSC_DB.");
-                if (!string.Equals(Path.GetFullPath(path ?? ""), Path.GetFullPath(DatabaseFile), StringComparison.OrdinalIgnoreCase))
-                    throw new Core.DatabaseCompatibilityException($"The connected FMSC_DB is not the approved database file.\nExpected: {DatabaseFile}\nConnected: {path}");
-            }
-            Core.DatabaseCompatibility.Validate(cn);
-            return true;
+            if (!r.Read())
+                throw new Core.DatabaseCompatibilityException(new(Core.DatabaseCompatibilityIssue.DatabaseIdentity,
+                    RequiredDatabaseSchemaVersion, Details: "The database did not return its identity information."));
+            string? name = Convert.ToString(r.GetValue(0));
+            string? path = Convert.ToString(r.GetValue(1));
+            if (!string.Equals(name, DatabaseName, StringComparison.OrdinalIgnoreCase))
+                throw new Core.DatabaseCompatibilityException(new(Core.DatabaseCompatibilityIssue.DatabaseIdentity,
+                    RequiredDatabaseSchemaVersion, Details: $"Expected database: {DatabaseName}. Connected database: {name}."));
+            if (!string.Equals(Path.GetFullPath(path ?? ""), Path.GetFullPath(DatabaseFile), StringComparison.OrdinalIgnoreCase))
+                throw new Core.DatabaseCompatibilityException(new(Core.DatabaseCompatibilityIssue.DatabaseIdentity,
+                    RequiredDatabaseSchemaVersion, Details: $"The connected FMSC_DB is not the approved database file.\nExpected: {DatabaseFile}\nConnected: {path}"));
         }
-        catch (Exception ex)
-        {
-            Core.AppExceptionHandler.LogNonFatal(ex, "Database identity/compatibility validation");
-            message = Core.DbMessage.UserMessage(ex);
-            return false;
-        }
+        Core.DatabaseCompatibility.Validate(cn);
     }
-    public static bool TestConnection(out string message)
+    public static bool TestConnection(out string message) => TestConnection(out message, out _);
+
+    internal static bool TestConnection(out string message, out Core.DatabaseCompatibilityFailure? compatibilityFailure)
     {
+        compatibilityFailure = null;
         try
         {
             EnsureDatabaseReady();
             /* The verification now lives in one place and is shared with EnsureDatabaseAttached, so this cannot drift from it. */
-            return TryVerifyDatabaseIdentity(out message);
+            VerifyDatabaseIdentity();
+            message = string.Empty;
+            return true;
         }
         catch (Exception ex)
         {
             /* Log the real exception (number, state, message) so a failure that the friendly text cannot explain can still be diagnosed from the log. */
             Core.AppExceptionHandler.LogNonFatal(ex, "TestConnection failed");
+            if (ex is Core.DatabaseCompatibilityException incompatible)
+                compatibilityFailure = incompatible.Failure;
             message = Core.DbMessage.UserMessage(
                 ex,
                 "The FMSC database could not be opened.");

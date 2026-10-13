@@ -108,9 +108,50 @@ internal static class Program
             }
             CheckSameRecordDraft();
             CheckChoiceFilters(form);
+            CheckInformationDialogs(form);
             Console.WriteLine($"PASS: {checks} Windows theme switching, structure, rendering and resource checks.");
         }
         finally { AppTheme.SetTheme(originalTheme); }
+    }
+
+    private static void CheckInformationDialogs(Form owner)
+    {
+        Assembly application = typeof(ApplicationWindowForm).Assembly;
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        var failureType = application.GetType("FMSC_SMS.Core.DatabaseCompatibilityFailure", true)!;
+        var issueType = application.GetType("FMSC_SMS.Core.DatabaseCompatibilityIssue", true)!;
+        var connectionType = application.GetType("FMSC_SMS.Core.DatabaseConnectionForm", true)!;
+        using var connection = (Form)Activator.CreateInstance(connectionType, flags, null, new object[] { false }, null)!;
+        var showFailure = connectionType.GetMethod("ShowFailure", flags)!;
+        var setBusy = connectionType.GetMethod("SetBusy", flags)!;
+        foreach (var (version, title) in new[] { ("1", "Database update required"), ("3", "Application update required") })
+        {
+            var failure = Activator.CreateInstance(failureType, new object?[] {
+                Enum.Parse(issueType, "SchemaVersion"), "2", version, "diagnostic detail", null })!;
+            showFailure.Invoke(connection, new[] { "diagnostic detail", "", failure });
+            setBusy.Invoke(connection, new object[] { false });
+            Check(((Label)connectionType.GetField("_status", flags)!.GetValue(connection)!).Text == title, "Connection dialog must display the correct compatibility direction");
+            var message = (Label)connectionType.GetField("_message", flags)!.GetValue(connection)!;
+            Check(message.Text.Contains($"version: {version}") && message.Text.Contains("application: 2"), "Versions must be visible in the main message without expanding diagnostics");
+            Check(!((Control)connectionType.GetField("_restart", flags)!.GetValue(connection)!).Enabled, "Restart must be disabled for compatibility failures");
+            Check(!((Control)connectionType.GetField("_repair", flags)!.GetValue(connection)!).Enabled, "Dependency repair must be disabled for compatibility failures");
+            Check(((Control)connectionType.GetField("_reconnect", flags)!.GetValue(connection)!).Enabled, "Reconnect remains available after an administrator fixes compatibility");
+        }
+        Check(!connection.IsHandleCreated, "Unshown connection fixture must never run its automatic SQL connection");
+        showFailure.Invoke(connection, new object?[] { "Connection unavailable", "", null });
+        setBusy.Invoke(connection, new object[] { false });
+        Check(((Control)connectionType.GetField("_restart", flags)!.GetValue(connection)!).Enabled, "Ordinary connection failures restore Restart");
+
+        var aboutType = application.GetType("FMSC_SMS.Core.AboutForm", true)!;
+        using var about = (Form)Activator.CreateInstance(aboutType, flags, null, Array.Empty<object>(), null)!;
+        about.Show(owner); Application.DoEvents();
+        Control[] descendants(Control parent) => parent.Controls.Cast<Control>().SelectMany(child => new[] { child }.Concat(descendants(child))).ToArray();
+        var labels = descendants(about).OfType<Label>().Select(label => label.Text).ToArray();
+        Check(labels.Contains("Required database schema") && labels.Contains(FMSC_SMS.DatabaseHelper.RequiredDatabaseSchemaVersion), "About shows the application's required schema");
+        Check(labels.Contains("Application version") && labels.Contains("Build"), "About distinguishes application version and build");
+        Check(about.AcceptButton is not null && ReferenceEquals(about.AcceptButton, about.CancelButton), "Enter and Escape provide a clear About close action");
+        Check(descendants(about).OfType<ModernButton>().Any(button => button.Text == "Copy details"), "Support details can be copied without a database read");
+        about.Close();
     }
 
     private static void CheckSameRecordDraft()
