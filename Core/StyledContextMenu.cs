@@ -56,6 +56,12 @@ public sealed class StyledContextMenu : ContextMenuStrip
         {
             if (!e.Item.Selected || !e.Item.Enabled) return;
             var rect = new Rectangle(2, 1, e.Item.Width - 4, e.Item.Height - 2);
+            if (AppTheme.UseSimpleRendering)
+            {
+                using var flatBrush = new SolidBrush(AppTheme.PrimaryLight);
+                e.Graphics.FillRectangle(flatBrush, rect);
+                return;
+            }
             using var path = new GraphicsPath();
             const int radius = 8;
             path.AddArc(rect.Left, rect.Top, radius, radius, 180, 90);

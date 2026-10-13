@@ -373,10 +373,15 @@ public class ModernComboBox : Panel, IValidationTarget, IAccessibleInput
         {
             return;
         }
-        using var path =
-            CreateRoundedPath(
-                new Rectangle(0, 0, Width, Height), _radius);
-        UiHelper.ReplaceRegion(this, new Region(path));
+        if (AppTheme.UseSimpleRendering)
+        {
+            if (Region is not null) UiHelper.ReplaceRegion(this, null);
+        }
+        else
+        {
+            using var path = CreateRoundedPath(new Rectangle(0, 0, Width, Height), _radius);
+            UiHelper.ReplaceRegion(this, new Region(path));
+        }
         int innerWidth =
             Math.Max(
                 0,
@@ -398,7 +403,7 @@ public class ModernComboBox : Panel, IValidationTarget, IAccessibleInput
     protected override void OnPaint(PaintEventArgs e)
     {
         e.Graphics.SmoothingMode =
-            SmoothingMode.AntiAlias;
+            AppTheme.UseSimpleRendering ? SmoothingMode.None : SmoothingMode.AntiAlias;
         var rect =
             new Rectangle(
                 0,
@@ -407,14 +412,14 @@ public class ModernComboBox : Panel, IValidationTarget, IAccessibleInput
                     0,
                     Width - 1),
                 Math.Max(0, Height - 1));
-        using var path =
-            CreateRoundedPath(rect, _radius);
+        using var shape =
+            new UiPaintShape(rect, _radius);
         using var brush =
             new SolidBrush(
                 Enabled
                     ? AppTheme.SurfaceElevated
                     : AppTheme.ButtonDisabledBackground);
-        e.Graphics.FillPath(brush, path);
+        shape.Fill(e.Graphics, brush);
         var borderColor =
             !Enabled
                 ? AppTheme.InputBorder
@@ -438,7 +443,7 @@ public class ModernComboBox : Panel, IValidationTarget, IAccessibleInput
                 Alignment =
                     PenAlignment.Inset
             };
-        e.Graphics.DrawPath(pen, path);
+        shape.Draw(e.Graphics, pen);
     }
     private static GraphicsPath CreateRoundedPath(Rectangle rect, int radius)
     {

@@ -7,7 +7,7 @@ internal sealed class UiColorTransition : IDisposable
 {
     private readonly Control owner;
     private readonly Action<Color> apply;
-    private readonly System.Windows.Forms.Timer timer = new() { Interval = 15 };
+    private System.Windows.Forms.Timer? timer;
     private Color start;
     private Color target;
     private long started;
@@ -19,17 +19,17 @@ internal sealed class UiColorTransition : IDisposable
         this.owner = owner;
         this.apply = apply;
         Value = start = target = initial;
-        timer.Tick += (_, _) => Tick();
         owner.VisibleChanged += OnVisibilityChanged;
+        AppTheme.ThemeChanged += OnThemeChanged;
     }
 
     internal void MoveTo(Color color, bool animate = true)
     {
         if (disposed) return;
-        if (!animate || !owner.Visible || !owner.Enabled || !owner.IsHandleCreated ||
+        if (AppTheme.UseSimpleRendering || !animate || !owner.Visible || !owner.Enabled || !owner.IsHandleCreated ||
             SystemInformation.TerminalServerSession || !SystemInformation.IsMenuAnimationEnabled)
         {
-            timer.Stop();
+            timer?.Stop();
             Value = start = target = color;
             apply(color);
             return;
@@ -38,14 +38,19 @@ internal sealed class UiColorTransition : IDisposable
         start = Value;
         target = color;
         started = Stopwatch.GetTimestamp();
+        if (timer is null)
+        {
+            timer = new System.Windows.Forms.Timer { Interval = 15 };
+            timer.Tick += (_, _) => Tick();
+        }
         timer.Start();
     }
 
     private void Tick()
     {
-        if (owner.IsDisposed || !owner.Visible || !owner.Enabled)
+        if (AppTheme.UseSimpleRendering || owner.IsDisposed || !owner.Visible || !owner.Enabled)
         {
-            timer.Stop();
+            timer?.Stop();
             return;
         }
         double progress = Math.Min(1, Stopwatch.GetElapsedTime(started).TotalMilliseconds / 140);
@@ -54,7 +59,14 @@ internal sealed class UiColorTransition : IDisposable
         Value = Color.FromArgb(Blend(start.A, target.A), Blend(start.R, target.R),
             Blend(start.G, target.G), Blend(start.B, target.B));
         apply(Value);
-        if (progress >= 1) timer.Stop();
+        if (progress >= 1) timer?.Stop();
+    }
+
+    private void OnThemeChanged(object? sender, EventArgs e)
+    {
+        if (!AppTheme.UseSimpleRendering) return;
+        timer?.Dispose();
+        timer = null;
     }
 
     private void OnVisibilityChanged(object? sender, EventArgs e)
@@ -67,6 +79,7 @@ internal sealed class UiColorTransition : IDisposable
         if (disposed) return;
         disposed = true;
         owner.VisibleChanged -= OnVisibilityChanged;
-        timer.Dispose();
+        AppTheme.ThemeChanged -= OnThemeChanged;
+        timer?.Dispose();
     }
 }

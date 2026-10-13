@@ -284,9 +284,15 @@ namespace FMSC_SMS.Core
                 Width <= 0 ||
                 Height <= 0)
                 return;
-            using var path =
-                CreateRoundedPath(new Rectangle(0, 0, Width, Height), _radius);
-            UiHelper.ReplaceRegion(this, new Region(path));
+            if (AppTheme.UseSimpleRendering)
+            {
+                if (Region is not null) UiHelper.ReplaceRegion(this, null);
+            }
+            else
+            {
+                using var path = CreateRoundedPath(new Rectangle(0, 0, Width, Height), _radius);
+                UiHelper.ReplaceRegion(this, new Region(path));
+            }
             int innerWidth =
                 Math.Max(0, Width - TextInsetLeft - TextInsetRight);
             if (_inner.Multiline)
@@ -317,18 +323,18 @@ namespace FMSC_SMS.Core
                 return;
             }
             e.Graphics.SmoothingMode =
-                SmoothingMode.AntiAlias;
+                AppTheme.UseSimpleRendering ? SmoothingMode.None : SmoothingMode.AntiAlias;
             var rect =
                 new Rectangle(0, 0, Math.Max(0, Width - 1), Math.Max(0, Height - 1));
-            using var path =
-                CreateRoundedPath(rect, _radius);
+            using var shape =
+                new UiPaintShape(rect, _radius);
             bool locked = !Enabled || ReadOnly;
             using var brush =
                 new SolidBrush(
                     locked
                         ? AppTheme.ButtonDisabledBackground
                         : BackColor);
-            e.Graphics.FillPath(brush, path);
+            shape.Fill(e.Graphics, brush);
             var borderColor =
                 locked
                     ? AppTheme.InputBorder
@@ -350,7 +356,7 @@ namespace FMSC_SMS.Core
                     Alignment =
                         PenAlignment.Inset
                 };
-            e.Graphics.DrawPath(pen, path);
+            shape.Draw(e.Graphics, pen);
         }
         private static GraphicsPath CreateRoundedPath(Rectangle rect, int radius)
         {

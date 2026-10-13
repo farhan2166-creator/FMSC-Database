@@ -1059,15 +1059,13 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
         {
             return;
         }
-        using (var path =
-               CreateRoundedPath(
-                   new Rectangle(
-                       0,
-                       0,
-                       Width,
-                       Height),
-                   _radius))
+        if (AppTheme.UseSimpleRendering)
         {
+            if (Region is not null) UiHelper.ReplaceRegion(this, null);
+        }
+        else
+        {
+            using var path = CreateRoundedPath(new Rectangle(0, 0, Width, Height), _radius);
             UiHelper.ReplaceRegion(this, new Region(path));
         }
         int arrow =
@@ -1084,7 +1082,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
         PaintEventArgs e)
     {
         e.Graphics.SmoothingMode =
-            SmoothingMode.AntiAlias;
+            AppTheme.UseSimpleRendering ? SmoothingMode.None : SmoothingMode.AntiAlias;
         var rect =
             new Rectangle(
                 0,
@@ -1095,18 +1093,13 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
                 Math.Max(
                     0,
                     Height - 1));
-        using var path =
-            CreateRoundedPath(
-                rect,
-                _radius);
+        using var shape = new UiPaintShape(rect, _radius);
         using var brush =
             new SolidBrush(
                 Enabled
                     ? AppTheme.SurfaceElevated
                     : AppTheme.ButtonDisabledBackground);
-        e.Graphics.FillPath(
-            brush,
-            path);
+        shape.Fill(e.Graphics, brush);
         Color border =
             !Enabled
                 ? AppTheme.InputBorder
@@ -1128,9 +1121,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
                 Alignment =
                     PenAlignment.Inset
             };
-        e.Graphics.DrawPath(
-            pen,
-            path);
+        shape.Draw(e.Graphics, pen);
         if (_showDropDownButton)
         {
             Rectangle arrow =

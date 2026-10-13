@@ -176,10 +176,16 @@ namespace FMSC_SMS.Core
                 height);
             Color accent = BadgeColor(text);
             var oldMode = g.SmoothingMode;
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            using (var path = new System.Drawing.Drawing2D.GraphicsPath())
-            using (var fill = new SolidBrush(AppTheme.Tint(accent, 0.86f)))
+            using var fill = new SolidBrush(AppTheme.Tint(accent, 0.86f));
+            if (AppTheme.UseSimpleRendering)
             {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.None;
+                g.FillRectangle(fill, pill);
+            }
+            else
+            {
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                using var path = new System.Drawing.Drawing2D.GraphicsPath();
                 int d = height;
                 path.AddArc(pill.Left, pill.Top, d, d, 90, 180);
                 path.AddArc(pill.Right - d, pill.Top, d, d, 270, 180);

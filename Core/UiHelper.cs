@@ -46,7 +46,7 @@ namespace FMSC_SMS.Core
         {
             pictureBox.Disposed += (_, _) => ReplacePictureImage(pictureBox, null);
         }
-        public static void ReplaceRegion(Control control, Region region)
+        public static void ReplaceRegion(Control control, Region? region)
         {
             Region? previous = control.Region;
             control.Region = region;

@@ -116,7 +116,11 @@ internal static class UiTheme
                     break;
                 case "ThemeHeaderContainer": control.BackColor = Color.Transparent; break;
             }
-            if (control is RoundedPanel panel && style.Border is not null) panel.BorderColor = style.Border();
+            if (control is RoundedPanel panel)
+            {
+                if (style.Border is not null) panel.BorderColor = style.Border();
+                panel.RefreshRendering();
+            }
             if (control is TabControl tabs) TabStrip.Repaint(tabs);
         }
         finally { style.Applying = false; }

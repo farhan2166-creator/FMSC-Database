@@ -193,6 +193,12 @@ namespace FMSC_SMS.Core
         }
         public void ApplyTheme()
         {
+            UpdateRegion();
+            try { ApplyThemeColors(); }
+            finally { _hoverMotion?.MoveTo(BackColor, animate: false); }
+        }
+        private void ApplyThemeColors()
+        {
             if (_themeRole == "Outline")
             {
                 var border = ResolveThemeColor(_outlineBorderRole, _outlineColor);
@@ -350,6 +356,11 @@ namespace FMSC_SMS.Core
         }
         private void UpdateRegion()
         {
+            if (AppTheme.UseSimpleRendering)
+            {
+                if (Region is not null) UiHelper.ReplaceRegion(this, null);
+                return;
+            }
             if (Width <= 0 ||
                 Height <= 0)
                 return;
@@ -375,11 +386,10 @@ namespace FMSC_SMS.Core
         protected override void OnPaint(PaintEventArgs e)
         {
             e.Graphics.SmoothingMode =
-                SmoothingMode.AntiAlias;
+                AppTheme.UseSimpleRendering ? SmoothingMode.None : SmoothingMode.AntiAlias;
             var rect =
                 new Rectangle(0, 0, Width - 1, Height - 1);
-            using var path =
-                CreateRoundedPath(rect, _radius);
+            using var shape = new UiPaintShape(rect, _radius);
             var fillColor =
                 Enabled
                     ? BackColor
@@ -397,7 +407,7 @@ namespace FMSC_SMS.Core
                     : ControlPaint.Dark(fillColor, 0.22f);
                 textColor = GetButtonTextColor(fillColor);
             }
-            if (Enabled && !_outline && rect.Width > 4 && rect.Height > 4)
+            if (!AppTheme.UseSimpleRendering && Enabled && !_outline && rect.Width > 4 && rect.Height > 4)
             {
                 var shadowRect = new Rectangle(rect.X, rect.Y + 2, rect.Width, rect.Height);
                 using var shadowPath =
@@ -408,7 +418,7 @@ namespace FMSC_SMS.Core
             }
             using var brush =
                 new SolidBrush(fillColor);
-            e.Graphics.FillPath(brush, path);
+            shape.Fill(e.Graphics, brush);
             var borderColor =
                 _outline
                     ? _outlineColor
@@ -418,7 +428,7 @@ namespace FMSC_SMS.Core
             using var pen = new Pen(borderColor, borderWidth) {
                 Alignment = PenAlignment.Inset
             };
-            e.Graphics.DrawPath(pen, path);
+            shape.Draw(e.Graphics, pen);
             // Paint focus AFTER the fill and border, otherwise the fill erases it.
             // Always show the focused action, including focus moved here by Enter.
             if (Focused && Enabled && rect.Width > 12 && rect.Height > 12)
@@ -426,8 +436,8 @@ namespace FMSC_SMS.Core
                 int inset = Math.Max(3, (int)Math.Round(3f * DeviceDpi / 96f));
                 using var focusPen = new Pen(GetButtonTextColor(fillColor), Math.Max(2f, 2f * DeviceDpi / 96f));
                 var focusRect = Rectangle.Inflate(rect, -inset, -inset);
-                using var focusPath = CreateRoundedPath(focusRect, Math.Max(1, _radius - inset));
-                e.Graphics.DrawPath(focusPen, focusPath);
+                using var focusShape = new UiPaintShape(focusRect, Math.Max(1, _radius - inset));
+                focusShape.Draw(e.Graphics, focusPen);
             }
             var textRect = Rectangle.Inflate(rect, -Padding.Horizontal / 2, -Padding.Vertical / 2);
             var alignmentFlags = TextAlign switch {

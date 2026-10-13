@@ -56,6 +56,12 @@ namespace FMSC_SMS.Core
         }
         private void UpdateRegion()
         {
+            if (AppTheme.UseSimpleRendering)
+            {
+                if (Region is not null) UiHelper.ReplaceRegion(this, null);
+                _regionRadius = int.MinValue;
+                return;
+            }
             if (Width <= 0 || Height <= 0)
                 return;
             if (_regionSize == Size && _regionRadius == _radius)
@@ -68,6 +74,19 @@ namespace FMSC_SMS.Core
         }
         protected override void OnPaint(PaintEventArgs e)
         {
+            if (AppTheme.UseSimpleRendering)
+            {
+                e.Graphics.SmoothingMode = SmoothingMode.None;
+                using var shape = new UiPaintShape(new Rectangle(0, 0, Width - 1, Height - 1), _radius);
+                using var fill = new SolidBrush(BackColor);
+                shape.Fill(e.Graphics, fill);
+                if (_showBorder)
+                {
+                    using var border = new Pen(_borderColor, 1F) { Alignment = PenAlignment.Inset };
+                    shape.Draw(e.Graphics, border);
+                }
+                return;
+            }
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             var rect =
                 new Rectangle(0, 0, Width - 1, Height - 1);
@@ -90,6 +109,16 @@ namespace FMSC_SMS.Core
                     };
                 e.Graphics.DrawPath(pen, path);
             }
+        }
+        internal void RefreshRendering()
+        {
+            if (AppTheme.UseSimpleRendering)
+            {
+                _paintPath?.Dispose();
+                _paintPath = null;
+            }
+            UpdateRegion();
+            Invalidate();
         }
         protected override void Dispose(bool disposing)
         {

@@ -1329,7 +1329,10 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 new ToolStripMenuItem(
                     AppTheme.GetThemeName(value)) {
                     Checked =
-                        AppTheme.CurrentTheme == value
+                        AppTheme.CurrentTheme == value,
+                    ToolTipText = value == AppThemeType.ProfessionalSimple
+                        ? "Flat appearance and instant hover feedback, with the same layout and workflows."
+                        : string.Empty
                 };
             item.Click += (_, _) =>
                 AppTheme.SetTheme(value);

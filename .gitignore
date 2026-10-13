@@ -310,6 +310,7 @@ Database/*.bak
 !/Tests/AuditFixChecks/
 !/Tests/QuickRegistrationSqlChecks/
 !/Tests/PerformanceChecks/
+!/Tests/ThemeSmokeChecks/
 /Tests/AuditFixChecks/*
 !/Tests/AuditFixChecks/*.cs
 !/Tests/AuditFixChecks/*.csproj
@@ -319,3 +320,6 @@ Database/*.bak
 /Tests/PerformanceChecks/*
 !/Tests/PerformanceChecks/*.cs
 !/Tests/PerformanceChecks/*.csproj
+/Tests/ThemeSmokeChecks/*
+!/Tests/ThemeSmokeChecks/*.cs
+!/Tests/ThemeSmokeChecks/*.csproj

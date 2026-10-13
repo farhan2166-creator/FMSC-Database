@@ -8,7 +8,8 @@ namespace FMSC_SMS.Core
         Violet,
         Rose,
         Teal,
-        Amber
+        Amber,
+        ProfessionalSimple
     }
     public static class AppTheme
     {
@@ -20,10 +21,12 @@ namespace FMSC_SMS.Core
                 AppThemeType.OceanBlue,
                 AppThemeType.Emerald,
                 AppThemeType.ProfessionalOrange,
-                AppThemeType.Violet
+                AppThemeType.Violet,
+                AppThemeType.ProfessionalSimple
             };
         public static AppThemeType CurrentTheme =>
             _currentTheme;
+        public static bool UseSimpleRendering => _currentTheme == AppThemeType.ProfessionalSimple;
         public static string CurrentThemeName =>
             GetThemeName(_currentTheme);
         private static readonly string ThemeFilePath =
@@ -96,6 +99,8 @@ namespace FMSC_SMS.Core
                     "Professional Orange",
                 AppThemeType.Violet =>
                     "Royal Violet",
+                AppThemeType.ProfessionalSimple =>
+                    "Professional Simple (Lightweight)",
                 AppThemeType.Rose =>
                     "Rose",
                 AppThemeType.Teal =>
@@ -125,6 +130,7 @@ namespace FMSC_SMS.Core
             get
             {
                 return _currentTheme switch {
+                    AppThemeType.ProfessionalSimple => Color.FromArgb(30, 64, 105),
                     AppThemeType.Emerald =>
                         Color.FromArgb(5, 150, 105),
                     AppThemeType.ProfessionalOrange =>
@@ -147,6 +153,7 @@ namespace FMSC_SMS.Core
             get
             {
                 return _currentTheme switch {
+                    AppThemeType.ProfessionalSimple => Color.FromArgb(23, 50, 83),
                     AppThemeType.Emerald =>
                         Color.FromArgb(4, 120, 87),
                     AppThemeType.ProfessionalOrange =>
@@ -169,6 +176,7 @@ namespace FMSC_SMS.Core
             get
             {
                 return _currentTheme switch {
+                    AppThemeType.ProfessionalSimple => Color.FromArgb(235, 241, 247),
                     AppThemeType.Emerald =>
                         Color.FromArgb(236, 253, 245),
                     AppThemeType.ProfessionalOrange =>
@@ -253,6 +261,7 @@ namespace FMSC_SMS.Core
             get
             {
                 return _currentTheme switch {
+                    AppThemeType.ProfessionalSimple => Color.FromArgb(245, 246, 248),
                     AppThemeType.Emerald =>
                         Color.FromArgb(246, 250, 248),
                     AppThemeType.ProfessionalOrange =>
@@ -277,6 +286,7 @@ namespace FMSC_SMS.Core
             get
             {
                 return _currentTheme switch {
+                    AppThemeType.ProfessionalSimple => Color.FromArgb(249, 250, 251),
                     AppThemeType.Emerald =>
                         Color.FromArgb(248, 252, 250),
                     AppThemeType.ProfessionalOrange =>
@@ -313,6 +323,7 @@ namespace FMSC_SMS.Core
             get
             {
                 return _currentTheme switch {
+                    AppThemeType.ProfessionalSimple => Color.FromArgb(207, 213, 221),
                     AppThemeType.Emerald =>
                         Color.FromArgb(220, 232, 227),
                     AppThemeType.ProfessionalOrange =>
@@ -396,6 +407,7 @@ namespace FMSC_SMS.Core
         }
         public static Color ModuleAccent(string title)
         {
+            if (UseSimpleRendering) return Primary;
             if (string.IsNullOrWhiteSpace(title))
                 return Primary;
             return title.Trim().ToLowerInvariant() switch {
