@@ -227,24 +227,24 @@ For guarded disposable native SQL checks, use the FMSC_AUDIT_CONNECTION environm
 
 ## 8. Source-to-master traceability (13 reports)
 
-Every source below was read for this consolidation. The reports are historical evidence; the master is the operational summary, not a replacement for their detailed test transcripts, linked source lines and exact historical hashes.
+All 13 original audit reports were consolidated and removed from the current main branch's Audit folder. Their original contents remain retrievable from the pinned historical Git commit linked below. This master is the only active report in Audit; the historical reports retain supporting details and test evidence.
 
-1. [12 Oct business logic / schema / C# cross-audit](2026-10-12_Business_Logic_and_Schema_CSharp_Cross_Audit.md) — BL-01..BL-10 and owner policy decisions.
-2. [13 Oct confirmed findings and fix verification](2026-10-13_Confirmed_Findings_Fix_Verification.md) — F-01..F-12 correction, whole-rupee plan, initial testing.
-3. [13 Oct remaining findings and native verification](2026-10-13_Remaining_Findings_and_Runtime_Verification.md) — native SQL, role/list checks and fixed test-discovered defects.
-4. [Connection guidance and About](FMSC_Connection_About_2026-10-13.md).
-5. [Dashboard review](FMSC_Dashboard_Review_2026-10-13.md).
-6. [Cross-application reliability / deployment hardening](FMSC_Deployment_Hardening_2026-10-13.md).
-7. [Existing workflow performance hardening](FMSC_Performance_Hardening_2026-10-13.md).
-8. [Photo storage, proportional preparation and photo zoom](FMSC_Photo_Storage_2026-10-13.md).
-9. [Professional Simple theme](FMSC_Professional_Simple_Theme_2026-10-13.md).
-10. [Profile opening, collection reads and sorting](FMSC_Record_Opening_Hardening_2026-10-13.md).
-11. [End-to-end read-only C#/DACPAC audit](FMSC_SMS_End_to_End_ReadOnly_Audit_2026-10-13.md) — original F-01..F-12 and acceptance runbook.
-12. [Existing UI flow and consistency](FMSC_UI_Flow_Consistency_2026-10-13.md).
-13. [Workflow/search/collection/report loading](FMSC_Workflow_Loading_Hardening_2026-10-13.md).
+1. [12 Oct business logic / schema / C# cross-audit](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/2026-10-12_Business_Logic_and_Schema_CSharp_Cross_Audit.md) — BL-01..BL-10 and owner policy decisions.
+2. [13 Oct confirmed findings and fix verification](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/2026-10-13_Confirmed_Findings_Fix_Verification.md) — F-01..F-12 correction, whole-rupee plan, initial testing.
+3. [13 Oct remaining findings and native verification](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/2026-10-13_Remaining_Findings_and_Runtime_Verification.md) — native SQL, role/list checks and fixed test-discovered defects.
+4. [Connection guidance and About](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/FMSC_Connection_About_2026-10-13.md).
+5. [Dashboard review](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/FMSC_Dashboard_Review_2026-10-13.md).
+6. [Cross-application reliability / deployment hardening](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/FMSC_Deployment_Hardening_2026-10-13.md).
+7. [Existing workflow performance hardening](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/FMSC_Performance_Hardening_2026-10-13.md).
+8. [Photo storage, proportional preparation and photo zoom](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/FMSC_Photo_Storage_2026-10-13.md).
+9. [Professional Simple theme](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/FMSC_Professional_Simple_Theme_2026-10-13.md).
+10. [Profile opening, collection reads and sorting](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/FMSC_Record_Opening_Hardening_2026-10-13.md).
+11. [End-to-end read-only C#/DACPAC audit](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/FMSC_SMS_End_to_End_ReadOnly_Audit_2026-10-13.md) — original F-01..F-12 and acceptance runbook.
+12. [Existing UI flow and consistency](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/FMSC_UI_Flow_Consistency_2026-10-13.md).
+13. [Workflow/search/collection/report loading](https://github.com/farhan2166-creator/FMSC-Database/blob/ba2a00632ae387f412d384eb407ea3488455ccaf/Audit/FMSC_Workflow_Loading_Hardening_2026-10-13.md).
 
 Supplementary current operational reference: [Validation/AuditFixChecks.md](../Validation/AuditFixChecks.md), [Migrations/2.sql](../Migrations/2.sql) and [AGENTS.md](../AGENTS.md). Note that AGENTS.md is release-packaging context, not authority to overwrite installed user data during updates.
 
 ---
 
-**FINAL STATUS — DOCUMENT CONSOLIDATION: DONE.** All thirteen reports were combined into this prioritized, traceable master with explicit findings, existing remedies, accepted policies and actionable remaining tests. **FIX DEPLOYMENT / WINDOWS & RELEASE ACCEPTANCE: NOT CLAIMED DONE.** No C#, SQL, DACPAC, migration, installer or original audit report was modified as part of this consolidation.
+**FINAL STATUS — DOCUMENT CONSOLIDATION: DONE.** All thirteen reports were combined into this prioritized, traceable master with explicit findings, existing remedies, accepted policies and actionable remaining tests. The 13 superseded reports have been removed from the current Audit folder and remain available in Git history. **FIX DEPLOYMENT / WINDOWS & RELEASE ACCEPTANCE: NOT CLAIMED DONE.** No application code, SQL, DACPAC, migration or installer artifact was changed by this consolidation; only audit documentation was updated, with the superseded individual reports deleted from the active branch.
