@@ -3,7 +3,8 @@
 **Current implementation update:** DP-04, RT-01, DP-01, DP-02 and DP-03 are
 implemented in source at the owner's request. IA-01/02/03 were excluded from that
 pass, then implemented in the subsequently authorized Users/Roles restructuring.
-The subsequent two-role policy is implemented in section 11. See sections 8–11 below; the original review remains
+The two-role policy is implemented in section 11; owner-authorized Account menu
+navigation follows in section 12. See sections 8–12 below; the original review remains
 pinned to its stated baseline and is not native deployment acceptance.
 
 **Audit date:** 13 October 2026  
@@ -524,3 +525,26 @@ unchanged; the artifact verifier passing for it does not certify version-3 relea
 packaging. Updated MDF/LDF preparation remains the owner's existing release step.
 No installed school database was changed. The completed flow is committed source
 plus a tested migration, not a claim that the owner's database is already upgraded.
+
+## 12. Owner-authorized dashboard Account navigation — 13 October 2026
+
+The owner explicitly requested Users/Roles access in the dashboard Account menu.
+This supersedes the hidden-navigation policy recorded in earlier sections.
+
+The Account dropdown now groups **Users** and **Roles & Permissions** after the
+personal username/password commands. Visibility uses the same `AccessRules` read
+prerequisites as the pages. Administrator's full authority makes both entries
+available; Accountant's preserved six grants expose neither. Separately granted
+read access can open a read-only page, while writes retain the existing management
+checks in both C# and SQL.
+
+Opening an administrative entry is deferred until the dropdown click completes,
+then rechecks the original signed-in user and current read permissions. Navigation
+uses the normal dashboard route, breadcrumb/title and dirty/busy/recovery guards.
+Role names remain fixed, Administrator remains protected/full, and permission
+editing remains the existing combined Roles & Permissions page. No additional
+SQL change, migration, DACPAC or data update is required by this navigation change.
+
+The application and Windows smoke harness compile with zero warnings/errors;
+the existing 530 portable assertions pass. Interactive Windows menu execution
+remains part of native acceptance, not a claim made by the Linux build checks.

@@ -739,8 +739,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             "Reports",
             "Reports",
             "Reports.View");
-        // BUSINESS RULE: User and role administration is intentionally disabled in shell
-        // navigation. The maintenance pages remain available only for controlled legacy work.
+        // User and role administration lives in the permission-controlled Account menu.
         AddModule(
             flow,
             "setup.png",
@@ -1322,6 +1321,24 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     using var form = new ChangePasswordForm();
                     form.ShowDialog(this);
                 }));
+        var access = AccessRules.For(CurrentUser.HasPermission);
+        if (access.CanReadUsers || access.CanReadRoles)
+        {
+            menu.Items.Add(new ToolStripSeparator());
+            if (access.CanReadUsers)
+                menu.Items.Add(new ToolStripMenuItem("Users", null,
+                    (_, _) => OpenAccountAdministrationAfterMenuCloses(AccessEditorKind.Users)) {
+                    ToolTipText = access.CanManageUsers
+                        ? "Create user accounts, assign Accountant access and reset passwords."
+                        : "View user accounts and their assigned access."
+                });
+            if (access.CanReadRoles)
+                menu.Items.Add(new ToolStripMenuItem("Roles && Permissions", null,
+                    (_, _) => OpenAccountAdministrationAfterMenuCloses(AccessEditorKind.Roles)) {
+                    ToolTipText = "Review Accountant permissions. Administrator always has full authority."
+                });
+            menu.Items.Add(new ToolStripSeparator());
+        }
         menu.Items.Add(
             new ToolStripMenuItem(
                 "Hot Keys",
@@ -1372,6 +1389,23 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         menu.Show(
             owner,
             new Point(0, -menu.Height));
+    }
+    private void OpenAccountAdministrationAfterMenuCloses(AccessEditorKind kind)
+    {
+        if (IsDisposed || Disposing || !IsHandleCreated || CurrentUser.UserId <= 0)
+            return;
+        int actor = CurrentUser.UserId;
+        // Defer navigation until the menu click has finished, then recheck the session
+        // and read access. NavigateTo retains the current page's busy/dirty guards.
+        BeginInvoke(new MethodInvoker(() => {
+            if (IsDisposed || Disposing || CurrentUser.UserId != actor)
+                return;
+            var access = AccessRules.For(CurrentUser.HasPermission);
+            if (kind == AccessEditorKind.Users && access.CanReadUsers)
+                NavigateTo(() => new UsersPage(), "Account", "Users");
+            else if (kind == AccessEditorKind.Roles && access.CanReadRoles)
+                NavigateTo(() => new RolesPage(), "Account", "Roles & Permissions");
+        }));
     }
     private void OpenHotKeysPageAfterAccountMenuCloses()
     {

@@ -2,8 +2,8 @@ using FMSC_SMS.Core;
 
 namespace FMSC_SMS.Pages.Administration;
 
-// BUSINESS RULE: Role administration stays outside ordinary navigation.
-// Existing role definitions/grants are preserved; only the editor flow changes.
+// Available from the dashboard Account menu when role viewing is permitted.
+// Administrator is always full authority; only Accountant grants may be edited.
 public sealed class RolesPage : AccessEditorPage
 {
     public RolesPage() : this(new AdministrationStore(AccessEditorKind.Roles),AccessRules.For(CurrentUser.HasPermission)) { }

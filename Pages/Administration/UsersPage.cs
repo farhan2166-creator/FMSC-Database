@@ -2,8 +2,8 @@ using FMSC_SMS.Core;
 
 namespace FMSC_SMS.Pages.Administration;
 
-// BUSINESS RULE: Account administration stays outside ordinary navigation.
-// This maintenance refactor does not authorize publishing it in the shell.
+// Available from the dashboard Account menu when its viewing permissions allow it.
+// Administrative writes still require the separate management permissions.
 public sealed class UsersPage : AccessEditorPage
 {
     internal readonly ModernTextBox NewPassword = HumanUi.TextBox(false,100);

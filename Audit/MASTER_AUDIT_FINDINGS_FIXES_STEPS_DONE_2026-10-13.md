@@ -1,5 +1,12 @@
 # FMSC_SMS — Master Audit: Findings, Fixes, Decisions and Remaining Steps
 
+**Current navigation update:** The owner authorized Users and Roles & Permissions
+in the dashboard Account menu. Entries use the pages' viewing prerequisites and
+recheck access/session before navigation; write safeguards remain in force.
+This supersedes earlier hidden-navigation decisions. See
+[section 12](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#12-owner-authorized-dashboard-account-navigation--13-october-2026).
+This menu change requires no additional SQL migration.
+
 **Current role-policy update:** The owner approved keeping Administrator and
 Accountant only and preserving Accountant's current six grants. Administrator
 always retains full authority. `Migrations/3.sql` implements transactional role

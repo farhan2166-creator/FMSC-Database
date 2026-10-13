@@ -37,7 +37,7 @@ public abstract partial class AccessEditorPage : V2Page, IUnsavedChanges, IBusyP
 
     private protected AccessEditorPage(AccessEditorKind kind, IAdministrationStore store, AccessRules rules)
         : base(kind == AccessEditorKind.Users ? "Users" : "Roles & Permissions",
-            "Restricted maintenance · choose a record, edit its draft, then save. Access menus refresh at the next sign-in.")
+            "Account administration · choose a record, edit its draft, then save. Access menus refresh at the next sign-in.")
     {
         Kind = kind; Store = store;
         canRead = kind == AccessEditorKind.Users ? rules.CanReadUsers : rules.CanReadRoles;
