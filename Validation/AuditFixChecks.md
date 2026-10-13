@@ -151,3 +151,54 @@ wildcard escaping, and immediate flushing before opening/reviewing a selection.
 
 Interactive WinForms, physical DPI, the data-specific correction script and the
 full restored-school admission suite remain separate Windows acceptance checks.
+
+## Two-role migration and permission consistency — current update
+
+The application and installer now require version **3**. Apply **Migrations/3.sql**
+after version 2, using the installer's verified recovery backup and closing all
+application sessions before migration. Administrator is always full authority;
+Accountant keeps its current six grants, including student and finance reports.
+Every other role is removed. User accounts/credentials remain; removed-role-only
+accounts gain no replacement membership and retain zero access. Existing Accountant
+and supported permission IDs are preserved.
+
+The submitted DACPAC still represents version 2. Provide the newly extracted
+version-3 artifact after applying this migration; review its seven changed SQL
+modules and data before updating approved fingerprints. The current artifact
+verifier passing describes the supplied baseline, not completed version-3 release
+packaging. No production or detached school files were changed during these tests.
+
+```text
+python -m unittest discover -s Tools -p test_permission_policy.py
+```
+
+For **a fresh disposable clone of the supplied data-bearing version-2 DACPAC**,
+set `FMSC_AUDIT_CONNECTION` as described above and also set `FMSC_MIGRATION_FILE`
+to the absolute path of `Migrations/3.sql`, then run:
+
+```text
+dotnet run --project Tests/AdministrationSqlChecks
+```
+
+The optional migration suite intentionally injects a final version-insert failure
+and verifies complete data/audit/procedure rollback, refuses an older version,
+adds legacy/empty-membership fixtures, migrates, confirms exact catalog and
+Accountant grants and verifies repeat execution is a no-op. It requires an
+unmodified version-2 fixture with the original four roles. Without
+`FMSC_MIGRATION_FILE`, the production-writer suite requires an already migrated
+copy. Both modes accept only an explicitly disposable database name; use neither
+against the school's installed database. The version-3 writer fixture changes
+Accountant temporarily to test atomic saves and readonly boundaries, then restores
+its original description and grants.
+
+Current results: **530 portable assertions**, **67 production SQL checks**,
+**15 migration durability assertions**, **four cross-layer catalog tests** and
+**12 artifact tests** passed. Windows-targeted application/smoke-harness build
+passed with zero warnings/errors. Native Windows interaction remains pending.
+
+`Tests/AdministrationSqlChecks/FirstRunChecks.sql` additionally passed three
+first-run checks on an empty, native schema-only version-3 database seeded with
+Administrator, Accountant and the 28 canonical permission definitions. It verifies
+Administrator-only assignment, full authority and refusal of repeat setup. Do not
+run it against the data-bearing fixture: it explicitly requires an empty Users
+table and a disposable database name.

@@ -327,3 +327,5 @@ Database/*.bak
 /Tests/AdministrationSqlChecks/*
 !/Tests/AdministrationSqlChecks/*.cs
 !/Tests/AdministrationSqlChecks/*.csproj
+
+!Tests/AdministrationSqlChecks/*.sql

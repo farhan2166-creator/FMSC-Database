@@ -33,6 +33,7 @@ public abstract partial class AccessEditorPage
         NameInput.MaxLength=Kind==AccessEditorKind.Users ? 100 : 50;
         NameInput.TextChanged+=(_,_)=>DraftChanged(); DescriptionInput.TextChanged+=(_,_)=>DraftChanged();ForceChange.CheckedChanged+=(_,_)=>DraftChanged();
         NewAction=AddAction(Kind==AccessEditorKind.Users ? "New User" : "New Role",(_,_)=>NewRecord(),"Secondary");
+        NewAction.Visible=Kind==AccessEditorKind.Users;
         SaveAction=AddAction(Kind==AccessEditorKind.Users ? "Save User" : "Save Role",async(_,_)=>await SaveAsync(),"Success");
         ReloadAction=AddAction("Reload",async(_,_)=>await ReloadAsync(),"Secondary");
         CheckAction=AddAction("Check Saved Changes",async(_,_)=>await CheckAsync(),"Secondary");CheckAction.Visible=false;
@@ -116,8 +117,8 @@ public abstract partial class AccessEditorPage
         var table=new DataTable();table.Columns.Add("ChoiceId",typeof(int));table.Columns.Add("Selected",typeof(bool));
         foreach(string column in new[]{"Label","Group","Code","Description"})table.Columns.Add(column);
         if(Kind==AccessEditorKind.Users)
-            foreach(var role in catalog.Roles.Where(role=>record?.Protected==true||!role.Protected).OrderBy(role=>role.Name,StringComparer.OrdinalIgnoreCase))
-                table.Rows.Add(role.Id,record?.Protected==true||record?.Choices.Contains(role.Id)==true,role.Name,"Roles",role.Name,role.Description);
+            foreach(var role in catalog.Roles.Where(role=>record?.Protected==true||AdministrativeAccess.IsAccountant(role.Name)).OrderBy(role=>role.Name,StringComparer.OrdinalIgnoreCase))
+                table.Rows.Add(role.Id,record?.Choices.Contains(role.Id)==true||record?.Protected==true&&role.Protected,role.Name,"Roles",role.Name,role.Description);
         else
             foreach(var permission in catalog.Permissions.OrderBy(permission=>permission.Code,StringComparer.OrdinalIgnoreCase))
                 table.Rows.Add(permission.Id,record?.Protected==true||record?.Choices.Contains(permission.Id)==true,
@@ -209,11 +210,11 @@ public abstract partial class AccessEditorPage
     {
         bool editable=canManage&&HasEditor&&Original?.Protected!=true&&!IsBusy&&!NeedsReload&&Unconfirmed is null;
         SaveAction.Enabled=editable&&(Creating||HasUnsavedChanges);
-        NewAction.Enabled=canManage&&canRead&&Catalog is not null&&!IsBusy&&!NeedsReload&&Unconfirmed is null&&
-            (Kind==AccessEditorKind.Roles||Catalog.Roles.Any(role=>!role.Protected));
+        NewAction.Enabled=Kind==AccessEditorKind.Users&&canManage&&canRead&&Catalog is not null&&!IsBusy&&!NeedsReload&&Unconfirmed is null&&
+            Catalog.Roles.Any(role=>AdministrativeAccess.IsAccountant(role.Name));
         ReloadAction.Enabled=canRead&&!IsBusy;CheckAction.Visible=Unconfirmed is not null;CheckAction.Enabled=canRead&&!IsBusy;
         Grid.Enabled=canRead&&!IsBusy;search.Enabled=canRead&&!IsBusy;
-        NameInput.ReadOnly=!editable;DescriptionInput.ReadOnly=!editable;ForceChange.Enabled=editable;
+        NameInput.ReadOnly=!editable||Kind==AccessEditorKind.Roles;DescriptionInput.ReadOnly=!editable;ForceChange.Enabled=editable;
         Assignments.ReadOnly=!editable;Assignments.Enabled=HasEditor&&!IsBusy;choiceSearch.Enabled=HasEditor&&!IsBusy;
         ExtraEnablement(editable);
         string state=Unconfirmed is not null?"check save outcome":NeedsReload?"reload required":Original?.Protected==true?"protected":!canManage?"read-only":HasUnsavedChanges?"unsaved changes":"saved details";

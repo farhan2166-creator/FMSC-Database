@@ -3,7 +3,7 @@
 **Current implementation update:** DP-04, RT-01, DP-01, DP-02 and DP-03 are
 implemented in source at the owner's request. IA-01/02/03 were excluded from that
 pass, then implemented in the subsequently authorized Users/Roles restructuring.
-See sections 8, 9 and 10 below; the original review remains
+The subsequent two-role policy is implemented in section 11. See sections 8–11 below; the original review remains
 pinned to its stated baseline and is not native deployment acceptance.
 
 **Audit date:** 13 October 2026  
@@ -445,3 +445,82 @@ required by this artifact review or the already completed administrative flow.**
 The disposable SQL container and private test credentials were removed after
 verification. No role definitions, production procedures, schema versions or
 DACPAC bytes were changed by this review.
+
+## 11. Owner-approved two-role policy and consistent permissions — 13 October 2026
+
+The owner subsequently approved keeping **Administrator and Accountant only**, with
+Administrator always holding full authority, and explicitly chose to preserve
+Accountant's current access. This supersedes section 10's pending role decision.
+
+**Implemented SQL update: `Migrations/3.sql`.** The script requires version 2,
+uses one transaction for data, seven procedure definitions, audit and version 3,
+and makes repeat execution at version 3 a no-op. Existing Accountant grants and
+IDs remain intact. In the supplied snapshot these are exactly `Students.View`,
+`Fees.View`, `Fees.Collect`, `Reports.View`, `Fees.Reports.View` and
+`Fees.Statement.View`; student and finance reports remain available. The migration
+removes every other role and its assignments. It preserves all user accounts,
+credentials and password requirements. Accounts with only removed roles receive
+no automatic replacement grant: their legacy primary reference becomes
+Accountant while an empty membership set continues to mean zero access.
+
+Administrator primary-role or membership accounts are normalized to Administrator
+with only that membership. No extra role or permission grant is needed for full
+authority. Role saves no longer automatically assign Accountant to Administrator,
+and first-run setup now assigns Administrator only.
+
+**Permission consistency:** a shared embedded `Core/PermissionCatalog.json`
+contains **28 implemented permissions**. Migration 3 carries the same catalog and
+removes 29 dormant/superseded options from the former 57 definitions. No permission
+IDs are renumbered and no grant is remapped to a broader capability. Names and
+descriptions distinguish viewing from management and make the broad scope of
+`Reports.View` and `Students.Administer` explicit. `Fees.Reports.View` accurately
+names billing-status checks; annual fee receipts retain `Fees.Statement.View`.
+
+The updated procedures retain their existing parameter signatures/defaults:
+
+| Procedure | Change |
+|---|---|
+| RequireAnyPermission | Same unconditional Administrator primary/membership bypass as RequirePermission. |
+| SaveRole | Edit the existing Accountant only; no new roles/renaming; remove automatic assignment to Administrator. |
+| SaveRolePermissions | Require management access, not System.Roles read access; validate the complete JSON array and positive/known supported IDs; require management viewing prerequisites. |
+| SaveUser | Protect Administrator membership as well as primary role; validate whole role arrays and the supported two-role selections. |
+| BootstrapFirstAdministrator | Assign only Administrator while retaining protected setup locking and credential checks. |
+| AddStudentSibling | Require Students.Administer, matching the C# add/remove family controls and DeleteStudentSibling; retire Students.Siblings. |
+| GetPermissions | Read via System.Roles/System.Administration, matching the maintained catalog flow; retire System.Permissions. |
+
+C# and installer require **database version 3**. The role editor hides New Role,
+keeps role names read-only and rejects direct new/rename calls. It edits only
+Accountant's description and checked permissions; Administrator remains full and
+protected. Its account display shows actual role membership rather than falsely
+checking Accountant to represent full authority. User assignment offers
+Accountant or no access for normal accounts.
+C# refuses incomplete administrative management/view combinations before saving,
+and SQL enforces the same rule. Catalog loading refuses unmigrated/unsupported
+role or permission definitions. Existing dirty/stale/busy guards, combined saves,
+password-only reset and read-only outcome recovery remain. Hidden maintenance
+navigation remains the established policy.
+
+**Verification:** 530 portable assertions (59 administrative), 67 production
+administration SQL checks, 15 migration durability assertions, four cross-layer
+permission-catalog checks and twelve artifact regression tests pass. The SQL
+fixture was restored from the owner's version-2 DACPAC in a disposable loopback
+SQL Server 2022 container. The migration tests inject a final version-write failure
+and compare role/permission/account/audit state and procedure definitions: all
+roll back. They verify older-version refusal, exact Accountant grant preservation,
+legacy references, empty access, Administrator membership normalization, unchanged
+school record counts and no-op repeat execution. The writer tests cover malformed
+payloads, direct SQL read/manage boundaries, full Administrator authority,
+concurrent/stale edits, combined-save rollback and exact Accountant capabilities.
+Three first-run checks also pass on a separate, empty native schema-only copy:
+Administrator-only assignment, full primary/membership authority and refusal of
+repeat setup. `Tests/AdministrationSqlChecks/FirstRunChecks.sql` documents that fixture.
+The application and Windows smoke harness compile with zero warnings/errors;
+interactive Windows/DPI tests remain unrun on this Linux executor.
+
+**Deployment handoff:** apply migration 3 with the established recovery backup and
+all application sessions closed, then provide a newly extracted version-3 DACPAC
+for review. The supplied version-2 DACPAC and its approved fingerprints were left
+unchanged; the artifact verifier passing for it does not certify version-3 release
+packaging. Updated MDF/LDF preparation remains the owner's existing release step.
+No installed school database was changed. The completed flow is committed source
+plus a tested migration, not a claim that the owner's database is already upgraded.

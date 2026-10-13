@@ -1,6 +1,16 @@
 # FMSC_SMS — Master Audit: Findings, Fixes, Decisions and Remaining Steps
 
-**Latest implementation note:** The approved compact dashboard, FR-03 navigation
+**Current role-policy update:** The owner approved keeping Administrator and
+Accountant only and preserving Accountant's current six grants. Administrator
+always retains full authority. `Migrations/3.sql` implements transactional role
+cleanup, a consistent 28-permission catalog and seven procedure corrections;
+C# and installer now require version 3. Verification passes 530 portable
+assertions, 67 production SQL checks and 15 migration durability assertions.
+See [section 11](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#11-owner-approved-two-role-policy-and-consistent-permissions--13-october-2026).
+The owner must apply the migration and supply the updated version-3 DACPAC;
+the provided artifact remains version 2. Windows/release acceptance remains pending.
+
+**Earlier implementation note:** The approved compact dashboard, FR-03 navigation
 recovery, FR-02 registration refresh feedback and FR-04/05 explicit photo-save
 and retry flow are implemented in the current source. FR-01 now has strict
 admission confirmation and read-only reconciliation, with unconfirmed saves

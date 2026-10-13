@@ -13,14 +13,14 @@ internal static partial class Program
         internal AccessDraft? LastDraft;
         internal string? LastPassword;
         internal readonly Dictionary<int,AccessRecord> Records=kind==AccessEditorKind.Users
-            ? new(){[7]=new(7,"Ali","",false,false,new[]{2},"user-1","credential"),[8]=new(8,"Bilal","",true,false,new[]{3},"user-2","other"),
-                [9]=new(9,"Administrator account","",false,true,new[]{1,2,3},"admin-user","admin-proof")}
+            ? new(){[7]=new(7,"Ali","",false,false,new[]{2},"user-1","credential"),[8]=new(8,"Bilal","",true,false,new[]{2},"user-2","other"),
+                [9]=new(9,"Administrator account","",false,true,new[]{1},"admin-user","admin-proof")}
             : new(){[1]=new(1,"Administrator","Protected",false,true,new[]{10,20},"admin-role"),
-                [2]=new(2,"Office","Office duties",false,false,new[]{10},"role-1",MemberCount:2),[3]=new(3,"Finance","Finance duties",false,false,new[]{20},"role-2",MemberCount:3)};
+                [2]=new(2,"Accountant","Accounting duties",false,false,new[]{10},"role-1",MemberCount:2)};
         private readonly AccessPermission[] permissions={new(10,"Students.View","View students","Student records"),new(20,"Fees.View","View fees","Fee reports")};
         internal AccessCatalog Catalog()
         {
-            var roles=kind==AccessEditorKind.Users?new[]{new AccessRole(1,"Administrator","Protected",new[]{10,20}),new AccessRole(2,"Office","Office duties",new[]{10}),new AccessRole(3,"Finance","Finance duties",new[]{20})}
+            var roles=kind==AccessEditorKind.Users?new[]{new AccessRole(1,"Administrator","Protected",new[]{10,20}),new AccessRole(2,"Accountant","Accounting duties",new[]{10})}
                 :Records.Values.OrderBy(record=>record.Id).Select(record=>new AccessRole(record.Id,record.Name,record.Description,record.Choices)).ToArray();
             var items=Records.Values.Select(record=>new AccessListItem(record.Id,record.Name,record.Protected?"Protected":$"{record.Choices.Length} choice(s)",record.Protected)).ToArray();
             return new(roles,permissions,items,AdministrativeAccess.CatalogToken(roles,permissions));
@@ -86,7 +86,7 @@ internal static partial class Program
             {
                 Finish(page.InitializeAsync());Check(Open(page,7)&&page.NameInput.Text=="Ali","A complete selected account loads into the inline editor");
                 Check(!page.HasUnsavedChanges&&!page.SaveAction.Enabled&&page.ResetAction.Enabled,"A clean saved user has a separate password reset and no redundant save");
-                page.NameInput.Text="Ali updated";Choose(page,3,true);
+                page.NameInput.Text="Ali updated";Choose(page,2,false);
                 Check(page.HasUnsavedChanges&&page.SaveAction.Enabled&&!page.ResetAction.Enabled,"Account/role edits are one dirty draft and disable password-only reset");
                 var refused=page.ResetForSavedUserAsync("Fixture password 12345",true);Finish(refused);
                 Check(refused.Result.Outcome==AccessSaveOutcome.Rejected&&userStore.Resets==0,"Password reset cannot secretly submit live role checkbox changes");
@@ -94,10 +94,10 @@ internal static partial class Program
                 page.ConfirmForTests=_=>false;
                 Check(!Open(page,8)&&page.Original?.Id==7&&page.NameInput.Text=="Ali updated","Declining a record switch retains the complete current draft");
                 page.ConfirmForTests=_=>true;Finish(page.SaveAsync());
-                Check(userStore.LastDraft is { Name:"Ali updated" }&&userStore.LastDraft.Choices.ToHashSet().SetEquals(new[]{2,3}),"One Save User deliberately submits displayed account and role changes together");
+                Check(userStore.LastDraft is { Name:"Ali updated" }&&userStore.LastDraft.Choices.Length==0,"One Save User deliberately submits displayed account and role changes together");
                 Check(!page.HasUnsavedChanges&&!page.NeedsReload&&page.ResetAction.Enabled,"A confirmed save with successful refresh establishes a clean editor");
                 var reset=page.ResetForSavedUserAsync("Fixture password 12345",true);Finish(reset);
-                Check(reset.Result.Outcome==AccessSaveOutcome.Saved&&userStore.Resets==1&&userStore.LastDraft!.Choices.ToHashSet().SetEquals(new[]{2,3}),"Separate reset uses saved roles after the account draft has settled");
+                Check(reset.Result.Outcome==AccessSaveOutcome.Saved&&userStore.Resets==1&&userStore.LastDraft!.Choices.Length==0,"Separate reset uses saved roles after the account draft has settled");
                 page.NameInput.Text="Committed but stale";userStore.FailReads=true;Finish(page.SaveAsync());
                 Check(page.NeedsReload&&!page.SaveAction.Enabled&&!page.ResetAction.Enabled&&!page.HasUnsavedChanges&&page.Original?.Name=="Committed but stale",
                     "A failed post-save refresh retains confirmed identity/values and blocks another write");
@@ -110,25 +110,26 @@ internal static partial class Program
                     "A NotApplied check preserves the exact draft and never repeats its write");
                 userStore.UnknownSave=false;userStore.FailSaves=true;userStore.StaleSave=true;Finish(page.SaveAsync());
                 Check(page.NeedsReload&&page.HasUnsavedChanges&&page.NameInput.Text=="Uncertain draft"&&!page.SaveAction.Enabled,"Stale-state refusal retains unsaved values and requires review");
+                Check(Open(page,9)&&page.CaptureDraft().Choices.SequenceEqual(new[]{1}),"Administrator shows its actual membership without falsely checking Accountant");
             }
             var roleStore=new FixtureAdministrationStore(AccessEditorKind.Roles);
             using(var page=new RolesPage(roleStore,full,false){BindingContext=new BindingContext()})
             {
-                Finish(page.InitializeAsync());Check(Open(page,2)&&page.DescriptionInput.Text=="Office duties","Role descriptions are bound directly rather than lost in a separate dialog");
+                Finish(page.InitializeAsync());Check(!page.NewAction.Visible&&!page.NewAction.Enabled&&page.NameInput.ReadOnly,"Fixed roles cannot be created or renamed");page.NewRecord();Check(!page.Creating,"Direct New Role calls cannot introduce another role");Check(Open(page,2)&&page.DescriptionInput.Text=="Accounting duties","Role descriptions are bound directly rather than lost in a separate dialog");
                 Choose(page,20,true);page.DescriptionInput.Text="Pending role description";
-                page.ConfirmForTests=_=>false;Check(!Open(page,3)&&page.Original?.Id==2&&page.HasUnsavedChanges,"Unsaved role permissions/descriptions are guarded during selection changes");
+                page.ConfirmForTests=_=>false;Check(!Open(page,1)&&page.Original?.Id==2&&page.HasUnsavedChanges,"Unsaved role permissions/descriptions are guarded during selection changes");
                 page.ConfirmForTests=_=>true;Finish(page.SaveAsync());
                 Check(roleStore.LastDraft is { Description:"Pending role description" }&&roleStore.LastDraft.Choices.ToHashSet().SetEquals(new[]{10,20}),"One Save Role carries both details and permissions");
                 page.AssignmentSearch.Text="Fees";PumpUntil(()=>page.Assignments.Rows.Count==1,"Permission filter debounces against the existing rows");
                 Check(page.CaptureDraft().Choices.Length==2,"Filtering permissions does not uncheck hidden selected permissions");
                 page.AssignmentSearch.Clear();PumpUntil(()=>page.Assignments.Rows.Count==2,"Clearing the filter restores all permission rows");
-                page.RecordSearch.Text="Finance";PumpUntil(()=>page.RecordGrid.Rows.Count==1,"Role list filters the cached view");
+                page.RecordSearch.Text="Administrator";PumpUntil(()=>page.RecordGrid.Rows.Count==1,"Role list filters the cached view");
                 Check(page.Original?.Id==2&&page.DescriptionInput.Text=="Pending role description","Filtering the list does not implicitly replace the open editor");
                 page.RecordSearch.Clear();PumpUntil(()=>page.RecordGrid.Rows.Count==3,"Clearing role search restores the list");
-                bool throwOnce=true;EventHandler fail=(_,_)=>{if(throwOnce&&page.NameInput.Text=="Finance"){throwOnce=false;throw new InvalidOperationException("Fixture binding failure");}};
+                bool throwOnce=true;EventHandler fail=(_,_)=>{if(throwOnce&&page.NameInput.Text=="Administrator"){throwOnce=false;throw new InvalidOperationException("Fixture binding failure");}};
                 page.NameInput.TextChanged+=fail;
-                try{Check(!Open(page,3),"A midway binding failure returns a failed read");}finally{page.NameInput.TextChanged-=fail;}
-                Check(page.Original?.Id==2&&page.NameInput.Text=="Office"&&page.DescriptionInput.Text=="Pending role description"&&page.CaptureDraft().Choices.Length==2,
+                try{Check(!Open(page,1),"A midway binding failure returns a failed read");}finally{page.NameInput.TextChanged-=fail;}
+                Check(page.Original?.Id==2&&page.NameInput.Text=="Accountant"&&page.DescriptionInput.Text=="Pending role description"&&page.CaptureDraft().Choices.Length==2,
                     "Failed binding restores the old record, details and permission draft atomically");
                 Check(Open(page,1)&&page.Original!.Protected&&!page.SaveAction.Enabled&&page.NameInput.ReadOnly&&page.Assignments.ReadOnly,"Administrator role remains fully read-only");
                 int writes=roleStore.Writes;Finish(page.SaveAsync());Check(roleStore.Writes==writes,"A protected role cannot bypass the main save guard");

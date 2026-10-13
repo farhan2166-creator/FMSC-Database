@@ -10,9 +10,9 @@ public sealed class RolesPage : AccessEditorPage
     internal RolesPage(IAdministrationStore store, AccessRules rules, bool initialize=true)
         : base(AccessEditorKind.Roles,store,rules)
     {
-        NameInput.PlaceholderText="Enter a unique role name";
+        NameInput.PlaceholderText="Administrator or Accountant";
         DescriptionInput.PlaceholderText="Describe this role's responsibility";
-        AddField(HumanUi.Field("Role name",NameInput,true));
+        AddField(HumanUi.Field("Role",NameInput));
         AddField(HumanUi.Field("Description",DescriptionInput));
         CompleteLayout(initialize);
     }

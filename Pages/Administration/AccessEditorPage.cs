@@ -73,9 +73,10 @@ public abstract partial class AccessEditorPage : V2Page, IUnsavedChanges, IBusyP
             var catalog = await Store.LoadCatalogAsync();
             if (!IsCurrent(version)) return;
             ApplyFrame(catalog,null,false);
-            SetStatus(Kind==AccessEditorKind.Users&&!catalog.Roles.Any(role=>!role.Protected)
-                ? "Create a non-Administrator access role before creating users. A new account may then have zero assigned roles."
-                : "Choose a record on the left, or create a new one.");
+            SetStatus(Kind==AccessEditorKind.Users&&!catalog.Roles.Any(role=>AdministrativeAccess.IsAccountant(role.Name))
+                ? "The Accountant role is missing. Apply the database migration before creating users."
+                : Kind==AccessEditorKind.Roles ? "Choose Accountant to review its permissions. Administrator always has full authority."
+                : "Choose a user on the left, or create a new one.");
         }
         catch (Exception ex) { if (IsCurrent(version)) ReadFailed(ex); }
         finally { if (version == generation) loading = false; if (!IsDisposed) UpdateActions(); }
@@ -115,12 +116,13 @@ public abstract partial class AccessEditorPage : V2Page, IUnsavedChanges, IBusyP
     }
     internal void NewRecord()
     {
+        if (Kind == AccessEditorKind.Roles) return;
         if (!canManage || IsBusy || NeedsReload || Unconfirmed is not null || Catalog is null || !MayReplaceDraft()) return;
-        if (Kind == AccessEditorKind.Users && !Catalog.Roles.Any(role => !role.Protected))
-        { SetStatus("Create a non-Administrator role first. A user may then be saved with no assigned roles.",PageStatusKind.Warning); return; }
+        if (Kind == AccessEditorKind.Users && !Catalog.Roles.Any(role => AdministrativeAccess.IsAccountant(role.Name)))
+        { SetStatus("The Accountant role is missing. Apply the database migration before creating users.",PageStatusKind.Warning); return; }
         ++generation; ApplyFrame(Catalog,null,true);
         SetStatus(Kind == AccessEditorKind.Users
-            ? "New user: enter account details and password, choose roles, then Save User. No roles means no access."
+            ? "New user: enter details and password, select Accountant access if needed, then Save User. Unchecked means no access."
             : "New role: enter its name and description, choose permissions, then Save Role. Empty permissions mean no access.");
         NameInput.Focus();
     }

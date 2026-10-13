@@ -48,6 +48,7 @@ internal sealed class AdministrativeStaleStateException(string message) : Invali
 internal static class AdministrativeAccess
 {
     internal static bool IsAdministrator(string name) => string.Equals(name.Trim(), "Administrator", StringComparison.OrdinalIgnoreCase);
+    internal static bool IsAccountant(string name) => string.Equals(name.Trim(), "Accountant", StringComparison.OrdinalIgnoreCase);
     internal static string Token(string material) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material)));
     internal static string CatalogToken(IEnumerable<AccessRole> roles, IEnumerable<AccessPermission> permissions) => Token(JsonSerializer.Serialize(new {
         Roles = roles.OrderBy(role => role.Id).Select(role => new { role.Id, role.Name, role.Description, Permissions = role.Permissions.Distinct().Order().ToArray() }),
@@ -71,13 +72,25 @@ internal static class AdministrativeAccess
         if (name.Length > (kind == AccessEditorKind.Users ? 100 : 50)) return "The name is too long.";
         if (draft.Description.Trim().Length > 250) return "Keep the description within 250 characters.";
         if (kind == AccessEditorKind.Roles && IsAdministrator(name)) return "Administrator is a protected system role.";
-        var valid = kind == AccessEditorKind.Users ? catalog.Roles.Where(role => !role.Protected).Select(role => role.Id).ToHashSet()
+        if (kind == AccessEditorKind.Roles && (draft.Id <= 0 || !IsAccountant(name) ||
+            !catalog.Roles.Any(role => role.Id == draft.Id && IsAccountant(role.Name))))
+            return "Only the existing Accountant role may be edited. Administrator always has full authority.";
+        var valid = kind == AccessEditorKind.Users ? catalog.Roles.Where(role => IsAccountant(role.Name)).Select(role => role.Id).ToHashSet()
             : catalog.Permissions.Select(permission => permission.Id).ToHashSet();
         if (draft.Choices.Any(id => id <= 0 || !valid.Contains(id))) return "An access selection is no longer available. Reload and review it.";
         if (catalog.Items.Any(item => item.Id != draft.Id && string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase)))
             return "That name is already in use. Choose a different name.";
         if (kind == AccessEditorKind.Users && draft.Id == 0 && valid.Count == 0)
-            return "Create a non-Administrator role before creating a user. No role is assigned automatically.";
+            return "The Accountant role is missing. Apply the database migration before creating users.";
+        if (kind == AccessEditorKind.Roles)
+        {
+            var codes = catalog.Permissions.Where(permission => draft.Choices.Contains(permission.Id)).Select(permission => permission.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!codes.Contains("System.Administration") &&
+                (codes.Contains("System.Users.Manage") && (!codes.Contains("System.Users") || !codes.Contains("System.Roles")) ||
+                 codes.Contains("System.Roles.Manage") && !codes.Contains("System.Roles") ||
+                 codes.Contains("System.Users") && !codes.Contains("System.Roles")))
+                return "User and role management need their viewing permissions. Select the required viewing access before saving.";
+        }
         return null;
     }
     internal static string[] Hints(AccessCatalog catalog, IEnumerable<int> permissionIds)

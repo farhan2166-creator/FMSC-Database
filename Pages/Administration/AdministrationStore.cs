@@ -72,6 +72,9 @@ internal sealed class AdministrationStore(AccessEditorKind kind) : IAdministrati
         var mappings = data.Tables[2].AsEnumerable().Select(row => (Role: Number(row,"RoleId"), Permission: Number(row,"PermissionId"))).ToArray();
         var roles = data.Tables[0].AsEnumerable().Select(row => new AccessRole(Number(row,"RoleId"), Text(row,"RoleName"),
             Text(row,"Description"), mappings.Where(map => map.Role == Number(row,"RoleId")).Select(map => map.Permission).Distinct().Order().ToArray())).ToArray();
+        if (roles.Length != 2 || !roles.Any(role => AdministrativeAccess.IsAccountant(role.Name)) ||
+            permissions.Length != PermissionCatalog.All.Count || permissions.Any(permission => !PermissionCatalog.Contains(permission.Code)))
+            throw new InvalidDataException("The database needs migration 3: Administrator, Accountant and the supported permission catalog.");
         if (roles.Count(role => role.Protected) != 1 || roles.Any(role => string.IsNullOrWhiteSpace(role.Name)) ||
             roles.Select(role => role.Id).Distinct().Count() != roles.Length ||
             roles.Select(role => role.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() != roles.Length ||

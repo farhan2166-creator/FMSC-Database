@@ -7,7 +7,7 @@ public static class DatabaseHelper
     public const string LocalDbInstance = @"(localdb)\MSSQLLocalDB";
     private const string DatabaseName = "FMSC_DB";
     // Version and required schema features are checked together by DatabaseCompatibility.
-    public const string RequiredDatabaseSchemaVersion = "2";
+    public const string RequiredDatabaseSchemaVersion = "3";
     private static volatile bool _databaseAttachConfirmed;
     private static readonly object DatabaseAttachSync = new();
     public static string DatabaseEndpoint => Core.LocalDatabaseEngine.Endpoint();

@@ -48,7 +48,8 @@ public sealed class StudentFamilyPage : V2Page
         var addMember = AddAction("Add Member", async (_, _) => await RunFamilyActionAsync(AddMemberAsync), "Success");
         /* removing a member deletes a sibling link, so it is guarded like adding one. */
         var removeMember = AddAction("Remove Selected Member", async (_, _) => await RunFamilyActionAsync(RemoveSelectedMemberAsync), "Danger");
-        /* The page is reachable with Students.Family, but adding and removing family members goes to procedures that require Students.Administer (dbo.AddStudentSibling / dbo.DeleteStudentSibling). */
+    /* Students.Family opens this workspace. Both add and remove use Students.Administer
+       in C# and SQL; migration 3 removes the inconsistent Students.Siblings guard. */
         GateAction(addMember, "Students.Administer");
         GateAction(removeMember, "Students.Administer");
         /* Item 14 - both actions work on the family currently rendered (currentMemberAdmissionIds, selectedCard). */

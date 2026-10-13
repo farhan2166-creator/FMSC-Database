@@ -21,7 +21,7 @@ internal static class AdministrativeAccessChecks
             new AccessPermission(31,"System.Users","View users",""),new AccessPermission(32,"System.Roles","View roles",""),
             new AccessPermission(33,"System.Roles.Manage","Manage roles",""),new AccessPermission(34,"System.Administration","Administration","")};
         var roles=new[]{new AccessRole(1,"Administrator","Protected",permissions.Select(permission=>permission.Id).ToArray()),
-            new AccessRole(2,"Office","Office duties",new[]{10,11}),new AccessRole(3,"Finance","Finance duties",new[]{10,20})};
+            new AccessRole(2,"Accountant","Office duties",new[]{10,11}),new AccessRole(3,"Finance","Finance duties",new[]{10,20})};
         var users=new[]{new AccessListItem(7,"Ali","1 role",false),new AccessListItem(8,"Bilal","1 role",false)};
         var catalog=new AccessCatalog(roles,permissions,users,AdministrativeAccess.CatalogToken(roles,permissions));
         var roleCatalog=catalog with { Items=roles.Select(role=>new AccessListItem(role.Id,role.Name,"",role.Protected)).ToArray() };
@@ -44,11 +44,11 @@ internal static class AdministrativeAccessChecks
         Check(AdministrativeAccess.Validate(AccessEditorKind.Users,draft with { Choices=new[]{1} },catalog) is not null,"Normal users cannot receive the reserved Administrator role");
         foreach(int id in new[]{0,-1,99})Check(AdministrativeAccess.Validate(AccessEditorKind.Users,draft with { Choices=new[]{id} },catalog) is not null,"Missing/invalid role IDs cannot enter a save");
         Check(AdministrativeAccess.Validate(AccessEditorKind.Users,new(0,"New","",true,Array.Empty<int>()),catalog with { Roles=new[]{roles[0]} }) is not null,"New-user creation preserves the legacy non-Administrator primary-reference prerequisite");
-        Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(0,"New role","",false,Array.Empty<int>()),roleCatalog) is null,"New roles may deliberately grant no permissions");
+        Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(0,"New role","",false,Array.Empty<int>()),roleCatalog) is not null,"The two-role policy refuses new role creation");
         Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(2,"administrator","",false,new[]{10}),roleCatalog) is not null,"Reserved role names cannot be introduced through renaming");
-        Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(2,"Office",new string('x',251),false,new[]{10}),roleCatalog) is not null,"Description length is checked before writes");
+        Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(2,"Accountant",new string('x',251),false,new[]{10}),roleCatalog) is not null,"Description length is checked before writes");
         Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(2,new string('x',51),"",false,new[]{10}),roleCatalog) is not null,"Role name length is checked before writes");
-        Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(2,"Office","",false,new[]{999}),roleCatalog) is not null,"Unknown permission IDs are refused");
+        Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(2,"Accountant","",false,new[]{999}),roleCatalog) is not null,"Unknown permission IDs are refused");
         Check(AdministrativeAccess.Hints(catalog,new[]{30}).Length==1&&AdministrativeAccess.Hints(catalog,new[]{30,31,32}).Length==0,"User-management dependency hints inform without silently granting access");
         Check(AdministrativeAccess.Hints(catalog,new[]{33}).Length==1&&AdministrativeAccess.Hints(catalog,new[]{33,32}).Length==0,"Role-management hints match the screen's read requirements");
         Check(AdministrativeAccess.Hints(catalog,new[]{11}).Single().Contains("Quick Registration")&&AdministrativeAccess.Hints(catalog,new[]{11,10}).Length==0,"Admission hint preserves the narrower Quick Registration requirement");
@@ -105,6 +105,14 @@ internal static class AdministrativeAccessChecks
             var result=AdministrativeSaveCoordinator.Execute(transaction,writeIntent with { Values=writeIntent.Values with { Id=2 } },()=>3);
             Check(result.Outcome==AccessSaveOutcome.Unconfirmed&&result.Intent?.Values.Id==2&&transaction.Commits==0,"A wrong returned ID cannot redirect an existing-record recovery");
         }
+        Check(PermissionCatalog.All.Count==28&&PermissionCatalog.All.Values.All(p=>p.Code.Length<=100&&p.Name.Length<=100&&p.Description.Length<=250),"Supported permission definitions fit SQL column bounds");
+        Check(!PermissionCatalog.Contains("Students.Edit")&&!PermissionCatalog.Contains("System.Roles.Deactivate")&&!PermissionCatalog.Contains("Students.Siblings"),"Dormant and superseded permission options are removed");
+        Check(PermissionCatalog.All["Reports.View"].Name.Contains("student and finance")&&PermissionCatalog.All["System.Roles"].Name.StartsWith("View"),"Permission labels describe actual access rather than claiming management");
+        Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(2,"Renamed","",false,Array.Empty<int>()),roleCatalog) is not null,"Accountant cannot be renamed into another role");
+        Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(2,"Accountant","",false,new[]{30}),roleCatalog) is not null,"Incomplete management permission sets are refused before writes");
+        Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(2,"Accountant","",false,new[]{30,31,32}),roleCatalog) is null,"Complete user management prerequisites remain usable");
+        Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(2,"Accountant","",false,new[]{30,34}),roleCatalog) is null,"Broad administration satisfies management prerequisites consistently");
+        Check(AdministrativeAccess.Validate(AccessEditorKind.Users,draft with { Choices=new[]{3} },catalog) is not null,"Removed roles cannot be assigned to normal accounts");
         return checks;
     }
 }
