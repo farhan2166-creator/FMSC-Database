@@ -12,7 +12,7 @@
 
 ## A. Executive summary
 
-**Fifteen findings or verification items** across Admission Review, Student Profile, Financial Adjustments, Posting Reversal, Daily Collection Closing, Family maintenance, Duplicate review, Record Checks and Annual Receipts. **Eleven** are confirmed **source-level control-flow/guard gaps**; **two** are conditional asynchronous UI behavior that needs a delayed-response fixture; **one** is a database uncertain-outcome *verification risk*; **one** is an intentional-UX decision to confirm. None should be called a proven production failure without an appropriate Windows/SQL reproduction.
+**Twenty findings or verification items** across Admission Review, Student Profile, Financial Adjustments, Posting Reversal, Daily Collection Closing, Family maintenance, Duplicate review, Record Checks, Annual Receipts, Additional Fee Posting, Fee Configuration and Student Account Statements. **Fifteen** identify confirmed **source-level control-flow, state, or guard gaps**; **two** are conditional asynchronous UI issues requiring delayed-response fixtures; **two** are verification risks (one SQL uncertain-outcome question and one synchronous performance issue); **one** is a navigation/UX policy decision. The five additional items (FQA-16 through FQA-20) were discovered in the second-pass review below. None is claimed to have been reproduced on the user's live Windows installation.
 
 **Most important pattern:** Disabling an individual `AddBusyAction` button is **not the same** as blocking page departure or other conflicting actions while a database write is running. `MainDashboardForm` checks the **top-level active page** for `IBusyPage` and then `IUnsavedChanges`. Several nested pages and dialogs fail to expose the true operation/draft state. Adding `IBusyPage` to a nested control **alone** is insufficient unless its host forwards that contract.
 
@@ -20,6 +20,11 @@
 
 | ID | Severity | Classification | Workflow | Concise problem |
 |---|---|---|---|---|
+| **FQA-16** | **P2** | Confirmed stale-result acceptance | Additional Fee Posting | Filter A can finish loading after operator changes to filter B, exposing an outdated student set for charging |
+| **FQA-17** | **P2** | Confirmed draft-discard gap | Fee Rate Matrix | Switching Campus clears unsaved fee-cell edits without asking |
+| **FQA-18** | **P2** | Confirmed missing busy contract | Embedded Fee Rate Matrix | Workspace navigation/tab changes are not blocked while Save Grid is executing |
+| **FQA-19** | **P2** | Confirmed failure-state gap | Student Account Statement | Failed regeneration preserves old statement plus enabled Export for unchanged filters |
+| **FQA-20** | **P3 verification** | Synchronous source design; impact unmeasured | Student Account Statement | Generating a statement serially queries each student on the UI thread, risking long unresponsive periods |
 | **FQA-15** | **P2** | Confirmed source gap | Admission / confirmation | `RunBusyAsync` writes are not reflected by `StudentAdmissionPage.IsBusy` |
 | **FQA-07** | **P2** | Confirmed source gap | Daily Collection Closing | Active financial write is handled as a confirmable discard, not an unconditional leave block |
 | **FQA-09** | **P2** | Confirmed source gap | Duplicate review | Confirm and Dismiss can operate concurrently on the same selected pairs |
@@ -223,7 +228,105 @@ No DACPAC or database replacement should be used for an update. If a SQL change 
 ## G. Review provenance and limitations
 
 - **Read-only code review** of the source linked above at **`3a3fbd6`**; compared several guarded working equivalents before creating findings.
-- **Not** all buttons or forms were executed. User's reported live defects are evidence from the operator, but are explicitly **excluded** from the new 15-item count.
+- **Not** all buttons or forms were executed. User's reported live defects are evidence from the operator, but are explicitly **excluded** from the 20-item count.
 - The report records **confirmed source control-flow gaps** separately from **conditional timing** and **database verification** questions. Risks involving server commit/retry are **not asserted as reproduced financial loss**.
 - Repository may receive additional Codex commits. Rebase findings against the **new HEAD** before modifications. Fixes should be small, independently testable, and should preserve transaction semantics, role permissions, opening-fee policy, sibling links, admission numbering and SQL migration ordering.
-- **Only intended repository mutation:** create this new audit Markdown file. No existing C#/PowerShell/SQL/test/audit files should be changed to publish the report.
+- **Only intended repository mutation:** create or update **this** functional-audit Markdown file. No C#/PowerShell/SQL/test files or other audit documents should be changed by this review.
+
+
+## H. Second-pass deepening — Additional Fee Posting, Fee Configuration, Statements
+
+**Audit addendum:** 13 October 2026. **Code baseline:** `3a3fbd63590cc7dedb3f17f008e84f7be67a9132` (unchanged from the original report); **preceding report commit:** `43a10b3fa829efa3727f3844e2ad17d871d0015d`. Five newly numbered items, FQA-16 through FQA-20. Old FQA-01 through FQA-15 are **retained**, not automatically marked fixed. The reported Quick Registration live-testing observations remain excluded from the new-finding count.
+
+### FQA-16 — Additional Fee Posting accepts an obsolete student-list response [P2, confirmed source gap]
+
+**Evidence:** [`Pages/Finance/Billing/AdditionalFeePostingPage.cs` lines 19–25](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Billing/AdditionalFeePostingPage.cs#L19-L25), [`Pages/Finance/Billing/AdditionalFeePostingPage.cs` lines 70–85](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Billing/AdditionalFeePostingPage.cs#L70-L85), [`Pages/Finance/Billing/AdditionalFeePostingPage.cs` lines 103–142](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Billing/AdditionalFeePostingPage.cs#L103-L142), [`Pages/Finance/Billing/AdditionalFeePostingPage.cs` lines 146–181](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Billing/AdditionalFeePostingPage.cs#L146-L181), [`Core/V2Page.cs` lines 718–769](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Core/V2Page.cs#L718-L769).
+
+**Operator sequence:** Choose Campus A, Class X and a year → click **Load Students** → while SQL is delayed, change Campus to B → the filter-change event clears the grid/selection → the earlier A query resolves and unconditionally assigns `candidates` and `students.DataSource`. The page now shows students from **A** while Campus reads **B**. Tick or **Select All**, supply a fee/amount/reason, and click **Post Selected**.
+
+**Cross-checks before confirming:** `ClearCandidates()` clears the current dataset and selection but does **not** invalidate a pending load generation. `LoadAsync` captures the lookup IDs as query arguments before `await`, but after the await applies the response without comparing them to the live lookups. There is no version/generation check or scope check in `PostAsync`; it sends the selected enrollment IDs in a table-valued parameter. `AddBusyAction("Load Students")` disables its clicked button, **not** the scope controls. The final confirmation displays fee, count, date, amount and total, **but neither the campus nor the specific student names**. This is a proven **client-side stale-context acceptance path**, not proof of incorrect SQL charges; `PostAdditionalFee` server rules must also be tested.
+
+**Expected:** A response for Campus A must never bind under Campus B. Post must not accept student selections from an obsolete scope.
+
+**Recommended fix (C#):**
+1. Capture a full candidate-query signature (year, campus, class, section) plus incrementing load generation **before** the await. Invalidate generation whenever any of those filters changes or the page is disposed; apply only a still-current result.
+2. Either hold scope filters for the entire load or allow changes and discard stale responses, with an intelligible “Filters changed; load again” status.
+3. Record the exact loaded scope alongside `candidates`; recheck it in `PostAsync` immediately before confirmation/submission, and check all selected enrollment IDs belong to the currently displayed candidate set.
+4. Make the final posting confirmation name the chosen scope and ideally a short summary of student identifiers with a way to inspect the full list. Keep the existing request-ID/idempotency and `IBusyPage` protections.
+
+**Windows/SQL acceptance:** Slow A query → change to B; clear class; reload B; cancel load; double-click Load; select all/untick; verify UI filters, displayed rows, selected IDs, confirmation and SQL TVP match the same scope. SQL assertions should use an isolated test database. **Never test posting to real students.**
+
+### FQA-17 — Fee Rate Matrix campus switch can silently lose unsaved edits [P2, confirmed source gap]
+
+**Evidence:** [`Pages/Finance/Configuration/FeeRateMatrixForm.cs` lines 169–197](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Configuration/FeeRateMatrixForm.cs#L169-L197), [`Pages/Finance/Configuration/FeeRateMatrixForm.cs` lines 220–246](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Configuration/FeeRateMatrixForm.cs#L220-L246), [`Pages/Finance/Configuration/FeeRateMatrixForm.cs` lines 426–439](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Configuration/FeeRateMatrixForm.cs#L426-L439), [`Pages/Finance/Configuration/FeeRateMatrixForm.cs` lines 639–662](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Configuration/FeeRateMatrixForm.cs#L639-L662).
+
+**Operator sequence:** Select a campus → edit a class/fee cell, without **Save Grid** → change Campus → observe the editor reset/rebuilt from another campus. There is no confirm/discard/stay decision attached to the **Campus.SelectedIndexChanged** event.
+
+**Cross-checks:** This form already has `HasUnsavedChanges => IsDirty()` and a `FormClosing` discard prompt; its `OnConfigurationsChanged` handler expressly refuses to reload while dirty. However, the Campus handler immediately calls `LoadGridAsync`. That method **first clears the grid and sets `loadedSnapshot = ""` and clears stored cell values**, then issues SQL queries. It does not check `IsDirty` or ask to discard before wiping the draft. Even a failed new-campus query can leave the original edits unavailable.
+
+**Expected:** Switching campus with edited fee values requires a Save / Discard / Stay decision, not silent loss. The old campus should remain selected if the user chooses Stay.
+
+**Proposed fix:** Reuse `IsDirty` / the existing modal confirmation concept for an *internal campus-selection change*, preserving prior ID and avoiding selection-change recursion during rollback. Optionally allow an explicit Save Grid followed by campus switch only once the save is confirmed; don't auto-submit financial edits. Do not disturb the clean-campus fast path and existing grid-version latest-load checks.
+
+**Tests:** Edit amount/frequency/remarks → switch campus → Stay, Discard and Save decisions; cancel picker; empty campus; failed destination load; rapid campus A→B→A; exact row focus and fee values. Include embedded-tab mode and standalone dialog.
+
+### FQA-18 — Embedded Fee Rate Matrix does not advertise Save Grid as page-busy [P2, confirmed source gap]
+
+**Evidence:** [`Pages/Finance/Configuration/FeeRateMatrixForm.cs` lines 1–9](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Configuration/FeeRateMatrixForm.cs#L1-L9), [`Pages/Finance/Configuration/FeeRateMatrixForm.cs` lines 187–232](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Configuration/FeeRateMatrixForm.cs#L187-L232), [`Pages/Finance/Configuration/FeeRateMatrixForm.cs` lines 150–172](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Configuration/FeeRateMatrixForm.cs#L150-L172), [`Pages/Finance/Configuration/FeeConfigurationWorkspace.cs` lines 1–14](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Finance/Configuration/FeeConfigurationWorkspace.cs#L1-L14), [`WorkspacePage.cs`](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Core/WorkspacePage.cs), [`MainDashboardForm.cs` lines 1637–1655](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/MainDashboardForm.cs#L1637-L1655).
+
+**Operator sequence:** Open **Fee Configuration → Fee Rate Matrix** (embedded as a tab) → edit one or more fee cells → click **Save Grid** → while SQL write is delayed, switch to **Fee Types** / **Copy Fees**, or navigate elsewhere/exit. The form holds `savingGrid` and disables its own campus selector/grid, but does **not** implement `IBusyPage`. Its existing `FormClosing` protection applies to the independent Form close event and **does not supply an `IBusyPage` interface to the host when embedded**.
+
+**Cross-checks:** The parent `WorkspacePage` **already** implements `IBusyPage` and `IUnsavedChanges`, scans *all loaded tabs*, and cancels tab switching on a busy child. Thus the parent infrastructure is **not** missing. The exact gap is the embedded `FeeRateMatrixForm`, which only implements `IUnsavedChanges`: while saving, the parent cannot detect that write via `BusyChild`. A dirty-change confirmation is not a substitute for an unconditional write block.
+
+**Fix:** Implement `IBusyPage` on `FeeRateMatrixForm` mapping `IsBusy => savingGrid` and a descriptive `BusyMessage`; preserve the existing unsaved/dirty contract. Ensure it covers the entire async save **including success/reload**, and the parent tab+dashboard automatically sees it. Test modal X/Escape, embedded tab switch, sidebar, sign-out and closing while the SQL server holds the save. Keep read-only tabs navigable when no write is running.
+
+**Important distinction:** FQA-17 concerns a **draft before save** and an internal campus switch. FQA-18 concerns a **submitted database write in flight** and leaving an embedded tab/workspace. They require different responses.
+
+### FQA-19 — Failed Student Account Statement regeneration leaves an old Export enabled [P2, confirmed source gap]
+
+**Evidence:** [`Pages/Reports/Finance/StudentAccountStatementPage.cs` lines 665–691](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Reports/Finance/StudentAccountStatementPage.cs#L665-L691), [`Pages/Reports/Finance/StudentAccountStatementPage.cs` lines 1230–1315](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Reports/Finance/StudentAccountStatementPage.cs#L1230-L1315), [`Pages/Reports/Finance/StudentAccountStatementPage.cs` lines 169–194](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Reports/Finance/StudentAccountStatementPage.cs#L169-L194).
+
+**Operator sequence:** Select one or more students/dates → Generate Statement successfully → some new payment or charge is recorded elsewhere → return to the **same filters and selection** → click **Generate Statement** again → inject a SQL failure while fetching new data. The page catches the error through `Fail(ex)`. **But** it does not clear or mark the previous bound statement as stale and does not clear `_appliedFilterSignature` or disable `exportButton` at the start/failure of regeneration.
+
+**Cross-checks:** `OnFiltersChanged` correctly disables Export when the *controls change*. That does **not** protect this scenario because the controls have not changed: the old signature still matches. `LoadStatement()` builds its new table off-screen; when a query fails before `Bind(combined)`, the old grid remains visible. Therefore Export may still operate on the old, potentially outdated report, even though the latest generate attempt failed. This is not proof the old amounts were wrong *when originally generated*.
+
+**Expected:** If a fresh Generate Statement attempt fails, the UI must not silently leave the old result exportable as a currently refreshed statement.
+
+**Fix:** On a new Generate attempt, mark the existing result **not current** before database calls and disable Export. On failure, either clear it or retain it explicitly labeled **previous snapshot / not refreshed** with Export disabled until a successful regeneration. Distinguish “latest query failed” from “no data” in status. Restore `_appliedFilterSignature` and actions only after all selected students' results, totals and grid binding succeed. Preserve user selection and date inputs after a failure.
+
+**Tests:** Generate A → insert payment in disposable SQL → fail subsequent Generate A → Export disabled and stale warning; recover and Generate → new totals/export match; change dates mid-flow; fail on second of several student queries; zero transaction rows; missing opening-balance row.
+
+### FQA-20 — Statement generation serially blocks the WinForms UI during SQL reads [P3, performance-verification item]
+
+**Evidence:** [`Pages/Reports/Finance/StudentAccountStatementPage.cs` lines 176–190](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Reports/Finance/StudentAccountStatementPage.cs#L176-L190), [`Pages/Reports/Finance/StudentAccountStatementPage.cs` lines 1227–1312](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Reports/Finance/StudentAccountStatementPage.cs#L1227-L1312).
+
+**Source design:** The **Generate Statement** button synchronously invokes `LoadStatement()` on the UI thread. Inside it, `foreach (int admissionId in admissionIds)` repeatedly calls synchronous `LoadStatementData` → `DatabaseHelper.QueryUserSet("GetFeeStatementTransactions")` before building the report. With a multi-student/family selection this is **one blocking SQL round trip per selected student** and the window cannot process normal paint/cancel/input events during those waits. This is a source-confirmed synchronous execution path, **not** a measured hang/crash on the user's PC.
+
+**Impact to verify:** A single student on local SQL may feel normal; 50–500 selected students on a slow Windows computer or delayed SQL instance could make the application appear frozen. A failed query later in the loop compounds FQA-19's feedback problem.
+
+**Proposed approach:** Benchmark first (1, 10, 50, 200 students; warm/cold DB). Move the existing verified result assembly off the UI thread with a cancellable/latest-load coordinator or, preferably, a bulk SQL retrieval interface if it can preserve financial semantics and balances. Capture immutable selected IDs/dates on the UI thread; never read WinForms controls inside background tasks. Bind all results atomically and preserve opening-balance verification and report sums. Do not schedule simultaneous unbounded queries or assume parallel SQL reads improve performance. Report a loading state and safe Cancel/Leave behavior while reads run, distinct from `IBusyPage` financial writes.
+
+**Acceptance:** Window remains responsive at 125–150% DPI under injected SQL delay; only the latest requested result binds, totals match the synchronous version exactly for all sample students, error and no-data states are clear, Export disabled while result is stale, and no further SQL activity continues after page disposal/cancellation where supported.
+
+## I. Second-pass regression matrix, ruled-out candidates, and new priorities
+
+| Test case (isolated Windows / disposable SQL) | Findings | Required outcome |
+|---|---|---|
+| Additional Fee Load Campus A delayed → switch to B → click Select All → Post | 16 | No stale A list binds under B; no A enrollment IDs posted under B |
+| Edit Fee Rate Matrix cell → campus change → Stay/Discard | 17 | Draft retained on Stay, discarded only after explicit decision |
+| Save Grid delayed → switch tabs/sidebar/exit | 18 | Parent host blocks all departures during active save and shows committed/unknown outcome |
+| Generate statement successfully → fail regeneration on same filters → Export | 19 | Existing grid marked stale or cleared; Export disabled until successful refresh |
+| Generate statement for many students with SQL delay | 20 | UI paints/responds, controls held appropriately; values and balances unchanged |
+| Test previous 15 FQA findings again after shared busy guards are changed | 01–15 | No regressions to protected dialogs, preview filters, payment identity or financial journaling |
+
+**Cross-checks deliberately excluded from defects:**
+
+- `WorkspacePage` already forwards `IUnsavedChanges` and `IBusyPage` from **all loaded child tabs**, and blocks switching tabs on a busy child. FQA-18 must be fixed **at the fee-matrix child**, not by duplicating host logic.
+- `StudentPurchasesPage` uses `StudentPicker.SelectionChangeGuard`, and `StudentPicker.OnTextEdited` invokes the guard before clearing a committed selection. The tempting claim that simply typing a different student's name silently discards a purchase draft was **rejected**.
+- `ApplyFeeConfigurationPage` only has a known production caller from `FeeRateMatrixForm` passing `matrixCampusId` and scopes; that route **disables its campus selector**. A generic “change campus mid-apply” bug is therefore **not claimed reachable** in the currently used dialog route.
+- In `ConfirmReturnAdmissionDialog` the currently used `ConfirmReturnAdmissionPage(compactDialog:true)` disables/hides the student picker. The suggestion that the clerk can switch students *inside this modal* and lose edits was **rejected as a current-route defect**. A future standalone page route should still protect edited opening-fee drafts.
+- `BulkPromotionPage` already disables its selection/scope controls for candidate loads and promotions, revalidates source IDs, and reports server counts. Do not report a generic filter-race bug there simply because the other fee-posting page has one.
+
+**Updated implementation order (risk-first):** First FQA-16 (wrong student scope can reach financial charge request); FQA-18 and FQA-17 (keep Fee Rate Matrix operations/drafts safe); FQA-19 (financial report freshness); then the original FQA-15/07/04/01/09/11 and remaining original findings; finally benchmark FQA-20 and improve only where justified. Coordinate shared busy/dirty-state changes with the existing `WorkspacePage` aggregator instead of introducing parallel mechanisms.
+
+**Execution/provenance:** These are additional static source findings at unchanged code HEAD `3a3fbd6`. Recheck against Codex's current pushed commit before fixing. No native UI, financial write, SQL fault injection, deployment, or performance benchmark was executed by this second pass. Updating this audit is documentation only.
