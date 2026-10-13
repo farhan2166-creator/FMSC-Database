@@ -35,6 +35,9 @@ public sealed class QuickRegistrationPage : UserControl, IUnsavedChanges, IBusyP
 internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
 {
     private readonly Action<Func<Control>, string, string> navigate;
+    private readonly Func<int, Task<(DataTable Details, DataTable Fees, string Snapshot)>> loadRegistration;
+    private bool applyingRegistration, needsRefresh;
+    private int registrationLoadVersion;
     private readonly StudentPicker family = new();
     private readonly ModernTextBox parent = HumanUi.TextBox(false, 500);
     private readonly ModernTextBox contact = HumanUi.TextBox(false, 30);
@@ -51,24 +54,40 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     internal bool IsBusy=>busy||loadingFees||loadingFamily;
     private string savedStatus="";
     private string savedSnapshot="",expectedQuote="";
+    // Owner-approved (2026-10-13): date/year-only changes on an otherwise blank
+    // new registration are selection context, not a student draft. Allow leaving
+    // without a discard prompt; entered student details or placement still warn.
+    // Existing pending records retain their normal edit tracking.
     public bool HasUnsavedChanges=>HasPendingChanges||(savedStudent==0&&(name.Text.Trim().Length>0||parent.Text.Trim().Length>0||contact.Text.Trim().Length>0||address.Text.Trim().Length>0||placement.SelectedId>0));
     public string UnsavedChangesMessage=>"Discard the unsaved registration changes?";
     private string familyReference="";
     private string[] savedBasics=Array.Empty<string>();
     private bool busy, loadingFamily, loadingFees, feesLoaded;
     private readonly FormValidator validator;
-    private readonly ModernButton save, next, bill, collect;
+    private readonly ModernButton save, next, bill, collect, reload;
     private readonly ModernButton linkFamily = new(){Text="Link Existing Family",ThemeRole="Secondary",AutoSize=true};
     private readonly HumanCard registrationCard;
     private readonly TableLayoutPanel registrationContent;
     private readonly TableLayoutPanel root;
     private readonly Control familyField;
     internal QuickRegistrationFormPage(Action<Func<Control>, string, string> navigate, int preselectRegistrationId=0)
+        : this(navigate, preselectRegistrationId, async id => {
+            var result = await QuickRegistrationWriter.LoadAsync(id);
+            return (result.Details, result.Fees, result.Snapshot);
+        }) { }
+
+    internal QuickRegistrationFormPage(Action<Func<Control>, string, string> navigate, int preselectRegistrationId,
+        Func<int, Task<(DataTable Details, DataTable Fees, string Snapshot)>> loadRegistration)
         : base("Quick Registration", "Save basic details and issue the family bill. Review and confirm from Pending Registrations.")
     {
         this.navigate=navigate;
+        this.loadRegistration=loadRegistration;
+        Disposed += (_, _) => ++registrationLoadVersion;
         validator=CreateValidator();
-        save=AddBusyAction("Save Registration", SaveAsync, "Success");
+        // These operations own their enabled state, including a stale post-save
+        // screen that must remain disabled until a deliberate reload succeeds.
+        save=AddAction("Save Registration", async (_, _) => await SaveAsync(), "Success");
+        reload=AddAction("Reload Registration", async (_, _) => { await OpenRegistrationAsync(savedStudent); }, "Secondary");
         next=AddAction("Add Another Child", (_,_)=>ClearChild(), "Secondary");
         bill=AddBusyAction("Print Family Bill", PrintBillAsync, "Secondary");
         collect=AddAction("Collect Payment",(_,_)=>navigate(()=>new FMSC_SMS.Pages.Finance.Collection.FeeCollectionPage(savedStudent),"Fees & Billing","Fee Collection"),"Primary");
@@ -107,8 +126,8 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(4)));
         root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.Controls.Add(registrationCard,0,0);root.Controls.Add(feeCard,0,1);SetContent(root);
         family.UserSelectionChanged+=async(_,_)=>await LoadFamilyAsync();
-        family.SelectionCleared+=(_,_)=>{++familyLoadVersion;familyAnchor=0;familyReference="";loadingFamily=false;parent.Clear();contact.Clear();address.Clear();UpdateActions();};
-        placement.SelectedIndexChanged+=async(_,_)=>await LoadFeesAsync();
+        family.SelectionCleared+=(_,_)=>{if(applyingRegistration)return;++familyLoadVersion;familyAnchor=0;familyReference="";loadingFamily=false;parent.Clear();contact.Clear();address.Clear();UpdateActions();};
+        placement.SelectedIndexChanged+=async(_,_)=>{if(!applyingRegistration)await LoadFeesAsync();};
         Load+=async(_,_)=>{await LoadLookupsAsync();if(preselectRegistrationId>0)await LoadRegistrationAsync(preselectRegistrationId);};UpdateActions();
     }
     private static TableLayoutPanel Fields(params (string Label,Control Input,bool Required,int Span)[] fields)
@@ -178,18 +197,18 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         }catch(Exception ex){if(version==loadVersion)Fail(ex);}
         finally{if(version==loadVersion){loadingFees=false;UpdateActions();}}
     }
-    private void SetRates(DataTable data){
-        data.Columns.Add("NetAmount",typeof(decimal),"Amount - Discount");
-        data.Columns.Add("OriginalDiscount",typeof(decimal));foreach(DataRow row in data.Rows)row["OriginalDiscount"]=row["Discount"];
-        if(!data.Columns.Contains("HasPayments"))data.Columns.Add(new DataColumn("HasPayments",typeof(bool)){DefaultValue=false});
-        rates=data;fees.DataSource=rates;
+    private void SetRates(DataTable data)
+    {
+        var prepared = QuickRegistrationView.PrepareFees(data);
+        rates = prepared; fees.DataSource = prepared;
     }
-    private bool ReadyToSave=>!busy&&!loadingFamily&&!loadingFees&&feesLoaded&&(savedStudent==0||(savedStatus=="Pending"&&savedSnapshot.Length>0))&&(family.SelectedId<=0||family.SelectedId==familyAnchor);
+    private bool ReadyToSave=>!needsRefresh&&!busy&&!loadingFamily&&!loadingFees&&feesLoaded&&(savedStudent==0||(savedStatus=="Pending"&&savedSnapshot.Length>0))&&(family.SelectedId<=0||family.SelectedId==familyAnchor);
     private string[] BasicValues()=>new[]{name.Text.Trim(),parent.Text.Trim(),contact.Text.Trim(),address.Text.Trim()};
     private bool HasPendingChanges=>savedStudent>0&&savedStatus=="Pending"&&savedBasics.Length==4&&(!savedBasics.SequenceEqual(BasicValues())||rates.AsEnumerable().Any(r=>Convert.ToDecimal(r["Discount"])!=Convert.ToDecimal(r["OriginalDiscount"])));
-    private void PendingEditChanged(){UpdateActions();if(!busy&&HasPendingChanges)SetStatus("Save changes before printing or collecting payment.");}
-    private void UpdateActions(){save.Enabled=ReadyToSave&&QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!busy&&savedStudent>0;bill.Enabled=!busy&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!busy&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.Collect");
-        bool editing=!busy&&(savedStudent==0||savedStatus=="Pending");family.Enabled=year.Enabled=placement.Enabled=joining.Enabled=editing&&savedStudent==0;
+    private void PendingEditChanged(){if(applyingRegistration)return;UpdateActions();if(!busy&&HasPendingChanges)SetStatus("Save changes before printing or collecting payment.");}
+    private void UpdateActions(){save.Enabled=ReadyToSave&&QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!busy&&!needsRefresh&&savedStudent>0;bill.Enabled=!busy&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!busy&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.Collect");
+        reload.Visible=needsRefresh&&savedStudent>0;reload.Enabled=!IsBusy&&savedStudent>0;
+        bool editing=!busy&&!needsRefresh&&(savedStudent==0||savedStatus=="Pending");family.Enabled=year.Enabled=placement.Enabled=joining.Enabled=editing&&savedStudent==0;
         name.ReadOnly=contact.ReadOnly=address.ReadOnly=!editing;
         parent.ReadOnly=!editing||familyAnchor>0||loadingFamily;
         linkFamily.Enabled=editing&&savedStudent==0&&familyAnchor==0&&!loadingFamily;
@@ -200,20 +219,20 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         // Switching grid ReadOnly can reset individual column/cell flags.
         // Restore the edit policy after every busy or saved-state transition.
         foreach(DataGridViewColumn column in fees.Columns)column.ReadOnly=column.Name switch{
-            "Discount"=>!CurrentUser.HasPermission("Fees.Adjust"),"Include"=>savedStudent>0,_=>true};
+            "Discount"=>!editing||!CurrentUser.HasPermission("Fees.Adjust"),"Include"=>!editing||savedStudent>0,_=>true};
         foreach(DataGridViewRow row in fees.Rows)if(row.DataBoundItem is DataRowView data){
-            row.Cells["Include"].ReadOnly=savedStudent>0||Convert.ToBoolean(data.Row["IsMandatory"]);
+            row.Cells["Include"].ReadOnly=!editing||savedStudent>0||Convert.ToBoolean(data.Row["IsMandatory"]);
             bool paid=Convert.ToBoolean(data.Row["HasPayments"]);
-            row.Cells["Discount"].ReadOnly=paid||!CurrentUser.HasPermission("Fees.Adjust");
+            row.Cells["Discount"].ReadOnly=!editing||paid||!CurrentUser.HasPermission("Fees.Adjust");
             row.Cells["Discount"].ToolTipText=paid?"This fee has a payment. Use Fee Corrections to adjust it.":"";
         }}
-    private void UpdateTotal(){if(!rates.Columns.Contains("Include")){total.Text="Bill Total: Rs. 0";return;}decimal amount=rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["Include"])).Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));total.Text=$"Bill Total: Rs. {amount:N0}";PendingEditChanged();}
+    private void UpdateTotal(){if(applyingRegistration)return;if(!rates.Columns.Contains("Include")){total.Text="Bill Total: Rs. 0";return;}decimal amount=rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["Include"])).Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));total.Text=$"Bill Total: Rs. {amount:N0}";PendingEditChanged();}
     private void ClearChild()
     {
         if(busy)return;
         // Start a fresh child; only the family link and shared details carry over.
         // Invalidate any previous fee load before clearing the placement.
-        ++loadVersion;savedStudent=0;savedStatus="";savedSnapshot="";expectedQuote="";loadingFees=false;feesLoaded=false;
+        ++registrationLoadVersion;++loadVersion;needsRefresh=false;savedStudent=0;savedStatus="";savedSnapshot="";expectedQuote="";loadingFees=false;feesLoaded=false;
         name.Clear();joining.Value=DateTime.Today;year.SelectedValue=defaultAcademicYear;
         placement.SelectedValue=0;rates=new();fees.DataSource=null;
         validator.Begin();UpdateTotal();UpdateActions();name.Focus();
@@ -248,38 +267,118 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
             // Nested fee operations can return their own result sets first.
             var results=await QuickRegistrationWriter.SaveNewAsync(placement.SelectedId,expectedQuote,args.ToArray());
             var result=results.Tables.Cast<DataTable>().Last(t=>t.Columns.Contains("AdmissionId")&&t.Columns.Contains("QuickReference")&&t.Rows.Count>0);
-            savedStudent=Convert.ToInt32(result.Rows[0]["AdmissionId"]);savedStatus="Pending";savedSnapshot="";familyAnchor=familyAnchor>0?familyAnchor:savedStudent;StudentSearchCache.Invalidate();
-            savedBasics=BasicValues();foreach(DataRow rate in rates.Rows)rate["OriginalDiscount"]=rate["Discount"];
-            string reference=result.Columns.Contains("QuickReference")?Convert.ToString(result.Rows[0]["QuickReference"])??"":$"QR-{savedStudent}";
-            if(familyAnchor==savedStudent)familyReference=reference;
-            busy=false;await LoadRegistrationAsync(savedStudent);busy=true;
-            SetStatus($"Saved {reference}. Print the family bill, collect payment or add another child.");
+            int committedId=Convert.ToInt32(result.Rows[0]["AdmissionId"]);
+            string reference=Convert.ToString(result.Rows[0]["QuickReference"])??"";
+            if(string.IsNullOrWhiteSpace(reference))reference=$"QR-{committedId}";
+            await CompleteCommittedSaveAsync(committedId,reference,isNew:true);
         }catch(Exception ex){Fail(ex);}finally{busy=false;UpdateActions();}
     }
-    private async Task LoadRegistrationAsync(int id)
+    private sealed record EditorState(int Student, string Status, string Snapshot, string Quote, int Anchor, string Reference,
+        string[] Basics, bool FeesLoaded, bool NeedsRefresh, DataTable Rates, string Name, string Parent, string Contact,
+        string Address, DateTime Joining, int Year, int Placement, int FamilyId, string FamilyText, bool FamilyShown, string Total);
+
+    private EditorState CaptureEditor() => new(savedStudent,savedStatus,savedSnapshot,expectedQuote,familyAnchor,familyReference,
+        savedBasics,feesLoaded,needsRefresh,rates,name.Text,parent.Text,contact.Text,address.Text,joining.Value,
+        year.SelectedId,placement.SelectedId,family.SelectedId,family.Text,registrationContent.RowStyles[0].Height>0,total.Text);
+
+    private void RestoreEditor(EditorState state)
     {
-        if(busy||id<=0)return;busy=true;UpdateActions();
-        try{
-            var loaded=await QuickRegistrationWriter.LoadAsync(id);
-            var data=loaded.Details;
-            if(IsDisposed||data.Rows.Count==0)return;var r=data.Rows[0];
-            ++familyLoadVersion;loadingFamily=false;savedStudent=id;savedStatus=Convert.ToString(r["Status"])??"";family.Clear();familyAnchor=id;ShowFamilyPicker(false);
-            parent.Text=Convert.ToString(r["FatherName"]);contact.Text=Convert.ToString(r["ContactNumber"]);address.Text=Convert.ToString(r["Address"]);name.Text=Convert.ToString(r["StudentName"]);
-            joining.Value=Convert.ToDateTime(r["AdmissionDate"]);
-            year.SelectedValue=r["AcademicYearId"];placement.SelectedValue=r["ClassSectionId"];
-            int version=++loadVersion;
-            var stored=loaded.Fees;
-            savedSnapshot=loaded.Snapshot;
-            if(IsDisposed||version!=loadVersion)return;savedBasics=BasicValues();SetRates(stored);loadingFees=false;feesLoaded=true;UpdateTotal();
-            string reference=Convert.ToString(r["QuickReference"])??"";
-            familyReference=Convert.ToString(r.IsNull("AdmissionNumber")?r["QuickReference"]:r["AdmissionNumber"])??"";
-            if(savedStatus=="Pending")SetStatus($"{reference} · Pending. Save edits here; review and confirm from Pending Registrations.");
-            else SetStatus(savedStatus=="Active"?$"Admitted · Admission {r["AdmissionNumber"]} · Registration {r["RegistrationNumber"]}":"Registration cancelled. History is retained.");
-        }catch(Exception ex){Fail(ex);}finally{busy=false;UpdateActions();}
+        savedStudent=state.Student;savedStatus=state.Status;savedSnapshot=state.Snapshot;expectedQuote=state.Quote;
+        familyAnchor=state.Anchor;familyReference=state.Reference;savedBasics=state.Basics;feesLoaded=state.FeesLoaded;
+        needsRefresh=state.NeedsRefresh;rates=state.Rates;
+        name.Text=state.Name;parent.Text=state.Parent;contact.Text=state.Contact;address.Text=state.Address;
+        joining.Value=state.Joining;year.SelectedValue=state.Year;placement.SelectedValue=state.Placement;
+        family.SetStudent(state.FamilyId,state.FamilyText);ShowFamilyPicker(state.FamilyShown);fees.DataSource=rates;
+        total.Text=state.Total;
     }
+
+    private async Task<RegistrationLoadOutcome> LoadRegistrationAsync(int id, bool afterSave=false)
+    {
+        if(busy&&!afterSave)return RegistrationLoadOutcome.Busy;
+        if(id<=0)return RegistrationLoadOutcome.NotFound;
+        bool wasBusy=busy;busy=true;
+        int version=++registrationLoadVersion;
+        ++familyLoadVersion;++loadVersion;loadingFamily=loadingFees=false;
+        UpdateActions();
+        using var progress=BeginLoading("Refreshing registration…");
+        EditorState? previous=null;
+        try
+        {
+            var loaded=await loadRegistration(id);
+            if(IsDisposed||version!=registrationLoadVersion)return RegistrationLoadOutcome.Superseded;
+            var view=QuickRegistrationView.Read(id,loaded.Details,loaded.Fees,loaded.Snapshot);
+            if(view is null)
+            {
+                if(id==savedStudent)needsRefresh=true;
+                SetStatus("The registration was not found. The current form has been retained.",PageStatusKind.Warning);
+                return RegistrationLoadOutcome.NotFound;
+            }
+            if(view.Joining<joining.MinDate||view.Joining>joining.MaxDate)
+                throw new InvalidDataException("The registration date cannot be displayed.");
+            if(view.Year>0&&(year.DataSource is not DataTable years||!years.AsEnumerable().Any(row=>Convert.ToInt32(row["AcademicYearId"])==view.Year)))
+                throw new InvalidDataException("Reload the academic-year list before opening this registration.");
+            if(view.Placement>0&&!placements.AsEnumerable().Any(row=>Convert.ToInt32(row["ClassSectionId"])==view.Placement))
+                throw new InvalidDataException("Reload the placement list before opening this registration.");
+            previous=CaptureEditor();
+            applyingRegistration=true;SuspendLayout();
+            try
+            {
+                parent.Text=view.Parent;contact.Text=view.Contact;address.Text=view.Address;name.Text=view.Student;
+                joining.Value=view.Joining;year.SelectedValue=view.Year;placement.SelectedValue=view.Placement;
+                rates=view.Fees;fees.DataSource=rates;
+                savedStudent=view.Id;savedStatus=view.Status;savedSnapshot=view.Snapshot;familyAnchor=view.Id;
+                familyReference=view.FamilyReference;savedBasics=BasicValues();feesLoaded=true;needsRefresh=false;
+                family.Clear();ShowFamilyPicker(false);
+            }
+            finally { applyingRegistration=false;ResumeLayout(true); }
+            UpdateTotal();
+            SetStatus(view.Status=="Pending"?$"{view.Reference} · Pending. Save edits here; review and confirm from Pending Registrations."
+                : view.Status=="Active"?$"Admitted · Admission {view.AdmissionNumber} · Registration {view.RegistrationNumber}"
+                : $"Registration status: {view.Status}. History is retained.");
+            return RegistrationLoadOutcome.Loaded;
+        }
+        catch(Exception ex)
+        {
+            if(IsDisposed||version!=registrationLoadVersion)return RegistrationLoadOutcome.Superseded;
+            if(previous is not null)
+            {
+                applyingRegistration=true;SuspendLayout();
+                try { RestoreEditor(previous); }
+                catch(Exception rollbackError)
+                {
+                    needsRefresh=true;
+                    AppExceptionHandler.LogNonFatal(rollbackError,"Restoring the registration editor after a failed refresh");
+                }
+                finally { applyingRegistration=false;ResumeLayout(false); }
+            }
+            if(id==savedStudent)needsRefresh=true;
+            AppExceptionHandler.LogNonFatal(ex,"Quick Registration refresh");
+            SetStatus("Could not refresh the registration. The current form has been retained. Reopen the record before continuing. "+DbMessage.UserMessage(ex),PageStatusKind.Error);
+            return RegistrationLoadOutcome.Failed;
+        }
+        finally { busy=wasBusy;if(!IsDisposed)UpdateActions(); }
+    }
+
+    private async Task CompleteCommittedSaveAsync(int id, string reference, bool isNew)
+    {
+        if(id<=0)throw new InvalidDataException("The saved registration did not return a valid student ID.");
+        savedStudent=id;savedStatus="Pending";savedSnapshot="";needsRefresh=true;
+        if(isNew)familyAnchor=familyAnchor>0?familyAnchor:id;
+        if(familyAnchor==id)familyReference=reference;
+        savedBasics=BasicValues();
+        foreach(DataRow rate in rates.Rows)rate["OriginalDiscount"]=rate["Discount"];
+        StudentSearchCache.Invalidate();
+        var result=await LoadRegistrationAsync(id,afterSave:true);
+        if(IsDisposed||result==RegistrationLoadOutcome.Superseded)return;
+        if(result==RegistrationLoadOutcome.Loaded)
+            SetStatus(isNew?$"Saved {reference}. Print the family bill, collect payment or add another child."
+                : "Registration changes saved. Review / Confirm is on Pending Registrations.",PageStatusKind.Success);
+        else
+            SetStatus($"{reference} was saved to the database, but the screen could not refresh. Use Reload Registration before further edits, printing or payment. Do not save it again.",PageStatusKind.Warning);
+    }
+
     private async Task SavePendingAsync(){
         busy=true;UpdateActions();using var hold=BeginBusy("Saving changes…",name,parent,contact,address,fees);
-        bool changed=false;
         try{
             var current=await DatabaseHelper.QueryUserAsync("GetStudentDetails",DatabaseHelper.Int("@AdmissionId",savedStudent));
             if(current.Rows.Count==0||Convert.ToString(current.Rows[0]["Status"])!="Pending"){Warn("This registration is no longer pending. Refresh the list before editing.");return;}
@@ -289,17 +388,16 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
             var args=new List<SqlParameter>{DatabaseHelper.Int("@AdmissionId",savedStudent),DatabaseHelper.P("@StudentName",name.Text.Trim()),DatabaseHelper.P("@FatherName",row["FatherName"]),DatabaseHelper.P("@ContactNumber",contact.Text.Trim()),DatabaseHelper.P("@Address",address.Text.Trim())};
             foreach(string key in new[]{"DateOfBirth","Gender","BFormNumber","Religion","BloodGroup","AlternateContactNumber","PreviousSchool","PlaceOfBirth","FatherOccupation","Disability","BiseEnrolmentNumber","CasteTribe"})args.Add(DatabaseHelper.P("@"+key,row[key]));
             args.Add(new SqlParameter("@Discounts",SqlDbType.Structured){TypeName="dbo.StudentFeeDiscountType",Value=Tvp.StudentFeeDiscounts(rates.AsEnumerable().Where(r=>Convert.ToDecimal(r["Discount"])!=Convert.ToDecimal(r["OriginalDiscount"])).Select(r=>(Convert.ToInt32(r["StudentFeeAssignmentId"]),Convert.ToDecimal(r["Discount"]))))});
-            await QuickRegistrationWriter.SavePendingAsync(savedStudent,savedSnapshot,args.ToArray());StudentSearchCache.Invalidate();changed=true;
+            await QuickRegistrationWriter.SavePendingAsync(savedStudent,savedSnapshot,args.ToArray());
+            await CompleteCommittedSaveAsync(savedStudent,familyReference,isNew:false);
         }catch(Exception ex){Fail(ex);}finally{busy=false;UpdateActions();}
-        if(changed){await LoadRegistrationAsync(savedStudent);SetStatus("Registration changes saved. Review / Confirm is on Pending Registrations.");}
     }
     internal async Task<bool> OpenRegistrationAsync(int id)
     {
-        if(busy)return false;
+        if(IsBusy)return false;
         if(!fees.EndEdit())return false;
         if(HasUnsavedChanges&&!Confirm("Discard the unsaved registration changes and reload this record?",UiText.Dialogs.UnsavedChanges))return false;
-        await LoadRegistrationAsync(id);
-        return savedStudent==id;
+        return await LoadRegistrationAsync(id)==RegistrationLoadOutcome.Loaded;
     }
     private async Task PrintBillAsync()
     {

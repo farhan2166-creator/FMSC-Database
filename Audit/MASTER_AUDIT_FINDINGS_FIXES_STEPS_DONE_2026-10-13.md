@@ -1,7 +1,11 @@
 # FMSC_SMS — Master Audit: Findings, Fixes, Decisions and Remaining Steps
 
-**Latest implementation note:** The approved compact dashboard and follow-up
-FR-03 navigation recovery are implemented in the current source. See the
+**Latest implementation note:** The approved compact dashboard, FR-03 navigation
+recovery, FR-02 registration refresh feedback and FR-04/05 explicit photo-save
+and retry flow are implemented in the current source. FR-01 remains open.
+FR-06 is accepted by the owner: date/year-only changes on a blank new registration
+allow leaving without a discard prompt; this policy is documented in C#.
+See the
 [follow-up report's implementation addendum](FMSC_FOLLOWUP_CODE_REVIEW_FINDINGS_2026-10-13.md#implementation-and-verification-addendum--13-october-2026)
 for current findings, checks and remaining work. The sections below retain their
 consolidated historical baseline and release-gate distinctions.
@@ -179,6 +183,7 @@ These are reported implemented changes, not fresh recommendations to repeat them
 10. Preserve busy/dirty navigation protection, including the deliberately different New/Clear policy. Never silently lose drafts due to implicit refresh.
 11. Preserve paid-charge protections, uniqueness, transaction boundaries, payment journals and non-idempotent write caution. No automatic retry after ambiguous payment commit.
 12. No automatic changes to real school/student records during audit, testing or migration verification; use separately restored disposable copies.
+13. On an otherwise blank new Quick Registration, changing only the date or academic year does not require a discard warning. Student-detail/placement drafts and existing pending-record edits keep their normal warnings.
 
 ## 6. Remaining steps — prioritized release acceptance checklist
 

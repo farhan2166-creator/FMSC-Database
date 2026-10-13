@@ -218,11 +218,17 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         ImageAlign = ContentAlignment.MiddleLeft,
         TextImageRelation = TextImageRelation.ImageBeforeText
     };
-    private byte[]? _pendingPhotoData;
+    private readonly StudentPhotoDraft photoDraft = new();
+    private byte[]? _pendingPhotoData => photoDraft.Current?.Data;
     private readonly LatestReadScope photoRead = new();
+    private readonly Func<int, byte[], string?, string?, Task> writePhoto;
+    private readonly Func<int, CancellationToken, Task<DataTable>> readPhoto;
     private bool photoBusy;
-    private string? _pendingPhotoFileName;
-    private string? _pendingPhotoContentType;
+    private readonly ModernButton savePhotoButton = new() {
+        TakesFocus = false, Text = "Save Photo", ThemeRole = "Secondary", Visible = false,
+        Width = AppScale.Scale(150), Height = AppMetrics.ButtonHeight
+    };
+    private RowStyle? photoSaveRow, photoActionsRow;
     private readonly DataGridView feeGrid = HumanUi.Grid(false);
     private readonly ModernComboBox feePreviewMonth=HumanUi.Combo();
     public bool IsBusy => saveBusy || photoBusy;
@@ -302,7 +308,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             List<AdmissionPart> current;
             try
             {
-                current = AdmissionParts(pendingPhoto: _pendingPhotoData is not null);
+                current = AdmissionParts(pendingPhoto: false);
             }
             catch (Exception nonFatalException47)
             {
@@ -599,11 +605,19 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     internal event Action? RegistrationFinished;
     public StudentAdmissionPage(
         Action<Func<Control>, string, string>? navigate = null, int preselectAdmissionId = 0, bool registrationReview = false, bool focusPhoto = false)
+        : this(navigate, preselectAdmissionId, registrationReview, focusPhoto, WritePreparedPhotoAsync,
+            (id, token) => DatabaseHelper.QueryUserAsync("GetStudentPhoto", token, DatabaseHelper.Int("@AdmissionId", id))) { }
+
+    internal StudentAdmissionPage(Action<Func<Control>, string, string>? navigate, int preselectAdmissionId,
+        bool registrationReview, bool focusPhoto, Func<int, byte[], string?, string?, Task> writePhoto,
+        Func<int, CancellationToken, Task<DataTable>> readPhoto)
     : base(
         registrationReview ? "Review Registration" : PageTitles.Admissions,
         registrationReview ? "Complete the details, save, then confirm admission. Official numbers are assigned on confirmation." : AdmissionContextSubtitle)
     {
         this.registrationReview = registrationReview;
+        this.writePhoto = writePhoto;
+        this.readPhoto = readPhoto;
         Disposed += (_, _) => photoRead.Dispose();
         firstPlacementStatus.Items.AddRange(new object[] { "Active", "Left" });
         viewEnrollmentDate.Text=editEnrollmentDate.Text="-";
@@ -639,7 +653,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         StudentPhotoViewForm.EnableZoom(photoPreview, () => currentAdmissionId > 0
             ? $"{AdmissionNumbers.ForId(currentAdmissionId)} - {name.Text.Trim()}"
             : name.Text.Trim());
-        foreach (Button button in new[] { tab1Button, tab2Button, choosePhotoButton, removePhotoButton })
+        foreach (Button button in new[] { tab1Button, tab2Button, choosePhotoButton, savePhotoButton, removePhotoButton })
             UiHelper.DisposeOwnedButtonImageOnDispose(button);
         _navigate = navigate;
         // This constructor builds by far the largest, most field-dense control tree in the app (student/guardian/address/placement fields, the fee grid, the siblings grid, both tabs).
@@ -956,9 +970,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             (_, _) => SwitchTab(1);
         choosePhotoButton.Click +=
             async (_, _) => await ChoosePhotoAsync();
+        savePhotoButton.Click += async (_, _) => await SavePhotoAsync();
         removePhotoButton.Click +=
             async (_, _) => await RemovePhoto();
-        choosePhotoButton.Enabled = removePhotoButton.Enabled = CurrentUser.HasPermission("Students.Administer");
+        UpdatePhotoActions();
         var studentGuardianCard = HumanUi.Card(
             "Student & Family Information",
             null,
@@ -1245,11 +1260,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             new RowStyle(
                 SizeType.Absolute,
                 120));
-        int photoButtonsRowHeight = 2 * (AppMetrics.ButtonHeight + 4);
-        photoPanel.RowStyles.Add(
-            new RowStyle(
-                SizeType.Absolute,
-                photoButtonsRowHeight));
+        photoActionsRow = new RowStyle(SizeType.Absolute, 2 * (AppMetrics.ButtonHeight + 4));
+        photoPanel.RowStyles.Add(photoActionsRow);
         photoPanel.RowStyles.Add(
             new RowStyle(
                 SizeType.Percent,
@@ -1265,18 +1277,22 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             TabStop = false,
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 2,
+            RowCount = 3,
             Padding = Padding.Empty,
             Margin = new Padding(0)
         };
         photoButtons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100F));
-        photoButtons.RowStyles.Add(new RowStyle(SizeType.Percent,50F));
-        photoButtons.RowStyles.Add(new RowStyle(SizeType.Percent,50F));
-        choosePhotoButton.Dock = removePhotoButton.Dock = DockStyle.Fill;
-        choosePhotoButton.Margin = removePhotoButton.Margin = new Padding(0,2,0,2);
+        photoButtons.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 4));
+        photoSaveRow = new RowStyle(SizeType.Absolute, 0);
+        photoButtons.RowStyles.Add(photoSaveRow);
+        photoButtons.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 4));
+        choosePhotoButton.Dock = savePhotoButton.Dock = removePhotoButton.Dock = DockStyle.Fill;
+        choosePhotoButton.Margin = savePhotoButton.Margin = removePhotoButton.Margin = new Padding(0,2,0,2);
         // Photo controls stay outside the Tab / Enter path from details to placement.
         photoButtons.Controls.Add(choosePhotoButton,0,0);
-        photoButtons.Controls.Add(removePhotoButton,0,1);
+        photoButtons.Controls.Add(savePhotoButton,0,1);
+        photoButtons.Controls.Add(removePhotoButton,0,2);
+        UpdatePhotoActions();
         photoPanel.Controls.Add(
             photoCaption,
             0,
@@ -2059,7 +2075,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     /// <summary>Shows the student's status in the Student &amp; Family Information header: "New Admission" until a student is loaded, then the stored status, coloured by what it says…</summary>
     private void UpdateStudentWorkspace()
     {
-        bool savedStudentReady = currentAdmissionId > 0 && !saveBusy;
+        UpdatePhotoActions();
+        bool savedStudentReady = currentAdmissionId > 0 && !IsBusy;
         if (collectPaymentButton is not null)
             collectPaymentButton.Enabled = savedStudentReady && _navigate is not null && CurrentUser.HasPermission("Fees.Collect");
         if (admissionPrintButton is not null)
@@ -2779,10 +2796,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         /* Item 11 - a photo chosen but not yet saved belongs to the record this load is replacing. */
         if (admissionId != currentAdmissionId)
         {
-            /* Re-loading the SAME student (the reload right after a save) keeps a photo whose save failed, so the "choose it again / still held on this form" message stays true. */
-            _pendingPhotoData = null;
-            _pendingPhotoFileName = null;
-            _pendingPhotoContentType = null;
+            /* Re-loading the same student keeps a prepared photo available for Save Photo or retry. */
+            photoDraft.Discard();
         }
         /* Item 6 - and the stored-religion carry-over belongs to the previous student too. */
         _loadedReligionNotInList = null;
@@ -3921,7 +3936,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         if (_pendingPhotoData is not null)
         {
             StudentPhotoViewForm.SetPreviewImage(photoPreview, BitmapFromBytes(_pendingPhotoData));
-            photoInfo.Text = $"{_pendingPhotoFileName} · {_pendingPhotoData.Length / 1024d:N0} KB · not saved";
+            ShowPendingPhotoStatus();
+            UpdatePhotoActions();
             return;
         }
         StudentPhotoViewForm.SetPreviewImage(photoPreview, null);
@@ -3930,7 +3946,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             return;
         try
         {
-            var dt = await DatabaseHelper.QueryUserAsync("GetStudentPhoto", request.Token, DatabaseHelper.Int("@AdmissionId", admissionId));
+            var dt = await readPhoto(admissionId, request.Token);
             /* Item 4 - a photo that arrives after the operator has moved to another student must not be shown on them. */
             if (IsDisposed ||
                 !photoRead.IsCurrent(request) || admissionLoadVersion != version || currentAdmissionId != admissionId)
@@ -3940,6 +3956,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if (dt.Rows.Count == 0)
             {
                 photoInfo.Text = "No photo on file.";
+                UpdatePhotoActions();
                 return;
             }
             var row = dt.Rows[0];
@@ -3947,6 +3964,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 photoPreview,
                 BitmapFromBytes((byte[])row["PhotoData"]));
             photoInfo.Text = $"Updated on {Convert.ToDateTime(row["UpdatedAt"]):dd MMM yyyy, hh:mm tt}";
+            UpdatePhotoActions();
         }
         catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { }
         catch (Exception nonFatalException53)
@@ -3987,23 +4005,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if (IsDisposed || !photoRead.IsCurrent(request) || currentAdmissionId != selectedAdmissionId || admissionLoadVersion != selectedVersion)
                 return;
             string fileName = Path.ChangeExtension(Path.GetFileName(dialog.FileName), ".jpg");
-            StudentPhotoViewForm.SetPreviewImage(photoPreview, BitmapFromBytes(bytes));
-            _pendingPhotoData = bytes;
-            _pendingPhotoFileName = fileName;
-            _pendingPhotoContentType = "image/jpeg";
-            string size = $"{bytes.Length / 1024d:N0} KB";
-            if (selectedAdmissionId > 0)
-            {
-                bool saved = await PersistPendingPhotoIfAnyAsync(selectedAdmissionId);
-                if (IsDisposed || currentAdmissionId != selectedAdmissionId || admissionLoadVersion != selectedVersion) return;
-                photoInfo.Text = $"{fileName} · {size} · " + (saved ? "saved" : "not saved");
-                if (saved) Info("Photo resized and saved. Its full aspect ratio is preserved.");
-                else Alert("The prepared photo was not saved. It is still on this form; choose the photo again to retry.");
-            }
-            else photoInfo.Text = $"{fileName} · {size} · will be saved with the admission";
+            StagePreparedPhoto(bytes, fileName);
+            SetStatus(selectedAdmissionId > 0
+                ? "Photo prepared for preview. Click Save Photo to store this selection."
+                : "Photo prepared for preview. It will be stored when this admission is saved.");
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
-        finally { photoBusy = false; }
+        finally { photoBusy = false; if (!IsDisposed) UpdatePhotoActions(); }
     }
     private async Task RemovePhoto()
     {
@@ -4014,6 +4022,15 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         try
         {
             using var busy = BeginBusy(BusyMessage, this);
+            if (_pendingPhotoData is not null)
+            {
+                photoRead.Cancel();
+                photoDraft.Discard();
+                await LoadPhotoForAdmissionAsync(selectedAdmissionId);
+                if (!IsDisposed && currentAdmissionId == selectedAdmissionId && admissionLoadVersion == selectedVersion)
+                    SetStatus("The pending photo selection was discarded. The stored photo was not changed.");
+                return;
+            }
             if (selectedAdmissionId > 0)
             {
                 /* this deletes the stored photo and cannot be undone, so it is confirmed first. */
@@ -4031,9 +4048,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     DatabaseHelper.Int("@AdmissionId", selectedAdmissionId));
                 if (IsDisposed || currentAdmissionId != selectedAdmissionId || admissionLoadVersion != selectedVersion) return;
                 Info("Photo removed.");
-                _pendingPhotoData = null;
-                _pendingPhotoFileName = null;
-                _pendingPhotoContentType = null;
+                photoDraft.Discard();
                 await LoadPhotoForAdmissionAsync(currentAdmissionId);
             }
             else
@@ -4041,44 +4056,89 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 photoRead.Cancel();
                 StudentPhotoViewForm.SetPreviewImage(photoPreview, null);
                 photoInfo.Text = string.Empty;
-                _pendingPhotoData = null;
-                _pendingPhotoFileName = null;
-                _pendingPhotoContentType = null;
+                photoDraft.Discard();
             }
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
-        finally { photoBusy = false; }
+        finally { photoBusy = false; if (!IsDisposed) UpdatePhotoActions(); }
     }
-    private async Task<bool> PersistPendingPhotoIfAnyAsync(int admissionId)
+    private static Task WritePreparedPhotoAsync(int id, byte[] data, string? fileName, string? contentType) =>
+        DatabaseHelper.ExecuteUserAsync("SaveStudentPhoto", DatabaseHelper.Int("@AdmissionId", id),
+            new SqlParameter("@PhotoData", SqlDbType.VarBinary, -1) { Value = data },
+            DatabaseHelper.P("@FileName", fileName), DatabaseHelper.P("@ContentType", contentType));
+
+    private void StagePreparedPhoto(byte[] bytes, string fileName)
     {
-        if (_pendingPhotoData is null)
-            return true;
-        byte[] data = _pendingPhotoData;
-        string? fileName = _pendingPhotoFileName;
-        string? contentType = _pendingPhotoContentType;
+        var image = BitmapFromBytes(bytes);
         try
         {
-            StudentPhotoInput.ValidateStoredData(data);
-            await DatabaseHelper.ExecuteUserAsync(
-                "SaveStudentPhoto",
-                DatabaseHelper.Int("@AdmissionId", admissionId),
-                new SqlParameter("@PhotoData", SqlDbType.VarBinary, -1) { Value = data },
-                DatabaseHelper.P("@FileName", fileName),
-                DatabaseHelper.P("@ContentType", contentType));
+            photoDraft.Stage(bytes, fileName);
+            StudentPhotoViewForm.SetPreviewImage(photoPreview, image);
         }
-        catch (Exception ex)
+        catch { image.Dispose(); throw; }
+        ShowPendingPhotoStatus();
+        UpdatePhotoActions();
+    }
+
+    private void ShowPendingPhotoStatus()
+    {
+        if (photoDraft.Current is not { } selection) return;
+        string action = currentAdmissionId <= 0 ? "save with admission"
+            : selection.SaveFailed ? "not saved — click Retry Photo Save" : "preview — click Save Photo";
+        photoInfo.Text = $"{selection.FileName} · {selection.Data.Length / 1024d:N0} KB · {action}";
+    }
+
+    private void UpdatePhotoActions()
+    {
+        bool allowed = CurrentUser.HasPermission("Students.Administer");
+        bool pending = photoDraft.Current is not null;
+        bool existing = currentAdmissionId > 0;
+        choosePhotoButton.Enabled = allowed && !IsBusy;
+        savePhotoButton.Visible = existing;
+        savePhotoButton.Enabled = allowed && existing && pending && !IsBusy;
+        savePhotoButton.Text = photoDraft.Current?.SaveFailed == true ? "Retry Photo Save" : "Save Photo";
+        removePhotoButton.Text = pending ? "Discard Selection" : "Remove Photo";
+        removePhotoButton.ThemeRole = pending ? "Secondary" : "Danger";
+        removePhotoButton.Enabled = allowed && !IsBusy && (pending || photoPreview.Image is not null);
+        if (photoSaveRow is not null) photoSaveRow.Height = existing ? AppMetrics.ButtonHeight + 4 : 0;
+        if (photoActionsRow is not null) photoActionsRow.Height = (existing ? 3 : 2) * (AppMetrics.ButtonHeight + 4);
+    }
+
+    private async Task SavePhotoAsync()
+    {
+        if (IsBusy || currentAdmissionId <= 0 || _pendingPhotoData is null || !CurrentUser.HasPermission("Students.Administer")) return;
+        int id = currentAdmissionId, version = admissionLoadVersion;
+        photoBusy = true; UpdatePhotoActions();
+        try
         {
-            /* The error is still recorded and reported, but the photo is kept so it can be saved again - and the form stays dirty, because it is. */
-            Fail(ex);
+            using var hold = BeginBusy(BusyMessage, this);
+            bool saved = await PersistPendingPhotoIfAnyAsync(id);
+            if (IsDisposed || currentAdmissionId != id || admissionLoadVersion != version) return;
+            if (saved) SetStatus("Photo saved. Student details were not changed.", PageStatusKind.Success);
+        }
+        finally { photoBusy = false; if (!IsDisposed) UpdatePhotoActions(); }
+    }
+
+    private async Task<bool> PersistPendingPhotoIfAnyAsync(int admissionId)
+    {
+        int version = admissionLoadVersion;
+        if (_pendingPhotoData is not null && !CurrentUser.HasPermission("Students.Administer"))
+        {
+            SetStatus("Your role cannot save student photos. The prepared selection has been retained.", PageStatusKind.Warning);
             return false;
         }
-        if (ReferenceEquals(_pendingPhotoData, data))
+        var result = await photoDraft.SaveAsync(admissionId, writePhoto,
+            () => !IsDisposed && currentAdmissionId == admissionId && admissionLoadVersion == version);
+        if (result.Error is not null) AppExceptionHandler.LogNonFatal(result.Error, "Saving prepared student photo");
+        if (IsDisposed || currentAdmissionId != admissionId || admissionLoadVersion != version) return false;
+        if (result.Outcome == PhotoSaveOutcome.Failed)
         {
-            _pendingPhotoData = null;
-            _pendingPhotoFileName = null;
-            _pendingPhotoContentType = null;
+            ShowPendingPhotoStatus();
+            SetStatus("Photo not saved. The prepared selection is still here; use Retry Photo Save. " + DbMessage.UserMessage(result.Error!), PageStatusKind.Warning);
         }
-        return true;
+        else if (result.Outcome == PhotoSaveOutcome.Saved) photoInfo.Text = "Photo saved.";
+        UpdatePhotoActions();
+        return result.Outcome is PhotoSaveOutcome.Saved or PhotoSaveOutcome.NoPendingPhoto;
     }
     private static TableLayoutPanel BuildGrid(
     int columns,
@@ -4393,7 +4453,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 /* The admission itself is committed, but the photo is not, so the "admitted successfully" message above is deliberately skipped rather than followed by this warning. */
                 Alert(
                     "The admission was saved, but the selected photo was NOT saved. The photo is " +
-                    "still held on this form - choose the photo again to retry saving it. The " +
+                    "still held on this form - use Retry Photo Save to store it. The " +
                     "student has been admitted without it.");
             }
             savedAdmissionReadyForNext = newAdmissionId > 0 && photoSaved && reloaded;
@@ -4488,11 +4548,19 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private async Task SaveExistingAsync()
     {
+        int savedStudent = currentAdmissionId, savedVersion = admissionLoadVersion;
         try
         {
             if (!HasAdmissionEdits)
             {
-                SetStatus("No changes to save.");
+                if (_pendingPhotoData is not null)
+                {
+                    int photoStudent = currentAdmissionId, photoVersion = admissionLoadVersion;
+                    bool stored = await PersistPendingPhotoIfAnyAsync(photoStudent);
+                    if (!IsDisposed && currentAdmissionId == photoStudent && admissionLoadVersion == photoVersion && stored)
+                        SetStatus("Photo saved. Student details were not changed.", PageStatusKind.Success);
+                }
+                else SetStatus("No changes to save.");
                 return;
             }
             /* UX - see SaveNewAdmissionAsync: all problems shown at once, inline. */
@@ -4509,31 +4577,39 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             /* The discount lines are built and validated FIRST: an unparseable discount must abort before the database is touched. */
             if (!TryBuildFeeDiscountPlan(out var feeDiscounts))
                 return;
+            if (IsDisposed || currentAdmissionId != savedStudent || admissionLoadVersion != savedVersion) return;
             await SaveDetailsAndDiscountsAsync(
-                currentAdmissionId,
+                savedStudent,
                 studentName,
                 bloodGroup,
                 feeDiscounts);
             StudentSearchCache.Invalidate();
+            if (IsDisposed || currentAdmissionId != savedStudent || admissionLoadVersion != savedVersion) return;
             AddSuggestionIfNew(fatherOccupation, fatherOccupation.Text);
             AddSuggestionIfNew(prevSchool, prevSchool.Text);
             AddSuggestionIfNew(address, address.Text);
             AddSuggestionIfNew(placeOfBirthInput, placeOfBirthInput.Text);
             AddSuggestionIfNew(casteTribe, casteTribe.Text);
-            Info(
-                AssigningFirstPlacement ? "Student details and verified first placement saved. No fees were generated." : "Student details and fee discounts updated successfully.");
-            /* The save is committed by now, so a reload that fails is only a stale screen. */
+            bool hadPhoto = _pendingPhotoData is not null;
+            bool photoSaved = await PersistPendingPhotoIfAnyAsync(savedStudent);
+            if (IsDisposed || currentAdmissionId != savedStudent || admissionLoadVersion != savedVersion) return;
+            string success = AssigningFirstPlacement ? "Student details and verified first placement saved. No fees were generated."
+                : "Student details and fee discounts updated successfully.";
+            /* The details transaction is committed by now, so a reload that fails is only a stale screen. */
             try
             {
-                await LoadStudentForEditAsync(
-                    currentAdmissionId);
+                await LoadStudentForEditAsync(savedStudent);
+                if (IsDisposed || currentAdmissionId != savedStudent) return;
+                SetStatus(success + (photoSaved && hadPhoto ? " Photo saved." : "") +
+                    (!photoSaved ? " Photo not saved; use Retry Photo Save." : ""),
+                    photoSaved ? PageStatusKind.Success : PageStatusKind.Warning);
             }
             catch (Exception nonFatalException55)
             {
                 FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException55, "StudentAdmissionPage: SaveExistingAsync fallback");
-                Warn(
-                    "The student was saved, but the form could not be refreshed from the " +
-                    "saved record. Open the student again from Find Student to see the stored values.");
+                SetStatus(success + (photoSaved && hadPhoto ? " Photo saved." : "") +
+                    (!photoSaved ? " Photo not saved; use Retry Photo Save." : "") +
+                    " The form could not refresh. Reopen the student from Find Student before further edits.", PageStatusKind.Warning);
             }
         }
         catch (Exception ex)
@@ -4731,9 +4807,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         siblingsGrid.DataSource = null;
         siblingsStatus.Text =
             "Save the admission first to manage siblings.";
-        _pendingPhotoData = null;
-        _pendingPhotoFileName = null;
-        _pendingPhotoContentType = null;
+        photoDraft.Discard();
         _loadedReligionNotInList = null;
         StudentPhotoViewForm.SetPreviewImage(photoPreview, null);
         photoInfo.Text = string.Empty;

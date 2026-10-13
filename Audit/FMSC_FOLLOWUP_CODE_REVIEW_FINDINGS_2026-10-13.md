@@ -220,11 +220,11 @@ pinned baseline; the following table describes the current source review.
 | Finding | Current disposition |
 |---|---|
 | FR-01 | Client success-condition gap confirmed in `SaveNewAdmissionAsync`. Both DACPAC admission procedures return the documented IDs after commit; malformed/missing response behavior has not been reproduced. The reconciliation/parser fix remains open. |
-| FR-02 | Confirmed: the loader consumes exceptions and callers overwrite its status or infer success from a retained ID. Typed load outcome and separate save/refresh feedback remain open. |
+| FR-02 | **Source fix implemented:** typed load outcome, validated complete view before binding, editor rollback on binding/layout failure, and success based on the actual load attempt. Confirmed new/pending saves report a failed refresh separately and require deliberate Reload Registration before further edits, printing or payment. Transaction/snapshot writer is unchanged; native execution remains pending. |
 | FR-03 | **Source fix implemented:** restore destination state before retiring the current page; compensate parenting/activation/layout failure by reattaching old controls and restoring page/factory/route/year/subscriptions. A failed destination is disposed; old pages retire only after confirmed activation. The navigation guard is released in `finally`. Native regression fixtures are compiled; Windows execution remains pending. |
-| FR-04 | Immediate persistence for existing students confirmed. Explicit photo save remains the recommended UX change; choosing between it and clearly labelled immediate save is still a product decision. |
-| FR-05 | Confirmed: existing-student main Save updates details/discounts without persisting retained photo bytes. Retry/save-outcome correction remains open. |
-| FR-06 | Confirmed: fresh-registration dirty detection omits year/date-only edits. Baseline correction remains open. |
+| FR-04 | **Owner chose explicit save; source fix implemented:** Choose Photo prepares and previews, Save Photo persists, and Discard Selection restores the saved preview without deleting/replacing stored data. New students retain their preview until admission creates the record. Stored-photo deletion still requires confirmation. |
+| FR-05 | **Source fix implemented:** failed saves retain prepared bytes and expose Retry Photo Save. Main Save handles photo-only work without an unrelated details transaction; combined details/photo saves report each outcome independently. Photo persistence keeps student ID/version and immutable-selection ownership guards. |
+| FR-06 | **Owner accepted existing behavior:** date/year-only changes on an otherwise blank new registration intentionally allow leaving without a discard prompt. This policy is documented beside C# dirty detection; entered student details/placement and existing pending-record edits retain their warnings. |
 | FR-07 | Source byte limit and unrestricted decoded dimensions confirmed. No leak/crash or safe peak memory figure has been measured on Windows. |
 | FR-08 | DACPAC `SaveStudentPhoto` validates nonempty bytes but has no 300 KB upper limit. This remains an application boundary; no SQL or historical-photo conversion was performed. |
 | FR-09 | Windows, school-data, migration/restore and deployed-hardware acceptance remain pending. Cross-build/portable results do not close this gate. |
@@ -244,3 +244,40 @@ layout failures, and subsequent successful navigation. They are compiled but
 unrun on this Linux environment. No school SQL connection was opened, and no
 live admission/photo failure scenario was reproduced. SQL procedures, migrations
 and DACPAC are unchanged.
+
+### Registration refresh and explicit photo-save implementation — 13 October 2026
+
+The owner requested remaining points 2 and 3 (FR-02 and FR-04/05) and explanations
+of points 1 and 4 (FR-01 and FR-06). FR-01 remains open. After the explanation,
+the owner accepted FR-06's existing behavior: date/year-only selections on a
+blank new registration should not prevent intentionally leaving. The C# source
+now records this policy; the dirty-detection expression remains unchanged.
+
+Quick Registration now returns Loaded/NotFound/Failed/Superseded/Busy from a
+specific read attempt. It validates identity, required detail/fee columns,
+assignment/payment state, whole-rupee amounts and the saved snapshot before
+touching the editor. It prepares derived fees on a copy, suppresses programmatic
+placement/family events while binding and restores the old editor on failure.
+Both committed-save paths use one read-only completion handler: the ID and
+entered committed values survive refresh failure, the old write snapshot is
+invalidated, and Save/payment/printing remain blocked until Reload Registration
+succeeds. No save transaction is repeated to recover from a read failure.
+
+Photos use an immutable prepared selection with explicit save/retry/discard.
+Selecting a file issues no storage write. A failed save retains the same JPEG
+bytes/metadata, and duplicate/obsolete saves cannot erase a newer selection.
+The standalone action saves only the photo. Main Admission Save separately
+handles photo-only versus details-plus-photo work. Stored-photo removal retains
+its existing confirmation; discarding a pending preview uses no DeleteStudentPhoto
+call. Unsaved selection, permissions, 300 KB limit, proportional preparation,
+photo enlargement, and record/version checks remain in effect.
+
+Executed validation: **339 portable assertions pass**, including **45 new
+registration-view and photo-save lifecycle checks**; the application and Windows
+smoke harness cross-build with zero warnings/errors. Native fixtures add failed
+same-ID reopen, malformed fees, midway binding failure, missing record,
+new/pending save with failed refresh, stale/disposed callback, preview/discard,
+save failure/retry, photo-only main Save and permission checks. These form tests
+are compiled but unrun on this Linux host. Real SQL writes, Windows interaction,
+and mixed details/photo failure acceptance remain pending. The new pure helpers
+were executed with controlled inputs; they do not establish deployment sign-off.
