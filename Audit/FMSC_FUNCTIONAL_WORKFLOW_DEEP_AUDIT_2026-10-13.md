@@ -12,7 +12,7 @@
 
 ## A. Executive summary
 
-**Twenty findings or verification items** across Admission Review, Student Profile, Financial Adjustments, Posting Reversal, Daily Collection Closing, Family maintenance, Duplicate review, Record Checks, Annual Receipts, Additional Fee Posting, Fee Configuration and Student Account Statements. **Fifteen** identify confirmed **source-level control-flow, state, or guard gaps**; **two** are conditional asynchronous UI issues requiring delayed-response fixtures; **two** are verification risks (one SQL uncertain-outcome question and one synchronous performance issue); **one** is a navigation/UX policy decision. The five additional items (FQA-16 through FQA-20) were discovered in the second-pass review below. None is claimed to have been reproduced on the user's live Windows installation.
+**Twenty-five findings or verification items** across Admission Review, Student Profile, Financial Adjustments, Posting Reversal, Daily Collection Closing, Family maintenance, Duplicate review, Record Checks, Annual Receipts, Additional Fee Posting, Fee Configuration and Student Account Statements. **Fifteen** identify confirmed **source-level control-flow, state, or guard gaps**; **two** are conditional asynchronous UI issues requiring delayed-response fixtures; **two** are verification risks (one SQL uncertain-outcome question and one synchronous performance issue); **one** is a navigation/UX policy decision. The five additional items (FQA-16 through FQA-20) were discovered in the second-pass review below. None is claimed to have been reproduced on the user's live Windows installation.
 
 **Most important pattern:** Disabling an individual `AddBusyAction` button is **not the same** as blocking page departure or other conflicting actions while a database write is running. `MainDashboardForm` checks the **top-level active page** for `IBusyPage` and then `IUnsavedChanges`. Several nested pages and dialogs fail to expose the true operation/draft state. Adding `IBusyPage` to a nested control **alone** is insufficient unless its host forwards that contract.
 
@@ -20,6 +20,11 @@
 
 | ID | Severity | Classification | Workflow | Concise problem |
 |---|---|---|---|---|
+| **FQA-21** | **P2/P3** | Confirmed missing dirty guard | Student certificate editors | Editable Character/Leave/College Leave drafts are not protected when switching students or leaving |
+| **FQA-22** | **P2** | Confirmed missing busy guard | Staff bank certificate | Creating a certificate does not block shell navigation or all conflicting controls |
+| **FQA-23** | **P2/P3** | Confirmed post-save feedback gap | Staff bank certificate | A confirmed Create followed by failed history reload can still show unqualified success |
+| **FQA-24** | **P2/P3** | Confirmed modal dirty guard gap | Confirm Return Admission | Edited opening fees can be abandoned via Cancel/X without discard confirmation |
+| **FQA-25** | **P2 verification** | Unknown commit outcome, SQL behavior untested | Staff bank certificate | Lost Create response requires safe duplicate/reconciliation testing |
 | **FQA-16** | **P2** | Confirmed stale-result acceptance | Additional Fee Posting | Filter A can finish loading after operator changes to filter B, exposing an outdated student set for charging |
 | **FQA-17** | **P2** | Confirmed draft-discard gap | Fee Rate Matrix | Switching Campus clears unsaved fee-cell edits without asking |
 | **FQA-18** | **P2** | Confirmed missing busy contract | Embedded Fee Rate Matrix | Workspace navigation/tab changes are not blocked while Save Grid is executing |
@@ -330,3 +335,98 @@ No DACPAC or database replacement should be used for an update. If a SQL change 
 **Updated implementation order (risk-first):** First FQA-16 (wrong student scope can reach financial charge request); FQA-18 and FQA-17 (keep Fee Rate Matrix operations/drafts safe); FQA-19 (financial report freshness); then the original FQA-15/07/04/01/09/11 and remaining original findings; finally benchmark FQA-20 and improve only where justified. Coordinate shared busy/dirty-state changes with the existing `WorkspacePage` aggregator instead of introducing parallel mechanisms.
 
 **Execution/provenance:** These are additional static source findings at unchanged code HEAD `3a3fbd6`. Recheck against Codex's current pushed commit before fixing. No native UI, financial write, SQL fault injection, deployment, or performance benchmark was executed by this second pass. Updating this audit is documentation only.
+
+
+## J. Third-pass expansion — certificates, staff, setup, security, and cross-module coverage
+
+**Pass date:** 14 October 2026 (Pakistan local date). **Application source baseline:** `3a3fbd63590cc7dedb3f17f008e84f7be67a9132`, still unchanged when reviewed. **Review scope:** screen-by-screen source inventory plus targeted handler/guard verification; no live Windows UI or production database access. Five additions numbered FQA-21 to FQA-25. Previous FQA-01–20 retained.
+
+### FQA-21 — Certificate editors do not protect unsaved new-certificate drafts [P2/P3, confirmed source guard gap]
+
+**Evidence:** [Pages/Students/Certificates/CharacterCertificatePage.cs L1-103](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Students/Certificates/CharacterCertificatePage.cs#L1-L103), [Pages/Students/Certificates/CharacterCertificatePage.cs L173-205](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Students/Certificates/CharacterCertificatePage.cs#L173-L205), [Pages/Students/Certificates/CharacterCertificatePage.cs L1070-1094](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Students/Certificates/CharacterCertificatePage.cs#L1070-L1094), [Pages/Students/Certificates/LeaveCertificatePage.cs L1-100](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Students/Certificates/LeaveCertificatePage.cs#L1-L100), [Pages/Students/Certificates/LeaveCertificatePage.cs L1294-1345](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Students/Certificates/LeaveCertificatePage.cs#L1294-L1345), [Pages/Students/Certificates/CollegeLeaveCertificatePage.cs L1-103](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Students/Certificates/CollegeLeaveCertificatePage.cs#L1-L103). **Working comparison:** [Pages/Students/Certificates/RegularStudentCertificatePage.cs L1-18](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Students/Certificates/RegularStudentCertificatePage.cs#L1-L18).
+
+**Operator reproduction:** In Character Certificate, select a student, enter BISE roll number/remarks/date without clicking Create, and either select another student, use Next Student, or navigate to another dashboard page. Similar sequences exist for Leave and College Leave with date, promotion/academic, attendance, and remarks. The handlers clear or replace the inputs without a shared `IUnsavedChanges` contract, and the pages inherit plain `V2Page`. In Character, `StudentChanged` clears certificate fields immediately. This is loss of **unsaved user input**, not loss of a committed certificate.
+
+**Caveat:** These forms sometimes intentionally reset fields on a new student. The missing behavior is a decision prompt *when the user has actually edited a draft*. A clean form must still switch directly.
+
+**Recommended fix:** Capture a baseline after loading/clearing a student, compare the true editable fields, implement `IUnsavedChanges`, and attach `StudentPicker.SelectionChangeGuard` plus explicit Next Student / refresh confirmation. Take care to distinguish fields deliberately not persisted (character-certificate exam-type print wording) and existing saved issuance from a new unsaved draft. Add change A→B→cancel, typed-search clear, Next Student, X/navigation, and after-success baseline reset tests.
+
+### FQA-22 — Bank Account Opening Certificate create does not block page departure [P2, confirmed source gap]
+
+**Evidence:** [Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs L1-13](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs#L1-L13), [Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs L68-112](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs#L68-L112), [Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs L444-517](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs#L444-L517).
+
+**Operator reproduction:** Start Create Certificate with a delayed `CreateBankAccountOpeningCertificate` database operation, then switch to another page or trigger New / Clear / Refresh while Create awaits. The clicked Create button and the Staff picker/Grid are disabled temporarily, but the page implements only `IUnsavedChanges`, **not `IBusyPage`; other buttons are not comprehensively locked**. The dashboard's whole-page busy guard cannot see this submitted write, and asynchronous continuation may run after the page is disposed.
+
+**Recommended fix:** Track a page-level `creating` flag; implement `IBusyPage` with clear busy text; guard all context-dependent actions and leave gestures, and preserve the existing staff/grid button restoration. Capture submitted IDs and values before await; don't treat a submitted write as cancellable. Regression: delayed Create → sidebar, sign-out, window X, New and Refresh; verify exactly one SQL submission and no continuation on a disposed control.
+
+### FQA-23 — Bank certificate save feedback may conceal failed history reload [P2/P3, confirmed conditional feedback gap]
+
+**Evidence:** [Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs L257-308](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs#L257-L308), [Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs L444-530](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs#L444-L530).
+
+**Sequence:** The Create stored procedure returns successfully. The handler sets `successMessage` and then calls `LoadCertificates(staffId)`. That loader catches its own SQL exceptions, clears its grid and calls `Fail(ex)` without returning a load-success value. The enclosing Create method still runs its `finally` and displays `Info(successMessage)`. The operator sees a success message over a failed/unrefreshed certificate list, with no explicit distinction between **committed write** and **failed refresh**.
+
+**Recommended fix:** Return an explicit loaded/failed result from `LoadCertificates`; show “Certificate created, but history could not be refreshed; reload before acting further.” For the UI, don't infer an ID or issue number from empty history and don't retry Create just because its *read* failed. Acceptance: successful Create + failed Get Records, successful Create + empty history, failed Create, delayed staff switch.
+
+### FQA-24 — Confirm Return Admission opening-fee edits have no modal discard protection [P2/P3, confirmed source guard gap]
+
+**Evidence:** [Pages/Students/Enrollment/ConfirmReturnAdmissionPage.cs L1-64](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Students/Enrollment/ConfirmReturnAdmissionPage.cs#L1-L64), [Pages/Students/Enrollment/ConfirmReturnAdmissionPage.cs L70-115](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Students/Enrollment/ConfirmReturnAdmissionPage.cs#L70-L115), [Pages/Students/Enrollment/ConfirmReturnAdmissionPage.cs L188-214](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Students/Enrollment/ConfirmReturnAdmissionPage.cs#L188-L214), [Pages/Students/Enrollment/ConfirmReturnAdmissionDialog.cs L1-26](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Students/Enrollment/ConfirmReturnAdmissionDialog.cs#L1-L26).
+
+**Operator reproduction:** Open the current compact **Confirm Return** dialog for a promoted student, change the editable Amount or Discount Amount cells, then press Cancel/Escape or X. The modal `FormClosing` only refuses to close while `workflow.IsConfirmingReturn`. There is **no unsaved fee-draft guard** or confirmation. The fee adjustments are local until Confirm, so this does not roll back a database write, but an operator can lose substantial input without warning.
+
+**Cross-check:** The compact dialog **disables its student picker**, so a claimed switch-student failure inside this dialog is **not** a currently reachable finding. Its active SQL confirmation is already blocked on close. This finding is only about the editable *pre-submission draft*.
+
+**Recommended fix:** Snapshot the original fee choices and return date/transport state after load, detect changed values, and prompt on Cancel/X only when dirty. Clear the baseline following successful Confirm. Test edited amount, edited discount, transport/date changes, clean Cancel, and active Confirm (must remain unconditionally blocked).
+
+### FQA-25 — Lost Create acknowledgment for bank certificates requires SQL reconciliation testing [P2 verification; not a proved duplicate bug]
+
+**Evidence:** [Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs L68-105](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs#L68-L105), [Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs L444-518](https://github.com/farhan2166-creator/FMSC-Database/blob/3a3fbd63590cc7dedb3f17f008e84f7be67a9132/Pages/Staff/Certificates/BankAccountOpeningCertificatePage.cs#L444-L518).
+
+The Create path submits one asynchronous `CreateBankAccountOpeningCertificate` call, and on any exception shows a general error. There is no durable client-generated request identity or unknown-outcome resolution on this path. **If** a SQL commit succeeds but its response is lost, the operator may press Create again. A source comment suggests this procedure has no duplicate guard, but **this review did not independently inspect its stored-procedure body or test its DB constraints**, so a duplicate-certificate conclusion remains **unconfirmed**.
+
+**Verification:** In a disposable SQL Server, deliberately drop the reply after commit, inspect created certificate IDs, retry, and inspect uniqueness constraints. If the server is not idempotent, design a request-token contract with safe outcome lookup. Do not insert a new SQL migration without explicitly reviewing existing schema and upgrade policy. On unknown outcomes, first prompt to check existing certificates, rather than blind retry.
+
+## K. Screen-by-screen coverage ledger: source trace vs native UI test
+
+This ledger measures *review scope*, not proof of correct functionality. `T` = targeted handlers and safeguards traced; `I` = file/workflow inventoried, representative patterns inspected; `P` = priority for a future deep scenario pass; `W` = native Windows UI behavior still untested. No group below has been certified as exhaustively exercised.
+
+| Module and actual operator workflow | Source-review depth | Existing/new findings or disposition | Native test status |
+|---|---|---|---|
+| Quick Registration, pending list, parent links, review/confirm, admission | T | Operator-reported issues excluded from finding count; FQA-01, FQA-15; previous follow-up audit | W |
+| Student profiles, sibling/family linking | T | FQA-03 (policy), FQA-08 | W |
+| Record issues, historical correction, duplicate scan and batch review | T | FQA-09/10/11/14 | W |
+| Transfers, readmission, promotion, return admissions | T | Bulk Promotion verified existing busy/loading protection; FQA-24; SQL life-cycle acceptance P | W |
+| Standard and additional fee posting, reversals, student purchases | T | FQA-04/16; Student Purchases change guard verified | W |
+| Collection, daily closing, corrections/refunds/reversals | T | FQA-02/05/06/07/13; collection journal exists | W |
+| Fee configuration matrix, rate copy/bulk, applying saved changes | T | FQA-17/18; shared WorkspacePage busy aggregation verified | W |
+| Student statements, annual receipts, class sheets, canonical finance reports | T | FQA-12/19/20; Class Sheets guards roster revision and selected scope | W |
+| Student Character, Leave, College Leave, Regular and other certificates | T / I | FQA-21; Regular Student page exposes dirty/busy state; further issue/collect/print scenarios P | W |
+| Staff profile, employment, employment dialogs | T | `MasterPage` busy/dirty guards, staff context guard, and employment dialog close checks verified | W |
+| Staff bank certificate create/edit/reprint | T | FQA-22/23/25 | W |
+| Campus/Class/Section assignment, years, campuses, subjects, school profile | T / I | `MasterPage` guards standard CRUD; campus assignment retains matrix draft on picker changes; special setup multi-edit tests P | W |
+| Users/Roles administration | I / T | Redesigned `AccessEditorPage` has dirty, busy, generation, and uncertain-save contracts; permission/version acceptance still P | W |
+| Audit Logs, backup/restore, migration cleanup | I / T | Backup/Restore exposes `IBusyPage`; actual restore/relink and audit pruning still P | W |
+| Login, password/username change, permissions | I | Authentication paths inventoried; session switching, role revocation, mid-operation SQL faults still P | W |
+| Print/export/RDLC and theme/scale/narrow screens | I | Export durability earlier fixed in code; physical printing and DPI/keyboard test P | W |
+
+**Do not interpret “T” as an assertion that every button and every combination was tested.** In a repository with many WinForms pages, complete interaction proof requires running the assembled program under the intended Windows scaling, SQL Server version, permissions, and workflows.
+
+## L. Additional failure-injection and usability scenarios
+
+1. **Certificate draft:** edit Character / Leave / College Leave fields, switch selected student or click Next Student; verify Stay preserves the exact editable values and Save/Discard intent is explicit.
+2. **Bank create:** create certificate, induce SQL reply loss and separate history-reload failure; verify the status never conflates an unknown Create with a confirmed Create + failed refresh. Reopen staff history before retrying.
+3. **Return admission:** edit Amount/Discount/date/transport, press X / Cancel; verify dirty confirmation; test committing concurrently with modal close (already busy-blocked).
+4. **Setup:** edit Campus Class/Section assignments, change campus before Apply; confirm existing guard preserves drafts. Test clearing 100 cells, permission denied, and clicking Apply twice.
+5. **Staff:** edit staff details, select another staff member via quick picker, then open Employment; verify combined dirty-state and permission checks. Existing staff employment modal already blocks active writes.
+6. **Reports:** modify a student's fees between Generate and regeneration; test FQA-19, and print under changed scope after slow load; profile first-use SQL latency.
+7. **Security/admin:** role change while page open; concurrent administrator attempts; permission denial after submit; uncertain outcome state and forced password reset. Validate against current schema and accounts only in disposable DB.
+8. **Backup/restore:** use fake history paths, denied backup directory, interrupted restore and post-restore compatibility failure; retain safety backup and do not experiment on real school data.
+
+## M. Priorities and correction strategy after third pass
+
+**High-value sequence:** FQA-16 (stale financial target set), FQA-18/17 (fee matrix write/draft), FQA-07/04/15 (write-busy gaps), FQA-22 (bank certificate in-flight write), FQA-19/23/13 (save versus refresh messages), FQA-21/24 (draft-loss), then other previously documented issues. FQA-25 and FQA-06 require disposable-SQL reconciliation before specifying schema changes. FQA-20 requires measured performance data before a refactor.
+
+**Generalized fixes:** Reuse the existing `IBusyPage` and `IUnsavedChanges` contracts and modal closing helper; don't invent new global state where a child host already delegates correctly. Make asynchronous read responses generation- and identity-scoped. Separate confirmed committed writes from refresh failures. Verify both positive and negative paths and record native-Windows test results explicitly.
+
+**Original owner reports:** Quick Registration screenshot issues stay distinct and are not counted as assistant discoveries; when Codex pushes changes, re-check those live-reported scenarios and this report against the new application commit.
+
+**Documentation-only mutation:** This addendum updates the existing functional audit, not the application. No SQL migrations, C# source files, or tests were changed for this pass.
