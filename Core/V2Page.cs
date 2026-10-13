@@ -772,6 +772,8 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         return button;
     }
     private bool _busyOperationRunning;
+    protected bool BusyOperationRunning=>_busyOperationRunning;
+    protected string BusyOperationMessage { get; private set; }="";
     /// <summary>Shows <paramref name="message"/> in the status line and disables only <paramref name="controlsToDisable"/> (the ones that would interfere or double-submit); navigation and every other control stay usable.</summary>
     protected BusyScope BeginBusy(string message, params Control?[] controlsToDisable) =>
         new BusyScope(
@@ -795,6 +797,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         if (_busyOperationRunning)
             return false;
         _busyOperationRunning = true;
+        BusyOperationMessage=message;
         try
         {
             using (BeginBusy(message, controlsToDisable))
@@ -803,6 +806,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         finally
         {
             _busyOperationRunning = false;
+            BusyOperationMessage="";
         }
         return true;
     }

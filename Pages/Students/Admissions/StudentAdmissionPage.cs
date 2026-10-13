@@ -231,8 +231,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private RowStyle? photoSaveRow, photoActionsRow;
     private readonly DataGridView feeGrid = HumanUi.Grid(false);
     private readonly ModernComboBox feePreviewMonth=HumanUi.Combo();
-    public bool IsBusy => saveBusy || photoBusy;
-    public string BusyMessage => photoBusy ? "Please wait while the student's photo is being prepared or saved." : "Please wait while the admission is being saved.";
+    public bool IsBusy => saveBusy || photoBusy || BusyOperationRunning;
+    public string BusyMessage => BusyOperationRunning ? BusyOperationMessage+" Wait for the result before leaving." : photoBusy ? "Please wait while the student's photo is being prepared or saved." : "Please wait while the admission is being saved.";
     private sealed record FeePreviewMonth(DateTime Month) {
         public override string ToString() => Month.ToString("MMMM yyyy");
     }

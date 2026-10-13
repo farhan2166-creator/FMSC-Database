@@ -46,3 +46,17 @@ or consume the independent form-close discard confirmation.
 Added fixtures for Stay retaining campus/amount, deliberate discard, clean switch
 and a campus change during save. Native GUI execution remains outstanding.
 No SQL migration is needed.
+
+## FQA-15 — Shared Admission operations are invisible to leave guards
+
+**Confirmed and fixed.** V2Page now exposes its existing RunBusyAsync state and
+operation message to derived pages. StudentAdmissionPage includes that state in
+IBusyPage along with its existing admission-save and photo flags. Placement/
+admission confirmation, legacy verification and both print preparations now
+remain visible to shell/modal guards until their shared operation settles.
+The shared double-submission gate and exception propagation are retained.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added pending-operation tests for the five operation messages, duplicate refusal,
+success and server refusal releasing the guard. Tests use delayed delegates,
+not SQL writes; native Windows execution remains required. No SQL changes.
