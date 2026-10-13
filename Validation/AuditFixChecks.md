@@ -23,6 +23,17 @@ Publishing also runs `Installer/VerifySchemaArtifact.ps1`, which rejects an
 unreviewed package/model. Use `--approve` only after independently reviewing an
 intentional artifact change; it records a baseline rather than proving correctness.
 
+The owner's data-bearing re-extraction at `ad60bbb` was independently reviewed
+and published into a disposable SQL Server 2022 copy. All 273 SQL modules are
+unchanged; reviewed model differences are serialization, `FLOOR` keyword casing
+and identity last-values. Approved package/model provenance is synchronized.
+Whole-rupee expression validation accepts only the function keyword's casing
+difference; exact fingerprints and policy columns/operators remain checked.
+The twelve artifact regression tests include casing acceptance and refusal of
+changed columns/operators/additional SQL. See the independent audit's section 10
+for the actual four-role catalog, 39 rerun production SQL checks and twelve
+separate role-boundary assertions. Native Windows acceptance remains pending.
+
 `Installer/VerifyBaseline.ps1` is retired: its old source-freeze manifest is no
 longer maintained. Invoking it fails explicitly with the supported verifier and
 validation instructions; it does not claim a successful source-freeze check.

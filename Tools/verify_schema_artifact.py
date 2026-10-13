@@ -19,6 +19,14 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def whole_rupee_expression_matches(actual, columns):
+    # SQL Server re-extracts FLOOR as floor. Accept only that keyword's casing;
+    # keep the exact column names, operators and remaining expression intact.
+    from apply_whole_rupee_schema import expression
+    pattern = re.escape(expression(columns)).replace('FLOOR', '(?i:FLOOR)')
+    return actual is not None and re.fullmatch(pattern, actual) is not None
+
+
 def inspect(path):
     with zipfile.ZipFile(path) as package:
         if package.testzip() is not None:
@@ -95,7 +103,7 @@ def verify_contract(root, ns, elements, contract, fingerprint):
             definition=element.find("d:Property[@Name='CheckExpressionScript']/d:Value",ns)
             if element.get('Name') is not None or definition is None or definition.text!=row.get('definition'):
                 errors.append(f'Generated check definition differs: {name}')
-    from apply_whole_rupee_schema import POLICY, expression
+    from apply_whole_rupee_schema import POLICY
     for table, columns in POLICY.items():
         name = f'[dbo].[CK_{table}_WholeRupees]'
         element = by_name.get(name)
@@ -103,7 +111,7 @@ def verify_contract(root, ns, elements, contract, fingerprint):
             errors.append(f'Missing whole-rupee safeguard {name}')
             continue
         actual = element.find("d:Property[@Name='CheckExpressionScript']/d:Value",ns)
-        if actual is None or actual.text != expression(columns):
+        if actual is None or not whole_rupee_expression_matches(actual.text, columns):
             errors.append(f'Whole-rupee expression changed: {name}')
         if {'schema':'dbo','objectName':table,'name':f'CK_{table}_WholeRupees'} not in contract['checkConstraints']:
             errors.append(f'Whole-rupee safeguard absent from startup contract: {name}')

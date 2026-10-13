@@ -3,7 +3,7 @@
 **Current implementation update:** DP-04, RT-01, DP-01, DP-02 and DP-03 are
 implemented in source at the owner's request. IA-01/02/03 were excluded from that
 pass, then implemented in the subsequently authorized Users/Roles restructuring.
-See sections 8 and 9 below; the original review remains
+See sections 8, 9 and 10 below; the original review remains
 pinned to its stated baseline and is not native deployment acceptance.
 
 **Audit date:** 13 October 2026  
@@ -338,3 +338,110 @@ Simple and Ocean Blue. Actual Windows painting, DPI/keyboard/modal behavior,
 target LocalDB/school-clone acceptance and session refresh remain release checks.
 No school database or release MDF/LDF was opened or changed. SQL, migrations,
 DACPAC and their approved fingerprints remain unchanged.
+
+## 10. Data-bearing DACPAC review and role-change scope — 13 October 2026
+
+**Reviewed input:** owner's commit `ad60bbb` (`dacpac`), package SHA-256
+`4c2eb8cbb76ce892666708b5397c9b4ee1f0fdca529ea4cac72b8cdbca6afabe`.
+This artifact actually includes BCP table data. It was published with native DacFx
+into a newly created, loopback-only SQL Server 2022 Developer container database
+`FMSC_AuditChecks_RoleData_20261013`. No installed school database or detached
+release files were opened or updated. Original catalog observations below were
+captured before the production-writer tests added or edited fixture records.
+
+### Actual role definitions and assignments
+
+| Role | Stored permission rows | Assigned accounts | Observed responsibility |
+|---|---:|---:|---|
+| Administrator | 0 | 1 | Protected; SQL and C# Administrator bypass supplies full access. Zero explicit grants is expected. |
+| Accountant | 6 | 1 | Student viewing, fee viewing/collection, broad reports, fee reports and annual fee statements. No `Fees.Adjust` grant. |
+| Students | 0 | 1 | Empty role; contributes no permissions. Its intended business purpose is unknown. |
+| Front Desk | 6 | 0 | Admissions, student viewing/administration, fee viewing/collection and broad reports. |
+
+There are **57 permission definitions, 12 role-permission mappings, three role
+memberships and one account**. The same account has Administrator, Accountant
+and Students memberships. Accountant/Students therefore add no effective access
+to this account beyond Administrator. This snapshot cannot demonstrate separate
+staff operation; fresh role-only probe accounts were used in the disposable copy.
+
+Accountant grants: `Students.View`, `Fees.View`, `Fees.Collect`, `Reports.View`,
+`Fees.Reports.View`, `Fees.Statement.View`.
+Front Desk grants: `Students.View`, `Fees.View`, `Students.Administer`,
+`Fees.Collect`, `Reports.View`, `Students.Admit`.
+
+### Confirmed behavior and potential inconsistencies
+
+- `Students.Administer` is broad maintenance access, including saved student
+  editing/photos, re-admission and multiple status/lifecycle/legacy operations.
+  Front Desk's stored description mentions only admissions and fee collection;
+  the grant is broader than that description. Whether this is intended is a
+  business decision. Removing it immediately would also remove existing useful
+  detail/photo operations. The current source references this code in ten C#
+  files and at least 24 procedure authorization checks.
+- `Reports.View` opens student and finance categories in `ReportsHomePage` and
+  guards their SQL reports. Accountant and Front Desk can therefore see broad
+  reports; `Fees.Reports.View` does not isolate the report hub to finance. It
+  currently also controls billing-status checks.
+- Granular catalog codes such as `Students.Edit`, `Students.Photo.Manage` and
+  `Students.ReAdmit` have no corresponding action gates or procedure permission
+  checks in the reviewed source. Checking them alone does not enable those
+  workflows. They must not be presented as functional substitutes for
+  `Students.Administer` before C# and SQL are aligned.
+- `System.Users`/`System.Roles` have legacy names that say "Manage", while the
+  completed editors use them as read prerequisites and `.Manage` codes for
+  writes. No staff role in this snapshot grants either management path.
+- `System.Roles.Deactivate` exists in the catalog, but the schema has no role
+  active flag and the application has no matching workflow. It cannot currently
+  implement role deactivation. This is dormant metadata, not a finished feature.
+
+These observations do not authorize automatic deletion, renaming, redistribution
+or expansion of existing grants. The owner requested the scope before choosing
+whether to redefine/reorganize roles. Existing definitions, memberships,
+Administrator protection, zero-access behavior and hidden maintenance navigation
+remain unchanged.
+
+### Scope before choosing a role redesign
+
+| Possible change | Scope | Required implementation |
+|---|---|---|
+| Use three operator roles: Administrator, Accountant, Front Desk; retire Students if it has no intended purpose | Small, data only | Inventory all assigned accounts and legacy `Users.RoleId` references; review responsibility matrix; transactionally remove/reassign only approved memberships and role. No permissions need merging. |
+| Improve descriptions and read/manage labels | Small | Update selected catalog labels/descriptions after agreeing their meaning; preserve permission codes and IDs. |
+| Limit Front Desk to admission, ordinary detail/photo edits and collection | Medium, C# and SQL | Define allowed actions first; replace broad maintenance guards selectively with functional granular permissions in both layers; migrate reviewed grants; verify allowed operations and denied lifecycle/correction actions. |
+| Limit Accountant/Front Desk reports by responsibility | Medium, report navigation and SQL | Choose report categories; align hub visibility, report loading, exports and SQL checks; migrate reviewed grants and test both allowed and refused paths. |
+| Remove/merge dormant permission definitions | Broader cleanup | Map all UI/SQL/legacy consumers and assignments first; preserve code/ID compatibility where needed. An absent C# literal alone does not prove a permission is safe to delete. |
+
+Recommended next decision: agree an action matrix for the three operator roles,
+then implement only the required guard/grant changes. Role count alone does not
+resolve the broad-versus-granular permission mismatch. Any chosen production SQL
+changes will be numbered scripts in **Migrations/**. **No SQL migration is
+required by this artifact review or the already completed administrative flow.**
+
+### Verification and reviewed artifact metadata
+
+- Native DacFx successfully restored schema and embedded data. SQL counts and
+  all twelve grants matched independently decoded role-catalog BCP records.
+- Administrator returned all 57 effective permissions. All eight whole-rupee
+  constraints were enabled and trusted; database version rows include version 2.
+- **39 production administration SQL checks passed again** on this imported
+  disposable copy: combined saves, credentials, protection, stale/catalog guards,
+  concurrent edits, second-step rollback/audit rollback and read-only recovery.
+  They modified only disposable fixtures; they are not real staff GUI acceptance.
+- **12 additional SQL boundary assertions passed** using separately assigned
+  Accountant, Students and Front Desk probe accounts. Effective grants matched
+  exactly; none could manage users/roles; Accountant was denied fee adjustment;
+  Front Desk passed broad student-administration and report checks. Probe account
+  writes were rolled back.
+- All **273 SQL module fingerprints remain identical**. Model differences are
+  SQL Server's `FLOOR` keyword casing, serialization/order of those constraints,
+  and identity last-value annotations. Full model comparison after these reviewed
+  normalizations found no other changes. Runtime whole-rupee policy is intact.
+- Updated approved package/model hashes and startup-contract package provenance
+  after that review. Offline policy validation accepts casing of the `FLOOR`
+  keyword only; it still rejects different columns, operators or extra SQL.
+  Full package/model/module fingerprint checks remain strict.
+- **12 artifact regression tests and 522 portable assertions pass.** Native
+  Windows GUI/DPI and release acceptance remain pending.
+
+The disposable SQL container and private test credentials were removed after
+verification. No role definitions, production procedures, schema versions or
+DACPAC bytes were changed by this review.

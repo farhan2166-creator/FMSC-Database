@@ -8,8 +8,8 @@ import unittest
 import zipfile
 import xml.etree.ElementTree as ET
 
-from verify_schema_artifact import ROOT, inspect, verify_contract
-from apply_whole_rupee_schema import POLICY, expression
+from verify_schema_artifact import ROOT, inspect, verify_contract, whole_rupee_expression_matches
+from apply_whole_rupee_schema import POLICY
 
 
 class ArtifactChecks(unittest.TestCase):
@@ -33,7 +33,7 @@ class ArtifactChecks(unittest.TestCase):
         checks={e.get('Name'):e for e in self.elements if e.get('Type')=='SqlCheckConstraint'}
         for table, columns in POLICY.items():
             e=checks[f'[dbo].[CK_{table}_WholeRupees]']
-            self.assertEqual(expression(columns),e.find("d:Property[@Name='CheckExpressionScript']/d:Value",self.ns).text)
+            self.assertTrue(whole_rupee_expression_matches(e.find("d:Property[@Name='CheckExpressionScript']/d:Value",self.ns).text, columns))
             parent=e.find("d:Relationship[@Name='DefiningTable']/d:Entry/d:References",self.ns)
             self.assertEqual(f'[dbo].[{table}]',parent.get('Name'))
 
@@ -41,6 +41,19 @@ class ArtifactChecks(unittest.TestCase):
         e=next(e for e in self.elements if e.get('Name')=='[dbo].[CK_BillingCharges_WholeRupees]')
         e.find("d:Property[@Name='CheckExpressionScript']/d:Value",self.ns).text='1=1'
         self.assertTrue(verify_contract(self.root,self.ns,self.elements,self.contract,self.fingerprint))
+
+    def test_server_floor_keyword_casing_accepted(self):
+        for keyword in ('FLOOR', 'floor', 'Floor'):
+            self.assertTrue(whole_rupee_expression_matches(f'[Amount]={keyword}([Amount])', ['Amount']))
+
+    def test_column_casing_and_wrong_column_stay_strict(self):
+        for actual in ('[amount]=floor([amount])', '[Amount]=floor([DiscountAmount])'):
+            self.assertFalse(whole_rupee_expression_matches(actual, ['Amount']))
+
+    def test_changed_operator_or_extra_sql_rejected(self):
+        for actual in ('[Amount]>=floor([Amount])', '[Amount]=floor([Amount])+0.5',
+                       '[Amount]=floor([Amount]) OR 1=1', None):
+            self.assertFalse(whole_rupee_expression_matches(actual, ['Amount']))
 
     def test_generated_check_definition_detected(self):
         row=next(r for r in self.contract['checkConstraints'] if r.get('isSystemNamed'))

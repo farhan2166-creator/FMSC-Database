@@ -19,6 +19,14 @@ UI/release acceptance remains pending. See the
 [independent audit implementation addendum](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#8-owner-authorized-implementation--13-october-2026).
 The current administration implementation is documented in
 [section 9](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#9-completed-usersroles-maintenance-flow--13-october-2026).
+The owner's data-bearing DACPAC at `ad60bbb` has also been reviewed and restored
+to a disposable SQL copy: four roles, 57 permissions, twelve grants and one
+account with three memberships. The 39 production-writer checks passed again,
+plus twelve standalone-role boundary assertions. See
+[section 10](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#10-data-bearing-dacpac-review-and-role-change-scope--13-october-2026)
+for confirmed behavior and the scope of potential role/permission alignment.
+Existing roles/grants remain unchanged pending that business decision; reviewed
+artifact fingerprints are synchronized and twelve artifact regression tests pass.
 FR-06 is accepted by the owner: date/year-only changes on a blank new registration
 allow leaving without a discard prompt; this policy is documented in C#.
 See the
