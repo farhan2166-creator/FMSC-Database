@@ -8,6 +8,7 @@ public sealed class StudentProfilePage : V2Page
 {
     private readonly Action<Func<Control>, string, string>? navigate;
     private readonly StudentPicker student = new();
+    private readonly LatestReadScope profileReads = new();
     private readonly ModernButton feeHistoryButton = new() { Text="Fee Change History", Enabled=false };
     private bool loadingFeeHistory;
     private readonly PictureBox photo = new() {
@@ -73,6 +74,7 @@ public sealed class StudentProfilePage : V2Page
             "View a student’s details, family, balance and history.")
     {
         UiHelper.DisposePictureImageOnDispose(photo);
+        Disposed += (_, _) => profileReads.Dispose();
         this.navigate = navigate;
         student.UserSelectionChanged += async (_, _) => await LoadProfileAsync();
         student.UserSelectionChanged += (_, _) => UpdateFeeHistoryAvailability();
@@ -317,56 +319,47 @@ public sealed class StudentProfilePage : V2Page
     }
     private async Task LoadProfileAsync()
     {
+        if (IsDisposed) return;
+        if (student.SelectedId <= 0)
+        {
+            Warn(UiText.Prompts.SelectStudent);
+            return;
+        }
+        int admissionId = student.SelectedId;
+        ClearProfile();
+        var request = profileReads.Begin();
+        bool Current() => !IsDisposed && profileReads.IsCurrent(request) && student.SelectedId == admissionId;
         try
         {
-            if (student.SelectedId <= 0)
-            {
-                Warn(UiText.Prompts.SelectStudent);
-                return;
-            }
-            int admissionId = student.SelectedId;
-            /* Item 14 - everything on this page belongs to the student being replaced. */
-            ClearProfile();
             SetStatus("Loading student profile...");
-            var contextTask = DatabaseHelper.QueryUserAsync(
-                "GetStudentDetails",
+            var contextTask = DatabaseHelper.QueryUserAsync("GetStudentDetails", request.Token,
                 DatabaseHelper.Int("@AdmissionId", admissionId));
-            var photoTask = Task.Run(() =>
-                DatabaseHelper.QueryUser(
-                    "GetStudentPhoto",
-                    DatabaseHelper.Int("@AdmissionId", admissionId)));
-            var familyLookupTask = Task.Run(() =>
-                DatabaseHelper.QueryUser(
-                    "GetStudentFamily",
-                    DatabaseHelper.Int("@AdmissionId", admissionId)));
-            var timelineTask = Task.Run(() =>
-                DatabaseHelper.QueryUser(
-                    "GetStudentLifecycleTimeline",
-                    DatabaseHelper.Int("@AdmissionId", admissionId)));
-            await Task.WhenAll(contextTask, photoTask, familyLookupTask, timelineTask);
-            if (IsDisposed ||
-                student.SelectedId != admissionId)
-            {
-                return;
-            }
+            var photoTask = DatabaseHelper.QueryUserAsync("GetStudentPhoto", request.Token,
+                DatabaseHelper.Int("@AdmissionId", admissionId));
+            var familyTask = DatabaseHelper.QueryUserAsync("GetStudentFamily", request.Token,
+                DatabaseHelper.Int("@AdmissionId", admissionId));
+            var timelineTask = DatabaseHelper.QueryUserAsync("GetStudentLifecycleTimeline", request.Token,
+                DatabaseHelper.Int("@AdmissionId", admissionId));
+            var balanceTask = ReadBalanceAsync(admissionId, request.Token);
+            // Show identity/context as soon as those reads finish; a slower
+            // balance calculation must not hold back the rest of the profile.
+            await Task.WhenAll(contextTask, photoTask, familyTask, timelineTask);
+            if (!Current()) return;
             RenderIdentity(await contextTask, admissionId);
             RenderPhoto(await photoTask);
             BindContextGrid(await contextTask);
             BindMiniGrid(timelineGrid, await timelineTask);
             ConfigureTimelineGrid();
-            RenderFamily(await familyLookupTask, admissionId);
-            await LoadBalanceAsync(admissionId);
-            if (IsDisposed ||
-                student.SelectedId != admissionId)
-            {
-                return;
-            }
-            SetStatus("Profile loaded.");
+            RenderFamily(await familyTask, admissionId);
+            var balance = await balanceTask;
+            if (!Current()) return;
+            RenderBalance(balance);
+            if (Current()) SetStatus("Profile loaded.");
         }
+        catch (Exception) when (request.Token.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            if (!IsDisposed)
-                Fail(ex);
+            if (Current()) { profileReads.Cancel(); Fail(ex); }
         }
     }
     private void RenderIdentity(DataTable students, int admissionId)
@@ -492,49 +485,33 @@ public sealed class StudentProfilePage : V2Page
             column.Visible = visible.Contains(column.DataPropertyName);
         familyGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
     }
-    private async Task LoadBalanceAsync(int admissionId)
+    private static async Task<(bool Available, decimal Amount, Exception? Error)> ReadBalanceAsync(int admissionId, CancellationToken token)
     {
-        // Business rule (V20 audit F-04): everyone with Students.View may see the
-        // profile balance, including users without Reports.View. Use the dedicated
-        // Students.View procedure; do not weaken permissions on unrelated reports.
-        // See Docs/AUDIT_DECISIONS.md.
+        // Everyone with Students.View may see the profile balance. Keep the
+        // dedicated procedure; do not broaden permission on financial reports.
         try
         {
-            object? value =
-                await DatabaseHelper.ScalarUserAsync(
-                    "GetStudentProfileOutstandingBalance",
-                    DatabaseHelper.Int("@AdmissionId", admissionId));
-            if (IsDisposed ||
-                student.SelectedId != admissionId)
-            {
-                return;
-            }
-            decimal balance =
-                value is null ||
-                value == DBNull.Value
-                    ? 0
-                    : Convert.ToDecimal(value);
-            balanceLabel.Text =
-                $"Outstanding Balance: Rs. {balance:N0}";
-            balanceLabel.ForeColor =
-                balance > 0
-                    ? AppTheme.Danger
-                    : AppTheme.Success;
+            object? value = await DatabaseHelper.ScalarUserAsync(
+                "GetStudentProfileOutstandingBalance", token,
+                DatabaseHelper.Int("@AdmissionId", admissionId)).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+            return (true, value is null or DBNull ? 0m : Convert.ToDecimal(value), null);
         }
-        catch (Exception ex)
-            when (ex is Microsoft.Data.SqlClient.SqlException sql &&
-                  sql.Number is 2812 or 208)
+        catch (Exception) when (token.IsCancellationRequested) { throw new OperationCanceledException(token); }
+        catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number is 2812 or 208)
         {
-            balanceLabel.Text =
-                "Outstanding Balance: unavailable. Contact the administrator.";
-            balanceLabel.ForeColor =
-                AppTheme.MutedText;
+            return (false, 0m, null);
         }
-        catch (Exception ex)
-        {
-            if (!IsDisposed)
-                Fail(ex);
-        }
+        catch (Exception ex) { return (false, 0m, ex); }
+    }
+    private void RenderBalance((bool Available, decimal Amount, Exception? Error) result)
+    {
+        if (result.Error is not null) { Fail(result.Error); return; }
+        balanceLabel.Text = result.Available
+            ? $"Outstanding Balance: Rs. {result.Amount:N0}"
+            : "Outstanding Balance: unavailable. Contact the administrator.";
+        balanceLabel.ForeColor = !result.Available ? AppTheme.MutedText
+            : result.Amount > 0 ? AppTheme.Danger : AppTheme.Success;
     }
     /* The identity card above already shows name, father, registration number and contact. */
     private static readonly string[] ContextColumns =
@@ -621,6 +598,7 @@ public sealed class StudentProfilePage : V2Page
             : string.Empty;
     private void ClearProfile()
     {
+        profileReads.Cancel();
         nameLabel.Text =
             "Select a student to see their full profile.";
         placementLabel.Text = string.Empty;

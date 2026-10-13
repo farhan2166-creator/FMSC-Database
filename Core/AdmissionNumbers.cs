@@ -135,9 +135,9 @@ public static class AdmissionNumbers
         foreach (DataRow row in table.Rows)
         {
             string number = Read(row);
-            var match = Regex.Match(number, @"^([0-9]+)(.*)$");
-            long main = match.Success && long.TryParse(match.Groups[1].Value, out long value) ? value : long.MaxValue;
-            string suffix = match.Success ? match.Groups[2].Value : number;
+            bool split = TrySplitSortNumber(number.AsSpan(), out var digits, out var tail);
+            long main = split && long.TryParse(digits, out long value) ? value : long.MaxValue;
+            string suffix = split ? tail.ToString() : number;
             // Binding and sorting revisit this table. Avoid row-change events and
             // index maintenance when derived values have not changed.
             if (!Equals(row["__AdmissionNumberBase"], main)) row["__AdmissionNumberBase"] = main;
@@ -147,15 +147,29 @@ public static class AdmissionNumbers
 
     public static int Compare(string left, string right)
     {
-        var a = Regex.Match(left, @"^([0-9]+)(.*)$");
-        var b = Regex.Match(right, @"^([0-9]+)(.*)$");
-        if (a.Success && b.Success && long.TryParse(a.Groups[1].Value, out long av) && long.TryParse(b.Groups[1].Value, out long bv))
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+        if (TrySplitSortNumber(left.AsSpan(), out var a, out var aSuffix) &&
+            TrySplitSortNumber(right.AsSpan(), out var b, out var bSuffix) &&
+            long.TryParse(a, out long av) && long.TryParse(b, out long bv))
         {
             int main = av.CompareTo(bv);
             if (main != 0) return main;
-            return StringComparer.OrdinalIgnoreCase.Compare(a.Groups[2].Value, b.Groups[2].Value);
+            return aSuffix.CompareTo(bSuffix, StringComparison.OrdinalIgnoreCase);
         }
         return StringComparer.OrdinalIgnoreCase.Compare(left, right);
+    }
+
+    private static bool TrySplitSortNumber(ReadOnlySpan<char> text, out ReadOnlySpan<char> digits, out ReadOnlySpan<char> suffix)
+    {
+        // Preserve the old ^([0-9]+)(.*)$ match, including its optional final
+        // newline. Sorting must not silently change existing register order.
+        if (!text.IsEmpty && text[^1] == '\n') text = text[..^1];
+        int length = 0;
+        while (length < text.Length && text[length] is >= '0' and <= '9') length++;
+        digits = text[..length];
+        suffix = text[length..];
+        return length > 0 && !suffix.Contains('\n');
     }
 
     public static DataTable Sort(DataTable table)

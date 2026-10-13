@@ -101,10 +101,12 @@ Check((long)register.Rows[0]["__AdmissionNumberBase"] == 1, "Edited numbers must
 Check(AdmissionNumbers.Sort(register).Rows[0]["AdmissionNumber"].Equals("1"), "Natural number order must be preserved");
 Console.WriteLine($"PASS: {checks} loader, cache concurrency/invalidation and sorting checks.");
 Console.WriteLine($"PASS: {await WorkflowLoadingChecks.RunAsync()} report pagination, cancellation and picker generation checks.");
+Console.WriteLine($"PASS: {await RecordOpeningChecks.RunAsync()} latest-read and register-order equivalence checks.");
 
 if (args.Contains("--profile"))
 {
     WorkflowLoadingChecks.ProfilePagination();
+    RecordOpeningChecks.ProfileSorting();
     async Task<DataTable> Baseline()
     {
         using var reader = source.CreateDataReader(); var table = source.Clone();

@@ -251,6 +251,37 @@ FOR ATTACH;";
         params SqlParameter[] parameters) =>
         QueryUser(procedure, 120, parameters);
 
+    /// <summary>Async text-query reads. Callers retain explicit SQL permission
+    /// checks; do not use cancellation-driven reads for financial writes.</summary>
+    public static Task<DataTable> QuerySqlAsync(string sql, params SqlParameter[] parameters) =>
+        QuerySqlAsync(sql, CancellationToken.None, parameters);
+
+    public static async Task<DataTable> QuerySqlAsync(string sql, CancellationToken token, params SqlParameter[] parameters)
+    {
+        token.ThrowIfCancellationRequested();
+        using var cn = GetConnection();
+        using var cmd = new SqlCommand(sql, cn) { CommandType = CommandType.Text, CommandTimeout = 120 };
+        cmd.Parameters.AddRange(parameters);
+        await OpenConnectionAsync(cn, token).ConfigureAwait(false);
+        var table = new DataTable();
+        using (var reader = await cmd.ExecuteReaderAsync(token).ConfigureAwait(false))
+        {
+            do
+            {
+                if (reader.FieldCount == 0) continue;
+                table = await Core.AsyncTableLoader.ReadAsync(reader, "Table", token).ConfigureAwait(false);
+                break;
+            } while (await reader.NextResultAsync(token).ConfigureAwait(false));
+            // Match the first-table contract of QuerySql and finish any later
+            // results before issuing enrichment on the same connection.
+            while (await reader.NextResultAsync(token).ConfigureAwait(false))
+                while (await reader.ReadAsync(token).ConfigureAwait(false)) { }
+        }
+        await Core.AdmissionNumbers.EnrichAsync(table, cn, token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        return table;
+    }
+
 
     public static Task<DataTable> QueryUserAsync(string procedure, params SqlParameter[] parameters) =>
         QueryUserCoreAsync(procedure, 120, CancellationToken.None, WithCurrentUser(parameters));

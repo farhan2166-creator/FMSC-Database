@@ -1889,7 +1889,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 return;
             }
             DataTable members = family;
-            var eligible = await Task.Run(() => DatabaseHelper.QuerySql("""
+            var eligible = await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Fees.View';
                 SELECT S.AdmissionId,
                     CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.Enrollments E WHERE E.AdmissionId=S.AdmissionId AND E.Status=N'Active') THEN 1 ELSE 0 END AS bit) IsActive,
@@ -1898,7 +1898,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                      ORDER BY B.EnrollmentId DESC) PendingEnrollmentId
                 FROM dbo.Students S WHERE S.AdmissionId IN (SELECT CONVERT(int,[value]) FROM OPENJSON(@Ids));
                 """, DatabaseHelper.Int("@UserId",CurrentUser.UserId), DatabaseHelper.P("@Ids",
-                    System.Text.Json.JsonSerializer.Serialize(members.AsEnumerable().Select(row=>GetInt(row,"AdmissionId")).ToArray()))));
+                    System.Text.Json.JsonSerializer.Serialize(members.AsEnumerable().Select(row=>GetInt(row,"AdmissionId")).ToArray())));
             if (IsDisposed || version != loadVersion)
                 return;
             foreach (DataRow row in members.Rows)
@@ -2143,7 +2143,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 return;
             int userId = CurrentUser.UserId;
             int selectedEnrollment = enrollmentId;
-            var summaries = await Task.Run(() => DatabaseHelper.QuerySql("""
+            var summaries = await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Fees.View';
                 SELECT P.FeePaymentId,P.TotalAmount,P.Status,
                     ISNULL(A.Refunded,0) Refunded,ISNULL(A.Corrected,0) Corrected
@@ -2154,7 +2154,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     FROM dbo.FeePayments X WHERE X.RelatedFeePaymentId=P.FeePaymentId
                     AND X.Status=N'Completed' AND X.TotalAmount<0) A
                 WHERE P.EnrollmentId=@EnrollmentId AND P.RelatedFeePaymentId IS NULL;
-                """,DatabaseHelper.Int("@UserId",userId),DatabaseHelper.Int("@EnrollmentId",selectedEnrollment)));
+                """,DatabaseHelper.Int("@UserId",userId),DatabaseHelper.Int("@EnrollmentId",selectedEnrollment));
             if (IsDisposed || version != loadVersion) return;
             var byPayment = summaries.AsEnumerable().ToDictionary(row => GetInt(row,"FeePaymentId"));
             var rows = raw.AsEnumerable()
