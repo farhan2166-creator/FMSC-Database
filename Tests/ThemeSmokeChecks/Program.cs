@@ -117,6 +117,7 @@ internal static partial class Program
             CheckNavigationRecovery();
             CheckRegistrationPhotoRecovery();
             CheckPdfFileDurability();
+            CheckAdministrationEditors();
             CheckSignInGuard();
             Console.WriteLine($"PASS: {checks} Windows theme switching, structure, rendering and resource checks.");
         }

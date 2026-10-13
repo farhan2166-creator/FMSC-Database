@@ -311,6 +311,7 @@ Database/*.bak
 !/Tests/QuickRegistrationSqlChecks/
 !/Tests/PerformanceChecks/
 !/Tests/ThemeSmokeChecks/
+!/Tests/AdministrationSqlChecks/
 /Tests/AuditFixChecks/*
 !/Tests/AuditFixChecks/*.cs
 !/Tests/AuditFixChecks/*.csproj
@@ -323,3 +324,6 @@ Database/*.bak
 /Tests/ThemeSmokeChecks/*
 !/Tests/ThemeSmokeChecks/*.cs
 !/Tests/ThemeSmokeChecks/*.csproj
+/Tests/AdministrationSqlChecks/*
+!/Tests/AdministrationSqlChecks/*.cs
+!/Tests/AdministrationSqlChecks/*.csproj

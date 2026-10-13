@@ -1,8 +1,9 @@
 # FMSC_SMS — Independent Security, Durability, and Release-Integrity Audit
 
 **Current implementation update:** DP-04, RT-01, DP-01, DP-02 and DP-03 are
-implemented in source at the owner's request. IA-01/02/03 were explicitly
-excluded. See the implementation addendum below; the original review remains
+implemented in source at the owner's request. IA-01/02/03 were excluded from that
+pass, then implemented in the subsequently authorized Users/Roles restructuring.
+See sections 8 and 9 below; the original review remains
 pinned to its stated baseline and is not native deployment acceptance.
 
 **Audit date:** 13 October 2026  
@@ -262,3 +263,78 @@ real access-denied/disk-full behavior and deployed-filesystem acceptance remain
 release checks. Injected I/O failures verify controlled recovery paths, not every
 storage hardware failure. This pass changes no SQL, migration, DACPAC, school
 records, stored images or Users/Roles functionality.
+
+## 9. Completed Users/Roles maintenance flow — 13 October 2026
+
+The owner subsequently authorized a complete, simpler and stronger Users/Roles
+editing flow. The exclusion in section 8 applies to that earlier pass only.
+
+| Finding | Current implementation |
+|---|---|
+| IA-01 | Account details and assigned roles form one explicit inline draft and one **Save User** action. Separate Edit Account/Save Roles dialogs/actions are retired. Password reset is a separate password-only dialog; it is disabled/refused while account/access edits are pending, uses the saved record rather than live checkboxes, and rechecks the exact snapshot before writing. |
+| IA-02 | **Save Role** captures name, description and permissions in one request. Existing `SaveRole` and `SaveRolePermissions` execute on one connection inside an enclosing serializable C# transaction. Each nested procedure must preserve the enclosing transaction count; IDs are validated before the outer commit. A failed second step rolls back the definition, permissions, membership side effects and audit entries together. No SQL procedure/schema change or migration is required. |
+| IA-03 | Both pages share `IBusyPage`/dirty-state guards across reads, account saves, combined role saves, password hashing/reset, post-save refresh and read-only recovery. Switching records, New, Reload, keyboard Save and affected controls respect those guards. |
+
+**Simplified operator flow:** New User → username/initial password/password-change
+requirement → explicit role selection → Save User. Existing User → edit displayed
+account/role draft → Save User. Clean saved User → Reset Password, which changes
+only credentials and its next-sign-in requirement. New/existing Role → name,
+description and filtered task/area permission grid → Save Role. Each editor has a
+compact searchable record list, selected-record/state heading, assignment filter
+and effective/proposed access summary. Filters use cached DataViews and 150 ms
+debounce; hidden checked rows remain selected. Large per-role/per-permission
+decorative control trees and redundant dialogs are removed. Fewer source lines
+are not claimed as measured deployed performance.
+
+**Additional recovery safeguards:** A coherent catalog/record snapshot is checked
+under the write transaction before either procedure is submitted. Competing
+edits, catalog/grant meaning changes and changed affected memberships are refused
+without overwriting the newer state. A successful write followed by failed UI
+refresh retains confirmed identity/values and requires Reload before another
+write. Lost commit replies/failed rollback remain unconfirmed and expose Check
+Saved Changes; that action only reads and verifies submitted values, including
+an opaque credential proof for password changes. It can establish a complete
+save, unchanged original/absent new record, or conflicting stored values. It never
+automatically repeats a write. Binding failure restores the entire previous
+editor, including unsubmitted new-account password inputs. Raw derived hashes
+and salts are not added to editor models, logs or audit display; temporary password
+buffers are zeroed, plaintext inputs are cleared after confirmed success, and
+PBKDF2 remains compatible with sign-in (100,000 SHA-512 iterations, 16-byte salt,
+64-byte derived hash) off the UI thread. Cleanup cannot turn a confirmed commit
+into an apparent failed save.
+
+**Role-definition scope:** Role names, memberships and grants are database data;
+the DACPAC supplies their schema/procedures, not the live school's catalog. No
+defined role is merged, renamed, deleted or automatically granted by this
+restructure. Permissions are grouped/displayed more clearly, and known viewing
+dependencies are explained without silently adding permissions. Future role
+consolidation needs the actual catalog, affected memberships, exact permission
+sets and business responsibility review before an explicit data migration.
+Administrator role/account protection includes both primary-role and membership
+paths. Multiple roles, deliberate zero-role/zero-permission access and the legacy
+primary-reference rule remain intact. Database permissions are checked on
+operations; menus/session permissions refresh on sign-out/sign-in. The existing
+hidden maintenance navigation policy is unchanged.
+
+**Executed verification:** **522 portable assertions pass**, including 51 new
+production administration model/coordinator checks. **39 native SQL checks pass**
+using the production `AdministrationStore` against the approved DACPAC deployed
+to a new, isolated SQL Server 2022 Developer container and synthetic
+`FMSC_AuditChecks_Admin_20261013` database. They verify user/role round trips,
+password compatibility/reset isolation, zero access, both Administrator
+protection paths, stale account/role/catalog refusal, captured-actor audit,
+read-only write denial, actual trigger-injected second-step rollback (including
+audit/membership effects), and competing simultaneous editors. Ordinary login
+counters do not invalidate an otherwise unchanged account draft. The application
+and Windows smoke harness cross-build with zero warnings/errors; the latter now
+uses the production internal UI helpers instead of linked duplicate copies.
+
+**Native UI fixtures remain compiled/unrun:** They cover unified saves, dirty
+selection guards, same-record draft retention, password/reset separation,
+new-account validation/secret clearing, filtering hidden checks, stale/unconfirmed
+recovery, atomic binding rollback including initial passwords, busy/disposed
+completion, protected/read-only editors and compact/wide layouts in Professional
+Simple and Ocean Blue. Actual Windows painting, DPI/keyboard/modal behavior,
+target LocalDB/school-clone acceptance and session refresh remain release checks.
+No school database or release MDF/LDF was opened or changed. SQL, migrations,
+DACPAC and their approved fingerprints remain unchanged.

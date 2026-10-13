@@ -9,9 +9,16 @@ adaptive sizing and a JPEG quality floor; existing stored photos are unchanged.
 The independent audit's DP-04, RT-01 and DP-01/02/03 are now implemented: bounded
 logo input, explicit retirement of the obsolete freeze verifier, honest report
 view persistence, recovery backups for corrupt settings and safe CSV/PDF
-replacement. IA-01/02/03 were excluded by the owner. The suite now passes 471
-portable assertions; native Windows/release acceptance remains pending. See the
+replacement. IA-01/02/03 were excluded from that pass and are now implemented in
+the separately authorized inline Users/Roles flow: one explicit save per editor,
+password-only reset, optimistic state guards and one enclosing role transaction.
+Existing role data, Administrator/zero-access policies and hidden navigation are
+preserved. The suite now passes 522 portable assertions; 39 production-writer
+SQL checks pass on an isolated synthetic SQL Server 2022 fixture. Native Windows
+UI/release acceptance remains pending. See the
 [independent audit implementation addendum](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#8-owner-authorized-implementation--13-october-2026).
+The current administration implementation is documented in
+[section 9](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#9-completed-usersroles-maintenance-flow--13-october-2026).
 FR-06 is accepted by the owner: date/year-only changes on a blank new registration
 allow leaving without a discard prompt; this policy is documented in C#.
 See the

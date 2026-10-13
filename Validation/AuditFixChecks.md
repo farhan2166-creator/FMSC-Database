@@ -15,7 +15,7 @@ python Tools/test_audit_schema.py
 ```
 
 The portable tests compile production money, TVP, quotation, registration/photo
-and file-persistence helpers. The
+file-persistence and administrative draft/transaction-outcome helpers. The
 schema verifier checks ZIP CRC, Origin.xml's model checksum, the exact package
 hash, contract inventory, money check expressions, the reviewed full model, and
 273 SQL-module fingerprints. These checks do not execute SQL Server or WinForms.
@@ -67,6 +67,34 @@ then apply the migration successfully. No automated rounding is an acceptable fi
 The existing `AdmissionWorkflowChecks.ps1` and `StudentCorrectionChecks.ps1`
 restore their own disposable copies and now apply migration 2 on those copies
 before their existing scenarios.
+
+### Administration transaction checks
+
+The unified Users/Roles writer reuses the existing procedures in one enclosing
+transaction; no new schema migration is needed. On a separately restored,
+**disposable** `FMSC_AuditChecks_<suffix>` clone, the administration harness links
+the production `AdministrationStore` and tests typed outcomes, stale state,
+zero access, password isolation, protected accounts/roles and captured actors.
+The current synthetic fixture expects `Students.View`, `Students.Admit`,
+`Fees.View`, `System.Users`, `System.Users.Manage`, `System.Roles` and
+`System.Roles.Manage` permission definitions, an Administrator, and at least two
+non-Administrator roles. It creates synthetic accounts/roles and temporarily
+creates a failure-injection trigger; it must not run against real school data.
+
+```powershell
+$env:FMSC_AUDIT_CONNECTION='Server=(localdb)\MSSQLLocalDB;Database=FMSC_AuditChecks_admin;Integrated Security=true;TrustServerCertificate=true'
+dotnet run --project Tests/AdministrationSqlChecks
+Remove-Item Env:FMSC_AUDIT_CONNECTION
+```
+
+The **39 executed SQL assertions** on the isolated SQL Server 2022 Developer
+fixture include genuine second-procedure failure with all first-step data/audit
+effects rolled back, two simultaneous user editors, and unchanged snapshots for
+unrelated login-counter activity. The portable suite now has **522 assertions**.
+Windows editor fixtures are compiled but not executed on the Linux host. Existing
+role/grant data and restricted maintenance navigation are preserved; business
+role consolidation is a separate review of live catalog/usage, not an automatic
+consequence of this UI restructuring.
 
 ## Native validation and remaining Windows checks
 

@@ -6,9 +6,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../FMSC_SMS.csproj" />
-    <Compile Include="../../Core/UiPaintShape.cs" Link="UiPaintShape.cs" />
-    <Compile Include="../../Core/UiColorTransition.cs" Link="UiColorTransition.cs" />
-    <Compile Include="../../Core/MasterEditorFocusNavigator.cs" Link="MasterEditorFocusNavigator.cs" />
     <Using Include="System.Drawing" />
     <Using Include="System.Windows.Forms" />
   </ItemGroup>
