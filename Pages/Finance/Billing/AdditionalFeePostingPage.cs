@@ -1,8 +1,11 @@
 using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Billing;
-public sealed class AdditionalFeePostingPage : V2Page
+public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
 {
+    private bool posting;
+    public bool IsBusy => posting;
+    public string BusyMessage => "Additional fees are being posted. Wait for the result before leaving.";
     private readonly LookupBox year = new(), campus = new(), klass = new(), section = new(), fee = new();
     private readonly ModernDatePicker date = HumanUi.Date();
     private readonly ModernNumericTextBox amount = new() { Minimum = 0, Maximum = 100000000, WholeRupeesOnly = true, DecimalPlaces = 0, Dock = DockStyle.Fill };
@@ -142,6 +145,7 @@ public sealed class AdditionalFeePostingPage : V2Page
     }
     private async Task PostAsync()
     {
+        if (posting) return;
         if (!ValidateRequiredInputs())
             return;
         students.EndEdit();
@@ -157,8 +161,10 @@ public sealed class AdditionalFeePostingPage : V2Page
         string postedFeeName = fee.Text;
         decimal postedAmount = amount.Value;
         DateTime postedDate = date.Value;
+        posting = true;
         try
         {
+            using var busy = BeginBusy(BusyMessage, this);
             await DatabaseHelper.QueryUserAsync("PostAdditionalFee",
                 DatabaseHelper.P("@RequestId", requestId),
                 DatabaseHelper.Int("@FeeTypeId", fee.SelectedId),
@@ -172,5 +178,6 @@ public sealed class AdditionalFeePostingPage : V2Page
             ClearCandidates();
         }
         catch (Exception ex) { Fail(ex); }
+        finally { posting = false; }
     }
 }

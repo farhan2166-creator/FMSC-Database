@@ -2,13 +2,18 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Security;
 public sealed class LoginForm : ApplicationWindowForm
 {
+    private readonly Func<string, string, (bool Success, string Message, Exception? ConnectionFailure)> signIn;
+    private bool signingIn;
     readonly ModernTextBox user = HumanUi.TextBox(false, 100);
     readonly ModernTextBox pass = HumanUi.TextBox(false, 100);
     readonly ModernButton login = new() { Text = "Sign In", Dock = DockStyle.Fill };
     /* UX - a missing username or password is marked on the field. A WRONG password is a real refusal and still says so in a dialog. */
     readonly FormValidator validator = new();
-    public LoginForm()
+    public LoginForm() : this(AttemptSignIn) { }
+    internal LoginForm(Func<string, string, (bool Success, string Message, Exception? ConnectionFailure)> signIn)
     {
+        this.signIn = signIn;
+        FormClosing += (_, e) => { if (signingIn) e.Cancel = true; };
         Text = "FMSC - Sign In";
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(AppScale.Scale(760), AppScale.Scale(500));
@@ -242,7 +247,14 @@ public sealed class LoginForm : ApplicationWindowForm
         }
         return base.ProcessCmdKey(ref msg, keyData);
     }
-    void Login_Click(object? s, EventArgs e)
+    private static (bool Success, string Message, Exception? ConnectionFailure) AttemptSignIn(string username, string password)
+    {
+        if (!DatabaseHelper.TestConnection(out string message, out var failure))
+            return (false, message, failure);
+        bool success = AuthenticationService.Authenticate(username, password, out message, out failure);
+        return (success, message, failure is not null && DatabaseConnectionForm.IsConnectionProblem(failure) ? failure : null);
+    }
+    async void Login_Click(object? s, EventArgs e)
     {
         /* UX - say what is missing, in the field that is missing it, before spending a database round trip on an attempt that cannot succeed. */
         if (!login.Enabled)
@@ -253,28 +265,51 @@ public sealed class LoginForm : ApplicationWindowForm
         if (!validator.Finish())
             return;
         login.Enabled = false;
-        /* UX - the check below runs on this thread, so the button says what is happening and is repainted before it starts. */
+        // Capture credentials on the UI thread; neither SQL nor password hashing
+        // should freeze the form, and the operation must not read live controls.
+        string username = user.Text;
+        string password = pass.Text;
+        signingIn = true;
+        user.Enabled = false;
+        pass.Enabled = false;
+        UseWaitCursor = true;
         string idleText = login.Text;
         login.Text = "Signing in…";
-        login.Refresh();
+        bool focusPassword = false;
         try
         {
-            if (!DatabaseHelper.TestConnection(out var dbMsg))
+            var result = await Task.Run(() => signIn(username, password));
+            if (IsDisposed) return;
+            if (result.ConnectionFailure is not null)
             {
-                ModernMessageDialog.ShowError(this, dbMsg, "Database");
+                using var connection = new DatabaseConnectionForm(startup: false);
+                connection.ShowDialog(this);
+                focusPassword = true;
                 return;
             }
-            if (AuthenticationService.Authenticate(user.Text, pass.Text, out var msg))
+            if (result.Success)
             {
                 DialogResult = DialogResult.OK;
                 return;
             }
-            ModernMessageDialog.ShowWarning(this, msg, "Login");
-            pass.Focus();
-            pass.SelectAll();
+            ModernMessageDialog.ShowWarning(this, result.Message, "Login");
+            focusPassword = true;
+        }
+        catch (Exception ex)
+        {
+            AppExceptionHandler.LogNonFatal(ex, "Sign-in operation");
+            if (!IsDisposed) ModernMessageDialog.ShowError(this, DbMessage.UserMessage(ex), "Sign In");
         }
         finally
         {
+            signingIn = false;
+            if (!IsDisposed)
+            {
+                UseWaitCursor = false;
+                user.Enabled = true;
+                pass.Enabled = true;
+                if (focusPassword) { pass.Focus(); pass.SelectAll(); }
+            }
             if (!login.IsDisposed)
             {
                 login.Text = idleText;

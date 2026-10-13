@@ -20,6 +20,8 @@ internal static class Program
         {
             Check((int)AppThemeType.Amber == 6, "Existing persisted enum values must stay stable");
             Check(AppTheme.SelectableThemes.Contains(AppThemeType.ProfessionalSimple), "Simple theme must be selectable");
+            AppTheme.SetTheme((AppThemeType)999);
+            Check(AppTheme.CurrentTheme == AppThemeType.OceanBlue, "Unknown saved/future theme values fall back to a supported appearance");
             AppTheme.SetTheme(AppThemeType.OceanBlue);
             using var form = new Form { ClientSize = new Size(720, 500), AutoScaleMode = AutoScaleMode.None };
             var card = new RoundedPanel { Bounds = new Rectangle(20, 20, 680, 460), CornerRadius = 12 };
@@ -109,9 +111,85 @@ internal static class Program
             CheckSameRecordDraft();
             CheckChoiceFilters(form);
             CheckInformationDialogs(form);
+            CheckPhotoWriteGuard();
+            CheckSignInGuard();
             Console.WriteLine($"PASS: {checks} Windows theme switching, structure, rendering and resource checks.");
         }
         finally { AppTheme.SetTheme(originalTheme); }
+    }
+
+    private static void PumpUntil(Func<bool> completed, string message)
+    {
+        var deadline = System.Diagnostics.Stopwatch.StartNew();
+        while (!completed() && deadline.Elapsed < TimeSpan.FromSeconds(5))
+        { Application.DoEvents(); Thread.Yield(); }
+        Check(completed(), message);
+    }
+
+    private static void CheckSignInGuard()
+    {
+        int attempts = 0;
+        using var release = new ManualResetEventSlim();
+        Func<string, string, (bool Success, string Message, Exception? ConnectionFailure)> attempt = (username, password) => {
+            Interlocked.Increment(ref attempts);
+            Check(username == "operator" && password == "captured password", "Sign-in uses the captured credentials");
+            if (!release.Wait(TimeSpan.FromSeconds(5))) throw new TimeoutException("Fake sign-in was not released");
+            return (true, "", null);
+        };
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        using var login = (Form)Activator.CreateInstance(typeof(FMSC_SMS.Pages.Security.LoginForm), flags, null, new object[] { attempt }, null)!;
+        var type = login.GetType();
+        var username = (ModernTextBox)type.GetField("user", flags)!.GetValue(login)!;
+        var password = (ModernTextBox)type.GetField("pass", flags)!.GetValue(login)!;
+        var button = (ModernButton)type.GetField("login", flags)!.GetValue(login)!;
+        username.Text = "operator"; password.Text = "captured password";
+        var click = type.GetMethod("Login_Click", flags)!;
+        click.Invoke(login, new object?[] { null, EventArgs.Empty });
+        PumpUntil(() => Volatile.Read(ref attempts) == 1, "Sign-in starts on the worker thread");
+        Check(!button.Enabled && !username.Enabled && !password.Enabled, "One sign-in holds its credentials and action");
+        click.Invoke(login, new object?[] { null, EventArgs.Empty });
+        Check(attempts == 1, "Repeated sign-in gestures must not start another authentication");
+        var closing = new FormClosingEventArgs(CloseReason.UserClosing, false);
+        typeof(Form).GetMethod("OnFormClosing", flags)!.Invoke(login, new object[] { closing });
+        Check(closing.Cancel, "Closing is blocked while authentication is in progress");
+        release.Set();
+        PumpUntil(() => button.Enabled, "Sign-in completion restores the form state");
+        Check(login.DialogResult == DialogResult.OK && username.Enabled && password.Enabled, "A successful sign-in closes with restored field state");
+    }
+
+    private static void CheckPhotoWriteGuard()
+    {
+        // Unshown fixture: the deferred student-cache loader never starts.
+        FMSC_SMS.Pages.Security.CurrentUser.SignIn(999, "Fixture", "Administrator", false, Array.Empty<string>());
+        try
+        {
+            using var photo = new FMSC_SMS.Pages.Students.Profile.StudentPhotoPage();
+            var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+            var type = photo.GetType();
+            var student = (StudentPicker)type.GetField("student", flags)!.GetValue(photo)!;
+            var students = new System.Data.DataTable();
+            students.Columns.Add("AdmissionId", typeof(int)); students.Columns.Add("AdmissionNumber", typeof(string));
+            students.Columns.Add("StudentName", typeof(string)); students.Columns.Add("FatherName", typeof(string));
+            students.Rows.Add(1, "1", "Student", "Parent");
+            student.SetStudent(students.Rows[0]);
+            type.GetField("_pendingPhoto", flags)!.SetValue(photo, new byte[] { 1, 2, 3 });
+            type.GetMethod("UpdateActionAvailability", flags)!.Invoke(photo, null);
+            Check(photo.HasUnsavedChanges && !student.Enabled, "A photo draft holds its student and participates in navigation checks");
+            int writes = 0;
+            var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            Func<Task> write = () => { writes++; return gate.Task; };
+            var run = type.GetMethod("RunPhotoWriteAsync", flags)!;
+            var first = (Task)run.Invoke(photo, new object[] { write })!;
+            Check(photo.IsBusy && !((Control)type.GetField("clearButton", flags)!.GetValue(photo)!).Enabled, "A photo update blocks leaving and Clear");
+            var duplicate = (Task)run.Invoke(photo, new object[] { write })!;
+            Check(duplicate.IsCompletedSuccessfully && writes == 1, "Photo updates cannot overlap");
+            gate.SetResult();
+            PumpUntil(() => first.IsCompleted, "Photo write guard finishes without SQL");
+            first.GetAwaiter().GetResult();
+            Check(!photo.IsBusy && photo.HasUnsavedChanges && !student.Enabled, "An unresolved photo draft remains protected after the operation");
+            Check(!photo.IsHandleCreated, "The photo fixture must never start its deferred SQL loader");
+        }
+        finally { FMSC_SMS.Pages.Security.CurrentUser.SignOut(); }
     }
 
     private static void CheckInformationDialogs(Form owner)
@@ -120,6 +198,7 @@ internal static class Program
         var flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var failureType = application.GetType("FMSC_SMS.Core.DatabaseCompatibilityFailure", true)!;
         var issueType = application.GetType("FMSC_SMS.Core.DatabaseCompatibilityIssue", true)!;
+        var exceptionType = application.GetType("FMSC_SMS.Core.DatabaseCompatibilityException", true)!;
         var connectionType = application.GetType("FMSC_SMS.Core.DatabaseConnectionForm", true)!;
         using var connection = (Form)Activator.CreateInstance(connectionType, flags, null, new object[] { false }, null)!;
         var showFailure = connectionType.GetMethod("ShowFailure", flags)!;
@@ -128,7 +207,8 @@ internal static class Program
         {
             var failure = Activator.CreateInstance(failureType, new object?[] {
                 Enum.Parse(issueType, "SchemaVersion"), "2", version, "diagnostic detail", null })!;
-            showFailure.Invoke(connection, new[] { "diagnostic detail", "", failure });
+            var exception = Activator.CreateInstance(exceptionType, flags, null, new[] { failure }, null)!;
+            showFailure.Invoke(connection, new[] { "diagnostic detail", exception });
             setBusy.Invoke(connection, new object[] { false });
             Check(((Label)connectionType.GetField("_status", flags)!.GetValue(connection)!).Text == title, "Connection dialog must display the correct compatibility direction");
             var message = (Label)connectionType.GetField("_message", flags)!.GetValue(connection)!;
@@ -138,9 +218,18 @@ internal static class Program
             Check(((Control)connectionType.GetField("_reconnect", flags)!.GetValue(connection)!).Enabled, "Reconnect remains available after an administrator fixes compatibility");
         }
         Check(!connection.IsHandleCreated, "Unshown connection fixture must never run its automatic SQL connection");
-        showFailure.Invoke(connection, new object?[] { "Connection unavailable", "", null });
+        showFailure.Invoke(connection, new object?[] { "Connection unavailable", null });
         setBusy.Invoke(connection, new object[] { false });
-        Check(((Control)connectionType.GetField("_restart", flags)!.GetValue(connection)!).Enabled, "Ordinary connection failures restore Restart");
+        Check(((Control)connectionType.GetField("_restart", flags)!.GetValue(connection)!).Enabled == File.Exists(FMSC_SMS.DatabaseHelper.DatabaseFile), "Restart is available for a connection failure only when the school file exists");
+        var recoveryType = application.GetType("FMSC_SMS.Core.DatabaseRecoveryException", true)!;
+        var recovery = Activator.CreateInstance(recoveryType, flags, null,
+            new object[] { "EngineBusy", "Close other database programs first.", "Engine diagnostic 123" }, null)!;
+        showFailure.Invoke(connection, new[] { "Generic outer text", recovery });
+        setBusy.Invoke(connection, new object[] { false });
+        Check(((Label)connectionType.GetField("_message", flags)!.GetValue(connection)!).Text.Contains("Close other database programs first."), "The main connection message retains the engine's explanation");
+        Check(((Control)connectionType.GetField("_details", flags)!.GetValue(connection)!).Text.Contains("Engine diagnostic 123"), "Connection details retain engine command output");
+        Check(!((Control)connectionType.GetField("_repair", flags)!.GetValue(connection)!).Enabled, "Busy engines must not suggest reinstalling software");
+        Check(connection.AutoScaleMode == AutoScaleMode.None, "Connection dialog uses the application's existing scale metrics");
 
         var aboutType = application.GetType("FMSC_SMS.Core.AboutForm", true)!;
         using var about = (Form)Activator.CreateInstance(aboutType, flags, null, Array.Empty<object>(), null)!;

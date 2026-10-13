@@ -366,6 +366,13 @@ public static class DatabaseBackupManager
             progress?.Report("Restore failed.");
             return Failed($"Restore failed:\n{DbMessage.UserMessage(ex)}{recoveryMessage}");
         }
+        finally
+        {
+            // A restore can change the database even when its acknowledgement or
+            // automatic recovery fails. Subsequent reads/writes must verify again.
+            if (restoreStarted)
+                DatabaseHelper.RefreshDatabaseConnection();
+        }
     }
     /// <summary>The pre-restore safety backup is MANDATORY.</summary>
     private static string TryCreatePreRestoreSafetyBackup(

@@ -291,36 +291,52 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
             return;
         string newFolder = dialog.SelectedPath;
-        /* setting the backup folder also relinks existing backup records to it, which is a real state change rather than a preference. */
-        int relinkable = await Task.Run(
-            () => DatabaseBackupManager.CountAutoRelinkableBackups(newFolder));
-        if (relinkable > 0)
+        isBusy = true;
+        busyMessage = "The backup folder is being updated. Wait until it finishes.";
+        SetBusyState(true);
+        try
         {
-            var confirmation = ModernMessageDialog.Show(
-                FindForm(),
-                "Change backup folder?\n\n" +
-                $"Folder: {newFolder}\n\n" +
-                $"Existing backup records found: {relinkable}\n\n" +
-                "Those records will be relinked to this folder. This changes where the " +
-                "application expects those backup files to be located.\n\n" +
-                "Do you want to change the backup folder?",
-                "Confirm Backup Folder Change",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning,
-                MessageBoxDefaultButton.Button2);
-            if (confirmation != DialogResult.Yes)
+            /* setting the backup folder also relinks existing backup records to it, which is a real state change rather than a preference. */
+            int relinkable = await Task.Run(
+                () => DatabaseBackupManager.CountAutoRelinkableBackups(newFolder));
+            if (relinkable > 0)
             {
-                SetStatus("Backup folder was not changed.");
+                var confirmation = ModernMessageDialog.Show(
+                    FindForm(),
+                    "Change backup folder?\n\n" +
+                    $"Folder: {newFolder}\n\n" +
+                    $"Existing backup records found: {relinkable}\n\n" +
+                    "Those records will be relinked to this folder. This changes where the " +
+                    "application expects those backup files to be located.\n\n" +
+                    "Do you want to change the backup folder?",
+                    "Confirm Backup Folder Change",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning,
+                    MessageBoxDefaultButton.Button2);
+                if (confirmation != DialogResult.Yes)
+                {
+                    SetStatus("Backup folder was not changed.");
+                    return;
+                }
+            }
+            if (!BackupSettings.SetBackupFolder(newFolder))
+            {
+                Warn("The backup folder could not be saved. The selected folder and backup records were not changed. Contact the administrator to check settings-folder access.");
                 return;
             }
+            backupFolder.Text = newFolder;
+            int relinked = await Task.Run(() => DatabaseBackupManager.TryAutoRelinkMissingBackups(newFolder));
+            SetStatus($"Backup folder changed to {newFolder}.");
+            if (relinked > 0)
+                Info($"Relinked {relinked} existing backup record(s) to this folder.");
+            await LoadHistoryAsync();
         }
-        backupFolder.Text = newFolder;
-        BackupSettings.SetBackupFolder(newFolder);
-        int relinked = await Task.Run(() => DatabaseBackupManager.TryAutoRelinkMissingBackups(newFolder));
-        SetStatus($"Backup folder changed to {newFolder}.");
-        if (relinked > 0)
-            Info($"Relinked {relinked} existing backup record(s) to this folder.");
-        await LoadHistoryAsync();
+        finally
+        {
+            isBusy = false;
+            busyMessage = string.Empty;
+            if (!IsDisposed) SetBusyState(false);
+        }
     }
     async Task BackupNowAsync()
     {

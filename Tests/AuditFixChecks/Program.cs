@@ -42,4 +42,6 @@ var missing=original.Copy();missing.Rows[0]["Amount"]=DBNull.Value;Assert(QuickR
 Console.WriteLine($"PASS: {checks} production money/TVP and quotation regression checks.");
 Console.WriteLine($"PASS: {RemainingFindingChecks.Run()} role, literal search and working-area checks.");
 Console.WriteLine($"PASS: {CompatibilityGuidanceChecks.Run()} database compatibility guidance checks.");
+Console.WriteLine($"PASS: {ConnectionRecoveryChecks.Run()} connection recovery explanation and action checks.");
+Console.WriteLine($"PASS: {await DurabilityChecks.RunAsync()} settings, photo input and payment journal durability checks.");
 if(args.Contains("--profile-search"))ReviewFilterProfile.Run();

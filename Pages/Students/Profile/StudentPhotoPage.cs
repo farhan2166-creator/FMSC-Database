@@ -1,8 +1,14 @@
 using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Profile;
-public sealed class StudentPhotoPage : V2Page
+public sealed class StudentPhotoPage : V2Page, IBusyPage, IUnsavedChanges
 {
+    private readonly LatestReadScope photoRead = new();
+    private bool changingPhoto;
+    public bool IsBusy => changingPhoto;
+    public string BusyMessage => "The student's photo is being updated. Wait for it to finish before leaving.";
+    public bool HasUnsavedChanges => _pendingPhoto is not null;
+    public string UnsavedChangesMessage => "The selected student photo has not been saved. Leave this page and discard it?";
     private readonly StudentPicker student = new();
     private readonly PictureBox preview = new() {
         Dock = DockStyle.Fill,
@@ -23,16 +29,18 @@ public sealed class StudentPhotoPage : V2Page
     private ModernButton choosePhotoButton = null!;
     private ModernButton savePhotoButton = null!;
     private ModernButton removePhotoButton = null!;
+    private ModernButton clearButton = null!;
     private bool CanManagePhotos => CurrentUser.HasPermission("Students.Administer");
     public StudentPhotoPage() : base("Student Photo", "Add or update a student’s profile photo.")
     {
         UiHelper.DisposePictureImageOnDispose(preview);
         choosePhotoButton = AddBusyAction("Choose Photo…", ChoosePhotoAsync);
         /* writing a photo is a real write; guarded so a double click cannot save twice. */
-        savePhotoButton = AddBusyAction("Save Photo", SavePhotoAsync, "Success");
+        savePhotoButton = AddBusyAction("Save Photo", () => RunPhotoWriteAsync(SavePhotoAsync), "Success");
         /* removing a photo deletes a row from the student record, so it is guarded like Save. */
-        removePhotoButton = AddBusyAction("Remove Photo", RemovePhotoAsync, "Danger");
-        var clear = AddAction(UiText.Actions.Clear, (_, _) => {
+        removePhotoButton = AddBusyAction("Remove Photo", () => RunPhotoWriteAsync(RemovePhotoAsync), "Danger");
+        clearButton = AddAction(UiText.Actions.Clear, (_, _) => {
+            if (changingPhoto) return;
             ClearForm();
             FormValidator.FocusInput(student);
         }, "Secondary");
@@ -47,7 +55,8 @@ public sealed class StudentPhotoPage : V2Page
         student.UserSelectionChanged += async (_, _) => { await LoadPhotoAsync(); UpdateActionAvailability(); };
         student.SelectionCleared += async (_, _) => { await LoadPhotoAsync(); UpdateActionAvailability(); };
         student.SearchFailed += ex => Fail(ex);
-        StudentSearchCache.Warm();
+        Disposed += (_, _) => photoRead.Dispose();
+        Defer(StudentSearchCache.Warm);
         var details = HumanUi.Card("Student", "Select a student to view or replace their profile photo.");
         details.Content.Controls.Add(HumanUi.Field("Student", student, true));
         var photoCard = HumanUi.Card("Photo", "Choose a JPEG or PNG image up to 5 MB.");
@@ -78,18 +87,21 @@ public sealed class StudentPhotoPage : V2Page
     }
     private async Task LoadPhotoAsync()
     {
+        if (IsDisposed) return;
+        var request = photoRead.Begin();
         _pendingPhoto = null;
         _pendingFileName = null;
         _pendingContentType = null;
         UiHelper.ReplacePictureImage(preview, null);
         fileInfo.Text = string.Empty;
+        UpdateActionAvailability();
         if (student.SelectedId <= 0)
             return;
         try
         {
             var admissionId = student.SelectedId;
-            var dt = await DatabaseHelper.QueryUserAsync("GetStudentPhoto", DatabaseHelper.Int("@AdmissionId", admissionId));
-            if (IsDisposed || student.SelectedId != admissionId) return;
+            var dt = await DatabaseHelper.QueryUserAsync("GetStudentPhoto", request.Token, DatabaseHelper.Int("@AdmissionId", admissionId));
+            if (IsDisposed || !photoRead.IsCurrent(request) || student.SelectedId != admissionId) return;
             if (dt.Rows.Count == 0)
             {
                 SetStatus("No photo on file for this student.");
@@ -104,7 +116,8 @@ public sealed class StudentPhotoPage : V2Page
             SetStatus("Photo loaded.");
             UpdateActionAvailability();
         }
-        catch (Exception ex) { Fail(ex); }
+        catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { }
+        catch (Exception ex) { if (!IsDisposed && photoRead.IsCurrent(request)) Fail(ex); }
     }
     private async Task ChoosePhotoAsync()
     {
@@ -124,18 +137,17 @@ public sealed class StudentPhotoPage : V2Page
             };
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
-            var bytes = await File.ReadAllBytesAsync(dialog.FileName);
+            // Choosing a replacement supersedes any outstanding stored-photo read.
+            var request = photoRead.Begin();
+            byte[] bytes;
+            try { bytes = await StudentPhotoInput.ReadAsync(dialog.FileName, request.Token); }
+            catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { return; }
             if (IsDisposed ||
-                student.SelectedId != chosenAdmissionId)
+                !photoRead.IsCurrent(request) || student.SelectedId != chosenAdmissionId)
             {
-                SetStatus(
+                if (!IsDisposed) SetStatus(
                     "Student changed while loading the photo. Photo not attached; choose it again.",
                     true);
-                return;
-            }
-            if (bytes.Length > 5_000_000)
-            {
-                Warn("Please choose an image smaller than 5 MB.");
                 return;
             }
             /* Item 12 - the picture already on screen was disposed BEFORE the new one was decoded. */
@@ -160,10 +172,27 @@ public sealed class StudentPhotoPage : V2Page
                 _ => "image/jpeg"
             };
             fileInfo.Text = $"{_pendingFileName} (not saved yet)";
-            SetStatus("Photo selected. Click Save Photo to store it.");
+            SetStatus("Photo selected. Save Photo to store it, or Clear to discard it before choosing another student.");
             UpdateActionAvailability();
         }
-        catch (Exception ex) { Fail(ex); }
+        catch (StudentPhotoInputException ex) { if (!IsDisposed) Warn(ex.Message); }
+        catch (Exception ex) { if (!IsDisposed) Fail(ex); }
+    }
+    private async Task RunPhotoWriteAsync(Func<Task> write)
+    {
+        if (changingPhoto) return;
+        changingPhoto = true;
+        photoRead.Cancel();
+        try
+        {
+            using var busy = BeginBusy(BusyMessage, student, choosePhotoButton, savePhotoButton, removePhotoButton, clearButton);
+            await write();
+        }
+        finally
+        {
+            changingPhoto = false;
+            if (!IsDisposed) UpdateActionAvailability();
+        }
     }
     private static Bitmap BitmapFromBytes(byte[] bytes)
     {
@@ -238,17 +267,18 @@ public sealed class StudentPhotoPage : V2Page
     }
     private void KeepActionAvailability()
     {
-        if (choosePhotoButton.Enabled && (!CanManagePhotos || student.SelectedId <= 0))
+        if (choosePhotoButton.Enabled && (changingPhoto || !CanManagePhotos || student.SelectedId <= 0))
             choosePhotoButton.Enabled = false;
-        if (savePhotoButton.Enabled && (!CanManagePhotos || student.SelectedId <= 0 || _pendingPhoto is null))
+        if (savePhotoButton.Enabled && (changingPhoto || !CanManagePhotos || student.SelectedId <= 0 || _pendingPhoto is null))
             savePhotoButton.Enabled = false;
-        if (removePhotoButton.Enabled && (!CanManagePhotos || student.SelectedId <= 0 || preview.Image is null || _pendingPhoto is not null))
+        if (removePhotoButton.Enabled && (changingPhoto || !CanManagePhotos || student.SelectedId <= 0 || preview.Image is null || _pendingPhoto is not null))
             removePhotoButton.Enabled = false;
     }
     private void UpdateActionAvailability()
     {
-        choosePhotoButton.Enabled = CanManagePhotos && student.SelectedId > 0;
-        savePhotoButton.Enabled = CanManagePhotos && student.SelectedId > 0 && _pendingPhoto is not null;
-        removePhotoButton.Enabled = CanManagePhotos && student.SelectedId > 0 && preview.Image is not null && _pendingPhoto is null;
+        student.Enabled = !changingPhoto && _pendingPhoto is null;
+        choosePhotoButton.Enabled = !changingPhoto && CanManagePhotos && student.SelectedId > 0;
+        savePhotoButton.Enabled = !changingPhoto && CanManagePhotos && student.SelectedId > 0 && _pendingPhoto is not null;
+        removePhotoButton.Enabled = !changingPhoto && CanManagePhotos && student.SelectedId > 0 && preview.Image is not null && _pendingPhoto is null;
     }
 }

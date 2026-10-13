@@ -28,14 +28,15 @@ public static class BackupSettings
             return string.Empty;
         }
     }
-    public static void SetBackupFolder(string path)
+    public static bool SetBackupFolder(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
-            return;
+            return false;
         try
         {
             Directory.CreateDirectory(SettingsFolder);
-            File.WriteAllText(SettingsFile, path.Trim(), Encoding.UTF8);
+            AtomicTextFile.Write(SettingsFile, path.Trim(), Encoding.UTF8);
+            return true;
         }
         catch (Exception ex)
         {
@@ -43,6 +44,7 @@ public static class BackupSettings
             AppExceptionHandler.LogNonFatal(
                 ex,
                 $"Saving the selected backup folder to '{SettingsFile}' - the folder choice will not survive a restart");
+            return false;
         }
     }
 }

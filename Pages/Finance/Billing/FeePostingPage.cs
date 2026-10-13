@@ -4,8 +4,11 @@ using FMSC_SMS.Pages.Reports.Finance;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Billing;
 /// <summary>Manual Monthly Fee Posting - the operator decides what fee to post, for which month, and for whom. Re-clicking Post is therefore harmless - the second click posts nothing.</summary>
-public sealed class FeePostingPage : V2Page
+public sealed class FeePostingPage : V2Page, IBusyPage
 {
+    private bool posting;
+    public bool IsBusy => posting;
+    public string BusyMessage => "Monthly fees are being posted. Wait for the result before leaving.";
     private const string PostColumn = "__Post";
     /// <summary>A tickable eligible charge. StudentFeeAssignmentId + BillingMonth is the same pair UX_BillingCharges_ActivePeriod keys on, so it identifies exactly the row that would be created.</summary>
     private readonly record struct PostingKey(int StudentFeeAssignmentId, DateTime BillingMonth);
@@ -499,8 +502,11 @@ public sealed class FeePostingPage : V2Page
     }
     private async Task PostSelectedAsync()
     {
+        if (posting) return;
+        posting = true;
         try
         {
+            using var busy = BeginBusy(BusyMessage, this);
             if (eligibleRows is null || eligibleRows.Rows.Count == 0)
             {
                 Warn("Load the eligible fees first, then choose what to post.");
@@ -620,6 +626,7 @@ public sealed class FeePostingPage : V2Page
         {
             Fail(ex);
         }
+        finally { posting = false; }
     }
     private void HideColumn(string columnName)
     {

@@ -97,18 +97,31 @@ FOR ATTACH;";
                 "The school data file could not be opened. Your records have not been replaced. " +
                 "Try Reconnect; if the file is damaged or locked, use Setup to restore your verified backup.", ex.ToString());
         }
+        // A successful attach alone does not establish identity or schema compatibility.
+        VerifyDatabaseIdentity();
     }
 
-    private static void EnsureDatabaseReady()
+    private static void EnsureDatabaseReady(bool verifyWhenReady = false)
     {
-        if (_databaseAttachConfirmed)
+        if (_databaseAttachConfirmed && !verifyWhenReady)
             return;
         lock (DatabaseAttachSync)
         {
-            if (_databaseAttachConfirmed)
+            if (_databaseAttachConfirmed && !verifyWhenReady)
                 return;
-            EnsureDatabaseAttached();
-            _databaseAttachConfirmed = true;
+            try
+            {
+                if (_databaseAttachConfirmed)
+                    VerifyDatabaseIdentity();
+                else
+                    EnsureDatabaseAttached(); // Both existing and fresh attachments verify once.
+                _databaseAttachConfirmed = true;
+            }
+            catch
+            {
+                _databaseAttachConfirmed = false;
+                throw;
+            }
         }
     }
     public static SqlConnection GetConnection()
@@ -154,14 +167,13 @@ FOR ATTACH;";
     }
     public static bool TestConnection(out string message) => TestConnection(out message, out _);
 
-    internal static bool TestConnection(out string message, out Core.DatabaseCompatibilityFailure? compatibilityFailure)
+    internal static bool TestConnection(out string message, out Exception? failure)
     {
-        compatibilityFailure = null;
+        failure = null;
         try
         {
-            EnsureDatabaseReady();
+            EnsureDatabaseReady(verifyWhenReady: true);
             /* The verification now lives in one place and is shared with EnsureDatabaseAttached, so this cannot drift from it. */
-            VerifyDatabaseIdentity();
             message = string.Empty;
             return true;
         }
@@ -169,8 +181,7 @@ FOR ATTACH;";
         {
             /* Log the real exception (number, state, message) so a failure that the friendly text cannot explain can still be diagnosed from the log. */
             Core.AppExceptionHandler.LogNonFatal(ex, "TestConnection failed");
-            if (ex is Core.DatabaseCompatibilityException incompatible)
-                compatibilityFailure = incompatible.Failure;
+            failure = ex;
             message = Core.DbMessage.UserMessage(
                 ex,
                 "The FMSC database could not be opened.");

@@ -13,12 +13,15 @@ internal sealed class CollectionRecoveryJournal : IDisposable
         "FMSC_SMS", "PendingCollection.json");
     private readonly string path;
     private FileStream? stream;
+    private readonly Guid id;
+    private bool completed;
 
-    private CollectionRecoveryJournal(string path, FileStream stream)
-    { this.path = path; this.stream = stream; }
+    private CollectionRecoveryJournal(string path, FileStream stream, Guid id)
+    { this.path = path; this.stream = stream; this.id = id; }
 
     internal static CollectionRecoveryJournal Begin(string summary, string? testPath = null) => Locked(() => {
         string path = testPath ?? JournalPath;
+        ArgumentException.ThrowIfNullOrWhiteSpace(summary);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         FileStream file;
         try { file = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None); }
@@ -26,9 +29,10 @@ internal sealed class CollectionRecoveryJournal : IDisposable
             throw new CollectionRecoveryException("A previous collection still needs review, or another window is recording a payment. Check Payment History before collecting again.", ex);
         }
         try {
-            JsonSerializer.Serialize(file, new Pending(Guid.NewGuid(), summary, DateTime.UtcNow));
+            Guid id = Guid.NewGuid();
+            JsonSerializer.Serialize(file, new Pending(id, summary, DateTime.UtcNow));
             file.Flush(flushToDisk: true);
-            return new CollectionRecoveryJournal(path, file);
+            return new CollectionRecoveryJournal(path, file, id);
         }
         catch { file.Dispose(); File.Delete(path); throw; } // No database write has started.
     });
@@ -38,8 +42,11 @@ internal sealed class CollectionRecoveryJournal : IDisposable
         if (!File.Exists(path)) return null;
         try {
             using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
-            return JsonSerializer.Deserialize<Pending>(file)
+            var pending = JsonSerializer.Deserialize<Pending>(file)
                 ?? throw new CollectionRecoveryException("The previous collection's recovery record cannot be read. Contact the administrator before collecting again.");
+            if (pending.Id == Guid.Empty || string.IsNullOrWhiteSpace(pending.Summary) || pending.StartedUtc == default)
+                throw new CollectionRecoveryException("The previous collection's recovery record is incomplete. Contact the administrator before collecting again; do not repeat the payment.");
+            return pending;
         }
         catch (IOException ex) {
             throw new CollectionRecoveryException("Another window is still recording a collection. Wait for its result before collecting again.", ex);
@@ -59,8 +66,13 @@ internal sealed class CollectionRecoveryJournal : IDisposable
     });
 
     internal void Complete() => Locked(() => {
+        if (completed) return true;
         stream?.Dispose(); stream = null;
+        var pending = ReadPending(path);
+        if (pending is not null && pending.Id != id)
+            throw new CollectionRecoveryException("The collection recovery record changed. Its payment must be reviewed before clearing it.");
         File.Delete(path);
+        completed = true;
         return true;
     });
 

@@ -32,8 +32,11 @@ public static class AuthenticationService
     private static readonly Dictionary<string, (int FailedCount, DateTime? LockedUntil)> LoginAttempts =
         new(StringComparer.OrdinalIgnoreCase);
     private static readonly object LoginAttemptsLock = new();
-    public static bool Authenticate(string username, string password, out string message)
+    public static bool Authenticate(string username, string password, out string message) =>
+        Authenticate(username, password, out message, out _);
+    internal static bool Authenticate(string username, string password, out string message, out Exception? failure)
     {
+        failure = null;
         message = string.Empty;
         if (string.IsNullOrWhiteSpace(username))
         {
@@ -124,6 +127,8 @@ public static class AuthenticationService
         }
         catch (Exception ex)
         {
+            Core.AppExceptionHandler.LogNonFatal(ex, "Authenticating sign-in");
+            failure = ex;
             message = Core.DbMessage.UserMessage(ex);
             return false;
         }

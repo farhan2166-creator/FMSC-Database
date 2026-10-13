@@ -21,7 +21,8 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         ScrollBars = ScrollBars.Vertical
     };
     private bool _busy;
-    private bool _incompatibleDatabase;
+    private bool _canRestart = true;
+    private bool _canRepair;
 
     internal DatabaseConnectionForm(bool startup)
     {
@@ -35,7 +36,7 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         ClientSize = new Size(AppScale.S(800), AppScale.S(440));
         Font = AppTheme.NormalFont;
         BackColor = AppTheme.PageBackground;
-        AutoScaleMode = AutoScaleMode.Dpi;
+        AutoScaleMode = AutoScaleMode.None;
         int gap = UiDesignSystem.Spacing.Md;
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill, Padding = new Padding(UiDesignSystem.Spacing.Lg),
@@ -149,8 +150,8 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
     {
         _busy = busy;
         foreach (var button in new[] { _reconnect, _restart, _repair, _close }) button.Enabled = !busy;
-        _restart.Enabled = !busy && !_incompatibleDatabase;
-        _repair.Enabled = !busy && !_incompatibleDatabase;
+        _restart.Enabled = !busy && _canRestart;
+        _repair.Enabled = !busy && _canRepair;
         _progress.Visible = busy;
         UseWaitCursor = busy;
     }
@@ -161,56 +162,45 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         SetBusy(true);
         _message.Text = restart ? "Restarting the connection. Your saved school records will be kept." : "Reconnecting to your saved school records…";
         _status.Text = restart ? "Restarting connection…" : "Checking connection…";
+        _details.Text = ConnectionDetails(_status.Text);
         try
         {
             var result = await Task.Run(() => {
                 DatabaseHelper.RefreshDatabaseConnection(restart);
-                bool connected = DatabaseHelper.TestConnection(out string message, out var compatibilityFailure);
-                return (connected, message, compatibilityFailure);
+                bool connected = DatabaseHelper.TestConnection(out string message, out var failure);
+                return (connected, message, failure);
             });
             if (IsDisposed) return;
             if (result.connected)
             {
-                _incompatibleDatabase = false;
+                _canRestart = true;
+                _canRepair = false;
                 _repair.Visible = false;
                 _message.Text = "Your school records are connected and ready.";
                 _status.Text = "Connection successful";
                 _details.Text = ConnectionDetails(string.Empty);
                 if (_startup) { SetBusy(false); DialogResult = DialogResult.OK; Close(); }
             }
-            else ShowFailure(result.message, compatibilityFailure: result.compatibilityFailure);
+            else ShowFailure(result.message, result.failure);
         }
         catch (Exception ex)
         {
             AppExceptionHandler.LogNonFatal(ex, "School records connection recovery");
             if (!IsDisposed) ShowFailure(ex is DatabaseRecoveryException recovery ? recovery.Message : DbMessage.UserMessage(ex),
-                ex.ToString(), (ex as DatabaseCompatibilityException)?.Failure);
+                ex);
         }
         finally { if (!IsDisposed) SetBusy(false); }
     }
 
-    private void ShowFailure(string message, string details = "", DatabaseCompatibilityFailure? compatibilityFailure = null)
+    private void ShowFailure(string message, Exception? failure = null)
     {
-        _incompatibleDatabase = compatibilityFailure is not null;
-        _repair.Visible = !_incompatibleDatabase && (LocalDatabaseEngine.FindTool() is null || message.Contains("database engine", StringComparison.OrdinalIgnoreCase) || message.Contains("LocalDB", StringComparison.OrdinalIgnoreCase));
-        if (_incompatibleDatabase)
-        {
-            _status.Text = compatibilityFailure!.Title;
-            _message.Text = compatibilityFailure.ConnectionMessage;
-            _details.Text = ConnectionDetails(message + "\r\n" + details);
-            return;
-        }
-        _status.Text = "Connection needs attention";
-        _message.Text = !File.Exists(DatabaseHelper.DatabaseFile)
-            ? "Your saved school data file could not be found. Contact your administrator to restore access to the school records."
-            : message.Contains("approved database", StringComparison.OrdinalIgnoreCase) || message.Contains("not FMSC_DB", StringComparison.OrdinalIgnoreCase)
-                    ? "FMSC found different school data. Your records have not been replaced. Ask the administrator to connect the correct school records."
-                    : message.Contains("Error", StringComparison.OrdinalIgnoreCase)
-                        ? "FMSC could not connect to your saved records. Choose Reconnect first. If it still fails, try Restart Connection. "
-                            + "Contact your administrator if the problem continues."
-                        : "School records could not be opened. Choose Reconnect or contact the administrator.";
-        _details.Text = ConnectionDetails(message + "\r\n" + details);
-        if (_repair.Visible) _message.Text += " Choose Repair Connection to reinstall the required connection software. Internet access and Windows administrator approval are required.";
+        var guidance = DatabaseConnectionGuidance.Create(message, failure, File.Exists(DatabaseHelper.DatabaseFile));
+        _canRestart = guidance.CanRestart;
+        _canRepair = guidance.CanRepair;
+        _repair.Visible = _canRepair;
+        _status.Text = guidance.Status;
+        _message.Text = guidance.Message;
+        _details.Text = ConnectionDetails(message + (failure is null ? "" : "\r\n\r\n" + failure));
     }
 
     private async Task RepairDependenciesAsync()
@@ -222,8 +212,15 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
             var progress = new Progress<string>(message => { if (!IsDisposed) { _status.Text = "Repairing SQL dependencies..."; _message.Text = message; } });
             int result = await SqlDependencyRepair.RepairAsync(progress);
             if (IsDisposed) return;
+            _details.Text = ConnectionDetails($"SQL dependency repair returned code {result}.");
             if (result == 3010)
-            { _status.Text = "Windows restart required"; _message.Text = "SQL Server LocalDB was installed. Restart Windows, then open FMSC again."; }
+            {
+                _canRestart = false;
+                _canRepair = false;
+                _repair.Visible = false;
+                _status.Text = "Windows restart required";
+                _message.Text = "SQL Server LocalDB was installed. Restart Windows, then open FMSC again.";
+            }
             else if (result == 0)
             { SetBusy(false); await ConnectAsync(false); }
             else
@@ -232,7 +229,12 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         catch (Exception ex)
         {
             AppExceptionHandler.LogNonFatal(ex, "SQL dependency download and repair");
-            if (!IsDisposed) { _status.Text = "SQL repair did not complete"; _message.Text = ex.Message; }
+            if (!IsDisposed)
+            {
+                _status.Text = "SQL repair did not complete";
+                _message.Text = ex.Message;
+                _details.Text = ConnectionDetails(ex.ToString());
+            }
         }
         finally { if (!IsDisposed) SetBusy(false); }
     }

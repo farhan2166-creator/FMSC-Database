@@ -69,7 +69,7 @@ namespace FMSC_SMS.Core
                 AppThemeType.Rose => AppThemeType.Violet,
                 AppThemeType.Teal => AppThemeType.Emerald,
                 AppThemeType.Amber => AppThemeType.ProfessionalOrange,
-                _ => theme
+                _ => SelectableThemes.Contains(theme) ? theme : AppThemeType.OceanBlue
             };
         private static void SaveTheme(AppThemeType theme)
         {
@@ -80,7 +80,7 @@ namespace FMSC_SMS.Core
                 if (!string.IsNullOrWhiteSpace(folder))
                 {
                     Directory.CreateDirectory(folder);
-                    File.WriteAllText(ThemeFilePath, theme.ToString());
+                    AtomicTextFile.Write(ThemeFilePath, theme.ToString());
                 }
             }
             catch (Exception nonFatalException2)

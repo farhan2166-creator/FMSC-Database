@@ -1,8 +1,11 @@
 using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Enrollment;
-public sealed class BulkPromotionPage : V2Page
+public sealed class BulkPromotionPage : V2Page, IBusyPage
 {
+    private bool processing;
+    public bool IsBusy => processing;
+    public string BusyMessage => "Student promotions are being processed. Wait for the result before leaving.";
     private readonly LookupBox sourceCampus = new();
     private readonly LookupBox sourceYear = new();
     private readonly LookupBox sourceClass = new();
@@ -208,12 +211,14 @@ public sealed class BulkPromotionPage : V2Page
                 return;
             /* The promotion owns the screen while it runs, so the whole setup card is held, not just this button. */
             BeginBusy();
+            processing = true;
             try
             {
                 await ProcessSelected();
             }
             finally
             {
+                processing = false;
                 EndBusy();
             }
         };

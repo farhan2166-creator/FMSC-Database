@@ -69,9 +69,7 @@ public static class ReportLayoutStore
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            string temp = path + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(data, JsonOptions));
-            File.Move(temp, path, overwrite: true);
+            AtomicTextFile.Write(path, JsonSerializer.Serialize(data, JsonOptions));
         }
         catch (Exception ex)
         {
