@@ -18,6 +18,7 @@
     <Compile Include="../../Core/DatabaseConnectionGuidance.cs" Link="DatabaseConnectionGuidance.cs" />
     <Compile Include="../../Core/AtomicTextFile.cs" Link="AtomicTextFile.cs" />
     <Compile Include="../../Core/StudentPhotoInput.cs" Link="StudentPhotoInput.cs" />
+    <Compile Include="../../Core/DashboardData.cs" Link="DashboardData.cs" />
     <Compile Include="../../Pages/Finance/Collection/CollectionRecoveryJournal.cs" Link="CollectionRecoveryJournal.cs" />
     <Using Include="System.Drawing" />
     <Using Include="System.Data" />

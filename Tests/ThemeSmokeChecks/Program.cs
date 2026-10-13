@@ -1,7 +1,7 @@
 using System.Reflection;
 using FMSC_SMS.Core;
 
-internal static class Program
+internal static partial class Program
 {
     private static int checks;
     private static void Check(bool condition, string message)
@@ -113,6 +113,7 @@ internal static class Program
             CheckInformationDialogs(form);
             CheckPhotoPreparation();
             CheckPhotoViewer(form);
+            CheckDashboard();
             CheckSignInGuard();
             Console.WriteLine($"PASS: {checks} Windows theme switching, structure, rendering and resource checks.");
         }

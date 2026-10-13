@@ -173,8 +173,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 factory => NavigateTo(factory),
                 (factory, module, title) => NavigateTo(factory, module, title)),
             "Dashboard",
-            "Overview",
-            true);
+            "Overview");
         ResumeLayout(true);
     }
     private static int DashboardTopBarHeight() =>
@@ -258,8 +257,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             NavigateTo(
                 _currentFactory,
                 _currentModule,
-                _currentTitle,
-                _currentIsDashboard);
+                _currentTitle);
         }
         else if (_currentPageControl != null)
         {
@@ -527,7 +525,14 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         sidebarToolTip.SetToolTip(_locationLabel, location);
     }
     private void OnCurrentSectionChanged(object? sender, EventArgs e) => UpdateTopBar(_currentModule, _currentTitle);
-    internal void UpdateTopAcademicYearLabel(string text) { _currentAcademicYearText = string.IsNullOrWhiteSpace(text) ? "Academic Year — Not Set" : text; if (_topAcademicYearLabel == null) return; _topAcademicYearLabel.Text = _currentAcademicYearText; _topAcademicYearLabel.ForeColor = AppTheme.Primary; }
+    internal void UpdateTopAcademicYearLabel(WelcomePage source, string text)
+    {
+        if (!ReferenceEquals(source, _currentPageControl) || source.IsDisposed) return;
+        _currentAcademicYearText = string.IsNullOrWhiteSpace(text) ? "Academic Year — Not Set" : text;
+        if (_topAcademicYearLabel is null) return;
+        _topAcademicYearLabel.Text = _currentAcademicYearText;
+        _topAcademicYearLabel.ForeColor = AppTheme.Primary;
+    }
     private void BuildSidebar()
     {
         if (sidebar == null)
@@ -837,7 +842,6 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             fontOverride);
         button.Click += (_, _) => {
             NavigateTo(factory, module, title);
-            SetActive(button);
         };
         navTargets[button] = NavKey(module, title);
         navButtons.Add(button);
@@ -937,7 +941,6 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     item.Factory,
                     item.Module,
                     item.Title);
-                SetActive(child);
             };
             navTargets[child] = NavKey(item.Module, item.Title);
             navButtons.Add(child);
@@ -1388,16 +1391,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 factory => NavigateTo(factory),
                 (factory, module, title) => NavigateTo(factory, module, title)),
             "Dashboard",
-            "Overview",
-            true);
-        if (navButtons.Count > 0)
-            SetActive(navButtons[0]);
+            "Overview");
     }
     private void NavigateTo(
 Func<Control> factory,
 string module = "Dashboard",
-string title = "Overview",
-bool dashboard = false)
+string title = "Overview")
     {
         if (factory == null ||
         IsDisposed ||
@@ -1448,6 +1447,7 @@ bool dashboard = false)
                 _currentFactory = factory;
                 _currentModule = module;
                 _currentTitle = title;
+                bool dashboard = page is WelcomePage;
                 _currentIsDashboard = dashboard;
                 if (page is WorkspacePage workspace)
                     workspace.CurrentSectionChanged += OnCurrentSectionChanged;
@@ -1552,13 +1552,6 @@ bool dashboard = false)
                 string.Equals(target, key, StringComparison.OrdinalIgnoreCase);
         }
     }
-    private void SetActive(
-        DashboardNavButton active)
-    {
-        foreach (var button in navButtons)
-            button.IsActive =
-                ReferenceEquals(button, active);
-    }
     /* The explicit parameter types pick the factory-taking constructor: the report page is then built by NavigateTo, after its leave check has passed. */
     private Control BuildReportsWorkspace() { return new ReportsHomePage((Func<Control> factory, string module, string title) => NavigateTo(factory, module, title)); }
     private void OnThemeChanged(
@@ -1574,9 +1567,6 @@ bool dashboard = false)
     }
     private void RebuildSidebar()
     {
-        int activeIndex =
-            navButtons.FindIndex(
-                button => button.IsActive);
         var oldChildren =
             sidebar.Controls
                 .Cast<Control>()
@@ -1604,11 +1594,7 @@ bool dashboard = false)
             }
             oldChild.Dispose();
         }
-        if (activeIndex >= 0 &&
-            activeIndex < navButtons.Count)
-        {
-            navButtons[activeIndex].IsActive = true;
-        }
+        SyncActiveNav(_currentModule, _currentTitle);
     }
     /// <summary>The one unsaved-changes question, asked by every path that leaves the current page: in-app navigation and closing the application both run it.</summary>
     private bool ConfirmLeaveCurrentPage()

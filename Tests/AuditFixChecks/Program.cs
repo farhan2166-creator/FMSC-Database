@@ -44,4 +44,5 @@ Console.WriteLine($"PASS: {RemainingFindingChecks.Run()} role, literal search an
 Console.WriteLine($"PASS: {CompatibilityGuidanceChecks.Run()} database compatibility guidance checks.");
 Console.WriteLine($"PASS: {ConnectionRecoveryChecks.Run()} connection recovery explanation and action checks.");
 Console.WriteLine($"PASS: {await DurabilityChecks.RunAsync()} settings, photo input and payment journal durability checks.");
+Console.WriteLine($"PASS: {DashboardChecks.Run()} dashboard count and academic-year checks.");
 if(args.Contains("--profile-search"))ReviewFilterProfile.Run();

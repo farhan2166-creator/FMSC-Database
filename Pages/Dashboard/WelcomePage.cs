@@ -22,20 +22,28 @@ public sealed class WelcomePage : UserControl
     /* A quick action opens a page of its own module, so the shell is told which one instead of navigating with the dashboard's own module and title. */
     private readonly Action<Func<Control>, string, string>? navigateInModule;
     private readonly Dictionary<Kpi, (Label Value, Label Caption)> kpiLabels = new();
-    private readonly Label academicYearLabel;
+    private readonly Func<string, CancellationToken, Task<DataTable>> query;
+    private readonly Func<CancellationToken, Task<DataTable>> checkReadiness;
+    private readonly LatestReadScope reads = new();
+    private TableLayoutPanel? root;
+    private TableLayoutPanel? body;
+    private HumanCard? studentStatusCard;
+    private HumanCard? snapshotCard;
+    private HumanCard? quickActionsCard;
+    private bool updatingLayout;
     private DashboardDonutChart? studentStatusChart;
     private DashboardBarChart? academicChart;
     private readonly List<Control> dashboardPageSurfaces = new();
-    private Control? setupJourneyCard;
+    private HumanCard? setupJourneyCard;
     private RowStyle? setupJourneyRowStyle;
-    private RowStyle? dashboardChartsRowStyle;
     private RowStyle? quickActionsRowStyle;
     private bool setupJourneyShown;
     private static int GreetingTitleRowHeight =>
         Math.Max(32, AppMetrics.TextHeight(AppTheme.PageTitleFont) + 6);
     private static int GreetingSubtitleRowHeight =>
         Math.Max(22, AppMetrics.TextHeight(AppTheme.NormalFont) + 4);
-    private static Font KpiValueFont { get; } = new("Segoe UI", 17F, FontStyle.Bold);
+    private static int GreetingHeaderHeight => GreetingTitleRowHeight + GreetingSubtitleRowHeight + 8;
+    private static Font KpiValueFont => AppTheme.SharedFont("Segoe UI", 17F * AppScale.BodyFontScale, FontStyle.Bold);
     // UI TUNING: icons inside dashboard KPI cards. Kept separate from compact toolbar/sidebar icons.
     private static Font KpiCardIconFont =>
         AppTheme.IconFont(27F * AppScale.HeadingFontScale);
@@ -52,17 +60,22 @@ public sealed class WelcomePage : UserControl
     public WelcomePage(
         Action<Func<Control>> navigate,
         Action<Func<Control>, string, string>? navigateInModule = null)
+        : this(navigate, navigateInModule,
+            (procedure, token) => DatabaseHelper.QueryUserAsync(procedure, token),
+            FMSC_SMS.Services.SetupReadiness.CheckAsync)
+    {
+    }
+
+    internal WelcomePage(Action<Func<Control>> navigate,
+        Action<Func<Control>, string, string>? navigateInModule,
+        Func<string, CancellationToken, Task<DataTable>> query,
+        Func<CancellationToken, Task<DataTable>> checkReadiness)
     {
         this.navigate = navigate;
         this.navigateInModule = navigateInModule;
-        academicYearLabel = new Label {
-            Dock = DockStyle.Fill,
-            Font = AppTheme.ButtonFont,
-            ForeColor = AppTheme.Primary,
-            TextAlign = ContentAlignment.MiddleCenter,
-            AutoEllipsis = true,
-            Text = "Academic Year — Loading..."
-        };
+        this.query = query;
+        this.checkReadiness = checkReadiness;
+        AutoScaleMode = AutoScaleMode.None;
         Dock = DockStyle.Fill;
         BackColor = AppTheme.PageBackground;
         Padding = new Padding(
@@ -73,7 +86,10 @@ public sealed class WelcomePage : UserControl
         AutoScroll = true;
         Build();
         AppTheme.ThemeChanged += OnDashboardThemeChanged;
-        Disposed += (_, _) => AppTheme.ThemeChanged -= OnDashboardThemeChanged;
+        Disposed += (_, _) => {
+            AppTheme.ThemeChanged -= OnDashboardThemeChanged;
+            reads.Dispose();
+        };
         Defer(() => _ = LoadDashboardDataAsync());
     }
     private T DashboardPageSurface<T>(T control) where T : Control
@@ -92,12 +108,18 @@ public sealed class WelcomePage : UserControl
             if (!surface.IsDisposed)
                 surface.BackColor = AppTheme.PageBackground;
         }
+        if (studentStatusChart is not null)
+        {
+            studentStatusChart.PrimaryColor = AppTheme.Primary;
+            studentStatusChart.SecondaryColor = AppTheme.Border;
+        }
+        if (academicChart is not null) academicChart.BarColor = AppTheme.Primary;
         Invalidate(true);
     }
     private void Build()
     {
-        var root = DashboardPageSurface(new TableLayoutPanel {
-            Dock = DockStyle.Fill,
+        root = DashboardPageSurface(new TableLayoutPanel {
+            Dock = DockStyle.Top,
             ColumnCount = 1,
             RowCount = 3,
             Padding = new Padding(0),
@@ -106,13 +128,14 @@ public sealed class WelcomePage : UserControl
         root.RowStyles.Add(
             new RowStyle(
                 SizeType.Absolute,
-                GreetingTitleRowHeight + GreetingSubtitleRowHeight));
+                GreetingHeaderHeight));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, KpiGridRowHeight));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(BuildDashboardHeader(), 0, 0);
         root.Controls.Add(BuildKpiGrid(), 0, 1);
         root.Controls.Add(BuildBody(), 0, 2);
         Controls.Add(root);
+        UpdateDashboardLayout();
     }
     private Control BuildDashboardHeader()
     {
@@ -126,16 +149,18 @@ public sealed class WelcomePage : UserControl
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, GreetingTitleRowHeight));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.Controls.Add(new Label {
-            Text = $"Good morning, {CurrentUser.Username}",
+            Text = $"Welcome, {CurrentUser.Username}",
             Dock = DockStyle.Fill,
+            Margin = Padding.Empty,
             Font = AppTheme.PageTitleFont,
             ForeColor = AppTheme.HeadingText,
             TextAlign = ContentAlignment.MiddleLeft,
             AutoEllipsis = true
         }, 0, 0);
         layout.Controls.Add(new Label {
-            Text = "Here is your school overview for the current academic year.",
+            Text = "School totals and admissions this month. Choose a quick action to begin.",
             Dock = DockStyle.Fill,
+            Margin = Padding.Empty,
             Font = AppTheme.NormalFont,
             ForeColor = AppTheme.MutedText,
             TextAlign = ContentAlignment.TopLeft,
@@ -192,57 +217,36 @@ public sealed class WelcomePage : UserControl
             admissionAccent);
         return grid;
     }
-    private async Task LoadAcademicYearAsync(DataTable? preloaded = null)
+    private async Task LoadAcademicYearAsync(LatestReadScope.Request request)
     {
         try
         {
-            if (academicYearLabel == null)
-                return;
-            DataTable years = preloaded ?? await DatabaseHelper.QueryUserAsync("GetAcademicYears");
-            if (years == null ||
-                years.Columns == null ||
-                years.Rows.Count == 0)
-            {
-                academicYearLabel.Text = "Academic Year — Not Set";
-                return;
-            }
-            if (!years.Columns.Contains("YearName"))
-            {
-                academicYearLabel.Text = "Academic Year — Not Set";
-                return;
-            }
-            DataRow? currentYear = null;
-            if (years.Columns.Contains("IsCurrent"))
-            {
-                currentYear = years.AsEnumerable()
-                    .FirstOrDefault(row =>
-                        row != null &&
-                        row["IsCurrent"] != DBNull.Value &&
-                        Convert.ToBoolean(row["IsCurrent"]));
-            }
-            currentYear ??= years.Rows[0];
-            if (currentYear == null)
-            {
-                academicYearLabel.Text = "Academic Year — Not Set";
-                return;
-            }
-            string yearName = currentYear["YearName"] == DBNull.Value
-                ? string.Empty
-                : Convert.ToString(currentYear["YearName"])?.Trim() ?? string.Empty;
-            string text = string.IsNullOrWhiteSpace(yearName)
-                ? "Academic Year — Not Set"
-                : $"Academic Year — {yearName}";
-            academicYearLabel.Text = text;
-            if (FindForm() is MainDashboardForm dashboard)
-                dashboard.UpdateTopAcademicYearLabel(text);
+            var years = await query("GetAcademicYears", request.Token);
+            if (!CanUpdate(request)) return;
+            UpdateAcademicYear(DashboardData.AcademicYearLabel(years));
         }
+        catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            if (academicYearLabel != null)
-                academicYearLabel.Text = "Academic Year — Unavailable";
-            System.Diagnostics.Debug.WriteLine(
-                $"LoadAcademicYear failed: {ex}");
+            if (!CanUpdate(request)) return;
+            AppExceptionHandler.LogNonFatal(ex, "Dashboard academic year");
+            UpdateAcademicYear("Academic Year — Unavailable");
         }
+    }
+
+    private void UpdateAcademicYear(string text)
+    {
+        if (FindForm() is MainDashboardForm dashboard)
+            dashboard.UpdateTopAcademicYearLabel(this, text);
+    }
+
+    private bool CanUpdate(LatestReadScope.Request request) =>
+        !IsDisposed && !Disposing && reads.IsCurrent(request);
+
+    private void Navigate(Func<Control> factory, string module, string title)
+    {
+        if (navigateInModule is not null) navigateInModule(factory, module, title);
+        else navigate(factory);
     }
     private void PlaceKpi(
         TableLayoutPanel grid,
@@ -291,6 +295,7 @@ public sealed class WelcomePage : UserControl
         var titleLabel = new Label {
             Text = title,
             Dock = DockStyle.Fill,
+            Margin = Padding.Empty,
             Font = AppTheme.NormalFont,
             ForeColor = AppTheme.MutedText,
             TextAlign = ContentAlignment.MiddleLeft,
@@ -299,6 +304,7 @@ public sealed class WelcomePage : UserControl
         var valueLabel = new Label {
             Text = "—",
             Dock = DockStyle.Fill,
+            Margin = Padding.Empty,
             Font = KpiValueFont,
             ForeColor = accent,
             TextAlign = ContentAlignment.MiddleLeft,
@@ -307,6 +313,7 @@ public sealed class WelcomePage : UserControl
         var captionLabel = new Label {
             Text = "Loading...",
             Dock = DockStyle.Fill,
+            Margin = Padding.Empty,
             Font = AppTheme.NormalFont,
             ForeColor = AppTheme.MutedText,
             TextAlign = ContentAlignment.TopLeft,
@@ -323,6 +330,7 @@ public sealed class WelcomePage : UserControl
         var iconLabel = new Label {
             Text = icon,
             Dock = DockStyle.Fill,
+            Margin = Padding.Empty,
             Font = KpiCardIconFont,
             ForeColor = accent,
             TextAlign = ContentAlignment.MiddleCenter,
@@ -345,7 +353,7 @@ public sealed class WelcomePage : UserControl
             CurrentUser.HasPermission("Calendar.Manage") ||
             CurrentUser.HasPermission("Fees.Configuration.Manage");
         setupJourneyShown = showSetupJourney;
-        var body = DashboardPageSurface(new TableLayoutPanel {
+        body = DashboardPageSurface(new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
             RowCount = showSetupJourney ? 3 : 2,
@@ -356,21 +364,20 @@ public sealed class WelcomePage : UserControl
             new ColumnStyle(SizeType.Percent, 50));
         body.ColumnStyles.Add(
             new ColumnStyle(SizeType.Percent, 50));
-        dashboardChartsRowStyle = new RowStyle(SizeType.Percent, showSetupJourney ? 40 : 55);
-        body.RowStyles.Add(dashboardChartsRowStyle);
+        body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         if (showSetupJourney)
         {
-            setupJourneyRowStyle = new RowStyle(SizeType.Percent, 30);
+            setupJourneyRowStyle = new RowStyle(SizeType.Absolute);
             body.RowStyles.Add(setupJourneyRowStyle);
         }
-        quickActionsRowStyle = new RowStyle(SizeType.Percent, showSetupJourney ? 30 : 45);
+        quickActionsRowStyle = new RowStyle(SizeType.Absolute);
         body.RowStyles.Add(quickActionsRowStyle);
         body.Controls.Add(
-            BuildStudentStatusCard(),
+            (studentStatusCard = BuildStudentStatusCard()),
             0,
             0);
         body.Controls.Add(
-            BuildAcademicSnapshotCard(),
+            (snapshotCard = BuildAcademicSnapshotCard()),
             1,
             0);
         int quickActionsRow = 1;
@@ -383,7 +390,7 @@ public sealed class WelcomePage : UserControl
             body.SetColumnSpan(setupJourney, 2);
             quickActionsRow = 2;
         }
-        var quickActions = BuildQuickActionsCard();
+        var quickActions = quickActionsCard = BuildQuickActionsCard();
         quickActions.Margin = new Padding(0, 8, 8, 0);
         body.Controls.Add(
             quickActions,
@@ -392,11 +399,10 @@ public sealed class WelcomePage : UserControl
         body.SetColumnSpan(
             quickActions,
             2);
-        if (showSetupJourney)
-            body.SizeChanged += (_, _) => SetSetupJourneySpace(setupJourneyShown);
+        body.SizeChanged += (_, _) => UpdateDashboardLayout();
         return body;
     }
-    private Control BuildSetupJourneyCard()
+    private HumanCard BuildSetupJourneyCard()
     {
         var card = HumanUi.Card(
             "School Setup — Recommended Order",
@@ -405,7 +411,7 @@ public sealed class WelcomePage : UserControl
         var steps = new (string Text, string Module, Func<Control> Factory, string Permission, string Title)[]
         {
             ("Check Readiness", "School Setup", () => new SetupReadinessPage(
-                (factory, module, title) => { if (navigateInModule is not null) navigateInModule(factory, module, title); else navigate(factory); }),
+                Navigate),
                 FMSC_SMS.Services.SetupReadiness.NavigationPermission, "Setup Readiness"),
             ("1  School Profile", "School Setup", () => new WorkspacePage(
                 "School Profile",
@@ -423,7 +429,7 @@ public sealed class WelcomePage : UserControl
             Dock = DockStyle.Fill,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = true,
-            AutoScroll = true,
+            AutoScroll = false,
             Padding = new Padding(0),
             Margin = new Padding(0)
         };
@@ -437,7 +443,7 @@ public sealed class WelcomePage : UserControl
         card.Content.Controls.Add(flow);
         return card;
     }
-    private Control BuildStudentStatusCard()
+    private HumanCard BuildStudentStatusCard()
     {
         var card = HumanUi.Card(
             "Student Status",
@@ -451,11 +457,11 @@ public sealed class WelcomePage : UserControl
         card.Content.Controls.Add(studentStatusChart);
         return card;
     }
-    private Control BuildAcademicSnapshotCard()
+    private HumanCard BuildAcademicSnapshotCard()
     {
         var card = HumanUi.Card(
-            "Academic Snapshot",
-            "Key figures for the current academic year.");
+            "School Snapshot",
+            "Classes, active staff and admissions this month.");
         academicChart = new DashboardBarChart {
             Dock = DockStyle.Fill,
             BarColor = AppTheme.Primary,
@@ -464,7 +470,7 @@ public sealed class WelcomePage : UserControl
         card.Content.Controls.Add(academicChart);
         return card;
     }
-    private Control BuildQuickActionsCard()
+    private HumanCard BuildQuickActionsCard()
     {
         var card = HumanUi.Card(
             "Quick Actions",
@@ -500,16 +506,12 @@ public sealed class WelcomePage : UserControl
             oldControl.Dispose();
         var actions = new (string Text, string Module, Func<Control> Factory, Func<bool> Allowed)[]
         {
-        (PageTitles.Admissions, "Students", () => new StudentAdmissionPage(), () => CurrentUser.HasPermission("Students.Admit")),
-        ("Quick Registration", "Students", () => new QuickRegistrationPage((factory, module, title) =>
-        {
-            if (navigateInModule is not null) navigateInModule(factory, module, title);
-            else navigate(factory);
-        }), () => QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)),
+        (PageTitles.Admissions, "Students", () => new StudentAdmissionPage(Navigate), () => CurrentUser.HasPermission("Students.Admit")),
+        ("Quick Registration", "Students", () => new QuickRegistrationPage(Navigate), () => QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)),
         ("Fee Collection", "Finance", () => new FeeCollectionPage(), () => CurrentUser.HasPermission("Fees.Collect")),
-        ("Student Profile", "Students", () => new StudentProfilePage(), () => CurrentUser.HasPermission("Students.View")),
+        ("Student Profile", "Students", () => new StudentProfilePage(Navigate), () => CurrentUser.HasPermission("Students.View")),
         ("Student Reports", "Students", () => new StudentReportsPage(), () => CurrentUser.HasPermission("Students.View")),
-        ("Reports", "Reports", () => new ReportsHomePage((Func<Control> factory, string module, string title) => navigateInModule?.Invoke(factory, module, title)), () => CurrentUser.HasPermission("Reports.View"))
+        ("Reports", "Reports", () => new ReportsHomePage(Navigate), () => CurrentUser.HasPermission("Reports.View"))
         };
         var visibleActions = actions
             .Where(action => action.Allowed())
@@ -519,6 +521,16 @@ public sealed class WelcomePage : UserControl
         table.RowStyles.Clear();
         for (int row = 0; row < rows; row++)
             table.RowStyles.Add(new RowStyle(SizeType.Percent, 100F / rows));
+        if (visibleActions.Length == 0)
+        {
+            var guidance = new Label {
+                Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
+                Text = "Use the sidebar to open the pages available to your account.",
+                Font = AppTheme.NormalFont, ForeColor = AppTheme.MutedText
+            };
+            table.Controls.Add(guidance, 0, 0);
+            table.SetColumnSpan(guidance, 3);
+        }
         for (int i = 0; i < visibleActions.Length; i++)
         {
             int row = i / 3;
@@ -528,13 +540,9 @@ public sealed class WelcomePage : UserControl
                                               action.Module,
                                               action.Factory,
                                               action.Text);
-            // Set dock style to fill the cell completely
             button.Dock = DockStyle.Fill;
-            // Remove any fixed sizing that might constrain it
-            button.Size = new Size(0, button.Height); // Allow dynamic width
-            // Set minimum size for height only
+            button.Size = new Size(0, button.Height);
             button.MinimumSize = new Size(0, AppMetrics.LargeButtonHeight);
-            // Add to table with full cell occupation
             table.Controls.Add(button, col, row);
         }
     }
@@ -565,141 +573,130 @@ public sealed class WelcomePage : UserControl
         // Keep the shared Secondary style; module colors belong to card accents,
         // not a separate button palette.
         button.ApplyTheme();
+        UiHelper.DisposeOwnedButtonImageOnDispose(button);
         // Numbered setup steps and action labels use the destination's canonical title.
-        button.Click += (_, _) => {
-            if (navigateInModule is not null)
-            {
-                navigateInModule(factory, module, title ?? text);
-                return;
-            }
-            navigate(factory);
-        };
+        button.Click += (_, _) => Navigate(factory, module, title ?? text);
         return button;
     }
     private async Task LoadDashboardDataAsync()
     {
+        if (IsDisposed || Disposing) return;
+        var request = reads.Begin();
+        UpdateAcademicYear("Academic Year — Loading...");
+        // Each section paints as soon as its own read finishes. Setup/backup history
+        // and academic-year failures must not hold up or erase successfully loaded totals.
+        await Task.WhenAll(LoadSummaryAsync(request), LoadAcademicYearAsync(request),
+            UpdateSetupJourneyVisibilityAsync(request));
+    }
+
+    private async Task LoadSummaryAsync(LatestReadScope.Request request)
+    {
+        if (!CurrentUser.HasPermission("Reports.View"))
+        {
+            ShowUnavailableState("Report access required");
+            return;
+        }
         try
         {
-            var summaryTask = DatabaseHelper.QueryUserAsync("GetDashboardSummary");
-            var yearsTask = DatabaseHelper.QueryUserAsync("GetAcademicYears");
-            var results = await Task.WhenAll(summaryTask, yearsTask);
-            var summary = results[0];
-            await LoadAcademicYearAsync(results[1]);
-            await UpdateSetupJourneyVisibilityAsync(results[1]);
+            var summary = await query("GetDashboardSummary", request.Token);
+            if (!CanUpdate(request)) return;
             if (summary.Rows.Count == 0)
             {
-                ShowEmptyState();
+                ShowUnavailableState("No dashboard data available");
                 return;
             }
-            var row = summary.Rows[0];
-            int totalStudents = GetInt(
-                row,
-                "TotalStudents",
-                "StudentCount",
-                "TotalStudentCount");
-            int activeStudents = GetInt(
-                row,
-                "ActiveStudents",
-                "ActiveStudentCount");
-            int totalClasses = GetInt(
-                row,
-                "TotalClasses",
-                "ClassCount",
-                "TotalClassCount");
-            int activeStaff = GetInt(
-                row,
-                "ActiveStaff",
-                "ActiveStaffCount",
-                "StaffCount");
-            int newAdmissions = GetInt(
-                row,
-                "NewAdmissionsThisMonth",
-                "NewAdmissions",
-                "AdmissionsThisMonth");
-            SetKpi(
-                Kpi.TotalStudents,
-                totalStudents > 0
-                    ? totalStudents.ToString("N0")
-                    : "—",
-                totalStudents > 0
-                    ? "All registered students"
-                    : "Not available");
-            SetKpi(
-                Kpi.ActiveStudents,
-                activeStudents > 0
-                    ? activeStudents.ToString("N0")
-                    : "—",
-                activeStudents > 0
-                    ? "Currently active"
-                    : "Not available");
-            SetKpi(
-                Kpi.TotalClasses,
-                totalClasses > 0
-                    ? totalClasses.ToString("N0")
-                    : "—",
-                totalClasses > 0
-                    ? "Configured classes"
-                    : "Not available");
-            SetKpi(
-                Kpi.ActiveStaff,
-                activeStaff > 0
-                    ? activeStaff.ToString("N0")
-                    : "—",
-                activeStaff > 0
-                    ? "Currently employed"
-                    : "Not available");
-            SetKpi(
-                Kpi.NewAdmissions,
-                newAdmissions.ToString("N0"),
-                $"Since {new DateTime(
-                    DateTime.Today.Year,
-                    DateTime.Today.Month,
-                    1):dd MMM}");
-            UpdateDashboardVisuals(
-                totalStudents,
-                activeStudents,
-                totalClasses,
-                activeStaff,
-                newAdmissions);
+            RenderSummary(summary.Rows[0]);
         }
+        catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { }
         catch (Exception ex)
         {
+            if (!CanUpdate(request)) return;
+            AppExceptionHandler.LogNonFatal(ex, "Dashboard summary");
             ShowLoadError(ex);
         }
     }
-    private async Task UpdateSetupJourneyVisibilityAsync(DataTable academicYears)
+
+    private void RenderSummary(DataRow row)
     {
-        if (setupJourneyCard is null || setupJourneyRowStyle is null)
-            return;
+        // These COUNT columns are part of the verified DACPAC contract. A real
+        // zero is valid; missing/malformed data is an error, never a synthetic zero.
+        var (totalStudents, activeStudents, totalClasses, activeStaff, newAdmissions) = DashboardData.ReadCounts(row);
+        SetKpi(Kpi.TotalStudents, totalStudents.ToString("N0"), "All registered students");
+        SetKpi(Kpi.ActiveStudents, activeStudents.ToString("N0"), "Currently active");
+        SetKpi(Kpi.TotalClasses, totalClasses.ToString("N0"), "Configured classes");
+        SetKpi(Kpi.ActiveStaff, activeStaff.ToString("N0"), "Active staff records");
+        SetKpi(Kpi.NewAdmissions, newAdmissions.ToString("N0"), $"Since {new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1):dd MMM}");
+        UpdateDashboardVisuals(totalStudents, activeStudents, totalClasses, activeStaff, newAdmissions);
+    }
+
+    private async Task UpdateSetupJourneyVisibilityAsync(LatestReadScope.Request request)
+    {
+        if (setupJourneyCard is null || setupJourneyRowStyle is null) return;
         try
         {
-            var issues = await FMSC_SMS.Services.SetupReadiness.CheckAsync();
-            if (IsDisposed) return;
-            bool complete = issues.Rows.Count == 0;
-            setupJourneyCard.Visible = !complete;
-            SetSetupJourneySpace(!complete);
+            var issues = await checkReadiness(request.Token);
+            if (!CanUpdate(request)) return;
+            SetSetupJourneySpace(issues.Rows.Count > 0);
         }
-        catch (Exception nonFatalException29)
+        catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { }
+        catch (Exception ex)
         {
-            FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException29, "WelcomePage: UpdateSetupJourneyVisibilityAsync fallback");
-            // Setup guidance is non-critical. If readiness cannot be checked, leave it visible so
-            // an administrator still has a safe route through the recommended setup sequence.
-            setupJourneyCard.Visible = true;
+            if (!CanUpdate(request)) return;
+            AppExceptionHandler.LogNonFatal(ex, "Dashboard setup readiness");
+            // Keep the existing setup routes available if a non-critical check fails.
             SetSetupJourneySpace(true);
         }
     }
+
     private void SetSetupJourneySpace(bool visible)
     {
-        if (setupJourneyRowStyle is null || dashboardChartsRowStyle is null || quickActionsRowStyle is null) return;
+        if (setupJourneyCard is null || setupJourneyRowStyle is null) return;
         setupJourneyShown = visible;
-        setupJourneyRowStyle.SizeType = SizeType.Absolute;
-        quickActionsRowStyle.SizeType = visible ? SizeType.Absolute : SizeType.Percent;
-        dashboardChartsRowStyle.Height = visible ? 100 : 55;
-        int available = setupJourneyCard?.Parent?.ClientSize.Height ?? 0;
-        int minimum = AppMetrics.FieldCardHeight(0) + 2 * (AppMetrics.LargeButtonHeight + AppScale.Scale(8)) + AppScale.Scale(12);
-        float height = Math.Max(minimum, available * 0.30f);
-        setupJourneyRowStyle.Height = visible ? height : 0;
-        quickActionsRowStyle.Height = visible ? height : 45;
+        setupJourneyCard.Visible = visible;
+        UpdateDashboardLayout();
+    }
+
+    protected override void OnSizeChanged(EventArgs e)
+    {
+        base.OnSizeChanged(e);
+        UpdateDashboardLayout();
+    }
+
+    private void UpdateDashboardLayout()
+    {
+        if (updatingLayout || root is null || body is null || quickActionsRowStyle is null ||
+            studentStatusCard is null || snapshotCard is null || quickActionsCard is null) return;
+        updatingLayout = true;
+        try
+        {
+            // Give each section room for its real controls. On smaller windows the
+            // page scrolls instead of collapsing charts and clipping action buttons.
+            int CardHeight(HumanCard card, int contentHeight) => card.Header.Height +
+                card.Padding.Vertical + card.Content.Padding.Vertical + card.Margin.Vertical + contentHeight;
+            int chartsHeight = Math.Max(CardHeight(studentStatusCard, studentStatusChart!.MinimumSize.Height),
+                CardHeight(snapshotCard, academicChart!.MinimumSize.Height));
+            var actions = quickActionsCard.Content.Controls.OfType<TableLayoutPanel>().Single();
+            int quickHeight = CardHeight(quickActionsCard,
+                actions.RowCount * (AppMetrics.LargeButtonHeight + 8) + actions.Padding.Vertical);
+            quickActionsRowStyle.Height = quickHeight;
+            int setupHeight = 0;
+            if (setupJourneyRowStyle is not null && setupJourneyCard is not null)
+            {
+                var flow = setupJourneyCard.Content.Controls.OfType<FlowLayoutPanel>().Single();
+                int width = Math.Max(1, ClientSize.Width - Padding.Horizontal - setupJourneyCard.Padding.Horizontal -
+                    setupJourneyCard.Margin.Horizontal - setupJourneyCard.Content.Padding.Horizontal - flow.Padding.Horizontal);
+                int columns = Math.Max(1, width / (AppScale.Scale(175) + 8));
+                int rows = Math.Max(1, (flow.Controls.Count + columns - 1) / columns);
+                setupHeight = setupJourneyShown
+                    ? CardHeight(setupJourneyCard, rows * (AppMetrics.LargeButtonHeight + 8)) : 0;
+                setupJourneyRowStyle.SizeType = SizeType.Absolute;
+                setupJourneyRowStyle.Height = setupHeight;
+            }
+            int minimumHeight = GreetingHeaderHeight + KpiGridRowHeight +
+                body.Padding.Vertical + chartsHeight + setupHeight + quickHeight;
+            root.Height = Math.Max(minimumHeight, ClientSize.Height - Padding.Vertical);
+        }
+        finally { updatingLayout = false; }
     }
     private void UpdateDashboardVisuals(
         int totalStudents,
@@ -741,43 +738,23 @@ public sealed class WelcomePage : UserControl
         labels.Value.Text = value;
         labels.Caption.Text = caption;
     }
-    private static int GetInt(
-        DataRow row,
-        params string[] possibleColumns)
+    private void ShowUnavailableState(string message)
     {
-        foreach (string column in possibleColumns)
+        foreach (Kpi kpi in Enum.GetValues<Kpi>()) SetKpi(kpi, "—", message);
+        if (studentStatusChart is not null)
         {
-            if (!row.Table.Columns.Contains(column))
-                continue;
-            if (row[column] == DBNull.Value)
-                continue;
-            if (int.TryParse(
-                    Convert.ToString(row[column]),
-                    out int value))
-            {
-                return value;
-            }
+            studentStatusChart.PrimaryValue = studentStatusChart.SecondaryValue = 0;
+            studentStatusChart.CenterText = "—";
+            studentStatusChart.CenterCaption = "";
+            studentStatusChart.Invalidate();
         }
-        return 0;
+        if (academicChart is not null) academicChart.Bars = Array.Empty<DashboardBarChart.Bar>();
     }
-    private void ShowEmptyState()
-    {
-        foreach (Kpi kpi in Enum.GetValues<Kpi>())
-            SetKpi(kpi, "—", "No dashboard data available");
-        UpdateDashboardVisuals(0, 0, 0, 0, 0);
-    }
+
     private void ShowLoadError(Exception ex)
     {
-        /* consistency: classify by SQL Server error number, not by matching English message text. */
-        bool procedureMissing =
-            ex is Microsoft.Data.SqlClient.SqlException sql &&
-            sql.Number is 2812 or 208;
-        string message = procedureMissing
-            ? "Dashboard procedure is unavailable."
-            : "Dashboard data is temporarily unavailable.";
-        foreach (Kpi kpi in Enum.GetValues<Kpi>())
-            SetKpi(kpi, "—", message);
-        UpdateDashboardVisuals(0, 0, 0, 0, 0);
+        bool procedureMissing = ex is Microsoft.Data.SqlClient.SqlException sql && sql.Number is 2812 or 208;
+        ShowUnavailableState(procedureMissing ? "Dashboard procedure unavailable" : "Unavailable — reopen Dashboard");
     }
     private void Defer(Action action)
     {
