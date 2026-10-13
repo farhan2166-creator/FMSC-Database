@@ -186,12 +186,22 @@ internal static class QuickRegistrationWriter
                 if (Quote(current)!=expectedQuote)
                     throw new InvalidOperationException("The class fees have changed. Choose the placement again to review the current fees before saving.");
                 using var command=new SqlCommand("AdmitStudent",connection,transaction){CommandType=CommandType.StoredProcedure,CommandTimeout=120};
-                command.Parameters.AddRange(parameters.Where(p=>!p.ParameterName.Equals("@UserId",StringComparison.OrdinalIgnoreCase))
+                command.Parameters.AddRange(parameters.Where(p=>!p.ParameterName.Equals("@UserId",StringComparison.OrdinalIgnoreCase)&&!p.ParameterName.Equals("@ExcludedFeeTypeIds",StringComparison.OrdinalIgnoreCase))
                     .Select(p=>(SqlParameter)((ICloneable)p).Clone()).ToArray());
                 command.Parameters.Add(DatabaseHelper.Int("@UserId",user));
                 state.SubmissionStarted=true;
                 using var result=new DataSet();using(var adapter=new SqlDataAdapter(command))adapter.Fill(result);
                 var saved=QuickRegistrationSaveCoordinator.ReadResponse(result);
+                if(parameters.FirstOrDefault(p=>p.ParameterName=="@ExcludedFeeTypeIds")?.Value is DataTable excluded)
+                {
+                    // The existing admission procedure includes required fees. Explicit
+                    // QR waivers cancel them within this same save/request transaction.
+                    foreach(DataRow fee in excluded.Rows)
+                    {
+                        using var remove=new SqlCommand("DECLARE @Assignment int=(SELECT A.StudentFeeAssignmentId FROM dbo.StudentFeeAssignments A JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId WHERE E.AdmissionId=@Admission AND E.Status=N'Pending' AND A.FeeTypeId=@Fee AND A.CancelledAt IS NULL); IF @Assignment IS NULL THROW 57511,'The excluded fee could not be identified.',1; EXEC dbo.DeleteStudentFeeAssignment @UserId,@Assignment;",connection,transaction);
+                        remove.Parameters.AddRange(new[]{DatabaseHelper.Int("@UserId",user),DatabaseHelper.Int("@Admission",saved.Id),DatabaseHelper.Int("@Fee",Convert.ToInt32(fee[0]))});remove.ExecuteNonQuery();
+                    }
+                }
                 using var marker=new SqlCommand("INSERT dbo.QuickRegistrationRequests(RequestId,UserId,PayloadHash,AdmissionId) VALUES(@Request,@User,@Hash,@Admission);",connection,transaction);
                 marker.Parameters.AddRange(new[]{new SqlParameter("@Request",SqlDbType.UniqueIdentifier){Value=request.Id},
                     DatabaseHelper.Int("@User",user),new SqlParameter("@Hash",SqlDbType.Binary,32){Value=Convert.FromHexString(request.PayloadHash)},DatabaseHelper.Int("@Admission",saved.Id)});
@@ -215,6 +225,38 @@ internal static class QuickRegistrationWriter
         return WriteAsync("SaveStudentDetailsWithFirstEnrollment",parameters,user,(connection,transaction)=>{
             if (string.IsNullOrEmpty(expectedSnapshot) || Snapshot(connection,transaction,admission,user)!=expectedSnapshot)
                 throw new InvalidOperationException("This registration has changed since it was opened. Your edits have been kept. Reopen it and review the current details before saving.");
+        });
+    }
+
+    internal static Task<DataSet> ChangeFeeAsync(int admission,string expectedSnapshot,int placement,int feeId,int? assignment,string? expectedQuote)
+    {
+        int user=CurrentUser.UserId;
+        var parameters=assignment.HasValue?new[]{DatabaseHelper.Int("@StudentFeeAssignmentId",assignment.Value)}:
+            new[]{DatabaseHelper.Int("@EnrollmentId",0),DatabaseHelper.Int("@FeeTypeId",feeId)};
+        return WriteAsync(assignment.HasValue?"DeleteStudentFeeAssignment":"AddStudentFeeAssignment",parameters,user,(connection,transaction)=>{
+            using var access=new SqlCommand("EXEC dbo.RequirePermission @UserId,N'Students.Administer'; EXEC dbo.RequirePermission @UserId,N'Fees.Adjust';",connection,transaction);
+            access.Parameters.Add(DatabaseHelper.Int("@UserId",user));access.ExecuteNonQuery();
+            if(string.IsNullOrEmpty(expectedSnapshot)||Snapshot(connection,transaction,admission,user)!=expectedSnapshot)
+                throw new InvalidOperationException("This registration or its fees changed. Reload Registration before changing fees.");
+            using var state=new SqlCommand("SELECT E.EnrollmentId FROM dbo.Enrollments E JOIN dbo.Students S ON S.AdmissionId=E.AdmissionId WHERE E.AdmissionId=@Admission AND E.ClassSectionId=@Placement AND E.Status=N'Pending' AND S.Status=N'Pending';",connection,transaction);
+            state.Parameters.AddRange(new[]{DatabaseHelper.Int("@Admission",admission),DatabaseHelper.Int("@Placement",placement)});
+            if(state.ExecuteScalar() is not int enrollment)throw new InvalidOperationException("This registration is no longer pending. Reload Registration.");
+            if(assignment.HasValue)
+            {
+                using var owned=new SqlCommand("SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE StudentFeeAssignmentId=@Assignment AND EnrollmentId=@Enrollment AND FeeTypeId=@Fee AND CancelledAt IS NULL;",connection,transaction);
+                owned.Parameters.AddRange(new[]{DatabaseHelper.Int("@Assignment",assignment.Value),DatabaseHelper.Int("@Enrollment",enrollment),DatabaseHelper.Int("@Fee",feeId)});
+                if(Convert.ToInt32(owned.ExecuteScalar())!=1)throw new InvalidOperationException("This fee is not part of the pending registration.");
+            }
+            else
+            {
+                using var preview=new SqlCommand(FeeQuery,connection,transaction);preview.Parameters.Add(DatabaseHelper.Int("@Placement",placement));
+                var current=new DataTable();using(var adapter=new SqlDataAdapter(preview))adapter.Fill(current);
+                if(Quote(current)!=expectedQuote||!current.AsEnumerable().Any(r=>Convert.ToInt32(r["FeeTypeId"])==feeId&&!r.IsNull("Amount")))throw new InvalidOperationException("The class fees changed. Open Add Fee again to review them.");
+                using var existing=new SqlCommand("SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@Enrollment AND FeeTypeId=@Fee AND CancelledAt IS NULL;",connection,transaction);
+                existing.Parameters.AddRange(new[]{DatabaseHelper.Int("@Enrollment",enrollment),DatabaseHelper.Int("@Fee",feeId)});
+                if(Convert.ToInt32(existing.ExecuteScalar())!=0)throw new InvalidOperationException("This fee is already included. Reload Registration.");
+                parameters[0].Value=enrollment;
+            }
         });
     }
 

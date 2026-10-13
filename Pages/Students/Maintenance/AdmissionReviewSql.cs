@@ -6,10 +6,17 @@ internal static class AdmissionReviewSql
                 EXEC dbo.RequirePermission @UserId,N'Students.View';
                 SELECT S.AdmissionId,COALESCE(S.AdmissionNumber,S.QuickReference) Reference,S.StudentName,S.FatherName,S.ContactNumber,S.Status,
                  CASE WHEN S.LegacyVerifiedAt IS NULL THEN N'Needs Review' ELSE N'Verified' END Verification,
-                 Y.YearName,C.ClassName,SEC.SectionName,E.EnrollmentDate PlacementStart,E.BillingStartDate BillingStart,
+                 Y.YearName,C.ClassName,SEC.SectionName,
+                 CONCAT_WS(N' / ',CP.CampusName,C.ClassName,SEC.SectionName) Placement,
+                 CASE WHEN FM.FamilyId IS NULL OR G.Children<2 THEN N'One child' ELSE CONCAT(N'F-',FM.FamilyId,N' · ',G.Children,N' children') END Family,
+                 COALESCE(G.LinkedChildren,N'') LinkedChildren,E.EnrollmentDate PlacementStart,E.BillingStartDate BillingStart,
                  COALESCE((SELECT SUM(dbo.GetFeeChargeBalance(B.BillingChargeId)) FROM dbo.BillingCharges B WHERE B.AdmissionId=S.AdmissionId AND B.Status<>N'Cancelled'),0) Outstanding
                 FROM dbo.Students S OUTER APPLY(SELECT TOP(1) * FROM dbo.Enrollments H WHERE H.AdmissionId=S.AdmissionId ORDER BY H.EnrollmentId DESC) E
                 LEFT JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId LEFT JOIN dbo.CampusClassSections CS ON CS.ClassSectionId=E.ClassSectionId
+                LEFT JOIN dbo.Campuses CP ON CP.CampusId=CS.CampusId
+                LEFT JOIN dbo.FamilyMembers FM ON FM.AdmissionId=S.AdmissionId
+                OUTER APPLY(SELECT COUNT(*) Children,STRING_AGG(CONVERT(nvarchar(max),CONCAT(COALESCE(K.AdmissionNumber,K.QuickReference),N' · ',K.StudentName)),N'; ') LinkedChildren
+                    FROM dbo.FamilyMembers M JOIN dbo.Students K ON K.AdmissionId=M.AdmissionId WHERE M.FamilyId=FM.FamilyId) G
                 LEFT JOIN dbo.Classes C ON C.ClassId=CS.ClassId LEFT JOIN dbo.Sections SEC ON SEC.SectionId=CS.SectionId
                 WHERE (@Pending=1 AND S.Status=N'Pending' AND S.QuickReference IS NOT NULL AND S.AdmissionNumber IS NULL) OR (@Pending=0 AND S.LegacySetupPending=1) ORDER BY S.LegacyVerifiedAt,S.AdmissionId;
                 """;

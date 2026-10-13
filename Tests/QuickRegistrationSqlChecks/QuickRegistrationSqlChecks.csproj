@@ -14,7 +14,9 @@
     <Compile Include="../../Core/Tvp.cs" Link="Tvp.cs" />
     <Compile Include="../../Core/DatabaseCompatibility.cs" Link="DatabaseCompatibility.cs" />
     <Compile Include="../../Core/DatabaseCompatibilityFailure.cs" Link="DatabaseCompatibilityFailure.cs" />
+    <EmbeddedResource Include="../../Migrations/5.sql" LogicalName="Migration5.sql" />
     <EmbeddedResource Include="../../Migrations/4.sql" LogicalName="Migration4.sql" />
+    <EmbeddedResource Include="Migration5Checks.sql" LogicalName="Migration5Checks.sql" />
     <EmbeddedResource Include="Migration4Checks.sql" LogicalName="Migration4Checks.sql" />
     <EmbeddedResource Include="../../Core/DatabaseMigrationRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseMigrationRequirements.json" />
     <EmbeddedResource Include="../../Core/DatabaseCompatibilityRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseCompatibilityRequirements.json" />

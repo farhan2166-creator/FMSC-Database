@@ -471,7 +471,9 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         bool fitting=false;
         void Fit()
         {
-            if(fitting || _actionBar.IsDisposed || _shellRoot is null || _actionBar.Parent!=_shellRoot)return;
+            // Effective Control.Visible is false for every button in a hidden tab.
+            // Do not turn that inherited state into a collapsed action bar.
+            if(fitting || !Visible || _actionBar.IsDisposed || _shellRoot is null || _actionBar.Parent!=_shellRoot)return;
             fitting=true;
             try {
                 int width=Math.Max(1,_shellRoot.ClientSize.Width-_actionBar.Padding.Horizontal);
@@ -518,6 +520,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             } finally {fitting=false;}
         }
         _fitActionBar=Fit;
+        VisibleChanged+=(_,_)=>Fit();
         Actions.Layout+=(_,_)=>Fit();layout.SizeChanged+=(_,_)=>Fit();
         StatusLabel.FontChanged+=(_,_)=>Fit();StatusLabel.TextChanged+=(_,_)=>Fit();
         StatusLabel.ParentChanged+=(_,_)=>{StatusLabel.MaximumSize=Size.Empty;StatusLabel.Visible=true;Fit();};

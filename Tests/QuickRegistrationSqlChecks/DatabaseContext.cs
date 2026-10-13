@@ -5,7 +5,7 @@ namespace FMSC_SMS
     // Test connection only; never use the production app's auto-attach path.
     public static class DatabaseHelper
     {
-        public const string RequiredDatabaseSchemaVersion="4";
+        public const string RequiredDatabaseSchemaVersion="5";
         internal static string ConnectionString = "";
         public static SqlConnection GetConnection()=>new(ConnectionString);
         public static void OpenConnection(SqlConnection connection)=>connection.Open();

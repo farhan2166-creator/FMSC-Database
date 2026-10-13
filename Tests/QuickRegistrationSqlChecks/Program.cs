@@ -22,16 +22,17 @@ if(args.Contains("--migration-4"))
     connection.InfoMessage+=(_,message)=>Console.WriteLine(message.Message);
     using var command=new SqlCommand(Resource("Migration4Checks.sql"),connection){CommandTimeout=120};
     command.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource("Migration4.sql")});command.ExecuteNonQuery();
+    using(var upgrade=new SqlCommand(Resource("Migration5Checks.sql"),connection){CommandTimeout=120}){upgrade.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource("Migration5.sql")});upgrade.ExecuteNonQuery();}
     DatabaseCompatibility.Validate(connection);
     Console.WriteLine("PASS: application startup contract validates migration 4's additive table, columns, uniqueness and foreign keys");
-    Console.WriteLine("PASS: 9 migration-4 durability and compatibility checks on a disposable version-3 database.");
+    Console.WriteLine("PASS: 9 migration-4 checks plus 4 migration-5 rollback, rerun and preservation checks on a disposable version-3 database.");
     return;
 }
 int checks=0;
 void Assert(bool ok,string label){if(!ok)throw new Exception(label);Console.WriteLine("PASS: "+label);checks++;}
 async Task Refused(Func<Task> action,string label)
 {try{await action();}catch(InvalidOperationException e) when(e.Message.Contains("changed",StringComparison.OrdinalIgnoreCase)){Console.WriteLine("PASS: "+label);checks++;return;}throw new Exception("Expected stale-state refusal: "+label);}
-Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="4","migration 4 installed on clone");
+Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="5","migration 5 installed on clone");
 using(var compatible=DatabaseHelper.GetConnection()){
     compatible.Open();DatabaseCompatibility.Validate(compatible);
     Assert(true,"production startup/restore compatibility contract accepts migrated schema");
@@ -64,7 +65,7 @@ using(var restored=DatabaseHelper.GetConnection()){
 }
 CurrentUser.UserId=Convert.ToInt32(Query("SELECT TOP(1) U.UserId FROM dbo.Users U WHERE EXISTS(SELECT 1 FROM dbo.Roles R WHERE R.RoleId=U.RoleId AND R.RoleName=N'Administrator') OR EXISTS(SELECT 1 FROM dbo.UserRoles UR JOIN dbo.Roles R ON R.RoleId=UR.RoleId WHERE UR.UserId=U.UserId AND R.RoleName=N'Administrator')").Rows[0][0]);
 var contexts=Query("""
-    SELECT TOP(1) Y.AcademicYearId,P.ClassSectionId,P.CampusId FROM dbo.AcademicYears Y CROSS JOIN dbo.CampusClassSections P
+    SELECT TOP(1) Y.AcademicYearId,P.ClassSectionId,P.CampusId,P.ClassId FROM dbo.AcademicYears Y CROSS JOIN dbo.CampusClassSections P
     WHERE CONVERT(date,GETDATE()) BETWEEN Y.StartDate AND Y.EndDate
       AND EXISTS(SELECT 1 FROM dbo.FeeConfigurations C WHERE C.CampusId=P.CampusId AND C.ClassId=P.ClassId)
       AND NOT EXISTS(SELECT 1 FROM dbo.FeeTypes F WHERE F.IsMandatory=1 AND NOT EXISTS
@@ -305,6 +306,76 @@ using(var c=DatabaseHelper.GetConnection()){
 Query("ALTER TABLE dbo.QuickRegistrationRequests DROP CONSTRAINT UQ_QuickRegistrationRequests_AdmissionId;");
 try{
     try{using var missing=DatabaseHelper.GetConnection();missing.Open();DatabaseCompatibility.Validate(missing);throw new Exception("Missing request uniqueness passed startup");}
-    catch(DatabaseCompatibilityException){Assert(true,"startup rejects a version-4 database missing the new recovery uniqueness safeguard");}
+    catch(DatabaseCompatibilityException){Assert(true,"startup rejects a version-5 database missing the new recovery uniqueness safeguard");}
 }finally{Query("ALTER TABLE dbo.QuickRegistrationRequests ADD CONSTRAINT UQ_QuickRegistrationRequests_AdmissionId UNIQUE(AdmissionId);");}
+// Quick Registration fee controls and optional phone exercise production SQL.
+var optional=Query("""
+    INSERT dbo.FeeTypes(FeeTypeCode,FeeTypeName,DefaultFrequency,IsMandatory,IsTransportLinked)
+        VALUES(@Code,N'Audit QR Extra',N'As Needed',0,0);
+    DECLARE @Fee int=SCOPE_IDENTITY();
+    INSERT dbo.FeeConfigurations(CampusId,ClassId,FeeTypeId,Amount,Frequency)
+        VALUES(@Campus,@Class,@Fee,700,N'As Needed');
+    SELECT @Fee FeeTypeId;
+    """,DatabaseHelper.P("@Code","QREX"+Guid.NewGuid().ToString("N")[..20]),DatabaseHelper.Int("@Campus",Convert.ToInt32(context["CampusId"])),DatabaseHelper.Int("@Class",Convert.ToInt32(context["ClassId"]))).Rows[0];
+int extra=Convert.ToInt32(optional["FeeTypeId"]);
+var extraRates=Rates();
+Assert(extraRates.AsEnumerable().Any(r=>(int)r["FeeTypeId"]==extra&&!(bool)r["Include"]),"optional configured fee appears as an available opening-bill choice");
+var emptyPhoneArgs=AdmissionArgs(extraRates);emptyPhoneArgs.Single(p=>p.ParameterName=="@ContactNumber").Value=DBNull.Value;
+emptyPhoneArgs.Single(p=>p.ParameterName=="@SelectedFeeTypeIds").Value=Tvp.FeeTypeIds(new[]{extra});
+var waivedType=extraRates.AsEnumerable().First(r=>(bool)r["IsMandatory"]);
+int waivedId=(int)waivedType["FeeTypeId"];
+emptyPhoneArgs=emptyPhoneArgs.Append(new SqlParameter("@ExcludedFeeTypeIds",SqlDbType.Structured){TypeName="dbo.FeeTypeIdList",Value=Tvp.FeeTypeIds(new[]{waivedId})}).ToArray();
+var noPhone=await SaveNew(placement,QuickRegistrationQuote.Create(extraRates),emptyPhoneArgs);
+var noPhoneView=await QuickRegistrationWriter.LoadAsync(noPhone.Id);
+Assert(noPhoneView.Details.Rows[0].IsNull("ContactNumber"),"registration saves with no phone number");
+Assert(noPhoneView.Fees.AsEnumerable().Any(r=>(int)r["FeeTypeId"]==extra)&&!noPhoneView.Fees.AsEnumerable().Any(r=>(int)r["FeeTypeId"]==waivedId),"additional fee selected and crossed automatic fee excluded atomically");
+Assert(Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=@Id AND FeeTypeId=@Fee AND ChargeKind=N'Manual' AND Status<>N'Cancelled'",DatabaseHelper.Int("@Id",noPhone.Id),DatabaseHelper.Int("@Fee",extra)).Rows[0][0])==1,"As Needed opening fee produces one collectable charge");
+Assert(Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=@Id AND FeeTypeId=@Fee AND Status<>N'Cancelled'",DatabaseHelper.Int("@Id",noPhone.Id),DatabaseHelper.Int("@Fee",waivedId)).Rows[0][0])==0,"crossed automatic fee retains no live charge");
+await QuickRegistrationWriter.ChangeFeeAsync(noPhone.Id,noPhoneView.Snapshot,placement,waivedId,null,QuickRegistrationQuote.Create(Rates()));
+var restoredFees=await QuickRegistrationWriter.LoadAsync(noPhone.Id);
+Assert(restoredFees.Fees.AsEnumerable().Any(r=>(int)r["FeeTypeId"]==waivedId),"crossed automatic fee can be restored to a saved pending registration");
+await Refused(()=>QuickRegistrationWriter.ChangeFeeAsync(noPhone.Id,noPhoneView.Snapshot,placement,extra,Convert.ToInt32(noPhoneView.Fees.AsEnumerable().Single(r=>(int)r["FeeTypeId"]==extra)["StudentFeeAssignmentId"]),null),"stale registration cannot remove another fee after restoration");
+int extraAssignment=(int)restoredFees.Fees.AsEnumerable().Single(r=>(int)r["FeeTypeId"]==extra)["StudentFeeAssignmentId"];
+await QuickRegistrationWriter.ChangeFeeAsync(noPhone.Id,restoredFees.Snapshot,placement,extra,extraAssignment,null);
+var removed=await QuickRegistrationWriter.LoadAsync(noPhone.Id);
+Assert(!removed.Fees.AsEnumerable().Any(r=>(int)r["FeeTypeId"]==extra),"cross removes an unpaid saved optional fee");
+Assert(Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=@Id AND FeeTypeId=@Fee AND Status=N'Cancelled'",DatabaseHelper.Int("@Id",noPhone.Id),DatabaseHelper.Int("@Fee",extra)).Rows[0][0])==1,"fee removal preserves cancelled opening-charge history");
+await QuickRegistrationWriter.ChangeFeeAsync(noPhone.Id,removed.Snapshot,placement,extra,null,QuickRegistrationQuote.Create(Rates()));
+var readded=await QuickRegistrationWriter.LoadAsync(noPhone.Id);
+Assert(readded.Fees.AsEnumerable().Any(r=>(int)r["FeeTypeId"]==extra)&&Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=@Id AND FeeTypeId=@Fee AND Status<>N'Cancelled'",DatabaseHelper.Int("@Id",noPhone.Id),DatabaseHelper.Int("@Fee",extra)).Rows[0][0])==1,"removing then re-adding in the same month retains history and creates exactly one live opening charge");
+try{await QuickRegistrationWriter.ChangeFeeAsync(noPhone.Id,readded.Snapshot,placement,extra,null,QuickRegistrationQuote.Create(Rates()));throw new Exception("Duplicate fee accepted");}
+catch(InvalidOperationException e) when(e.Message.Contains("already included")){Assert(true,"duplicate saved fee addition is refused");}
+var missingFee=Query("INSERT dbo.FeeTypes(FeeTypeCode,FeeTypeName,IsMandatory,IsTransportLinked) VALUES(@Code,N'Unconfigured audit fee',0,0); SELECT CONVERT(int,SCOPE_IDENTITY())",DatabaseHelper.P("@Code","QRNO"+Guid.NewGuid().ToString("N")[..20])).Rows[0][0];
+await Refused(()=>QuickRegistrationWriter.ChangeFeeAsync(noPhone.Id,readded.Snapshot,placement,(int)missingFee,null,QuickRegistrationQuote.Create(Rates())),"unconfigured fee cannot be silently added without a price");
+var otherPending=await NewChild();var otherFees=await QuickRegistrationWriter.LoadAsync(otherPending);
+try{await QuickRegistrationWriter.ChangeFeeAsync(noPhone.Id,readded.Snapshot,placement,(int)otherFees.Fees.Rows[0]["FeeTypeId"],(int)otherFees.Fees.Rows[0]["StudentFeeAssignmentId"],null);throw new Exception("Foreign fee removed");}
+catch(InvalidOperationException e) when(e.Message.Contains("not part")){Assert(true,"a fee from another student cannot be removed");}
+Query("""
+    DECLARE @Enrollment int=(SELECT EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=@Id AND Status=N'Pending');
+    DECLARE @Charge bigint=(SELECT BillingChargeId FROM dbo.BillingCharges WHERE AdmissionId=@Id AND FeeTypeId=@Fee AND Status<>N'Cancelled');
+    INSERT dbo.FeePayments(AdmissionId,EnrollmentId,PaymentDate,ReceiptNumber,TotalAmount,PaymentMethod,Status,CreatedByUserId)
+        VALUES(@Id,@Enrollment,CONVERT(date,GETDATE()),@Receipt,1,N'Cash',N'Completed',@User);
+    DECLARE @Payment int=SCOPE_IDENTITY();
+    INSERT dbo.FeePaymentAllocations(FeePaymentId,AdmissionId,BillingChargeId,Amount) VALUES(@Payment,@Id,@Charge,1);
+    """,DatabaseHelper.Int("@Id",noPhone.Id),DatabaseHelper.Int("@Fee",extra),DatabaseHelper.Int("@User",CurrentUser.UserId),DatabaseHelper.P("@Receipt","QRTEST-"+Guid.NewGuid().ToString("N")));
+var paidView=await QuickRegistrationWriter.LoadAsync(noPhone.Id);
+Assert((bool)paidView.Fees.AsEnumerable().Single(r=>(int)r["FeeTypeId"]==extra)["HasPayments"],"saved QR fee exposes payment protection to the UI");
+try{await QuickRegistrationWriter.ChangeFeeAsync(noPhone.Id,paidView.Snapshot,placement,extra,extraAssignment,null);throw new Exception("Paid fee removed");}
+catch(SqlException e) when(e.Number==53121){Assert(true,"SQL rejects a fee removal after a payment, even from a refreshed screen");}
+var limitedSaveArgs=AdmissionArgs(Rates()).Append(new SqlParameter("@ExcludedFeeTypeIds",SqlDbType.Structured){TypeName="dbo.FeeTypeIdList",Value=Tvp.FeeTypeIds(new[]{waivedId})}).ToArray();
+int adminActor=CurrentUser.UserId;int studentsBeforeWaiver=Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0]);
+CurrentUser.UserId=limitedUser;
+try{await SaveNew(placement,QuickRegistrationQuote.Create(Rates()),limitedSaveArgs);throw new Exception("Unauthorized waiver saved");}
+catch(SqlException e) when(e.Number==50003){Assert(true,"crossing an automatic fee requires fee-adjustment permission in SQL");}
+finally{CurrentUser.UserId=adminActor;}
+Assert(Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0])==studentsBeforeWaiver,"unauthorized automatic-fee waiver rolls back student and opening bill");
+var familyGrid=Query(AdmissionReviewSql.Query,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Bit("@Pending",true));
+var connected=familyGrid.AsEnumerable().Where(r=>(int)r["AdmissionId"]==otherChild|| (int)r["AdmissionId"]==otherAnchor).ToArray();
+Assert(connected.Length==2&&(string)connected[0]["Family"]==(string)connected[1]["Family"]&&((string)connected[0]["Family"]).Contains("2 children"),"pending grid identifies connected children with one shared family group");
+Assert(familyGrid.AsEnumerable().All(r=>((string)r["Reference"]).StartsWith("QR-"))&&familyGrid.AsEnumerable().Any(r=>((string)r["Placement"]).Split(" / ").Length==3),"grid keeps temporary QR references separate and combines campus, class and section");
+Query("UPDATE dbo.Students SET Gender=N'Male',PlaceOfBirth=N'Audit city' WHERE AdmissionId=@Id; EXEC dbo.CompleteQuickAdmission @UserId,@Id;",DatabaseHelper.Int("@Id",noPhone.Id),DatabaseHelper.Int("@UserId",CurrentUser.UserId));
+Assert(Convert.ToString(Query("SELECT Status FROM dbo.Students WHERE AdmissionId=@Id",DatabaseHelper.Int("@Id",noPhone.Id)).Rows[0][0])=="Active","admission confirmation succeeds without a phone number");
+try{var activeFeeView=await QuickRegistrationWriter.LoadAsync(noPhone.Id);await QuickRegistrationWriter.ChangeFeeAsync(noPhone.Id,activeFeeView.Snapshot,placement,waivedId,null,QuickRegistrationQuote.Create(Rates()));throw new Exception("Active QR fee changed");}
+catch(InvalidOperationException e) when(e.Message.Contains("no longer pending")){Assert(true,"quick-registration fee changes stop after admission confirmation");}
+
 Console.WriteLine($"PASS: {checks} production SQL checks. Fixture remains only in the disposable clone; drop that clone after inspection.");

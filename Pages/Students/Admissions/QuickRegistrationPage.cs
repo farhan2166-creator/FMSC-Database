@@ -48,6 +48,8 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     private readonly LookupBox year = new();
     private readonly PlacementPicker placement = new();
     private readonly ModernDatePicker joining = HumanUi.Date();
+    private readonly ModernButton addFee = new() { Text="+ Add Fee", ThemeRole="Secondary", AutoSize=true, Height=AppMetrics.ButtonHeight };
+    private readonly ContextMenuStrip feeMenu = new();
     private readonly DataGridView fees = new() { Dock=DockStyle.Fill, AllowUserToAddRows=false, AllowUserToDeleteRows=false, AutoGenerateColumns=false, RowHeadersVisible=false };
     private readonly Label total=new(){Dock=DockStyle.Fill,AutoSize=true,Font=AppTheme.ButtonFont,TextAlign=ContentAlignment.MiddleRight,Padding=new Padding(8),Text="Bill Total: Rs. 0"};
     private DataTable placements = new(), rates = new();
@@ -113,7 +115,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         registrationContent.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         familyField=HumanUi.Field("Find another child of this parent (pending QR or admitted student)",family);familyField.Visible=false;familyField.TabIndex=0;
         registrationContent.Controls.Add(familyField,0,0);
-        var fields=Fields(("Student name",name,true,1),("Joining date",joining,true,1),("Academic year",year,true,1),("Campus / Class / Section",placement,true,1),("Parent name",parent,true,1),("Primary phone",contact,true,1),("Address",address,false,2));
+        var fields=Fields(("Student name",name,true,1),("Joining date",joining,true,1),("Academic year",year,true,1),("Campus / Class / Section",placement,true,1),("Parent name",parent,true,1),("Primary phone (optional)",contact,false,1),("Address",address,false,2));
         fields.TabIndex=1;registrationContent.Controls.Add(fields,0,1);registrationCard.Content.Controls.Add(registrationContent);
         fees.Columns.Add(new DataGridViewCheckBoxColumn { Name="Include",DataPropertyName="Include",HeaderText="Include",Width=65 });
         fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Fee",DataPropertyName="FeeTypeName",HeaderText=UiText.Fees.FeeType,ReadOnly=true,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill });
@@ -121,6 +123,10 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Amount",DataPropertyName="Amount",HeaderText=UiText.Fees.Amount,ReadOnly=true,Width=110 });
         fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Discount",DataPropertyName="Discount",HeaderText=UiText.Fees.Discount,ReadOnly=!CurrentUser.HasPermission("Fees.Adjust"),Width=125 });
         fees.Columns.Add(new DataGridViewTextBoxColumn { Name="NetAmount",DataPropertyName="NetAmount",HeaderText=UiText.Fees.NetAmount,ReadOnly=true,Width=145 });
+        fees.Columns.Add(CreateCrossActionColumn("Remove",useColumnTextForButtonValue:false));
+        fees.CellContentClick+=async(_,e)=>{if(e.RowIndex>=0&&e.ColumnIndex>=0&&fees.Columns[e.ColumnIndex].Name=="Remove"&&fees.Rows[e.RowIndex].DataBoundItem is DataRowView row)await RemoveFeeAsync(row.Row);};
+        addFee.Click+=async(_,_)=>await ShowAddFeeAsync();
+        Disposed+=(_,_)=>feeMenu.Dispose();
         fees.Columns["Amount"].DefaultCellStyle.Format=fees.Columns["Discount"].DefaultCellStyle.Format=fees.Columns["NetAmount"].DefaultCellStyle.Format="N0";
         fees.CellValidating+=(_,e)=>{
             if(e.RowIndex<0||fees.Columns[e.ColumnIndex].Name!="Discount")return;
@@ -129,11 +135,11 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         };
         fees.DataError+=(_,e)=>{e.ThrowException=false;SetStatus("Enter a valid discount amount.");};
         fees.CurrentCellDirtyStateChanged+=(_,_)=>{if(fees.IsCurrentCellDirty&&fees.CurrentCell is DataGridViewCheckBoxCell)fees.CommitEdit(DataGridViewDataErrorContexts.Commit);};
-        fees.CellValueChanged+=(_,_)=>UpdateTotal();
+        fees.CellValueChanged+=(_,e)=>{if(e.ColumnIndex>=0&&fees.Columns[e.ColumnIndex].Name!="Remove")UpdateTotal();};
         fees.CellEndEdit+=(_,_)=>{if(fees.CurrentRow?.DataBoundItem is DataRowView row)row.EndEdit();UpdateTotal();};
         foreach(var input in new[]{name,parent,contact,address})input.TextChanged+=(_,_)=>PendingEditChanged();
-        var feeCard=HumanUi.Card("Opening Bill", "Configured fees are shared with Admission. Review sibling discounts before saving.");
-        var feeContent=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};feeContent.RowStyles.Add(new RowStyle(SizeType.Percent,100));feeContent.RowStyles.Add(new RowStyle(SizeType.AutoSize));feeContent.Controls.Add(fees,0,0);feeContent.Controls.Add(total,0,1);feeCard.Content.Controls.Add(feeContent);
+        var feeCard=HumanUi.Card("Opening Bill", "Use + Add Fee or × to change the opening bill. Paid fees are protected; saved fee changes apply immediately.");
+        var feeContent=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};feeContent.RowStyles.Add(new RowStyle(SizeType.Percent,100));feeContent.RowStyles.Add(new RowStyle(SizeType.AutoSize));feeContent.Controls.Add(fees,0,0);var feeFooter=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=true};feeFooter.Controls.Add(addFee);feeFooter.Controls.Add(total);feeContent.Controls.Add(feeFooter,0,1);feeCard.Content.Controls.Add(feeContent);
         root=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2 };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(4)));
         root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.Controls.Add(registrationCard,0,0);root.Controls.Add(feeCard,0,1);SetContent(root);
@@ -268,10 +274,58 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
             foreach(var row in missing)data.Rows.Remove(row);
             expectedQuote=QuickRegistrationWriter.Quote(data);SetRates(data);feesLoaded=missing.Length==0;
             if(!feesLoaded)SetStatus("Configure the required class fees before saving: "+missingNames+".");
-            foreach(DataGridViewRow row in fees.Rows)if(Convert.ToBoolean(((DataRowView)row.DataBoundItem).Row["IsMandatory"]))row.Cells["Include"].ReadOnly=true;
             UpdateTotal();
         }catch(Exception ex){if(version==loadVersion)Fail(ex);}
         finally{if(version==loadVersion){loadingFees=false;UpdateActions();}}
+    }
+    private async Task ShowAddFeeAsync()
+    {
+        if(!addFee.Enabled||IsBusy||recoveryBlocked||needsRefresh)return;
+        try
+        {
+            int version=registrationLoadVersion,feeVersion=loadVersion,selectedPlacement=placement.SelectedId,user=CurrentUser.UserId;
+            var options=savedStudent==0?rates.Copy():await Task.Run(()=>DatabaseHelper.QuerySql("EXEC dbo.RequirePermission @UserId,N'Students.View';\n"+QuickRegistrationWriter.FeeQuery,DatabaseHelper.Int("@UserId",user),DatabaseHelper.Int("@Placement",selectedPlacement)));
+            if(IsDisposed||IsBusy||recoveryBlocked||needsRefresh||version!=registrationLoadVersion||feeVersion!=loadVersion||user!=CurrentUser.UserId)return;
+            feeMenu.Items.Clear();
+            var included=rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["Include"])).Select(r=>Convert.ToInt32(r["FeeTypeId"])).ToHashSet();
+            string quote=QuickRegistrationWriter.Quote(options);
+            foreach(DataRow option in options.Rows)
+            {
+                int feeId=Convert.ToInt32(option["FeeTypeId"]);
+                if(included.Contains(feeId)||option.IsNull("Amount"))continue;
+                var item=feeMenu.Items.Add($"{option["FeeTypeName"]} · Rs. {option["Amount"]:N0} · {option["Frequency"]}");
+                item.Click+=async(_,_)=>{
+                    if(!addFee.Enabled||IsBusy||version!=registrationLoadVersion||feeVersion!=loadVersion||user!=CurrentUser.UserId)return;
+                    if(savedStudent==0){var row=rates.AsEnumerable().Single(r=>Convert.ToInt32(r["FeeTypeId"])==feeId);row["Include"]=true;UpdateTotal();}
+                    else await ChangeSavedFeeAsync(feeId,null,quote);
+                };
+            }
+            if(feeMenu.Items.Count==0){var item=feeMenu.Items.Add("No additional configured fees. Configure this class in Fee Setup.");item.Enabled=false;}
+            feeMenu.Show(addFee,new Point(0,addFee.Height));
+        }
+        catch(Exception ex){if(!IsDisposed)Fail(ex);}
+    }
+    private async Task RemoveFeeAsync(DataRow row)
+    {
+        if(IsBusy||recoveryBlocked||needsRefresh||savedStudent>0&&savedStatus!="Pending"||!CurrentUser.HasPermission("Fees.Adjust")||Convert.ToBoolean(row["HasPayments"]))return;
+        if(!fees.EndEdit())return;
+        if(savedStudent==0){row["Include"]=false;UpdateTotal();return;}
+        if(HasPendingChanges){SetStatus("Save changes before removing a saved fee.",PageStatusKind.Warning);return;}
+        if(!Confirm($"Remove {row["FeeTypeName"]} (Rs. {Convert.ToDecimal(row["Amount"])-Convert.ToDecimal(row["Discount"]):N0}) from this registration? Unpaid charges will be cancelled; history will be retained.","Remove Fee"))return;
+        await ChangeSavedFeeAsync(Convert.ToInt32(row["FeeTypeId"]),Convert.ToInt32(row["StudentFeeAssignmentId"]),null);
+    }
+    private async Task ChangeSavedFeeAsync(int feeId,int? assignment,string? quote)
+    {
+        if(IsBusy||HasPendingChanges||recoveryBlocked||needsRefresh)return;
+        busy=true;UpdateActions();
+        try
+        {
+            await QuickRegistrationWriter.ChangeFeeAsync(savedStudent,savedSnapshot,placement.SelectedId,feeId,assignment,quote);
+            needsRefresh=true;
+            if(await LoadRegistrationAsync(savedStudent,afterSave:true)==RegistrationLoadOutcome.Loaded)SetStatus(assignment.HasValue?"Fee removed. Unpaid charges cancelled; history retained.":"Fee added to the opening bill.",PageStatusKind.Success);
+        }
+        catch(Exception ex){needsRefresh=true;Fail(ex);}
+        finally{busy=false;if(!IsDisposed)UpdateActions();}
     }
     private void SetRates(DataTable data)
     {
@@ -295,13 +349,17 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         registrationCard.SetHeaderText("Registration Details",recoveryBlocked?"Save recovery pending · Use Check Save Outcome before continuing.":savedStudent>0
             ? $"{familyReference} · "+(savedFamilyMemberCount>1?$"Family: {savedFamilyMemberCount} children · Link or unlink a parent above.":"One child · You can link an existing parent above.")
             : familyAnchor>0?$"Parent linked · {familyReference} · Use Unlink Parent to change it.":"Enter a child, or use Link Existing Parent above.");
+        addFee.Enabled=editing&&feesLoaded&&(savedStudent==0||!HasPendingChanges&&CurrentUser.HasPermission("Fees.Adjust"));
         fees.ReadOnly=!editing;
         // Switching grid ReadOnly can reset individual column/cell flags.
         // Restore the edit policy after every busy or saved-state transition.
         foreach(DataGridViewColumn column in fees.Columns)column.ReadOnly=column.Name switch{
-            "Discount"=>!editing||!CurrentUser.HasPermission("Fees.Adjust"),"Include"=>!editing||savedStudent>0,_=>true};
+            "Discount"=>!editing||!CurrentUser.HasPermission("Fees.Adjust"),"Include"=>!editing||savedStudent>0,"Remove"=>false,_=>true};
         foreach(DataGridViewRow row in fees.Rows)if(row.DataBoundItem is DataRowView data){
-            row.Cells["Include"].ReadOnly=!editing||savedStudent>0||Convert.ToBoolean(data.Row["IsMandatory"]);
+            row.Cells["Include"].ReadOnly=!editing||savedStudent>0||(Convert.ToBoolean(data.Row["IsMandatory"])&&!CurrentUser.HasPermission("Fees.Adjust"));
+            bool removable=editing&&!Convert.ToBoolean(data.Row["HasPayments"])&&CurrentUser.HasPermission("Fees.Adjust");
+            if(!Equals(row.Cells["Remove"].Value,removable?"×":""))row.Cells["Remove"].Value=removable?"×":"";
+            row.Cells["Remove"].ToolTipText=Convert.ToBoolean(data.Row["HasPayments"])?"This fee has a payment. Use Fee Corrections.":!CurrentUser.HasPermission("Fees.Adjust")?"Fee adjustment permission is required.":"Remove this fee from the opening bill.";
             bool paid=Convert.ToBoolean(data.Row["HasPayments"]);
             row.Cells["Discount"].ReadOnly=!editing||paid||!CurrentUser.HasPermission("Fees.Adjust");
             row.Cells["Discount"].ToolTipText=paid?"This fee has a payment. Use Fee Corrections to adjust it.":"";
@@ -330,7 +388,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     private async Task SaveAsync()
     {
         if(!ReadyToSave)return;
-        var v=validator;v.Begin();v.Required(name);v.Required(parent);v.Required(contact);v.Required(year);v.Required(placement);
+        var v=validator;v.Begin();v.Required(name);v.Required(parent);v.Required(year);v.Required(placement);
         v.Check(contact,PakistanPhoneNumber.IsValidOptional(contact.Text),PakistanPhoneNumber.ValidationMessage);
         if(!v.Finish())return;
         if(!fees.EndEdit()){Warn("Correct the discount amount before saving.");return;}var row=placements.AsEnumerable().First(r=>Convert.ToInt32(r["ClassSectionId"])==placement.SelectedId);
@@ -352,6 +410,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
                 DatabaseHelper.P("@StudentName",name.Text.Trim()),DatabaseHelper.P("@FatherName",parent.Text.Trim()),DatabaseHelper.P("@ContactNumber",contact.Text.Trim()),DatabaseHelper.P("@Address",address.Text.Trim()),DatabaseHelper.P("@Disability","No"),DatabaseHelper.Bit("@UsesTransport",selected.Any(r=>Convert.ToBoolean(r["IsTransportLinked"]))),
                 new SqlParameter("@SelectedFeeTypeIds",SqlDbType.Structured){TypeName="dbo.FeeTypeIdList",Value=Tvp.FeeTypeIds(selected.Select(r=>Convert.ToInt32(r["FeeTypeId"])))},
                 new SqlParameter("@AdmissionDiscounts",SqlDbType.Structured){TypeName="dbo.AdmissionFeeDiscountType",Value=Tvp.AdmissionFeeDiscounts(selected.Where(r=>Convert.ToDecimal(r["Discount"])>0).Select(r=>(Convert.ToInt32(r["FeeTypeId"]),Convert.ToDecimal(r["Discount"]))))}};
+            args.Add(new SqlParameter("@ExcludedFeeTypeIds",SqlDbType.Structured){TypeName="dbo.FeeTypeIdList",Value=Tvp.FeeTypeIds(rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["IsMandatory"])&&!Convert.ToBoolean(r["Include"])).Select(r=>Convert.ToInt32(r["FeeTypeId"])))});
             foreach(string key in new[]{"DateOfBirth","PlaceOfBirth","Gender","BFormNumber","Religion","BloodGroup","AlternateContactNumber","PreviousSchool","FatherOccupation"})args.Add(DatabaseHelper.P("@"+key,null));
             await SubmitNewRegistrationAsync(args.ToArray());
         }catch(Exception ex){ReadRecoveryRecord();if(recoveryBlocked)ShowSaveRecovery();else Fail(ex);}finally{busy=false;UpdateActions();}

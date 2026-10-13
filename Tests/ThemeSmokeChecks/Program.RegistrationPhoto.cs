@@ -14,6 +14,7 @@ internal static partial class Program
             CurrentUser.SignIn(7779, "Recovery fixture", "Operator", false, new[] {
                 "Students.Admit", "Students.View", "Students.Administer", "Fees.Adjust", "Fees.View", "Fees.Collect" });
             CheckRegistrationRefresh();
+            CheckPendingSelection();
             CheckExplicitPhotoSave();
         }
         finally { CurrentUser.SignIn(previous.UserId, previous.Username, previous.RoleName, previous.MustChangePassword, previous.Permissions); }

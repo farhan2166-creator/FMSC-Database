@@ -310,3 +310,33 @@ On Windows, verify automatic recovery on reopening, Check Save Outcome keyboard
 access, close/reopen with offline SQL, successful save followed by refresh failure,
 locked/corrupt recovery storage, sign-out/session changes and a real disconnect
 around commit. Run the smoke suite in a disposable Windows profile.
+
+### Quick Registration fee controls and pending-grid flow — 13 October 2026
+
+- Added explicit + Add Fee and cross controls for configured opening fees, before
+  saving and on saved pending registrations. Required automatic fees can be
+  explicitly waived with Fees.Adjust; the waiver and recovery marker commit in
+  the original registration transaction. Paid fees cannot be removed.
+- Saved fee changes require Students.Administer and Fees.Adjust, verify the
+  registration snapshot, placement, assignment ownership and current fee quote,
+  and reload the screen. Failed or uncertain changes require a deliberate reload.
+- Phone is optional in QR and full review/confirmation. A supplied phone retains
+  the existing format validation.
+- Fixed shared toolbar collapse caused by measuring effective button visibility
+  while a page's tab was hidden; toolbar fitting resumes when the page returns.
+- Pending grid shows shared family groups with member tooltips and combined
+  Campus / Class / Section. The helper-generated Admission Number column is
+  hidden, leaving the genuine QR temporary reference. Refresh, changed filters,
+  empty-grid clicks and clicks elsewhere clear the confirmation target; actions
+  use selected rows instead of stale CurrentRow values.
+- Apply Migrations/5.sql after migration 4. Application and installer now require
+  schema 5. Migration 5 changes three existing procedure bodies: optional phone
+  confirmation, safe same-month restoration of unpaid pending fees, and pending
+  As Needed fees on the opening bill. The source DACPAC remains the reviewed
+  version-3 artifact; migrations 4 and 5 are still required with that artifact.
+- Verification: 72 production SQL checks on a disposable restored DACPAC,
+  migration-4/5 rollback, rerun and record-preservation checks, 636 portable
+  checks, 16 Python artifact checks and all 273 approved module fingerprints.
+  App and Windows smoke-check project build with zero warnings/errors. Added
+  Windows regression checks for hidden-tab toolbar recovery and stale-row
+  selection; Windows GUI execution remains outstanding in this Linux environment.

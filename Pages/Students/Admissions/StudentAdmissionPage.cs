@@ -1188,9 +1188,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         ConfigurePhoneInput(altContact);
         guardianGrid.Controls.Add(
             AdmissionField(
-                "Primary Phone",
+                "Primary Phone (optional)",
                 contact,
-                registrationReview),
+                false),
             3,
             0);
         var addressField = AdmissionField(
@@ -2719,7 +2719,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             v.Required(fatherName);
             v.Required(address);
             v.Required(placeOfBirthInput);
-            if (confirmingRegistration) v.Required(contact);
+            // Phone is optional during registration and confirmation alike.
         }
         v.Check(dob,
             !(dob.Checked && dob.Value.Date > admissionDate.Value.Date),

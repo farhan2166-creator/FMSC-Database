@@ -341,3 +341,17 @@ Supplementary current operational reference: [Validation/AuditFixChecks.md](../V
 ---
 
 **FINAL STATUS — DOCUMENT CONSOLIDATION: DONE.** All thirteen reports were combined into this prioritized, traceable master with explicit findings, existing remedies, accepted policies and actionable remaining tests. The 13 superseded reports have been removed from the current Audit folder and remain available in Git history. **FIX DEPLOYMENT / WINDOWS & RELEASE ACCEPTANCE: NOT CLAIMED DONE.** No application code, SQL, DACPAC, migration or installer artifact was changed by this consolidation; only audit documentation was updated, with the superseded individual reports deleted from the active branch.
+
+### Quick Registration owner-reported flow fixes — 13 October 2026
+
+Implemented configured fee add/remove controls, optional phone through admission
+confirmation, hidden-tab action-bar recovery, visible pending family groups,
+combined placement, genuine temporary-reference display and explicit selection
+for review/confirmation. Fee removals preserve history and protect paid charges;
+required-fee waivers require Fees.Adjust. Migration 5 supports optional phone,
+pending fee restoration and As Needed opening charges. Application/installer
+require schema 5; the current v3 DACPAC requires migrations 4 and 5.
+
+Verified 72 native SQL registration checks, migration rollback/rerun preservation,
+636 portable checks, 16 artifact tests and the Windows-targeted build. New GUI
+regression checks compile; execute them on Windows before deployment.
