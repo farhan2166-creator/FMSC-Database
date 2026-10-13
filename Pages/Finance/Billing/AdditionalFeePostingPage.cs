@@ -15,12 +15,28 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
     private DataTable? candidates;
     private Guid requestId = Guid.NewGuid();
     private bool loading;
-    public AdditionalFeePostingPage() : base("Post Additional Fee",
+    private readonly LatestReadScope candidateReads=new();
+    private (int Year,int Campus,int Class,int Section)? loadedScope;
+    private readonly Func<int,int,int,int,Task<DataTable>> loadCandidates;
+    private readonly ModernButton selectAll,post;
+    private (int Year,int Campus,int Class,int Section) CurrentScope=>(year.SelectedId,campus.SelectedId,klass.SelectedId,section.SelectedId);
+    private bool CurrentCandidates=>candidates is not null&&loadedScope==CurrentScope;
+    private void UpdateSelectionActions()
+    {
+        selectAll.Enabled=!posting&&CurrentCandidates&&candidates!.Rows.Count>0;
+        post.Enabled=!posting&&CurrentCandidates&&selected.Count>0&&CurrentUser.HasPermission("Fees.Collect");
+    }
+    public AdditionalFeePostingPage() : this((y,c,k,s)=>DatabaseHelper.QueryUserAsync("GetAdditionalFeeCandidates",
+        DatabaseHelper.Int("@AcademicYearId",y),DatabaseHelper.Int("@CampusId",c),DatabaseHelper.Int("@ClassId",k),DatabaseHelper.Int("@SectionId",s))) { }
+    internal AdditionalFeePostingPage(Func<int,int,int,int,Task<DataTable>> loadCandidates,bool initialize=true) : base("Post Additional Fee",
         "Select students and add the same fee charge to each.")
     {
+        this.loadCandidates=loadCandidates;
+        Disposed+=(_,_)=>candidateReads.Dispose();
         var load = AddBusyAction("Load Students", LoadAsync, "Secondary");
-        var selectAll = AddAction(UiText.Actions.SelectAll, (_, _) => SelectAll(), "Secondary");
-        var post = AddBusyAction("Post Selected", PostAsync, "Success");
+        selectAll = AddAction(UiText.Actions.SelectAll, (_, _) => SelectAll(), "Secondary");
+        post = AddAction("Post Selected", async(_,_)=>await PostAsync(), "Success");
+        GateAction(post,"Fees.Collect");
         RelocateFromActions(load, selectAll, post);
         students.ReadOnly = false;
         students.AutoGenerateColumns = false;
@@ -48,6 +64,7 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
             int id = Convert.ToInt32(bound["EnrollmentId"]);
             if (Convert.ToBoolean(students.Rows[e.RowIndex].Cells[0].Value)) selected.Add(id);
             else selected.Remove(id);
+            UpdateSelectionActions();
         };
         var fields = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 2 };
         for (int i = 0; i < 4; i++) fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
@@ -79,7 +96,8 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
         klass.SelectedIndexChanged += (_, _) => ClearCandidates();
         section.SelectedIndexChanged += (_, _) => ClearCandidates();
         year.Enabled = false;
-        Defer(BindAsync);
+        UpdateSelectionActions();
+        if(initialize)Defer(BindAsync);
     }
     private async Task BindAsync()
     {
@@ -92,6 +110,7 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
             Task<DataTable> feeTypesTask = DatabaseHelper.QueryUserAsync(
                 "GetFeeTypes");
             await Task.WhenAll(yearsTask, campusesTask, classesTask, sectionsTask, feeTypesTask);
+            if(IsDisposed)return;
             DataTable years = await yearsTask;
             HumanUi.BindCurrentAcademicYear(year, years);
             campus.Bind(await campusesTask, "CampusId", "CampusName", "All campuses");
@@ -99,17 +118,20 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
             section.Bind(await sectionsTask, "SectionId", "SectionName", "All sections");
             fee.Bind(await feeTypesTask, "FeeTypeId", "FeeTypeName");
         }
-        catch (Exception ex) { Fail(ex); }
+        catch (Exception ex) { if(!IsDisposed)Fail(ex); }
     }
     private void ClearCandidates()
     {
+        candidateReads.Cancel();loadedScope=null;
+        SetStatus("Filters changed. Load students, then select those to charge.");
         candidates = null;
         students.DataSource = null;
         selected.Clear();
+        UpdateSelectionActions();
     }
     private void SelectAll()
     {
-        if (candidates is null) return;
+        if (posting||!CurrentCandidates) return;
         loading = true;
         foreach (DataGridViewRow row in students.Rows)
         {
@@ -118,34 +140,44 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
             selected.Add(Convert.ToInt32(bound["EnrollmentId"]));
         }
         loading = false;
+        UpdateSelectionActions();
         SetStatus($"{selected.Count} students selected. Untick any exceptions before posting.");
     }
     private async Task LoadAsync()
     {
+        if(posting)return;
         ClearCandidates();
         if (year.SelectedId <= 0)
         {
             Warn("Set the current academic year in Academic Year setup first.");
             return;
         }
+        var scope=CurrentScope;
+        var request=candidateReads.Begin();
         try
         {
-            candidates = await DatabaseHelper.QueryUserAsync("GetAdditionalFeeCandidates",
-                DatabaseHelper.Int("@AcademicYearId", year.SelectedId),
-                DatabaseHelper.Int("@CampusId", campus.SelectedId),
-                DatabaseHelper.Int("@ClassId", klass.SelectedId),
-                DatabaseHelper.Int("@SectionId", section.SelectedId));
-            loading = true;
-            students.DataSource = candidates;
-            foreach (DataGridViewRow row in students.Rows) row.Cells[0].Value = false;
-            loading = false;
+            var data=await loadCandidates(scope.Year,scope.Campus,scope.Class,scope.Section);
+            if(IsDisposed||!candidateReads.IsCurrent(request)||scope!=CurrentScope)return;
+            candidates=data;loadedScope=scope;
+            loading=true;
+            try
+            {
+                students.DataSource=candidates;
+                foreach(DataGridViewRow row in students.Rows)row.Cells[0].Value=false;
+            }
+            finally{loading=false;}
+            UpdateSelectionActions();
             SetStatus($"{candidates.Rows.Count} admitted students loaded. Tick those to charge.");
         }
-        catch (Exception ex) { loading = false; Fail(ex); }
+        catch(Exception ex)
+        {
+            if(!IsDisposed&&candidateReads.IsCurrent(request)&&scope==CurrentScope){ClearCandidates();Fail(ex);}
+        }
     }
     private async Task PostAsync()
     {
         if (posting) return;
+        if(!CurrentCandidates){SetStatus("Filters changed or students have not been loaded. Load students again before posting.",PageStatusKind.Warning);return;}
         if (!ValidateRequiredInputs())
             return;
         students.EndEdit();
@@ -155,13 +187,21 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
             Warn("Select students and a fee, then enter a whole-rupee amount and reason.");
             return;
         }
-        int count = selected.Count;
-        if (!Confirm($"Post {fee.Text} to {count} students?\nCharge date: {date.Value:dd-MMM-yyyy}\nAmount each: Rs. {amount.Value:N0}\nTotal: Rs. {amount.Value * count:N0}",
+        var ids=selected.OrderBy(id=>id).ToArray();
+        var chosen=candidates!.AsEnumerable().Where(r=>ids.Contains(Convert.ToInt32(r["EnrollmentId"]))).ToArray();
+        if(chosen.Length!=ids.Length){ClearCandidates();SetStatus("The selected students no longer match this list. Load students again.",PageStatusKind.Warning);return;}
+        var scope=CurrentScope;
+        string scopeText=$"{year.Text} · {campus.Text} · {klass.Text} · {section.Text}";
+        string studentText=string.Join("\n",chosen.Take(6).Select(r=>$"{r["AdmissionNumber"]} · {r["StudentName"]}"));
+        if(chosen.Length>6)studentText+=$"\n…and {chosen.Length-6} more selected students.";
+        int count = ids.Length;
+        if (!Confirm($"Post {fee.Text} to {count} students?\n{scopeText}\n{studentText}\nCharge date: {date.Value:dd-MMM-yyyy}\nAmount each: Rs. {amount.Value:N0}\nTotal: Rs. {amount.Value * count:N0}",
             "Post Additional Fee")) return;
+        if(!CurrentCandidates||scope!=CurrentScope)return;
         string postedFeeName = fee.Text;
         decimal postedAmount = amount.Value;
         DateTime postedDate = date.Value;
-        posting = true;
+        posting = true;UpdateSelectionActions();
         try
         {
             using var busy = BeginBusy(BusyMessage, this);
@@ -172,12 +212,12 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
                 DatabaseHelper.P("@Amount", amount.Value),
                 DatabaseHelper.P("@DiscountAmount", 0m),
                 DatabaseHelper.P("@Reason", reason.Text.Trim()),
-                new SqlParameter("@Selection", SqlDbType.Structured) { TypeName = "dbo.ManualChargeSelectionType", Value = Tvp.ManualChargeSelection(selected) });
+                new SqlParameter("@Selection", SqlDbType.Structured) { TypeName = "dbo.ManualChargeSelectionType", Value = Tvp.ManualChargeSelection(ids) });
             requestId = Guid.NewGuid();
             Info($"{postedFeeName} posted to {count} student(s): Rs. {postedAmount:0.##} each, dated {postedDate:dd MMM yyyy}.");
             ClearCandidates();
         }
-        catch (Exception ex) { Fail(ex); }
-        finally { posting = false; }
+        catch (Exception ex) { if(!IsDisposed)Fail(ex); }
+        finally { posting = false;if(!IsDisposed)UpdateSelectionActions(); }
     }
 }
