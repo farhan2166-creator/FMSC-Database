@@ -53,4 +53,6 @@ Console.WriteLine($"PASS: {ThemeAppearanceChecks.Run()} lightweight palettes, sa
 
 Console.WriteLine($"PASS: {RegistrationBillChecks.Run()} student and family bill data checks.");
 
+Console.WriteLine($"PASS: {QuickRegistrationRecoveryChecks.Run()} registration commit-outcome and durable recovery checks.");
+
 if(args.Contains("--profile-search"))ReviewFilterProfile.Run();

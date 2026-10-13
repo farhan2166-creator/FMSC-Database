@@ -1,5 +1,15 @@
 # FMSC_SMS — Master Audit: Findings, Fixes, Decisions and Remaining Steps
 
+**Current save-recovery update:** Quick Registration now tracks exact save
+requests, retains recovery across restart and blocks new submissions while an
+outcome is unknown. `Migrations/4.sql` adds transactionally committed request
+markers; the application/installer require version 4 after migration 3. The
+latest owner DACPAC at `51abb13` is verified as version 3; startup checks include the additive
+migration contract. Verification: 636 portable checks, 51 production QR SQL
+checks, 9 migration checks, 16 artifact/catalog tests and clean cross-builds.
+Windows UI/disconnection acceptance remains pending. See
+[section 16](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#16-quick-registration-interrupted-save-recovery--implemented-13-october-2026).
+
 **Current fee-grid wording update:** Shared captions now use Fee Type,
 Amount (Rs.), Discount (Rs.), Net Amount (Rs.) and Frequency across student/fee
 workspaces and finance reports. Current/new comparisons and payment meanings
@@ -42,8 +52,10 @@ cleanup, a consistent 28-permission catalog and seven procedure corrections;
 C# and installer now require version 3. Verification passes 530 portable
 assertions, 67 production SQL checks and 15 migration durability assertions.
 See [section 11](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#11-owner-approved-two-role-policy-and-consistent-permissions--13-october-2026).
-The owner must apply the migration and supply the updated version-3 DACPAC;
-the provided artifact remains version 2. Windows/release acceptance remains pending.
+The owner supplied the version-3 DACPAC at `51abb13`; its seven changed procedures
+match migration 3 and its role/permission data are verified. Migration 4 is now
+the remaining schema handoff for the save-recovery update. Windows/release
+acceptance remains pending.
 
 **Earlier implementation note:** The approved compact dashboard, FR-03 navigation
 recovery, FR-02 registration refresh feedback and FR-04/05 explicit photo-save

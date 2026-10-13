@@ -1,5 +1,8 @@
 using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace FMSC_SMS.Pages.Students.Admissions;
 
@@ -92,17 +95,118 @@ internal static class QuickRegistrationWriter
 
     internal static string Quote(DataTable rates) => QuickRegistrationQuote.Create(rates);
 
-    internal static Task<DataSet> SaveNewAsync(int placement, string expectedQuote, params SqlParameter[] parameters)
+    internal static string PayloadHash(int user,int placement,string quote,params SqlParameter[] parameters)
     {
-        int user = CurrentUser.UserId;
-        return WriteAsync("AdmitStudent",parameters,user,(connection,transaction)=>{
-            using var check = new SqlCommand("EXEC dbo.RequirePermission @UserId,N'Students.Admit';\n"+FeeQuery,connection,transaction);
-            check.Parameters.AddRange(new[] { DatabaseHelper.Int("@UserId",user),DatabaseHelper.Int("@Placement",placement) });
-            var current = new DataTable();
-            using (var adapter = new SqlDataAdapter(check)) adapter.Fill(current);
-            if (Quote(current)!=expectedQuote)
-                throw new InvalidOperationException("The class fees have changed. Choose the placement again to review the current fees before saving.");
+        var values=parameters.Where(p=>!p.ParameterName.Equals("@UserId",StringComparison.OrdinalIgnoreCase))
+            .OrderBy(p=>p.ParameterName,StringComparer.Ordinal).Select(p=>new {
+                Name=p.ParameterName,
+                Value=p.Value is DataTable table?(object)new {
+                    Columns=table.Columns.Cast<DataColumn>().Select(c=>c.ColumnName).ToArray(),
+                    Rows=table.Rows.Cast<DataRow>().Select(r=>r.ItemArray.Select(v=>v is DBNull?null:v).ToArray()).ToArray()
+                }:p.Value is DBNull?null:p.Value
+            });
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new{User=user,Placement=placement,Quote=quote,Values=values}))));
+    }
+    private static string Scope(SqlConnection connection)
+    {
+        using var command=new SqlCommand("SELECT TRY_CONVERT(uniqueidentifier,value) FROM sys.extended_properties WHERE class=0 AND major_id=0 AND minor_id=0 AND name=N'FMSC_QuickRegistrationScope';",connection);
+        if(command.ExecuteScalar() is not Guid scope||scope==Guid.Empty)
+            throw new InvalidDataException("The database recovery identity is missing. Verify migration 4 before registering students.");
+        return Convert.ToHexString(SHA256.HashData(scope.ToByteArray()));
+    }
+    internal static Task<string> GetScopeAsync()=>Task.Run(()=>{
+        using var connection=DatabaseHelper.GetConnection();DatabaseHelper.OpenConnection(connection);return Scope(connection);
+    });
+    private static void LockRequest(SqlConnection connection,SqlTransaction transaction,Guid id,bool readOnly)
+    {
+        using var command=new SqlCommand("""
+            DECLARE @Result int;
+            EXEC @Result=sys.sp_getapplock @Resource=@Resource,@LockMode=@Mode,@LockOwner=N'Transaction',@LockTimeout=8000;
+            IF @Result<0 THROW 57510,'The registration request is still being processed. Wait, then check its save outcome again.',1;
+            """,connection,transaction){CommandTimeout=12};
+        command.Parameters.Add(new SqlParameter("@Resource",SqlDbType.NVarChar,255){Value="FMSC.QuickRegistration."+id.ToString("D")});
+        command.Parameters.Add(new SqlParameter("@Mode",SqlDbType.NVarChar,32){Value=readOnly?"Shared":"Exclusive"});command.ExecuteNonQuery();
+    }
+    private static SavedQuickRegistration? ReadRequest(SqlConnection connection,SqlTransaction transaction,QuickRegistrationRecoveryJournal.Pending request)
+    {
+        using var command=new SqlCommand("""
+            SELECT R.UserId,R.PayloadHash,S.AdmissionId,S.QuickReference FROM dbo.QuickRegistrationRequests R
+            JOIN dbo.Students S ON S.AdmissionId=R.AdmissionId WHERE R.RequestId=@Request;
+            """,connection,transaction);
+        command.Parameters.Add(new SqlParameter("@Request",SqlDbType.UniqueIdentifier){Value=request.Id});
+        using var reader=command.ExecuteReader();if(!reader.Read())return null;
+        if(reader.GetInt32(0)!=request.UserId||!((byte[])reader[1]).SequenceEqual(Convert.FromHexString(request.PayloadHash)))
+            throw new InvalidOperationException("The registration request belongs to different saved details. Keep its recovery record for administrator review.");
+        var result=new SavedQuickRegistration(reader.GetInt32(2),reader.GetString(3));
+        if(result.Id<=0||string.IsNullOrWhiteSpace(result.Reference))throw new InvalidDataException("The saved registration identity could not be verified.");
+        return result;
+    }
+    internal static Task<SavedQuickRegistration?> CheckSaveAsync(QuickRegistrationRecoveryJournal.Pending request)
+    {
+        int user=CurrentUser.UserId;QuickRegistrationRecoveryJournal.Validate(request);
+        return Task.Run(()=>{
+            using var connection=DatabaseHelper.GetConnection();DatabaseHelper.OpenConnection(connection);
+            if(Scope(connection)!=request.Scope)throw new InvalidOperationException("Reconnect to the database used for this registration before checking its save outcome.");
+            using var transaction=connection.BeginTransaction();
+            using var access=new SqlCommand("""
+                EXEC dbo.RequirePermission @UserId,N'Students.View';
+                IF @UserId<>@Owner EXEC dbo.RequirePermission @UserId,N'System.Administration';
+                """,connection,transaction);
+            access.Parameters.AddRange(new[]{DatabaseHelper.Int("@UserId",user),DatabaseHelper.Int("@Owner",request.UserId)});access.ExecuteNonQuery();
+            // A missing marker is final only after the original request releases
+            // its transaction lock. A timeout/offline check never authorizes retry.
+            LockRequest(connection,transaction,request.Id,true);
+            var saved=ReadRequest(connection,transaction,request);transaction.Commit();return saved;
         });
+    }
+    internal static Task<SavedQuickRegistration> SaveNewAsync(QuickRegistrationRecoveryJournal.Pending request,int placement, string expectedQuote, params SqlParameter[] parameters)
+        =>SaveNewAsync(request,placement,expectedQuote,null,parameters);
+    // The commit delegate permits native failure injection after an actual commit;
+    // the application uses the overload above and the normal SQL transaction commit.
+    internal static Task<SavedQuickRegistration> SaveNewAsync(QuickRegistrationRecoveryJournal.Pending request,int placement,string expectedQuote,
+        Action<SqlTransaction>? commit,params SqlParameter[] parameters)
+    {
+        int user=CurrentUser.UserId;QuickRegistrationRecoveryJournal.Validate(request);
+        if(request.UserId!=user||request.PayloadHash!=PayloadHash(user,placement,expectedQuote,parameters))
+            throw new InvalidOperationException("The registration draft changed after its save request was prepared. Check Save Outcome before continuing.");
+        return Task.Run(()=>{
+            using var connection=DatabaseHelper.GetConnection();DatabaseHelper.OpenConnection(connection);
+            if(Scope(connection)!=request.Scope)throw new InvalidOperationException("The registration database changed before saving. Reconnect and check the save outcome.");
+            using var transaction=connection.BeginTransaction(IsolationLevel.Serializable);
+            var state=new SaveTransaction(transaction,commit);
+            var outcome=QuickRegistrationSaveCoordinator.Execute(state,()=>{
+                using var access=new SqlCommand("EXEC dbo.RequirePermission @UserId,N'Students.Admit'; EXEC dbo.RequirePermission @UserId,N'Students.View';",connection,transaction);
+                access.Parameters.Add(DatabaseHelper.Int("@UserId",user));access.ExecuteNonQuery();
+                LockRequest(connection,transaction,request.Id,false);
+                if(ReadRequest(connection,transaction,request) is { } prior)return prior;
+                using var check = new SqlCommand("EXEC dbo.RequirePermission @UserId,N'Students.Admit';\n"+FeeQuery,connection,transaction);
+                check.Parameters.AddRange(new[] { DatabaseHelper.Int("@UserId",user),DatabaseHelper.Int("@Placement",placement) });
+                var current = new DataTable();
+                using (var adapter = new SqlDataAdapter(check)) adapter.Fill(current);
+                if (Quote(current)!=expectedQuote)
+                    throw new InvalidOperationException("The class fees have changed. Choose the placement again to review the current fees before saving.");
+                using var command=new SqlCommand("AdmitStudent",connection,transaction){CommandType=CommandType.StoredProcedure,CommandTimeout=120};
+                command.Parameters.AddRange(parameters.Where(p=>!p.ParameterName.Equals("@UserId",StringComparison.OrdinalIgnoreCase))
+                    .Select(p=>(SqlParameter)((ICloneable)p).Clone()).ToArray());
+                command.Parameters.Add(DatabaseHelper.Int("@UserId",user));
+                state.SubmissionStarted=true;
+                using var result=new DataSet();using(var adapter=new SqlDataAdapter(command))adapter.Fill(result);
+                var saved=QuickRegistrationSaveCoordinator.ReadResponse(result);
+                using var marker=new SqlCommand("INSERT dbo.QuickRegistrationRequests(RequestId,UserId,PayloadHash,AdmissionId) VALUES(@Request,@User,@Hash,@Admission);",connection,transaction);
+                marker.Parameters.AddRange(new[]{new SqlParameter("@Request",SqlDbType.UniqueIdentifier){Value=request.Id},
+                    DatabaseHelper.Int("@User",user),new SqlParameter("@Hash",SqlDbType.Binary,32){Value=Convert.FromHexString(request.PayloadHash)},DatabaseHelper.Int("@Admission",saved.Id)});
+                marker.ExecuteNonQuery();return saved;
+            });
+            if(outcome.Outcome==QuickRegistrationWriteOutcome.Saved)return outcome.Student!;
+            if(outcome.Outcome==QuickRegistrationWriteOutcome.Unconfirmed)throw new QuickRegistrationOutcomeUnknownException(outcome.Error!);
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(outcome.Error!).Throw();throw new InvalidOperationException();
+        });
+    }
+    private sealed class SaveTransaction(SqlTransaction transaction,Action<SqlTransaction>? commit):IQuickRegistrationTransaction
+    {
+        public bool SubmissionStarted{get;set;}
+        public void Commit(){if(commit is null)transaction.Commit();else commit(transaction);}
+        public void Rollback()=>transaction.Rollback();
     }
 
     internal static Task<DataSet> SavePendingAsync(int admission, string expectedSnapshot, params SqlParameter[] parameters)

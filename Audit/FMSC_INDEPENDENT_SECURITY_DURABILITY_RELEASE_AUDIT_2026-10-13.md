@@ -709,3 +709,92 @@ permissions, schema, migrations and DACPAC are retained. Application and Windows
 smoke-harness builds pass with zero warnings/errors; all 602 existing portable
 checks pass. No new label-only test suite or SQL migration is added. Windows
 visual/DPI verification of the longer captions remains acceptance work.
+
+
+## 16. Quick Registration interrupted-save recovery — implemented 13 October 2026
+
+**Confirmed source gap:** the new-registration Save catch restored a usable new
+form after any write exception, including a lost outer-transaction commit reply.
+The earlier successful-save refresh guard only ran once an ID had been returned;
+retrying an uncertain new save could submit the child again.
+
+**Implemented:** an exact request GUID, actor, database-scope digest and payload
+hash accompany each new save. `Migrations/4.sql` adds the small
+QuickRegistrationRequests table with primary/unique keys and student/user foreign
+keys. The existing admission procedure and the request marker commit together in
+the C# outer transaction. Procedure signatures, fees and admission rules are
+unchanged. A repeated identical request returns its original identity, and an
+actor/payload mismatch is rejected. A malformed response cannot commit.
+
+The commit coordinator distinguishes confirmed success, confirmed rejection and
+unconfirmed commit/rollback. It never automatically retries a write. Recovery
+uses an indexed lookup by the exact request, after acquiring a shared request
+lock; an unfinished writer or timeout cannot become a false "not saved" result.
+The writer takes the same lock exclusively. Recovery requires student viewing;
+checking another operator's request also requires Administrator authority.
+Migration 4 also creates a persistent database recovery GUID. Startup validates
+its type/nonempty value; scope survives aliases/restarts and rejects another
+database identity even under the same connection name. Migration rollback undoes
+this identity, and an idempotent rerun preserves it.
+
+A small exclusive local intent is flushed before submission and survives page
+closure or process restart. The intent contains a short student/parent/date
+summary and hashes, not credentials, full input, connection strings or photos.
+The form blocks further save/new-family/sibling/parent/payment/bill actions until
+resolution. It automatically checks on reopening and exposes **Check Save
+Outcome** for failed checks. Confirmed saves are loaded before clearing recovery;
+a failed refresh or journal-clear failure retains recovery. Current input stays
+on-screen after rejected saves. Following a restart and confirmed absence, staff
+may need to re-enter the draft. Corrupt journals are retained for review.
+
+Application and installer now require **schema version 4**. Migration 4 must
+follow migration 3. Runtime checks merge an additive migrated-schema definition
+with the reviewed artifact inventory. The owner supplied an updated version-3
+DACPAC at `51abb13` while this change was in progress; its review is recorded below. Native checks prove version 4 with missing request
+uniqueness is refused. Request metadata adds small fixed-size SQL rows and a tiny
+local file, with no timers/polling; low-end RAM/CPU measurements remain acceptance
+work.
+
+**Verification:** **636 portable checks** pass, including 34 new exact-result,
+commit/rollback and durable-journal checks. **51 production SQL checks** pass on
+a disposable SQL Server 2022 publication of the latest version-3 DACPAC plus
+migration 4. These exercise an actual server commit followed by an injected lost reply;
+exact recovery; sequential/concurrent duplicate-request refusal; payload/scope
+and other-operator denial; Administrator recovery; student/marker/fee/enrollment/
+charge/family/audit rollback together; deliberate retry after confirmed rollback;
+recovery while a SQL request lock is held; typed discounts and startup rejection
+of a missing recovery uniqueness safeguard.
+
+A separate version-3 DACPAC copy passes **9 migration checks**: older-version
+refusal, injected final-version failure, atomic DDL/version rollback, successful
+version 4, two trusted foreign keys/two uniqueness safeguards, idempotence, exact
+preservation of school/accounts data and final application structural validation.
+The **16 artifact/catalog tests** pass. App, smoke and historical administration
+harnesses build cleanly. New native GUI recovery guards are compiled but unrun on
+Linux; actual Windows disconnection, file permissions, keyboard/DPI and restart
+acceptance remain required. Task-created SQL containers and credentials are
+removed after verification; no live school MDF/LDF is modified.
+
+
+### Latest owner DACPAC review incorporated during this change
+
+GitHub commit `51abb13` replaced the DACPAC. Native DacFx publication verifies
+its data includes version 3, exactly Administrator/Accountant, 28 definitions
+matching PermissionCatalog, Accountant's six preserved grants and normalized
+Administrator membership. All 273 module identities are retained. Exactly seven
+module fingerprints changed: AddStudentSibling, BootstrapFirstAdministrator,
+GetPermissions, RequireAnyPermission, SaveRolePermissions, SaveRole and SaveUser.
+Each new body exactly matches the corresponding approved migration-3 script;
+parameter/table/index/constraint inventory remains compatible. The only other
+model-element differences are LastValue identity annotations in AuditLogs,
+DatabaseBackups and DatabaseVersion. Package ZIP/model integrity and contract
+checks pass. Approved provenance/fingerprints and the base contract package hash
+are synchronized after this review, not silently accepted before inspection.
+
+- Package SHA-256: `0afe32d41a914b348b67d248b31ed50e86b21bbfcde17dd374d14df9e2ee8267`
+- Model SHA-256: `bf0ee32940ec650bce0e7cde001bc2d6fb8022a84c8b2aecf484e255774e2888`
+
+The 51 recovery/QR SQL checks and nine migration checks are rerun on fresh copies
+of this latest artifact. The new request table is absent in the supplied snapshot;
+apply migration 4 before using the updated application. Earlier source reports
+refer to the older version-2 snapshot as historical evidence.

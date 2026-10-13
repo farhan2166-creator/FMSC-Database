@@ -15,11 +15,23 @@ DataTable Query(string sql,params SqlParameter[] parameters)
     using var c=DatabaseHelper.GetConnection();c.Open();using var q=new SqlCommand(sql,c){CommandTimeout=120};q.Parameters.AddRange(parameters);
     var t=new DataTable();using var a=new SqlDataAdapter(q);a.Fill(t);return t;
 }
+if(args.Contains("--migration-4"))
+{
+    string Resource(string name){using var input=typeof(QuickRegistrationSaveCoordinator).Assembly.GetManifestResourceStream(name)!;using var reader=new StreamReader(input);return reader.ReadToEnd();}
+    using var connection=DatabaseHelper.GetConnection();connection.Open();
+    connection.InfoMessage+=(_,message)=>Console.WriteLine(message.Message);
+    using var command=new SqlCommand(Resource("Migration4Checks.sql"),connection){CommandTimeout=120};
+    command.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource("Migration4.sql")});command.ExecuteNonQuery();
+    DatabaseCompatibility.Validate(connection);
+    Console.WriteLine("PASS: application startup contract validates migration 4's additive table, columns, uniqueness and foreign keys");
+    Console.WriteLine("PASS: 9 migration-4 durability and compatibility checks on a disposable version-3 database.");
+    return;
+}
 int checks=0;
 void Assert(bool ok,string label){if(!ok)throw new Exception(label);Console.WriteLine("PASS: "+label);checks++;}
 async Task Refused(Func<Task> action,string label)
 {try{await action();}catch(InvalidOperationException e) when(e.Message.Contains("changed",StringComparison.OrdinalIgnoreCase)){Console.WriteLine("PASS: "+label);checks++;return;}throw new Exception("Expected stale-state refusal: "+label);}
-Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="3","migration 3 installed on clone");
+Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="4","migration 4 installed on clone");
 using(var compatible=DatabaseHelper.GetConnection()){
     compatible.Open();DatabaseCompatibility.Validate(compatible);
     Assert(true,"production startup/restore compatibility contract accepts migrated schema");
@@ -75,6 +87,10 @@ SqlParameter[] AdmissionArgs(DataTable rates)=>new[]{
     DatabaseHelper.P("@Religion",null),DatabaseHelper.P("@BloodGroup",null),DatabaseHelper.P("@AlternateContactNumber",null),
     DatabaseHelper.P("@PreviousSchool",null),DatabaseHelper.P("@FatherOccupation",null)
 };
+string scope=await QuickRegistrationWriter.GetScopeAsync();
+QuickRegistrationRecoveryJournal.Pending Intent(int place,string quoted,SqlParameter[] arguments)=>new(Guid.NewGuid(),CurrentUser.UserId,scope,
+    QuickRegistrationWriter.PayloadHash(CurrentUser.UserId,place,quoted,arguments),"Disposable QR fixture",DateTime.UtcNow);
+Task<SavedQuickRegistration> SaveNew(int place,string quoted,SqlParameter[] arguments)=>QuickRegistrationWriter.SaveNewAsync(Intent(place,quoted,arguments),place,quoted,arguments);
 var rates=Rates();string quote=QuickRegistrationQuote.Create(rates);
 int before=Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0]);
 var rate=Query("SELECT TOP(1) C.FeeConfigurationId,C.Amount FROM dbo.FeeConfigurations C JOIN dbo.CampusClassSections P ON P.CampusId=C.CampusId AND P.ClassId=C.ClassId WHERE P.ClassSectionId=@Placement ORDER BY C.FeeConfigurationId",DatabaseHelper.Int("@Placement",placement)).Rows[0];
@@ -93,11 +109,11 @@ using(var locked=DatabaseHelper.GetConnection()){
     transaction.Rollback();
 }
 Query("UPDATE dbo.FeeConfigurations SET Amount=Amount+1 WHERE FeeConfigurationId=@Id",DatabaseHelper.Int("@Id",rateId));
-await Refused(async()=>{await QuickRegistrationWriter.SaveNewAsync(placement,quote,AdmissionArgs(rates));},"stale fee quote rejected by production writer");
+await Refused(async()=>{await SaveNew(placement,quote,AdmissionArgs(rates));},"stale fee quote rejected by production writer");
 Assert(Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0])==before,"stale quote creates no student");
 Query("UPDATE dbo.FeeConfigurations SET Amount=@Amount WHERE FeeConfigurationId=@Id",DatabaseHelper.P("@Amount",rate["Amount"]),DatabaseHelper.Int("@Id",rateId));
-rates=Rates();var results=await QuickRegistrationWriter.SaveNewAsync(placement,QuickRegistrationQuote.Create(rates),AdmissionArgs(rates));
-int admission=Convert.ToInt32(results.Tables.Cast<DataTable>().Last(t=>t.Columns.Contains("AdmissionId")&&t.Columns.Contains("QuickReference")&&t.Rows.Count>0).Rows[0]["AdmissionId"]);
+rates=Rates();var results=await SaveNew(placement,QuickRegistrationQuote.Create(rates),AdmissionArgs(rates));
+int admission=results.Id;
 var listed=Query(AdmissionReviewSql.Query,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Bit("@Pending",true));
 Assert(listed.AsEnumerable().Any(r=>Convert.ToInt32(r["AdmissionId"])==admission),"production pending list includes eligible QR");
 var roleFixture=Query("""
@@ -160,8 +176,8 @@ async Task<int> NewChild(int? sibling=null)
 {
     var current=Rates();var parameters=AdmissionArgs(current);
     parameters.Single(p=>p.ParameterName=="@FamilyStudentId").Value=(object?)sibling??DBNull.Value;
-    var result=await QuickRegistrationWriter.SaveNewAsync(placement,QuickRegistrationQuote.Create(current),parameters);
-    return Convert.ToInt32(result.Tables.Cast<DataTable>().Last(t=>t.Columns.Contains("AdmissionId")&&t.Rows.Count>0).Rows[0]["AdmissionId"]);
+    var result=await SaveNew(placement,QuickRegistrationQuote.Create(current),parameters);
+    return result.Id;
 }
 int anchor=await NewChild();
 var selectable=Query("EXEC dbo.GetStudents @UserId=@UserId,@CampusId=0,@AcademicYearId=0,@IncludeFormerStudents=1;",DatabaseHelper.Int("@UserId",CurrentUser.UserId));
@@ -214,4 +230,81 @@ Query("UPDATE dbo.Students SET Status=N'Cancelled' WHERE AdmissionId=@Id",Databa
 var cancelled=await QuickRegistrationWriter.LoadAsync(admission);
 try{await QuickRegistrationWriter.ChangeFamilyAsync(admission,cancelled.Snapshot,null);throw new Exception("Cancelled QR was unlinked");}
 catch(InvalidOperationException e) when(e.Message.Contains("pending or active")){Assert(true,"cancelled students cannot change parent links from Quick Registration");}
+var discountRates=Rates();var discountArgs=AdmissionArgs(discountRates);
+var discountedFee=discountRates.AsEnumerable().First(r=>Convert.ToBoolean(r["IsMandatory"])&&Convert.ToDecimal(r["Amount"])>=100m);
+discountArgs.Single(p=>p.ParameterName=="@AdmissionDiscounts").Value=Tvp.AdmissionFeeDiscounts(new[]{(Convert.ToInt32(discountedFee["FeeTypeId"]),100m)});
+var discounted=await SaveNew(placement,QuickRegistrationQuote.Create(discountRates),discountArgs);
+Assert((await QuickRegistrationWriter.LoadAsync(discounted.Id)).Fees.AsEnumerable().Any(r=>Convert.ToInt32(r["FeeTypeId"])==Convert.ToInt32(discountedFee["FeeTypeId"])&&Convert.ToDecimal(r["Discount"])==100m),
+    "discounted registrations retain typed fee discounts and one valid saved identity");
+// An actual server commit followed by a synthetic lost reply exercises the same
+// writer/transaction coordinator used by the application, not a name heuristic.
+var recoveryRates=Rates();string recoveryQuote=QuickRegistrationQuote.Create(recoveryRates);
+var recoveryArgs=AdmissionArgs(recoveryRates);var request=Intent(placement,recoveryQuote,recoveryArgs);
+int countBefore=Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0]);
+try{
+    await QuickRegistrationWriter.SaveNewAsync(request,placement,recoveryQuote,transaction=>{transaction.Commit();throw new IOException("Injected lost commit reply");},recoveryArgs);
+    throw new Exception("Lost commit reply reported success");
+}catch(QuickRegistrationOutcomeUnknownException){Assert(true,"lost reply after actual SQL commit reports an unconfirmed outcome");}
+var verified=await QuickRegistrationWriter.CheckSaveAsync(request);
+Assert(verified is not null&&Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0])==countBefore+1,"exact request recovery finds the single committed student");
+var repeated=await QuickRegistrationWriter.SaveNewAsync(request,placement,recoveryQuote,recoveryArgs);
+Assert(repeated==verified&&Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0])==countBefore+1,"repeating the same request returns the original identity without duplicating student or fees");
+var changedArgs=AdmissionArgs(recoveryRates);
+try{await QuickRegistrationWriter.SaveNewAsync(request,placement,recoveryQuote,changedArgs);throw new Exception("Request identity reused for another payload");}
+catch(InvalidOperationException){Assert(true,"the same request cannot be reused with changed student details");}
+try{await QuickRegistrationWriter.CheckSaveAsync(request with{Scope=new string('A',64)});throw new Exception("Wrong database scope accepted");}
+catch(InvalidOperationException){Assert(true,"recovery refuses a different database scope");}
+Guid databaseIdentity=(Guid)Query("SELECT CONVERT(uniqueidentifier,value) FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_QuickRegistrationScope';").Rows[0][0];
+Query("DECLARE @Scope uniqueidentifier=NEWID(); EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@Scope;");
+try{
+    try{await QuickRegistrationWriter.CheckSaveAsync(request);throw new Exception("Changed database identity accepted");}
+    catch(InvalidOperationException){Assert(true,"a different database identity is refused even with the same connection name");}
+}finally{Query("EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@Scope;",new SqlParameter("@Scope",SqlDbType.UniqueIdentifier){Value=databaseIdentity});}
+Assert(await QuickRegistrationWriter.GetScopeAsync()==scope,"reopening connections preserves the database's recovery identity");
+int recoveryActor=CurrentUser.UserId;
+try{
+    CurrentUser.UserId=limitedUser;
+    var limitedArgs=AdmissionArgs(recoveryRates);var limitedRequest=Intent(placement,recoveryQuote,limitedArgs);
+    var limitedSaved=await QuickRegistrationWriter.SaveNewAsync(limitedRequest,placement,recoveryQuote,limitedArgs);
+    CurrentUser.UserId=recoveryActor;
+    Assert(await QuickRegistrationWriter.CheckSaveAsync(limitedRequest)==limitedSaved,"Administrator can recover another operator's exact saved request");
+}finally{CurrentUser.UserId=recoveryActor;}
+
+try{
+    CurrentUser.UserId=limitedUser;
+    try{await QuickRegistrationWriter.CheckSaveAsync(request);throw new Exception("Another user's intent exposed to a limited role");}
+    catch(SqlException e) when(e.Number==50003){Assert(true,"another user's recovery requires Administrator authority");}
+}finally{CurrentUser.UserId=recoveryActor;}
+var concurrentArgs=AdmissionArgs(recoveryRates);var concurrentRequest=Intent(placement,recoveryQuote,concurrentArgs);
+int beforeConcurrent=Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0]);
+var concurrent=await Task.WhenAll(QuickRegistrationWriter.SaveNewAsync(concurrentRequest,placement,recoveryQuote,concurrentArgs),
+    QuickRegistrationWriter.SaveNewAsync(concurrentRequest,placement,recoveryQuote,concurrentArgs));
+Assert(concurrent[0]==concurrent[1]&&Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0])==beforeConcurrent+1,"concurrent copies of one request create exactly one student");
+var failedArgs=AdmissionArgs(recoveryRates);var failedRequest=Intent(placement,recoveryQuote,failedArgs);
+int beforeFailed=Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0]);
+string WriteCounts()=>Convert.ToString(Query("SELECT (SELECT COUNT(*) FROM dbo.Enrollments) E,(SELECT COUNT(*) FROM dbo.StudentFeeAssignments) A,(SELECT COUNT(*) FROM dbo.BillingCharges) B,(SELECT COUNT(*) FROM dbo.Families) F,(SELECT COUNT(*) FROM dbo.FamilyMembers) M,(SELECT COUNT(*) FROM dbo.AuditLogs) L FOR JSON PATH;").Rows[0][0])!;
+string beforeFailedCounts=WriteCounts();
+Query("CREATE TRIGGER dbo.FMSC_QR_FailMarker ON dbo.QuickRegistrationRequests AFTER INSERT AS BEGIN SET NOCOUNT ON; THROW 57599,'Injected marker failure',1; END;");
+try{
+    try{await QuickRegistrationWriter.SaveNewAsync(failedRequest,placement,recoveryQuote,failedArgs);throw new Exception("Marker failure committed a student");}
+    catch(Exception e) when(e is QuickRegistrationOutcomeUnknownException||e is SqlException sql&&sql.Number==57599){Assert(true,"marker failure is surfaced for recovery");}
+}finally{Query("DROP TRIGGER dbo.FMSC_QR_FailMarker;");}
+Assert(await QuickRegistrationWriter.CheckSaveAsync(failedRequest) is null&&Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0])==beforeFailed,
+    "student and marker roll back together; exact negative recovery permits a deliberate retry");
+Assert(WriteCounts()==beforeFailedCounts,"marker failure also rolls back enrollments, fee assignments, charges, families and audit rows");
+var failedRetried=await QuickRegistrationWriter.SaveNewAsync(failedRequest,placement,recoveryQuote,failedArgs);
+Assert(failedRetried.Id>0&&Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0])==beforeFailed+1,"a confirmed rolled-back request can be deliberately retried once");
+using(var c=DatabaseHelper.GetConnection()){
+    c.Open();using var transaction=c.BeginTransaction();
+    using var held=new SqlCommand("DECLARE @Result int; EXEC @Result=sys.sp_getapplock @Resource=@Resource,@LockMode=N'Exclusive',@LockOwner=N'Transaction'; IF @Result<0 THROW 57598,'Fixture lock failed',1;",c,transaction);
+    held.Parameters.Add(new SqlParameter("@Resource",SqlDbType.NVarChar,255){Value="FMSC.QuickRegistration."+failedRequest.Id.ToString("D")});held.ExecuteNonQuery();
+    try{await QuickRegistrationWriter.CheckSaveAsync(failedRequest);throw new Exception("In-flight request incorrectly finalized");}
+    catch(SqlException e) when(e.Number==57510){Assert(true,"a request still locked in SQL remains unresolved, rather than reporting not saved");}
+    transaction.Rollback();
+}
+Query("ALTER TABLE dbo.QuickRegistrationRequests DROP CONSTRAINT UQ_QuickRegistrationRequests_AdmissionId;");
+try{
+    try{using var missing=DatabaseHelper.GetConnection();missing.Open();DatabaseCompatibility.Validate(missing);throw new Exception("Missing request uniqueness passed startup");}
+    catch(DatabaseCompatibilityException){Assert(true,"startup rejects a version-4 database missing the new recovery uniqueness safeguard");}
+}finally{Query("ALTER TABLE dbo.QuickRegistrationRequests ADD CONSTRAINT UQ_QuickRegistrationRequests_AdmissionId UNIQUE(AdmissionId);");}
 Console.WriteLine($"PASS: {checks} production SQL checks. Fixture remains only in the disposable clone; drop that clone after inspection.");

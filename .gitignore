@@ -318,6 +318,7 @@ Database/*.bak
 /Tests/QuickRegistrationSqlChecks/*
 !/Tests/QuickRegistrationSqlChecks/*.cs
 !/Tests/QuickRegistrationSqlChecks/*.csproj
+!/Tests/QuickRegistrationSqlChecks/Migration4Checks.sql
 /Tests/PerformanceChecks/*
 !/Tests/PerformanceChecks/*.cs
 !/Tests/PerformanceChecks/*.csproj

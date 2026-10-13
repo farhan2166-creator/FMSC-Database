@@ -64,6 +64,7 @@
 	</ItemGroup>
 	<ItemGroup>
 		<EmbeddedResource Include="Core\DatabaseCompatibilityRequirements.json" />
+		<EmbeddedResource Include="Core\DatabaseMigrationRequirements.json" />
 		<EmbeddedResource Include="Core\PermissionCatalog.json" LogicalName="FMSC_SMS.Core.PermissionCatalog.json" />
 		<EmbeddedResource Include="Pages\Students\Admissions\PlacementCorrection.sql" />
 	</ItemGroup>

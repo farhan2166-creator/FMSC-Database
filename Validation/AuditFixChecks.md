@@ -51,8 +51,8 @@ pwsh -NoProfile -File Installer/VerifySchemaArtifact.ps1 -ProjectDirectory .
 2. Run `Migrations/2.sql` on the clone. It locks/preflights monetary tables and
    aborts atomically if any stored amount is fractional. It does not round or
    clean existing data. Only a successful complete migration records version 2.
-   Then apply `Migrations/3.sql`; the current harness requires version 3 and the
-   consistent `Students.Administer` family-maintenance guard.
+   Then apply `Migrations/3.sql` and `Migrations/4.sql`; the current harness requires
+   version 4, the consistent family-maintenance guard and save-request recovery.
 3. Confirm the clone has a current academic year, a usable class placement,
    complete mandatory fee configurations and an Administrator user.
 4. In Windows PowerShell, set a connection to the clone and run the harness:
@@ -228,7 +228,7 @@ a deployed speed improvement. No additional SQL migration is needed for themes.
 
 ## Quick Registration family and entry-flow verification
 
-Current portable count: **602**, including nine additional checks for verified
+Portable count at the family-flow change: **602**, including nine additional checks for verified
 family IDs/counts and rejection of missing/inconsistent family context, plus
 eight student/family bill identity, grouping and monetary-preservation checks.
 The production QuickRegistration SQL harness passes **34 checks** against an
@@ -250,3 +250,63 @@ heading, same-name sibling grouping and monetary-preservation checks.
 It compiles cleanly here; native GUI execution remains unrun on Linux. Manually
 verify the unsaved-discard confirmation keeps the draft when No is selected and
 that parent actions/search remain visible at supported window sizes and DPI.
+
+
+## Quick Registration lost-reply recovery (schema version 4)
+
+Current results: **636 portable checks**, **51 production Quick Registration SQL
+checks**, **9 migration-4 checks**, and **16 artifact/catalog tests**. App and
+Windows smoke builds have no warnings/errors; native GUI checks remain unrun here.
+
+Apply `Migrations/4.sql` after version 3, with the established verified backup and
+closed application sessions. Application and installer now require version 4.
+The latest DACPAC at `51abb13` is now independently reviewed as version 3. Startup merges its
+base inventory with `Core/DatabaseMigrationRequirements.json`, checking the new
+table/columns, both uniqueness safeguards, trusted foreign keys and a persistent
+database recovery GUID. This GUID survives reconnects/restarts and avoids treating
+a different installation with the same connection name as the original database. A version-4
+label alone cannot satisfy this new structural contract. The artifact verifier
+continues checking the actual supplied artifact without inventing a new baseline.
+
+Each new save has an exact request GUID and normalized payload hash. A tiny local
+intent is flushed before submission; SQL commits student, fees and request marker
+in one transaction. Recovery reads that exact request; it never repeats a write
+or searches by possibly duplicated student names. A transaction-scoped request
+lock prevents a check from reporting absence while that request is still running.
+A confirmed absence unlocks a deliberate new save. Offline/timeout/permission/
+corrupt-journal cases remain blocked and retain recovery. The form keeps the
+intent until the saved record is loaded, including after app/page restart.
+It retains current input on failure; the journal stores a short summary, not a
+complete draft or photos. Restart after confirmed absence may require re-entry.
+
+Normal use needs no extra click. **Check Save Outcome** appears during recovery.
+Save, new/sibling drafts, linking, payment and printing wait for resolution.
+The originating operator can check their request; Administrator can check another
+operator's request. A different database scope or payload cannot silently reuse
+an intent. Do not delete `PendingQuickRegistration.json` or SQL request markers
+as a routine way to enable retry; unresolved/corrupt intents require administrator
+review. No recurring timers or background polling are added.
+
+For migration refusal/rollback/idempotence, use a separate disposable version-3
+copy (request table absent) and run:
+
+```powershell
+$env:FMSC_AUDIT_CONNECTION='Server=(localdb)\MSSQLLocalDB;Database=FMSC_AuditChecks_qr_migration;Integrated Security=true;TrustServerCertificate=true'
+dotnet run --project Tests/QuickRegistrationSqlChecks -- --migration-4
+Remove-Item Env:FMSC_AUDIT_CONNECTION
+```
+
+The embedded migration test intentionally changes this guarded disposable clone,
+uses a final-version trigger failure, checks existing record preservation and
+validates the final application contract. The normal SQL harness additionally
+injects a lost reply after an actual commit, runs two concurrent identical
+requests, fails marker insertion and tests recovery while a request lock is held.
+It checks typed discounts, Administrator recovery and refusal of a database with
+a missing recovery uniqueness safeguard. All fixtures stay in the disposable
+clone; remove it after inspection. Historical migration-3 administration tests
+retain their separately scoped version-3 compatibility check.
+
+On Windows, verify automatic recovery on reopening, Check Save Outcome keyboard
+access, close/reopen with offline SQL, successful save followed by refresh failure,
+locked/corrupt recovery storage, sign-out/session changes and a real disconnect
+around commit. Run the smoke suite in a disposable Windows profile.

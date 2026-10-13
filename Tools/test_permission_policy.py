@@ -54,8 +54,14 @@ class PermissionPolicyChecks(unittest.TestCase):
         self.assertEqual(self.codes, sql_codes | cs_codes)
 
     def test_application_and_installer_require_migration_version(self):
-        self.assertIn('RequiredDatabaseSchemaVersion = "3"', (ROOT/'DatabaseHelper.cs').read_text())
-        self.assertRegex((ROOT/'Installer/core.ps1').read_text(), r"\$DatabaseVersion = '3'")
+        application = re.search(r'RequiredDatabaseSchemaVersion = "(\d+)"', (ROOT/'DatabaseHelper.cs').read_text())
+        installer = re.search(r"\$DatabaseVersion = '(\d+)'", (ROOT/'Installer/core.ps1').read_text())
+        self.assertIsNotNone(application)
+        self.assertIsNotNone(installer)
+        required = int(application.group(1))
+        self.assertGreaterEqual(required, 3)
+        self.assertEqual(int(installer.group(1)), required)
+        self.assertEqual(max(int(path.stem) for path in (ROOT/'Migrations').glob('*.sql') if path.stem.isdigit()), required)
         self.assertIn("VALUES(N'3',SYSDATETIME()", self.migration)
 
     def test_metadata_fits_sql_columns(self):

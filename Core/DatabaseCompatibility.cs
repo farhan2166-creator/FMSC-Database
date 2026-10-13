@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+using System.Text.Json.Nodes;
 
 namespace FMSC_SMS.Core;
 
@@ -14,7 +15,24 @@ internal static class DatabaseCompatibility
             ?? throw new DatabaseCompatibilityException(new(DatabaseCompatibilityIssue.ApplicationDefinition,
                 DatabaseHelper.RequiredDatabaseSchemaVersion, Details: "The application's database compatibility definition is missing."));
         using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
+        string baseline=reader.ReadToEnd();
+        // Historical migration-3 harnesses still validate the reviewed v2 shape.
+        if(int.TryParse(DatabaseHelper.RequiredDatabaseSchemaVersion,out int required)&&required<4)return baseline;
+        var definition=JsonNode.Parse(baseline)!.AsObject();
+        // Preserve the reviewed DACPAC inventory while requiring additive features
+        // installed by numbered migrations until the owner supplies a new artifact.
+        using var migrations=typeof(DatabaseCompatibility).Assembly.GetManifestResourceStream(
+            "FMSC_SMS.Core.DatabaseMigrationRequirements.json")
+            ?? throw new DatabaseCompatibilityException(new(DatabaseCompatibilityIssue.ApplicationDefinition,
+                DatabaseHelper.RequiredDatabaseSchemaVersion,Details:"The migrated database compatibility definition is missing."));
+        using var migrationReader=new StreamReader(migrations);
+        foreach(var section in JsonNode.Parse(migrationReader.ReadToEnd())!.AsObject())
+        {
+            var items=(definition[section.Key]??=new JsonArray()).AsArray();
+            foreach(var item in section.Value!.AsArray())
+                if(!items.Any(existing=>JsonNode.DeepEquals(existing,item)))items.Add(item!.DeepClone());
+        }
+        return definition.ToJsonString();
     }
 
     internal static void Validate(SqlConnection connection)
@@ -105,6 +123,13 @@ internal static class DatabaseCompatibility
             WHERE C.column_id IS NULL OR TYPE_NAME(C.user_type_id)<>R.[type]
                 OR C.max_length<>R.maxLength OR C.precision<>R.[precision] OR C.scale<>R.scale
                 OR C.is_nullable<>R.isNullable OR C.is_identity<>R.isIdentity OR C.is_computed<>R.isComputed;
+            INSERT @Problems
+            SELECT CONCAT('Missing/incompatible database recovery identity: ',R.name)
+            FROM OPENJSON(@Requirements,'$.databaseProperties') WITH(name nvarchar(128),[type] nvarchar(128)) R
+            WHERE NOT EXISTS(SELECT 1 FROM sys.extended_properties E WHERE E.class=0 AND E.major_id=0 AND E.minor_id=0
+                AND E.name=R.name AND SQL_VARIANT_PROPERTY(E.value,'BaseType')=R.[type]
+                AND TRY_CONVERT(uniqueidentifier,E.value) IS NOT NULL
+                AND TRY_CONVERT(uniqueidentifier,E.value)<>'00000000-0000-0000-0000-000000000000');
             INSERT @Problems
             SELECT CONCAT('Missing/incompatible parameter: ',R.[schema],'.',R.objectName,' ',R.name)
             FROM OPENJSON(@Requirements,'$.parameters') WITH

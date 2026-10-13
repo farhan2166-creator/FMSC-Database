@@ -37,6 +37,8 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     private readonly Action<Func<Control>, string, string> navigate;
     private readonly Func<int, Task<(DataTable Details, DataTable Fees, string Snapshot)>> loadRegistration;
     private bool applyingRegistration, needsRefresh;
+    private bool recoveryBlocked;
+    private QuickRegistrationRecoveryJournal.Pending? pendingSave;
     private int registrationLoadVersion;
     private readonly StudentPicker family = new();
     private readonly ModernTextBox parent = HumanUi.TextBox(false, 500);
@@ -59,13 +61,13 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     // new registration are selection context, not a student draft. Allow leaving
     // without a discard prompt; entered student details or placement still warn.
     // Existing pending records retain their normal edit tracking.
-    public bool HasUnsavedChanges=>HasPendingChanges||(savedStudent==0&&(name.Text.Trim().Length>0||parent.Text.Trim().Length>0||contact.Text.Trim().Length>0||address.Text.Trim().Length>0||placement.SelectedId>0));
-    public string UnsavedChangesMessage=>"Discard the unsaved registration changes?";
+    public bool HasUnsavedChanges=>recoveryBlocked||HasPendingChanges||(savedStudent==0&&(name.Text.Trim().Length>0||parent.Text.Trim().Length>0||contact.Text.Trim().Length>0||address.Text.Trim().Length>0||placement.SelectedId>0));
+    public string UnsavedChangesMessage=>recoveryBlocked?"A registration save still needs verification. Its recovery record will be retained when you leave. Check Save Outcome when you return; do not register this child again until its outcome is clear.":"Discard the unsaved registration changes?";
     private string familyReference="";
     private string[] savedBasics=Array.Empty<string>();
     private bool busy, loadingFamily, loadingFees, feesLoaded;
     private readonly FormValidator validator;
-    private readonly ModernButton save, next, bill, collect, reload, newFamily;
+    private readonly ModernButton save, next, bill, collect, reload, newFamily, checkSave;
     private readonly ModernButton linkFamily, unlinkFamily;
     private readonly HumanCard registrationCard;
     private readonly TableLayoutPanel registrationContent;
@@ -89,6 +91,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         // screen that must remain disabled until a deliberate reload succeeds.
         save=AddAction("Save Registration", async (_, _) => await SaveAsync(), "Success");
         reload=AddAction("Reload Registration", async (_, _) => { await OpenRegistrationAsync(savedStudent); }, "Secondary");
+        checkSave=AddAction("Check Save Outcome",async(_,_)=>await CheckSaveOutcomeAsync(),"Secondary");
         next=AddAction("Add Another Child", (_,_)=>StartNextDraft(false), "Secondary");
         bill=AddBusyAction("Print Bill", PrintBillAsync, "Secondary");
         collect=AddAction("Collect Payment",(_,_)=>navigate(()=>new FMSC_SMS.Pages.Finance.Collection.FeeCollectionPage(savedStudent),"Fees & Billing","Fee Collection"),"Primary");
@@ -138,8 +141,9 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         family.RowFilter=row=>savedStudent==0||Convert.ToInt32(row["AdmissionId"])!=savedStudent;
         family.SelectionCleared+=(_,_)=>{if(applyingRegistration)return;++familyLoadVersion;if(savedStudent==0){familyAnchor=0;familyReference="";}loadingFamily=false;UpdateActions();};
         placement.SelectedIndexChanged+=async(_,_)=>{if(!applyingRegistration)await LoadFeesAsync();};
-        Load+=async(_,_)=>{await LoadLookupsAsync();if(preselectRegistrationId>0)await LoadRegistrationAsync(preselectRegistrationId);};UpdateActions();
+        Load+=async(_,_)=>{await LoadLookupsAsync();if(recoveryBlocked)await CheckSaveOutcomeAsync(afterSave:true);else if(preselectRegistrationId>0)await LoadRegistrationAsync(preselectRegistrationId);};UpdateActions();
         SetStatus("Enter the student and placement, review the opening fees, then Save Registration. Use Link Existing Parent for another child of the same parent.");
+        ReadRecoveryRecord();UpdateActions();
     }
     private static TableLayoutPanel Fields(params (string Label,Control Input,bool Required,int Span)[] fields)
     {
@@ -162,7 +166,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     }
     private void ToggleFamilySearch()
     {
-        if(IsBusy||needsRefresh||HasPendingChanges||!CurrentUser.HasPermission("Students.Administer"))return;
+        if(IsBusy||recoveryBlocked||needsRefresh||HasPendingChanges||!CurrentUser.HasPermission("Students.Administer"))return;
         ShowFamilyPicker(!familyField.Visible);if(familyField.Visible)family.Focus();
     }
     private async Task LoadLookupsAsync()
@@ -218,7 +222,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     }
     private async Task UnlinkFamilyAsync()
     {
-        if(IsBusy||needsRefresh||HasPendingChanges||!CurrentUser.HasPermission("Students.Administer"))return;
+        if(IsBusy||recoveryBlocked||needsRefresh||HasPendingChanges||!CurrentUser.HasPermission("Students.Administer"))return;
         if(savedStudent==0)
         {
             ++familyLoadVersion;familyAnchor=0;familyReference="";ClearFamilySelection();UpdateActions();
@@ -274,20 +278,21 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         var prepared = QuickRegistrationView.PrepareFees(data);
         rates = prepared; fees.DataSource = prepared;
     }
-    private bool ReadyToSave=>!needsRefresh&&!busy&&!loadingFamily&&!loadingFees&&feesLoaded&&(savedStudent==0||(savedStatus=="Pending"&&savedSnapshot.Length>0))&&(family.SelectedId<=0||family.SelectedId==familyAnchor)
+    private bool ReadyToSave=>!recoveryBlocked&&!needsRefresh&&!busy&&!loadingFamily&&!loadingFees&&feesLoaded&&(savedStudent==0||(savedStatus=="Pending"&&savedSnapshot.Length>0))&&(family.SelectedId<=0||family.SelectedId==familyAnchor)
         &&(savedStudent==0&&familyAnchor==0||CurrentUser.HasPermission("Students.Administer"));
     private string[] BasicValues()=>new[]{name.Text.Trim(),parent.Text.Trim(),contact.Text.Trim(),address.Text.Trim()};
     private bool HasPendingChanges=>savedStudent>0&&savedStatus=="Pending"&&savedBasics.Length==4&&(!savedBasics.SequenceEqual(BasicValues())||rates.AsEnumerable().Any(r=>Convert.ToDecimal(r["Discount"])!=Convert.ToDecimal(r["OriginalDiscount"])));
-    private void PendingEditChanged(){if(applyingRegistration)return;UpdateActions();if(!busy&&HasPendingChanges)SetStatus("Save changes before printing, collecting payment or changing the parent link.");}
-    private void UpdateActions(){save.Enabled=ReadyToSave&&QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!IsBusy&&!needsRefresh&&savedStudent>0&&CurrentUser.HasPermission("Students.Administer");newFamily.Enabled=!IsBusy&&!needsRefresh;bill.Enabled=!IsBusy&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!IsBusy&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.Collect");
-        reload.Visible=savedStudent>0;reload.Enabled=!IsBusy&&savedStudent>0;
-        bool editing=!busy&&!loadingFamily&&!needsRefresh&&(savedStudent==0||savedStatus=="Pending"&&CurrentUser.HasPermission("Students.Administer"));year.Enabled=placement.Enabled=joining.Enabled=editing&&savedStudent==0;
-        bool canLink=!IsBusy&&!needsRefresh&&!HasPendingChanges&&(savedStudent==0||savedStatus is "Pending" or "Active")&&CurrentUser.HasPermission("Students.Administer");
+    private void PendingEditChanged(){if(applyingRegistration)return;UpdateActions();if(!busy&&!recoveryBlocked&&HasPendingChanges)SetStatus("Save changes before printing, collecting payment or changing the parent link.");}
+    private void UpdateActions(){save.Enabled=ReadyToSave&&QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&savedStudent>0&&CurrentUser.HasPermission("Students.Administer");newFamily.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh;bill.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.Collect");
+        checkSave.Visible=recoveryBlocked;checkSave.Enabled=recoveryBlocked&&!IsBusy;
+        reload.Visible=savedStudent>0;reload.Enabled=!IsBusy&&!recoveryBlocked&&savedStudent>0;
+        bool editing=!busy&&!loadingFamily&&!recoveryBlocked&&!needsRefresh&&(savedStudent==0||savedStatus=="Pending"&&CurrentUser.HasPermission("Students.Administer"));year.Enabled=placement.Enabled=joining.Enabled=editing&&savedStudent==0;
+        bool canLink=!IsBusy&&!recoveryBlocked&&!needsRefresh&&!HasPendingChanges&&(savedStudent==0||savedStatus is "Pending" or "Active")&&CurrentUser.HasPermission("Students.Administer");
         family.Enabled=linkFamily.Enabled=canLink;
         unlinkFamily.Enabled=canLink&&(savedStudent==0?familyAnchor>0:savedFamilyMemberId>0);
         name.ReadOnly=contact.ReadOnly=address.ReadOnly=!editing;
         parent.ReadOnly=!editing||familyAnchor>0||loadingFamily;
-        registrationCard.SetHeaderText("Registration Details",savedStudent>0
+        registrationCard.SetHeaderText("Registration Details",recoveryBlocked?"Save recovery pending · Use Check Save Outcome before continuing.":savedStudent>0
             ? $"{familyReference} · "+(savedFamilyMemberCount>1?$"Family: {savedFamilyMemberCount} children · Link or unlink a parent above.":"One child · You can link an existing parent above.")
             : familyAnchor>0?$"Parent linked · {familyReference} · Use Unlink Parent to change it.":"Enter a child, or use Link Existing Parent above.");
         fees.ReadOnly=!editing;
@@ -304,7 +309,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     private void UpdateTotal(){if(applyingRegistration)return;if(!rates.Columns.Contains("Include")){total.Text="Bill Total: Rs. 0";return;}decimal amount=rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["Include"])).Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));total.Text=$"Bill Total: Rs. {amount:N0}";PendingEditChanged();}
     private void StartNextDraft(bool startNewFamily)
     {
-        if(IsBusy||needsRefresh||!fees.EndEdit())return;
+        if(IsBusy||recoveryBlocked||needsRefresh||!fees.EndEdit())return;
         if(!startNewFamily&&!CurrentUser.HasPermission("Students.Administer"))return;
         if(HasUnsavedChanges&&!Confirm("Discard the unsaved registration changes and "+(startNewFamily?"start a new family?":"enter the next child?"),UiText.Dialogs.UnsavedChanges))return;
         if(startNewFamily){familyAnchor=0;familyReference="";ClearFamilySelection();parent.Clear();contact.Clear();address.Clear();}
@@ -313,7 +318,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     }
     private void ClearChild()
     {
-        if(busy)return;
+        if(busy||recoveryBlocked)return;
         // Start a fresh child; only the family link and shared details carry over.
         // Invalidate any previous fee load before clearing the placement.
         ++registrationLoadVersion;++familyLoadVersion;++loadVersion;loadingFamily=false;needsRefresh=false;savedStudent=0;savedFamilyMemberId=savedFamilyMemberCount=0;savedStatus="";savedSnapshot="";expectedQuote="";loadingFees=false;feesLoaded=false;
@@ -348,14 +353,79 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
                 new SqlParameter("@SelectedFeeTypeIds",SqlDbType.Structured){TypeName="dbo.FeeTypeIdList",Value=Tvp.FeeTypeIds(selected.Select(r=>Convert.ToInt32(r["FeeTypeId"])))},
                 new SqlParameter("@AdmissionDiscounts",SqlDbType.Structured){TypeName="dbo.AdmissionFeeDiscountType",Value=Tvp.AdmissionFeeDiscounts(selected.Where(r=>Convert.ToDecimal(r["Discount"])>0).Select(r=>(Convert.ToInt32(r["FeeTypeId"]),Convert.ToDecimal(r["Discount"]))))}};
             foreach(string key in new[]{"DateOfBirth","PlaceOfBirth","Gender","BFormNumber","Religion","BloodGroup","AlternateContactNumber","PreviousSchool","FatherOccupation"})args.Add(DatabaseHelper.P("@"+key,null));
-            // Nested fee operations can return their own result sets first.
-            var results=await QuickRegistrationWriter.SaveNewAsync(placement.SelectedId,expectedQuote,args.ToArray());
-            var result=results.Tables.Cast<DataTable>().Last(t=>t.Columns.Contains("AdmissionId")&&t.Columns.Contains("QuickReference")&&t.Rows.Count>0);
-            int committedId=Convert.ToInt32(result.Rows[0]["AdmissionId"]);
-            string reference=Convert.ToString(result.Rows[0]["QuickReference"])??"";
-            if(string.IsNullOrWhiteSpace(reference))reference=$"QR-{committedId}";
-            await CompleteCommittedSaveAsync(committedId,reference,isNew:true);
-        }catch(Exception ex){Fail(ex);}finally{busy=false;UpdateActions();}
+            await SubmitNewRegistrationAsync(args.ToArray());
+        }catch(Exception ex){ReadRecoveryRecord();if(recoveryBlocked)ShowSaveRecovery();else Fail(ex);}finally{busy=false;UpdateActions();}
+    }
+    private void ReadRecoveryRecord()
+    {
+        try{pendingSave=QuickRegistrationRecoveryJournal.ReadPending();recoveryBlocked=pendingSave is not null;
+            if(recoveryBlocked)ShowSaveRecovery();}
+        catch(Exception ex){recoveryBlocked=true;AppExceptionHandler.LogNonFatal(ex,"Reading registration recovery");
+            SetStatus("A previous registration save needs review. Use Check Save Outcome. "+DbMessage.UserMessage(ex),PageStatusKind.Warning);}
+    }
+    private void ShowSaveRecovery()=>SetStatus("Registration save not yet confirmed"+(pendingSave is null?"":": "+pendingSave.Summary)+
+        ". Your current entries are retained. Use Check Save Outcome before saving or starting another registration.",PageStatusKind.Warning);
+    private bool ClearVerifiedRecovery()
+    {
+        if(pendingSave is null)return false;
+        try{if(QuickRegistrationRecoveryJournal.ReadPending() is not null)QuickRegistrationRecoveryJournal.ClearVerified(pendingSave.Id);pendingSave=null;recoveryBlocked=false;return true;}
+        catch(Exception ex){AppExceptionHandler.LogNonFatal(ex,"Clearing verified registration recovery");
+            SetStatus("The save outcome was checked, but its recovery record could not be cleared. Use Check Save Outcome again before continuing. "+DbMessage.UserMessage(ex),PageStatusKind.Warning);return false;}
+    }
+    private async Task SubmitNewRegistrationAsync(SqlParameter[] parameters)
+    {
+        int actor=CurrentUser.UserId;
+        string scope=await QuickRegistrationWriter.GetScopeAsync();
+        if(IsDisposed||CurrentUser.UserId!=actor)return;
+        using var journal=QuickRegistrationRecoveryJournal.Begin(actor,scope,
+            QuickRegistrationWriter.PayloadHash(actor,placement.SelectedId,expectedQuote,parameters),
+            $"{name.Text.Trim()} · Parent: {parent.Text.Trim()} · {joining.Value:dd MMM yyyy}");
+        pendingSave=journal.Intent;recoveryBlocked=true;UpdateActions();
+        SavedQuickRegistration? saved=null;
+        try{saved=await QuickRegistrationWriter.SaveNewAsync(journal.Intent,placement.SelectedId,expectedQuote,parameters);}
+        catch(QuickRegistrationOutcomeUnknownException ex){AppExceptionHandler.LogNonFatal(ex,"Unconfirmed Quick Registration save");}
+        catch(Exception ex){journal.Dispose();if(ClearVerifiedRecovery())Fail(ex);return;}
+        finally{journal.Dispose();}
+        if(IsDisposed)return; // Keep the durable intent for recovery on the next open.
+        if(saved is not null)await ApplyVerifiedSaveAsync(saved);
+        else{ShowSaveRecovery();await CheckSaveOutcomeAsync(afterSave:true);}
+    }
+    private async Task ApplyVerifiedSaveAsync(SavedQuickRegistration saved)
+    {
+        savedStudent=saved.Id;savedStatus="Pending";savedSnapshot="";needsRefresh=true;
+        await CompleteCommittedSaveAsync(saved.Id,saved.Reference,isNew:true);
+        if(IsDisposed)return;
+        if(needsRefresh){SetStatus($"Saved registration {saved.Reference} was confirmed, but its screen could not refresh. The recovery record is retained. Use Check Save Outcome to reload it.",PageStatusKind.Warning);return;}
+        ClearVerifiedRecovery();
+    }
+    private async Task CheckSaveOutcomeAsync(bool afterSave=false)
+    {
+        if(IsBusy&&!afterSave)return;
+        bool wasBusy=busy;busy=true;UpdateActions();int version=registrationLoadVersion;
+        try
+        {
+            // Another window may have cleared a verified intent. Retain the
+            // in-memory request identity and check SQL before releasing this draft.
+            pendingSave=QuickRegistrationRecoveryJournal.ReadPending()??pendingSave;
+            if(pendingSave is null){recoveryBlocked=false;SetStatus("The previous recovery record has been resolved. Review the current registration before continuing.");return;}
+            recoveryBlocked=true;
+            using var progress=BeginLoading("Checking the registration save…");
+            var saved=await QuickRegistrationWriter.CheckSaveAsync(pendingSave);
+            if(IsDisposed||version!=registrationLoadVersion)return;
+            if(saved is null)
+            {
+                if(savedStudent>0){SetStatus("A previously confirmed student's recovery marker was not found. Keep this record for administrator review.",PageStatusKind.Warning);return;}
+                if(ClearVerifiedRecovery())SetStatus("The database confirmed this request did not save a student. Review or re-enter the details, then Save Registration when ready.",PageStatusKind.Warning);
+            }
+            else
+            {
+                await ApplyVerifiedSaveAsync(saved);
+                if(!IsDisposed&&!recoveryBlocked&&!needsRefresh)SetStatus($"Saved registration {saved.Reference} verified. The current student record is loaded.",PageStatusKind.Success);
+            }
+        }
+        catch(Exception ex){recoveryBlocked=true;AppExceptionHandler.LogNonFatal(ex,"Checking registration save outcome");
+            if(!IsDisposed)SetStatus("The save outcome is still unknown. Keep the recovery record and use Check Save Outcome after the connection or access is restored. "+DbMessage.UserMessage(ex),PageStatusKind.Warning);}
+        finally{busy=wasBusy;if(!IsDisposed)UpdateActions();}
     }
     private sealed record EditorState(int Student, string Status, string Snapshot, string Quote, int Anchor, string Reference,
         string[] Basics, bool FeesLoaded, bool NeedsRefresh, DataTable Rates, string Name, string Parent, string Contact,
@@ -480,14 +550,14 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     }
     internal async Task<bool> OpenRegistrationAsync(int id)
     {
-        if(IsBusy)return false;
+        if(IsBusy||recoveryBlocked)return false;
         if(!fees.EndEdit())return false;
         if(HasUnsavedChanges&&!Confirm("Discard the unsaved registration changes and reload this record?",UiText.Dialogs.UnsavedChanges))return false;
         return await LoadRegistrationAsync(id)==RegistrationLoadOutcome.Loaded;
     }
     private async Task PrintBillAsync()
     {
-        if(IsBusy||needsRefresh||savedStudent<=0||!CurrentUser.HasPermission("Fees.View")||!fees.EndEdit()||HasPendingChanges)return;
+        if(IsBusy||recoveryBlocked||needsRefresh||savedStudent<=0||!CurrentUser.HasPermission("Fees.View")||!fees.EndEdit()||HasPendingChanges)return;
         busy=true;UpdateActions();
         try{
             var data=await Task.Run(()=>DatabaseHelper.QuerySql("""

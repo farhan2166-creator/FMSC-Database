@@ -91,6 +91,18 @@ internal static partial class Program
         mode="active-family";Check(Outcome(Start(41))=="Loaded"&&Field<ModernButton>("linkFamily").Enabled&&Field<ModernButton>("unlinkFamily").Enabled,"Parent links remain manageable after admission confirmation");
         mode="cancelled-family";Check(Outcome(Start(41))=="Loaded"&&!Field<ModernButton>("linkFamily").Enabled&&!Field<ModernButton>("unlinkFamily").Enabled,"Cancelled QR cannot change parent links");
         mode="loaded";Check(Outcome(Start(41))=="Loaded","Standalone registration fixture restored");
+        type.GetField("recoveryBlocked",flags)!.SetValue(page,true);type.GetMethod("UpdateActions",flags)!.Invoke(page,null);
+        Check(Field<ModernButton>("checkSave").Enabled&&!Field<ModernButton>("save").Enabled&&!Field<ModernButton>("next").Enabled&&
+            !Field<ModernButton>("newFamily").Enabled&&!Field<ModernButton>("linkFamily").Enabled&&!Field<ModernButton>("bill").Enabled,
+            "Unconfirmed registration recovery exposes its read-only check and blocks new writes or drafts");
+        Check(((IUnsavedChanges)page).HasUnsavedChanges&&((IUnsavedChanges)page).UnsavedChangesMessage.Contains("recovery record"),"Leaving unconfirmed registration explains durable recovery");
+        int recoveryReads=reads;
+        var recoverySave=(Task)type.GetMethod("SaveAsync",flags)!.Invoke(page,null)!;
+        type.GetMethod("StartNextDraft",flags)!.Invoke(page,new object[]{true});
+        var recoveryOpen=(Task<bool>)type.GetMethod("OpenRegistrationAsync",flags)!.Invoke(page,new object[]{42})!;
+        Check(recoverySave.IsCompletedSuccessfully&&recoveryOpen.IsCompletedSuccessfully&&!recoveryOpen.Result&&reads==recoveryReads&&Field<int>("savedStudent")==41,
+            "Save/open/new-family runtime paths cannot bypass the recovery guard");
+        type.GetField("recoveryBlocked",flags)!.SetValue(page,false);type.GetMethod("UpdateActions",flags)!.Invoke(page,null);
         var permissions=CurrentUser.GetPermissions().ToArray();
         CurrentUser.SignIn(7779,"Admission-only fixture","Operator",false,new[]{"Students.Admit","Students.View"});
         type.GetMethod("UpdateActions",flags)!.Invoke(page,null);

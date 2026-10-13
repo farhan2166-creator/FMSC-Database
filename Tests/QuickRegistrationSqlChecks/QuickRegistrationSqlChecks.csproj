@@ -6,12 +6,17 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
     <Compile Include="../../Pages/Students/Admissions/QuickRegistrationWriter.cs" Link="QuickRegistrationWriter.cs" />
+    <Compile Include="../../Core/QuickRegistrationRecovery.cs" Link="QuickRegistrationRecovery.cs" />
+    <Compile Include="../../Core/QuickRegistrationRecoveryJournal.cs" Link="QuickRegistrationRecoveryJournal.cs" />
     <Compile Include="../../Core/QuickRegistrationQuote.cs" Link="QuickRegistrationQuote.cs" />
     <Compile Include="../../Core/QuickRegistrationAccess.cs" Link="QuickRegistrationAccess.cs" />
     <Compile Include="../../Core/WholeRupees.cs" Link="WholeRupees.cs" />
     <Compile Include="../../Core/Tvp.cs" Link="Tvp.cs" />
     <Compile Include="../../Core/DatabaseCompatibility.cs" Link="DatabaseCompatibility.cs" />
     <Compile Include="../../Core/DatabaseCompatibilityFailure.cs" Link="DatabaseCompatibilityFailure.cs" />
+    <EmbeddedResource Include="../../Migrations/4.sql" LogicalName="Migration4.sql" />
+    <EmbeddedResource Include="Migration4Checks.sql" LogicalName="Migration4Checks.sql" />
+    <EmbeddedResource Include="../../Core/DatabaseMigrationRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseMigrationRequirements.json" />
     <EmbeddedResource Include="../../Core/DatabaseCompatibilityRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseCompatibilityRequirements.json" />
     <Compile Include="../../Pages/Students/Maintenance/AdmissionReviewSql.cs" Link="AdmissionReviewSql.cs" />
     <Using Include="System.Data" />
