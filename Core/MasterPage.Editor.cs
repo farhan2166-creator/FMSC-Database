@@ -737,6 +737,7 @@ public partial class MasterPage
     }
     private bool LoadRow(DataGridViewRow row)
     {
+        if (ReopenCurrentEditor(row)) return true;
         try
         {
             object? id =
@@ -768,11 +769,10 @@ public partial class MasterPage
                         ?.Value;
                 MasterFieldValueCodec.Write(control, value);
             }
-            SetStatus(
-                "Record loaded for editing.");
             /* say which record is in the editor and that this is an edit, so an opened record cannot be mistaken for a blank Add form. */
             string recordName =
                 GetDeleteDisplayName(row).Trim();
+            SetStatus($"Editing {(recordName.Length > 0 ? recordName : MasterEntityNaming.Singularize(NavigationTitle))}. Change fields, then Save (Ctrl+S).");
             if (string.IsNullOrWhiteSpace(recordName))
             {
                 _editorCard?.SetHeaderText(
@@ -797,6 +797,7 @@ public partial class MasterPage
             }
             RecordLoaded(row);
             if (_entryRecordsTabs is not null) _entryRecordsTabs.SelectedIndex = 0;
+            FocusFirstEditorField();
             return true;
         }
         catch (Exception ex)
@@ -807,6 +808,15 @@ public partial class MasterPage
             Fail(ex);
             return false;
         }
+    }
+    private bool ReopenCurrentEditor(DataGridViewRow row)
+    {
+        if (_saving || !HasUnsavedChanges || _id <= 0 || row.IsNewRow ||
+            !int.TryParse(Convert.ToString(FindRowId(row), CultureInfo.InvariantCulture), out int target) || target != _id)
+            return false;
+        ShowRecordsTab(false);
+        FocusFirstEditorField();
+        return true;
     }
     private Dictionary<string, object?> Values()
     {
@@ -1126,7 +1136,7 @@ public partial class MasterPage
             }
         }
         SetStatus(
-            "Ready for a new record.");
+            "New record: enter details, then Save (Ctrl+S).");
         /* The editor is blank again, so the header must stop naming the record that was just saved, cleared or deleted. */
         _editorCard?.SetHeaderText(
             NewRecordHeaderTitle,

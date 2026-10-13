@@ -48,6 +48,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     private Button? _commandButton;
     private ModernTextBox? _globalSearchBox;
     private Label? _topAcademicYearLabel;
+    private Label? _locationLabel;
     private string _currentAcademicYearText = "Academic Year — Not Set";
     private Func<Control>? _currentFactory;
     private string _currentModule = "Dashboard";
@@ -405,6 +406,8 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             Padding = new Padding(0)
         };
         var titleLabel = new Label {
+            Name = "CurrentLocation",
+            AccessibleName = "Current location",
             Dock = DockStyle.Fill,
             AutoEllipsis = true,
             AutoSize = false,
@@ -414,6 +417,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             Margin = new Padding(0)
         };
         titlePanel.Controls.Add(titleLabel);
+        _locationLabel = titleLabel;
         var right = new FlowLayoutPanel {
             Dock = DockStyle.Fill,
             AutoSize = true,
@@ -512,10 +516,17 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         };
         topBar.Controls.Add(header);
         topBar.Controls.Add(divider);
+        UpdateTopBar(_currentModule, _currentTitle);
     }
     private void UpdateTopBar(string module, string title)
     {
+        if (_locationLabel is null || _locationLabel.IsDisposed) return;
+        string location = NavigationLocation.Format(module, title,
+            (_currentPageControl as WorkspacePage)?.CurrentSection);
+        _locationLabel.Text = location;
+        sidebarToolTip.SetToolTip(_locationLabel, location);
     }
+    private void OnCurrentSectionChanged(object? sender, EventArgs e) => UpdateTopBar(_currentModule, _currentTitle);
     internal void UpdateTopAcademicYearLabel(string text) { _currentAcademicYearText = string.IsNullOrWhiteSpace(text) ? "Academic Year — Not Set" : text; if (_topAcademicYearLabel == null) return; _topAcademicYearLabel.Text = _currentAcademicYearText; _topAcademicYearLabel.ForeColor = AppTheme.Primary; }
     private void BuildSidebar()
     {
@@ -1401,10 +1412,6 @@ bool dashboard = false)
             return;
         SaveCurrentWorkspaceState();
         string destinationKey = NavKey(module, title);
-        _currentFactory = factory;
-        _currentModule = module;
-        _currentTitle = title;
-        _currentIsDashboard = dashboard;
         Control? page = null;
         try
         {
@@ -1437,7 +1444,15 @@ bool dashboard = false)
                 content.Controls.Add(page);
                 RestoreWorkspaceState(page, destinationKey);
                 page.BringToFront();
+                if (_currentPageControl is WorkspacePage previousWorkspace)
+                    previousWorkspace.CurrentSectionChanged -= OnCurrentSectionChanged;
                 _currentPageControl = page;
+                _currentFactory = factory;
+                _currentModule = module;
+                _currentTitle = title;
+                _currentIsDashboard = dashboard;
+                if (page is WorkspacePage workspace)
+                    workspace.CurrentSectionChanged += OnCurrentSectionChanged;
                 status.Text =
                     dashboard
                         ? $"{CurrentUser.Username}  •  {CurrentUser.RoleName}"
@@ -1490,13 +1505,14 @@ bool dashboard = false)
             }
             AppExceptionHandler.LogNonFatal(
                 ex,
-                $"Dashboard Menu: {_currentModule} / {_currentTitle}");
+                $"Dashboard Menu: {module} / {title}");
             if (IsDisposed || Disposing)
                 return;
-            status.Text = DbMessage.UserMessage(ex);
+            SyncActiveNav(_currentModule, _currentTitle);
+            status.Text = $"Could not open {title}. {DbMessage.UserMessage(ex)}";
             ModernMessageDialog.ShowWarning(
                 this,
-                $"Unable to open this FMSC page.\r\n\r\n{DbMessage.UserMessage(ex)}",
+                $"Unable to open {title}.\r\n\r\n{DbMessage.UserMessage(ex)}",
                 "FMSC");
         }
     }

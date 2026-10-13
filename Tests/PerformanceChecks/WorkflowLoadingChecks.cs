@@ -8,6 +8,9 @@ internal static class WorkflowLoadingChecks
     {
         int checks = 0;
         void Check(bool condition, string message) { if (!condition) throw new Exception(message); checks++; }
+        Check(NavigationLocation.Format("Finance", "Fee Posting", "Monthly Fees") == "Finance › Fee Posting › Monthly Fees", "Location must include the active workspace section");
+        Check(NavigationLocation.Format(" Setup ", " Setup ", "") == "Setup", "Location must trim and avoid repeated segments");
+        Check(NavigationLocation.Format("", "Student Profile") == "Student Profile", "Standalone pages retain their identity");
         async Task Cancelled(Task operation)
         {
             try { await operation.WaitAsync(TimeSpan.FromSeconds(2)); throw new Exception("Cancellation expected"); }

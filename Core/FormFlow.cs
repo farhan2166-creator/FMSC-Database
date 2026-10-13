@@ -121,6 +121,7 @@ public static class FormFlow
                 return false;
             if (!next.Visible || !next.Enabled || !next.TabStop)
                 continue;
+            if (next is TextBoxBase { ReadOnly: true }) continue;
             // Wrapped inputs are panels; focus their native child, not the decorative shell.
             if (next is Panel || !next.CanSelect)
                 continue;

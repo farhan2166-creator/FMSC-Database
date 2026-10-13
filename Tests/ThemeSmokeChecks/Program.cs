@@ -89,9 +89,71 @@ internal static class Program
             Check(!debounce.Enabled && student.SelectedId == 0, "Escape must cancel a pending search");
             input.Text = "2"; input.Clear();
             Check(!debounce.Enabled && student.MatchCount == 0, "Clearing input must stop pending work");
+            var output = new ModernTextBox { Bounds = new Rectangle(360, 85, 260, 42), ReadOnly = true, Text = "Calculated output", TabIndex = 1 };
+            var tick = new CheckBox { Bounds = new Rectangle(360, 150, 220, 30), Text = "Active", TabIndex = 2 };
+            card.Controls.AddRange(new Control[] { output, tick }); Application.DoEvents();
+            int saves = 0; button.Click += (_, _) => saves++;
+            field.Focus();
+            Check(!MasterEditorFocusNavigator.FocusInside(output), "Entry focus must skip read-only outputs");
+            Check(MasterEditorFocusNavigator.TryAdvance(field.Controls.OfType<TextBox>().Single(), new Control[] { field, output, tick }, button), "Enter must skip outputs and deliberate checkbox choices, then reach Save");
+            Check(button.Focused && saves == 0, "Completing a field must focus Save without submitting it");
+            button.PerformClick(); Check(saves == 1, "A deliberate Save action still runs");
+
+            using (var workspace = new WorkspacePage("Fee Posting", "", ("Monthly", () => new Panel()), ("Additional", () => new Panel())))
+            {
+                var tabs = (TabControl)typeof(WorkspacePage).GetField("_tabs", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(workspace)!;
+                int updates = 0; workspace.CurrentSectionChanged += (_, _) => updates++;
+                tabs.SelectedIndex = 1;
+                Check(workspace.CurrentSection == "Additional" && updates == 1, "Workspace context must follow the selected section");
+            }
+            CheckSameRecordDraft();
+            CheckChoiceFilters(form);
             Console.WriteLine($"PASS: {checks} Windows theme switching, structure, rendering and resource checks.");
         }
         finally { AppTheme.SetTheme(originalTheme); }
+    }
+
+    private static void CheckSameRecordDraft()
+    {
+        // Keep this editor unparented: its deferred SQL loader is never started.
+        using var editor = new MasterPage("Subjects", "", "UnusedRead", "UnusedSave",
+            new[] { new FieldSpec("SubjectName", "Subject") }, _ => Array.Empty<Microsoft.Data.SqlClient.SqlParameter>(), recordIdColumn: "SubjectId");
+        Check(!editor.IsHandleCreated, "SQL-free editor fixture must remain unparented and unshown");
+        var grid = (DataGridView)typeof(V2Page).GetField("Grid", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(editor)!;
+        grid.Columns.Clear(); grid.Columns.Add("SubjectId", "Id"); grid.Columns.Add("SubjectName", "Subject");
+        grid.Rows.Add(7, "Maths");
+        var load = typeof(MasterPage).GetMethod("LoadRow", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        Check((bool)load.Invoke(editor, new object[] { grid.Rows[0] })!, "Fixture record must load");
+        var controls = (Dictionary<string, Control>)typeof(MasterPage).GetField("_controls", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(editor)!;
+        controls["SubjectName"].Text = "Unsaved Maths";
+        Check(editor.HasUnsavedChanges, "Draft must be recognized");
+        Check((bool)load.Invoke(editor, new object[] { grid.Rows[0] })! && controls["SubjectName"].Text == "Unsaved Maths" && editor.HasUnsavedChanges,
+            "Reopening the current record must preserve unsaved fields and baseline");
+        typeof(MasterPage).GetMethod("CaptureEditorBaseline", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(editor, null);
+        grid.Rows[0].Cells["SubjectName"].Value = "Refreshed Maths";
+        Check((bool)load.Invoke(editor, new object[] { grid.Rows[0] })! && controls["SubjectName"].Text == "Refreshed Maths",
+            "A clean editor must still reload refreshed values for the same record");
+    }
+
+    private static void CheckChoiceFilters(Form form)
+    {
+        var reportUi = typeof(AppTheme).Assembly.GetType("FMSC_SMS.Pages.Reports.ReportUi")!;
+        using var filters = new Panel { Height = 50 };
+        var method = new ModernComboBox { Width = 250 };
+        method.Items.AddRange(new object[] { "All", "Cash", "Bank" }); method.SelectedIndex = 2;
+        var view = new ModernComboBox { Left = 270, Width = 250 };
+        view.Items.AddRange(new object[] { "Details", "Summary" }); view.SelectedIndex = 1;
+        filters.Controls.AddRange(new Control[] { method, view });
+        reportUi.GetMethod("RegisterChoiceFilter", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, new object[] { method, 0 });
+        using var grid = new DataGridView();
+        var layoutMethod = reportUi.GetMethod("CompactLayout", new[] { typeof(Control), typeof(DataGridView), typeof(string), typeof(Control[]) })!;
+        using var layout = (Control)layoutMethod.Invoke(null, new object[] { filters, grid, "Results", Array.Empty<Control>() })!;
+        layout.Bounds = new Rectangle(20, 20, 680, 400); form.Controls.Add(layout); layout.BringToFront(); Application.DoEvents();
+        IEnumerable<Control> Children(Control root) => root.Controls.Cast<Control>().SelectMany(child => new[] { child }.Concat(Children(child)));
+        Check(Children(layout).OfType<Label>().Any(label => label.Text == "1 filter active"), "Payment method must appear in active-filter feedback");
+        Children(layout).OfType<ModernButton>().Single(control => control.Text == "Clear Filters").PerformClick();
+        Check(method.SelectedIndex == 0 && view.SelectedIndex == 1, "Clear Filters must reset actual filters while preserving report view choices");
+        Check(Children(layout).OfType<Label>().Any(label => label.Text == "No optional filters"), "Counter must update after clearing the choice filter");
     }
 
     private static double Contrast(Color a, Color b)

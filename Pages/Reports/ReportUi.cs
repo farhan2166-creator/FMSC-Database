@@ -2,6 +2,15 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Reports;
 internal static class ReportUi
 {
+    private sealed record ChoiceFilter(int DefaultIndex);
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ModernComboBox, ChoiceFilter> ChoiceFilters = new();
+    /// <summary>Opt an actual filter into counting/resetting. Report views and
+    /// grouping choices stay intact unless explicitly registered as filters.</summary>
+    public static void RegisterChoiceFilter(ModernComboBox choice, int defaultIndex = 0)
+    {
+        ChoiceFilters.Remove(choice);
+        ChoiceFilters.Add(choice, new ChoiceFilter(defaultIndex));
+    }
     /// <summary>UX - the shared "From must not be after To" check for the dated reports, shown on the To picker itself ("Earlier than From") instead of in a message box.</summary>
     public static bool ValidDateRange(FormValidator validator, ModernDatePicker from, ModernDatePicker to)
     {
@@ -150,7 +159,7 @@ internal static class ReportUi
         };
         accessory.Controls.Add(active);
         accessory.Controls.Add(clear);
-        var filterCard = HumanUi.Card("Report Filters", "Run with no filters or any combination. Leave a filter at All or an optional date unchecked to ignore it.", accessory: accessory);
+        var filterCard = HumanUi.Card("Report Filters", "Choose the scope below, then run the report. All and unchecked optional dates include every value.", accessory: accessory);
         filterCard.Content.Controls.Add(filters);
         /* each date picker's value as the page built it. Captured here, at construction, because this is the one moment those defaults are on screen. */
         var dateBaselines = Descendants(filters)
@@ -162,6 +171,9 @@ internal static class ReportUi
             foreach (Control control in Descendants(filters))
             {
                 if (control is LookupBox lookup && lookup.SelectedId > 0)
+                    count++;
+                else if (control is ModernComboBox choice && ChoiceFilters.TryGetValue(choice, out var filter) &&
+                         choice.SelectedIndex >= 0 && choice.SelectedIndex != filter.DefaultIndex)
                     count++;
                 else if (control is ModernTextBox textBox && !string.IsNullOrWhiteSpace(textBox.Text))
                     count++;
@@ -182,6 +194,8 @@ internal static class ReportUi
             {
                 if (control is LookupBox lookup)
                     lookup.SelectedIndex = 0;
+                else if (control is ModernComboBox choice && ChoiceFilters.TryGetValue(choice, out var filter))
+                    choice.SelectedIndex = filter.DefaultIndex < choice.Items.Count ? filter.DefaultIndex : -1;
                 else if (control is ModernTextBox textBox)
                     textBox.Text = string.Empty;
                 else if (control is CheckBox checkBox)
@@ -201,6 +215,8 @@ internal static class ReportUi
         {
             if (control is LookupBox lookup)
                 lookup.SelectedIndexChanged += (_, _) => RefreshFilterState();
+            else if (control is ModernComboBox choice && ChoiceFilters.TryGetValue(choice, out _))
+                choice.SelectedIndexChanged += (_, _) => RefreshFilterState();
             else if (control is ModernTextBox textBox)
                 textBox.TextChanged += (_, _) => RefreshFilterState();
             else if (control is CheckBox checkBox)

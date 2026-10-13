@@ -16,6 +16,9 @@ public sealed class WorkspacePage : UserControl, IUnsavedChanges, IWorkspaceStat
     private Label? _titleLabel;
     private bool _embedded;
     public string NavigationTitle { get; }
+    public string CurrentSection => _tabs.SelectedIndex >= 0 && _tabs.SelectedIndex < _pages.Count
+        ? _pages[_tabs.SelectedIndex].Caption : string.Empty;
+    public event EventHandler? CurrentSectionChanged;
     public WorkspacePage(string title, string subtitle, params (string Caption, Func<Control> Factory)[] pages)
     {
         // Shared metrics and text measurements size these controls; avoid a second WinForms autoscaling pass.
@@ -63,6 +66,7 @@ public sealed class WorkspacePage : UserControl, IUnsavedChanges, IWorkspaceStat
         }
         _tabs.SelectedIndexChanged += (_, _) => {
             EnsureSelectedTab();
+            CurrentSectionChanged?.Invoke(this, EventArgs.Empty);
             if (IsHandleCreated) BeginInvoke(new Action(() => {
                 if (!IsDisposed && _tabs.SelectedTab is TabPage selected)
                     FormFlow.ScheduleInitialFocus(this, selected, () => selected == _tabs.SelectedTab);

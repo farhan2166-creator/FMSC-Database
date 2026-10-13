@@ -34,6 +34,12 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
     }
     protected bool EditRecordById(int id)
     {
+        if (!_saving && HasUnsavedChanges && id > 0 && id == _id)
+        {
+            ShowRecordsTab(false);
+            FocusFirstEditorField();
+            return true;
+        }
         if (_recordSearchBox is not null) _recordSearchBox.Clear();
         _staffRecordPicker?.Clear();
         ApplyRecordSearch();
@@ -441,6 +447,7 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
                 MasterGridLayout.IsInternal(Grid.Columns[e.ColumnIndex]) ||
                 IsBooleanGridColumn(Grid.Columns[e.ColumnIndex]))
                 return;
+            if (ReopenCurrentEditor(Grid.Rows[e.RowIndex])) return;
             /* Clicking another row replaces the editor, which is a context switch like any other: if the operator has unsaved edits, ask before they are replaced. */
             if (!ConfirmDiscardChanges())
             {
@@ -455,6 +462,7 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
             {
                 e.Handled = true;
                 e.SuppressKeyPress = true;
+                if (ReopenCurrentEditor(Grid.CurrentRow)) return;
                 if (!ConfirmDiscardChanges())
                 {
                     RestoreEditorSelection();

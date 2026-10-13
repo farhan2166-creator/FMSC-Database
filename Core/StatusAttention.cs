@@ -10,6 +10,7 @@ internal static class StatusAttention
         {
             FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException19, "StatusAttention: Show fallback");
         }
+        if (AppTheme.UseSimpleRendering) { restore(); return; }
         int ticks = 0;
         var timer = new System.Windows.Forms.Timer { Interval = 170 };
         timer.Tick += (_, _) => {
