@@ -134,9 +134,14 @@ public static class AdmissionNumbers
         if (!table.Columns.Contains("__AdmissionNumberSuffix")) table.Columns.Add("__AdmissionNumberSuffix", typeof(string));
         foreach (DataRow row in table.Rows)
         {
-            var match = Regex.Match(Read(row), @"^([0-9]+)(.*)$");
-            row["__AdmissionNumberBase"] = match.Success && long.TryParse(match.Groups[1].Value, out long value) ? value : long.MaxValue;
-            row["__AdmissionNumberSuffix"] = match.Success ? match.Groups[2].Value : Read(row);
+            string number = Read(row);
+            var match = Regex.Match(number, @"^([0-9]+)(.*)$");
+            long main = match.Success && long.TryParse(match.Groups[1].Value, out long value) ? value : long.MaxValue;
+            string suffix = match.Success ? match.Groups[2].Value : number;
+            // Binding and sorting revisit this table. Avoid row-change events and
+            // index maintenance when derived values have not changed.
+            if (!Equals(row["__AdmissionNumberBase"], main)) row["__AdmissionNumberBase"] = main;
+            if (!Equals(row["__AdmissionNumberSuffix"], suffix)) row["__AdmissionNumberSuffix"] = suffix;
         }
     }
 

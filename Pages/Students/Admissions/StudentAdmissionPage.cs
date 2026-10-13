@@ -2480,11 +2480,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             return;
         try
         {
-            var raw = await DatabaseHelper.QueryUserAsync(
+            var configurationsTask = DatabaseHelper.QueryUserAsync(
                 "GetFeeConfigurations",
                 DatabaseHelper.Int("@CampusId", campusId),
                 DatabaseHelper.Int("@ClassId", classId));
-            var feeTypes = await DatabaseHelper.QueryUserAsync("GetFeeTypes");
+            var feeTypesTask = DatabaseHelper.QueryUserAsync("GetFeeTypes");
+            await Task.WhenAll(configurationsTask, feeTypesTask);
+            var raw = await configurationsTask;
+            var feeTypes = await feeTypesTask;
             var feePositions = feeTypes.AsEnumerable().ToDictionary(r => Convert.ToInt32(r["FeeTypeId"]),
                 r => r.IsNull("DisplayOrder") ? int.MaxValue : Convert.ToInt32(r["DisplayOrder"]));
             foreach (DataRow row in raw.AsEnumerable().OrderBy(r =>

@@ -19,6 +19,13 @@ internal static class LookupDataCache
     private static int generation;
     private const int Capacity = 64;
     private static readonly TimeSpan MaxAge = TimeSpan.FromMinutes(2);
+    // Verified read-only workflows. Unknown operations still invalidate conservatively.
+    private static readonly HashSet<string> ReadOnlyOperations = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CheckClassFeeConfiguration", "CheckStudentConsistency", "DailyClosingSnapshot",
+        "PreviewLifecycleDateRepair", "PreviewMigrationBillingCleanup", "PreviewMonthlyFees",
+        "PreviewPostingReversal", "ReportClassSectionLookup"
+    };
 
     internal static void Invalidate()
     {
@@ -28,7 +35,7 @@ internal static class LookupDataCache
     internal static void OperationCompleted(string procedure)
     {
         // Conservative invalidation covers writes returning IDs/tables as well as Execute.
-        if (procedure.StartsWith("Get", StringComparison.OrdinalIgnoreCase)) return;
+        if (procedure.StartsWith("Get", StringComparison.OrdinalIgnoreCase) || ReadOnlyOperations.Contains(procedure)) return;
         Invalidate();
         StudentSearchCache.Invalidate();
     }
@@ -82,9 +89,16 @@ internal static class LookupDataCache
             lock (Sync)
             {
                 if (observed != generation) continue;
-                // Consumers bind/filter/edit independently; shared cached tables stay private.
-                return table.Copy();
             }
+            // Copying can be expensive: do not block unrelated lookups or invalidation.
+            // The cached table is immutable; consumers receive independent copies.
+            var copy = table.Copy();
+            token.ThrowIfCancellationRequested();
+            lock (Sync)
+            {
+                if (observed != generation) continue;
+            }
+            return copy;
         }
     }
 }

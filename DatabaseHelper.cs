@@ -495,22 +495,8 @@ FOR ATTACH;";
                     while (await reader.ReadAsync(token).ConfigureAwait(false)) { }
                     continue;
                 }
-                var table = new DataTable(result.Tables.Count == 0 ? "Table" : $"Table{result.Tables.Count}");
-                for (int i = 0; i < reader.FieldCount; i++)
-                {
-                    string baseName = reader.GetName(i);
-                    if (string.IsNullOrEmpty(baseName)) baseName = $"Column{i + 1}";
-                    string name = baseName;
-                    for (int suffix = 1; table.Columns.Contains(name); suffix++) name = baseName + suffix;
-                    table.Columns.Add(name, reader.GetFieldType(i));
-                }
-                while (await reader.ReadAsync(token).ConfigureAwait(false))
-                {
-                    var values = new object[reader.FieldCount];
-                    reader.GetValues(values);
-                    table.Rows.Add(values);
-                }
-                table.AcceptChanges();
+                var table = await Core.AsyncTableLoader.ReadAsync(reader,
+                    result.Tables.Count == 0 ? "Table" : $"Table{result.Tables.Count}", token).ConfigureAwait(false);
                 result.Tables.Add(table);
             } while (await reader.NextResultAsync(token).ConfigureAwait(false));
         }

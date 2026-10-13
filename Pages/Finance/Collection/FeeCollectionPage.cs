@@ -1594,17 +1594,20 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     {
         if (forAdmissionId <= 0 || forEnrollmentId <= 0)
             return 0;
-        DataTable raw = await DatabaseHelper.QueryUserAsync(
+        var chargesTask = DatabaseHelper.QueryUserAsync(
             "GetOutstandingCharges",
             DatabaseHelper.Int("@AdmissionId", forAdmissionId),
             DatabaseHelper.Int("@EnrollmentId", forEnrollmentId),
             DatabaseHelper.Date("@AsOfDate", DateTime.Today));
+        var frequenciesTask = LoadAssignmentFrequenciesAsync(forEnrollmentId);
+        // Same Fees.View permission as the former direct query; stable catalog
+        // data can use the existing user-scoped cache across sibling accounts.
+        var feeOrderTask = DatabaseHelper.QueryUserAsync("GetFeeTypes");
+        await Task.WhenAll(chargesTask, frequenciesTask, feeOrderTask);
+        DataTable raw = await chargesTask;
         Dictionary<int, string> frequencyByAssignment =
-            await LoadAssignmentFrequenciesAsync(forEnrollmentId);
-        var feeOrderRows = await Task.Run(() => DatabaseHelper.QuerySql("""
-            EXEC dbo.RequirePermission @UserId,N'Fees.View';
-            SELECT FeeTypeId,DisplayOrder FROM dbo.FeeTypes;
-            """,DatabaseHelper.Int("@UserId",CurrentUser.UserId)));
+            await frequenciesTask;
+        var feeOrderRows = await feeOrderTask;
         var feeOrder=feeOrderRows.AsEnumerable().ToDictionary(row=>GetInt(row,"FeeTypeId"),row=>GetInt(row,"DisplayOrder"));
         /* Callers that pass no version (-1) are the explicit tick paths, which append on demand rather than on a load. */
         if (version >= 0 &&

@@ -309,9 +309,13 @@ Database/*.bak
 /Tests/*
 !/Tests/AuditFixChecks/
 !/Tests/QuickRegistrationSqlChecks/
+!/Tests/PerformanceChecks/
 /Tests/AuditFixChecks/*
 !/Tests/AuditFixChecks/*.cs
 !/Tests/AuditFixChecks/*.csproj
 /Tests/QuickRegistrationSqlChecks/*
 !/Tests/QuickRegistrationSqlChecks/*.cs
 !/Tests/QuickRegistrationSqlChecks/*.csproj
+/Tests/PerformanceChecks/*
+!/Tests/PerformanceChecks/*.cs
+!/Tests/PerformanceChecks/*.csproj
