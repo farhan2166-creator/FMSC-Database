@@ -293,7 +293,7 @@ internal static partial class Program
             }
             using var png = new MemoryStream(); source.Save(png, System.Drawing.Imaging.ImageFormat.Png);
             byte[] jpeg = Prepared(png.ToArray());
-            Check(jpeg.Length > 0 && jpeg.Length <= 300 * 1024, "Prepared photos fit the database storage limit");
+            Check(jpeg.Length > 0 && jpeg.Length <= 80 * 1024, "Prepared photos fit the compact database storage limit");
             using var encoded = new MemoryStream(jpeg); using var result = Image.FromStream(encoded);
             Check(result.Width == fittedWidth && result.Height == fittedHeight, "Real image fitting preserves portrait/landscape proportions without upscaling");
             Check(result.RawFormat.Guid == System.Drawing.Imaging.ImageFormat.Jpeg.Guid, "Prepared photo bytes and JPEG content type agree");
@@ -317,7 +317,11 @@ internal static partial class Program
             }
             finally { noise.UnlockBits(data); }
             using var png = new MemoryStream(); noise.Save(png, System.Drawing.Imaging.ImageFormat.Png);
-            Check(Prepared(png.ToArray()).Length <= 300 * 1024, "High-detail images also fit the storage limit through JPEG quality selection");
+            byte[] prepared = Prepared(png.ToArray());
+            Check(prepared.Length <= 80 * 1024, "High-detail images fit the 80 KB cap through quality and proportional resolution selection");
+            using var encoded = new MemoryStream(prepared); using var result = Image.FromStream(encoded);
+            Check(result.Width == result.Height && result.Width <= 600 && result.Width >= 320,
+                "Detailed images preserve proportions while keeping useful portrait resolution");
         }
         using (var landscape = new Bitmap(1200, 600))
         {

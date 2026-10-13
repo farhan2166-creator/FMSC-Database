@@ -219,14 +219,14 @@ pinned baseline; the following table describes the current source review.
 
 | Finding | Current disposition |
 |---|---|
-| FR-01 | Client success-condition gap confirmed in `SaveNewAdmissionAsync`. Both DACPAC admission procedures return the documented IDs after commit; malformed/missing response behavior has not been reproduced. The reconciliation/parser fix remains open. |
+| FR-01 | **Source fix implemented:** read all result sets, validate the documented positive ID/official-number response, and reconcile missing/malformed replies or write exceptions by read-only exact-number/identity lookup. Unconfirmed outcomes retain entries/photo, block Save and Save & New, and expose Check Saved Admission. No automatic write retry. Both DACPAC procedures were checked; native/real-SQL failure acceptance remains pending. |
 | FR-02 | **Source fix implemented:** typed load outcome, validated complete view before binding, editor rollback on binding/layout failure, and success based on the actual load attempt. Confirmed new/pending saves report a failed refresh separately and require deliberate Reload Registration before further edits, printing or payment. Transaction/snapshot writer is unchanged; native execution remains pending. |
 | FR-03 | **Source fix implemented:** restore destination state before retiring the current page; compensate parenting/activation/layout failure by reattaching old controls and restoring page/factory/route/year/subscriptions. A failed destination is disposed; old pages retire only after confirmed activation. The navigation guard is released in `finally`. Native regression fixtures are compiled; Windows execution remains pending. |
 | FR-04 | **Owner chose explicit save; source fix implemented:** Choose Photo prepares and previews, Save Photo persists, and Discard Selection restores the saved preview without deleting/replacing stored data. New students retain their preview until admission creates the record. Stored-photo deletion still requires confirmation. |
 | FR-05 | **Source fix implemented:** failed saves retain prepared bytes and expose Retry Photo Save. Main Save handles photo-only work without an unrelated details transaction; combined details/photo saves report each outcome independently. Photo persistence keeps student ID/version and immutable-selection ownership guards. |
 | FR-06 | **Owner accepted existing behavior:** date/year-only changes on an otherwise blank new registration intentionally allow leaving without a discard prompt. This policy is documented beside C# dirty detection; entered student details/placement and existing pending-record edits retain their warnings. |
 | FR-07 | Source byte limit and unrestricted decoded dimensions confirmed. No leak/crash or safe peak memory figure has been measured on Windows. |
-| FR-08 | DACPAC `SaveStudentPhoto` validates nonempty bytes but has no 300 KB upper limit. This remains an application boundary; no SQL or historical-photo conversion was performed. |
+| FR-08 | DACPAC `SaveStudentPhoto` validates nonempty bytes but has no application byte cap. The current application cap is **80 KB**, reduced from 300 KB at the owner's request. This remains an application boundary; no SQL or historical-photo conversion was performed. |
 | FR-09 | Windows, school-data, migration/restore and deployed-hardware acceptance remain pending. Cross-build/portable results do not close this gate. |
 
 The approved dashboard now has five compact KPI cards, six permission-filtered
@@ -252,6 +252,10 @@ of points 1 and 4 (FR-01 and FR-06). FR-01 remains open. After the explanation,
 the owner accepted FR-06's existing behavior: date/year-only selections on a
 blank new registration should not prevent intentionally leaving. The C# source
 now records this policy; the dirty-detection expression remains unchanged.
+
+The subsequent owner request also implements FR-01 and reduces new photo storage
+to 80 KB; see the latest implementation section below. The 339-check evidence in
+this section describes the earlier registration/photo-save pass.
 
 Quick Registration now returns Loaded/NotFound/Failed/Superseded/Busy from a
 specific read attempt. It validates identity, required detail/fee columns,
@@ -281,3 +285,41 @@ save failure/retry, photo-only main Save and permission checks. These form tests
 are compiled but unrun on this Linux host. Real SQL writes, Windows interaction,
 and mixed details/photo failure acceptance remain pending. The new pure helpers
 were executed with controlled inputs; they do not establish deployment sign-off.
+
+### Confirmed admission outcome and compact photos — 13 October 2026
+
+The admission response parser now selects the documented admission result among
+all returned tables. Exactly one row with a positive int AdmissionId and matching
+official number is required; nullable historical registration numbers remain
+supported. Missing/malformed replies and write exceptions trigger one read-only
+lookup by the original submitted number. The candidate must also match student,
+parent, admission date and campus. Failure to establish identity retains the
+original request, form entries and prepared photo, blocks both Save paths and
+shows Check Saved Admission. That action only rechecks; it never submits another
+admission. Leaving/Clear warns that a record might already exist. Confirmed IDs
+precede photo persistence and success feedback. Form reload reports a separate
+boolean outcome, so an early refusal/missing record is not called refreshed.
+
+The owner changed the stored-photo budget from 300 KB to **80 KB maximum** for
+newly selected photos. The full image remains proportional, EXIF-corrected and
+uncropped, with no upscaling. Preparation tries JPEG quality 88/82/76/70 at a
+600-pixel maximum long edge; if needed, it estimates a smaller proportional
+canvas, down to a 320-pixel long edge for large originals, and encodes again from
+the original. An impossible fit is refused, not stored over the cap. Bitmaps are
+reused between quality attempts and disposed between sizes. Smaller originals
+stay smaller; outputs already below 50 KB are not padded. The aim is acceptable
+student-portrait quality within the byte budget, not a guaranteed perceptual
+quality measure or a 50 KB minimum.
+
+Executed validation: **389 portable assertions pass**, including **50 new
+admission-result/reconciliation and compression-policy checks**. They exercise
+invalid/empty/wrong/ambiguous results, nested fee tables, historical nullable
+registration numbers, lost write replies, missing/unrelated records, read-only
+rechecks, the 80 KB boundary, proportional adaptive sizing, quality floor,
+bounded attempts and cancellation. The application and Windows smoke harness
+cross-build with zero warnings/errors. Native fixtures now enforce the 80 KB cap
+for actual encodes, detailed-image dimensions, and unconfirmed-save UI guards.
+Native GDI/JPEG output, portrait visual quality and real SQL interrupted-response
+acceptance remain **unrun** on this Linux host. Existing stored photos, SQL,
+migrations and DACPAC are unchanged. The old 300 KB statements above describe
+the original pinned audit or earlier implementation, not the current limit.

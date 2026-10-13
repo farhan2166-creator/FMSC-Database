@@ -276,6 +276,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private int currentAdmissionId;
     private ModernButton? saveButton;
     private ModernButton? saveAndNewButton;
+    private ModernButton? checkAdmissionButton;
+    private AdmissionSubmission? unconfirmedAdmission;
     private bool savedAdmissionReadyForNext;
     private readonly ModernCheckBox keepPlacement = new() {
         Text = "Keep placement", Checked = true, AutoSize = true,
@@ -298,7 +300,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly record struct AdmissionPart(string Where, string Value);
     /// <summary>At most one report per baseline: HasUnsavedChanges is asked several times on some paths.</summary>
     private bool _admissionDifferenceReported;
-    public bool HasUnsavedChanges => _pendingPhotoData is not null || HasAdmissionEdits;
+    public bool HasUnsavedChanges => unconfirmedAdmission is not null || _pendingPhotoData is not null || HasAdmissionEdits;
     private bool HasAdmissionEdits
     {
         get
@@ -323,8 +325,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             return true;
         }
     }
-    public string UnsavedChangesMessage =>
-        "This admission contains unsaved changes.\r\n\r\nIf you leave now, those changes will be lost.";
+    public string UnsavedChangesMessage => unconfirmedAdmission is { } submitted
+        ? $"Admission {submitted.Number} may already have been saved. Check Saved Admission or Find Student before submitting it again.\r\n\r\nLeave this form and discard its entries?"
+        : "This admission contains unsaved changes.\r\n\r\nIf you leave now, those changes will be lost.";
     /// <summary>names the first field that differs, once per baseline, in the same log the rest of the application writes to. This makes the next occurrence say which field.</summary>
     private void ReportFirstDifference(string difference)
     {
@@ -688,7 +691,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 {
                     choosePhotoButton.TakesFocus = true;
                     choosePhotoButton.Focus();
-                    SetStatus($"Photo · {name.Text} · Choose Photo to resize and save an image within 300 KB.");
+                    SetStatus($"Photo · {name.Text} · Choose Photo to resize and save an image within 80 KB.");
                 }
                 else SetStatus($"Photo · {name.Text} · Your role can view the photo but cannot change it.");
             }
@@ -847,11 +850,12 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         UiAccessibility.Describe(newAdmissionButton, "Clear and start a new admission",
             "Discard current student entries and start a new admission. Placement is retained when Keep placement is selected.");
         /* Save writes the student record (and can create it), so it is guarded against a double submit. Clear is local; the print actions only read. */
-        saveButton = AddBusyAction(
-            UiText.Actions.Save,
-            Save,
-            "Success");
-        saveAndNewButton = AddBusyAction("Save & New", SaveAndStartNextAsync, "Success");
+        // These actions own their enabled state; a generic busy action must not
+        // re-enable Save after an unconfirmed admission reply.
+        saveButton = AddAction(UiText.Actions.Save, async (_, _) => await Save(), "Success");
+        saveAndNewButton = AddAction("Save & New", async (_, _) => await SaveAndStartNextAsync(), "Success");
+        checkAdmissionButton = AddAction("Check Saved Admission", async (_, _) => await RecheckAdmissionAsync(), "Secondary");
+        checkAdmissionButton.Visible = false;
         UiAccessibility.Describe(keepPlacement, "Keep placement for the next student",
             "Retain campus, academic year, class and section for Clear / New and Save & New. Student details and discounts are cleared.");
         AddToolbarSeparator();
@@ -2086,10 +2090,21 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 (CurrentUser.HasPermission("Students.Admit") || CurrentUser.HasPermission("Enrollment.Manage") || CurrentUser.HasPermission("Students.Administer"));
         findSiblingButton.Enabled = savedStudentReady && CurrentUser.HasPermission("Students.Administer");
         if (saveAndNewButton is not null)
-            saveAndNewButton.Enabled = !saveBusy && currentAdmissionId <= 0;
+            saveAndNewButton.Enabled = !IsBusy && currentAdmissionId <= 0 && unconfirmedAdmission is null;
+        if (saveButton is not null) saveButton.Enabled = !IsBusy && unconfirmedAdmission is null;
+        if (checkAdmissionButton is not null)
+        {
+            checkAdmissionButton.Visible = unconfirmedAdmission is not null;
+            checkAdmissionButton.Enabled = !IsBusy;
+        }
         string text;
         Color color;
-        if (currentAdmissionId <= 0)
+        if (unconfirmedAdmission is { } submitted)
+        {
+            text = $"Admission {submitted.Number} · Check save outcome";
+            color = AppTheme.Warning;
+        }
+        else if (currentAdmissionId <= 0)
         {
             text = "New Admission";
             color = AppTheme.Primary;
@@ -2182,6 +2197,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private void StartNewAdmission()
     {
+        if (unconfirmedAdmission is not null && !ConfirmDiscardAdmission()) return;
         pendingPlacementId = 0;
         if (confirmPlacementAction is not null) confirmPlacementAction.Visible = false;
         currentAdmissionId = 0;
@@ -2786,7 +2802,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     /* The load generation for the edit form. */
     private int admissionLoadVersion;
-    private async Task LoadStudentForEditAsync(int admissionId)
+    private async Task<bool> LoadStudentForEditAsync(int admissionId)
     {
         pendingPlacementId = -1; // Fail closed while placement confirmation state is loading.
         if (confirmPlacementAction is not null) confirmPlacementAction.Visible = false;
@@ -2808,7 +2824,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if (admissionId <= 0)
             {
                 Warn("The selected student is invalid.");
-                return;
+                return false;
             }
             DataTable dt =
                 await DatabaseHelper.QueryUserAsync(
@@ -2820,13 +2836,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             {
                 Alert(
                     "The selected student could not be loaded.");
-                return;
+                return false;
             }
             /* The form may have been cleared, or another student loaded, while this query was running. */
             if (IsDisposed ||
                 version != admissionLoadVersion)
             {
-                return;
+                return false;
             }
             DataRow row = dt.Rows[0];
             if (!registrationReview && Convert.ToString(row["Status"]) == "Pending")
@@ -2834,8 +2850,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 if (!QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)) Warn("Your role needs admission and student-view access to edit or confirm this quick registration.");
                 else if (_navigate is not null) _navigate(() => new QuickRegistrationPage(_navigate, admissionId), "Students", "Quick Registration");
                 else Warn("This is a pending registration. Review and confirm it in Dashboard Quick Registration.");
-                return;
+                return false;
             }
+            unconfirmedAdmission = null;
             legacySetupPending = row.Table.Columns.Contains("LegacySetupPending") && Convert.ToBoolean(row["LegacySetupPending"]);
             currentAdmissionId =
                 admissionId;
@@ -3072,7 +3089,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             int transportEnrollmentId=row.Table.Columns.Contains("EnrollmentId") && row["EnrollmentId"]!=DBNull.Value
                 ? Convert.ToInt32(row["EnrollmentId"]) : 0;
             string transportText=await Task.Run(() => EnrollmentTransportStatus.Read(transportEnrollmentId));
-            if(IsDisposed || version!=admissionLoadVersion) return;
+            if(IsDisposed || version!=admissionLoadVersion) return false;
             viewRegistrationNo.Text =
                 registrationNo.Text;
             viewAdmissionDate.Text =
@@ -3104,7 +3121,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     "SectionName");
             viewTransport.Text =
                 transportText;
-            if (IsDisposed || version != admissionLoadVersion) return;
+            if (IsDisposed || version != admissionLoadVersion) return false;
             initializingFirstPlacement = true;
             try
             {
@@ -3119,7 +3136,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             finally { initializingFirstPlacement = false; }
             if (_editEnrollmentId <= 0)
                 await PrepareFirstPlacementAsync(_editCampusId);
-            if (IsDisposed || version != admissionLoadVersion) return;
+            if (IsDisposed || version != admissionLoadVersion) return false;
             ShowPlacementSummary(true);
             loadedThisStudent = true;
             if (_editEnrollmentId > 0)
@@ -3138,7 +3155,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 version != admissionLoadVersion ||
                 currentAdmissionId != admissionId)
             {
-                return;
+                return false;
             }
             await LoadPhotoForAdmissionAsync(
                 currentAdmissionId);
@@ -3146,14 +3163,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 version != admissionLoadVersion ||
                 currentAdmissionId != admissionId)
             {
-                return;
+                return false;
             }
             await LoadCurrentSiblingsAsync();
             if (IsDisposed ||
                 version != admissionLoadVersion ||
                 currentAdmissionId != admissionId)
             {
-                return;
+                return false;
             }
             UpdateStudentWorkspace();
             SwitchTab(0);
@@ -3177,7 +3194,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         if (IsDisposed ||
             version != admissionLoadVersion)
         {
-            return;
+            return false;
         }
         /* and this is the point at which the page knows WHICH record it is showing, so the header says so rather than looking like a blank form. */
         string loadedStudent = name.Text.Trim();
@@ -3188,6 +3205,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         /* this is the point at which the form has settled on a record. */
         CaptureAdmissionBaseline();
         Defer(() => RefreshConfirmReturnAvailabilityAsync(admissionId, version));
+        return true;
     }
     /* The load generation for the new-admission fee structure. Its loader is now awaited, so a second Campus/Year/Class change can overtake this run and this one must not write after it. */
     private int feeStructureLoadVersion;
@@ -3984,7 +4002,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             using var busy = BeginBusy(BusyMessage, this);
             using var dialog = new OpenFileDialog {
                 Filter = "Image files (*.jpg;*.jpeg;*.png)|*.jpg;*.jpeg;*.png",
-                Title = "Choose a student photo — resized automatically to 300 KB or less"
+                Title = "Choose a student photo — resized automatically to 80 KB or less"
             };
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK) return;
             var request = photoRead.Begin();
@@ -4211,7 +4229,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private bool legacySetupPending;
     private async Task Save()
     {
-        if (IsBusy || (registrationReview && (!IsPendingRegistration || currentAdmissionId <= 0)))
+        if (IsBusy || unconfirmedAdmission is not null || (registrationReview && (!IsPendingRegistration || currentAdmissionId <= 0)))
             return;
         saveBusy = true;
         UpdateStudentWorkspace();
@@ -4219,7 +4237,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         if (saveButton is not null)
             saveButton.Enabled = false;
         /* UX - while the save runs, the actions that would wipe or replace the form under it (Find, New Admission, Clear, quick find) are held. */
-        using BusyScope holdInterfering =
+        BusyScope holdInterfering =
             BeginBusy(string.Empty, findButton, newAdmissionButton, quickStudent, saveAndNewButton, keepPlacement);
         try
         {
@@ -4234,9 +4252,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         finally
         {
+            // Restore temporarily held controls before applying the final save/recovery state.
+            // Otherwise the scope could undo Save & New's enabled state after validation fails.
+            holdInterfering.Dispose();
             saveBusy = false;
-            if (!IsDisposed && saveButton is not null)
-                saveButton.Enabled = true;
             if (!IsDisposed)
                 UpdateStudentWorkspace();
         }
@@ -4389,79 +4408,99 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             }
             if(!AdmissionNumbers.TryNormalize(admissionIdValue.Text,out string cleanAdmissionNumber)) return;
             admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber").Value=cleanAdmissionNumber;
-            var result = await DatabaseHelper.QueryUserAsync(savedHistorical ? "AdmitHistoricalStudent" : "AdmitStudent", admissionParameters.ToArray());
-            int newAdmissionId = 0;
-            if (result.Rows.Count > 0 &&
-                result.Columns.Contains("AdmissionId"))
-            {
-                newAdmissionId =
-                    Convert.ToInt32(
-                        result.Rows[0]["AdmissionId"]);
-            }
-            if (result.Rows.Count > 0 &&
-                result.Columns.Contains("RegistrationNumber"))
-            {
-                registrationNo.Text =
-                    Convert.ToString(
-                        result.Rows[0]["RegistrationNumber"])
-                    ?? string.Empty;
-            }
-            bool photoSaved = true;
-            bool reloaded = false;
-            string reloadError = string.Empty;
-            if (newAdmissionId > 0)
-            {
-                StudentSearchCache.Invalidate();
-                currentAdmissionId =
-                    newAdmissionId;
-                /* The admission is already committed at this point, so a photo that cannot be stored must not undo it. */
-                photoSaved =
-                    await PersistPendingPhotoIfAnyAsync(
-                        newAdmissionId);
-                /* The admission is committed, so a reload that fails is a refresh problem and nothing more. */
-                try
-                {
-                    await LoadStudentForEditAsync(
-                        newAdmissionId);
-                    reloaded = true;
-                }
-                catch (Exception reloadException)
-                {
-                    reloaded = false;
-                    reloadError = reloadException.Message;
-                }
-            }
-            AddSuggestionIfNew(fatherOccupation, fatherOccupation.Text);
-            AddSuggestionIfNew(prevSchool, prevSchool.Text);
-            AddSuggestionIfNew(address, address.Text);
-            AddSuggestionIfNew(placeOfBirthInput, placeOfBirthInput.Text);
-            AddSuggestionIfNew(casteTribe, casteTribe.Text);
-            if (photoSaved)
-            {
-                Info(
-                    (savedHistorical ? "Historical student saved for legacy review. No fees were generated." : "Student admitted. Placement and opening fees are ready.")
-                    + (typedDiscounts.Count > 0
-                        ? " The typed fee discount(s) have been saved."
-                        : string.Empty)
-                    + (reloaded
-                        ? " The form has been kept open with the saved student details."
-                        : " The form could not be refreshed from the saved record - open the student from Find Student to see it."
-                          + (reloadError.Length > 0 ? " (" + reloadError + ")" : string.Empty)));
-            }
-            if (!photoSaved)
-            {
-                /* The admission itself is committed, but the photo is not, so the "admitted successfully" message above is deliberately skipped rather than followed by this warning. */
-                Alert(
-                    "The admission was saved, but the selected photo was NOT saved. The photo is " +
-                    "still held on this form - use Retry Photo Save to store it. The " +
-                    "student has been admitted without it.");
-            }
-            savedAdmissionReadyForNext = newAdmissionId > 0 && photoSaved && reloaded;
+            var submitted = new AdmissionSubmission(cleanAdmissionNumber, studentName,
+                Convert.ToString(admissionParameters.First(p => p.ParameterName == "@FatherName").Value) ?? "",
+                Convert.ToDateTime(admissionParameters.First(p => p.ParameterName == "@AdmissionDate").Value),
+                Convert.ToInt32(admissionParameters.First(p => p.ParameterName == "@AdmissionCampusId").Value),
+                savedHistorical, typedDiscounts.Count);
+            int submittedVersion = admissionLoadVersion;
+            unconfirmedAdmission = submitted;
+            var confirmation = await AdmissionSaveConfirmation.SubmitAsync(submitted,
+                () => DatabaseHelper.QueryUserSetAsync(savedHistorical ? "AdmitHistoricalStudent" : "AdmitStudent", admissionParameters.ToArray()),
+                ReadSubmittedAdmissionAsync);
+            if (IsDisposed || submittedVersion != admissionLoadVersion) return;
+            await ApplyAdmissionConfirmationAsync(submitted, confirmation);
         }
         catch (Exception ex)
         {
-            Fail(ex);
+            if (unconfirmedAdmission is not null) ShowUnconfirmedAdmission();
+            else Fail(ex);
+            AppExceptionHandler.LogNonFatal(ex, "Saving a new admission");
         }
+    }
+
+    private static Task<DataTable> ReadSubmittedAdmissionAsync(AdmissionSubmission submitted) =>
+        DatabaseHelper.QuerySqlAsync("""
+            EXEC dbo.RequirePermission @UserId,N'Students.Admit';
+            SELECT AdmissionId,AdmissionNumber,RegistrationNumber,StudentName,FatherName,AdmissionDate,AdmissionCampusId
+            FROM dbo.Students WHERE AdmissionNumber=@AdmissionNumber;
+            """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.P("@AdmissionNumber", submitted.Number));
+
+    private void ShowUnconfirmedAdmission()
+    {
+        if (unconfirmedAdmission is not { } submitted) return;
+        savedAdmissionReadyForNext = false;
+        SetStatus($"Admission {submitted.Number}: the save outcome could not be confirmed. Your entries and photo are retained. " +
+            "Use Check Saved Admission or Find Student. Do not submit this student again until you verify whether the admission exists.", PageStatusKind.Warning);
+        UpdateStudentWorkspace();
+    }
+
+    private async Task RecheckAdmissionAsync()
+    {
+        if (IsBusy || unconfirmedAdmission is not { } submitted) return;
+        int version = admissionLoadVersion;
+        saveBusy = true; UpdateStudentWorkspace();
+        try
+        {
+            using var hold = BeginBusy("Checking the saved admission…", this);
+            var confirmation = await AdmissionSaveConfirmation.RecheckAsync(submitted, ReadSubmittedAdmissionAsync);
+            if (IsDisposed || version != admissionLoadVersion || !ReferenceEquals(unconfirmedAdmission, submitted)) return;
+            await ApplyAdmissionConfirmationAsync(submitted, confirmation);
+        }
+        finally { saveBusy = false; if (!IsDisposed) UpdateStudentWorkspace(); }
+    }
+
+    private async Task ApplyAdmissionConfirmationAsync(AdmissionSubmission submitted, AdmissionConfirmation confirmation)
+    {
+        if (confirmation.WriteError is { } writeError) AppExceptionHandler.LogNonFatal(writeError, "Admission write response");
+        if (confirmation.ReadError is { } readError) AppExceptionHandler.LogNonFatal(readError, "Checking admission after an uncertain write");
+        if (confirmation.Admission is not { } admitted)
+        {
+            unconfirmedAdmission = submitted;
+            ShowUnconfirmedAdmission();
+            return;
+        }
+        unconfirmedAdmission = null;
+        StudentSearchCache.Invalidate();
+        currentAdmissionId = admitted.Id;
+        registrationNo.Text = admitted.RegistrationNumber;
+        int version = admissionLoadVersion;
+        // Confirmation precedes all photo writes, reloads and success messages.
+        bool photoSaved = await PersistPendingPhotoIfAnyAsync(admitted.Id);
+        if (IsDisposed || currentAdmissionId != admitted.Id || version != admissionLoadVersion) return;
+        bool reloaded = false;
+        string reloadError = "";
+        try { reloaded = await LoadStudentForEditAsync(admitted.Id); }
+        catch (Exception ex)
+        {
+            reloadError = DbMessage.UserMessage(ex);
+            AppExceptionHandler.LogNonFatal(ex, "Refreshing a confirmed admission");
+        }
+        if (IsDisposed || currentAdmissionId != admitted.Id) return;
+        AddSuggestionIfNew(fatherOccupation, fatherOccupation.Text);
+        AddSuggestionIfNew(prevSchool, prevSchool.Text);
+        AddSuggestionIfNew(address, address.Text);
+        AddSuggestionIfNew(placeOfBirthInput, placeOfBirthInput.Text);
+        AddSuggestionIfNew(casteTribe, casteTribe.Text);
+        string message = submitted.Historical ? "Historical student saved for legacy review. No fees were generated."
+            : "Student admitted. Placement and opening fees are ready.";
+        if (submitted.DiscountCount > 0) message += " The typed fee discount(s) have been saved.";
+        if (confirmation.Reconciled) message += " The saved record was verified after an incomplete save reply.";
+        message += reloaded ? " The form has been kept open with the saved student details."
+            : " The form could not be refreshed; open this student from Find Student before further edits. " + reloadError;
+        if (!photoSaved) message += " The selected photo was not saved; it is retained here. Use Retry Photo Save.";
+        SetStatus(message, photoSaved && reloaded ? PageStatusKind.Success : PageStatusKind.Warning);
+        savedAdmissionReadyForNext = photoSaved && reloaded;
     }
     /// <summary>The edit path uses dbo.SaveStudentDetailsWithFirstEnrollment to save student details, fee discounts and an optional verified first enrollment in one transaction.</summary>
     private async Task SaveDetailsAndDiscountsAsync(
@@ -4598,11 +4637,12 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             /* The details transaction is committed by now, so a reload that fails is only a stale screen. */
             try
             {
-                await LoadStudentForEditAsync(savedStudent);
+                bool refreshed = await LoadStudentForEditAsync(savedStudent);
                 if (IsDisposed || currentAdmissionId != savedStudent) return;
                 SetStatus(success + (photoSaved && hadPhoto ? " Photo saved." : "") +
-                    (!photoSaved ? " Photo not saved; use Retry Photo Save." : ""),
-                    photoSaved ? PageStatusKind.Success : PageStatusKind.Warning);
+                    (!photoSaved ? " Photo not saved; use Retry Photo Save." : "") +
+                    (!refreshed ? " The form could not refresh; reopen the student from Find Student before further edits." : ""),
+                    photoSaved && refreshed ? PageStatusKind.Success : PageStatusKind.Warning);
             }
             catch (Exception nonFatalException55)
             {
@@ -4729,6 +4769,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     {
         /* any student load still in flight belongs to the form this clear is replacing, so it must not land on the cleared page. */
         admissionLoadVersion++;
+        unconfirmedAdmission = null;
         photoRead.Cancel();
         pendingPlacementId = 0;
         if (confirmPlacementAction is not null) confirmPlacementAction.Visible = false;

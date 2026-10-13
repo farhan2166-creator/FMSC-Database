@@ -134,6 +134,24 @@ internal static partial class Program
         Task Call(string name) => (Task)type.GetMethod(name, flags)!.Invoke(page, null)!;
         void Stage() => type.GetMethod("StagePreparedPhoto", flags)!.Invoke(page, new object[] { jpeg, "fixture.jpg" });
         bool Pending() => type.GetProperty("_pendingPhotoData", flags)!.GetValue(page) is not null;
+        // An uncertain admission must never permit another write or store its pending photo.
+        var submissionType = type.Assembly.GetType("FMSC_SMS.Core.AdmissionSubmission", true)!;
+        var submission = Activator.CreateInstance(submissionType, new object[] { "125", "Ali", "Parent", new DateTime(2026, 10, 13), 2, false, 0 })!;
+        type.GetField("unconfirmedAdmission", flags)!.SetValue(page, submission);
+        Stage();
+        type.GetMethod("ShowUnconfirmedAdmission", flags)!.Invoke(page, null);
+        Check(Field<Label>("studentStatusBadge").Text.Contains("Check save outcome"), "The student header explains that the submitted admission needs confirmation");
+        Check(!Field<ModernButton>("saveButton").Enabled && !Field<ModernButton>("saveAndNewButton").Enabled &&
+            Field<ModernButton>("checkAdmissionButton").Visible, "An unconfirmed admission disables both save paths and exposes a read-only check");
+        Check(((IUnsavedChanges)page).HasUnsavedChanges && ((IUnsavedChanges)page).UnsavedChangesMessage.Contains("may already have been saved"),
+            "Leaving an unconfirmed admission explains the possible existing record");
+        var guardedSave = Call("Save");
+        Check(guardedSave.IsCompletedSuccessfully && Pending() && writes == 0 && !Field<ModernButton>("saveButton").Enabled,
+            "A keyboard/main Save cannot bypass unconfirmed state or save the photo without a student ID");
+        var guardedNext = Call("SaveAndStartNextAsync");
+        Check(guardedNext.IsCompletedSuccessfully && ReferenceEquals(type.GetField("unconfirmedAdmission", flags)!.GetValue(page), submission),
+            "Save and New cannot clear an unconfirmed admission");
+        type.GetField("unconfirmedAdmission", flags)!.SetValue(page, null);
         type.GetField("currentAdmissionId", flags)!.SetValue(page, 41);
         type.GetMethod("CaptureAdmissionBaseline", flags)!.Invoke(page, null);
         Stage(); Check(writes == 0 && Pending() && Field<ModernButton>("savePhotoButton").Enabled, "Choosing a photo previews it without saving");

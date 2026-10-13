@@ -19,11 +19,34 @@ internal static class StudentPhotoProcessor
         if (original.RawFormat.Guid != ImageFormat.Jpeg.Guid && original.RawFormat.Guid != ImageFormat.Png.Guid)
             throw new StudentPhotoInputException("Choose a JPEG or PNG image.");
         CorrectOrientation(original);
-        Size size = StudentPhotoInput.FittedSize(original.Width, original.Height);
-        using var resized = new Bitmap(size.Width, size.Height, PixelFormat.Format24bppRgb);
-        resized.SetResolution(96, 96);
-        using (var graphics = Graphics.FromImage(resized))
+        Bitmap? resized = null;
+        try
         {
+            return StudentPhotoCompression.Prepare(original.Width, original.Height, (size, quality) =>
+            {
+                // Reuse the bitmap across quality attempts; always resize from the original.
+                if (resized is null || resized.Size != size)
+                {
+                    resized?.Dispose(); resized = null;
+                    resized = Render(original, size);
+                }
+                using var parameters = new EncoderParameters(1);
+                parameters.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)quality);
+                using var encoded = new MemoryStream();
+                resized.Save(encoded, JpegCodec.Value, parameters);
+                return encoded.ToArray();
+            }, token);
+        }
+        finally { resized?.Dispose(); }
+    }
+
+    private static Bitmap Render(Image original, Size size)
+    {
+        var resized = new Bitmap(size.Width, size.Height, PixelFormat.Format24bppRgb);
+        try
+        {
+            resized.SetResolution(96, 96);
+            using var graphics = Graphics.FromImage(resized);
             // JPEG has no alpha channel; a white background avoids black transparent areas.
             graphics.Clear(Color.White);
             graphics.CompositingQuality = CompositingQuality.HighQuality;
@@ -31,28 +54,14 @@ internal static class StudentPhotoProcessor
             graphics.SmoothingMode = SmoothingMode.HighQuality;
             graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
             graphics.PageUnit = GraphicsUnit.Pixel;
-            float scale = (float)Math.Min(1d, (double)StudentPhotoInput.MaximumDimension / Math.Max(original.Width, original.Height));
-            // Apply the same transform to both axes; rounded canvas dimensions
-            // must not introduce independent horizontal/vertical stretching.
+            float scale = (float)Math.Min(1d, (double)Math.Max(size.Width, size.Height) / Math.Max(original.Width, original.Height));
+            // One transform preserves aspect ratio even when the canvas edge rounds outward.
             graphics.ScaleTransform(scale, scale);
             graphics.DrawImage(original, new Rectangle(0, 0, original.Width, original.Height),
                 0, 0, original.Width, original.Height, GraphicsUnit.Pixel);
+            return resized;
         }
-        for (int quality = 90; quality >= 30; quality -= 15)
-        {
-            token.ThrowIfCancellationRequested();
-            using var parameters = new EncoderParameters(1);
-            parameters.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)quality);
-            using var encoded = new MemoryStream();
-            resized.Save(encoded, JpegCodec.Value, parameters);
-            if (encoded.Length <= StudentPhotoInput.MaximumStoredBytes)
-            {
-                byte[] bytes = encoded.ToArray();
-                StudentPhotoInput.ValidateStoredData(bytes);
-                return bytes;
-            }
-        }
-        throw new StudentPhotoInputException("This image could not be prepared within 300 KB. Choose a simpler photo or resize the original first.");
+        catch { resized.Dispose(); throw; }
     }
 
     private static void CorrectOrientation(Image image)

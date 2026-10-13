@@ -61,7 +61,7 @@ internal static class RegistrationPhotoChecks
         { broken.Columns.Remove("Frequency"); Reject(() => QuickRegistrationView.Read(41, details, broken, "snapshot")); }
 
         var draft = new StudentPhotoDraft();
-        byte[] data = new byte[300 * 1024];
+        byte[] data = new byte[StudentPhotoInput.MaximumStoredBytes];
         int writes = 0, storedId = 0; byte[]? storedData = null;
         Func<int, byte[], string?, string?, Task> write = (id, bytes, name, type) => {
             writes++; storedId = id; storedData = bytes;
@@ -82,7 +82,7 @@ internal static class RegistrationPhotoChecks
         draft.Stage(data, "photo.jpg"); draft.Discard();
         Check(draft.Current is null && writes == 2, "Discarding a selection never changes the stored photo");
         draft.Stage(data, "photo.jpg");
-        Reject(() => draft.Stage(new byte[300 * 1024 + 1], "oversize.jpg"));
+        Reject(() => draft.Stage(new byte[StudentPhotoInput.MaximumStoredBytes + 1], "oversize.jpg"));
         Check(ReferenceEquals(draft.Current!.Data, data), "Invalid staging preserves the previous valid selection");
         try { await draft.SaveAsync(0, write, () => true); throw new Exception("A photo was saved before its student exists"); }
         catch (ArgumentOutOfRangeException) { checks++; }

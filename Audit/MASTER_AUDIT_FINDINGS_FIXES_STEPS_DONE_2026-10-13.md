@@ -2,7 +2,10 @@
 
 **Latest implementation note:** The approved compact dashboard, FR-03 navigation
 recovery, FR-02 registration refresh feedback and FR-04/05 explicit photo-save
-and retry flow are implemented in the current source. FR-01 remains open.
+and retry flow are implemented in the current source. FR-01 now has strict
+admission confirmation and read-only reconciliation, with unconfirmed saves
+blocked. New photo preparation enforces an 80 KB maximum using proportional
+adaptive sizing and a JPEG quality floor; existing stored photos are unchanged.
 FR-06 is accepted by the owner: date/year-only changes on a blank new registration
 allow leaving without a discard prompt; this policy is documented in C#.
 See the
@@ -184,6 +187,7 @@ These are reported implemented changes, not fresh recommendations to repeat them
 11. Preserve paid-charge protections, uniqueness, transaction boundaries, payment journals and non-idempotent write caution. No automatic retry after ambiguous payment commit.
 12. No automatic changes to real school/student records during audit, testing or migration verification; use separately restored disposable copies.
 13. On an otherwise blank new Quick Registration, changing only the date or academic year does not require a discard warning. Student-detail/placement drafts and existing pending-record edits keep their normal warnings.
+14. New photo selections must prepare to <=80 KB while preserving full-image proportions, avoiding upscaling and retaining acceptable JPEG quality. Existing stored photos are not automatically rewritten. Admission success requires a confirmed positive student ID; uncertain saves are checked read-only and never automatically resubmitted.
 
 ## 6. Remaining steps — prioritized release acceptance checklist
 
