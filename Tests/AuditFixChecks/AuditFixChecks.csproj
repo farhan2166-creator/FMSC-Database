@@ -23,6 +23,11 @@
     <Compile Include="../../Core/StudentPhotoDraft.cs" Link="StudentPhotoDraft.cs" />
     <Compile Include="../../Core/AdmissionSaveConfirmation.cs" Link="AdmissionSaveConfirmation.cs" />
     <Compile Include="../../Core/StudentPhotoCompression.cs" Link="StudentPhotoCompression.cs" />
+    <Compile Include="../../Core/BoundedImageFile.cs" Link="BoundedImageFile.cs" />
+    <Compile Include="../../Core/ReportSettingsFile.cs" Link="ReportSettingsFile.cs" />
+    <Compile Include="../../Core/AtomicExportFile.cs" Link="AtomicExportFile.cs" />
+    <Compile Include="../../Core/CsvFileExporter.cs" Link="CsvFileExporter.cs" />
+    <Compile Include="../../Core/CsvSafety.cs" Link="CsvSafety.cs" />
     <Compile Include="../../Pages/Finance/Collection/CollectionRecoveryJournal.cs" Link="CollectionRecoveryJournal.cs" />
     <Using Include="System.Drawing" />
     <Using Include="System.Data" />

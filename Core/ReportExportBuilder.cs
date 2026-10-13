@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 
 namespace FMSC_SMS.Core;
 
@@ -52,21 +51,5 @@ internal static class ReportExportBuilder
     }
 
     internal static void WriteCsv(DataTable table, string filePath)
-    {
-        DataColumn[] columns = table.Columns.Cast<DataColumn>().ToArray();
-        var text = new StringBuilder();
-        text.AppendLine(string.Join(",", columns.Select(column => Cell(column.ColumnName))));
-        foreach (DataRow row in table.Rows)
-            text.AppendLine(string.Join(",", columns.Select(column => Cell(row[column]))));
-        File.WriteAllText(filePath, text.ToString(), new UTF8Encoding(true));
-    }
-
-    private static string Cell(object? value)
-    {
-        string text = value is null || value == DBNull.Value
-            ? string.Empty
-            : Convert.ToString(value, CultureInfo.CurrentCulture) ?? string.Empty;
-        text = CsvSafety.Neutralise(text);
-        return $"\"{text.Replace("\"", "\"\"")}\"";
-    }
+        => CsvFileExporter.Write(table, filePath);
 }

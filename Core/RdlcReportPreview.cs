@@ -289,7 +289,7 @@ internal static class RdlcReportPreview
                 };
                 if (dialog.ShowDialog(form) != DialogResult.OK) return;
                 byte[] bytes = viewer.LocalReport.Render("PDF");
-                File.WriteAllBytes(dialog.FileName, bytes);
+                AtomicExportFile.Publish(dialog.FileName, temporary => File.WriteAllBytes(temporary, bytes), PdfTableExporter.ValidatePdf);
             });
         });
         BindToolbarAction(form, previous, Keys.Control | Keys.Left, "Ctrl+Left", () => {

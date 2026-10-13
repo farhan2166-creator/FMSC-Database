@@ -1406,12 +1406,19 @@ public partial class StudentReportsPage : V2Page
         {
             return;
         }
-        ReportLayoutStore.SaveView(ViewsKey, new ReportSavedView {
+        var saved = ReportLayoutStore.SaveView(ViewsKey, new ReportSavedView {
             Name = name,
             State = CaptureState()
         });
+        if (!saved.Succeeded)
+        {
+            SetStatus($"View \"{name}\" was not saved. Your current selections are retained. " +
+                DbMessage.UserMessage(saved.Error!), PageStatusKind.Warning);
+            return;
+        }
         RefreshViewChoices(name);
-        Info($"View \"{name}\" saved.");
+        SetStatus($"View \"{name}\" saved." + (saved.RecoveryPath is not null
+            ? " Previous damaged settings were backed up for recovery." : ""), PageStatusKind.Success);
     }
     private void DeleteSelectedView()
     {
@@ -1426,9 +1433,15 @@ public partial class StudentReportsPage : V2Page
         {
             return;
         }
-        ReportLayoutStore.DeleteView(ViewsKey, name);
+        var deleted = ReportLayoutStore.DeleteView(ViewsKey, name);
+        if (!deleted.Succeeded)
+        {
+            SetStatus($"View \"{name}\" was not deleted. " + DbMessage.UserMessage(deleted.Error!), PageStatusKind.Warning);
+            return;
+        }
         RefreshViewChoices(string.Empty);
-        Info($"View \"{name}\" deleted.");
+        SetStatus(deleted.Changed ? $"View \"{name}\" deleted." : "That saved view is already absent.",
+            deleted.Changed ? PageStatusKind.Success : PageStatusKind.Info);
     }
     private async Task OnViewChosenAsync()
     {

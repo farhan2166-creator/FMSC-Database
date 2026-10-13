@@ -241,12 +241,8 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
             byte[] bytes =
-                await File.ReadAllBytesAsync(dialog.FileName);
-            if (bytes.Length > 2_000_000)
-            {
-                Warn("Please choose an image smaller than 2 MB.");
-                return;
-            }
+                await BoundedImageFile.ReadAsync(dialog.FileName, 2_000_000);
+            if (IsDisposed) return;
             UiHelper.ReplacePictureImage(logoPreview, BitmapFromBytes(bytes));
             _logoBytes = bytes;
             _logoFileName =
@@ -261,6 +257,10 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             logoInfo.Text =
                 $"{_logoFileName} (not saved yet)";
             SetStatus("Logo selected. Click Save to store it.");
+        }
+        catch (InvalidDataException ex)
+        {
+            if (!IsDisposed) SetStatus(ex.Message, PageStatusKind.Warning);
         }
         catch (Exception ex)
         {

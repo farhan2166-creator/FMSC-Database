@@ -14,13 +14,23 @@ python Tools/verify_schema_artifact.py --check
 python Tools/test_audit_schema.py
 ```
 
-The portable tests compile the production money, TVP and quotation helpers. The
+The portable tests compile production money, TVP, quotation, registration/photo
+and file-persistence helpers. The
 schema verifier checks ZIP CRC, Origin.xml's model checksum, the exact package
 hash, contract inventory, money check expressions, the reviewed full model, and
 273 SQL-module fingerprints. These checks do not execute SQL Server or WinForms.
 Publishing also runs `Installer/VerifySchemaArtifact.ps1`, which rejects an
 unreviewed package/model. Use `--approve` only after independently reviewing an
 intentional artifact change; it records a baseline rather than proving correctness.
+
+`Installer/VerifyBaseline.ps1` is retired: its old source-freeze manifest is no
+longer maintained. Invoking it fails explicitly with the supported verifier and
+validation instructions; it does not claim a successful source-freeze check.
+For the supported PowerShell artifact check, run:
+
+```text
+pwsh -NoProfile -File Installer/VerifySchemaArtifact.ps1 -ProjectDirectory .
+```
 
 ## Disposable SQL checks
 

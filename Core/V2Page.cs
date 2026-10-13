@@ -1043,11 +1043,15 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         if (keys is null || keys.Count == 0)
         {
             _reportLayoutCache[layoutKey] = null;
-            ReportLayoutStore.ClearColumns(layoutKey);
+            var reset = ReportLayoutStore.ClearColumns(layoutKey);
+            if (!reset.Succeeded) SetStatus("The default columns apply here, but the saved layout could not be reset. " +
+                DbMessage.UserMessage(reset.Error!), PageStatusKind.Warning);
             return;
         }
         _reportLayoutCache[layoutKey] = keys.ToList();
-        ReportLayoutStore.SetColumns(layoutKey, keys);
+        var saved = ReportLayoutStore.SetColumns(layoutKey, keys);
+        if (!saved.Succeeded) SetStatus("These columns apply here, but the layout was not saved for next time. " +
+            DbMessage.UserMessage(saved.Error!), PageStatusKind.Warning);
     }
     private void HookReportColumnLayout()
     {

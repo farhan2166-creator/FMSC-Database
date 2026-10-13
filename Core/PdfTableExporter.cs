@@ -89,7 +89,13 @@ public static class PdfTableExporter
         }
         var renderer = new PdfDocumentRenderer { Document = document };
         renderer.RenderDocument();
-        renderer.PdfDocument.Save(filePath);
+        using var output = renderer.PdfDocument;
+        AtomicExportFile.Publish(filePath, temporary => output.Save(temporary), ValidatePdf);
+    }
+    internal static void ValidatePdf(string path)
+    {
+        using var pdf = PdfSharp.Pdf.IO.PdfReader.Open(path, PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+        if (pdf.PageCount <= 0) throw new InvalidDataException("The PDF contains no pages. The previous file was not replaced.");
     }
     private const double MinColumnWidthPt = 45;
     private const double MaxColumnWidthPt = 260;

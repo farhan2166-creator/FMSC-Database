@@ -47,4 +47,5 @@ Console.WriteLine($"PASS: {await DurabilityChecks.RunAsync()} settings, photo in
 Console.WriteLine($"PASS: {DashboardChecks.Run()} dashboard count and academic-year checks.");
 Console.WriteLine($"PASS: {await RegistrationPhotoChecks.RunAsync()} registration view and photo save/retry checks.");
 Console.WriteLine($"PASS: {await AdmissionCompressionChecks.RunAsync()} admission confirmation and compact photo compression checks.");
+Console.WriteLine($"PASS: {await FilePersistenceChecks.RunAsync()} logo preflight, report settings recovery and export durability checks.");
 if(args.Contains("--profile-search"))ReviewFilterProfile.Run();

@@ -1,5 +1,10 @@
 # FMSC_SMS — Independent Security, Durability, and Release-Integrity Audit
 
+**Current implementation update:** DP-04, RT-01, DP-01, DP-02 and DP-03 are
+implemented in source at the owner's request. IA-01/02/03 were explicitly
+excluded. See the implementation addendum below; the original review remains
+pinned to its stated baseline and is not native deployment acceptance.
+
 **Audit date:** 13 October 2026  
 **Repository:** `farhan2166-creator/FMSC-Database`  
 **Branch:** `main`  
@@ -225,3 +230,35 @@ These tests are **not claimed to have run** in this review:
 The application still has real existing protections and no newly proven P1 school-database corruption was identified in this review. **Nothing is marked fixed or production-verified by producing this report.** Proposed changes should be small, test-backed, and should preserve business logic and the existing database migration/update policy.
 
 **Repository mutation for this task:** This Markdown report only.
+
+## 8. Owner-authorized implementation — 13 October 2026
+
+The owner requested the five non-Users/Roles fixes, in two passes. The original
+review above remains historical evidence for its pinned commit. Current status:
+
+| ID | Current source disposition | Implementation |
+|---|---|---|
+| DP-04 | Implemented | School logo uses a bounded file reader. Empty/over-2,000,000-byte files are refused before buffer allocation, exact-limit input is accepted, short/growing reads are refused, and the previous preview/data stay intact until decoding succeeds. |
+| RT-01 | Retired with explicit refusal | The obsolete freeze verifier has no current callers or maintained manifest. Its retained entry point now fails clearly with supported `VerifySchemaArtifact.ps1` and validation instructions; it never invents a source-freeze pass. Standard publishing continues to use the approved schema verifier. |
+| DP-01 | Implemented | Report mutators return persistence success/change/error explicitly. View Save/Delete report success only after publication; failed operations keep the current selections/dropdown. Missing views are reported as already absent. Column-choice persistence failures also explain that the current selection is session-only. |
+| DP-02 | Implemented | Report reads may use defaults without changing the source. Mutations refuse unreadable/locked originals. Corrupt JSON/invalid setting shapes require a unique adjacent `.corrupt-<UTC>-<guid>.bak`, containing the exact original bytes and flushed to disk, before replacement. Failed backup prevents replacement; failed publication retains original and any completed backup. Reads/no-op mutations do not repeatedly quarantine files. |
+| DP-03 | Implemented | CSV, table PDFs and RDLC-preview PDFs generate a unique temporary file beside the chosen destination, close/flush and validate it, then replace by same-directory rename. Failed generation/validation/replacement preserves the previous export and cleans only the temporary file. PDFs are parsed and must contain pages; CSV uses strict UTF-8, keeps its BOM/escaping/formula safeguards, and streams rows instead of keeping a full second text copy. |
+| IA-01/02/03 | Excluded by owner | UsersPage and RolesPage source were not changed or exposed in navigation by this pass. |
+
+**Executed checks:** The portable production-helper suite passes **471
+assertions**, including **82 new file-persistence checks**. The new cases cover
+logo size boundaries, sparse 100 MB input, growing/truncated/cancelled reads,
+actual file-sharing refusal, save/delete write failures, corrupt/null/incomplete
+JSON, exact-byte recovery backups, backup and post-backup publication failures,
+UTF-8 BOM compatibility, interrupted/empty/invalid exports, refused replacement,
+temporary cleanup and actual CSV encoding failure while preserving prior bytes.
+The application and native Windows smoke harness cross-build with zero warnings
+and errors. PowerShell execution confirms that the retired verifier exits 1 with
+its guidance and the supported approved-artifact verifier exits 0.
+
+**Still pending:** Native PDF-generation/parse/file-lock fixtures are compiled,
+not executed on this Linux host. Windows report-view dialogs/status, RDLC export,
+real access-denied/disk-full behavior and deployed-filesystem acceptance remain
+release checks. Injected I/O failures verify controlled recovery paths, not every
+storage hardware failure. This pass changes no SQL, migration, DACPAC, school
+records, stored images or Users/Roles functionality.

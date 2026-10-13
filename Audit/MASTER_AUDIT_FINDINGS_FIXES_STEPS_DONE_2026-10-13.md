@@ -6,6 +6,12 @@ and retry flow are implemented in the current source. FR-01 now has strict
 admission confirmation and read-only reconciliation, with unconfirmed saves
 blocked. New photo preparation enforces an 80 KB maximum using proportional
 adaptive sizing and a JPEG quality floor; existing stored photos are unchanged.
+The independent audit's DP-04, RT-01 and DP-01/02/03 are now implemented: bounded
+logo input, explicit retirement of the obsolete freeze verifier, honest report
+view persistence, recovery backups for corrupt settings and safe CSV/PDF
+replacement. IA-01/02/03 were excluded by the owner. The suite now passes 471
+portable assertions; native Windows/release acceptance remains pending. See the
+[independent audit implementation addendum](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#8-owner-authorized-implementation--13-october-2026).
 FR-06 is accepted by the owner: date/year-only changes on a blank new registration
 allow leaving without a discard prompt; this policy is documented in C#.
 See the
