@@ -60,3 +60,16 @@ The shared double-submission gate and exception propagation are retained.
 Added pending-operation tests for the five operation messages, duplicate refusal,
 success and server refusal releasing the guard. Tests use delayed delegates,
 not SQL writes; native Windows execution remains required. No SQL changes.
+
+## FQA-01 — Registration Review / Confirm modal has no leave guard
+
+**Confirmed and fixed.** Added ModalPageCloseGuard using existing IBusyPage and
+IUnsavedChanges contracts. The registration review owner attaches this guard:
+submitted operations block every close reason, edited drafts require discard,
+and an explicitly completed/cancelled registration closes without a false draft
+prompt. FQA-15's shared-operation state is included through the hosted editor.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added modal event fixtures for clean close, Stay/discard, active user/app close,
+completion while still busy and confirmed completion. Native modal interaction
+and SQL-delayed close acceptance remain outstanding on Windows. No SQL changes.

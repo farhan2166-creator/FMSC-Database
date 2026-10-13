@@ -76,7 +76,9 @@ public sealed class AdmissionReviewListPage : V2Page
         int id=Convert.ToInt32(row["AdmissionId"]);
         using var dialog=new ApplicationWindowForm{Text="Quick Registration — Review / Confirm",Size=new Size(AppScale.Scale(1280),AppScale.Scale(900)),MinimumSize=new Size(AppScale.Scale(1000),AppScale.Scale(700)),StartPosition=FormStartPosition.CenterParent};
         using var page=new StudentAdmissionPage(null,id,registrationReview:true){Dock=DockStyle.Fill};
-        page.RegistrationFinished+=()=>{dialog.DialogResult=DialogResult.OK;dialog.Close();};dialog.Controls.Add(page);dialog.ShowDialog(FindForm());await RefreshAsync();if(dialog.DialogResult==DialogResult.OK)RegistrationReviewed?.Invoke(id);
+        bool completed=false;
+        ModalPageCloseGuard.Attach(dialog,page,()=>completed);
+        page.RegistrationFinished+=()=>{completed=true;dialog.DialogResult=DialogResult.OK;dialog.Close();};dialog.Controls.Add(page);dialog.ShowDialog(FindForm());await RefreshAsync();if(dialog.DialogResult==DialogResult.OK)RegistrationReviewed?.Invoke(id);
     }
     private DataRowView? SelectedRecord=>Grid.SelectedRows.Count==1?Grid.SelectedRows[0].DataBoundItem as DataRowView:null;
     private void UpdateSelectionActions()
