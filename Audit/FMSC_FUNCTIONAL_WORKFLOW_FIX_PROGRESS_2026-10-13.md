@@ -73,3 +73,16 @@ prompt. FQA-15's shared-operation state is included through the hosted editor.
 Added modal event fixtures for clean close, Stay/discard, active user/app close,
 completion while still busy and confirmed completion. Native modal interaction
 and SQL-delayed close acceptance remain outstanding on Windows. No SQL changes.
+
+## FQA-07 — Daily closing operation can be left by confirming discard
+
+**Confirmed and fixed.** DailyCollectionClosingPage now implements IBusyPage
+using its existing operation flag, including submit, approval and their reloads.
+IUnsavedChanges tracks only actual unsubmitted edits. Dashboard leave/close now
+blocks the operation before it can offer a discard decision; draft-only notes
+and amounts retain their normal discard prompt.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added actual-page close-contract fixtures for busy clean/dirty state, zero discard
+prompts during the operation and normal settled draft behavior. Native delayed-
+SQL, sign-out and navigation acceptance remains required. No SQL changes.

@@ -5,7 +5,7 @@ using FMSC_SMS.Pages.Reports;
 namespace FMSC_SMS.Pages.Finance.Collection;
 
 /// <summary>Reconciliation records are separate from student payments.</summary>
-public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges
+public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyPage
 {
     private readonly ModernDatePicker day = HumanUi.Date();
     private readonly ModernTextBox notes = HumanUi.TextBox(true, 2000);
@@ -15,9 +15,10 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges
     private DateTime loadedDay;
     private bool busy, loading, dirty;
     private readonly Label totals = new() { Dock = DockStyle.Fill, Font = AppTheme.BodyBoldFont, TextAlign = ContentAlignment.MiddleLeft };
-    public bool HasUnsavedChanges => dirty || busy;
-    public string UnsavedChangesMessage => busy ? "A closing operation is in progress. Wait for it to finish before leaving." :
-        "The daily closing amounts or notes have not been submitted.";
+    public bool IsBusy=>busy;
+    public string BusyMessage=>"A daily closing operation is in progress. Wait for its result before leaving.";
+    public bool HasUnsavedChanges => dirty;
+    public string UnsavedChangesMessage => "The daily closing amounts or notes have not been submitted.";
 
     public DailyCollectionClosingPage() : base("Daily Collection Closing",
         "Reconcile daily cash and bank totals. Student payments stay unchanged.")

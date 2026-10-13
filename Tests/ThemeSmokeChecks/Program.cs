@@ -123,6 +123,7 @@ internal static partial class Program
             CheckFeeMatrixCampusDraft();
             CheckAdmissionSharedBusy();
             CheckModalPageCloseGuard();
+            CheckDailyClosingLeaveContract();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();
