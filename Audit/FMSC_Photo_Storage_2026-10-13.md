@@ -49,3 +49,20 @@ On Windows, run the smoke harness and inspect normal/high-detail JPEGs, transpar
 PNGs and EXIF-rotated phone photos. Check the Profile shortcut, new/existing student
 saves, failed-save retry, removal, draft closure and both application themes/DPI.
 No school database was accessed for this change.
+
+## Photo enlargement
+
+Student Profile and Admission thumbnails now open a small themed Student Photo
+dialog on left-click. A loaded thumbnail shows a hand cursor and hover guidance;
+an empty thumbnail has no zoom action. The dialog identifies the student and fits
+the complete photo proportionally, with Close, Enter and Escape dismissal. It also
+works for prepared but unsaved Admission photos. It uses the displayed image,
+without a database query, file reload or change to photo/admission data.
+
+The dialog owns a disposable snapshot, so an asynchronous thumbnail replacement
+does not invalidate the open view and closing it does not dispose the page's
+image. The Windows smoke harness covers portrait/landscape fitting in Ocean Blue
+and Professional Simple, snapshot ownership, replacement while open, disposal,
+empty/right-click behavior, and modal left-click/Escape dismissal. The application
+and harness cross-build with zero warnings/errors; these native checks still
+require execution on Windows.

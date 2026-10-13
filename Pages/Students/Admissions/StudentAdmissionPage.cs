@@ -636,6 +636,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         };
         firstPlacementStatus.SelectedIndexChanged += (_, _) => { if (!initializingFirstPlacement) UpdateAdmissionEntryFlow(); };
         UiHelper.DisposePictureImageOnDispose(photoPreview);
+        StudentPhotoViewForm.EnableZoom(photoPreview, () => currentAdmissionId > 0
+            ? $"{AdmissionNumbers.ForId(currentAdmissionId)} - {name.Text.Trim()}"
+            : name.Text.Trim());
         foreach (Button button in new[] { tab1Button, tab2Button, choosePhotoButton, removePhotoButton })
             UiHelper.DisposeOwnedButtonImageOnDispose(button);
         _navigate = navigate;
@@ -3917,11 +3920,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         int version = admissionLoadVersion;
         if (_pendingPhotoData is not null)
         {
-            UiHelper.ReplacePictureImage(photoPreview, BitmapFromBytes(_pendingPhotoData));
+            StudentPhotoViewForm.SetPreviewImage(photoPreview, BitmapFromBytes(_pendingPhotoData));
             photoInfo.Text = $"{_pendingPhotoFileName} · {_pendingPhotoData.Length / 1024d:N0} KB · not saved";
             return;
         }
-        UiHelper.ReplacePictureImage(photoPreview, null);
+        StudentPhotoViewForm.SetPreviewImage(photoPreview, null);
         photoInfo.Text = string.Empty;
         if (admissionId <= 0)
             return;
@@ -3940,7 +3943,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 return;
             }
             var row = dt.Rows[0];
-            UiHelper.ReplacePictureImage(
+            StudentPhotoViewForm.SetPreviewImage(
                 photoPreview,
                 BitmapFromBytes((byte[])row["PhotoData"]));
             photoInfo.Text = $"Updated on {Convert.ToDateTime(row["UpdatedAt"]):dd MMM yyyy, hh:mm tt}";
@@ -3984,7 +3987,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if (IsDisposed || !photoRead.IsCurrent(request) || currentAdmissionId != selectedAdmissionId || admissionLoadVersion != selectedVersion)
                 return;
             string fileName = Path.ChangeExtension(Path.GetFileName(dialog.FileName), ".jpg");
-            UiHelper.ReplacePictureImage(photoPreview, BitmapFromBytes(bytes));
+            StudentPhotoViewForm.SetPreviewImage(photoPreview, BitmapFromBytes(bytes));
             _pendingPhotoData = bytes;
             _pendingPhotoFileName = fileName;
             _pendingPhotoContentType = "image/jpeg";
@@ -4036,7 +4039,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             else
             {
                 photoRead.Cancel();
-                UiHelper.ReplacePictureImage(photoPreview, null);
+                StudentPhotoViewForm.SetPreviewImage(photoPreview, null);
                 photoInfo.Text = string.Empty;
                 _pendingPhotoData = null;
                 _pendingPhotoFileName = null;
@@ -4732,7 +4735,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         _pendingPhotoFileName = null;
         _pendingPhotoContentType = null;
         _loadedReligionNotInList = null;
-        UiHelper.ReplacePictureImage(photoPreview, null);
+        StudentPhotoViewForm.SetPreviewImage(photoPreview, null);
         photoInfo.Text = string.Empty;
         SetStatus(
             "New admission");

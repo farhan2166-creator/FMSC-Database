@@ -74,6 +74,7 @@ public sealed class StudentProfilePage : V2Page
             "View a student’s details, family, balance and history.")
     {
         UiHelper.DisposePictureImageOnDispose(photo);
+        StudentPhotoViewForm.EnableZoom(photo, () => nameLabel.Text);
         Disposed += (_, _) => profileReads.Dispose();
         this.navigate = navigate;
         student.UserSelectionChanged += async (_, _) => await LoadProfileAsync();
@@ -414,7 +415,7 @@ public sealed class StudentProfilePage : V2Page
     }
     private void RenderPhoto(DataTable photoTable)
     {
-        UiHelper.ReplacePictureImage(photo, null);
+        StudentPhotoViewForm.SetPreviewImage(photo, null);
         if (photoTable.Rows.Count == 0 ||
             !photoTable.Columns.Contains("PhotoData"))
         {
@@ -428,8 +429,7 @@ public sealed class StudentProfilePage : V2Page
                 new MemoryStream(bytes);
             using var loaded =
                 Image.FromStream(stream);
-            photo.Image =
-                new Bitmap(loaded);
+            StudentPhotoViewForm.SetPreviewImage(photo, new Bitmap(loaded));
         }
         catch (Exception nonFatalException76)
         {
@@ -610,7 +610,7 @@ public sealed class StudentProfilePage : V2Page
         registrationLabel.Text = string.Empty;
         contactLabel.Text = string.Empty;
         balanceLabel.Text = string.Empty;
-        UiHelper.ReplacePictureImage(photo, null);
+        StudentPhotoViewForm.SetPreviewImage(photo, null);
         contextGrid.DataSource = null;
         familyGrid.DataSource = null;
         familyGrid.Visible = true;

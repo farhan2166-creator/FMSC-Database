@@ -112,6 +112,7 @@ internal static class Program
             CheckChoiceFilters(form);
             CheckInformationDialogs(form);
             CheckPhotoPreparation();
+            CheckPhotoViewer(form);
             CheckSignInGuard();
             Console.WriteLine($"PASS: {checks} Windows theme switching, structure, rendering and resource checks.");
         }
@@ -206,6 +207,68 @@ internal static class Program
         Check(about.AcceptButton is not null && ReferenceEquals(about.AcceptButton, about.CancelButton), "Enter and Escape provide a clear About close action");
         Check(descendants(about).OfType<ModernButton>().Any(button => button.Text == "Copy details"), "Support details can be copied without a database read");
         about.Close();
+    }
+
+    private static void CheckPhotoViewer(Form owner)
+    {
+        var type = typeof(ApplicationWindowForm).Assembly.GetType("FMSC_SMS.Core.StudentPhotoViewForm", true)!;
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        var enable = type.GetMethod("EnableZoom", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var replace = type.GetMethod("SetPreviewImage", BindingFlags.Static | BindingFlags.NonPublic)!;
+        Control[] descendants(Control parent) => parent.Controls.Cast<Control>()
+            .SelectMany(child => new[] { child }.Concat(descendants(child))).ToArray();
+        using var preview = new PictureBox { Size = new Size(96, 100) };
+        UiHelper.DisposePictureImageOnDispose(preview);
+        bool contextRead = false;
+        enable.Invoke(null, new object[] { preview, (Func<string>)(() => { contextRead = true; return "Student fixture"; }) });
+        var click = typeof(Control).GetMethod("OnMouseClick", flags)!;
+        click.Invoke(preview, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 0, 0, 0) });
+        Check(!contextRead && preview.Cursor == Cursors.Default, "An empty photo has no zoom action or hand cursor");
+        var previousTheme = AppTheme.CurrentTheme;
+        try
+        {
+            foreach (var (theme, width, height) in new[] { (AppThemeType.OceanBlue, 300, 600), (AppThemeType.ProfessionalSimple, 600, 300) })
+            {
+                AppTheme.SetTheme(theme);
+                var original = new Bitmap(width, height);
+                replace.Invoke(null, new object[] { preview, original });
+                Check(preview.Cursor == Cursors.Hand, "Loaded photos indicate that they can be enlarged");
+                click.Invoke(preview, new object[] { new MouseEventArgs(MouseButtons.Right, 1, 0, 0, 0) });
+                Check(!contextRead, "Right-click must not open a photo dialog");
+                using var viewer = (Form)Activator.CreateInstance(type, flags, null, new object[] { original, "Student fixture" }, null)!;
+                viewer.Show(owner); Application.DoEvents();
+                var enlarged = descendants(viewer).OfType<PictureBox>().Single();
+                Check(enlarged.SizeMode == PictureBoxSizeMode.Zoom && enlarged.Image!.Size == original.Size,
+                    "Portrait and landscape viewers keep the complete image with proportional fitting");
+                Check(enlarged.Width > preview.Width && enlarged.Height > preview.Height, "The dialog provides a larger photo area");
+                Check(!ReferenceEquals(enlarged.Image, original), "The dialog owns an independent snapshot");
+                Check(ReferenceEquals(viewer.AcceptButton, viewer.CancelButton) && viewer.CancelButton is not null,
+                    "Enter and Escape share the close action");
+                var replacement = new Bitmap(64, 64);
+                replace.Invoke(null, new object[] { preview, replacement });
+                Check(enlarged.Image!.Size == new Size(width, height), "Replacing the page image cannot invalidate the open viewer");
+                viewer.Close(); viewer.Dispose();
+                Check(enlarged.Image is null, "Closing releases the dialog's image");
+                Check(preview.Image!.Size == new Size(64, 64), "Closing leaves the page's current image intact");
+                replace.Invoke(null, new object?[] { preview, null });
+                Check(preview.Cursor == Cursors.Default && preview.Image is null, "Clearing a photo removes its zoom hint");
+            }
+            owner.Controls.Add(preview);
+            replace.Invoke(null, new object[] { preview, new Bitmap(64, 64) });
+            bool closedByEscape = false;
+            owner.BeginInvoke(new Action(() => {
+                var modal = Application.OpenForms.Cast<Form>().Single(form => form.GetType() == type);
+                Check(modal.Modal && modal.Owner == owner, "Clicking the photo opens a modal dialog owned by its page window");
+                Check(descendants(modal).OfType<Label>().Any(label => label.Text == "Student fixture"), "The dialog identifies the displayed student");
+                closedByEscape = (bool)typeof(ApplicationWindowForm).GetMethod("ProcessDialogKey", flags)!
+                    .Invoke(modal, new object[] { Keys.Escape })!;
+            }));
+            click.Invoke(preview, new object[] { new MouseEventArgs(MouseButtons.Left, 1, 0, 0, 0) });
+            Check(contextRead && closedByEscape, "Left-click opens the viewer and Escape closes it");
+            Check(preview.Image!.Size == new Size(64, 64), "The thumbnail survives a complete open/close cycle");
+            owner.Controls.Remove(preview);
+        }
+        finally { AppTheme.SetTheme(previousTheme); }
     }
 
     private static void CheckPhotoPreparation()
