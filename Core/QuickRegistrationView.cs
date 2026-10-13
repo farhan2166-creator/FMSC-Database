@@ -5,7 +5,7 @@ internal enum RegistrationLoadOutcome { Loaded, NotFound, Failed, Superseded, Bu
 /// <summary>Validate a complete registration before changing the editor.</summary>
 internal sealed record QuickRegistrationView(int Id, string Status, string Student, string Parent,
     string Contact, string Address, DateTime Joining, int Year, int Placement, string Reference,
-    string FamilyReference, string AdmissionNumber, string RegistrationNumber, DataTable Fees, string Snapshot)
+    string FamilyReference, string AdmissionNumber, string RegistrationNumber, int FamilyMemberId, int FamilyMemberCount, DataTable Fees, string Snapshot)
 {
     internal static QuickRegistrationView? Read(int id, DataTable details, DataTable fees, string snapshot)
     {
@@ -13,7 +13,7 @@ internal sealed record QuickRegistrationView(int Id, string Status, string Stude
         if (details.Rows.Count != 1) throw new InvalidDataException("Registration details did not identify one student.");
         var row = details.Rows[0];
         foreach (string column in new[] { "AdmissionId", "Status", "StudentName", "FatherName", "ContactNumber", "Address",
-            "AdmissionDate", "AcademicYearId", "ClassSectionId", "QuickReference", "AdmissionNumber", "RegistrationNumber" })
+            "AdmissionDate", "AcademicYearId", "ClassSectionId", "QuickReference", "AdmissionNumber", "RegistrationNumber", "FamilyMemberId", "FamilyMemberCount" })
             if (!details.Columns.Contains(column)) throw new InvalidDataException($"Registration details are missing '{column}'.");
         if (id <= 0 || row["AdmissionId"] is not int returnedId || returnedId != id || string.IsNullOrWhiteSpace(snapshot))
             throw new InvalidDataException("The registration identity or saved snapshot could not be verified.");
@@ -25,6 +25,8 @@ internal sealed record QuickRegistrationView(int Id, string Status, string Stude
         if (string.IsNullOrWhiteSpace(status)) throw new InvalidDataException("The registration status is missing.");
         if (status == "Pending" && (Key("AcademicYearId") == 0 || Key("ClassSectionId") == 0))
             throw new InvalidDataException("The pending registration has no complete placement.");
+        if(row.IsNull("FamilyMemberId")||row.IsNull("FamilyMemberCount")||(Key("FamilyMemberId")==0)!=(Key("FamilyMemberCount")==0))
+            throw new InvalidDataException("The registration family membership is inconsistent.");
         if (!fees.Columns.Contains("StudentFeeAssignmentId") || !fees.Columns.Contains("HasPayments"))
             throw new InvalidDataException("Saved registration fees are missing assignment or payment state.");
         foreach (DataRow fee in fees.Rows)
@@ -33,7 +35,7 @@ internal sealed record QuickRegistrationView(int Id, string Status, string Stude
         return new(id, status, Text("StudentName"), Text("FatherName"), Text("ContactNumber"), Text("Address"), date,
             Key("AcademicYearId"), Key("ClassSectionId"), Text("QuickReference"),
             row.IsNull("AdmissionNumber") ? Text("QuickReference") : Text("AdmissionNumber"),
-            Text("AdmissionNumber"), Text("RegistrationNumber"), PrepareFees(fees), snapshot);
+            Text("AdmissionNumber"), Text("RegistrationNumber"), Key("FamilyMemberId"), Key("FamilyMemberCount"), PrepareFees(fees), snapshot);
     }
 
     internal static DataTable PrepareFees(DataTable source)

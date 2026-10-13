@@ -1,12 +1,23 @@
 # FMSC_SMS — Master Audit: Findings, Fixes, Decisions and Remaining Steps
 
+**Current Quick Registration update:** Parent link/unlink actions are available
+before and after saving, with consistent student-maintenance permissions.
+First-time siblings can form a family while both remain Pending: save the first
+child, choose Add Another Child, then save the next. Parent search includes QR
+records. Print Bill uses student/family titles according to its contents. Draft
+transitions, in-flight work, stale family changes and refresh recovery are guarded.
+Verification passes **602 portable assertions**, **34 production QR SQL checks**
+on a disposable DACPAC publication with migration 3, and a clean app/smoke build.
+Native Windows UI/print acceptance remains pending; no additional migration is
+required. See [section 14](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#14-quick-registration-parent-links-first-time-siblings-and-safe-entry-flow--implemented-13-october-2026).
+
 **Current appearance update:** Four colored lightweight variants accompany the
 refreshed Professional Simple option. Each of the four original color families
 is explicitly presented as a Standard / Lightweight pair; the standard variants
 retain their rendering. All five lightweight choices use one flat rendering path,
 stronger readable colors, reduced decorative timers/shadows and safer switching.
 The existing layout and saved theme identities are retained. Verification passes
-585 portable assertions and a clean Windows-targeted app/smoke-harness build;
+585 portable assertions at that change and a clean Windows-targeted app/smoke-harness build;
 physical Windows/DPI and resource measurements remain pending. See
 [section 13](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#13-colored-lightweight-themes-and-rendering-reliability--13-october-2026).
 The notification proposal is on hold; this work adds no SQL migration.

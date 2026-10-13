@@ -15,9 +15,9 @@ internal static class RegistrationPhotoChecks
         foreach (var (name, type) in new[] { ("AdmissionId", typeof(int)), ("AdmissionDate", typeof(DateTime)),
             ("AcademicYearId", typeof(int)), ("ClassSectionId", typeof(int)), ("Status", typeof(string)),
             ("StudentName", typeof(string)), ("FatherName", typeof(string)), ("ContactNumber", typeof(string)),
-            ("Address", typeof(string)), ("QuickReference", typeof(string)), ("AdmissionNumber", typeof(string)), ("RegistrationNumber", typeof(string)) })
+            ("Address", typeof(string)), ("QuickReference", typeof(string)), ("AdmissionNumber", typeof(string)), ("RegistrationNumber", typeof(string)), ("FamilyMemberId", typeof(int)), ("FamilyMemberCount", typeof(int)) })
             details.Columns.Add(name, type);
-        details.Rows.Add(41, new DateTime(2026, 10, 13), 1, 2, "Pending", "Ali", "Parent", "03001234567", "Address", "QR-41", DBNull.Value, DBNull.Value);
+        details.Rows.Add(41, new DateTime(2026, 10, 13), 1, 2, "Pending", "Ali", "Parent", "03001234567", "Address", "QR-41", DBNull.Value, DBNull.Value, 0, 0);
         using var fees = new DataTable();
         foreach (var (name, type) in new[] { ("StudentFeeAssignmentId", typeof(int)), ("HasPayments", typeof(bool)), ("FeeTypeId", typeof(int)), ("FeeTypeName", typeof(string)),
             ("IsMandatory", typeof(bool)), ("IsTransportLinked", typeof(bool)), ("Amount", typeof(decimal)),
@@ -38,7 +38,7 @@ internal static class RegistrationPhotoChecks
         Check(QuickRegistrationView.Read(41, empty, fees, "snapshot") is null, "A missing record is distinct from a loaded record");
         Reject(() => QuickRegistrationView.Read(42, details, fees, "snapshot"));
         Reject(() => QuickRegistrationView.Read(41, details, fees, ""));
-        foreach (string field in new[] { "AdmissionId", "AdmissionDate", "Status", "ClassSectionId", "StudentName" })
+        foreach (string field in new[] { "AdmissionId", "AdmissionDate", "Status", "ClassSectionId", "StudentName", "FamilyMemberId", "FamilyMemberCount" })
         {
             using var broken = details.Copy(); broken.Columns.Remove(field);
             Reject(() => QuickRegistrationView.Read(41, broken, fees, "snapshot"));
@@ -51,6 +51,17 @@ internal static class RegistrationPhotoChecks
         }
         using (var duplicate = details.Copy())
         { duplicate.ImportRow(details.Rows[0]); Reject(() => QuickRegistrationView.Read(41, duplicate, fees, "snapshot")); }
+        foreach(var (member,count) in new (object,object)[]{(DBNull.Value,0),(0,DBNull.Value),(-1,2),(1,-1),(0,2),(1,0)})
+        {
+            using var broken=details.Copy();broken.Rows[0]["FamilyMemberId"]=member;broken.Rows[0]["FamilyMemberCount"]=count;
+            Reject(()=>QuickRegistrationView.Read(41,broken,fees,"snapshot"));
+        }
+        using(var linked=details.Copy())
+        {
+            linked.Rows[0]["FamilyMemberId"]=81;linked.Rows[0]["FamilyMemberCount"]=3;
+            var familyView=QuickRegistrationView.Read(41,linked,fees,"snapshot")!;
+            Check(familyView.FamilyMemberId==81&&familyView.FamilyMemberCount==3,"Saved views retain verified family identity and child count");
+        }
         foreach (var (field, value) in new (string, object)[] { ("Amount", 1000.5m), ("Discount", -1m), ("Discount", 1001m), ("Include", DBNull.Value) })
         {
             using var broken = fees.Copy(); broken.Rows[0][field] = value;

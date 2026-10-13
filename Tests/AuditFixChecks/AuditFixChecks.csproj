@@ -21,6 +21,8 @@
     <Compile Include="../../Core/StudentPhotoInput.cs" Link="StudentPhotoInput.cs" />
     <Compile Include="../../Core/DashboardData.cs" Link="DashboardData.cs" />
     <Compile Include="../../Core/QuickRegistrationView.cs" Link="QuickRegistrationView.cs" />
+    <Compile Include="../../Core/AdmissionBillReport.Data.cs" Link="AdmissionBillReport.Data.cs" />
+    <Compile Include="../../Core/ReceiptReportData.cs" Link="ReceiptReportData.cs" />
     <Compile Include="../../Core/StudentPhotoDraft.cs" Link="StudentPhotoDraft.cs" />
     <Compile Include="../../Core/AdmissionSaveConfirmation.cs" Link="AdmissionSaveConfirmation.cs" />
     <Compile Include="../../Core/StudentPhotoCompression.cs" Link="StudentPhotoCompression.cs" />

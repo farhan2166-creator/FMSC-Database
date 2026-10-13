@@ -24,7 +24,11 @@ internal static class QuickRegistrationWriter
             (SELECT E.* FROM dbo.Enrollments E WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@Admission
                 ORDER BY EnrollmentId FOR JSON PATH,INCLUDE_NULL_VALUES),
             (SELECT A.* FROM dbo.StudentFeeAssignments A WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@Admission
-                ORDER BY StudentFeeAssignmentId FOR JSON PATH,INCLUDE_NULL_VALUES));
+                ORDER BY StudentFeeAssignmentId FOR JSON PATH,INCLUDE_NULL_VALUES),
+            (SELECT FM.* FROM dbo.FamilyMembers FM WITH(UPDLOCK,HOLDLOCK)
+                WHERE FM.AdmissionId=@Admission OR FM.FamilyId IN
+                    (SELECT FamilyId FROM dbo.FamilyMembers WHERE AdmissionId=@Admission)
+                ORDER BY FamilyMemberId FOR JSON PATH,INCLUDE_NULL_VALUES));
         """;
 
     private const string StoredFeesSql = """
@@ -53,6 +57,23 @@ internal static class QuickRegistrationWriter
             details.Parameters.AddRange(new[] { DatabaseHelper.Int("@UserId",user), DatabaseHelper.Int("@AdmissionId",admission) });
             var data = new DataTable();
             using (var adapter = new SqlDataAdapter(details)) adapter.Fill(data);
+            using var family = new SqlCommand("""
+                SELECT COALESCE(FM.FamilyMemberId,0) FamilyMemberId,
+                    (SELECT COUNT(*) FROM dbo.FamilyMembers WHERE FamilyId=FM.FamilyId) FamilyMemberCount
+                FROM dbo.Students S LEFT JOIN dbo.FamilyMembers FM ON FM.AdmissionId=S.AdmissionId
+                WHERE S.AdmissionId=@Admission;
+                """,connection,transaction);
+            family.Parameters.Add(DatabaseHelper.Int("@Admission",admission));
+            using (var reader=family.ExecuteReader())
+            {
+                data.Columns.Add("FamilyMemberId",typeof(int));
+                data.Columns.Add("FamilyMemberCount",typeof(int));
+                if(reader.Read()&&data.Rows.Count==1)
+                {
+                    data.Rows[0]["FamilyMemberId"]=reader.GetInt32(0);
+                    data.Rows[0]["FamilyMemberCount"]=reader.GetInt32(1);
+                }
+            }
             using var fees = new SqlCommand(StoredFeesSql, connection, transaction);
             fees.Parameters.Add(DatabaseHelper.Int("@Admission",admission));
             var rates = new DataTable();
@@ -93,8 +114,26 @@ internal static class QuickRegistrationWriter
         });
     }
 
+    internal static Task<DataSet> ChangeFamilyAsync(int admission, string expectedSnapshot, int? sibling)
+    {
+        int user=CurrentUser.UserId;
+        return WriteAsync(sibling.HasValue?"AddStudentSibling":"DeleteStudentSibling",
+            sibling.HasValue?new[]{DatabaseHelper.Int("@AdmissionId",admission),
+                DatabaseHelper.Int("@SiblingAdmissionId",sibling.Value),DatabaseHelper.P("@RelationshipType","Sibling")}
+                :new[]{DatabaseHelper.Int("@FamilyMemberId",0)},user,(connection,transaction)=>{
+            using var access=new SqlCommand("EXEC dbo.RequirePermission @UserId,N'Students.Administer';",connection,transaction);
+            access.Parameters.Add(DatabaseHelper.Int("@UserId",user));access.ExecuteNonQuery();
+            if(string.IsNullOrEmpty(expectedSnapshot)||Snapshot(connection,transaction,admission,user)!=expectedSnapshot)
+                throw new InvalidOperationException("This registration or family has changed. Reload Registration before changing its parent link.");
+            using var state=new SqlCommand("SELECT Status FROM dbo.Students WHERE AdmissionId=@Admission",connection,transaction);
+            state.Parameters.Add(DatabaseHelper.Int("@Admission",admission));
+            if(Convert.ToString(state.ExecuteScalar()) is not ("Pending" or "Active"))
+                throw new InvalidOperationException("Only pending or active students can change their parent link here.");
+        },admission);
+    }
+
     private static Task<DataSet> WriteAsync(string procedure, SqlParameter[] parameters, int user,
-        Action<SqlConnection,SqlTransaction> verify) => Task.Run(()=>{
+        Action<SqlConnection,SqlTransaction> verify, int unlinkAdmission=0) => Task.Run(()=>{
             using var connection = DatabaseHelper.GetConnection();
             DatabaseHelper.OpenConnection(connection);
             using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
@@ -104,6 +143,14 @@ internal static class QuickRegistrationWriter
             // captured signed-in actor exactly once, as DatabaseHelper does.
             command.Parameters.AddRange(parameters.Where(p=>!string.Equals(p.ParameterName,"@UserId",StringComparison.OrdinalIgnoreCase)).ToArray());
             command.Parameters.Add(DatabaseHelper.Int("@UserId",user));
+            if(procedure=="DeleteStudentSibling")
+            {
+                using var member=new SqlCommand("SELECT FamilyMemberId FROM dbo.FamilyMembers WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@Admission",connection,transaction);
+                member.Parameters.Add(DatabaseHelper.Int("@Admission",unlinkAdmission));
+                object? id=member.ExecuteScalar();
+                if(id is not int memberId)throw new InvalidOperationException("This student has no parent link to remove. Reload Registration.");
+                command.Parameters["@FamilyMemberId"].Value=memberId;
+            }
             var result = new DataSet();
             using (var adapter = new SqlDataAdapter(command)) adapter.Fill(result);
             transaction.Commit();

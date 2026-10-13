@@ -622,3 +622,67 @@ remain acceptance work. The sixteen artifact/catalog tests still pass.
 No SQL procedures, migrations, permissions, database version or DACPAC were changed
 by this work. Database version 3 and its earlier migration handoff remain as
 previously documented.
+
+
+## 14. Quick Registration parent links, first-time siblings and safe entry flow — implemented 13 October 2026
+
+**Owner requests:** expose linking an existing parent before and after quick
+registration, allow unlinking, make single-child bills clear, and strengthen the
+entry flow. First-time siblings must be handled before confirmed admission.
+
+- **Link Existing Parent** and **Unlink Parent** are explicit page actions, using
+  the existing `Students.Administer` permission in C# and SQL. The original card
+  accessory was difficult to discover and disabled after saving. Both actions now
+  remain available for saved Pending/Active students when the form is clean.
+  The same maintenance guard covers editing saved Pending records and adding
+  another child into a family; admission/view-only access can create a standalone
+  registration without being offered unusable family/edit actions.
+- Parent lookup uses the existing shared picker. Verified `GetStudents` with
+  `IncludeFormerStudents=1` includes pending children under QR references; the
+  picker retains the Pending status and excludes the currently selected student.
+  There is no separate Parents table in this DACPAC: linking chooses another
+  child of the same parent and updates existing FamilyMembers relationships.
+- First-time siblings: save child one; use **Add Another Child** to retain that
+  pending child's identity as family anchor and carry parent/contact details;
+  save child two. The existing AdmitStudent/AddStudentSibling transaction creates
+  the family when neither child had one. Admission confirmation is not required.
+- Saved students can link, unlink and relink from the same page. A saved link
+  confirmation shows both students/parent names; unlink confirmation explains
+  exactly what remains. New-draft unlink retains entered details and makes the
+  parent field editable without a database write. Saved unlink removes only the
+  current membership, preserving other children and all student/financial data.
+  Parent/contact fields remain per-student; saved linking does not silently change them.
+- The production writer performs saved family mutations in a serializable
+  transaction around existing procedures. Its token includes the current family's
+  memberships as well as student/enrollment/fee assignments. Stale student or
+  sibling changes reject the mutation; different established families cannot be
+  merged by the existing SQL safeguard. Family ID/count are loaded within the
+  same transaction and validated before applying a view.
+- Dirty edits must be saved before billing/payment/family mutations. Starting
+  **New Family** or **Add Another Child** now confirms before discarding a draft.
+  Both wait during in-flight work; old load generations are invalidated before
+  clearing. Bill preparation holds the page busy so its student/family context
+  cannot change during the read. Saved screens offer **Reload Registration**;
+  failed/uncertain family writes and failed post-commit refresh require recovery
+  before continuing. Initial/save status messages and action tooltips explain
+  next steps and pending-sibling handling.
+- The neutral **Print Bill** action remains correct for one or several children.
+  One child's outstanding charges print a **Student Bill** headed with that child;
+  multiple child references print a **Family Bill**, retaining totals and separate
+  sections even when children share a name. Billing scope still includes existing
+  family members with outstanding charges.
+
+**Verification:** **602 portable assertions** pass, including eight executed
+student/family report-data checks. The expanded production QR
+SQL harness passes **34 checks** against a disposable loopback SQL Server 2022
+publication of the supplied data-bearing DACPAC with migration 3 applied. Checks
+include first-time Pending search/creation, later link/unlink/relink, actual
+CompleteQuickAdmission followed by family edits, stale/member-change/cross-family
+refusal, permission enforcement, exact preservation of student/enrollment/fee/
+charge/payment rows and preservation of remaining family members. The app and
+Windows smoke harness compile with zero warnings/errors. New GUI scenarios are compiled but unrun on Linux; supported DPI,
+compact layouts, printed output and real keyboard/dialog behavior remain Windows
+acceptance work. The disposable container and temporary credentials are removed.
+
+No new procedure/schema migration, permission definition, version or DACPAC change
+is required. Existing migration 3 and the earlier owner DACPAC handoff remain.

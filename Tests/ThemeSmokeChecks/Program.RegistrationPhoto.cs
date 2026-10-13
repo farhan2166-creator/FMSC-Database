@@ -32,9 +32,9 @@ internal static partial class Program
             var table = new DataTable();
             foreach (var (column, kind) in new[] { ("AdmissionId", typeof(int)), ("AdmissionDate", typeof(DateTime)), ("AcademicYearId", typeof(int)),
                 ("ClassSectionId", typeof(int)), ("Status", typeof(string)), ("StudentName", typeof(string)), ("FatherName", typeof(string)),
-                ("ContactNumber", typeof(string)), ("Address", typeof(string)), ("QuickReference", typeof(string)), ("AdmissionNumber", typeof(string)), ("RegistrationNumber", typeof(string)) })
+                ("ContactNumber", typeof(string)), ("Address", typeof(string)), ("QuickReference", typeof(string)), ("AdmissionNumber", typeof(string)), ("RegistrationNumber", typeof(string)), ("FamilyMemberId", typeof(int)), ("FamilyMemberCount", typeof(int)) })
                 table.Columns.Add(column, kind);
-            table.Rows.Add(id, new DateTime(2026, 10, 13), 1, 2, "Pending", name, "Parent", "03001234567", "Address", $"QR-{id}", DBNull.Value, DBNull.Value);
+            table.Rows.Add(id, new DateTime(2026, 10, 13), 1, 2, "Pending", name, "Parent", "03001234567", "Address", $"QR-{id}", DBNull.Value, DBNull.Value, 0, 0);
             return table;
         }
         DataTable Fees()
@@ -52,6 +52,11 @@ internal static partial class Program
             if (mode == "failed") return Task.FromException<(DataTable, DataTable, string)>(new IOException("Fixture refresh failure"));
             if (mode == "delayed") return delayed!.Task;
             var details = Details(id, id == 41 ? "Ali" : "Bilal");
+            if(mode is "family" or "active-family" or "cancelled-family")
+            {
+                details.Rows[0]["FamilyMemberId"]=81;details.Rows[0]["FamilyMemberCount"]=2;
+                details.Rows[0]["Status"]=mode=="active-family"?"Active":mode=="cancelled-family"?"Cancelled":"Pending";
+            }
             if (mode == "missing") details.Rows.Clear();
             var fees = Fees(); if (mode == "malformed") fees.Columns.Remove("Discount");
             return Task.FromResult((details, fees, "snapshot"));
@@ -68,7 +73,30 @@ internal static partial class Program
         Task Start(int id) => (Task)method.Invoke(page, new object[] { id, false })!;
         string Outcome(Task task) { PumpUntil(() => task.IsCompleted, "Registration fixture read completes"); return task.GetType().GetProperty("Result")!.GetValue(task)!.ToString()!; }
         string Status() => ((Label)typeof(V2Page).GetField("StatusLabel", flags)!.GetValue(page)!).Text;
+        Field<ModernTextBox>("name").Text="Draft child";Field<ModernTextBox>("parent").Text="Existing parent";
+        Field<ModernTextBox>("contact").Text="03001234567";type.GetField("familyAnchor",flags)!.SetValue(page,81);
+        type.GetMethod("UpdateActions",flags)!.Invoke(page,null);
+        Check(Field<ModernButton>("linkFamily").Enabled&&Field<ModernButton>("unlinkFamily").Enabled,"A new linked draft exposes both parent actions");
+        var unlinkDraft=(Task)type.GetMethod("UnlinkFamilyAsync",flags)!.Invoke(page,null)!;
+        Check(unlinkDraft.IsCompletedSuccessfully&&Field<int>("familyAnchor")==0&&Field<ModernTextBox>("name").Text=="Draft child"&&
+            Field<ModernTextBox>("parent").Text=="Existing parent"&&Field<ModernTextBox>("contact").Text=="03001234567"&&!Field<ModernTextBox>("parent").ReadOnly,
+            "Unlinking a draft retains entered details, makes parent editable and performs no SQL write");
         Check(Outcome(Start(41)) == "Loaded" && Field<ModernTextBox>("name").Text == "Ali", "A fully validated registration is applied");
+        Check(Field<ModernButton>("linkFamily").Enabled&&!Field<ModernButton>("unlinkFamily").Enabled&&Field<ModernButton>("bill").Text=="Print Bill",
+            "Saved standalone QR exposes later parent linking and a clear Print Bill action");
+        mode="family";Check(Outcome(Start(41))=="Loaded"&&Field<ModernButton>("unlinkFamily").Enabled,"Saved linked pending QR can unlink its parent");
+        Field<ModernTextBox>("name").Text="Unsaved edit";
+        Check(!Field<ModernButton>("linkFamily").Enabled&&!Field<ModernButton>("unlinkFamily").Enabled,"Unsaved edits block family writes until saved");
+        Field<ModernTextBox>("name").Text="Ali";
+        mode="active-family";Check(Outcome(Start(41))=="Loaded"&&Field<ModernButton>("linkFamily").Enabled&&Field<ModernButton>("unlinkFamily").Enabled,"Parent links remain manageable after admission confirmation");
+        mode="cancelled-family";Check(Outcome(Start(41))=="Loaded"&&!Field<ModernButton>("linkFamily").Enabled&&!Field<ModernButton>("unlinkFamily").Enabled,"Cancelled QR cannot change parent links");
+        mode="loaded";Check(Outcome(Start(41))=="Loaded","Standalone registration fixture restored");
+        var permissions=CurrentUser.GetPermissions().ToArray();
+        CurrentUser.SignIn(7779,"Admission-only fixture","Operator",false,new[]{"Students.Admit","Students.View"});
+        type.GetMethod("UpdateActions",flags)!.Invoke(page,null);
+        Check(!Field<ModernButton>("save").Enabled&&!Field<ModernButton>("next").Enabled&&!Field<ModernButton>("linkFamily").Enabled&&
+            Field<ModernTextBox>("name").ReadOnly,"Admission/view access cannot edit a saved QR or create family relationships without student-maintenance access");
+        CurrentUser.SignIn(7779,"Recovery fixture","Operator",false,permissions);type.GetMethod("UpdateActions",flags)!.Invoke(page,null);
         var originalRates = Field<DataTable>("rates");
         mode = "malformed";
         Check(Outcome(Start(42)) == "Failed" && Field<ModernTextBox>("name").Text == "Ali" && ReferenceEquals(Field<DataTable>("rates"), originalRates),
@@ -93,8 +121,26 @@ internal static partial class Program
             "A committed save reports its separate refresh failure and runs one read only");
         Check(!Field<ModernButton>("save").Enabled && !Field<ModernButton>("bill").Enabled && !Field<ModernButton>("collect").Enabled,
             "A stale post-save screen blocks further writes, printing and payment");
+        Check(!Field<ModernButton>("linkFamily").Enabled&&!Field<ModernButton>("unlinkFamily").Enabled,"A stale post-save screen also blocks parent-link writes");
+        Check(!Field<ModernButton>("next").Enabled&&!Field<ModernButton>("newFamily").Enabled,"A stale saved registration cannot be cleared into a new draft");
         Check(Field<ModernTextBox>("name").Text == "Committed edit", "Refresh failure preserves the entered committed values");
         mode = "loaded"; Check(Outcome(Start(41)) == "Loaded" && !Field<bool>("needsRefresh"), "A deliberate reload clears the stale-state guard");
+        foreach(string state in new[]{"busy","loadingFamily","loadingFees"})
+        {
+            type.GetField(state,flags)!.SetValue(page,true);type.GetMethod("UpdateActions",flags)!.Invoke(page,null);
+            Check(!Field<ModernButton>("next").Enabled&&!Field<ModernButton>("newFamily").Enabled&&!Field<ModernButton>("bill").Enabled&&!Field<ModernButton>("collect").Enabled,
+                "In-flight "+state+" prevents changing the current draft or billing context");
+            type.GetField(state,flags)!.SetValue(page,false);type.GetMethod("UpdateActions",flags)!.Invoke(page,null);
+        }
+        type.GetMethod("StartNextDraft",flags)!.Invoke(page,new object[]{false});
+        Check(Field<int>("savedStudent")==0&&Field<int>("familyAnchor")==41&&Field<ModernTextBox>("name").Text==""&&
+            Field<ModernTextBox>("parent").Text=="Parent"&&Field<ModernTextBox>("contact").Text=="03001234567",
+            "Add Another Child retains the first pending child as family anchor and clears only the child draft");
+        Check(Outcome(Start(41))=="Loaded","First saved child can be reopened after starting a sibling draft");
+        type.GetMethod("StartNextDraft",flags)!.Invoke(page,new object[]{true});
+        Check(Field<int>("savedStudent")==0&&Field<int>("familyAnchor")==0&&Field<ModernTextBox>("parent").Text==""&&
+            Field<ModernTextBox>("contact").Text=="","New Family clears the family anchor and shared details from a clean saved record");
+        Check(Outcome(Start(41))=="Loaded","Saved child fixture restored after starting a new family");
         mode = "missing";
         Check(Outcome(Start(41)) == "NotFound" && Field<int>("savedStudent") == 41,
             "Not found is an explicit outcome and preserves the prior editor identity");

@@ -51,6 +51,8 @@ pwsh -NoProfile -File Installer/VerifySchemaArtifact.ps1 -ProjectDirectory .
 2. Run `Migrations/2.sql` on the clone. It locks/preflights monetary tables and
    aborts atomically if any stored amount is fractional. It does not round or
    clean existing data. Only a successful complete migration records version 2.
+   Then apply `Migrations/3.sql`; the current harness requires version 3 and the
+   consistent `Students.Administer` family-maintenance guard.
 3. Confirm the clone has a current academic year, a usable class placement,
    complete mandatory fee configurations and an Administrator user.
 4. In Windows PowerShell, set a connection to the clone and run the harness:
@@ -66,7 +68,11 @@ to the supplied clone. It rejects a non-test catalog and non-integrated security
 It checks the SQL version, competing rate updates under serializable quotation
 locks, stale quotation refusal before student insertion, successful QR save,
 two-clerk stale detail refusal, retention of the newer phone number, assignment
-drift refusal, and database-side fractional-rate refusal. It deliberately leaves
+drift refusal, and database-side fractional-rate refusal. It also checks pending
+QR records in the parent picker query; family creation before confirmation;
+later link/unlink/relink; sibling-change snapshot refusal; cross-family refusal;
+required maintenance access; preservation of student and financial records; and
+parent-link management after actual `CompleteQuickAdmission`. It deliberately leaves
 fixtures in the clone for inspection. Drop that clone after inspecting results.
 
 On a separate version-1 clone, verify the migration's refusal path: inject a
@@ -205,7 +211,7 @@ table and a disposable database name.
 
 ## Colored lightweight-theme verification
 
-Current portable count: **585**, including 55 production appearance-policy checks.
+Portable count at the theme change: **585**, including 55 production appearance-policy checks.
 The five lightweight options preserve saved IDs/names, provide distinct palettes,
 meet tested primary/hover/text contrast and visible input-boundary contrast, and
 share the existing simple-rendering policy. Theme refresh dispatch continues after
@@ -219,3 +225,28 @@ recursive callbacks. The suite also tests compact/wide administration layouts fo
 each appearance. Native GUI execution and DPI/readability acceptance remain unrun
 on Linux. Measure RAM/CPU on a representative low-end Windows PC before claiming
 a deployed speed improvement. No additional SQL migration is needed for themes.
+
+## Quick Registration family and entry-flow verification
+
+Current portable count: **602**, including nine additional checks for verified
+family IDs/counts and rejection of missing/inconsistent family context, plus
+eight student/family bill identity, grouping and monetary-preservation checks.
+The production QuickRegistration SQL harness passes **34 checks** against an
+isolated SQL Server 2022 publication of the supplied DACPAC plus migration 3.
+No school database is modified. No additional SQL migration is needed.
+
+First-time sibling flow: save the first child, choose **Add Another Child**, then
+save the second child with the retained parent details. Saving creates the family;
+neither child needs confirmed admission. **Link Existing Parent** searches pending
+QR and admitted students and also works on saved registrations. **Unlink Parent**
+removes only this child's membership and retains the student/contact/financial
+records. Existing parent information is stored per student; linking a saved record
+does not overwrite its parent/contact details. Correct details in Admission / Review.
+
+On Windows, run the expanded smoke harness for draft unlink retention, pending/
+active/cancelled family actions, same-parent next-child/new-family resets, dirty/
+busy/stale guards. The portable harness executes student versus family bill
+heading, same-name sibling grouping and monetary-preservation checks.
+It compiles cleanly here; native GUI execution remains unrun on Linux. Manually
+verify the unsaved-discard confirmation keeps the draft when No is selected and
+that parent actions/search remain visible at supported window sizes and DPI.

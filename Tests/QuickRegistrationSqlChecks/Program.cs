@@ -19,7 +19,7 @@ int checks=0;
 void Assert(bool ok,string label){if(!ok)throw new Exception(label);Console.WriteLine("PASS: "+label);checks++;}
 async Task Refused(Func<Task> action,string label)
 {try{await action();}catch(InvalidOperationException e) when(e.Message.Contains("changed",StringComparison.OrdinalIgnoreCase)){Console.WriteLine("PASS: "+label);checks++;return;}throw new Exception("Expected stale-state refusal: "+label);}
-Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="2","migration 2 installed on clone");
+Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="3","migration 3 installed on clone");
 using(var compatible=DatabaseHelper.GetConnection()){
     compatible.Open();DatabaseCompatibility.Validate(compatible);
     Assert(true,"production startup/restore compatibility contract accepts migrated schema");
@@ -156,4 +156,62 @@ if(saved.Fees.Rows.Count>0){
 }
 try{Query("UPDATE dbo.FeeConfigurations SET Amount=1000.50 WHERE FeeConfigurationId=@Id",DatabaseHelper.Int("@Id",rateId));throw new Exception("Fraction accepted by SQL");}
 catch(SqlException e) when(e.Number==547){Console.WriteLine("PASS: SQL rejects fractional rate without rounding");checks++;}
+async Task<int> NewChild(int? sibling=null)
+{
+    var current=Rates();var parameters=AdmissionArgs(current);
+    parameters.Single(p=>p.ParameterName=="@FamilyStudentId").Value=(object?)sibling??DBNull.Value;
+    var result=await QuickRegistrationWriter.SaveNewAsync(placement,QuickRegistrationQuote.Create(current),parameters);
+    return Convert.ToInt32(result.Tables.Cast<DataTable>().Last(t=>t.Columns.Contains("AdmissionId")&&t.Rows.Count>0).Rows[0]["AdmissionId"]);
+}
+int anchor=await NewChild();
+var selectable=Query("EXEC dbo.GetStudents @UserId=@UserId,@CampusId=0,@AcademicYearId=0,@IncludeFormerStudents=1;",DatabaseHelper.Int("@UserId",CurrentUser.UserId));
+Assert(selectable.AsEnumerable().Any(r=>Convert.ToInt32(r["AdmissionId"])==anchor&&Convert.ToString(r["Status"])=="Pending"&&Convert.ToString(r["AdmissionNumber"])!.StartsWith("QR-")),
+    "parent picker query includes first-time pending children with QR references before confirmation");
+var single=await QuickRegistrationWriter.LoadAsync(admission);
+Assert((int)single.Details.Rows[0]["FamilyMemberId"]==0&&(int)single.Details.Rows[0]["FamilyMemberCount"]==0,"standalone QR has no invented family membership");
+string FinancialState()=>Convert.ToString(Query("""
+    SELECT CONCAT((SELECT S.* FROM dbo.Students S WHERE AdmissionId=@Id FOR JSON PATH,INCLUDE_NULL_VALUES),
+        (SELECT E.* FROM dbo.Enrollments E WHERE AdmissionId=@Id ORDER BY EnrollmentId FOR JSON PATH,INCLUDE_NULL_VALUES),
+        (SELECT A.* FROM dbo.StudentFeeAssignments A WHERE AdmissionId=@Id ORDER BY StudentFeeAssignmentId FOR JSON PATH,INCLUDE_NULL_VALUES),
+        (SELECT B.* FROM dbo.BillingCharges B WHERE AdmissionId=@Id ORDER BY BillingChargeId FOR JSON PATH,INCLUDE_NULL_VALUES),
+        (SELECT P.* FROM dbo.FeePayments P WHERE AdmissionId=@Id ORDER BY FeePaymentId FOR JSON PATH,INCLUDE_NULL_VALUES));
+    """,DatabaseHelper.Int("@Id",admission)).Rows[0][0])!;
+string financialBefore=FinancialState();
+await QuickRegistrationWriter.ChangeFamilyAsync(admission,single.Snapshot,anchor);
+var linked=await QuickRegistrationWriter.LoadAsync(admission);
+Assert((int)linked.Details.Rows[0]["FamilyMemberId"]>0&&(int)linked.Details.Rows[0]["FamilyMemberCount"]==2,"saved pending QR can link an existing parent");
+Assert(FinancialState()==financialBefore,"linking retains all student details, enrollments, fees, charges and payments");
+await Refused(()=>QuickRegistrationWriter.ChangeFamilyAsync(admission,single.Snapshot,null),"stale screen cannot unlink a new family membership");
+await Refused(()=>QuickRegistrationWriter.SavePendingAsync(admission,single.Snapshot,Edits(single,"Stale family edit","03007654321")),"family changes invalidate pending student edits");
+int third=await NewChild(anchor);
+var withThird=await QuickRegistrationWriter.LoadAsync(admission);
+Assert((int)withThird.Details.Rows[0]["FamilyMemberCount"]==3,"link during new QR joins the same existing family");
+await Refused(()=>QuickRegistrationWriter.ChangeFamilyAsync(admission,linked.Snapshot,null),"another child's family change invalidates unlink snapshot");
+int otherAnchor=await NewChild();int otherChild=await NewChild(otherAnchor);
+try{await QuickRegistrationWriter.ChangeFamilyAsync(admission,withThird.Snapshot,otherAnchor);throw new Exception("Different families were merged");}
+catch(SqlException e) when(e.Number==56643){Assert(true,"cross-family merge is refused by the existing SQL safeguard");}
+Assert((await QuickRegistrationWriter.LoadAsync(admission)).Snapshot==withThird.Snapshot,"refused cross-family link rolls back without membership changes");
+int actor=CurrentUser.UserId;
+try{
+    CurrentUser.UserId=limitedUser;
+    try{await QuickRegistrationWriter.ChangeFamilyAsync(admission,withThird.Snapshot,null);throw new Exception("Admission/view role unlinked a parent");}
+    catch(SqlException e) when(e.Number==50003){Assert(true,"parent unlink requires Students.Administer in SQL");}
+}finally{CurrentUser.UserId=actor;}
+await QuickRegistrationWriter.ChangeFamilyAsync(admission,withThird.Snapshot,null);
+var unlinked=await QuickRegistrationWriter.LoadAsync(admission);
+Assert((int)unlinked.Details.Rows[0]["FamilyMemberId"]==0&&(int)unlinked.Details.Rows[0]["FamilyMemberCount"]==0,"unlink removes only this child's membership");
+Assert((int)(await QuickRegistrationWriter.LoadAsync(anchor)).Details.Rows[0]["FamilyMemberCount"]==2,"unlink retains the other family members");
+Assert(FinancialState()==financialBefore,"unlink retains student and financial history exactly");
+await QuickRegistrationWriter.ChangeFamilyAsync(admission,unlinked.Snapshot,anchor);
+Assert((int)(await QuickRegistrationWriter.LoadAsync(admission)).Details.Rows[0]["FamilyMemberCount"]==3,"a saved QR can relink after unlinking");
+Query("UPDATE dbo.Students SET Gender=N'Male',PlaceOfBirth=N'Audit city' WHERE AdmissionId=@Id; EXEC dbo.CompleteQuickAdmission @UserId,@Id;",DatabaseHelper.Int("@Id",admission),DatabaseHelper.Int("@UserId",CurrentUser.UserId));
+var active=await QuickRegistrationWriter.LoadAsync(admission);
+await QuickRegistrationWriter.ChangeFamilyAsync(admission,active.Snapshot,null);
+var activeUnlinked=await QuickRegistrationWriter.LoadAsync(admission);
+await QuickRegistrationWriter.ChangeFamilyAsync(admission,activeUnlinked.Snapshot,anchor);
+Assert((int)(await QuickRegistrationWriter.LoadAsync(admission)).Details.Rows[0]["FamilyMemberCount"]==3,"link and unlink remain available after admission confirmation");
+Query("UPDATE dbo.Students SET Status=N'Cancelled' WHERE AdmissionId=@Id",DatabaseHelper.Int("@Id",admission));
+var cancelled=await QuickRegistrationWriter.LoadAsync(admission);
+try{await QuickRegistrationWriter.ChangeFamilyAsync(admission,cancelled.Snapshot,null);throw new Exception("Cancelled QR was unlinked");}
+catch(InvalidOperationException e) when(e.Message.Contains("pending or active")){Assert(true,"cancelled students cannot change parent links from Quick Registration");}
 Console.WriteLine($"PASS: {checks} production SQL checks. Fixture remains only in the disposable clone; drop that clone after inspection.");
