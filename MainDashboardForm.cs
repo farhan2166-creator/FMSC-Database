@@ -635,12 +635,6 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Students",
                 "Family / Siblings",
                 "Students.Family"),
-            new(
-                "Student Photo",
-                () => new StudentPhotoPage(),
-                "Students",
-                "Student Photo",
-                "Students.View"),
             Section("PROMOTION"),
             new(
                 "Bulk Promotion",

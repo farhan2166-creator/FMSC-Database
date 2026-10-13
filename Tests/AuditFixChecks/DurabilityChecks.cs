@@ -43,7 +43,7 @@ internal static class DurabilityChecks
             await File.WriteAllBytesAsync(photo, original);
             Check((await StudentPhotoInput.ReadAsync(photo)).SequenceEqual(original), "Photo input must preserve exact bytes");
             using (var file = new FileStream(photo, FileMode.Create)) file.SetLength(StudentPhotoInput.MaximumBytes);
-            Check((await StudentPhotoInput.ReadAsync(photo)).Length == StudentPhotoInput.MaximumBytes, "Exactly 5 MB remains supported");
+            Check((await StudentPhotoInput.ReadAsync(photo)).Length == StudentPhotoInput.MaximumBytes, "Exactly 25 MB source input remains supported before resizing");
             foreach (long size in new long[] { StudentPhotoInput.MaximumBytes + 1L, 200_000_000 })
             {
                 using (var file = new FileStream(photo, FileMode.Create)) file.SetLength(size);
@@ -51,6 +51,22 @@ internal static class DurabilityChecks
                 catch (StudentPhotoInputException) { checks++; }
             }
             await File.WriteAllBytesAsync(photo, original);
+            foreach (var (width, height, expected) in new[] {
+                (4000, 3000, new System.Drawing.Size(600, 450)),
+                (3000, 4000, new System.Drawing.Size(450, 600)),
+                (1200, 2000, new System.Drawing.Size(360, 600)),
+                (120, 90, new System.Drawing.Size(120, 90)),
+                (600, 600, new System.Drawing.Size(600, 600)),
+                (1001, 2000, new System.Drawing.Size(301, 600)),
+                (5000, 1, new System.Drawing.Size(600, 1))
+            }) Check(StudentPhotoInput.FittedSize(width, height) == expected, "Photo fitting preserves the whole image's proportions without upscaling");
+            StudentPhotoInput.ValidateStoredData(new byte[StudentPhotoInput.MaximumStoredBytes]);
+            checks++;
+            foreach (int size in new[] { 0, StudentPhotoInput.MaximumStoredBytes + 1 })
+            {
+                try { StudentPhotoInput.ValidateStoredData(new byte[size]); throw new Exception("Invalid stored photo size was accepted"); }
+                catch (StudentPhotoInputException) { checks++; }
+            }
             using (var cancellation = new CancellationTokenSource())
             {
                 cancellation.Cancel();

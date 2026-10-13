@@ -111,7 +111,7 @@ internal static class Program
             CheckSameRecordDraft();
             CheckChoiceFilters(form);
             CheckInformationDialogs(form);
-            CheckPhotoWriteGuard();
+            CheckPhotoPreparation();
             CheckSignInGuard();
             Console.WriteLine($"PASS: {checks} Windows theme switching, structure, rendering and resource checks.");
         }
@@ -155,41 +155,6 @@ internal static class Program
         release.Set();
         PumpUntil(() => button.Enabled, "Sign-in completion restores the form state");
         Check(login.DialogResult == DialogResult.OK && username.Enabled && password.Enabled, "A successful sign-in closes with restored field state");
-    }
-
-    private static void CheckPhotoWriteGuard()
-    {
-        // Unshown fixture: the deferred student-cache loader never starts.
-        FMSC_SMS.Pages.Security.CurrentUser.SignIn(999, "Fixture", "Administrator", false, Array.Empty<string>());
-        try
-        {
-            using var photo = new FMSC_SMS.Pages.Students.Profile.StudentPhotoPage();
-            var flags = BindingFlags.Instance | BindingFlags.NonPublic;
-            var type = photo.GetType();
-            var student = (StudentPicker)type.GetField("student", flags)!.GetValue(photo)!;
-            var students = new System.Data.DataTable();
-            students.Columns.Add("AdmissionId", typeof(int)); students.Columns.Add("AdmissionNumber", typeof(string));
-            students.Columns.Add("StudentName", typeof(string)); students.Columns.Add("FatherName", typeof(string));
-            students.Rows.Add(1, "1", "Student", "Parent");
-            student.SetStudent(students.Rows[0]);
-            type.GetField("_pendingPhoto", flags)!.SetValue(photo, new byte[] { 1, 2, 3 });
-            type.GetMethod("UpdateActionAvailability", flags)!.Invoke(photo, null);
-            Check(photo.HasUnsavedChanges && !student.Enabled, "A photo draft holds its student and participates in navigation checks");
-            int writes = 0;
-            var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            Func<Task> write = () => { writes++; return gate.Task; };
-            var run = type.GetMethod("RunPhotoWriteAsync", flags)!;
-            var first = (Task)run.Invoke(photo, new object[] { write })!;
-            Check(photo.IsBusy && !((Control)type.GetField("clearButton", flags)!.GetValue(photo)!).Enabled, "A photo update blocks leaving and Clear");
-            var duplicate = (Task)run.Invoke(photo, new object[] { write })!;
-            Check(duplicate.IsCompletedSuccessfully && writes == 1, "Photo updates cannot overlap");
-            gate.SetResult();
-            PumpUntil(() => first.IsCompleted, "Photo write guard finishes without SQL");
-            first.GetAwaiter().GetResult();
-            Check(!photo.IsBusy && photo.HasUnsavedChanges && !student.Enabled, "An unresolved photo draft remains protected after the operation");
-            Check(!photo.IsHandleCreated, "The photo fixture must never start its deferred SQL loader");
-        }
-        finally { FMSC_SMS.Pages.Security.CurrentUser.SignOut(); }
     }
 
     private static void CheckInformationDialogs(Form owner)
@@ -241,6 +206,69 @@ internal static class Program
         Check(about.AcceptButton is not null && ReferenceEquals(about.AcceptButton, about.CancelButton), "Enter and Escape provide a clear About close action");
         Check(descendants(about).OfType<ModernButton>().Any(button => button.Text == "Copy details"), "Support details can be copied without a database read");
         about.Close();
+    }
+
+    private static void CheckPhotoPreparation()
+    {
+        var processor = typeof(ApplicationWindowForm).Assembly.GetType("FMSC_SMS.Core.StudentPhotoProcessor", true)!;
+        var prepare = processor.GetMethod("Prepare", BindingFlags.Static | BindingFlags.NonPublic)!;
+        byte[] Prepared(byte[] source, CancellationToken token = default) =>
+            (byte[])prepare.Invoke(null, new object[] { source, token })!;
+        foreach (var (width, height, fittedWidth, fittedHeight) in new[] {
+            (2000, 1200, 600, 360), (1200, 2000, 360, 600), (160, 90, 160, 90), (600, 600, 600, 600)
+        })
+        {
+            using var source = new Bitmap(width, height);
+            using (var graphics = Graphics.FromImage(source))
+            {
+                graphics.Clear(Color.White);
+                graphics.FillRectangle(Brushes.Red, 0, 0, width, height / 4);
+                graphics.FillRectangle(Brushes.Blue, 0, height * 3 / 4, width, height / 4);
+            }
+            using var png = new MemoryStream(); source.Save(png, System.Drawing.Imaging.ImageFormat.Png);
+            byte[] jpeg = Prepared(png.ToArray());
+            Check(jpeg.Length > 0 && jpeg.Length <= 300 * 1024, "Prepared photos fit the database storage limit");
+            using var encoded = new MemoryStream(jpeg); using var result = Image.FromStream(encoded);
+            Check(result.Width == fittedWidth && result.Height == fittedHeight, "Real image fitting preserves portrait/landscape proportions without upscaling");
+            Check(result.RawFormat.Guid == System.Drawing.Imaging.ImageFormat.Jpeg.Guid, "Prepared photo bytes and JPEG content type agree");
+            using var pixels = new Bitmap(result);
+            Check(pixels.GetPixel(pixels.Width / 2, pixels.Height / 8).R > 200 && pixels.GetPixel(pixels.Width / 2, pixels.Height * 7 / 8).B > 200, "Photo fitting keeps both ends of the original image without cropping");
+        }
+        using (var transparent = new Bitmap(32, 32, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+        {
+            using var png = new MemoryStream(); transparent.Save(png, System.Drawing.Imaging.ImageFormat.Png);
+            using var jpeg = new MemoryStream(Prepared(png.ToArray())); using var result = new Bitmap(jpeg);
+            Check(result.GetPixel(0, 0).R > 245, "Transparent PNG areas flatten to white rather than black");
+        }
+        using (var noise = new Bitmap(600, 600, System.Drawing.Imaging.PixelFormat.Format24bppRgb))
+        {
+            var data = noise.LockBits(new Rectangle(0, 0, 600, 600), System.Drawing.Imaging.ImageLockMode.WriteOnly,
+                System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+            try
+            {
+                var pixels = new byte[data.Stride * 600]; new Random(1234).NextBytes(pixels);
+                System.Runtime.InteropServices.Marshal.Copy(pixels, 0, data.Scan0, pixels.Length);
+            }
+            finally { noise.UnlockBits(data); }
+            using var png = new MemoryStream(); noise.Save(png, System.Drawing.Imaging.ImageFormat.Png);
+            Check(Prepared(png.ToArray()).Length <= 300 * 1024, "High-detail images also fit the storage limit through JPEG quality selection");
+        }
+        using (var landscape = new Bitmap(1200, 600))
+        {
+            using var jpeg = new MemoryStream(); landscape.Save(jpeg, System.Drawing.Imaging.ImageFormat.Jpeg);
+            byte[] original = jpeg.ToArray();
+            // EXIF little-endian TIFF IFD0: orientation SHORT = 6 (rotate 90 degrees).
+            byte[] exif = { 69, 120, 105, 102, 0, 0, 73, 73, 42, 0, 8, 0, 0, 0,
+                1, 0, 18, 1, 3, 0, 1, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0 };
+            using var tagged = new MemoryStream();
+            tagged.Write(original.AsSpan(0, 2)); tagged.Write(new byte[] { 255, 225, 0, 34 });
+            tagged.Write(exif); tagged.Write(original.AsSpan(2));
+            using var prepared = new MemoryStream(Prepared(tagged.ToArray())); using var portrait = Image.FromStream(prepared);
+            Check(portrait.Width == 300 && portrait.Height == 600, "Phone orientation is corrected before fitting the aspect ratio");
+        }
+        using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+        try { Prepared(new byte[] { 1, 2 }, cancelled.Token); throw new Exception("Expected photo cancellation"); }
+        catch (TargetInvocationException ex) when (ex.InnerException is OperationCanceledException) { checks++; }
     }
 
     private static void CheckSameRecordDraft()

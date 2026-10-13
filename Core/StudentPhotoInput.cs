@@ -2,7 +2,26 @@ namespace FMSC_SMS.Core;
 
 internal static class StudentPhotoInput
 {
-    internal const int MaximumBytes = 5_000_000;
+    // Input files may be larger; only the prepared JPEG is stored in the database.
+    internal const int MaximumBytes = 25_000_000;
+    internal const int MaximumStoredBytes = 300 * 1024;
+    internal const int MaximumDimension = 600;
+
+    internal static Size FittedSize(int width, int height)
+    {
+        if (width <= 0 || height <= 0)
+            throw new StudentPhotoInputException("The photo has invalid dimensions. Choose another JPEG or PNG.");
+        double scale = Math.Min(1d, (double)MaximumDimension / Math.Max(width, height));
+        // Round the canvas outward so a fractional edge of the scaled image is retained.
+        return new Size(Math.Clamp((int)Math.Ceiling(width * scale), 1, MaximumDimension),
+            Math.Clamp((int)Math.Ceiling(height * scale), 1, MaximumDimension));
+    }
+
+    internal static void ValidateStoredData(byte[] bytes)
+    {
+        if (bytes.Length == 0 || bytes.Length > MaximumStoredBytes)
+            throw new StudentPhotoInputException("The prepared photo must be no larger than 300 KB. Choose the photo again to resize it before saving.");
+    }
 
     internal static async Task<byte[]> ReadAsync(string path, CancellationToken token = default)
     {
@@ -10,7 +29,7 @@ internal static class StudentPhotoInput
             81920, FileOptions.Asynchronous | FileOptions.SequentialScan);
         long length = file.Length;
         if (length > MaximumBytes)
-            throw new StudentPhotoInputException("Please choose an image no larger than 5 MB.");
+            throw new StudentPhotoInputException("Please choose an original JPEG or PNG no larger than 25 MB. It will be resized to fit within 300 KB before saving.");
         token.ThrowIfCancellationRequested();
         byte[] bytes = new byte[(int)length];
         try { await file.ReadExactlyAsync(bytes, token); }

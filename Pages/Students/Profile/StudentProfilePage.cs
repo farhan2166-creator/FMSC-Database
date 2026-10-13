@@ -249,7 +249,7 @@ public sealed class StudentProfilePage : V2Page
         recordRow.Controls.Add(
             JumpButton("Open Family / Siblings", id => new StudentFamilyPage(id)));
         recordRow.Controls.Add(
-            JumpButton("Open Photo", id => new StudentPhotoPage(id), title: "Student Photo"));
+            JumpButton("Manage Photo", id => new StudentAdmissionPage(navigate, preselectAdmissionId: id, focusPhoto: true), title: PageTitles.Admissions));
         var lifecycleRow = Row();
         lifecycleRow.Controls.Add(
             JumpButton("Open " + PageTitles.StudentRecordChecks, id => new StudentRecordChecksPage(id)));
@@ -313,6 +313,11 @@ public sealed class StudentProfilePage : V2Page
             var control = openPage();
             control.Dock = DockStyle.Fill;
             dialog.Controls.Add(control);
+            dialog.FormClosing += (_, e) => {
+                if (control is IBusyPage busy && busy.IsBusy) { e.Cancel = true; return; }
+                if (control is IUnsavedChanges pending && pending.HasUnsavedChanges)
+                    e.Cancel = !ModernMessageDialog.Confirm(dialog, pending.UnsavedChangesMessage, UiText.Dialogs.UnsavedChanges);
+            };
             dialog.ShowDialog(FindForm());
         };
         return button;

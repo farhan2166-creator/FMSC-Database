@@ -1,6 +1,4 @@
 using System.ComponentModel;
-using System.Drawing.Drawing2D;
-using System.Drawing.Imaging;
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Finance.Collection;
 using FMSC_SMS.Pages.Finance.StudentAccounts;
@@ -221,12 +219,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         TextImageRelation = TextImageRelation.ImageBeforeText
     };
     private byte[]? _pendingPhotoData;
+    private readonly LatestReadScope photoRead = new();
+    private bool photoBusy;
     private string? _pendingPhotoFileName;
     private string? _pendingPhotoContentType;
     private readonly DataGridView feeGrid = HumanUi.Grid(false);
     private readonly ModernComboBox feePreviewMonth=HumanUi.Combo();
-    public bool IsBusy => saveBusy;
-    public string BusyMessage => "Please wait while the admission is being saved.";
+    public bool IsBusy => saveBusy || photoBusy;
+    public string BusyMessage => photoBusy ? "Please wait while the student's photo is being prepared or saved." : "Please wait while the admission is being saved.";
     private sealed record FeePreviewMonth(DateTime Month) {
         public override string ToString() => Month.ToString("MMMM yyyy");
     }
@@ -598,12 +598,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly bool registrationReview;
     internal event Action? RegistrationFinished;
     public StudentAdmissionPage(
-        Action<Func<Control>, string, string>? navigate = null, int preselectAdmissionId = 0, bool registrationReview = false)
+        Action<Func<Control>, string, string>? navigate = null, int preselectAdmissionId = 0, bool registrationReview = false, bool focusPhoto = false)
     : base(
         registrationReview ? "Review Registration" : PageTitles.Admissions,
         registrationReview ? "Complete the details, save, then confirm admission. Official numbers are assigned on confirmation." : AdmissionContextSubtitle)
     {
         this.registrationReview = registrationReview;
+        Disposed += (_, _) => photoRead.Dispose();
         firstPlacementStatus.Items.AddRange(new object[] { "Active", "Left" });
         viewEnrollmentDate.Text=editEnrollmentDate.Text="-";
         RecordTextPolicy.WireInput(name, "@StudentName");
@@ -661,7 +662,20 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             GateAction(cancel, "Students.Administer");
             admissionIdCaption.Text = "Temp Reference";
         }
-        if (preselectAdmissionId > 0) Defer(() => LoadStudentForEditAsync(preselectAdmissionId));
+        if (preselectAdmissionId > 0) Defer(async () => {
+            await LoadStudentForEditAsync(preselectAdmissionId);
+            if (!IsDisposed && focusPhoto && currentAdmissionId == preselectAdmissionId)
+            {
+                SwitchTab(0);
+                if (choosePhotoButton.Enabled)
+                {
+                    choosePhotoButton.TakesFocus = true;
+                    choosePhotoButton.Focus();
+                    SetStatus($"Photo · {name.Text} · Choose Photo to resize and save an image within 300 KB.");
+                }
+                else SetStatus($"Photo · {name.Text} · Your role can view the photo but cannot change it.");
+            }
+        });
     }
     internal override bool FocusEntryField() => name.Visible && name.Enabled && name.Focus();
     protected override bool ProcessDialogKey(Keys keyData)
@@ -938,9 +952,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         tab2Button.Click +=
             (_, _) => SwitchTab(1);
         choosePhotoButton.Click +=
-            (_, _) => _ = ChoosePhotoAsync();
+            async (_, _) => await ChoosePhotoAsync();
         removePhotoButton.Click +=
             async (_, _) => await RemovePhoto();
+        choosePhotoButton.Enabled = removePhotoButton.Enabled = CurrentUser.HasPermission("Students.Administer");
         var studentGuardianCard = HumanUi.Card(
             "Student & Family Information",
             null,
@@ -2757,6 +2772,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         if (confirmPlacementAction is not null) confirmPlacementAction.Visible = false;
         if (confirmReturnButton is not null) confirmReturnButton.Visible = false;
         int version = ++admissionLoadVersion;
+        photoRead.Cancel();
         /* Item 11 - a photo chosen but not yet saved belongs to the record this load is replacing. */
         if (admissionId != currentAdmissionId)
         {
@@ -3896,16 +3912,25 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private async Task LoadPhotoForAdmissionAsync(int admissionId)
     {
+        if (IsDisposed) return;
+        var request = photoRead.Begin();
+        int version = admissionLoadVersion;
+        if (_pendingPhotoData is not null)
+        {
+            UiHelper.ReplacePictureImage(photoPreview, BitmapFromBytes(_pendingPhotoData));
+            photoInfo.Text = $"{_pendingPhotoFileName} · {_pendingPhotoData.Length / 1024d:N0} KB · not saved";
+            return;
+        }
         UiHelper.ReplacePictureImage(photoPreview, null);
         photoInfo.Text = string.Empty;
         if (admissionId <= 0)
             return;
         try
         {
-            var dt = await DatabaseHelper.QueryUserAsync("GetStudentPhoto", DatabaseHelper.Int("@AdmissionId", admissionId));
+            var dt = await DatabaseHelper.QueryUserAsync("GetStudentPhoto", request.Token, DatabaseHelper.Int("@AdmissionId", admissionId));
             /* Item 4 - a photo that arrives after the operator has moved to another student must not be shown on them. */
             if (IsDisposed ||
-                currentAdmissionId != admissionId)
+                !photoRead.IsCurrent(request) || admissionLoadVersion != version || currentAdmissionId != admissionId)
             {
                 return;
             }
@@ -3920,135 +3945,73 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 BitmapFromBytes((byte[])row["PhotoData"]));
             photoInfo.Text = $"Updated on {Convert.ToDateTime(row["UpdatedAt"]):dd MMM yyyy, hh:mm tt}";
         }
+        catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { }
         catch (Exception nonFatalException53)
         {
             FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException53, "StudentAdmissionPage: LoadPhotoForAdmissionAsync fallback");
-            photoInfo.Text = "Unable to load photo right now.";
+            if (!IsDisposed && photoRead.IsCurrent(request)) photoInfo.Text = "Unable to load photo right now.";
         }
-    }
-    private const int MaxStoredPhotoBytes = 300 * 1024;
-    private const int MaxStoredPhotoDimension = 600;
-    private static byte[] CompressPhoto(byte[] originalBytes)
-    {
-        using var sourceStream = new MemoryStream(originalBytes);
-        using var original = new Bitmap(sourceStream);
-        int width = original.Width;
-        int height = original.Height;
-        if (width > MaxStoredPhotoDimension || height > MaxStoredPhotoDimension)
-        {
-            double scale = Math.Min(
-                (double)MaxStoredPhotoDimension / width,
-                (double)MaxStoredPhotoDimension / height);
-            width = Math.Max(1, (int)Math.Round(width * scale));
-            height = Math.Max(1, (int)Math.Round(height * scale));
-        }
-        using var resized = new Bitmap(width, height);
-        resized.SetResolution(original.HorizontalResolution, original.VerticalResolution);
-        using (var g = Graphics.FromImage(resized))
-        {
-            g.CompositingQuality = CompositingQuality.HighQuality;
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            g.SmoothingMode = SmoothingMode.HighQuality;
-            g.DrawImage(original, 0, 0, width, height);
-        }
-        ImageCodecInfo jpegCodec =
-            ImageCodecInfo.GetImageEncoders()
-                .First(c => c.FormatID == ImageFormat.Jpeg.Guid);
-        byte[] smallestSoFar = Array.Empty<byte>();
-        for (int quality = 90; quality >= 30; quality -= 15)
-        {
-            using var encoderParams = new EncoderParameters(1);
-            encoderParams.Param[0] =
-                new EncoderParameter(Encoder.Quality, quality);
-            using var outStream = new MemoryStream();
-            resized.Save(outStream, jpegCodec, encoderParams);
-            byte[] candidate = outStream.ToArray();
-            if (smallestSoFar.Length == 0 || candidate.Length < smallestSoFar.Length)
-                smallestSoFar = candidate;
-            if (candidate.Length <= MaxStoredPhotoBytes)
-                return candidate;
-        }
-        return smallestSoFar;
     }
     private async Task ChoosePhotoAsync()
     {
+        if (IsBusy || !CurrentUser.HasPermission("Students.Administer")) return;
+        int selectedAdmissionId = currentAdmissionId;
+        int selectedVersion = admissionLoadVersion;
+        photoBusy = true;
         try
         {
+            using var busy = BeginBusy(BusyMessage, this);
             using var dialog = new OpenFileDialog {
                 Filter = "Image files (*.jpg;*.jpeg;*.png)|*.jpg;*.jpeg;*.png",
-                Title = "Choose a student photo"
+                Title = "Choose a student photo — resized automatically to 300 KB or less"
             };
-            if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
-                return;
-            var originalBytes = await File.ReadAllBytesAsync(dialog.FileName);
-            if (originalBytes.Length > 25_000_000)
-            {
-                Warn("That file is too large to be a photo (over 25 MB). Please choose an image file.");
-                return;
-            }
+            if (dialog.ShowDialog(FindForm()) != DialogResult.OK) return;
+            var request = photoRead.Begin();
             byte[] bytes;
             try
             {
-                bytes = CompressPhoto(originalBytes);
+                var original = await StudentPhotoInput.ReadAsync(dialog.FileName, request.Token);
+                bytes = await Task.Run(() => StudentPhotoProcessor.Prepare(original, request.Token), request.Token);
             }
-            catch (Exception nonFatalException54)
+            catch (OperationCanceledException) when (request.Token.IsCancellationRequested) { return; }
+            catch (StudentPhotoInputException ex) { if (!IsDisposed && photoRead.IsCurrent(request)) Warn(ex.Message); return; }
+            catch (Exception ex)
             {
-                FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException54, "StudentAdmissionPage: ChoosePhotoAsync fallback");
-                Warn("That file doesn't look like a valid image (JPG or PNG).");
+                AppExceptionHandler.LogNonFatal(ex, "Preparing student photo");
+                if (!IsDisposed && photoRead.IsCurrent(request)) Warn("That image could not be processed. Choose another JPEG or PNG photo.");
                 return;
             }
-            if (bytes.Length > MaxStoredPhotoBytes)
-            {
-                Warn(
-                    $"This photo is still {bytes.Length / 1024.0:N0} KB even after compression.\n\n" +
-                    "This usually happens with scanned documents or screenshots rather than " +
-                    "ordinary photos. Try:\n" +
-                    "- Using a photo taken on a phone/camera instead of a scan, or\n" +
-                    "- Cropping the image closer to just the face, or\n" +
-                    "- Saving it as a JPG (not PNG) before choosing it here.");
+            if (IsDisposed || !photoRead.IsCurrent(request) || currentAdmissionId != selectedAdmissionId || admissionLoadVersion != selectedVersion)
                 return;
-            }
+            string fileName = Path.ChangeExtension(Path.GetFileName(dialog.FileName), ".jpg");
             UiHelper.ReplacePictureImage(photoPreview, BitmapFromBytes(bytes));
             _pendingPhotoData = bytes;
-            _pendingPhotoFileName =
-                Path.ChangeExtension(
-                    Path.GetFileName(dialog.FileName),
-                    ".jpg");
+            _pendingPhotoFileName = fileName;
             _pendingPhotoContentType = "image/jpeg";
-            if (currentAdmissionId > 0)
+            string size = $"{bytes.Length / 1024d:N0} KB";
+            if (selectedAdmissionId > 0)
             {
-                bool photoSaved =
-                    await PersistPendingPhotoIfAnyAsync(currentAdmissionId);
-                if (photoSaved)
-                {
-                    photoInfo.Text = $"{_pendingPhotoFileName} - saved just now";
-                    Info("Photo saved.");
-                }
-                else
-                {
-                    /* The photo is still pending, so it must not be captioned or announced as saved. */
-                    photoInfo.Text =
-                        $"{_pendingPhotoFileName} - NOT saved; choose the photo again to retry";
-                    Alert(
-                        "The photo could not be saved to this student. The photo is still held on " +
-                        "this form - choose the photo again to retry saving it.");
-                }
+                bool saved = await PersistPendingPhotoIfAnyAsync(selectedAdmissionId);
+                if (IsDisposed || currentAdmissionId != selectedAdmissionId || admissionLoadVersion != selectedVersion) return;
+                photoInfo.Text = $"{fileName} · {size} · " + (saved ? "saved" : "not saved");
+                if (saved) Info("Photo resized and saved. Its full aspect ratio is preserved.");
+                else Alert("The prepared photo was not saved. It is still on this form; choose the photo again to retry.");
             }
-            else
-            {
-                photoInfo.Text = $"{_pendingPhotoFileName} (will be saved once the student is admitted)";
-            }
+            else photoInfo.Text = $"{fileName} · {size} · will be saved with the admission";
         }
-        catch (Exception ex)
-        {
-            Fail(ex);
-        }
+        catch (Exception ex) { if (!IsDisposed) Fail(ex); }
+        finally { photoBusy = false; }
     }
     private async Task RemovePhoto()
     {
+        if (IsBusy || !CurrentUser.HasPermission("Students.Administer")) return;
+        int selectedAdmissionId = currentAdmissionId;
+        int selectedVersion = admissionLoadVersion;
+        photoBusy = true;
         try
         {
-            if (currentAdmissionId > 0)
+            using var busy = BeginBusy(BusyMessage, this);
+            if (selectedAdmissionId > 0)
             {
                 /* this deletes the stored photo and cannot be undone, so it is confirmed first. */
                 if (!Confirm(
@@ -4058,14 +4021,21 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 {
                     return;
                 }
+                if (currentAdmissionId != selectedAdmissionId || admissionLoadVersion != selectedVersion) return;
+                photoRead.Cancel();
                 await DatabaseHelper.ExecuteUserAsync(
                     "DeleteStudentPhoto",
-                    DatabaseHelper.Int("@AdmissionId", currentAdmissionId));
+                    DatabaseHelper.Int("@AdmissionId", selectedAdmissionId));
+                if (IsDisposed || currentAdmissionId != selectedAdmissionId || admissionLoadVersion != selectedVersion) return;
                 Info("Photo removed.");
+                _pendingPhotoData = null;
+                _pendingPhotoFileName = null;
+                _pendingPhotoContentType = null;
                 await LoadPhotoForAdmissionAsync(currentAdmissionId);
             }
             else
             {
+                photoRead.Cancel();
                 UiHelper.ReplacePictureImage(photoPreview, null);
                 photoInfo.Text = string.Empty;
                 _pendingPhotoData = null;
@@ -4073,24 +4043,25 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 _pendingPhotoContentType = null;
             }
         }
-        catch (Exception ex)
-        {
-            Fail(ex);
-        }
+        catch (Exception ex) { if (!IsDisposed) Fail(ex); }
+        finally { photoBusy = false; }
     }
-    /// <summary>stores the photo the operator picked, if any. A false return is the caller's signal that it must not announce a complete success.</summary>
     private async Task<bool> PersistPendingPhotoIfAnyAsync(int admissionId)
     {
         if (_pendingPhotoData is null)
             return true;
+        byte[] data = _pendingPhotoData;
+        string? fileName = _pendingPhotoFileName;
+        string? contentType = _pendingPhotoContentType;
         try
         {
+            StudentPhotoInput.ValidateStoredData(data);
             await DatabaseHelper.ExecuteUserAsync(
                 "SaveStudentPhoto",
                 DatabaseHelper.Int("@AdmissionId", admissionId),
-                new SqlParameter("@PhotoData", SqlDbType.VarBinary, -1) { Value = _pendingPhotoData },
-                DatabaseHelper.P("@FileName", _pendingPhotoFileName),
-                DatabaseHelper.P("@ContentType", _pendingPhotoContentType));
+                new SqlParameter("@PhotoData", SqlDbType.VarBinary, -1) { Value = data },
+                DatabaseHelper.P("@FileName", fileName),
+                DatabaseHelper.P("@ContentType", contentType));
         }
         catch (Exception ex)
         {
@@ -4098,9 +4069,12 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             Fail(ex);
             return false;
         }
-        _pendingPhotoData = null;
-        _pendingPhotoFileName = null;
-        _pendingPhotoContentType = null;
+        if (ReferenceEquals(_pendingPhotoData, data))
+        {
+            _pendingPhotoData = null;
+            _pendingPhotoFileName = null;
+            _pendingPhotoContentType = null;
+        }
         return true;
     }
     private static TableLayoutPanel BuildGrid(
@@ -4174,7 +4148,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private bool legacySetupPending;
     private async Task Save()
     {
-        if (saveBusy || (registrationReview && (!IsPendingRegistration || currentAdmissionId <= 0)))
+        if (IsBusy || (registrationReview && (!IsPendingRegistration || currentAdmissionId <= 0)))
             return;
         saveBusy = true;
         UpdateStudentWorkspace();
@@ -4676,6 +4650,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     {
         /* any student load still in flight belongs to the form this clear is replacing, so it must not land on the cleared page. */
         admissionLoadVersion++;
+        photoRead.Cancel();
         pendingPlacementId = 0;
         if (confirmPlacementAction is not null) confirmPlacementAction.Visible = false;
         if (confirmReturnButton is not null) confirmReturnButton.Visible = false;
