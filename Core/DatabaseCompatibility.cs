@@ -51,13 +51,18 @@ internal static class DatabaseCompatibility
                    AND (SELECT STRING_AGG(CONVERT(nvarchar(max),E.type_desc),',') WITHIN GROUP(ORDER BY E.type_desc)
                         FROM sys.trigger_events E WHERE E.object_id=T.object_id)=R.events);
             INSERT @Problems
-            SELECT CONCAT('Missing/inactive check constraint: ',R.[schema],'.',R.objectName,' ',R.name)
+            SELECT CONCAT('Missing/incompatible check constraint: ',R.[schema],'.',R.objectName,' ',
+                CASE WHEN R.isSystemNamed=1 THEN R.definition ELSE R.name END)
             FROM OPENJSON(@Requirements,'$.checkConstraints') WITH
-                ([schema] nvarchar(128),objectName nvarchar(128),name nvarchar(128)) R
+                ([schema] nvarchar(128),objectName nvarchar(128),name nvarchar(128),isSystemNamed bit,definition nvarchar(max)) R
             WHERE NOT EXISTS
                 (SELECT 1 FROM sys.check_constraints C
                  WHERE C.parent_object_id=OBJECT_ID(QUOTENAME(R.[schema])+'.'+QUOTENAME(R.objectName))
-                   AND C.name=R.name AND C.is_disabled=0 AND C.is_not_trusted=0);
+                   AND C.is_disabled=0 AND C.is_not_trusted=0
+                   AND ((ISNULL(R.isSystemNamed,0)=0 AND C.name=R.name)
+                     OR (R.isSystemNamed=1 AND C.is_system_named=1
+                       AND (C.definition COLLATE Latin1_General_100_BIN2=R.definition COLLATE Latin1_General_100_BIN2
+                         OR C.definition COLLATE Latin1_General_100_BIN2=CONCAT('(',R.definition,')') COLLATE Latin1_General_100_BIN2))));
             INSERT @Problems
             SELECT CONCAT('Missing/incompatible foreign key: ',R.[schema],'.',R.objectName,' (',R.columns,')')
             FROM OPENJSON(@Requirements,'$.foreignKeys') WITH

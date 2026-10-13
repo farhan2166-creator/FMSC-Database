@@ -1,12 +1,14 @@
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Students.Admissions;
+using FMSC_SMS.Pages.Students.Maintenance;
 using Microsoft.Data.SqlClient;
 
 // The name guard prevents running writes against the school database accidentally.
 string connectionText=Environment.GetEnvironmentVariable("FMSC_AUDIT_CONNECTION")??throw new Exception("Set FMSC_AUDIT_CONNECTION to an explicitly disposable restored database.");
 var builder=new SqlConnectionStringBuilder(connectionText);
-if(!builder.InitialCatalog.StartsWith("FMSC_AuditChecks_",StringComparison.Ordinal)||!builder.IntegratedSecurity)
-    throw new Exception("Use integrated security and a disposable database named FMSC_AuditChecks_<suffix>. No production catalog is accepted.");
+bool localSqlAuth=!builder.IntegratedSecurity && builder.DataSource.StartsWith("127.0.0.1,",StringComparison.Ordinal) && builder.UserID=="sa";
+if(!builder.InitialCatalog.StartsWith("FMSC_AuditChecks_",StringComparison.Ordinal)||(!builder.IntegratedSecurity&&!localSqlAuth))
+    throw new Exception("Use a disposable database named FMSC_AuditChecks_<suffix>, with integrated security or an isolated loopback SQL Server test instance. No production catalog is accepted.");
 DatabaseHelper.ConnectionString=connectionText;
 DataTable Query(string sql,params SqlParameter[] parameters)
 {
@@ -18,6 +20,36 @@ void Assert(bool ok,string label){if(!ok)throw new Exception(label);Console.Writ
 async Task Refused(Func<Task> action,string label)
 {try{await action();}catch(InvalidOperationException e) when(e.Message.Contains("changed",StringComparison.OrdinalIgnoreCase)){Console.WriteLine("PASS: "+label);checks++;return;}throw new Exception("Expected stale-state refusal: "+label);}
 Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="2","migration 2 installed on clone");
+using(var compatible=DatabaseHelper.GetConnection()){
+    compatible.Open();DatabaseCompatibility.Validate(compatible);
+    Assert(true,"production startup/restore compatibility contract accepts migrated schema");
+}
+try{
+    Query("""
+        DECLARE @Check sysname=(SELECT TOP(1) name FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.LegacyAdmissionSetup') AND is_system_named=1);
+        IF @Check IS NULL THROW 59991,'Missing generated setup safeguard',1;
+        DECLARE @Sql nvarchar(max)=N'ALTER TABLE dbo.LegacyAdmissionSetup DROP CONSTRAINT '+QUOTENAME(@Check);
+        EXEC sys.sp_executesql @Sql;
+        ALTER TABLE dbo.LegacyAdmissionSetup WITH CHECK ADD CHECK ([SetupId]>=(1));
+        """);
+    try{
+        using var weakened=DatabaseHelper.GetConnection();weakened.Open();DatabaseCompatibility.Validate(weakened);
+        throw new Exception("Weakened anonymous check passed startup validation");
+    }catch(DatabaseCompatibilityException){Console.WriteLine("PASS: startup rejects weakened generated check expression");checks++;}
+}finally{
+    Query("""
+        DECLARE @Check sysname=(SELECT TOP(1) name FROM sys.check_constraints WHERE parent_object_id=OBJECT_ID(N'dbo.LegacyAdmissionSetup') AND is_system_named=1);
+        IF @Check IS NOT NULL BEGIN
+            DECLARE @Sql nvarchar(max)=N'ALTER TABLE dbo.LegacyAdmissionSetup DROP CONSTRAINT '+QUOTENAME(@Check);
+            EXEC sys.sp_executesql @Sql;
+        END;
+        ALTER TABLE dbo.LegacyAdmissionSetup WITH CHECK ADD CHECK ([SetupId]=(1));
+        """);
+}
+using(var restored=DatabaseHelper.GetConnection()){
+    restored.Open();DatabaseCompatibility.Validate(restored);
+    Assert(true,"restored exact generated safeguard passes startup validation");
+}
 CurrentUser.UserId=Convert.ToInt32(Query("SELECT TOP(1) U.UserId FROM dbo.Users U WHERE EXISTS(SELECT 1 FROM dbo.Roles R WHERE R.RoleId=U.RoleId AND R.RoleName=N'Administrator') OR EXISTS(SELECT 1 FROM dbo.UserRoles UR JOIN dbo.Roles R ON R.RoleId=UR.RoleId WHERE UR.UserId=U.UserId AND R.RoleName=N'Administrator')").Rows[0][0]);
 var contexts=Query("""
     SELECT TOP(1) Y.AcademicYearId,P.ClassSectionId,P.CampusId FROM dbo.AcademicYears Y CROSS JOIN dbo.CampusClassSections P
@@ -30,7 +62,8 @@ if(contexts.Rows.Count==0)throw new Exception("Clone needs a current academic ye
 var context=contexts.Rows[0];int placement=Convert.ToInt32(context["ClassSectionId"]);
 DataTable Rates()=>Query(QuickRegistrationWriter.FeeQuery,DatabaseHelper.Int("@Placement",placement));
 SqlParameter[] AdmissionArgs(DataTable rates)=>new[]{
-    DatabaseHelper.Bit("@QuickRegistration",true),DatabaseHelper.P("@AdmissionNumber",null),DatabaseHelper.Int("@FamilyAnchorAdmissionId",0),
+    DatabaseHelper.Int("@UserId",-999), // Writer must replace this with the current actor once.
+    DatabaseHelper.Bit("@QuickRegistration",true),DatabaseHelper.P("@AdmissionNumber",null),DatabaseHelper.P("@FamilyStudentId",null),
     DatabaseHelper.Date("@AdmissionDate",DateTime.Today),DatabaseHelper.Int("@AdmissionCampusId",Convert.ToInt32(context["CampusId"])),
     DatabaseHelper.Int("@AcademicYearId",Convert.ToInt32(context["AcademicYearId"])),DatabaseHelper.Int("@ClassSectionId",placement),
     DatabaseHelper.P("@StudentName","Audit QR "+Guid.NewGuid().ToString("N")),DatabaseHelper.P("@FatherName","Audit parent"),
@@ -65,6 +98,46 @@ Assert(Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.Students").Rows[0][0])==b
 Query("UPDATE dbo.FeeConfigurations SET Amount=@Amount WHERE FeeConfigurationId=@Id",DatabaseHelper.P("@Amount",rate["Amount"]),DatabaseHelper.Int("@Id",rateId));
 rates=Rates();var results=await QuickRegistrationWriter.SaveNewAsync(placement,QuickRegistrationQuote.Create(rates),AdmissionArgs(rates));
 int admission=Convert.ToInt32(results.Tables.Cast<DataTable>().Last(t=>t.Columns.Contains("AdmissionId")&&t.Columns.Contains("QuickReference")&&t.Rows.Count>0).Rows[0]["AdmissionId"]);
+var listed=Query(AdmissionReviewSql.Query,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Bit("@Pending",true));
+Assert(listed.AsEnumerable().Any(r=>Convert.ToInt32(r["AdmissionId"])==admission),"production pending list includes eligible QR");
+var roleFixture=Query("""
+    IF NOT EXISTS(SELECT 1 FROM dbo.Permissions WHERE PermissionCode=N'Students.Admit')
+        INSERT dbo.Permissions(PermissionCode,PermissionName) VALUES(N'Students.Admit',N'Admit students');
+    IF NOT EXISTS(SELECT 1 FROM dbo.Permissions WHERE PermissionCode=N'Students.View')
+        INSERT dbo.Permissions(PermissionCode,PermissionName) VALUES(N'Students.View',N'View students');
+    INSERT dbo.Roles(RoleName) VALUES(@Name);
+    DECLARE @Role int=SCOPE_IDENTITY();
+    INSERT dbo.Users(Username,RoleId) VALUES(@Name,@Role);
+    DECLARE @User int=SCOPE_IDENTITY();
+    INSERT dbo.UserRoles(UserId,RoleId) VALUES(@User,@Role);
+    INSERT dbo.RolePermissions(RoleId,PermissionId) SELECT @Role,PermissionId FROM dbo.Permissions WHERE PermissionCode=N'Students.Admit';
+    SELECT @User UserId,@Role RoleId;
+    """,DatabaseHelper.P("@Name","audit-limited-"+Guid.NewGuid().ToString("N"))).Rows[0];
+int limitedUser=Convert.ToInt32(roleFixture["UserId"]),limitedRole=Convert.ToInt32(roleFixture["RoleId"]);
+try{
+    Query(AdmissionReviewSql.Query,DatabaseHelper.Int("@UserId",limitedUser),DatabaseHelper.Bit("@Pending",true));
+    throw new Exception("Admit alone unexpectedly authorized the student list");
+}catch(SqlException e) when(e.Number==50003){Console.WriteLine("PASS: SQL retains Students.View requirement for admission-only role");checks++;}
+Assert(!QuickRegistrationAccess.CanUse(p=>p=="Students.Admit"),"admission-only role is not offered unusable QR workflow");
+Query("INSERT dbo.RolePermissions(RoleId,PermissionId) SELECT @Role,PermissionId FROM dbo.Permissions WHERE PermissionCode=N'Students.View'",DatabaseHelper.Int("@Role",limitedRole));
+var rights=Query("SELECT P.PermissionCode FROM dbo.RolePermissions RP JOIN dbo.Permissions P ON P.PermissionId=RP.PermissionId WHERE RP.RoleId=@Role",DatabaseHelper.Int("@Role",limitedRole))
+    .AsEnumerable().Select(r=>Convert.ToString(r[0])!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+Assert(QuickRegistrationAccess.CanUse(rights.Contains),"role with actual Admit and View permissions can use QR");
+var limitedList=Query(AdmissionReviewSql.Query,DatabaseHelper.Int("@UserId",limitedUser),DatabaseHelper.Bit("@Pending",true));
+Assert(limitedList.AsEnumerable().Any(r=>Convert.ToInt32(r["AdmissionId"])==admission),"limited role with View can query pending QR");
+// Make a non-QR Pending fixture inside a transaction, test the production query,
+// then roll it back so the valid registration can exercise the remaining saves.
+using(var c=DatabaseHelper.GetConnection()){
+    c.Open();using var transaction=c.BeginTransaction();
+    using(var change=new SqlCommand("UPDATE dbo.Students SET QuickReference=NULL WHERE AdmissionId=@Id",c,transaction)){
+        change.Parameters.Add(DatabaseHelper.Int("@Id",admission));change.ExecuteNonQuery();
+    }
+    using var query=new SqlCommand(AdmissionReviewSql.Query,c,transaction);
+    query.Parameters.AddRange(new[]{DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Bit("@Pending",true)});
+    var nonQr=new DataTable();using(var adapter=new SqlDataAdapter(query))adapter.Fill(nonQr);
+    Assert(!nonQr.AsEnumerable().Any(r=>Convert.ToInt32(r["AdmissionId"])==admission),"production pending list excludes non-QR Pending fixture");
+    transaction.Rollback();
+}
 var a=await QuickRegistrationWriter.LoadAsync(admission);var b=await QuickRegistrationWriter.LoadAsync(admission);
 SqlParameter[] Edits(QuickRegistrationWriter.Registration loaded,string name,string phone)
 {

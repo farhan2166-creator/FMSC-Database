@@ -41,7 +41,7 @@ Remove-Item Env:FMSC_AUDIT_CONNECTION
 ```
 
 The harness compiles the production `QuickRegistrationWriter` and connects only
-to the supplied clone. It rejects a non-test catalog and non-integrated security.
+to the supplied clone. It rejects a non-test catalog and non-integrated security except SQL authentication to a guarded loopback test instance.
 It checks the SQL version, competing rate updates under serializable quotation
 locks, stale quotation refusal before student insertion, successful QR save,
 two-clerk stale detail refusal, retention of the newer phone number, assignment
@@ -58,12 +58,14 @@ The existing `AdmissionWorkflowChecks.ps1` and `StudentCorrectionChecks.ps1`
 restore their own disposable copies and now apply migration 2 on those copies
 before their existing scenarios.
 
-## Windows and native artifact checks still required
+## Native validation and remaining Windows checks
 
 - Load the revised DACPAC through native DacFx/SqlPackage and generate a deployment
   script against a disposable clone. Compare the eight additive constraints with
   `Migrations/2.sql`, then execute the clone checks. The artifact was edited
-  offline; native package load/deployment was not exercised in the Linux workspace.
+  offline and has now passed native SqlPackage 170.5.96 publication against a
+  disposable SQL Server 2022 Developer instance. Repeat release-specific checks
+  against the intended snapshot; the source school database was never connected.
 - Open a pending QR, edit its phone/discount, open another QR and choose Stay at
   the discard prompt. Verify every draft value is retained. Choose Discard and
   verify the requested record loads. Close Review without completion and verify
@@ -80,3 +82,23 @@ Startup continues to validate live schema structure; the new release check
 fingerprints the approved artifact. It does not assert that a supplied MDF or a
 live database's module bodies match that artifact. Clone/runtime validation remains
 a separate verification step.
+
+## Follow-up results
+
+- 75 production money/TVP/quotation checks and 102 role/search/geometry checks passed.
+- Nine artifact regression tests and both PowerShell release-check success/refusal paths passed.
+- Native publication of both the source version-1 schema and revised DACPAC passed.
+- Migration refusal retained fractional data, version 1 and the prior constraints; valid
+  data upgraded to version 2 with eight enabled/trusted constraints. Re-execution was safe.
+- Seventeen production SQL checks passed, including startup/restore compatibility,
+  rejection of a weakened generated check, current-actor parameter binding, rate locks,
+  stale saves, real limited-role permission checks and pending eligibility.
+- Synthetic cached-list filtering was exercised at 100, 2,000 and 10,000 rows. It does
+  not measure SQL balance aggregation, WinForms rendering or a school workload.
+
+Run `dotnet run --project Tests/AuditFixChecks -- --profile-search` to repeat the
+UI-side profile. Search uses a single DataView with a 200 ms debounce, literal
+wildcard escaping, and immediate flushing before opening/reviewing a selection.
+
+Interactive WinForms, physical DPI, the data-specific correction script and the
+full restored-school admission suite remain separate Windows acceptance checks.

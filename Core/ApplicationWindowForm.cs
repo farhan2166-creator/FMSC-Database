@@ -108,12 +108,9 @@ public class ApplicationWindowForm : Form
     {
         if (!TopLevel || WindowState != FormWindowState.Normal) return;
         Rectangle workingArea = Screen.FromControl(this).WorkingArea;
-        Size available = workingArea.Size;
-        available = new Size(Math.Max(1, available.Width - 16), Math.Max(1, available.Height - 16));
-        MinimumSize = new Size(Math.Min(MinimumSize.Width, available.Width), Math.Min(MinimumSize.Height, available.Height));
-        Size = new Size(Math.Min(Width, available.Width), Math.Min(Height, available.Height));
-        Location = new Point(Math.Clamp(Left, workingArea.Left, Math.Max(workingArea.Left, workingArea.Right - Width)),
-            Math.Clamp(Top, workingArea.Top, Math.Max(workingArea.Top, workingArea.Bottom - Height)));
+        var fitted=WorkingAreaLayout.Fit(Bounds,MinimumSize,workingArea);
+        MinimumSize=fitted.MinimumSize;
+        Bounds=fitted.Bounds;
     }
     protected override void Dispose(bool disposing)
     {

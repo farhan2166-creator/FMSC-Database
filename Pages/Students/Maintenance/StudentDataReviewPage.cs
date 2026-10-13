@@ -35,6 +35,9 @@ public sealed class AdmissionReviewListPage : V2Page
     internal event Action? LegacySetupCompleted;
     internal event Action<int>? RegistrationReviewed;
     private DataTable records=new();
+    private DataView? recordView;
+    private int verifiedCount,activeCount;
+    private readonly System.Windows.Forms.Timer searchDebounce=new(){Interval=200};
     private readonly ModernTextBox search=HumanUi.TextBox(false,200);
     private readonly CheckBox remaining=new(){Text="Needs review only",AutoSize=true},active=new(){Text="Active students only",AutoSize=true,Checked=true};
     public AdmissionReviewListPage(Action<Func<Control>,string,string> navigate,bool pending,Func<int,Task>? openRegistration=null)
@@ -42,8 +45,8 @@ public sealed class AdmissionReviewListPage : V2Page
     {
         this.navigate=navigate;this.pending=pending;this.openRegistration=openRegistration;
         AddBusyAction("Refresh",RefreshAsync,"Secondary");
-        var open=AddBusyAction(pending?"Open Registration":"Open Admission",OpenSelectedAsync,"Primary");GateActionAny(open,"Students.Admit","Students.Administer");
-        if(pending){reviewRegistration=AddBusyAction("Review / Confirm",ReviewRegistrationAsync,"Secondary");GateAction(reviewRegistration,"Students.Admit");reviewRegistration.Enabled=false;Grid.SelectionChanged+=(_,_)=>reviewRegistration.Enabled=CurrentUser.HasPermission("Students.Admit")&&Grid.CurrentRow?.DataBoundItem is DataRowView;}
+        var open=AddBusyAction(pending?"Open Registration":"Open Admission",OpenSelectedAsync,"Primary");if(pending)open.Enabled=QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);else GateActionAny(open,"Students.Admit","Students.Administer");
+        if(pending){reviewRegistration=AddBusyAction("Review / Confirm",ReviewRegistrationAsync,"Secondary");GateAction(reviewRegistration,"Students.Admit");reviewRegistration.Enabled=false;Grid.SelectionChanged+=(_,_)=>reviewRegistration.Enabled=QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)&&Grid.CurrentRow?.DataBoundItem is DataRowView;}
         if(!pending){goLive=AddBusyAction("Finish Setup / Go Live",async()=>{using var dialog=new LegacyGoLiveDialog();dialog.ShowDialog(FindForm());if(dialog.Changed)await RefreshAsync();},"Success");GateAction(goLive,"Students.Administer");goLive.Visible=false;}
         var card=HumanUi.Card(pending?"Registrations Awaiting Completion":"Legacy Records",pending?"Payments and family links remain attached when admission is completed.":"Changes to student details, placement or fees clear the verification mark.");card.Content.Controls.Add(Grid);
         var filters=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1};filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,65));filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,35));
@@ -52,11 +55,15 @@ public sealed class AdmissionReviewListPage : V2Page
         if(!pending){options.Controls.Add(active);options.Controls.Add(remaining);filters.Controls.Add(options,1,0);}
         else filters.SetColumnSpan(filters.GetControlFromPosition(0,0)!,2);
         var root=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.Controls.Add(filters,0,0);root.Controls.Add(card,0,1);SetContent(root);
-        search.TextChanged+=(_,_)=>ApplyFilter();remaining.CheckedChanged+=(_,_)=>ApplyFilter();active.CheckedChanged+=(_,_)=>ApplyFilter();
+        search.TextChanged+=(_,_)=>{searchDebounce.Stop();searchDebounce.Start();};
+        searchDebounce.Tick+=(_,_)=>ApplyFilter();
+        remaining.CheckedChanged+=(_,_)=>ApplyFilter();active.CheckedChanged+=(_,_)=>ApplyFilter();
         Load+=async(_,_)=>await RefreshAsync();Grid.CellDoubleClick+=async(_,e)=>{if(e.RowIndex>=0)await OpenSelectedAsync();};
     }
-    private async Task OpenSelectedAsync(){if(Grid.CurrentRow?.DataBoundItem is not DataRowView row)return;int id=Convert.ToInt32(row["AdmissionId"]);if(pending){if(openRegistration is not null)await openRegistration(id);else navigate(()=>new QuickRegistrationPage(navigate,id),"Students","Quick Registration");}else navigate(()=>new StudentAdmissionPage(navigate,id),"Students",PageTitles.Admissions);}
+    private async Task OpenSelectedAsync(){ApplyFilter();if(pending&&!QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)){Warn("Your role needs admission and student-view access to open this registration.");return;}if(Grid.CurrentRow?.DataBoundItem is not DataRowView row)return;int id=Convert.ToInt32(row["AdmissionId"]);if(pending){if(openRegistration is not null)await openRegistration(id);else navigate(()=>new QuickRegistrationPage(navigate,id),"Students","Quick Registration");}else navigate(()=>new StudentAdmissionPage(navigate,id),"Students",PageTitles.Admissions);}
     private async Task ReviewRegistrationAsync(){
+        ApplyFilter();
+        if(!QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)){Warn("Your role needs admission and student-view access to review this registration.");return;}
         if(Grid.CurrentRow?.DataBoundItem is not DataRowView row)return;
         int id=Convert.ToInt32(row["AdmissionId"]);
         using var dialog=new ApplicationWindowForm{Text="Quick Registration — Review / Confirm",Size=new Size(AppScale.Scale(1280),AppScale.Scale(900)),MinimumSize=new Size(AppScale.Scale(1000),AppScale.Scale(700)),StartPosition=FormStartPosition.CenterParent};
@@ -83,18 +90,12 @@ public sealed class AdmissionReviewListPage : V2Page
                 UpdateLegacySetupState(completed);
                 if(completed)return;
             }
-            var data=await Task.Run(()=>DatabaseHelper.QuerySql("""
-                EXEC dbo.RequirePermission @UserId,N'Students.View';
-                SELECT S.AdmissionId,COALESCE(S.AdmissionNumber,S.QuickReference) Reference,S.StudentName,S.FatherName,S.ContactNumber,S.Status,
-                 CASE WHEN S.LegacyVerifiedAt IS NULL THEN N'Needs Review' ELSE N'Verified' END Verification,
-                 Y.YearName,C.ClassName,SEC.SectionName,E.EnrollmentDate PlacementStart,E.BillingStartDate BillingStart,
-                 COALESCE((SELECT SUM(dbo.GetFeeChargeBalance(B.BillingChargeId)) FROM dbo.BillingCharges B WHERE B.AdmissionId=S.AdmissionId AND B.Status<>N'Cancelled'),0) Outstanding
-                FROM dbo.Students S OUTER APPLY(SELECT TOP(1) * FROM dbo.Enrollments H WHERE H.AdmissionId=S.AdmissionId ORDER BY H.EnrollmentId DESC) E
-                LEFT JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId LEFT JOIN dbo.CampusClassSections CS ON CS.ClassSectionId=E.ClassSectionId
-                LEFT JOIN dbo.Classes C ON C.ClassId=CS.ClassId LEFT JOIN dbo.Sections SEC ON SEC.SectionId=CS.SectionId
-                WHERE (@Pending=1 AND S.Status=N'Pending') OR (@Pending=0 AND S.LegacySetupPending=1) ORDER BY S.LegacyVerifiedAt,S.AdmissionId;
-                """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Bit("@Pending",pending)));
-            if(IsDisposed)return;records=data;Grid.DataSource=data;Grid.Columns["AdmissionId"].Visible=false;Grid.Columns["Verification"].Visible=!pending;
+            var data=await Task.Run(()=>DatabaseHelper.QuerySql(AdmissionReviewSql.Query,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Bit("@Pending",pending)));
+            if(IsDisposed)return;
+            recordView?.Dispose();records=data;records.CaseSensitive=false;records.Locale=System.Globalization.CultureInfo.InvariantCulture;
+            recordView=new DataView(records);Grid.DataSource=recordView;
+            verifiedCount=records.AsEnumerable().Count(r=>Convert.ToString(r["Status"])=="Active"&&Convert.ToString(r["Verification"])=="Verified");
+            activeCount=records.AsEnumerable().Count(r=>Convert.ToString(r["Status"])=="Active");Grid.Columns["AdmissionId"].Visible=false;Grid.Columns["Verification"].Visible=!pending;
             Grid.Columns["Reference"].HeaderText="Admission / Registration";Grid.Columns["StudentName"].HeaderText="Student";Grid.Columns["FatherName"].HeaderText="Parent";Grid.Columns["ContactNumber"].HeaderText="Contact";
             if(pending){Grid.Columns["Reference"].HeaderText="Temp Reference";Grid.Columns["Status"].Visible=false;Grid.Columns["BillingStart"].Visible=false;}
             Grid.Columns["YearName"].HeaderText="Academic Year";Grid.Columns["ClassName"].HeaderText="Class";Grid.Columns["SectionName"].HeaderText="Section";
@@ -105,13 +106,14 @@ public sealed class AdmissionReviewListPage : V2Page
     }
     private void ApplyFilter()
     {
-        if(!records.Columns.Contains("StudentName"))return;
-        string term=search.Text.Trim();var filtered=records.Clone();
-        foreach(DataRow row in records.Rows){if(!pending&&active.Checked&&Convert.ToString(row["Status"])!="Active")continue;if(!pending&&remaining.Checked&&Convert.ToString(row["Verification"])=="Verified")continue;
-            if(term.Length>0&&!new[]{"Reference","StudentName","FatherName","ContactNumber"}.Any(key=>(Convert.ToString(row[key])??"").Contains(term,StringComparison.OrdinalIgnoreCase)))continue;filtered.ImportRow(row);}
-        Grid.DataSource=filtered;
-        int verified=records.AsEnumerable().Count(r=>Convert.ToString(r["Status"])=="Active"&&Convert.ToString(r["Verification"])=="Verified");
-        int activeCount=records.AsEnumerable().Count(r=>Convert.ToString(r["Status"])=="Active");
-        SetStatus(pending?$"{filtered.Rows.Count} pending registration(s).":$"{verified}/{activeCount} active students verified · {filtered.Rows.Count} shown.");
+        searchDebounce.Stop();
+        if(IsDisposed||recordView is null)return;
+        recordView.RowFilter=AdmissionReviewFilter.Create(pending,active.Checked,remaining.Checked,search.Text);
+        SetStatus(pending?$"{recordView.Count} pending registration(s).":$"{verifiedCount}/{activeCount} active students verified · {recordView.Count} shown.");
+    }
+    protected override void Dispose(bool disposing)
+    {
+        if(disposing){searchDebounce.Stop();searchDebounce.Dispose();recordView?.Dispose();}
+        base.Dispose(disposing);
     }
 }

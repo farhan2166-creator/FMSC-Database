@@ -6,10 +6,14 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../Core/QuickRegistrationAccess.cs" Link="QuickRegistrationAccess.cs" />
     <Compile Include="../../Core/WholeRupees.cs" Link="WholeRupees.cs" />
     <Compile Include="../../Core/QuickRegistrationQuote.cs" Link="QuickRegistrationQuote.cs" />
     <Compile Include="../../Core/InputParse.cs" Link="InputParse.cs" />
     <Compile Include="../../Core/Tvp.cs" Link="Tvp.cs" />
+    <Compile Include="../../Core/AdmissionReviewFilter.cs" Link="AdmissionReviewFilter.cs" />
+    <Compile Include="../../Core/WorkingAreaLayout.cs" Link="WorkingAreaLayout.cs" />
+    <Using Include="System.Drawing" />
     <Using Include="System.Data" />
   </ItemGroup>
 </Project>

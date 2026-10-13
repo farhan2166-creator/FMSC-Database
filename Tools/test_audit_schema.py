@@ -42,6 +42,11 @@ class ArtifactChecks(unittest.TestCase):
         e.find("d:Property[@Name='CheckExpressionScript']/d:Value",self.ns).text='1=1'
         self.assertTrue(verify_contract(self.root,self.ns,self.elements,self.contract,self.fingerprint))
 
+    def test_generated_check_definition_detected(self):
+        row=next(r for r in self.contract['checkConstraints'] if r.get('isSystemNamed'))
+        row['definition']='[SetupId]>=(1)'
+        self.assertTrue(verify_contract(self.root,self.ns,self.elements,self.contract,self.fingerprint))
+
     def test_sql_body_drift_despite_matching_signature(self):
         e=next(e for e in self.elements if e.get('Name')=='[dbo].[AdmitStudent]')
         body=e.find("d:Property[@Name='BodyScript']/d:Value",self.ns)

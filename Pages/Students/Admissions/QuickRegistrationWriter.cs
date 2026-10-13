@@ -100,7 +100,9 @@ internal static class QuickRegistrationWriter
             using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
             verify(connection,transaction);
             using var command = new SqlCommand(procedure,connection,transaction) { CommandType=CommandType.StoredProcedure,CommandTimeout=120 };
-            command.Parameters.AddRange(parameters);
+            // The UI's new-admission arguments already contain @UserId. Use the
+            // captured signed-in actor exactly once, as DatabaseHelper does.
+            command.Parameters.AddRange(parameters.Where(p=>!string.Equals(p.ParameterName,"@UserId",StringComparison.OrdinalIgnoreCase)).ToArray());
             command.Parameters.Add(DatabaseHelper.Int("@UserId",user));
             var result = new DataSet();
             using (var adapter = new SqlDataAdapter(command)) adapter.Fill(result);

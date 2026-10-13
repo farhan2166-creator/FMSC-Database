@@ -498,21 +498,21 @@ public sealed class WelcomePage : UserControl
         table.Controls.Clear();
         foreach (var oldControl in oldControls)
             oldControl.Dispose();
-        var actions = new (string Text, string Module, Func<Control> Factory, string Permission)[]
+        var actions = new (string Text, string Module, Func<Control> Factory, Func<bool> Allowed)[]
         {
-        (PageTitles.Admissions, "Students", () => new StudentAdmissionPage(), "Students.Admit"),
+        (PageTitles.Admissions, "Students", () => new StudentAdmissionPage(), () => CurrentUser.HasPermission("Students.Admit")),
         ("Quick Registration", "Students", () => new QuickRegistrationPage((factory, module, title) =>
         {
             if (navigateInModule is not null) navigateInModule(factory, module, title);
             else navigate(factory);
-        }), "Students.Admit"),
-        ("Fee Collection", "Finance", () => new FeeCollectionPage(), "Fees.Collect"),
-        ("Student Profile", "Students", () => new StudentProfilePage(), "Students.View"),
-        ("Student Reports", "Students", () => new StudentReportsPage(), "Students.View"),
-        ("Reports", "Reports", () => new ReportsHomePage((Func<Control> factory, string module, string title) => navigateInModule?.Invoke(factory, module, title)), "Reports.View")
+        }), () => QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)),
+        ("Fee Collection", "Finance", () => new FeeCollectionPage(), () => CurrentUser.HasPermission("Fees.Collect")),
+        ("Student Profile", "Students", () => new StudentProfilePage(), () => CurrentUser.HasPermission("Students.View")),
+        ("Student Reports", "Students", () => new StudentReportsPage(), () => CurrentUser.HasPermission("Students.View")),
+        ("Reports", "Reports", () => new ReportsHomePage((Func<Control> factory, string module, string title) => navigateInModule?.Invoke(factory, module, title)), () => CurrentUser.HasPermission("Reports.View"))
         };
         var visibleActions = actions
-            .Where(action => CurrentUser.HasPermission(action.Permission))
+            .Where(action => action.Allowed())
             .ToArray();
         int rows = Math.Max(1, (int)Math.Ceiling(visibleActions.Length / 3d));
         table.RowCount = rows;

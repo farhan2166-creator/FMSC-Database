@@ -2794,7 +2794,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             DataRow row = dt.Rows[0];
             if (!registrationReview && Convert.ToString(row["Status"]) == "Pending")
             {
-                if (_navigate is not null) _navigate(() => new QuickRegistrationPage(_navigate, admissionId), "Students", "Quick Registration");
+                if (!QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)) Warn("Your role needs admission and student-view access to edit or confirm this quick registration.");
+                else if (_navigate is not null) _navigate(() => new QuickRegistrationPage(_navigate, admissionId), "Students", "Quick Registration");
                 else Warn("This is a pending registration. Review and confirm it in Dashboard Quick Registration.");
                 return;
             }

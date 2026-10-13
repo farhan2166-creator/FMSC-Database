@@ -4,14 +4,19 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 
 public sealed class QuickRegistrationPage : UserControl, IUnsavedChanges, IBusyPage
 {
-    private readonly QuickRegistrationFormPage form;
-    public bool HasUnsavedChanges=>form.HasUnsavedChanges;
-    public string UnsavedChangesMessage=>form.UnsavedChangesMessage;
-    public bool IsBusy=>form.IsBusy;
+    private readonly QuickRegistrationFormPage? form;
+    public bool HasUnsavedChanges=>form?.HasUnsavedChanges??false;
+    public string UnsavedChangesMessage=>form?.UnsavedChangesMessage??"";
+    public bool IsBusy=>form?.IsBusy??false;
     public string BusyMessage=>"Wait for the registration operation to finish.";
     public QuickRegistrationPage(Action<Func<Control>,string,string> navigate,int preselectRegistrationId=0)
     {
         Dock=DockStyle.Fill;
+        if(!QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)){
+            Controls.Add(new Label{Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,Padding=new Padding(24),
+                Text="Your role needs admission and student-view access to use Quick Registration."});
+            return;
+        }
         var tabs=new TabControl{Dock=DockStyle.Fill,Font=AppTheme.NormalFont};
         var formTab=new TabPage("Registration Form"){BackColor=AppTheme.Surface};
         var pendingTab=new TabPage("Pending Registrations"){BackColor=AppTheme.Surface};
@@ -183,7 +188,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     private string[] BasicValues()=>new[]{name.Text.Trim(),parent.Text.Trim(),contact.Text.Trim(),address.Text.Trim()};
     private bool HasPendingChanges=>savedStudent>0&&savedStatus=="Pending"&&savedBasics.Length==4&&(!savedBasics.SequenceEqual(BasicValues())||rates.AsEnumerable().Any(r=>Convert.ToDecimal(r["Discount"])!=Convert.ToDecimal(r["OriginalDiscount"])));
     private void PendingEditChanged(){UpdateActions();if(!busy&&HasPendingChanges)SetStatus("Save changes before printing or collecting payment.");}
-    private void UpdateActions(){save.Enabled=ReadyToSave&&CurrentUser.HasPermission("Students.Admit");save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!busy&&savedStudent>0;bill.Enabled=!busy&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!busy&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.Collect");
+    private void UpdateActions(){save.Enabled=ReadyToSave&&QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!busy&&savedStudent>0;bill.Enabled=!busy&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!busy&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.Collect");
         bool editing=!busy&&(savedStudent==0||savedStatus=="Pending");family.Enabled=year.Enabled=placement.Enabled=joining.Enabled=editing&&savedStudent==0;
         name.ReadOnly=contact.ReadOnly=address.ReadOnly=!editing;
         parent.ReadOnly=!editing||familyAnchor>0||loadingFamily;

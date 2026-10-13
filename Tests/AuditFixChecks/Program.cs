@@ -40,3 +40,5 @@ var added=original.Copy();added.Rows.Add(3,100m,"Monthly",false,false);Assert(Qu
 var removed=original.Copy();removed.Rows.RemoveAt(1);Assert(QuickRegistrationQuote.Create(removed)!=quote,"Removed fee invalidates quote");
 var missing=original.Copy();missing.Rows[0]["Amount"]=DBNull.Value;Assert(QuickRegistrationQuote.Create(missing)!=quote,"Missing configuration invalidates quote");
 Console.WriteLine($"PASS: {checks} production money/TVP and quotation regression checks.");
+Console.WriteLine($"PASS: {RemainingFindingChecks.Run()} role, literal search and working-area checks.");
+if(args.Contains("--profile-search"))ReviewFilterProfile.Run();

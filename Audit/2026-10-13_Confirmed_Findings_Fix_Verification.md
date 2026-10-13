@@ -48,3 +48,21 @@ SQL Server execution, native DacFx/SqlPackage validation, PowerShell release-che
 `Validation/AuditFixChecks.md` provides the commands and acceptance scenarios. `Tests/QuickRegistrationSqlChecks` rejects production catalog names and non-integrated authentication; it requires a disposable restored database named `FMSC_AuditChecks_<suffix>`. It checks competing rate locks, stale quote refusal, successful QR creation, stale detail/assignment refusal and SQL fractional-rate refusal.
 
 Apply migration 2 and run the clone/native/Windows checks before deploying this application. The user's established snapshot-supply process remains unchanged; absence of an MDF/LDF pair in this development workspace was not treated as a release blocker.
+
+## Subsequent native verification and remaining findings
+
+The later pass supersedes the earlier environment-unavailable statements above.
+Native SqlPackage publication, migration refusal/success/idempotence, the production
+startup/restore checker, 17 SQL integration checks and PowerShell release verification
+have now run successfully on disposable synthetic data. No school database was touched.
+
+The transaction wrapper's duplicate UserId binding was corrected. Startup matching
+for the system-named LegacyAdmissionSetup safeguard now uses its table and exact
+expression rather than its export-time generated name; a weakened expression is
+rejected. Quick Registration now requires both existing Admit and View permissions,
+the pending query matches completion eligibility, and list searching uses a debounced
+DataView rather than cloning/rebinding records on each keystroke. Existing working-area
+clamping was revalidated and its geometry extracted for testing.
+
+See `2026-10-13_Remaining_Findings_and_Runtime_Verification.md` and
+`Validation/AuditFixChecks.md` for the current results and outstanding Windows checks.

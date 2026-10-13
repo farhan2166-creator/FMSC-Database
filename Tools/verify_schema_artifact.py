@@ -72,6 +72,29 @@ def verify_contract(root, ns, elements, contract, fingerprint):
             name = f"[{i['schema']}].[{i['objectName']}].[{i['name']}]"
             if name not in all_named:
                 errors.append(f'Missing {section} entry {name}')
+    checks={}
+    for element in elements:
+        if element.get('Type')!='SqlCheckConstraint':
+            continue
+        name=element.get('Name')
+        if name is None:
+            annotation=element.find("d:Annotation[@Type='SqlInlineConstraintAnnotation']",ns)
+            name=annotation.get('Name') if annotation is not None else None
+        if name:
+            checks[name]=element
+    for row in contract['checkConstraints']:
+        name=f"[{row['schema']}].[{row['name']}]"
+        element=checks.get(name)
+        if element is None:
+            errors.append(f'Missing contract check {name}')
+            continue
+        parent=element.find("d:Relationship[@Name='DefiningTable']/d:Entry/d:References",ns)
+        if parent is None or parent.get('Name')!=f"[{row['schema']}].[{row['objectName']}]":
+            errors.append(f'Check parent differs: {name}')
+        if row.get('isSystemNamed'):
+            definition=element.find("d:Property[@Name='CheckExpressionScript']/d:Value",ns)
+            if element.get('Name') is not None or definition is None or definition.text!=row.get('definition'):
+                errors.append(f'Generated check definition differs: {name}')
     from apply_whole_rupee_schema import POLICY, expression
     for table, columns in POLICY.items():
         name = f'[dbo].[CK_{table}_WholeRupees]'
