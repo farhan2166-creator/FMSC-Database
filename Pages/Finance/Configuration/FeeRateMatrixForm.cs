@@ -71,6 +71,10 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
     public string BusyMessage=>"Fee rates are being saved. Wait for the save and reload to finish before leaving.";
     /* selecting campus A and then quickly B left two loads running with no owner. */
     private int gridLoadVersion;
+    private int? selectedCampusId;
+    private bool restoringCampus;
+    private readonly Func<bool> confirmCampusDiscard;
+    private readonly Func<Task> reloadCampus;
     /* The editable cell values the grid was last loaded with, so Close on an untouched grid asks nothing. Re-captured by every load, including the reload that follows a successful save. */
     private string loadedSnapshot = "";
     private readonly Dictionary<DataGridViewCell, object?> loadedCellValues = new();
@@ -175,8 +179,12 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
     public string UnsavedChangesMessage =>
         "The fee matrix has unsaved changes. Leaving this screen will discard them.";
     public FeeRateMatrixForm(int? defaultCampusId = null) : this(defaultCampusId,true) { }
-    internal FeeRateMatrixForm(int? defaultCampusId,bool initialize)
+    internal FeeRateMatrixForm(int? defaultCampusId,bool initialize) : this(defaultCampusId,initialize,null,null) { }
+    internal FeeRateMatrixForm(int? defaultCampusId,bool initialize,Func<bool>? confirmCampusDiscard,Func<Task>? reloadCampus)
     {
+        this.confirmCampusDiscard=confirmCampusDiscard??(()=>ModernMessageDialog.Confirm(this,
+            "Discard the unsaved fee-grid changes and switch campus? Choose No to stay; use Save Grid first if you want to keep these rates.",UiText.Dialogs.UnsavedChanges));
+        this.reloadCampus=reloadCampus??(()=>LoadGridAsync());
         Text = PageTitles.FeeRateMatrix;
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
@@ -191,7 +199,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         editFeeButton.Click += (_, _) => EditSelectedFee();
         applyStudentsButton.Click += (_, _) => ApplyToStudents();
         /* D-H10 - the campus selector is wired BEFORE the list is loaded, and the grid is loaded AFTER it. */
-        campus.SelectedIndexChanged += async (_, _) => await LoadGridAsync();
+        campus.SelectedIndexChanged += async (_, _) => await ChangeCampusAsync();
         /* Save Grid is a bulk financial write: one insert/update per class x fee-type cell, so a double click could submit the whole batch twice. */
         saveButton.Click += async (_, _) => {
             if (savingGrid || !saveButton.Enabled)
@@ -249,6 +257,23 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         Disposed += (_, _) => FeeConfigurationChanges.Changed -= OnConfigurationsChanged;
         Disposed += (_, _) => FeeTypeCatalog.Changed -= OnConfigurationsChanged;
         if(initialize)_ = InitializeAsync(defaultCampusId);
+    }
+    private async Task ChangeCampusAsync()
+    {
+        if(restoringCampus)return;
+        int? next=campus.SelectedValue is int id&&id>0?id:null;
+        if(next==selectedCampusId)return;
+        // Changing the picker happens before this event. Restore its old value
+        // without loading or touching any cells when the operator chooses Stay.
+        if(savingGrid||!grid.EndEdit()||IsDirty()&&!confirmCampusDiscard())
+        {
+            restoringCampus=true;
+            try{if(selectedCampusId is int old)campus.SelectedValue=old;else campus.SelectedIndex=-1;}
+            finally{restoringCampus=false;}
+            return;
+        }
+        selectedCampusId=next;
+        await reloadCampus();
     }
     /// <summary>D-H10 - one ordered start instead of two racing fire-and-forget loads: the campus list first, then the grid. LoadGridAsync is version-guarded, so the overlap is harmless.</summary>
     private async Task InitializeAsync(int? defaultCampusId)

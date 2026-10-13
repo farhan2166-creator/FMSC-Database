@@ -120,6 +120,7 @@ internal static partial class Program
             CheckHiddenRegistrationToolbar();
             CheckAdditionalFeeScope();
             CheckFeeMatrixHostBusy();
+            CheckFeeMatrixCampusDraft();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();

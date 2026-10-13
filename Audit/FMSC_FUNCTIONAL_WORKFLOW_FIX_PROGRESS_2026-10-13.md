@@ -32,3 +32,17 @@ the dashboard can now see this save through that established contract.
 Added an embedded-host fixture covering active-save tab refusal, navigation after
 completion and a busy child in a non-selected tab. Native Windows execution of
 these GUI fixtures remains required. No SQL or permission changes.
+
+## FQA-17 — Campus picker silently discards fee-grid edits
+
+**Confirmed and fixed.** Internal campus changes now finish validation of the
+edited cell and check the actual grid snapshot. Changed grids require an explicit
+discard; declining restores the previous campus without loading or touching the
+edited cells. Clean switches remain immediate. Programmatic changes during a
+submitted save also restore the original campus. This decision does not reuse
+or consume the independent form-close discard confirmation.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added fixtures for Stay retaining campus/amount, deliberate discard, clean switch
+and a campus change during save. Native GUI execution remains outstanding.
+No SQL migration is needed.
