@@ -515,6 +515,8 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
         };
         var grid=HumanUi.Grid(false);
         grid.Dock=DockStyle.Fill;grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.None;grid.DataSource=data;
+        grid.Columns["Fee"].HeaderText=UiText.Fees.FeeType;
+        grid.Columns["Amount (Rs.)"].HeaderText=UiText.Fees.Amount;
         grid.Columns["Billing Month"].DefaultCellStyle.Format="MMM-yyyy";
         grid.Columns["Amount (Rs.)"].DefaultCellStyle.Format="#,##0.##";
         grid.Columns["Amount (Rs.)"].DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleCenter;

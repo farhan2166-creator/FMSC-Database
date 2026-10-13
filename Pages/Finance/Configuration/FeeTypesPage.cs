@@ -23,7 +23,7 @@ public sealed class FeeTypesPage : MasterPage
                     Required: true),
                 new FieldSpec(
                     "FeeTypeName",
-                    "Fee Type",
+                    UiText.Fees.FeeType,
                     Required: true),
                 new FieldSpec(
                     "DefaultFrequency",

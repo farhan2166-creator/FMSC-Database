@@ -227,10 +227,10 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
         preview.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Include", HeaderText = "Apply", Width = AppScale.Scale(55) });
         preview.Columns.Add("Campus", "Campus");
         preview.Columns.Add("Class", "Class");
-        preview.Columns.Add("FeeType", "Fee Type");
-        preview.Columns.Add("Frequency", "Frequency");
-        preview.Columns.Add("OldAmount", "Current Amount");
-        preview.Columns.Add("NewAmount", "New Amount");
+        preview.Columns.Add("FeeType", UiText.Fees.FeeType);
+        preview.Columns.Add("Frequency", UiText.Fees.Frequency);
+        preview.Columns.Add("OldAmount", UiText.Fees.CurrentAmount);
+        preview.Columns.Add("NewAmount", UiText.Fees.NewAmount);
         preview.Columns.Add("Change", "Change (Rs.)");
         foreach (DataGridViewColumn column in preview.Columns)
             column.ReadOnly = column.Name != "Include";

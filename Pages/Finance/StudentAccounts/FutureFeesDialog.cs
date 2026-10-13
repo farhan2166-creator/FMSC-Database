@@ -80,11 +80,11 @@ public sealed class FutureFeesDialog : ApplicationWindowForm
         grid.AutoGenerateColumns = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         grid.Columns.Add("BillingMonth", "Billing Month");
-        grid.Columns.Add("FeeTypeName", "Fee Type");
-        grid.Columns.Add("Frequency", "Frequency");
-        grid.Columns.Add("ExpectedAmount", "Amount");
-        grid.Columns.Add("ExpectedDiscountAmount", "Discount (Rs.)");
-        grid.Columns.Add("ExpectedNetAmount", "Net");
+        grid.Columns.Add("FeeTypeName", UiText.Fees.FeeType);
+        grid.Columns.Add("Frequency", UiText.Fees.Frequency);
+        grid.Columns.Add("ExpectedAmount", UiText.Fees.Amount);
+        grid.Columns.Add("ExpectedDiscountAmount", UiText.Fees.Discount);
+        grid.Columns.Add("ExpectedNetAmount", UiText.Fees.NetAmount);
         grid.Columns.Add("FeeTypeId", "FeeTypeId");
         grid.Columns["FeeTypeId"].Visible = false;
         grid.Columns.Add("StudentFeeAssignmentId", "Id");

@@ -151,9 +151,9 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
         preview.ReadOnly = false;
         preview.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Include", HeaderText = "Copy", Width = AppScale.Scale(55) });
         preview.Columns.Add("Class", "Class");
-        preview.Columns.Add("FeeType", "Fee Type");
-        preview.Columns.Add("Amount", "Amount");
-        preview.Columns.Add("Frequency", "Frequency");
+        preview.Columns.Add("FeeType", UiText.Fees.FeeType);
+        preview.Columns.Add("Amount", UiText.Fees.Amount);
+        preview.Columns.Add("Frequency", UiText.Fees.Frequency);
         preview.Columns.Add("Action", "Result");
         foreach (DataGridViewColumn column in preview.Columns) column.ReadOnly = column.Name != "Include";
         preview.CurrentCellDirtyStateChanged += (_, _) => {

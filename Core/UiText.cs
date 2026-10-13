@@ -23,6 +23,20 @@ public static class UiText
     /// <summary>Guidance connecting fee setup, student rates and billing.</summary>
     public static class Fees
     {
+        // Amount is the fee before discount; Net Amount is Amount - Discount.
+        // Payments/balances and old/new comparisons retain their distinct meaning.
+        public const string FeeType = "Fee Type";
+        public const string Amount = "Amount (Rs.)";
+        public const string Discount = "Discount (Rs.)";
+        public const string NetAmount = "Net Amount (Rs.)";
+        public const string Frequency = "Frequency";
+        public const string CurrentAmount = "Current Amount (Rs.)";
+        public const string NewAmount = "New Amount (Rs.)";
+        public const string PostedAmount = "Posted Amount (Rs.)";
+        public const string CollectedAmount = "Collected Amount (Rs.)";
+        public const string UncollectedAmount = "Uncollected Amount (Rs.)";
+        public const string Due = "Due (Rs.)";
+        public const string PayNow = "Pay Now (Rs.)";
         public const string SetupSteps = "Define fee types → Save class rates → Update student rates if needed → Post monthly fees.";
         public const string MatrixScope = "Save Grid saves class rates. Use Update Student Fee Rates for existing students; Fee Posting creates bills.";
         public const string MatrixSaved = "Class rates saved. Existing student fees and bills are unchanged.";

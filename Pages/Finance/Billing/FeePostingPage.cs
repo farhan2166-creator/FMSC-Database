@@ -441,10 +441,10 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         SetHeader("CampusName", "Campus", 115);
         SetHeader("ClassName", "Class", 100);
         SetHeader("SectionName", "Section", 90);
-        SetHeader("FeeTypeName", "Fee Type", 150);
+        SetHeader("FeeTypeName", UiText.Fees.FeeType, 150);
         SetHeader("BillingMonth", "Billing Month", 120);
-        SetHeader("GrossAmount", "Gross", 100);
-        SetHeader("NetAmount", "Net Payable", 110);
+        SetHeader("GrossAmount", UiText.Fees.Amount, 100);
+        SetHeader("NetAmount", UiText.Fees.NetAmount, 110);
         SetHeader("EligibilityNote", "Status", 170);
         Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
     }

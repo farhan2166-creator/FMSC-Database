@@ -45,6 +45,21 @@ Check presentation on Windows in light and dark themes, at the display scales us
 by staff. Confirm captions fit, guidance is readable, shortcuts still work, and
 state-dependent actions retain their intended meaning.
 
+## Fee-grid wording
+
+Use `UiText.Fees` captions for fee columns on admission, registration, student
+accounts, fee setup, billing, collection and finance-report grids:
+
+- **Fee Type** names the fee; **Frequency** says when it recurs.
+- **Amount (Rs.)** is the fee before discount.
+- **Discount (Rs.)** is the rupee reduction; **Net Amount (Rs.)** is Amount minus Discount.
+- Compare **Current Amount (Rs.)** and **New Amount (Rs.)** when changing rates.
+- Keep distinct payment meanings: **Due (Rs.)**, **Pay Now (Rs.)**, and posted,
+  collected or uncollected amounts. Net paid is not a fee's Net Amount.
+
+The shared grid presenter also uses these captions for bound fee columns. Keep
+data-property names, order, calculations and saved-view column identities intact.
+
 ## Lightweight appearances
 
 Account → Change - Appearance/Theme lists each original color theme next to its

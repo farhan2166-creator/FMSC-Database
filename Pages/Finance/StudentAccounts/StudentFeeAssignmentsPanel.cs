@@ -81,12 +81,12 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         grid.Dock = DockStyle.Fill;
         grid.AutoGenerateColumns = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
-        grid.Columns.Add("FeeTypeName", "Fee Type");
-        grid.Columns.Add("StandardAmount", "Amount");
+        grid.Columns.Add("FeeTypeName", UiText.Fees.FeeType);
+        grid.Columns.Add("StandardAmount", UiText.Fees.Amount);
         // StudentFeeAssignments.DiscountAmount (and SaveStudentFeeDiscount's @DiscountAmount) is a rupee value only - there is no percentage discount mode anywhere in the assignment workflow.
-        grid.Columns.Add("DiscountAmount", "Discount (Rs.)");
-        grid.Columns.Add("NetAmount", "Net");
-        grid.Columns.Add("Frequency", "Frequency");
+        grid.Columns.Add("DiscountAmount", UiText.Fees.Discount);
+        grid.Columns.Add("NetAmount", UiText.Fees.NetAmount);
+        grid.Columns.Add("Frequency", UiText.Fees.Frequency);
         grid.Columns.Add("EffectiveFrom", "From Month");
         grid.Columns.Add("EffectiveTo", "Through Month");
         grid.Columns.Add("Status", "Rate Status");

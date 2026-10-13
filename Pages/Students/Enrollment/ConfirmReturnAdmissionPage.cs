@@ -83,19 +83,19 @@ public sealed class ConfirmReturnAdmissionPage : V2Page
         fees.AllowUserToDeleteRows = false;
         fees.AutoGenerateColumns = false;
         fees.Columns.Add(new DataGridViewTextBoxColumn {
-            Name = "FeeTypeName", HeaderText = "Fee", DataPropertyName = "FeeTypeName",
+            Name = "FeeTypeName", HeaderText = UiText.Fees.FeeType, DataPropertyName = "FeeTypeName",
             ReadOnly = true, FillWeight = 42
         });
         fees.Columns.Add(new DataGridViewTextBoxColumn {
-            Name = "Frequency", HeaderText = "When charged", DataPropertyName = "Frequency",
+            Name = "Frequency", HeaderText = UiText.Fees.Frequency, DataPropertyName = "Frequency",
             ReadOnly = true, FillWeight = 25
         });
         fees.Columns.Add(new DataGridViewTextBoxColumn {
-            Name = "Amount", HeaderText = "Class amount", DataPropertyName = "Amount",
+            Name = "Amount", HeaderText = UiText.Fees.Amount, DataPropertyName = "Amount",
             ReadOnly = false, FillWeight = 20
         });
         fees.Columns.Add(new DataGridViewTextBoxColumn {
-            Name = "DiscountAmount", HeaderText = "Discount / waiver", DataPropertyName = "DiscountAmount",
+            Name = "DiscountAmount", HeaderText = UiText.Fees.Discount, DataPropertyName = "DiscountAmount",
             ReadOnly = false, FillWeight = 22
         });
         fees.CellValueChanged += (_, _) => UpdateTotal();

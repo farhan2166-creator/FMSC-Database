@@ -1,5 +1,11 @@
 # FMSC_SMS — Master Audit: Findings, Fixes, Decisions and Remaining Steps
 
+**Current fee-grid wording update:** Shared captions now use Fee Type,
+Amount (Rs.), Discount (Rs.), Net Amount (Rs.) and Frequency across student/fee
+workspaces and finance reports. Current/new comparisons and payment meanings
+remain distinct. Bound fee grids use the same presenter policy; no additional
+SQL migration is required. See [section 15](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#15-consistent-fee-grid-captions--implemented-13-october-2026).
+
 **Current Quick Registration update:** Parent link/unlink actions are available
 before and after saving, with consistent student-maintenance permissions.
 First-time siblings can form a family while both remain Pending: save the first

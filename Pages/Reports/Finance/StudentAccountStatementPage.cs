@@ -1507,7 +1507,7 @@ public sealed class StudentAccountStatementPage : V2Page
         }
         SetStatementColumn("StatementStudent", "Student", 170, true);
         SetStatementColumn("TransactionDate", "Date", 88, true);
-        SetStatementColumn("FeeTypeName", "Fee", 135, true);
+        SetStatementColumn("FeeTypeName", UiText.Fees.FeeType, 135, true);
         SetStatementColumn("BillingMonth", "Month", 90, true);
         SetStatementColumn("DebitAmount", "Charge", 78, true);
         SetStatementColumn("PaidAmount", "Paid", 70, true);

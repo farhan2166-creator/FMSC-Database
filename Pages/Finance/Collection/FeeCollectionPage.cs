@@ -826,7 +826,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         charges.Columns.Add(
             new DataGridViewTextBoxColumn {
                 Name = "FeeTypeName",
-                HeaderText = "Charge",
+                HeaderText = UiText.Fees.FeeType,
                 ReadOnly = true,
                 MinimumWidth = AppScale.Scale(80)
             });
@@ -848,7 +848,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         charges.Columns.Add(
             new DataGridViewTextBoxColumn {
                 Name = "Balance",
-                HeaderText = "Due",
+                HeaderText = UiText.Fees.Due,
                 ReadOnly = true,
                 MinimumWidth = AppScale.Scale(70),
                 DefaultCellStyle =
@@ -861,7 +861,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         charges.Columns.Add(
             new DataGridViewTextBoxColumn {
                 Name = "Amount",
-                HeaderText = "Pay Now",
+                HeaderText = UiText.Fees.PayNow,
                 ReadOnly = false,
                 MinimumWidth = AppScale.Scale(75),
                 DefaultCellStyle =
@@ -880,7 +880,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         charges.Columns.Add(
             new DataGridViewTextBoxColumn {
                 Name = "GrossAmount",
-                HeaderText = "Fee",
+                HeaderText = UiText.Fees.Amount,
                 Visible = true,
                 ReadOnly = true,
                 DefaultCellStyle = new DataGridViewCellStyle { Format = "0.##", Alignment = DataGridViewContentAlignment.MiddleCenter }
@@ -905,7 +905,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 ReadOnly = true
             });
         charges.Columns.Add(new DataGridViewTextBoxColumn {
-            Name = "AppliedDiscount", HeaderText = "Discount", ReadOnly = !CurrentUser.HasPermission("Fees.Adjust"),
+            Name = "AppliedDiscount", HeaderText = UiText.Fees.Discount, ReadOnly = !CurrentUser.HasPermission("Fees.Adjust"),
             DefaultCellStyle = new DataGridViewCellStyle {
                 Format = "0.##", Alignment = DataGridViewContentAlignment.MiddleCenter
             }

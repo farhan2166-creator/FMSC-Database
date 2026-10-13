@@ -113,11 +113,11 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         var fields=Fields(("Student name",name,true,1),("Joining date",joining,true,1),("Academic year",year,true,1),("Campus / Class / Section",placement,true,1),("Parent name",parent,true,1),("Primary phone",contact,true,1),("Address",address,false,2));
         fields.TabIndex=1;registrationContent.Controls.Add(fields,0,1);registrationCard.Content.Controls.Add(registrationContent);
         fees.Columns.Add(new DataGridViewCheckBoxColumn { Name="Include",DataPropertyName="Include",HeaderText="Include",Width=65 });
-        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Fee",DataPropertyName="FeeTypeName",HeaderText="Fee",ReadOnly=true,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill });
-        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Frequency",DataPropertyName="Frequency",HeaderText="Frequency",ReadOnly=true,Width=100 });
-        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Amount",DataPropertyName="Amount",HeaderText="Fee (Rs.)",ReadOnly=true,Width=110 });
-        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Discount",DataPropertyName="Discount",HeaderText="Discount (Rs.)",ReadOnly=!CurrentUser.HasPermission("Fees.Adjust"),Width=125 });
-        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="NetAmount",DataPropertyName="NetAmount",HeaderText="Net (Rs.)",ReadOnly=true,Width=110 });
+        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Fee",DataPropertyName="FeeTypeName",HeaderText=UiText.Fees.FeeType,ReadOnly=true,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill });
+        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Frequency",DataPropertyName="Frequency",HeaderText=UiText.Fees.Frequency,ReadOnly=true,Width=100 });
+        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Amount",DataPropertyName="Amount",HeaderText=UiText.Fees.Amount,ReadOnly=true,Width=110 });
+        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Discount",DataPropertyName="Discount",HeaderText=UiText.Fees.Discount,ReadOnly=!CurrentUser.HasPermission("Fees.Adjust"),Width=125 });
+        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="NetAmount",DataPropertyName="NetAmount",HeaderText=UiText.Fees.NetAmount,ReadOnly=true,Width=145 });
         fees.Columns["Amount"].DefaultCellStyle.Format=fees.Columns["Discount"].DefaultCellStyle.Format=fees.Columns["NetAmount"].DefaultCellStyle.Format="N0";
         fees.CellValidating+=(_,e)=>{
             if(e.RowIndex<0||fees.Columns[e.ColumnIndex].Name!="Discount")return;

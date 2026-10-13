@@ -448,6 +448,9 @@ namespace FMSC_SMS.Core
         private static void ApplyGridColumnPresentation(DataGridView grid)
         {
             WireAdmissionNumberSorting(grid);
+            bool feeGrid = grid.Columns.Cast<DataGridViewColumn>().Any(column =>
+                (column.DataPropertyName.Length > 0 ? column.DataPropertyName : column.Name)
+                    is "FeeTypeName" or "FeeType" or "FeeTypeId");
             foreach (DataGridViewColumn column in grid.Columns)
             {
                 string name = column.Name ?? string.Empty;
@@ -457,7 +460,7 @@ namespace FMSC_SMS.Core
                     continue;
                 }
                 column.HeaderText =
-                    HumanizeColumnHeader(column.HeaderText);
+                    HumanizeColumnHeader(column.HeaderText, feeGrid);
                 if (name == "AdmissionNumber")
                     column.SortMode = DataGridViewColumnSortMode.Programmatic;
                 if (string.IsNullOrEmpty(column.DefaultCellStyle.Format) &&
@@ -589,10 +592,25 @@ namespace FMSC_SMS.Core
                 column.HeaderCell.SortGlyphDirection = descending ? SortOrder.Descending : SortOrder.Ascending;
             };
         }
-        private static string HumanizeColumnHeader(string headerText)
+        private static string HumanizeColumnHeader(string headerText, bool feeGrid)
         {
             if (string.IsNullOrEmpty(headerText))
                 return headerText;
+            // Bound fee lists use the same captions as explicitly defined columns.
+            // Match database headings and their humanized form; keep contextual captions such as
+            // Pay Now, Posted Amount and transfer comparison descriptions intact.
+            if (feeGrid)
+            {
+                headerText = headerText switch {
+                    "FeeTypeName" or "Fee Type Name" or "FeeType" => UiText.Fees.FeeType,
+                    "Amount" or "StandardAmount" or "Standard Amount" or "GrossAmount" or "Gross Amount" or "ExpectedAmount" or "Expected Amount" => UiText.Fees.Amount,
+                    "Discount" or "DiscountAmount" or "Discount Amount" or "ExpectedDiscountAmount" or "Expected Discount Amount" => UiText.Fees.Discount,
+                    "NetAmount" or "Net Amount" or "ExpectedNetAmount" or "Expected Net Amount" => UiText.Fees.NetAmount,
+                    "CurrentAmount" or "Current Amount" or "OldAmount" or "Old Amount" => UiText.Fees.CurrentAmount,
+                    "NewAmount" or "New Amount" => UiText.Fees.NewAmount,
+                    _ => headerText
+                };
+            }
             string header = headerText.Replace("_", " ");
             header = System.Text.RegularExpressions.Regex.Replace(header, "(?<=[a-z])(?=[A-Z])", " ");
             return header.Trim();

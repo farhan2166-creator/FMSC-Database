@@ -1614,7 +1614,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         feeGrid.Columns.Add(
             new DataGridViewTextBoxColumn {
                 Name = "FeeTypeName",
-                HeaderText = "Fee Type",
+                HeaderText = UiText.Fees.FeeType,
                 DataPropertyName = "FeeTypeName",
                 ReadOnly = true,
                 FillWeight = 26
@@ -1622,7 +1622,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         feeGrid.Columns.Add(
             new DataGridViewTextBoxColumn {
                 Name = "StandardAmount",
-                HeaderText = "Standard Fee",
+                HeaderText = UiText.Fees.Amount,
                 DataPropertyName = "StandardAmount",
                 ReadOnly = true,
                 FillWeight = 18,
@@ -1636,7 +1636,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         feeGrid.Columns.Add(
             new DataGridViewTextBoxColumn {
                 Name = "DiscountAmount",
-                HeaderText = "Discount (Rs.)",
+                HeaderText = UiText.Fees.Discount,
                 DataPropertyName = "DiscountAmount",
                 ReadOnly = false,
                 FillWeight = 18,
@@ -1650,7 +1650,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         feeGrid.Columns.Add(
             new DataGridViewTextBoxColumn {
                 Name = "NetAmount",
-                HeaderText = "Net Fee",
+                HeaderText = UiText.Fees.NetAmount,
                 DataPropertyName = "NetAmount",
                 ReadOnly = true,
                 FillWeight = 18,
@@ -1664,7 +1664,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         feeGrid.Columns.Add(
             new DataGridViewTextBoxColumn {
                 Name = "Frequency",
-                HeaderText = "Frequency",
+                HeaderText = UiText.Fees.Frequency,
                 DataPropertyName = "Frequency",
                 ReadOnly = true,
                 FillWeight = 16

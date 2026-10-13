@@ -419,9 +419,9 @@ public sealed class ApplyFeeConfigurationPage : V2Page
         ShowColumn("AdmissionNumber", "Admission Number", 115);
         SetHeader("StudentDetails", "Student", 300);
         SetHeader("ClassSection", "Class - Section", 120);
-        SetHeader("FeeTypeName", "Fee Type", 140);
-        SetHeader("CurrentAmount", "Current Amount", 130);
-        SetHeader("NewAmount", "New Amount", 130);
+        SetHeader("FeeTypeName", UiText.Fees.FeeType, 140);
+        SetHeader("CurrentAmount", UiText.Fees.CurrentAmount, 130);
+        SetHeader("NewAmount", UiText.Fees.NewAmount, 130);
         SetHeader("CurrentFrequency", "Current Frequency", 130);
         SetHeader("ConfiguredFrequency", "New Frequency", 130);
         SetHeader("AssignmentEffectiveFrom", "Current Rate From", 150);

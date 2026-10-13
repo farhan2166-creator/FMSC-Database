@@ -279,12 +279,12 @@ public sealed class FeePostingReversalPage : V2Page
         SetHeader("CampusName", "Campus", 110);
         SetHeader("ClassName", "Class", 95);
         SetHeader("SectionName", "Section", 85);
-        SetHeader("FeeTypeName", "Fee Type", 140);
+        SetHeader("FeeTypeName", UiText.Fees.FeeType, 140);
         SetHeader("ChargeKind", "Charge Kind", 100);
         SetHeader("BillingMonth", "Billing Month", 120);
-        SetHeader("NetAmount", "Posted", 100);
-        SetHeader("CollectedAmount", "Collected", 100);
-        SetHeader("UncollectedAmount", "Uncollected", 105);
+        SetHeader("NetAmount", UiText.Fees.PostedAmount, 100);
+        SetHeader("CollectedAmount", UiText.Fees.CollectedAmount, 100);
+        SetHeader("UncollectedAmount", UiText.Fees.UncollectedAmount, 105);
         SetHeader("ReversalNote", "Reversal", 260);
         Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
     }

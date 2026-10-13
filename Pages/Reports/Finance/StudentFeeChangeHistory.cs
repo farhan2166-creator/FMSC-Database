@@ -87,7 +87,7 @@ internal static class StudentFeeChangeHistory
         string identityText = $"Admission {Text(identity,"AdmissionNumber")}   |   {Text(identity,"StudentName")}   |   Father: {Text(identity,"FatherName")}\n"
             + $"{Text(identity,"ClassName")} / {Text(identity,"SectionName")}   |   {Text(identity,"CampusName")}   |   {Text(identity,"YearName")}";
         var rows = new DataTable();
-        foreach (string name in new[] { "Recorded / Status", "Fee / Action", "Amounts / Changes", "Effective period", "By", "Reason / Notes" }) rows.Columns.Add(name);
+        foreach (string name in new[] { "Recorded / Status", "Fee Type / Action", "Amounts / Changes", "Effective period", "By", "Reason / Notes" }) rows.Columns.Add(name);
         var assignments = data.Tables[1].AsEnumerable().ToDictionary(r => Convert.ToInt64(r["StudentFeeAssignmentId"]));
         var charges = data.Tables[2].AsEnumerable().ToDictionary(r => Convert.ToInt64(r["BillingChargeId"]));
         DateTime month = new(today.Year,today.Month,1);

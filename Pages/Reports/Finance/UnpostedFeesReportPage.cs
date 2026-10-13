@@ -125,9 +125,9 @@ public sealed class UnpostedFeesReportPage : V2Page
         SetHeader("CampusName", "Campus", 130);
         SetHeader("ClassName", "Class", 100);
         SetHeader("SectionName", "Section", 90);
-        SetHeader("FeeTypeName", "Fee Type", 140);
+        SetHeader("FeeTypeName", UiText.Fees.FeeType, 140);
         SetHeader("ExpectedBillingMonth", "Missing Month", 130);
-        SetHeader("ExpectedAmount", "Amount", 110);
+        SetHeader("ExpectedAmount", UiText.Fees.Amount, 110);
         Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
     }
     private void HideColumn(string columnName)

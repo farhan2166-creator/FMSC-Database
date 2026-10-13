@@ -686,3 +686,26 @@ acceptance work. The disposable container and temporary credentials are removed.
 
 No new procedure/schema migration, permission definition, version or DACPAC change
 is required. Existing migration 3 and the earlier owner DACPAC handoff remain.
+
+
+## 15. Consistent fee-grid captions — implemented 13 October 2026
+
+The owner requested consistent terminology wherever fee grids are displayed.
+`UiText.Fees` now owns Fee Type, Amount (Rs.), Discount (Rs.), Net Amount (Rs.)
+and Frequency captions, plus contextual current/new and posted/collected/
+uncollected amounts. Net Amount means the fee after discount; Due, Pay Now and
+Net Paid retain their separate financial meaning.
+
+Shared captions are applied across admission/quick registration, return and
+readmission/transfer fee previews, student assignments/future/pending fees,
+fee-type/class-rate setup and copy/bulk/apply previews, fee collection, posting/
+reversal, student statements, payment details and unposted-fee reports. Fee-history
+mixed headings now say Fee Type / Action. Bound fee columns use the same captions
+through the shared grid presenter, including columns already humanized during
+binding. Quick Registration's net-amount column has room for its longer caption.
+
+Only presentation changes: data names, column order, monetary calculations,
+permissions, schema, migrations and DACPAC are retained. Application and Windows
+smoke-harness builds pass with zero warnings/errors; all 602 existing portable
+checks pass. No new label-only test suite or SQL migration is added. Windows
+visual/DPI verification of the longer captions remains acceptance work.

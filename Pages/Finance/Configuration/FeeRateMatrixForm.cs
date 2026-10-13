@@ -535,7 +535,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
         grid.Columns.Clear();
         grid.Columns.Add(new DataGridViewTextBoxColumn {
             Name = FeeTypeColumnName,
-            HeaderText = "Fee Type",
+            HeaderText = UiText.Fees.FeeType,
             ReadOnly = true,
             Frozen = true,
             Width = AppScale.Scale(190),
@@ -543,7 +543,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
         });
         var frequencyColumn = new DataGridViewComboBoxColumn {
             Name = FrequencyColumnName,
-            HeaderText = "Frequency",
+            HeaderText = UiText.Fees.Frequency,
             Frozen = true,
             Width = AppScale.Scale(120),
             FlatStyle = FlatStyle.Flat,

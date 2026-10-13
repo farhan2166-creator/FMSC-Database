@@ -203,7 +203,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         }
         grid.Dock = DockStyle.Fill;
         grid.AutoGenerateColumns = false;
-        grid.Columns.Add("FeeTypeName", "Fee");
+        grid.Columns.Add("FeeTypeName", UiText.Fees.FeeType);
         grid.Columns.Add("Current", "Current fees");
         grid.Columns.Add("New", "New fees");
         grid.Columns.Add("Change", "Change");

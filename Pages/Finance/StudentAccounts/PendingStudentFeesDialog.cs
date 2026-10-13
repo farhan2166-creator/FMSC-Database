@@ -32,7 +32,7 @@ internal sealed class PendingStudentFeesDialog : ApplicationWindowForm
         grid.SelectionMode=DataGridViewSelectionMode.FullRowSelect;
         grid.MultiSelect=false;
         grid.Columns.Add(new DataGridViewCheckBoxColumn { Name="Post", HeaderText="Post?", Width=65 });
-        foreach(var field in new[]{("FeeTypeName","Fee"),("GrossAmount","Amount"),("DiscountAmount","Discount"),("NetAmount","Net payable"),("ReviewNote","Note")})
+        foreach(var field in new[]{("FeeTypeName",UiText.Fees.FeeType),("GrossAmount",UiText.Fees.Amount),("DiscountAmount",UiText.Fees.Discount),("NetAmount",UiText.Fees.NetAmount),("ReviewNote","Note")})
             grid.Columns.Add(new DataGridViewTextBoxColumn { Name=field.Item1, HeaderText=field.Item2, DataPropertyName=field.Item1, ReadOnly=true });
         grid.Columns["Post"].FillWeight=45;
         grid.Columns["FeeTypeName"].FillWeight=140;

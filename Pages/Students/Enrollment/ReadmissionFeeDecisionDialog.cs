@@ -19,7 +19,7 @@ internal sealed class ReadmissionFeeDecisionDialog : ApplicationWindowForm
         var waive=new RadioButton {Text="Waive yearly fees for this placement",AutoSize=true};
         var annual=new FlowLayoutPanel {Dock=DockStyle.Fill,AutoSize=true}; annual.Controls.Add(charge); annual.Controls.Add(waive);
         var grid=HumanUi.Grid(true); grid.AutoGenerateColumns=false;
-        foreach(var column in new[]{("FeeTypeName","Fee"),("Frequency","Frequency"),("Amount","New rate")})
+        foreach(var column in new[]{("FeeTypeName",UiText.Fees.FeeType),("Frequency",UiText.Fees.Frequency),("Amount",UiText.Fees.NewAmount)})
             grid.Columns.Add(new DataGridViewTextBoxColumn {DataPropertyName=column.Item1,HeaderText=column.Item2,ReadOnly=true});
         grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.None; grid.DataSource=rates;
         grid.Columns[2].DefaultCellStyle.Format="N0";
