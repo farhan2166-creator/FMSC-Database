@@ -124,6 +124,7 @@ internal static partial class Program
             CheckAdmissionSharedBusy();
             CheckModalPageCloseGuard();
             CheckDailyClosingLeaveContract();
+            CheckPostingReversalBusy();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();

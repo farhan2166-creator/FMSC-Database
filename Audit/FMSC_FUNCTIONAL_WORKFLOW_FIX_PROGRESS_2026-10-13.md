@@ -86,3 +86,16 @@ and amounts retain their normal discard prompt.
 Added actual-page close-contract fixtures for busy clean/dirty state, zero discard
 prompts during the operation and normal settled draft behavior. Native delayed-
 SQL, sign-out and navigation acceptance remains required. No SQL changes.
+
+## FQA-04 — Posting reversal does not block page departure
+
+**Confirmed and fixed.** Reversal now runs through the established shared
+RunBusyAsync gate while the whole page is held. IBusyPage remains true through
+validation, confirmation, the SQL call and the post-reversal month/impact refresh.
+Conflicting preview/filter/selection actions cannot run during the operation.
+Collected-charge exclusions, scope validation and server result counts remain.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added actual-page shared-operation fixtures for busy visibility, conflicting
+control lock and settled restoration. Native delayed SQL/navigation acceptance
+remains outstanding. No SQL migration is needed.

@@ -3,7 +3,7 @@ using FMSC_SMS.Pages.Reports;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Billing;
 /// <summary>Reverses charges assigned to a billing month - but only the part that has NOT been collected. That is the intended repair loop: post -> mistake -> reverse -> repost.</summary>
-public sealed class FeePostingReversalPage : V2Page
+public sealed class FeePostingReversalPage : V2Page, IBusyPage
 {
     /// <summary>The months that have a live posting to reverse (dbo.GetReversibleMonths), newest first. A month with nothing posted, or already fully reversed, is not offered. Keyed as yyyymm - see BillingMonthKey.</summary>
     private readonly LookupBox monthBox = new();
@@ -21,6 +21,8 @@ public sealed class FeePostingReversalPage : V2Page
     /* Guards RefreshMonthsAsync: only the newest request may land. */
     private int monthsLoadVersion;
     private ModernButton reverseButton = null!;
+    public bool IsBusy=>BusyOperationRunning;
+    public string BusyMessage=>"Fees are being reversed. Wait for the result and refreshed impact before leaving.";
     public FeePostingReversalPage()
         : base("Reverse a Posting", "Review uncollected monthly, annual and additional charges assigned to a billing month.")
     {
@@ -288,7 +290,8 @@ public sealed class FeePostingReversalPage : V2Page
         SetHeader("ReversalNote", "Reversal", 260);
         Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
     }
-    private async Task ReverseAsync()
+    private Task ReverseAsync()=>RunBusyAsync(BusyMessage,ReverseCoreAsync,this);
+    private async Task ReverseCoreAsync()
     {
         try
         {

@@ -26,4 +26,17 @@ internal static partial class Program
         Check(failed.IsFaulted&&!page.IsBusy,"A refused operation releases the shared busy state without swallowing the failure");
         Check(!page.IsHandleCreated,"Shared admission busy fixture never starts real SQL loaders");
     }
+    private static void CheckPostingReversalBusy()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        using var page=new FMSC_SMS.Pages.Finance.Billing.FeePostingReversalPage();
+        var reply=new TaskCompletionSource();Func<Task> operation=()=>reply.Task;
+        var run=typeof(V2Page).GetMethod("RunBusyAsync",flags)!;
+        var task=(Task<bool>)run.Invoke(page,new object[]{((IBusyPage)page).BusyMessage,operation,new Control[]{page}})!;
+        Check(((IBusyPage)page).IsBusy&&!page.Enabled,"Posting reversal publishes its busy state and locks conflicting page controls during the operation");
+        reply.SetResult();PumpUntil(()=>task.IsCompleted,"Reversal guard operation settles");
+        Check(task.Result&&!((IBusyPage)page).IsBusy&&page.Enabled,"Reversal completion releases both navigation and conflicting controls");
+        Check(!page.IsHandleCreated,"Reversal guard fixture never invokes real database posting or reversal");
+    }
+
 }
