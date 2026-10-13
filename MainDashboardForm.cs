@@ -1351,11 +1351,13 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         var theme =
             new ToolStripMenuItem(
                 "Change - Appearance/Theme");
-        bool lightweightGroup=false;
+        AppThemeType? previousFamily=null;
         foreach (AppThemeType value in AppTheme.SelectableThemes)
         {
-            if(AppTheme.IsLightweight(value)&&!lightweightGroup)
-            { theme.DropDownItems.Add(new ToolStripSeparator());lightweightGroup=true; }
+            var family=ThemeAppearance.BaseTheme(value);
+            if(previousFamily is not null&&previousFamily!=family)
+                theme.DropDownItems.Add(new ToolStripSeparator());
+            previousFamily=family;
             var item =
                 new ToolStripMenuItem(
                     AppTheme.GetThemeName(value)) {
@@ -1363,7 +1365,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                         AppTheme.CurrentTheme == value,
                     ToolTipText = AppTheme.IsLightweight(value)
                         ? "Strong colors, flat controls and instant feedback. The same layout and workflows, with fewer visual effects."
-                        : string.Empty
+                        : "Original themed appearance with rounded controls and decorative effects."
                 };
             item.Click += (_, _) =>
                 ChangeAppearanceAfterAccountMenuCloses(value);

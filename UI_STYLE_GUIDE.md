@@ -47,9 +47,10 @@ state-dependent actions retain their intended meaning.
 
 ## Lightweight appearances
 
-Account → Change - Appearance/Theme lists the four standard color themes, then
-Professional Simple and lightweight Ocean Blue, Emerald Green, Professional
-Orange and Royal Violet. All lightweight options use the same rendering path:
+Account → Change - Appearance/Theme lists each original color theme next to its
+lightweight version: Ocean Blue, Emerald Green, Professional Orange and Royal
+Violet, each explicitly labeled Standard or Lightweight. Professional Simple
+remains an additional lightweight option. All lightweight options use the same rendering path:
 flat controls, immediate hover feedback and no decorative loading/attention
 animation or popup shadows. Strong accents, dark guidance and visible borders
 retain a professional management-system appearance. Labels, input sizes,

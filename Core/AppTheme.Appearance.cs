@@ -18,9 +18,11 @@ internal readonly record struct LightweightPalette(Color Primary, Color Hover, C
 internal static class ThemeAppearance
 {
     internal static IReadOnlyList<AppThemeType> Selectable { get; } = Array.AsReadOnly(new[] {
-        AppThemeType.OceanBlue, AppThemeType.Emerald, AppThemeType.ProfessionalOrange, AppThemeType.Violet,
-        AppThemeType.ProfessionalSimple, AppThemeType.OceanBlueLightweight, AppThemeType.EmeraldLightweight,
-        AppThemeType.ProfessionalOrangeLightweight, AppThemeType.VioletLightweight
+        AppThemeType.OceanBlue, AppThemeType.OceanBlueLightweight,
+        AppThemeType.Emerald, AppThemeType.EmeraldLightweight,
+        AppThemeType.ProfessionalOrange, AppThemeType.ProfessionalOrangeLightweight,
+        AppThemeType.Violet, AppThemeType.VioletLightweight,
+        AppThemeType.ProfessionalSimple
     });
     internal static bool IsLightweight(AppThemeType theme) => theme is AppThemeType.ProfessionalSimple or
         AppThemeType.OceanBlueLightweight or AppThemeType.EmeraldLightweight or
@@ -44,8 +46,8 @@ internal static class ThemeAppearance
         _ => AppThemeType.OceanBlue
     };
     internal static string Name(AppThemeType theme) => theme switch {
-        AppThemeType.OceanBlue => "Ocean Blue", AppThemeType.Emerald => "Emerald Green",
-        AppThemeType.ProfessionalOrange => "Professional Orange", AppThemeType.Violet => "Royal Violet",
+        AppThemeType.OceanBlue => "Ocean Blue (Standard)", AppThemeType.Emerald => "Emerald Green (Standard)",
+        AppThemeType.ProfessionalOrange => "Professional Orange (Standard)", AppThemeType.Violet => "Royal Violet (Standard)",
         AppThemeType.ProfessionalSimple => "Professional Simple (Lightweight)",
         AppThemeType.OceanBlueLightweight => "Ocean Blue (Lightweight)",
         AppThemeType.EmeraldLightweight => "Emerald Green (Lightweight)",

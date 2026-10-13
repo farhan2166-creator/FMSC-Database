@@ -1,7 +1,9 @@
 # FMSC_SMS — Master Audit: Findings, Fixes, Decisions and Remaining Steps
 
 **Current appearance update:** Four colored lightweight variants accompany the
-refreshed Professional Simple option. All five use one flat rendering path,
+refreshed Professional Simple option. Each of the four original color families
+is explicitly presented as a Standard / Lightweight pair; the standard variants
+retain their rendering. All five lightweight choices use one flat rendering path,
 stronger readable colors, reduced decorative timers/shadows and safer switching.
 The existing layout and saved theme identities are retained. Verification passes
 585 portable assertions and a clean Windows-targeted app/smoke-harness build;

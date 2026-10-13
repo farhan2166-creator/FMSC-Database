@@ -556,9 +556,12 @@ The owner requested lightweight versions of the existing selectable color themes
 stronger colors and improvements to the shared light-rendering system. The
 notification-system proposal remains on hold; no communication feature is added.
 
-**Available appearances:** the four standard themes remain. Account → Change -
-Appearance/Theme now separates them from five lightweight choices: Professional
-Simple, Ocean Blue, Emerald Green, Professional Orange and Royal Violet. All five
+**Available appearances:** the four original themes retain their standard
+rendering. Account → Change - Appearance/Theme presents each color family as an
+explicit **Standard / Lightweight pair**: Ocean Blue, Emerald Green, Professional
+Orange and Royal Violet. Professional Simple remains an additional lightweight
+choice. The owner's clarification is implemented in menu labels/grouping; no
+standard theme was removed or converted to lightweight. All five
 share the established flat/no-shadow/immediate-feedback path; forms and report
 flows are not duplicated. The existing enum IDs 0–7 and saved names keep their
 meaning; four new IDs 8–11 are appended. Retired Rose/Teal/Amber preferences keep
