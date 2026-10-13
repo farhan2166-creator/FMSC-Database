@@ -292,7 +292,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly record struct AdmissionPart(string Where, string Value);
     /// <summary>At most one report per baseline: HasUnsavedChanges is asked several times on some paths.</summary>
     private bool _admissionDifferenceReported;
-    public bool HasUnsavedChanges => HasAdmissionEdits;
+    public bool HasUnsavedChanges => _pendingPhotoData is not null || HasAdmissionEdits;
     private bool HasAdmissionEdits
     {
         get
