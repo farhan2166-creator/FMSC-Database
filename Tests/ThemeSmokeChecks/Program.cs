@@ -119,6 +119,7 @@ internal static partial class Program
             CheckRegistrationPhotoRecovery();
             CheckHiddenRegistrationToolbar();
             CheckAdditionalFeeScope();
+            CheckFeeMatrixHostBusy();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();

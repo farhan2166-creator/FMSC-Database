@@ -2,7 +2,7 @@ using System.Globalization;
 using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Configuration;
-public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
+public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, IBusyPage
 {
     private sealed class ExistingCell
     {
@@ -67,6 +67,8 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
     private bool buildingGridRows;
     /* A campus change during an in-flight save runs LoadGridAsync, which re-enables saveButton, so the disabled button alone cannot refuse a click in that window. */
     private bool savingGrid;
+    public bool IsBusy=>savingGrid;
+    public string BusyMessage=>"Fee rates are being saved. Wait for the save and reload to finish before leaving.";
     /* selecting campus A and then quickly B left two loads running with no owner. */
     private int gridLoadVersion;
     /* The editable cell values the grid was last loaded with, so Close on an untouched grid asks nothing. Re-captured by every load, including the reload that follows a successful save. */
@@ -172,7 +174,8 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
     public bool HasUnsavedChanges => IsDirty();
     public string UnsavedChangesMessage =>
         "The fee matrix has unsaved changes. Leaving this screen will discard them.";
-    public FeeRateMatrixForm(int? defaultCampusId = null)
+    public FeeRateMatrixForm(int? defaultCampusId = null) : this(defaultCampusId,true) { }
+    internal FeeRateMatrixForm(int? defaultCampusId,bool initialize)
     {
         Text = PageTitles.FeeRateMatrix;
         StartPosition = FormStartPosition.CenterParent;
@@ -245,7 +248,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges
         FeeTypeCatalog.Changed += OnConfigurationsChanged;
         Disposed += (_, _) => FeeConfigurationChanges.Changed -= OnConfigurationsChanged;
         Disposed += (_, _) => FeeTypeCatalog.Changed -= OnConfigurationsChanged;
-        _ = InitializeAsync(defaultCampusId);
+        if(initialize)_ = InitializeAsync(defaultCampusId);
     }
     /// <summary>D-H10 - one ordered start instead of two racing fire-and-forget loads: the campus list first, then the grid. LoadGridAsync is version-guarded, so the overlap is harmless.</summary>
     private async Task InitializeAsync(int? defaultCampusId)

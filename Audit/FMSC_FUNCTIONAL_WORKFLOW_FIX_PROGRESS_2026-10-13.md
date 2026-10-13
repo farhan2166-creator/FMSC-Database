@@ -20,3 +20,15 @@ or errors; added delayed A→B, current-result selection, scope clearing and dis
 response GUI fixtures. Existing portable latest-read/cancellation regressions run
 in PerformanceChecks. The Windows GUI fixtures require native Windows execution.
 No SQL migration is needed.
+
+## FQA-18 — Embedded fee matrix save is invisible to its host
+
+**Confirmed and fixed.** FeeRateMatrixForm's existing savingGrid state now
+implements IBusyPage for the entire save and post-save reload. WorkspacePage
+already scans all loaded children and blocks switching tabs when one is busy;
+the dashboard can now see this save through that established contract.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added an embedded-host fixture covering active-save tab refusal, navigation after
+completion and a busy child in a non-selected tab. Native Windows execution of
+these GUI fixtures remains required. No SQL or permission changes.
