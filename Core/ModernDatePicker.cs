@@ -60,6 +60,7 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
     {
         if (IsDisposed || Disposing)
             return;
+        if(_popup is {IsDisposed:false})_popup.DropShadowEnabled=!AppTheme.UseSimpleRendering;
         RefreshTheme();
     }
     public void RefreshTheme()
@@ -179,7 +180,7 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
         var selector = new DateSelectionPanel(Value, MinDate, MaxDate, ShowCheckBox);
         var popup = new ToolStripDropDown {
             Padding = Padding.Empty, AutoSize = true,
-            BackColor = AppTheme.Surface, DropShadowEnabled = true
+            BackColor = AppTheme.Surface, DropShadowEnabled = !AppTheme.UseSimpleRendering
         };
         _popup = popup;
         popup.Items.Add(new ToolStripControlHost(selector) {

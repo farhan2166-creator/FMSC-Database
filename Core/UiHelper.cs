@@ -197,10 +197,12 @@ namespace FMSC_SMS.Core
         }
         public static void RefreshApplicationTheme()
         {
-            foreach (Form form
-                in Application.OpenForms)
+            foreach (Form form in Application.OpenForms.Cast<Form>().ToArray())
             {
-                ApplyThemeToForm(form);
+                if (form.IsDisposed) continue;
+                try { ApplyThemeToForm(form); }
+                catch (Exception ex) when (AppTheme.IsChangingTheme)
+                { AppExceptionHandler.LogNonFatal(ex,"Refreshing form theme: "+form.GetType().Name); }
             }
         }
         internal static void RefreshControlsForScaleChange(Control root)
@@ -426,16 +428,8 @@ namespace FMSC_SMS.Core
             button.BackColor = background;
             button.ForeColor = GetButtonTextColor(background);
         }
-        private static Color GetButtonTextColor(Color background)
-        {
-            double luminance =
-                (0.2126 * background.R +
-                 0.7152 * background.G +
-                 0.0722 * background.B) / 255.0;
-            return luminance > 0.68
-                ? Color.FromArgb(17, 24, 39)
-                : Color.White;
-        }
+        private static Color GetButtonTextColor(Color background) => ThemeAppearance.ReadableText(background);
+
         private static void LegacyButtonMouseEnter(object? sender, EventArgs e)
         {
             if (sender is not Button button)
@@ -448,8 +442,13 @@ namespace FMSC_SMS.Core
                 return;
             }
             var normalColor = LegacyButtonColor(button.Tag as string);
-            button.BackColor = ControlPaint.Light(normalColor, 0.08f);
-            button.ForeColor = GetButtonTextColor(normalColor);
+            button.BackColor = AppTheme.UseSimpleRendering ? (button.Tag as string) switch {
+                "Success" => AppTheme.SuccessHover,
+                "Warning" => AppTheme.WarningHover,
+                "Danger" => AppTheme.DangerHover,
+                _ => AppTheme.PrimaryHover
+            } : ControlPaint.Light(normalColor,0.08f);
+            button.ForeColor = GetButtonTextColor(button.BackColor);
         }
         private static void LegacyButtonMouseLeave(object? sender, EventArgs e)
         {
@@ -464,7 +463,7 @@ namespace FMSC_SMS.Core
             }
             var normalColor = LegacyButtonColor(button.Tag as string);
             button.BackColor = normalColor;
-            button.ForeColor = GetButtonTextColor(normalColor);
+            button.ForeColor = GetButtonTextColor(button.BackColor);
         }
         private static Color LegacyButtonColor(string? role) => role switch {
             "Danger" => AppTheme.Danger,

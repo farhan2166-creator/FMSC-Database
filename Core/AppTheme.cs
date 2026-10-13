@@ -1,32 +1,15 @@
 namespace FMSC_SMS.Core
 {
-    public enum AppThemeType
-    {
-        OceanBlue,
-        Emerald,
-        ProfessionalOrange,
-        Violet,
-        Rose,
-        Teal,
-        Amber,
-        ProfessionalSimple
-    }
     public static class AppTheme
     {
-        // Deliberately small, visually distinct professional set shown to the operator.
-        // The remaining enum values stay readable only so older saved preferences migrate cleanly.
-        public static IReadOnlyList<AppThemeType> SelectableThemes { get; } =
-            new[]
-            {
-                AppThemeType.OceanBlue,
-                AppThemeType.Emerald,
-                AppThemeType.ProfessionalOrange,
-                AppThemeType.Violet,
-                AppThemeType.ProfessionalSimple
-            };
+        // Rendering style is independent of the selected color family.
+        public static IReadOnlyList<AppThemeType> SelectableThemes => ThemeAppearance.Selectable;
+        public static bool IsLightweight(AppThemeType theme) => ThemeAppearance.IsLightweight(theme);
         public static AppThemeType CurrentTheme =>
             _currentTheme;
-        public static bool UseSimpleRendering => _currentTheme == AppThemeType.ProfessionalSimple;
+        public static bool UseSimpleRendering => IsLightweight(_currentTheme);
+        private static AppThemeType BaseTheme => ThemeAppearance.BaseTheme(_currentTheme);
+        private static LightweightPalette Lightweight => ThemeAppearance.Palette(_currentTheme);
         public static string CurrentThemeName =>
             GetThemeName(_currentTheme);
         private static readonly string ThemeFilePath =
@@ -64,13 +47,7 @@ namespace FMSC_SMS.Core
             }
             return AppThemeType.OceanBlue;
         }
-        private static AppThemeType NormalizeSelectableTheme(AppThemeType theme) =>
-            theme switch {
-                AppThemeType.Rose => AppThemeType.Violet,
-                AppThemeType.Teal => AppThemeType.Emerald,
-                AppThemeType.Amber => AppThemeType.ProfessionalOrange,
-                _ => SelectableThemes.Contains(theme) ? theme : AppThemeType.OceanBlue
-            };
+        private static AppThemeType NormalizeSelectableTheme(AppThemeType theme) => ThemeAppearance.Normalize(theme);
         private static void SaveTheme(AppThemeType theme)
         {
             try
@@ -88,39 +65,20 @@ namespace FMSC_SMS.Core
                 FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException2, "AppTheme: SaveTheme fallback");
             }
         }
-        public static string GetThemeName(
-            AppThemeType theme) =>
-            theme switch {
-                AppThemeType.OceanBlue =>
-                    "Ocean Blue",
-                AppThemeType.Emerald =>
-                    "Emerald Green",
-                AppThemeType.ProfessionalOrange =>
-                    "Professional Orange",
-                AppThemeType.Violet =>
-                    "Royal Violet",
-                AppThemeType.ProfessionalSimple =>
-                    "Professional Simple (Lightweight)",
-                AppThemeType.Rose =>
-                    "Rose",
-                AppThemeType.Teal =>
-                    "Teal",
-                AppThemeType.Amber =>
-                    "Amber Gold",
-                _ => theme.ToString()
-            };
+        public static string GetThemeName(AppThemeType theme) => ThemeAppearance.Name(theme);
         public static void SetTheme(AppThemeType theme)
         {
             theme = NormalizeSelectableTheme(theme);
-            if (_currentTheme == theme)
+            if (_currentTheme == theme || IsChangingTheme)
                 return;
-            UiTheme.CaptureOpenForms();
+            try { UiTheme.CaptureOpenForms(); }
+            catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex,"Capturing controls before theme change"); return; }
             IsChangingTheme = true;
             try
             {
                 _currentTheme = theme;
                 SaveTheme(theme);
-                ThemeChanged?.Invoke(null, EventArgs.Empty);
+                ThemeChangeDelivery.Notify(ThemeChanged, ex => AppExceptionHandler.LogNonFatal(ex,"Refreshing a theme listener"));
             }
             finally { IsChangingTheme = false; }
         }
@@ -129,7 +87,8 @@ namespace FMSC_SMS.Core
         {
             get
             {
-                return _currentTheme switch {
+                if (UseSimpleRendering) return Lightweight.Primary;
+                return BaseTheme switch {
                     AppThemeType.ProfessionalSimple => Color.FromArgb(30, 64, 105),
                     AppThemeType.Emerald =>
                         Color.FromArgb(5, 150, 105),
@@ -152,7 +111,8 @@ namespace FMSC_SMS.Core
         {
             get
             {
-                return _currentTheme switch {
+                if (UseSimpleRendering) return Lightweight.Hover;
+                return BaseTheme switch {
                     AppThemeType.ProfessionalSimple => Color.FromArgb(23, 50, 83),
                     AppThemeType.Emerald =>
                         Color.FromArgb(4, 120, 87),
@@ -175,7 +135,8 @@ namespace FMSC_SMS.Core
         {
             get
             {
-                return _currentTheme switch {
+                if (UseSimpleRendering) return Lightweight.Selection;
+                return BaseTheme switch {
                     AppThemeType.ProfessionalSimple => Color.FromArgb(235, 241, 247),
                     AppThemeType.Emerald =>
                         Color.FromArgb(236, 253, 245),
@@ -199,7 +160,8 @@ namespace FMSC_SMS.Core
         {
             get
             {
-                return _currentTheme switch {
+                if (UseSimpleRendering) return Color.FromArgb(21,128,61);
+                return BaseTheme switch {
                     AppThemeType.Emerald =>
                         Color.FromArgb(16, 185, 129),
                     AppThemeType.ProfessionalOrange =>
@@ -213,7 +175,8 @@ namespace FMSC_SMS.Core
         {
             get
             {
-                return _currentTheme switch {
+                if (UseSimpleRendering) return Color.FromArgb(22,101,52);
+                return BaseTheme switch {
                     AppThemeType.Emerald =>
                         Color.FromArgb(5, 150, 105),
                     AppThemeType.ProfessionalOrange =>
@@ -227,7 +190,8 @@ namespace FMSC_SMS.Core
         {
             get
             {
-                return _currentTheme switch {
+                if (UseSimpleRendering) return Color.FromArgb(180,83,9);
+                return BaseTheme switch {
                     AppThemeType.Emerald =>
                         Color.FromArgb(245, 158, 11),
                     AppThemeType.ProfessionalOrange =>
@@ -241,7 +205,8 @@ namespace FMSC_SMS.Core
         {
             get
             {
-                return _currentTheme switch {
+                if (UseSimpleRendering) return Color.FromArgb(146,64,14);
+                return BaseTheme switch {
                     AppThemeType.Emerald =>
                         Color.FromArgb(217, 119, 6),
                     AppThemeType.ProfessionalOrange =>
@@ -260,7 +225,8 @@ namespace FMSC_SMS.Core
         {
             get
             {
-                return _currentTheme switch {
+                if (UseSimpleRendering) return Lightweight.Page;
+                return BaseTheme switch {
                     AppThemeType.ProfessionalSimple => Color.FromArgb(245, 246, 248),
                     AppThemeType.Emerald =>
                         Color.FromArgb(246, 250, 248),
@@ -285,7 +251,8 @@ namespace FMSC_SMS.Core
         {
             get
             {
-                return _currentTheme switch {
+                if (UseSimpleRendering) return Lightweight.Secondary;
+                return BaseTheme switch {
                     AppThemeType.ProfessionalSimple => Color.FromArgb(249, 250, 251),
                     AppThemeType.Emerald =>
                         Color.FromArgb(248, 252, 250),
@@ -310,19 +277,20 @@ namespace FMSC_SMS.Core
         public static Color HeadingText =>
             Color.FromArgb(17, 24, 39);
         public static Color MutedText =>
-            Color.FromArgb(107, 114, 128);
+            UseSimpleRendering ? Color.FromArgb(95,107,122) : Color.FromArgb(107,114,128);
         public static Color MenuText =>
-            Color.FromArgb(243, 244, 246);
+            Text;
         public static Color MenuMutedText =>
-            Color.FromArgb(156, 163, 175);
+            MutedText;
         public static Color ThemeOnPrimaryText =>
-            Color.FromArgb(225, 240, 255);
+            ThemeAppearance.ReadableText(Primary);
         // Borders
         public static Color Border
         {
             get
             {
-                return _currentTheme switch {
+                if (UseSimpleRendering) return Lightweight.Border;
+                return BaseTheme switch {
                     AppThemeType.ProfessionalSimple => Color.FromArgb(207, 213, 221),
                     AppThemeType.Emerald =>
                         Color.FromArgb(220, 232, 227),
@@ -353,8 +321,8 @@ namespace FMSC_SMS.Core
         public static Color InputBorderHover =>
             Blend(InputBorder, Primary, 0.28f);
         // Quiet hierarchy on white cards, with readable theme-related text.
-        public static Color SectionHeaderBackground => Blend(Surface, Primary, 0.055f);
-        public static Color PageTitleBackground => Blend(Surface, Primary, 0.035f);
+        public static Color SectionHeaderBackground => Blend(Surface, Primary, UseSimpleRendering ? 0.10f : 0.055f);
+        public static Color PageTitleBackground => Blend(Surface, Primary, UseSimpleRendering ? 0.07f : 0.035f);
         public static Color SectionHeadingText => Blend(Text, Primary, 0.30f);
         public static Color SectionGuidanceText => Blend(MutedText, Primary, 0.15f);
         private static Color Blend(Color from, Color to, float amount)

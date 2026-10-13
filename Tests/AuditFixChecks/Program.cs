@@ -49,4 +49,6 @@ Console.WriteLine($"PASS: {await RegistrationPhotoChecks.RunAsync()} registratio
 Console.WriteLine($"PASS: {await AdmissionCompressionChecks.RunAsync()} admission confirmation and compact photo compression checks.");
 Console.WriteLine($"PASS: {await FilePersistenceChecks.RunAsync()} logo preflight, report settings recovery and export durability checks.");
 Console.WriteLine($"PASS: {AdministrativeAccessChecks.Run()} administrative drafts, access previews and transaction-outcome checks.");
+Console.WriteLine($"PASS: {ThemeAppearanceChecks.Run()} lightweight palettes, saved preferences and refresh delivery checks.");
+
 if(args.Contains("--profile-search"))ReviewFilterProfile.Run();

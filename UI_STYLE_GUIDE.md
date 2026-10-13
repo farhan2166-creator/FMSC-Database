@@ -44,3 +44,20 @@ at runtime or replace New with Clear solely for visual consistency.
 Check presentation on Windows in light and dark themes, at the display scales used
 by staff. Confirm captions fit, guidance is readable, shortcuts still work, and
 state-dependent actions retain their intended meaning.
+
+## Lightweight appearances
+
+Account → Change - Appearance/Theme lists the four standard color themes, then
+Professional Simple and lightweight Ocean Blue, Emerald Green, Professional
+Orange and Royal Violet. All lightweight options use the same rendering path:
+flat controls, immediate hover feedback and no decorative loading/attention
+animation or popup shadows. Strong accents, dark guidance and visible borders
+retain a professional management-system appearance. Labels, input sizes,
+spacing, focus order and work flows remain the same.
+
+`AppTheme` remains the public source of theme colors and rendering mode.
+`AppTheme.Appearance.cs` contains its internal portable palette/policy; do not
+create independent per-page theme settings or checks for ProfessionalSimple
+alone. Use `AppTheme.UseSimpleRendering` for rendering choices and
+`AppTheme.IsLightweight(theme)` for appearance-menu labels. Treat progress text
+and warnings as functional information; animation is optional decoration.

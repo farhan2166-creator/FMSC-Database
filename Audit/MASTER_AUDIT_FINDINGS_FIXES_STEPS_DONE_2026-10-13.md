@@ -1,5 +1,14 @@
 # FMSC_SMS — Master Audit: Findings, Fixes, Decisions and Remaining Steps
 
+**Current appearance update:** Four colored lightweight variants accompany the
+refreshed Professional Simple option. All five use one flat rendering path,
+stronger readable colors, reduced decorative timers/shadows and safer switching.
+The existing layout and saved theme identities are retained. Verification passes
+585 portable assertions and a clean Windows-targeted app/smoke-harness build;
+physical Windows/DPI and resource measurements remain pending. See
+[section 13](FMSC_INDEPENDENT_SECURITY_DURABILITY_RELEASE_AUDIT_2026-10-13.md#13-colored-lightweight-themes-and-rendering-reliability--13-october-2026).
+The notification proposal is on hold; this work adds no SQL migration.
+
 **Current navigation update:** The owner authorized Users and Roles & Permissions
 in the dashboard Account menu. Entries use the pages' viewing prerequisites and
 recheck access/session before navigation; write safeguards remain in force.

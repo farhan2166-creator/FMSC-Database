@@ -4,7 +4,8 @@
 implemented in source at the owner's request. IA-01/02/03 were excluded from that
 pass, then implemented in the subsequently authorized Users/Roles restructuring.
 The two-role policy is implemented in section 11; owner-authorized Account menu
-navigation follows in section 12. See sections 8–12 below; the original review remains
+navigation follows in section 12, and colored lightweight themes in section 13.
+See sections 8–13 below; the original review remains
 pinned to its stated baseline and is not native deployment acceptance.
 
 **Audit date:** 13 October 2026  
@@ -548,3 +549,73 @@ SQL change, migration, DACPAC or data update is required by this navigation chan
 The application and Windows smoke harness compile with zero warnings/errors;
 the existing 530 portable assertions pass. Interactive Windows menu execution
 remains part of native acceptance, not a claim made by the Linux build checks.
+
+## 13. Colored lightweight themes and rendering reliability — 13 October 2026
+
+The owner requested lightweight versions of the existing selectable color themes,
+stronger colors and improvements to the shared light-rendering system. The
+notification-system proposal remains on hold; no communication feature is added.
+
+**Available appearances:** the four standard themes remain. Account → Change -
+Appearance/Theme now separates them from five lightweight choices: Professional
+Simple, Ocean Blue, Emerald Green, Professional Orange and Royal Violet. All five
+share the established flat/no-shadow/immediate-feedback path; forms and report
+flows are not duplicated. The existing enum IDs 0–7 and saved names keep their
+meaning; four new IDs 8–11 are appended. Retired Rose/Teal/Amber preferences keep
+their established mappings. Unknown preferences safely fall back to Ocean Blue.
+The selectable collection is read-only and theme preference writes retain the
+existing atomic file replacement and logged fallback behavior.
+
+**Stronger presentation:** each lightweight family has a distinct saturated
+accent, darker hover, more visible selection/header tints and clearer input
+boundaries. Professional Simple's blue is refreshed too. Shared success/warning
+colors and muted guidance use readable contrast. Menus no longer use pale text
+against their white surfaces. Selected student rows use a contrast-selected
+foreground; modern and legacy solid actions share actual sRGB luminance-based
+text selection, including hover/press fills. Lightweight hover uses its darker
+semantic role color. Standard theme accent palettes remain intact.
+
+`AppTheme` remains the public source of colors/rendering behavior;
+`AppTheme.Appearance.cs` holds its portable palette/policy implementation.
+Palette lookup uses fixed switches/cached palette values rather than a theme-list
+search during painting. Fonts, spacing, widths, heights, data, control order,
+action meaning and keyboard navigation are retained. The 55 portable theme
+assertions verify saved identities/fallbacks, all five distinct palettes, at
+least 4.5:1 primary/hover/text contrast and 3:1 input-boundary contrast on white,
+plus readable solid-action foregrounds and independent refresh delivery.
+
+**Resource/lifecycle improvements:** loading indicators stay static in lightweight
+mode without allocating animation timers. Standard-mode loading timers are lazy,
+released while hidden, on handle destruction and on disposal; Windows motion/
+remote-session preferences are respected. Loading labels reuse the shared font
+cache and refresh their colors. Status-attention flashing is limited to one
+session per label, replaces prior sessions, cancels on theme changes and releases
+its timer/subscriptions on disposal. Lightweight warnings retain their text and
+tooltip with no flash timer. Popup/calendar shadows are disabled in lightweight
+mode. Existing flat rendering avoids rounded clipping/path allocation and button
+shadows; hover-transition timers are released on entry to any lightweight option.
+
+**Safer switching:** recursive theme requests during refresh are ignored. Failure
+to capture the old control bindings logs and aborts before changing the theme.
+A failed theme subscriber is logged without blocking later subscribers; individual
+control/form refresh failures during a theme change are contained so the remaining
+UI can refresh. Forms/children are snapshotted during theme-change iteration.
+The regular idle initialization does not add a snapshot allocation on every idle
+callback. Account-menu theme changes are deferred until its click completes,
+then recheck the session before the sidebar rebuild retires its owner button.
+These safeguards contain refresh failures; they do not claim every third-party
+control can always redraw successfully or that deployed CPU/RAM was measured.
+
+**Verification:** **585 portable assertions** pass, including 55 new theme checks.
+The application and expanded Windows smoke harness build with **zero warnings
+and errors**. The harness covers forward/reverse switching of all nine choices,
+saved selection, draft/validation/focus/geometry preservation, clipping regions,
+flat paint paths, loading/attention lifecycle, contrast, failed listener/control
+refresh and recursive callbacks. Compact/wide Users/Roles layouts include all
+appearances. Those native GUI tests are **compiled but unrun** on Linux; Windows
+100/125/150% DPI, physical color/readability and low-end resource measurements
+remain acceptance work. The sixteen artifact/catalog tests still pass.
+
+No SQL procedures, migrations, permissions, database version or DACPAC were changed
+by this work. Database version 3 and its earlier migration handoff remain as
+previously documented.

@@ -42,20 +42,20 @@ internal static partial class Program
             // Start in a decorated theme; starting an animation may be disabled
             // by Windows accessibility settings. Either case must switch safely.
             motion.MoveTo(Color.Red);
-            foreach (var theme in new[] { AppThemeType.ProfessionalSimple, AppThemeType.Emerald, AppThemeType.ProfessionalSimple, AppThemeType.OceanBlue })
+            foreach (var theme in AppTheme.SelectableThemes.Concat(AppTheme.SelectableThemes.Reverse()))
             {
                 AppTheme.SetTheme(theme); Application.DoEvents();
                 for (int i = 0; i < controls.Length; i++)
                     Check(before[i] == (controls[i].Bounds, controls[i].Padding, controls[i].Margin, controls[i].Font, controls[i].TabIndex, controls[i].Enabled, controls[i].Visible), "Theme must preserve control structure and geometry");
                 Check(field.Text == "Unsaved student details" && field.IsInvalid && choice.SelectedIndex == 1 && day.Value.Date == new DateTime(2026, 10, 13), "Theme must preserve draft values and validation state");
                 Check(form.ActiveControl == focus, "Theme must preserve focus");
-                Check(AppTheme.UseSimpleRendering == (theme == AppThemeType.ProfessionalSimple), "Rendering mode must follow theme selection");
+                Check(AppTheme.UseSimpleRendering == AppTheme.IsLightweight(theme), "Rendering mode must follow theme selection");
                 foreach (var control in controls)
                     Check(AppTheme.UseSimpleRendering ? control.Region is null : control.Region is not null, "Switching must release or restore rounded clipping regions");
                 if (AppTheme.UseSimpleRendering)
                 {
                     string preference = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FMSC_SMS", "theme.txt");
-                    Check(File.ReadAllText(preference).Trim() == nameof(AppThemeType.ProfessionalSimple), "Simple choice must use the saved theme preference");
+                    Check(File.ReadAllText(preference).Trim() == theme.ToString(), "Simple choice must use the saved theme preference");
                     motion.MoveTo(AppTheme.PrimaryHover);
                     Check(timerField.GetValue(motion) is null && motion.Value == AppTheme.PrimaryHover, "Simple feedback must apply immediately without an animation timer");
                     Check(Contrast(AppTheme.Text, AppTheme.Surface) >= 4.5 && Contrast(Color.White, AppTheme.Primary) >= 4.5, "Simple text and primary actions need readable contrast");
@@ -68,7 +68,8 @@ internal static partial class Program
             using (var flatShape = new UiPaintShape(new Rectangle(0, 0, 100, 30), 8))
                 Check(typeof(UiPaintShape).GetField("path", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(flatShape) is null, "Flat shapes must avoid allocating a rounded path");
             using var menu = new StyledContextMenu(); menu.Items.Add("Save");
-            Check(menu.Items.Count == 1, "Popup actions must remain available");
+            Check(menu.Items.Count == 1&&!menu.DropShadowEnabled, "Lightweight popup actions remain available without a shadow");
+            CheckLightweightResources(form);
             using var students = new System.Data.DataTable();
             students.Columns.Add("AdmissionId", typeof(int)); students.Columns.Add("AdmissionNumber", typeof(string));
             students.Columns.Add("StudentName", typeof(string)); students.Columns.Add("FatherName", typeof(string));

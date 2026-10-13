@@ -202,3 +202,20 @@ Administrator, Accountant and the 28 canonical permission definitions. It verifi
 Administrator-only assignment, full authority and refusal of repeat setup. Do not
 run it against the data-bearing fixture: it explicitly requires an empty Users
 table and a disposable database name.
+
+## Colored lightweight-theme verification
+
+Current portable count: **585**, including 55 production appearance-policy checks.
+The five lightweight options preserve saved IDs/names, provide distinct palettes,
+meet tested primary/hover/text contrast and visible input-boundary contrast, and
+share the existing simple-rendering policy. Theme refresh dispatch continues after
+a failed listener. Run the normal AuditFixChecks command above.
+
+The expanded `ThemeSmokeChecks` harness compiles with zero warnings/errors. On a
+disposable Windows profile, run it to exercise all nine appearances forward and
+back, verify preference files, preserve draft/focus/geometry, release clipping and
+animation resources, replace/cancel status attention and contain failed refresh/
+recursive callbacks. The suite also tests compact/wide administration layouts for
+each appearance. Native GUI execution and DPI/readability acceptance remain unrun
+on Linux. Measure RAM/CPU on a representative low-end Windows PC before claiming
+a deployed speed improvement. No additional SQL migration is needed for themes.

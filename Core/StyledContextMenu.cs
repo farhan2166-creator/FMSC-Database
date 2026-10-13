@@ -21,6 +21,7 @@ public sealed class StyledContextMenu : ContextMenuStrip
         Font = AppTheme.NormalFont;
         BackColor = AppTheme.Surface;
         ForeColor = AppTheme.Text;
+        DropShadowEnabled = !AppTheme.UseSimpleRendering;
         foreach (ToolStripItem item in Items) StyleItem(item);
     }
 
@@ -34,6 +35,7 @@ public sealed class StyledContextMenu : ContextMenuStrip
         if (item is ToolStripMenuItem menuItem)
         {
             menuItem.DropDown.Renderer = new PopupRenderer();
+            menuItem.DropDown.DropShadowEnabled = !AppTheme.UseSimpleRendering;
             foreach (ToolStripItem child in menuItem.DropDownItems) StyleItem(child);
         }
     }

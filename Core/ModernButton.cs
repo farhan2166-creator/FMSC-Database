@@ -181,16 +181,8 @@ namespace FMSC_SMS.Core
             "PrimaryLight" => AppTheme.PrimaryLight,
             _ => fixedValue
         };
-        private static Color GetButtonTextColor(Color background)
-        {
-            double luminance =
-                (0.2126 * background.R +
-                 0.7152 * background.G +
-                 0.0722 * background.B) / 255.0;
-            return luminance > 0.68
-                ? Color.FromArgb(17, 24, 39)
-                : Color.White;
-        }
+        private static Color GetButtonTextColor(Color background) => ThemeAppearance.ReadableText(background);
+
         public void ApplyTheme()
         {
             UpdateRegion();
@@ -269,7 +261,13 @@ namespace FMSC_SMS.Core
         private void UpdateColors()
         {
             _hoverColor =
-                ControlPaint.Light(_normalColor, 0.08f);
+                AppTheme.UseSimpleRendering ? _themeRole switch {
+                    "Primary" or "TabActive" => AppTheme.PrimaryHover,
+                    "Success" => AppTheme.SuccessHover,
+                    "Warning" => AppTheme.WarningHover,
+                    "Danger" => AppTheme.DangerHover,
+                    _ => ControlPaint.Dark(_normalColor,0.08f)
+                } : ControlPaint.Light(_normalColor, 0.08f);
             _pressedColor =
                 ControlPaint.Dark(_normalColor, 0.10f);
             BackColor =
@@ -396,7 +394,7 @@ namespace FMSC_SMS.Core
                     : AppTheme.ButtonDisabledBackground;
             var textColor =
                 Enabled
-                    ? ForeColor
+                    ? _outline || _themeRole is "Navigation" or "TabInactive" ? ForeColor : GetButtonTextColor(fillColor)
                     : AppTheme.ButtonDisabledText;
             // Keyboard focus needs a visible whole-button change as well as a ring.
             // Keep this separate from hover, so focus remains clear with the mouse elsewhere.

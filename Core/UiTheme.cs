@@ -24,7 +24,7 @@ internal static class UiTheme
 
     internal static void CaptureOpenForms()
     {
-        foreach (Form form in Application.OpenForms) CaptureTree(form);
+        foreach (Form form in Application.OpenForms.Cast<Form>().ToArray()) CaptureTree(form);
     }
     private static bool OwnsChildren(Control control) => control is IAccessibleInput ||
         control is DataGridView || control is MainDashboardForm.DashboardNavButton;
@@ -74,9 +74,14 @@ internal static class UiTheme
     {
         if (root.IsDisposed) return;
         if (root is Form form) InitializedForms.GetValue(form, _ => new object());
-        ApplyControl(root);
+        try { ApplyControl(root); }
+        catch (Exception ex) when (AppTheme.IsChangingTheme)
+        { AppExceptionHandler.LogNonFatal(ex,"Refreshing theme control: "+root.GetType().Name); }
         if (OwnsChildren(root)) return;
-        foreach (Control child in root.Controls) ApplyTree(child);
+        if(AppTheme.IsChangingTheme)
+            foreach(Control child in root.Controls.Cast<Control>().ToArray())ApplyTree(child);
+        else
+            foreach(Control child in root.Controls)ApplyTree(child);
         root.Invalidate();
     }
     internal static void ApplyControl(Control control)

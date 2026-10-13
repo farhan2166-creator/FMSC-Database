@@ -164,7 +164,7 @@ internal static partial class Program
                     "Read-only viewing permission does not enable any management action");
                 page.NameInput.Text="Programmatic draft";Finish(page.SaveAsync());Check(readStore.Writes==0,"Programmatic UI changes cannot bypass the permission guard");
             }
-            foreach(var selectedTheme in new[]{AppThemeType.ProfessionalSimple,AppThemeType.OceanBlue})
+            foreach(var selectedTheme in AppTheme.SelectableThemes)
                 foreach(int width in new[]{760,1100})
                 {
                     AppTheme.SetTheme(selectedTheme);using var page=new RolesPage(new FixtureAdministrationStore(AccessEditorKind.Roles),full,false){Dock=DockStyle.Fill,BindingContext=new BindingContext()};

@@ -1351,19 +1351,22 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         var theme =
             new ToolStripMenuItem(
                 "Change - Appearance/Theme");
+        bool lightweightGroup=false;
         foreach (AppThemeType value in AppTheme.SelectableThemes)
         {
+            if(AppTheme.IsLightweight(value)&&!lightweightGroup)
+            { theme.DropDownItems.Add(new ToolStripSeparator());lightweightGroup=true; }
             var item =
                 new ToolStripMenuItem(
                     AppTheme.GetThemeName(value)) {
                     Checked =
                         AppTheme.CurrentTheme == value,
-                    ToolTipText = value == AppThemeType.ProfessionalSimple
-                        ? "Flat appearance and instant hover feedback, with the same layout and workflows."
+                    ToolTipText = AppTheme.IsLightweight(value)
+                        ? "Strong colors, flat controls and instant feedback. The same layout and workflows, with fewer visual effects."
                         : string.Empty
                 };
             item.Click += (_, _) =>
-                AppTheme.SetTheme(value);
+                ChangeAppearanceAfterAccountMenuCloses(value);
             theme.DropDownItems.Add(item);
         }
         menu.Items.Add(theme);
@@ -1389,6 +1392,16 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         menu.Show(
             owner,
             new Point(0, -menu.Height));
+    }
+    private void ChangeAppearanceAfterAccountMenuCloses(AppThemeType theme)
+    {
+        if(IsDisposed||Disposing||!IsHandleCreated)return;
+        int actor=CurrentUser.UserId;
+        // Theme refresh rebuilds the sidebar; finish the dropdown click before
+        // retiring its owner button, just as other Account navigation does.
+        BeginInvoke(new MethodInvoker(()=>{
+            if(!IsDisposed&&!Disposing&&CurrentUser.UserId==actor)AppTheme.SetTheme(theme);
+        }));
     }
     private void OpenAccountAdministrationAfterMenuCloses(AccessEditorKind kind)
     {
