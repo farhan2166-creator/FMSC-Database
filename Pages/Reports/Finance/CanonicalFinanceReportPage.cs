@@ -168,7 +168,11 @@ public abstract class CanonicalFinanceReportPage : V2Page
         _filterSummary.Length == 0 ? base.ReportExportSubtitle() : _filterSummary;
     private void FiltersChanged()
     {
-        if (_runningReport) return;
+        if (_runningReport)
+        {
+            CancelPendingReport();
+            return;
+        }
         if (_appliedSignature.Length == 0) return;
         bool current = string.Equals(_appliedSignature, Signature(), StringComparison.Ordinal);
         _print.Enabled = current;
@@ -204,8 +208,9 @@ public abstract class CanonicalFinanceReportPage : V2Page
             DataTable? captured = null;
             DataTable? totals = null;
             string summary = FiltersText();
-            await BindReportAsync(() => {
-                DataSet result = DatabaseHelper.QueryUserSet(_procedure, parameters);
+            await BindReportAsync(async token => {
+                DataSet result = await DatabaseHelper.QueryUserSetAsync(_procedure, token, parameters).ConfigureAwait(false);
+                token.ThrowIfCancellationRequested();
                 captured = result.Tables.Count > 0 ? result.Tables[0] : new DataTable();
                 totals = result.Tables.Count > 1 ? result.Tables[1] : null;
                 AppendAuthoritativeTotalRow(captured, totals);
@@ -216,7 +221,9 @@ public abstract class CanonicalFinanceReportPage : V2Page
                 if (!IsDisposed) _summary.Text = "Run the report again to see current totals.";
                 return;
             }
-            _displayed = captured.Copy();
+            // Pager rows are detached copies. Keep the private full result for
+            // print eligibility without duplicating every financial row.
+            _displayed = captured;
             string totalsText = FormatTotals(totals);
             _summary.Text = totalsText;
             _filterSummary = summary + "   " + totalsText;

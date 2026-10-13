@@ -1226,13 +1226,17 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     }
     protected virtual void OnWorkspaceStateRestoring() { }
     protected Task BindReportAsync(Func<DataTable> query) =>
-        BindReportCoreAsync(() => Task.Run(query));
+        BindReportCoreAsync(token => Task.Run(query, token));
 
     protected Task BindReportAsync(Func<Task<DataTable>> query) =>
+        BindReportCoreAsync(_ => query());
+
+    protected Task BindReportAsync(Func<CancellationToken, Task<DataTable>> query) =>
         BindReportCoreAsync(query);
 
-    private async Task BindReportCoreAsync(Func<Task<DataTable>> query)
+    private async Task BindReportCoreAsync(Func<CancellationToken, Task<DataTable>> query)
     {
+        if (IsDisposed) return;
         ReportLoadCoordinator.Ticket ticket = _reportLoads.Begin();
         string requestedSignature = ReportFilterSignature();
         _reportLanded = false;
@@ -1244,12 +1248,12 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             /* see the synchronous overload above. */
             SetReportPagerEnabled(false);
             _reportStale = true;
-            await _reportLoads.EnterAsync();
+            await _reportLoads.EnterAsync(ticket);
             try
             {
                 if (!_reportLoads.IsCurrent(ticket) || IsDisposed)
                     return;
-                var table = await query();
+                var table = await query(ticket.Token);
                 if (!_reportLoads.IsCurrent(ticket) || IsDisposed)
                     return;
                 SuspendLayout();
@@ -1269,7 +1273,9 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 _reportLoads.Exit();
             }
         }
-        catch (OperationCanceledException) when (ticket.Cancellation.IsCancellationRequested) { }
+        // A cancelled provider read can also surface a SqlException. Neither
+        // form should display a failure for an intentionally superseded request.
+        catch (Exception) when (ticket.Token.IsCancellationRequested) { }
         catch (Exception) when (MarkReportGridFailed(ticket.Cancellation))
         {
             /* Never reached: the filter above only records the failed state and returns false, so the exception still travels to the page's own handler exactly as before. */
@@ -1279,6 +1285,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         {
             if (_reportLoads.IsCurrent(ticket))
                 UseWaitCursor = false;
+            _reportLoads.Complete(ticket);
         }
     }
     /* UX - a failed load leaves the grid saying so, inline, instead of looking like "no records". */
@@ -1375,6 +1382,17 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         if (_reportPageLabel is not null)
             _reportPageLabel.Text = "No records";
         SetStatus("Filters changed - run the report again to refresh the results.");
+    }
+    /// <summary>Stops a superseded read while retaining the previous report for
+    /// pages that deliberately show old rows behind a filters-changed warning.</summary>
+    protected void CancelPendingReport()
+    {
+        if (!_reportLoads.Cancel()) return;
+        UseWaitCursor = false;
+        UiHelper.ClearGridState(Grid);
+        SetReportPagerEnabled(false);
+        SetReportExportEnabled(false);
+        SetStatus(UiText.Reports.FiltersChanged, true);
     }
     /// <summary>Marks the displayed report as no longer matching the filters on screen **without** clearing it, for pages that deliberately keep the previous report visible behind a warning (see CurrentStudentsReportPage's rule).</summary>
     protected void MarkReportStale()

@@ -39,6 +39,7 @@ public sealed class BillingStatusReportPage : V2Page
         $"{year.SelectedId}|{campus.SelectedId}|{asOfDate.Value.Date:yyyy-MM-dd}";
     private void OnFiltersChanged()
     {
+        CancelPendingReport();
         if (string.IsNullOrEmpty(_appliedFilterSignature) ||
             string.Equals(_appliedFilterSignature, FilterSignature(), StringComparison.Ordinal))
         {
@@ -87,12 +88,13 @@ public sealed class BillingStatusReportPage : V2Page
             int academicYearId = year.SelectedId;
             int campusId = campus.SelectedId;
             DateTime asOf = asOfDate.Value;
-            await BindReportAsync(() => DatabaseHelper.QueryUser(
+            await BindReportAsync(token => DatabaseHelper.QueryUserAsync(
                 "GetBillingCycleStatus",
+                token,
                 DatabaseHelper.Int("@AcademicYearId", academicYearId),
                 DatabaseHelper.Int("@CampusId", campusId),
                 DatabaseHelper.Date("@AsOfDate", asOf)));
-            if (IsDisposed) return;
+            if (IsDisposed || !ReportLanded) return;
             /* BindReportAsync has already bound whatever came back, so a run whose filters moved while it was loading would otherwise leave one campus/year's rows on screen under a different selection. */
             if (!string.Equals(requestedFilters, FilterSignature(), StringComparison.Ordinal))
             {

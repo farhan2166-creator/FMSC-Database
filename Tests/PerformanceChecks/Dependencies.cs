@@ -7,6 +7,7 @@ internal static class StudentSearchCache
 {
     internal static int Invalidations;
     internal static void Invalidate() => Invalidations++;
+    internal static Task<DataTable> GetAllAsync() => throw new InvalidOperationException("Unexpected SQL access");
 }
 internal static class DatabaseHelper
 {

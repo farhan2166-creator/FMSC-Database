@@ -67,6 +67,28 @@ internal static class Program
                 Check(typeof(UiPaintShape).GetField("path", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(flatShape) is null, "Flat shapes must avoid allocating a rounded path");
             using var menu = new StyledContextMenu(); menu.Items.Add("Save");
             Check(menu.Items.Count == 1, "Popup actions must remain available");
+            using var students = new System.Data.DataTable();
+            students.Columns.Add("AdmissionId", typeof(int)); students.Columns.Add("AdmissionNumber", typeof(string));
+            students.Columns.Add("StudentName", typeof(string)); students.Columns.Add("FatherName", typeof(string));
+            students.Rows.Add(1, "1", "Ali", "Parent One"); students.Rows.Add(2, "2", "Bilal", "Parent Two");
+            student.SetSource(students); student.Focus();
+            var input = student.Controls.OfType<TextBox>().Single();
+            var debounceField = typeof(StudentPicker).GetField("_searchDebounce", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var keyHandler = typeof(StudentPicker).GetMethod("OnTextKeyDown", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            void Key(Keys key) => keyHandler.Invoke(student, new object[] { input, new KeyEventArgs(key) });
+            input.Text = "1";
+            var debounce = (System.Windows.Forms.Timer)debounceField.GetValue(student)!;
+            Check(debounce.Enabled && student.SelectedId == 0, "Typing must debounce without committing a student");
+            Key(Keys.Enter);
+            Check(student.SelectedId == 1 && !debounce.Enabled, "Enter must flush the search immediately");
+            input.Text = "2";
+            Check(student.SelectedId == 0 && debounce.Enabled, "Editing must clear the prior identity and debounce the new term");
+            Key(Keys.Enter);
+            Check(student.SelectedId == 2, "Enter after editing must never commit the old highlighted student");
+            input.Text = "1"; Key(Keys.Escape);
+            Check(!debounce.Enabled && student.SelectedId == 0, "Escape must cancel a pending search");
+            input.Text = "2"; input.Clear();
+            Check(!debounce.Enabled && student.MatchCount == 0, "Clearing input must stop pending work");
             Console.WriteLine($"PASS: {checks} Windows theme switching, structure, rendering and resource checks.");
         }
         finally { AppTheme.SetTheme(originalTheme); }

@@ -15,15 +15,23 @@ internal static class ReportPaginator
 
     internal static Page Build(DataTable source, int requestedIndex, int pageSize)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(pageSize);
         int total = source.Rows.Count;
-        int pageCount = Math.Max(1, (int)Math.Ceiling(total / (double)pageSize));
+        int pageCount = total == 0 ? 1 : (total - 1) / pageSize + 1;
         int index = Math.Clamp(requestedIndex, 0, pageCount - 1);
+        int start = index * pageSize;
+        int end = start + Math.Min(pageSize, total - start);
         DataTable rows = source.Clone();
-        foreach (DataRow row in source.Rows.Cast<DataRow>().Skip(index * pageSize).Take(pageSize))
-            rows.ImportRow(row);
+        rows.BeginLoadData();
+        try
+        {
+            // Index directly: Skip enumerates every preceding row on late pages.
+            for (int i = start; i < end; i++) rows.ImportRow(source.Rows[i]);
+        }
+        finally { rows.EndLoadData(); }
         string range = total == 0
             ? "No records"
-            : $"Showing {index * pageSize + 1:N0}–{Math.Min((index + 1) * pageSize, total):N0} of {total:N0}";
+            : $"Showing {start + 1:N0}–{end:N0} of {total:N0}";
         string status = total == 0
             ? "0 record(s)"
             : $"{total:N0} record(s) • Page {index + 1:N0} of {pageCount:N0}";

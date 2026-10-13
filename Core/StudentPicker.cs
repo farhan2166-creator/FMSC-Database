@@ -73,6 +73,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
     private int _selectedId;
     private string _committedText = string.Empty;
     private readonly StudentPickerSearchSession _searchSession = new();
+    private System.Windows.Forms.Timer? _searchDebounce;
     private bool _mouseDownAtFocus;
     private DataTable? _source;
     private DataTable? _fixedSource;
@@ -415,7 +416,22 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
                 this,
                 EventArgs.Empty);
         }
-        RunSearch(false);
+        // Invalidate and hide the old matches immediately: Enter must never
+        // commit a highlighted result belonging to the previous typed term.
+        HidePopup();
+        if (_text.Text.Trim().Length == 0) SetMatches(0, false);
+        else
+        {
+            if (_searchDebounce is null)
+            {
+                _searchDebounce = new System.Windows.Forms.Timer { Interval = 180 };
+                _searchDebounce.Tick += (_, _) => {
+                    _searchDebounce?.Stop();
+                    if (!IsDisposed && Visible && Enabled && _text.Focused) RunSearch(false);
+                };
+            }
+            _searchDebounce.Start();
+        }
         OnTextChanged(
             EventArgs.Empty);
     }
@@ -423,6 +439,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
         bool commitWhenReady,
         bool listAll = false)
     {
+        _searchDebounce?.Stop();
         /* listAll is the drop-down: every row of the list, regardless of what is typed. */
         string term =
             listAll
@@ -592,9 +609,10 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
             case Keys.Up:
             case Keys.PageDown:
             case Keys.PageUp:
-            case Keys.Escape:
                 return
                     PopupOpen;
+            case Keys.Escape:
+                return PopupOpen || _searchDebounce?.Enabled == true;
             case Keys.Enter:
                 return
                     PopupOpen ||
@@ -625,7 +643,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
                     MoveSelection(-VisibleRows);
                 break;
             case Keys.Escape:
-                if (PopupOpen)
+                if (PopupOpen || _searchDebounce?.Enabled == true)
                 {
                     HidePopup();
                     consumed = true;
@@ -935,6 +953,8 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
     }
     private void HidePopup()
     {
+        _searchDebounce?.Stop();
+        _searchSession.Cancel();
         _commitWhenReady = false;
         if (!IsDisposed &&
             !_popup.IsDisposed &&
@@ -1000,6 +1020,8 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
     {
         if (disposing)
         {
+            _searchDebounce?.Dispose();
+            _searchDebounce = null;
             _searchSession.Cancel();
             AppTheme.ThemeChanged -=
                 OnThemeChanged;

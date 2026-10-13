@@ -1633,13 +1633,16 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                         frequencyByAssignment))
                 .ToList();
         int added = 0;
+        var listedCharges = charges.Rows.Cast<DataGridViewRow>()
+            .Where(row => !row.IsNewRow)
+            .Select(row => GetLong(row.Cells["BillingChargeId"].Value)).ToHashSet();
         foreach (DataRow row in ordered)
         {
             long chargeId = GetLong(row, "BillingChargeId");
             if (chargeId <= 0)
                 continue;
             // Never list the same charge twice - ticking a sibling, unticking and re-ticking would otherwise duplicate every one of their rows.
-            if (ChargeAlreadyListed(chargeId))
+            if (!listedCharges.Add(chargeId))
                 continue;
             decimal outstanding = GetDecimal(row, "Balance");
             bool additional = string.Equals(GetText(row, "ChargeKind"),
@@ -1861,17 +1864,6 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         {
             suppressPaymentEvents = false;
         }
-    }
-    private bool ChargeAlreadyListed(long chargeId)
-    {
-        foreach (DataGridViewRow row in charges.Rows)
-        {
-            if (row.IsNewRow)
-                continue;
-            if (GetLong(row.Cells["BillingChargeId"].Value) == chargeId)
-                return true;
-        }
-        return false;
     }
     /// <summary>Loads the selected student's siblings into the Paying For list, all unticked.</summary>
     private async Task LoadSiblingsAsync(int version)

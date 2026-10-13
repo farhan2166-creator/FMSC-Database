@@ -882,6 +882,7 @@ public partial class StudentReportsPage : V2Page
     {
         if (_suppress)
             return;
+        CancelPendingReport();
         UpdateEnabledState();
         if (string.IsNullOrEmpty(_appliedSignature))
             return;
@@ -1166,8 +1167,9 @@ public partial class StudentReportsPage : V2Page
             string filterText = DescribeFilters(args);
             bool wantBalance = IsRegisterMode(_mode) && WantsBalance(view);
             int matched = 0;
-            await BindReportAsync(async () => {
-                LoadResult loaded = await LoadAsync(args, wantBalance);
+            await BindReportAsync(async token => {
+                LoadResult loaded = await LoadAsync(args, wantBalance, token);
+                token.ThrowIfCancellationRequested();
                 if (revision != _reportRevision || IsDisposed)
                     return new DataTable();
                 _raw = loaded.Raw;
@@ -1259,19 +1261,22 @@ public partial class StudentReportsPage : V2Page
         IEnumerable<string> keys = saved ?? shape.DefaultKeys ?? shape.Catalog.Where(c => c.DefaultVisible).Select(c => c.Key);
         return keys.Contains(BalanceKey, StringComparer.OrdinalIgnoreCase);
     }
-    private async Task<LoadResult> LoadAsync(RunArgs a, bool wantBalance)
+    private async Task<LoadResult> LoadAsync(RunArgs a, bool wantBalance, CancellationToken token)
     {
         if (a.Mode == ModeChanges)
         {
             DataTable changes = await DatabaseHelper.QueryUserAsync(
                 "GetStudentMovementReport",
+                token,
                 DatabaseHelper.Date("@FromDate", a.LimitDate ? a.From : new DateTime(1900, 1, 1)),
                 DatabaseHelper.Date("@ToDate", a.LimitDate ? a.To : new DateTime(2999, 12, 31)),
                 DatabaseHelper.Int("@CampusId", a.CampusId));
+            token.ThrowIfCancellationRequested();
             PrepareChanges(changes);
             return new LoadResult(changes, null, false);
         }
-        DataTable raw = await QueryRegisterAsync(a, a.YearId, wantBalance);
+        DataTable raw = await QueryRegisterAsync(a, a.YearId, wantBalance, token);
+        token.ThrowIfCancellationRequested();
         if (a.Mode == ModeStrength)
             KeepEnrolledStudents(raw);
         if (a.ByAdmissionId)
@@ -1280,7 +1285,8 @@ public partial class StudentReportsPage : V2Page
         DataTable? compare = null;
         if (a.Mode == ModeStrength && a.CompareYearId > 0)
         {
-            compare = await QueryRegisterAsync(a, a.CompareYearId);
+            compare = await QueryRegisterAsync(a, a.CompareYearId, cancellationToken: token);
+            token.ThrowIfCancellationRequested();
             KeepEnrolledStudents(compare);
             PrepareRegister(compare);
         }
@@ -1288,7 +1294,7 @@ public partial class StudentReportsPage : V2Page
             throw new BalanceUnavailableException("The report did not return verified outstanding balances, so it was not generated.");
         return new LoadResult(raw, compare, wantBalance);
     }
-    private static Task<DataTable> QueryRegisterAsync(RunArgs a, int yearId, bool includeBalance = false)
+    private static Task<DataTable> QueryRegisterAsync(RunArgs a, int yearId, bool includeBalance = false, CancellationToken cancellationToken = default)
     {
         bool strength = a.Mode == ModeStrength;
         /* Historical enrollment remains part of that year's strength after the student leaves.
@@ -1297,6 +1303,7 @@ public partial class StudentReportsPage : V2Page
         string enrolmentStatus = strength ? a.Status : string.Empty;
         return DatabaseHelper.QueryUserAsync(
             "GetStudentRegister",
+            cancellationToken,
             DatabaseHelper.Int("@CampusId", a.CampusId),
             DatabaseHelper.Int("@AcademicYearId", yearId),
             DatabaseHelper.Int("@ClassId", a.ClassId),

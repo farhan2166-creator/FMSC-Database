@@ -44,6 +44,7 @@ public sealed class UnpostedFeesReportPage : V2Page
     /* report the displayed report as stale the moment the filters no longer match the values that generated it. */
     private void OnFiltersChanged()
     {
+        if (_loadInFlight) CancelPendingReport();
         if (string.IsNullOrEmpty(_appliedFilterSignature))
             return;
         bool current = string.Equals(
@@ -82,8 +83,9 @@ public sealed class UnpostedFeesReportPage : V2Page
             _loadInFlight = true;
             try
             {
-                await BindReportAsync(() => DatabaseHelper.QueryUser(
+                await BindReportAsync(token => DatabaseHelper.QueryUserAsync(
                     "GetMissingChargeCandidates",
+                    token,
                     DatabaseHelper.Int("@AcademicYearId", academicYearId),
                     DatabaseHelper.Int("@CampusId", campusId),
                     DatabaseHelper.Date("@AsOfDate", asOf)));
@@ -92,6 +94,7 @@ public sealed class UnpostedFeesReportPage : V2Page
             {
                 _loadInFlight = false;
             }
+            if (IsDisposed || !ReportLanded) return;
             ConfigureGrid();
             /* only claim the grid matches the filters when they did not move while the query was running. */
             if (!string.Equals(requestedFilters, FilterSignature(), StringComparison.Ordinal))

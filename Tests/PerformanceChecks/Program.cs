@@ -100,9 +100,11 @@ register.Rows[0]["AdmissionNumber"] = "1"; AdmissionNumbers.AddSortColumns(regis
 Check((long)register.Rows[0]["__AdmissionNumberBase"] == 1, "Edited numbers must refresh derived keys");
 Check(AdmissionNumbers.Sort(register).Rows[0]["AdmissionNumber"].Equals("1"), "Natural number order must be preserved");
 Console.WriteLine($"PASS: {checks} loader, cache concurrency/invalidation and sorting checks.");
+Console.WriteLine($"PASS: {await WorkflowLoadingChecks.RunAsync()} report pagination, cancellation and picker generation checks.");
 
 if (args.Contains("--profile"))
 {
+    WorkflowLoadingChecks.ProfilePagination();
     async Task<DataTable> Baseline()
     {
         using var reader = source.CreateDataReader(); var table = source.Clone();

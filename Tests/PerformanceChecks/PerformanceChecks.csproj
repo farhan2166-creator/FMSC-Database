@@ -9,6 +9,9 @@
     <Compile Include="../../Core/LookupDataCache.cs" Link="LookupDataCache.cs" />
     <Compile Include="../../Core/LookupDisplayOrder.cs" Link="LookupDisplayOrder.cs" />
     <Compile Include="../../Core/AdmissionNumbers.cs" Link="AdmissionNumbers.cs" />
+    <Compile Include="../../Core/ReportPaginator.cs" Link="ReportPaginator.cs" />
+    <Compile Include="../../Core/ReportLoadCoordinator.cs" Link="ReportLoadCoordinator.cs" />
+    <Compile Include="../../Core/StudentPickerSearchSession.cs" Link="StudentPickerSearchSession.cs" />
     <Using Include="System.Data" />
   </ItemGroup>
 </Project>
