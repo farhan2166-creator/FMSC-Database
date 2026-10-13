@@ -1,5 +1,11 @@
 # FMSC_SMS — Master Audit: Findings, Fixes, Decisions and Remaining Steps
 
+**Latest implementation note:** The approved compact dashboard and follow-up
+FR-03 navigation recovery are implemented in the current source. See the
+[follow-up report's implementation addendum](FMSC_FOLLOWUP_CODE_REVIEW_FINDINGS_2026-10-13.md#implementation-and-verification-addendum--13-october-2026)
+for current findings, checks and remaining work. The sections below retain their
+consolidated historical baseline and release-gate distinctions.
+
 **Consolidation status: DONE — 13 October 2026**  
 **Release / live-workflow verification status: NOT YET COMPLETE**  
 **Repository:** farhan2166-creator/FMSC-Database  

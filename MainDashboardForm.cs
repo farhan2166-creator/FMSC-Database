@@ -60,11 +60,14 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         new(StringComparer.OrdinalIgnoreCase);
     /* Set while Sign Out is closing the window, so the unsaved-changes guard in FormClosing can clear the session only when it accepts the close. */
     private bool signOutRequested;
+    private readonly Action<string, Exception>? navigationFailureReporter;
     private readonly System.Windows.Forms.Timer _scaleDebounceTimer = new() {
         Interval = 350
     };
-    public MainDashboardForm()
+    public MainDashboardForm() : this(null) { }
+    internal MainDashboardForm(Action<string, Exception>? navigationFailureReporter)
     {
+        this.navigationFailureReporter = navigationFailureReporter;
         // Every control size in this app is computed programmatically (AppMetrics/AppTheme, using DPI-aware TextRenderer measurements that already reflect the real font/DPI), never left to WinForms' built-in Font/Dpi auto-scaling.
         AutoScaleMode = AutoScaleMode.None;
         /* leaving the application is a page switch, so the same guard the in-app navigation check runs is applied on close. */
@@ -1393,126 +1396,111 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             "Dashboard",
             "Overview");
     }
-    private void NavigateTo(
-Func<Control> factory,
-string module = "Dashboard",
-string title = "Overview")
+    private void NavigateTo(Func<Control> factory, string module = "Dashboard", string title = "Overview")
     {
-        if (factory == null ||
-        IsDisposed ||
-        Disposing ||
-        content.IsDisposed)
-            return;
-        if (_navigationInProgress)
-            return;
-        if (!ConfirmLeaveCurrentPage())
-            return;
-        SaveCurrentWorkspaceState();
-        string destinationKey = NavKey(module, title);
+        if (factory is null || IsDisposed || Disposing || content.IsDisposed || _navigationInProgress) return;
+        if (!ConfirmLeaveCurrentPage()) return;
+        var previous = (Page: _currentPageControl, Factory: _currentFactory, Module: _currentModule,
+            Title: _currentTitle, Dashboard: _currentIsDashboard, Year: _currentAcademicYearText);
+        Control[] oldPages = content.Controls.Cast<Control>().ToArray();
         Control? page = null;
+        bool activated = false;
+        _navigationInProgress = true;
         try
         {
+            SaveCurrentWorkspaceState();
             page = factory();
-            if (page == null ||
-                page.IsDisposed ||
-                IsDisposed ||
-                Disposing ||
-                content.IsDisposed)
-            {
-                page?.Dispose();
-                return;
-            }
-            _navigationInProgress = true;
-            Control[] oldPages;
+            if (page is null || page.IsDisposed || IsDisposed || Disposing || content.IsDisposed) return;
+            // Factories normally create new pages. Never retire an already hosted page.
+            if (oldPages.Contains(page)) { page = null; return; }
+            page.Dock = DockStyle.Fill;
+            page.Margin = Padding.Empty;
+            if (page is StudentAdmissionPage && content.ClientSize.Width > 0 && content.ClientSize.Height > 0)
+                page.Size = content.ClientSize;
+            // Validate saved state while the previous page is still attached and usable.
+            RestoreWorkspaceState(page, NavKey(module, title));
             content.SuspendLayout();
             try
             {
-                oldPages =
-                    content.Controls
-                        .Cast<Control>()
-                        .ToArray();
-                foreach (Control oldPage in oldPages)
-                    content.Controls.Remove(oldPage);
-                page.Dock = DockStyle.Fill;
-                page.Margin = new Padding(0);
-                // Admissions has a large native control tree; avoid resizing it immediately after creating its handles.
-                if (page is StudentAdmissionPage && content.ClientSize.Width > 0 && content.ClientSize.Height > 0)
-                    page.Size = content.ClientSize;
                 content.Controls.Add(page);
-                RestoreWorkspaceState(page, destinationKey);
                 page.BringToFront();
-                if (_currentPageControl is WorkspacePage previousWorkspace)
+                if (previous.Page is WorkspacePage previousWorkspace)
                     previousWorkspace.CurrentSectionChanged -= OnCurrentSectionChanged;
                 _currentPageControl = page;
                 _currentFactory = factory;
                 _currentModule = module;
                 _currentTitle = title;
-                bool dashboard = page is WelcomePage;
-                _currentIsDashboard = dashboard;
+                _currentIsDashboard = page is WelcomePage;
                 if (page is WorkspacePage workspace)
                     workspace.CurrentSectionChanged += OnCurrentSectionChanged;
-                status.Text =
-                    dashboard
-                        ? $"{CurrentUser.Username}  •  {CurrentUser.RoleName}"
-                        : $"{module}  •  {title}";
+                status.Text = _currentIsDashboard
+                    ? $"{CurrentUser.Username}  •  {CurrentUser.RoleName}"
+                    : $"{module}  •  {title}";
                 UpdateTopBar(module, title);
-                /* The status bar above now names this page; the sidebar follows it here, rather than staying on whatever entry was last clicked. */
                 SyncActiveNav(module, title);
+                foreach (Control oldPage in oldPages) content.Controls.Remove(oldPage);
             }
-            finally
-            {
-                content.ResumeLayout(true);
-                _navigationInProgress = false;
-            }
-            Control openedPage = page;
-            FormFlow.ScheduleInitialFocus(this, openedPage,
-                () => ReferenceEquals(openedPage, _currentPageControl));
-            if (oldPages.Length == 0)
-                return;
-            foreach (Control oldPage in oldPages)
-            {
-                if (oldPage.IsDisposed)
-                    continue;
-                try
-                {
-                    oldPage.Dispose();
-                }
-                catch (Exception ex) when (
-                    ex is InvalidOperationException ||
-                    ex is ObjectDisposedException)
-                {
-                    // Dashboard is already closing/disposed.
-                }
-            }
+            finally { content.ResumeLayout(true); }
+            activated = true;
         }
         catch (Exception ex)
         {
-            _navigationInProgress = false;
-            if (page != null &&
-                !page.IsDisposed &&
-                !ReferenceEquals(page, _currentPageControl))
+            if (!IsDisposed && !Disposing && !content.IsDisposed)
             {
+                // Activation can fail during parenting or layout too. Restore the
+                // previous controls and route before reporting the failed destination.
+                content.SuspendLayout();
                 try
                 {
-                    page.Dispose();
+                    if (page is WorkspacePage failedWorkspace)
+                        failedWorkspace.CurrentSectionChanged -= OnCurrentSectionChanged;
+                    if (page is not null) content.Controls.Remove(page);
+                    foreach (Control oldPage in oldPages)
+                        if (!oldPage.IsDisposed && !content.Controls.Contains(oldPage)) content.Controls.Add(oldPage);
+                    _currentPageControl = previous.Page;
+                    _currentFactory = previous.Factory;
+                    _currentModule = previous.Module;
+                    _currentTitle = previous.Title;
+                    _currentIsDashboard = previous.Dashboard;
+                    _currentAcademicYearText = previous.Year;
+                    if (previous.Page is WorkspacePage previousWorkspace)
+                    {
+                        previousWorkspace.CurrentSectionChanged -= OnCurrentSectionChanged;
+                        previousWorkspace.CurrentSectionChanged += OnCurrentSectionChanged;
+                    }
+                    previous.Page?.BringToFront();
+                    if (_topAcademicYearLabel is not null) _topAcademicYearLabel.Text = previous.Year;
+                    UpdateTopBar(previous.Module, previous.Title);
+                    SyncActiveNav(previous.Module, previous.Title);
                 }
-                catch (Exception nonFatalException87)
-                {
-                    FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException87, "MainDashboardForm: NavigateTo fallback");
-                }
+                finally { content.ResumeLayout(false); }
+                DisposeNavigationPage(page, "Failed navigation page disposal");
+                status.Text = $"Could not open {title}. {DbMessage.UserMessage(ex)}";
+                if (navigationFailureReporter is not null) navigationFailureReporter(title, ex);
+                else ModernMessageDialog.ShowWarning(this, $"Unable to open {title}.\r\n\r\n{DbMessage.UserMessage(ex)}", "FMSC");
             }
-            AppExceptionHandler.LogNonFatal(
-                ex,
-                $"Dashboard Menu: {module} / {title}");
-            if (IsDisposed || Disposing)
-                return;
-            SyncActiveNav(_currentModule, _currentTitle);
-            status.Text = $"Could not open {title}. {DbMessage.UserMessage(ex)}";
-            ModernMessageDialog.ShowWarning(
-                this,
-                $"Unable to open {title}.\r\n\r\n{DbMessage.UserMessage(ex)}",
-                "FMSC");
+            AppExceptionHandler.LogNonFatal(ex, $"Dashboard Menu: {module} / {title}");
         }
+        finally
+        {
+            _navigationInProgress = false;
+            if (!activated) DisposeNavigationPage(page, "Failed navigation page disposal");
+        }
+        if (!activated) return;
+        foreach (Control oldPage in oldPages)
+            DisposeNavigationPage(oldPage, "Retired navigation page disposal");
+        try
+        {
+            Control openedPage = page!;
+            FormFlow.ScheduleInitialFocus(this, openedPage, () => ReferenceEquals(openedPage, _currentPageControl));
+        }
+        catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex, "Navigation initial focus"); }
+    }
+    private static void DisposeNavigationPage(Control? page, string context)
+    {
+        if (page is null || page.IsDisposed) return;
+        try { page.Dispose(); }
+        catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex, context); }
     }
     private void SaveCurrentWorkspaceState()
     {

@@ -22,6 +22,12 @@ internal static class DashboardChecks
         Check(DashboardData.ReadCounts(counts.Rows[0]) == new DashboardData.Counts(0, 0, 0, 0, 0), "All valid zero counts remain zero");
         counts.Rows.Add(100, 85, 12, 8, 3);
         Check(DashboardData.ReadCounts(counts.Rows[1]) == new DashboardData.Counts(100, 85, 12, 8, 3), "School totals and monthly admissions retain their own columns");
+        Check(DashboardData.ActiveStudentCaption(1250, 1180) == "94% of registered", "The compact card retains the active share formerly shown by the chart");
+        Check(DashboardData.ActiveStudentCaption(3, 1) == "33% of registered", "Active share rounds only the display percentage");
+        Check(DashboardData.ActiveStudentCaption(int.MaxValue, int.MaxValue) == "100% of registered", "Large valid counts cannot overflow percentage arithmetic");
+        Check(DashboardData.ActiveStudentCaption(0, 0) == "Currently active", "An empty school does not invent a percentage");
+        Check(DashboardData.ActiveStudentCaption(100, 0) == "0% of registered", "Zero active students retain a meaningful zero share");
+        Check(DashboardData.ActiveStudentCaption(10, 11) == "Currently active", "Inconsistent concurrent counts do not display a misleading percentage");
         foreach (DataColumn column in counts.Columns)
         {
             using var missing = counts.Copy(); missing.Columns.Remove(column.ColumnName);

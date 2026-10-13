@@ -48,11 +48,11 @@ This is the main table you will use most of the time.
 | Gap before Admission / Placement | 📄 | [StudentAdmissionPage.cs](Pages/Students/Admissions/StudentAdmissionPage.cs) | `studentGuardianCard.Margin` |
 | Admission / Placement height | 📄 | [StudentAdmissionPage.cs](Pages/Students/Admissions/StudentAdmissionPage.cs) | `admissionCardHeight` |
 | Fee Collection layout | 📄 | [FeeCollectionPage.cs](Pages/Finance/Collection/FeeCollectionPage.cs) | `root.RowStyles` |
-| Dashboard sections | 📄 | [WelcomePage.cs](Pages/Dashboard/WelcomePage.cs) | `BuildBody` |
+| Dashboard sections and sizing | 📄 | [WelcomePage.cs](Pages/Dashboard/WelcomePage.cs) | `Build` / `UpdateDashboardLayout` |
 | Dashboard Quick Actions | 📄 | [WelcomePage.cs](Pages/Dashboard/WelcomePage.cs) | `BuildQuickActionsCard` |
 | Dashboard top bar | 📄 | [MainDashboardForm.cs](MainDashboardForm.cs) | `DashboardTopBarHeight` |
-| Dashboard card icon size | 📄 | [WelcomePage.cs](Pages/Dashboard/WelcomePage.cs) | `KpiCardIconFont` |
-| Dashboard Quick Action icon size | 📄 | [WelcomePage.cs](Pages/Dashboard/WelcomePage.cs) | `BuildQuickActionsCard` |
+| Dashboard KPI size | 📄 | [WelcomePage.cs](Pages/Dashboard/WelcomePage.cs) | `KpiGridRowHeight` / `KpiValueFont` |
+| Dashboard Quick Action icon size | 📄 | [WelcomePage.cs](Pages/Dashboard/WelcomePage.cs) | `DashboardActionButton.PaintLeadingContent` |
 | Certificate card icon size | 📄 | [StudentCertificatesPage.cs](Pages/Students/Certificates/StudentCertificatesPage.cs) | `CertificateCardIconFont` |
 | Reports-home cards | 📄 | [ReportsHomePage.cs](Pages/Reports/ReportsHomePage.cs) | `BuildReportGrid` |
 
@@ -146,7 +146,7 @@ Do not edit a shared component to fix one unusual page unless the shared compone
 | Transfers / Re-Admission | [StudentTransferReadmissionPage.cs](Pages/Students/Enrollment/StudentTransferReadmissionPage.cs) | `BuildStudentContext` |
 | Fee Collection | [FeeCollectionPage.cs](Pages/Finance/Collection/FeeCollectionPage.cs) | `Payment Summary` |
 | Fee Rate Setup | [FeeConfigurationWorkspace.cs](Pages/Finance/Configuration/FeeConfigurationWorkspace.cs) | `RowStyles` |
-| Dashboard and sidebar | [MainDashboardForm.cs](MainDashboardForm.cs) / [WelcomePage.cs](Pages/Dashboard/WelcomePage.cs) | `BuildSidebar` / `BuildBody` |
+| Dashboard and sidebar | [MainDashboardForm.cs](MainDashboardForm.cs) / [WelcomePage.cs](Pages/Dashboard/WelcomePage.cs) | `BuildSidebar` / `Build` |
 | Reports home | [ReportsHomePage.cs](Pages/Reports/ReportsHomePage.cs) | `BuildCategory` |
 | School Profile | [SchoolProfilePage.cs](Pages/Setup/SchoolProfilePage.cs) | `School Identity` |
 | Classes and Sections | [ClassesAndSectionsWorkspacePage.cs](Pages/Setup/Academics/ClassesAndSectionsWorkspacePage.cs) | `split` |

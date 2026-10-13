@@ -114,6 +114,7 @@ internal static partial class Program
             CheckPhotoPreparation();
             CheckPhotoViewer(form);
             CheckDashboard();
+            CheckNavigationRecovery();
             CheckSignInGuard();
             Console.WriteLine($"PASS: {checks} Windows theme switching, structure, rendering and resource checks.");
         }

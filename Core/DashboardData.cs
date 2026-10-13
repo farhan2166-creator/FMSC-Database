@@ -6,6 +6,11 @@ internal static class DashboardData
     internal sealed record Counts(int TotalStudents, int ActiveStudents, int TotalClasses,
         int ActiveStaff, int NewAdmissions);
 
+    internal static string ActiveStudentCaption(int totalStudents, int activeStudents) =>
+        totalStudents > 0 && activeStudents <= totalStudents
+            ? $"{activeStudents * 100m / totalStudents:0}% of registered"
+            : "Currently active";
+
     internal static Counts ReadCounts(DataRow row)
     {
         int Count(string column)

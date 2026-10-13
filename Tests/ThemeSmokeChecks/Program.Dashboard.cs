@@ -43,49 +43,65 @@ internal static partial class Program
             (string Module, string Title) route = default;
             Action<Func<Control>> fallback = _ => throw new Exception("Expected module-aware navigation");
             Action<Func<Control>, string, string> navigate = (_, module, title) => route = (module, title);
-            using var window = new Form { ClientSize = new Size(1080, 470), AutoScaleMode = AutoScaleMode.None };
+            using var window = new Form { ClientSize = new Size(1080, 620), AutoScaleMode = AutoScaleMode.None };
             using var page = (UserControl)Activator.CreateInstance(type, flags, null, new object[] { fallback, navigate, query, ready }, null)!;
             window.Controls.Add(page); window.Show();
             PumpUntil(() => queries.Count == 2 && readiness.Count == 1, "All three dashboard sections start independently");
             queries.Single(read => read.Procedure == "GetDashboardSummary").Result.SetResult(Summary(0));
             PumpUntil(() => descendants(page).OfType<Label>().Count(label => label.Text == "0") == 5,
                 "Real zero totals paint while academic year and readiness are still pending");
-            Check(window.Visible && page.VerticalScroll.Visible && !page.HorizontalScroll.Visible,
-                "Small dashboards scroll vertically instead of losing sections or adding horizontal scrolling");
-            foreach (var chart in descendants(page).Where(control => control is DashboardDonutChart or DashboardBarChart))
-                Check(chart.Height >= chart.MinimumSize.Height, "The charts keep their minimum usable height");
+            Check(!page.VerticalScroll.Visible && !page.HorizontalScroll.Visible, "The compact dashboard fits its ordinary desktop viewport");
+            Check(!descendants(page).Any(control => control.GetType().Name is "DashboardDonutChart" or "DashboardBarChart"), "Repeated chart panels are removed");
+            var quickCard = (HumanCard)type.GetField("quickActionsCard", flags)!.GetValue(page)!;
+            var actions = quickCard.Content.Controls.OfType<TableLayoutPanel>().Single();
+            Check(actions.Controls.OfType<ModernButton>().Select(button => button.Text).SequenceEqual(new[] {
+                PageTitles.Admissions, "Fee Collection", "Student Profile", "Quick Registration", "Student Reports", "Reports" }),
+                "Six existing quick actions are ordered with daily work first");
+            foreach (var button in actions.Controls.OfType<ModernButton>())
+                Check(button.Height >= button.MinimumSize.Height && button.Bottom <= actions.ClientSize.Height,
+                    "All quick actions fit their two rows");
+            window.ClientSize = new Size(1080, 360); Application.DoEvents();
+            Check(page.VerticalScroll.Visible && !page.HorizontalScroll.Visible, "Very small windows retain vertical access to every section");
+            window.ClientSize = new Size(1080, 620); Application.DoEvents();
             var header = page.Controls[0].Controls[0];
             foreach (var label in header.Controls.OfType<Label>())
                 Check(label.Height >= AppMetrics.TextHeight(label.Font), "Dashboard greeting text has its full measured height");
             foreach (var value in descendants(page).OfType<Label>().Where(label => label.Text == "0"))
                 Check(value.Height >= AppMetrics.TextHeight(value.Font), "Dashboard values are not clipped by default label margins");
-            var initialHeight = page.Controls[0].Height;
             queries.Single(read => read.Procedure == "GetAcademicYears").Result.SetException(new InvalidOperationException("Fixture year unavailable"));
             readiness[0].Result.SetResult(new DataTable());
-            var setup = (Control)type.GetField("setupJourneyCard", flags)!.GetValue(page)!;
+            var setup = (Control)type.GetField("setupReadinessBar", flags)!.GetValue(page)!;
             PumpUntil(() => !setup.Visible, "A completed setup check releases its dashboard space");
-            Check(page.Controls[0].Height < initialHeight, "Hiding setup shrinks the scrollable content");
+            Check(((TableLayoutPanel)page.Controls[0]).RowStyles[3].Height == 0, "Completed setup has no reserved row height");
             Check(descendants(page).OfType<Label>().Count(label => label.Text == "0") == 5,
                 "An academic-year failure cannot erase valid totals");
             var profile = descendants(page).OfType<ModernButton>().Single(button => button.Text == "Student Profile");
             profile.PerformClick(); Check(route == ("Students", "Student Profile"), "Profile quick actions preserve the sidebar route");
             AppTheme.SetTheme(AppThemeType.Emerald); Application.DoEvents();
-            Check(descendants(page).OfType<DashboardDonutChart>().Single().PrimaryColor == AppTheme.Primary &&
-                descendants(page).OfType<DashboardBarChart>().Single().BarColor == AppTheme.Primary,
-                "Dashboard chart colors follow the current theme");
+            Check(descendants(page).OfType<Label>().Where(label => label.Text == "0").All(label => label.ForeColor == AppTheme.Primary),
+                "Compact dashboard figures follow the current theme");
+            using (var bitmap = new Bitmap(window.Width, window.Height))
+                window.DrawToBitmap(bitmap, window.ClientRectangle);
             Check(queries.Count == 2 && readiness.Count == 1, "Theme changes and quick-action routing do not reload dashboard data");
 
             var reload = (Task)type.GetMethod("LoadDashboardDataAsync", flags)!.Invoke(page, null)!;
             Check(queries.Count == 4 && readiness.Count == 2 && queries[0].Token.IsCancellationRequested,
                 "A new dashboard read cancels its predecessor");
+            using var issues = new DataTable(); issues.Columns.Add("Issue");
+            issues.Rows.Add("Profile"); issues.Rows.Add("Year"); issues.Rows.Add("Fee rates");
+            readiness[1].Result.SetResult(issues);
+            var setupStatus = (Label)type.GetField("setupStatus", flags)!.GetValue(page)!;
+            PumpUntil(() => setup.Visible && setupStatus.Text.Contains("3 items need attention"), "Setup uses one counted status bar when attention is needed");
+            descendants(setup).OfType<ModernButton>().Single().PerformClick();
+            Check(route == ("School Setup", PageTitles.SetupReadiness), "The status bar opens the existing readiness workflow");
             var labels = descendants(page).OfType<Label>().Select(label => (Label: label, label.Text)).ToArray();
             page.Dispose();
             Check(queries.Skip(2).All(read => read.Token.IsCancellationRequested) && readiness[1].Token.IsCancellationRequested,
                 "Leaving the dashboard cancels all pending reads");
-            queries[2].Result.SetResult(Summary(99)); queries[3].Result.SetResult(Years()); readiness[1].Result.SetResult(new DataTable());
+            queries[2].Result.SetResult(Summary(99)); queries[3].Result.SetResult(Years());
             PumpUntil(() => reload.IsCompleted, "Late fake reads finish safely after dashboard disposal");
             Check(labels.All(item => item.Label.Text == item.Text), "Late completions cannot repaint the disposed page");
-            Check(profile.Image is null, "Dashboard disposal releases shortcut glyphs");
+            Check(profile.IsDisposed && profile.Image is null, "Shortcut icons use shared fonts and retain no image buffers");
 
             CurrentUser.SignIn(7778, "Restricted fixture", "Operator", false, new[] { "Staff.Manage" });
             int summaryReads = 0, readinessReads = 0;

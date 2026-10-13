@@ -7,7 +7,7 @@
 **Historical comparison:** `c63bb90b8b5df83f3a13ed33ae2e26348535ef18` and intervening changes where relevant  
 **Scope:** Targeted read-only examination of recent C# changes and business workflows; comparison against older implementations. No source, database, migration, or test modifications were made to produce this report.  
 **Related report:** [Master audit](MASTER_AUDIT_FINDINGS_FIXES_STEPS_DONE_2026-10-13.md) consolidates earlier findings and fixes; this file adds the follow-up review of remaining failure paths.  
-**Status:** Findings and recommendations only — **NOT IMPLEMENTED**; deployment/runtime sign-off **PENDING**.
+**Original review status:** Findings and recommendations only — **NOT IMPLEMENTED** at the inspected baseline. The implementation addendum below records subsequent work; deployment/runtime sign-off remains **PENDING**.
 
 > This is a targeted source review, not a claim that all project files were inspected end-to-end. Where a defect requires a rare exception, changed SQL response, or particular operator action, its *conditional nature* is stated. No real school database was accessed, and no native Windows UI test was executed during this review.
 
@@ -210,3 +210,37 @@ The current master audit documents historical success for portable checks, a cro
 - Findings are **source-based** with status distinctions above. No new tests were executed and no application defects were reproduced on the user's PC.
 - The existing [master audit](MASTER_AUDIT_FINDINGS_FIXES_STEPS_DONE_2026-10-13.md) remains unchanged. This addendum does not reopen previously fixed/accepted F- or BL-series issues without new evidence.
 - This report is the **only intended repository change** from the follow-up review.
+
+## Implementation and verification addendum — 13 October 2026
+
+This section follows the owner's request to implement the approved compact
+dashboard and examine this report. The original findings above describe their
+pinned baseline; the following table describes the current source review.
+
+| Finding | Current disposition |
+|---|---|
+| FR-01 | Client success-condition gap confirmed in `SaveNewAdmissionAsync`. Both DACPAC admission procedures return the documented IDs after commit; malformed/missing response behavior has not been reproduced. The reconciliation/parser fix remains open. |
+| FR-02 | Confirmed: the loader consumes exceptions and callers overwrite its status or infer success from a retained ID. Typed load outcome and separate save/refresh feedback remain open. |
+| FR-03 | **Source fix implemented:** restore destination state before retiring the current page; compensate parenting/activation/layout failure by reattaching old controls and restoring page/factory/route/year/subscriptions. A failed destination is disposed; old pages retire only after confirmed activation. The navigation guard is released in `finally`. Native regression fixtures are compiled; Windows execution remains pending. |
+| FR-04 | Immediate persistence for existing students confirmed. Explicit photo save remains the recommended UX change; choosing between it and clearly labelled immediate save is still a product decision. |
+| FR-05 | Confirmed: existing-student main Save updates details/discounts without persisting retained photo bytes. Retry/save-outcome correction remains open. |
+| FR-06 | Confirmed: fresh-registration dirty detection omits year/date-only edits. Baseline correction remains open. |
+| FR-07 | Source byte limit and unrestricted decoded dimensions confirmed. No leak/crash or safe peak memory figure has been measured on Windows. |
+| FR-08 | DACPAC `SaveStudentPhoto` validates nonempty bytes but has no 300 KB upper limit. This remains an application boundary; no SQL or historical-photo conversion was performed. |
+| FR-09 | Windows, school-data, migration/restore and deployed-hardware acceptance remain pending. Cross-build/portable results do not close this gate. |
+
+The approved dashboard now has five compact KPI cards, six permission-filtered
+quick actions in two rows, and a counted setup-readiness bar that disappears when
+ready. The redundant charts and numbered setup-step panel are removed. Active
+percentage is retained in the Active Students caption. Existing menu groups,
+page routes, academic-year display and themes continue to supply context.
+
+Validation executed for this implementation: the application and native Windows
+smoke harness cross-build with zero warnings/errors; **294 portable assertions**
+pass (including 29 dashboard count/year/percentage checks). Native fixtures cover
+normal/tiny viewport sizing, quick-action order and routing, readiness visibility,
+theme rendering, delayed/disposed reads, destination factory/null/state/parenting/
+layout failures, and subsequent successful navigation. They are compiled but
+unrun on this Linux environment. No school SQL connection was opened, and no
+live admission/photo failure scenario was reproduced. SQL procedures, migrations
+and DACPAC are unchanged.

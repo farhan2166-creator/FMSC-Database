@@ -453,8 +453,10 @@ namespace FMSC_SMS.Core
             };
             if (Enabled && _isPressed)
                 textRect.Offset(0, 1);
+            textRect = PaintLeadingContent(e.Graphics, textRect, textColor);
             TextRenderer.DrawText(e.Graphics, Text, Font, textRect, textColor, alignmentFlags | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         }
+        protected virtual Rectangle PaintLeadingContent(Graphics graphics, Rectangle bounds, Color textColor) => bounds;
         protected override void Dispose(bool disposing)
         {
             if (disposing)
