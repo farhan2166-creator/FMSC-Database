@@ -1,9 +1,9 @@
 # FMSC_SMS — End-to-End C# / DACPAC Business, Workflow and End-User Audit
 
-**Report date:** 13 October 2026 (Pakistan time)
-**Repository:** `farhan2166-creator/FMSC-Database`
-**Reviewed branch and head:** `main` — [`063e4e69c8bd82bbad154252fc2a99d8cb8c92f3`](https://github.com/farhan2166-creator/FMSC-Database/commit/063e4e69c8bd82bbad154252fc2a99d8cb8c92f3)
-**Schema artifact:** `FMSC.dacpac` (Git blob `e98af9460d69095458b880bbee74cd4995711653`, 253,120 bytes). Its compressed `model.xml` was decoded and inspected.
+**Report date:** 13 October 2026 (Pakistan time)  
+**Repository:** `farhan2166-creator/FMSC-Database`  
+**Reviewed branch and head:** `main` — [`063e4e69c8bd82bbad154252fc2a99d8cb8c92f3`](https://github.com/farhan2166-creator/FMSC-Database/commit/063e4e69c8bd82bbad154252fc2a99d8cb8c92f3)  
+**Schema artifact:** `FMSC.dacpac` (Git blob `e98af9460d69095458b880bbee74cd4995711653`, 253,120 bytes). Its compressed `model.xml` was decoded and inspected.  
 **Mode:** **READ-ONLY.** No GitHub files, application files, SQL database, commits, branches, or schema artifacts were modified. This report is a new local output, **not** a commit to the repository.
 
 ## Executive judgment
