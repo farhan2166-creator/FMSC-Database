@@ -1,0 +1,67 @@
+name: FMSC .NET Desktop CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fmsc-desktop-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-check:
+    name: Build and portable regression checks
+    runs-on: windows-2022
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Restore application
+        run: dotnet restore FMSC_SMS.sln
+
+      - name: Build desktop application (Release)
+        run: dotnet build FMSC_SMS.sln -c Release --no-restore
+
+      - name: Compile native WinForms smoke checks
+        run: dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
+
+      - name: Run portable audit regression checks
+        run: dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
+
+      - name: Run synthetic performance and state checks
+        run: dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
+
+      - name: Verify reviewed DACPAC and SQL-module fingerprints
+        run: python Tools/verify_schema_artifact.py --check
+
+      - name: Run schema artifact regression tests
+        run: python Tools/test_audit_schema.py
+
+      - name: Verify Windows PowerShell publish provenance checks
+        shell: powershell
+        run: .\Installer\VerifySchemaArtifact.ps1 -ProjectDirectory .
+
+# Safety boundaries:
+# - No installation, signing, or publishing: the release publish target requires
+#   the owner's validated LocalDB MSI and (for fresh installs) detached MDF/LDF.
+# - No SQL mutation/integration tests: those require a disposable test database.
+# - WinForms smoke checks are compiled here, not executed on an unattended runner.
+#   Execute native UI/DPI/printing smoke tests on an interactive Windows desktop.
