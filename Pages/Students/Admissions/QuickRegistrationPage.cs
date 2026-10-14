@@ -5,11 +5,14 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 public sealed class QuickRegistrationPage : UserControl, IUnsavedChanges, IBusyPage
 {
     private readonly QuickRegistrationFormPage? form;
+    private readonly TabControl tabs=new(){Dock=DockStyle.Fill,Font=AppTheme.NormalFont};
+    private IEnumerable<IBusyPage> BusyChildren=>tabs.TabPages.Cast<TabPage>().SelectMany(t=>t.Controls.Cast<Control>()).OfType<IBusyPage>();
     public bool HasUnsavedChanges=>form?.HasUnsavedChanges??false;
     public string UnsavedChangesMessage=>form?.UnsavedChangesMessage??"";
-    public bool IsBusy=>form?.IsBusy??false;
-    public string BusyMessage=>"Wait for the registration operation to finish.";
-    public QuickRegistrationPage(Action<Func<Control>,string,string> navigate,int preselectRegistrationId=0)
+    public bool IsBusy=>form?.IsBusy==true||BusyChildren.Any(p=>p.IsBusy);
+    public string BusyMessage=>BusyChildren.FirstOrDefault(p=>p.IsBusy)?.BusyMessage??"Wait for the registration operation to finish.";
+    public QuickRegistrationPage(Action<Func<Control>,string,string> navigate,int preselectRegistrationId=0):this(navigate,preselectRegistrationId,true){ }
+    internal QuickRegistrationPage(Action<Func<Control>,string,string> navigate,int preselectRegistrationId,bool initialize)
     {
         Dock=DockStyle.Fill;
         if(!QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)){
@@ -17,10 +20,9 @@ public sealed class QuickRegistrationPage : UserControl, IUnsavedChanges, IBusyP
                 Text="Your role needs admission and student-view access to use Quick Registration."});
             return;
         }
-        var tabs=new TabControl{Dock=DockStyle.Fill,Font=AppTheme.NormalFont};
         var formTab=new TabPage("Registration Form"){BackColor=AppTheme.Surface};
         var pendingTab=new TabPage("Pending Registrations"){BackColor=AppTheme.Surface};
-        form=new QuickRegistrationFormPage(navigate,preselectRegistrationId){Dock=DockStyle.Fill};
+        form=new QuickRegistrationFormPage(navigate,preselectRegistrationId,initialize:initialize){Dock=DockStyle.Fill};
         var pending=new FMSC_SMS.Pages.Students.Maintenance.AdmissionReviewListPage(navigate,true,async id=>{
             if(await form.OpenRegistrationAsync(id))tabs.SelectedTab=formTab;
         }){Dock=DockStyle.Fill};
@@ -28,7 +30,15 @@ public sealed class QuickRegistrationPage : UserControl, IUnsavedChanges, IBusyP
         formTab.Controls.Add(form);pendingTab.Controls.Add(pending);
         tabs.TabPages.Add(formTab);tabs.TabPages.Add(pendingTab);
         TabStrip.Apply(tabs,AppTheme.ModuleAccent("Students"));Controls.Add(TabStrip.CreateHost(tabs));
-        tabs.SelectedIndexChanged+=async(_,_)=>{if(tabs.SelectedTab==pendingTab)await pending.RefreshRecordsAsync();};
+        tabs.Selecting+=(_,e)=>
+        {
+            if(!IsBusy&&(!form.HasUnresolvedSave||e.TabPage==formTab))return;
+            e.Cancel=true;
+            string guidance=form.HasUnresolvedSave?"Use Check Save Outcome on Registration Form before opening another registration workflow. Your entries are retained.":BusyMessage;
+            if(tabs.SelectedTab==pendingTab)pending.ShowRegistrationContextWarning(guidance);
+            else form.ShowRegistrationContextWarning(guidance);
+        };
+        tabs.SelectedIndexChanged+=async(_,_)=>{if(initialize&&tabs.SelectedTab==pendingTab)await pending.RefreshRecordsAsync();};
     }
 }
 
@@ -56,6 +66,8 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     private int savedStudent, familyAnchor, loadVersion, familyLoadVersion, defaultAcademicYear;
     private int savedFamilyMemberId, savedFamilyMemberCount;
     internal int SavedRegistrationId=>savedStudent;
+    internal bool HasUnresolvedSave=>recoveryBlocked;
+    internal void ShowRegistrationContextWarning(string message)=>Warn(message);
     internal bool IsBusy=>busy||loadingFees||loadingFamily;
     private string savedStatus="";
     private string savedSnapshot="",expectedQuote="";
@@ -75,14 +87,18 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     private readonly TableLayoutPanel registrationContent;
     private readonly TableLayoutPanel root;
     private readonly Control familyField;
-    internal QuickRegistrationFormPage(Action<Func<Control>, string, string> navigate, int preselectRegistrationId=0)
+    internal QuickRegistrationFormPage(Action<Func<Control>, string, string> navigate, int preselectRegistrationId=0,bool initialize=true)
         : this(navigate, preselectRegistrationId, async id => {
             var result = await QuickRegistrationWriter.LoadAsync(id);
             return (result.Details, result.Fees, result.Snapshot);
-        }) { }
+        },initialize) { }
 
     internal QuickRegistrationFormPage(Action<Func<Control>, string, string> navigate, int preselectRegistrationId,
         Func<int, Task<(DataTable Details, DataTable Fees, string Snapshot)>> loadRegistration)
+        :this(navigate,preselectRegistrationId,loadRegistration,true){ }
+
+    internal QuickRegistrationFormPage(Action<Func<Control>,string,string> navigate,int preselectRegistrationId,
+        Func<int,Task<(DataTable Details,DataTable Fees,string Snapshot)>> loadRegistration,bool initialize)
         : base("Quick Registration", "Save basic details, print a bill or add siblings. Review and confirm from Pending Registrations.")
     {
         this.navigate=navigate;
@@ -149,7 +165,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         placement.SelectedIndexChanged+=async(_,_)=>{if(!applyingRegistration)await LoadFeesAsync();};
         Load+=async(_,_)=>{await LoadLookupsAsync();if(recoveryBlocked)await CheckSaveOutcomeAsync(afterSave:true);else if(preselectRegistrationId>0)await LoadRegistrationAsync(preselectRegistrationId);};UpdateActions();
         SetStatus("Enter the student and placement, review the opening fees, then Save Registration. Use Link Existing Parent for another child of the same parent.");
-        ReadRecoveryRecord();UpdateActions();
+        if(initialize)ReadRecoveryRecord();UpdateActions();
     }
     private static TableLayoutPanel Fields(params (string Label,Control Input,bool Required,int Span)[] fields)
     {

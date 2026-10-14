@@ -46,4 +46,47 @@ internal static partial class Program
         Check(!confirm.Enabled&&grid.SelectedRows.Count==0,"A click outside the grid clears the visible confirmation target");
         Check(!page.IsHandleCreated,"Pending-selection fixture never starts its real SQL loader");
     }
+    private static void CheckQuickRegistrationTabGuard()
+    {
+        var previous=(FMSC_SMS.Pages.Security.CurrentUser.UserId,FMSC_SMS.Pages.Security.CurrentUser.Username,FMSC_SMS.Pages.Security.CurrentUser.RoleName,FMSC_SMS.Pages.Security.CurrentUser.MustChangePassword,Permissions:FMSC_SMS.Pages.Security.CurrentUser.GetPermissions().ToArray());
+        try
+        {
+            FMSC_SMS.Pages.Security.CurrentUser.SignIn(8881,"Fixture","Administrator",false,Array.Empty<string>());
+            const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+            var type=typeof(FMSC_SMS.Pages.Students.Admissions.QuickRegistrationPage);
+            using var page=new FMSC_SMS.Pages.Students.Admissions.QuickRegistrationPage((_,_,_)=>{},0,false);
+            var tabs=(TabControl)type.GetField("tabs",flags)!.GetValue(page)!;
+            var form=(Control)type.GetField("form",flags)!.GetValue(page)!;var formType=form.GetType();
+            TabControlCancelEventArgs Attempt(int target=1)
+            {
+                var args=new TabControlCancelEventArgs(tabs.TabPages[target],target,false,TabControlAction.Selecting);
+                typeof(TabControl).GetMethod("OnSelecting",flags)!.Invoke(tabs,new object[]{args});return args;
+            }
+            foreach(int student in new[]{0,41})
+            {
+                formType.GetField("savedStudent",flags)!.SetValue(form,student);
+                formType.GetField("busy",flags)!.SetValue(form,true);
+                Check(page.IsBusy&&Attempt().Cancel&&tabs.SelectedIndex==0,"New and saved registration write states refuse internal tab selection without moving context");
+                formType.GetField("busy",flags)!.SetValue(form,false);
+                Check(!Attempt().Cancel,"A settled registration operation permits tab navigation again");
+            }
+            foreach(string loading in new[]{"loadingFees","loadingFamily"})
+            {
+                formType.GetField(loading,flags)!.SetValue(form,true);Check(Attempt().Cancel,"Fee/family reads retain their tab context until settled");formType.GetField(loading,flags)!.SetValue(form,false);
+            }
+            formType.GetField("recoveryBlocked",flags)!.SetValue(form,true);
+            Check(!page.IsBusy&&page.HasUnsavedChanges&&Attempt().Cancel,"Unknown save outcomes block sibling workflows while remaining a retained recovery draft for dashboard leave");
+            Check(!Attempt(0).Cancel,"An unresolved record still permits returning to Registration Form to check its exact outcome");
+            formType.GetField("recoveryBlocked",flags)!.SetValue(form,false);
+            using var child=new ReturnBusyFixture();tabs.TabPages[1].Controls.Add(child);child.Active=true;
+            Check(page.IsBusy&&Attempt().Cancel,"The registration host aggregates busy contracts from every loaded child");child.Active=false;
+            Check(!Attempt().Cancel&&!page.IsHandleCreated&&!form.IsHandleCreated,"Clean tab decisions require no SQL, profile recovery files or native page handle");
+        }
+        finally{FMSC_SMS.Pages.Security.CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Permissions);}
+    }
+    private sealed class ReturnBusyFixture:UserControl,IBusyPage
+    {
+        internal bool Active;public bool IsBusy=>Active;public string BusyMessage=>"Wait for the pending registration operation.";
+    }
+
 }

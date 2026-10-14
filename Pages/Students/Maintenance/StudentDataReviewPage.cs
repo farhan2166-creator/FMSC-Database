@@ -106,6 +106,7 @@ public sealed class AdmissionReviewListPage : V2Page
             child.MouseDown+=(_,_)=>ClearSelection();ClearOnOutsideClick(child);
         }
     }
+    internal void ShowRegistrationContextWarning(string message)=>Warn(message);
     internal Task RefreshRecordsAsync()=>RefreshAsync();
     private void UpdateLegacySetupState(bool completed)
     {
