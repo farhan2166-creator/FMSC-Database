@@ -1,0 +1,154 @@
+name: FMSC DACPAC refresh verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'FMSC.dacpac'
+      - 'Core/ApprovedSchemaArtifact.json'
+      - 'Core/DatabaseCompatibilityRequirements.json'
+      - 'Tests/LifecycleSqlChecks/Baseline/**'
+      - 'Tools/*dacpac_refresh.py'
+      - 'Tools/refresh_dacpac.py'
+      - '.github/workflows/fmsc-dacpac-refresh.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'FMSC.dacpac'
+      - 'Core/ApprovedSchemaArtifact.json'
+      - 'Core/DatabaseCompatibilityRequirements.json'
+      - 'Tests/LifecycleSqlChecks/Baseline/**'
+      - 'Tools/*dacpac_refresh.py'
+      - 'Tools/refresh_dacpac.py'
+      - '.github/workflows/fmsc-dacpac-refresh.yml'
+  workflow_dispatch:
+    inputs:
+      synchronize:
+        description: Prepare a PR for a verified metadata-only refresh on the default branch
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fmsc-dacpac-refresh-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Compare against anchored approved DACPAC
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      result: ${{ steps.compare.outputs.result }}
+    steps:
+      - name: Check out candidate with history; do not persist credentials
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out trusted approval and verification code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          path: trusted
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Exercise synthetic refusal and synchronization regressions
+        # PR code runs only in this read-only job, with no secrets or write token.
+        run: python Tools/test_dacpac_refresh.py
+
+      - name: Compare model, data and compatibility to trusted Git approval
+        id: compare
+        env:
+          APPROVAL_REF: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
+          GITHUB_EVENT_BEFORE: ${{ github.event.before || '' }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          verifier=trusted/Tools/refresh_dacpac.py
+          if ! test -f "$verifier"; then
+            if test "$EVENT_NAME" != pull_request; then
+              echo 'Trusted default-branch verifier is not installed.'
+              exit 1
+            fi
+            # Initial installation PR only: candidate verifier has read credentials,
+            # cannot reach the publisher job and creates no approval commit.
+            verifier=Tools/refresh_dacpac.py
+            echo 'Bootstrap PR: verifier is under review; no write operation is permitted.'
+          fi
+          if test -n "$APPROVAL_REF"; then
+            python "$verifier" --project "$GITHUB_WORKSPACE" --approval-ref "$APPROVAL_REF" \
+              --report-dir "$RUNNER_TEMP/fmsc-refresh-evidence"
+          else
+            python "$verifier" --project "$GITHUB_WORKSPACE" --report-dir "$RUNNER_TEMP/fmsc-refresh-evidence"
+          fi
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          report = json.loads((Path(os.environ['RUNNER_TEMP']) / 'fmsc-refresh-evidence/report.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('result=' + report['result'] + '\n')
+          PY
+
+      - name: Publish sanitized difference summary
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/fmsc-refresh-evidence/summary.md"; then
+            cat "$RUNNER_TEMP/fmsc-refresh-evidence/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Refresh verification did not complete. No approval or SQL execution is claimed.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload reports only; never the DACPAC or exported data
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fmsc-dacpac-refresh-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/fmsc-refresh-evidence/report.json
+            ${{ runner.temp }}/fmsc-refresh-evidence/summary.md
+          retention-days: 7
+          if-no-files-found: warn
+
+  synchronize:
+    name: Prepare verified alignment pull request
+    needs: verify
+    # Never a PR event, PR head, pull_request_target, or arbitrary dispatch ref.
+    if: >-
+      needs.verify.outputs.result == 'SAFE_METADATA_ONLY' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.synchronize))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Check out only the trusted default-branch source snapshot
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Reverify and publish only the four allowed alignment paths
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          GITHUB_EVENT_BEFORE: ${{ github.event.before || '' }}
+        run: python3 Tools/publish_dacpac_refresh.py
+
+# The short publisher job rechecks source/actor permissions and compares again.
+# It executes only reviewed default-branch Python, never candidate PR code.
+# GITHUB_TOKEN PRs suppress ordinary PR events; existing reviewed Windows/security/
+# isolated SQL workflows are explicitly dispatched with read-only job permissions.
+# No automatic merges, PATs, public releases, school archives or SQL connections.
