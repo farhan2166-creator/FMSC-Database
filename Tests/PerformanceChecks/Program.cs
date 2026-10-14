@@ -123,3 +123,5 @@ if (args.Contains("--profile"))
         Console.WriteLine($"PROFILE {label}: 5 x {source.Rows.Count} synthetic rows, {watch.Elapsed.TotalMilliseconds:F1} ms, {(GC.GetAllocatedBytesForCurrentThread()-before)/1024:N0} KiB allocated. Excludes SQL, WinForms and retained process memory.");
     }
 }
+
+Console.WriteLine($"PASS: {await StatementReadBatchChecks.RunAsync()} nonblocking statement read/assembly checks.");

@@ -1,6 +1,6 @@
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Reports.Finance;
-public sealed class StudentAccountStatementPage : V2Page
+public sealed class StudentAccountStatementPage : V2Page, IBusyPage
 {
     private readonly LookupBox campus =
         new();
@@ -61,9 +61,16 @@ public sealed class StudentAccountStatementPage : V2Page
         new();
     private readonly Dictionary<int, HashSet<int>> familySelections =
         new();
-    public StudentAccountStatementPage()
+    private readonly LatestReadScope statementReads=new();
+    private readonly Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>> readStatement;
+    public bool IsBusy=>BusyOperationRunning||printingDueReport;
+    public string BusyMessage=>"A financial statement or report is being prepared. Wait for the result before leaving.";
+    public StudentAccountStatementPage() : this(true,null) { }
+    internal StudentAccountStatementPage(bool initialize,Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>>? readStatement)
         : base(PageTitles.StudentAccountStatement, "Select students to review or print their charges, payments and balances.")
     {
+        this.readStatement=readStatement??LoadStatementDataAsync;
+        Disposed+=(_,_)=>statementReads.Dispose();
         var export =
             AddExportAction("Student_Fee_Statement");
         exportButton = export;
@@ -131,7 +138,7 @@ public sealed class StudentAccountStatementPage : V2Page
             (_, _) => OnFiltersChanged();
         to.ValueChanged +=
             (_, _) => OnFiltersChanged();
-        Defer(BindContextLookups);
+        if(initialize)Defer(BindContextLookups);
         ConfigureStudentGrid();
         var filters =
             HumanUi.Card("1. Find Students", "Use any combination of filters. Admission Number or name is usually the quickest search.");
@@ -183,7 +190,7 @@ public sealed class StudentAccountStatementPage : V2Page
             + "including students ticked in an earlier search that this list does not show.");
         /* SearchStudents returns Task; await it so a failure surfaces through this handler rather than as an unobserved task exception. */
         searchButton.Click += async (_, _) => await SearchStudents();
-        viewButton.Click += (_, _) => LoadStatement();
+        viewButton.Click += async (_, _) => await LoadStatement();
         dueReportButton.Click += async (_, _) => await PrintDueReport();
         clearButton.Click += (_, _) => {
             ClearForm();
@@ -395,7 +402,7 @@ public sealed class StudentAccountStatementPage : V2Page
             await SearchStudents();
             if (IsDisposed)
                 return;
-            LoadStatement();
+            await LoadStatement();
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
     }
@@ -681,6 +688,7 @@ public sealed class StudentAccountStatementPage : V2Page
     /* report the displayed statement as stale the moment the selection or dates no longer match the values that produced it. */
     private void OnFiltersChanged()
     {
+        if(BusyOperationRunning)statementReads.Cancel();
         UpdateSelectionActions();
         if (string.IsNullOrEmpty(_appliedFilterSignature))
             return;
@@ -1090,7 +1098,7 @@ public sealed class StudentAccountStatementPage : V2Page
     private void UpdateSelectionActions()
     {
         bool hasStudents = GetSelectedAdmissionIds().Count > 0;
-        if (generateStatementButton is not null) generateStatementButton.Enabled = hasStudents;
+        if (generateStatementButton is not null) generateStatementButton.Enabled = hasStudents&&!BusyOperationRunning;
         if (printAmountsDueButton is not null) printAmountsDueButton.Enabled = hasStudents && !printingDueReport;
     }
     private List<int> GetSelectedAdmissionIds()
@@ -1228,10 +1236,10 @@ public sealed class StudentAccountStatementPage : V2Page
             DatabaseHelper.P("@FromDate", fromDate.HasValue ? fromDate.Value.Date : (object)DBNull.Value),
             DatabaseHelper.P("@ToDate", toDate.HasValue ? toDate.Value.Date : (object)DBNull.Value));
     }
-    private static (DataTable Transactions, decimal OpeningBalance) LoadStatementData(
+    private static async Task<(DataTable Transactions, decimal OpeningBalance)> LoadStatementDataAsync(
         int admissionId, DateTime? fromDate, DateTime? toDate)
     {
-        var data = DatabaseHelper.QueryUserSet(
+        var data = await DatabaseHelper.QueryUserSetAsync(
             "GetFeeStatementTransactions",
             DatabaseHelper.Int("@AdmissionId", admissionId),
             DatabaseHelper.Date("@FromDate", fromDate),
@@ -1242,8 +1250,14 @@ public sealed class StudentAccountStatementPage : V2Page
             throw new InvalidOperationException("The statement opening balance could not be verified.");
         return (data.Tables[0], Convert.ToDecimal(data.Tables[1].Rows[0]["OpeningBalance"]));
     }
-    private void LoadStatement()
+    private async Task LoadStatement()
     {
+        try{await RunBusyAsync("Generating statement…",LoadStatementCoreAsync,this);}
+        finally{if(!IsDisposed)UpdateSelectionActions();}
+    }
+    private async Task LoadStatementCoreAsync()
+    {
+        var request=statementReads.Begin();
         // Every regeneration attempt invalidates the old financial snapshot,
         // including a failed attempt under exactly the same filters.
         _appliedFilterSignature=string.Empty;
@@ -1270,24 +1284,38 @@ public sealed class StudentAccountStatementPage : V2Page
             decimal combinedOpening = 0m;
             decimal combinedCharges = 0m;
             decimal combinedPayments = 0m;
-            foreach (int admissionId
-                     in admissionIds)
-            {
-                var statement = LoadStatementData(admissionId, from.Checked ? from.Value.Date : null, to.Checked ? to.Value.Date : null);
-                var current = statement.Transactions;
-                AppendStudentRows(combined, current, admissionId);
-                combinedCharges +=
-                    SumDistinctCharges(current);
-                combinedPayments +=
-                    SumPayments(current);
-                combinedOpening += statement.OpeningBalance;
-            }
+            DateTime? fromDate=from.Checked?from.Value.Date:null,toDate=to.Checked?to.Value.Date:null;
+            string signature=FilterSignature();
+            var visibleNames=students.Rows.Cast<DataGridViewRow>().Where(row=>!row.IsNewRow)
+                .GroupBy(GetRowAdmissionId).ToDictionary(group=>group.Key,group=>Convert.ToString(group.First().Cells["StudentName"].Value)??"");
+            await SequentialReadBatch.ReadAsync(admissionIds,async id=>{
+                var statement=await readStatement(id,fromDate,toDate).ConfigureAwait(false);
+                request.Token.ThrowIfCancellationRequested();
+                string name=visibleNames.GetValueOrDefault(id,"");
+                if(string.IsNullOrWhiteSpace(name)&&statement.Transactions.Columns.Contains("StudentName")&&statement.Transactions.Rows.Count>0)
+                    name=Convert.ToString(statement.Transactions.Rows[0]["StudentName"])??"";
+                if(string.IsNullOrWhiteSpace(name))
+                {
+                    var details=await DatabaseHelper.QueryUserAsync("GetStudentDetails",DatabaseHelper.Int("@AdmissionId",id)).ConfigureAwait(false);
+                    if(details.Rows.Count==0)throw new InvalidOperationException("A selected statement student could not be verified. Find students again.");
+                    name=Convert.ToString(details.Rows[0]["StudentName"])??"";
+                }
+                return (statement.Transactions,statement.OpeningBalance,Name:name);
+            },(id,statement)=>{
+                AppendStudentRows(combined,statement.Transactions,statement.Name);
+                combinedCharges+=SumDistinctCharges(statement.Transactions);
+                combinedPayments+=SumPayments(statement.Transactions);
+                combinedOpening+=statement.OpeningBalance;
+            },request.Token);
+            if(IsDisposed||!statementReads.IsCurrent(request)||signature!=FilterSignature())return;
             if (combined.Columns.Contains("StatementStudent") &&
                 combined.Columns.Contains("TransactionDate"))
             {
-                combined.DefaultView.Sort =
-                    "StatementStudent ASC, TransactionDate ASC, TransactionType ASC, TransactionId ASC";
-                combined = combined.DefaultView.ToTable();
+                combined = await Task.Run(()=>{
+                    combined.DefaultView.Sort="StatementStudent ASC, TransactionDate ASC, TransactionType ASC, TransactionId ASC";
+                    return combined.DefaultView.ToTable();
+                },request.Token);
+                if(IsDisposed||!statementReads.IsCurrent(request)||signature!=FilterSignature())return;
             }
             Bind(combined);
             ConfigureStatementGrid();
@@ -1309,8 +1337,10 @@ public sealed class StudentAccountStatementPage : V2Page
                 FilterSignature();
             SetReportActionsEnabled(true);
         }
+        catch(OperationCanceledException) when(!statementReads.IsCurrent(request)) { }
         catch (Exception ex)
         {
+            if(IsDisposed||!statementReads.IsCurrent(request))return;
             Fail(ex);
             SetStatus("Statement could not be refreshed. The previous snapshot is not current; generate again before exporting. "+DbMessage.UserMessage(ex),PageStatusKind.Warning);
         }
@@ -1319,7 +1349,7 @@ public sealed class StudentAccountStatementPage : V2Page
     {
         return new DataTable();
     }
-    private void AppendStudentRows(DataTable combined, DataTable source, int admissionId)
+    private static void AppendStudentRows(DataTable combined, DataTable source, string studentName)
     {
         if (source.Rows.Count == 0)
             return;
@@ -1335,8 +1365,6 @@ public sealed class StudentAccountStatementPage : V2Page
                 combined.Columns.Add("StatementStudent", typeof(string));
             }
         }
-        string studentName =
-            GetStudentName(admissionId);
         foreach (DataRow sourceRow
                  in source.Rows)
         {
@@ -1649,10 +1677,9 @@ public sealed class StudentAccountStatementPage : V2Page
     }
     private void AddDueReportRows(List<DueReportRow> result, DataTable table, int admissionId)
     {
+        string studentName=GetStudentName(admissionId);
         if (!table.Columns.Contains("TransactionType"))
             return;
-        string studentName =
-            GetStudentName(admissionId);
         IEnumerable<DataRow> chargeRows =
         table.AsEnumerable()
             .Where(row =>
@@ -1962,6 +1989,7 @@ public sealed class StudentAccountStatementPage : V2Page
     }
     private void ClearForm()
     {
+        statementReads.Cancel();
         suppressFilterEvents = true;
         campus.SelectedIndex = -1;
         year.SelectedIndex = -1;

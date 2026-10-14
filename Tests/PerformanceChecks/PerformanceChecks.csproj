@@ -12,6 +12,7 @@
     <Compile Include="../../Core/ReportPaginator.cs" Link="ReportPaginator.cs" />
     <Compile Include="../../Core/ReportLoadCoordinator.cs" Link="ReportLoadCoordinator.cs" />
     <Compile Include="../../Core/StudentPickerSearchSession.cs" Link="StudentPickerSearchSession.cs" />
+    <Compile Include="../../Core/SequentialReadBatch.cs" Link="SequentialReadBatch.cs" />
     <Compile Include="../../Core/LatestReadScope.cs" Link="LatestReadScope.cs" />
     <Compile Include="../../Core/NavigationLocation.cs" Link="NavigationLocation.cs" />
     <Using Include="System.Data" />

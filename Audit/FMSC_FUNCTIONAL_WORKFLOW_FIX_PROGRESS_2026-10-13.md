@@ -231,3 +231,22 @@ student selection and dates retained for another generation attempt.
 Added an actual-page rejected-generation fixture asserting old export/signature
 invalidation and previous-table retention without reaching SQL. Native SQL failure
 and GUI status acceptance remains required. No SQL changes.
+
+## FQA-20 — Statement SQL/assembly blocks the UI thread
+
+**Synchronous source design confirmed and improved.** Statement generation now
+awaits each captured student's read and assembles/sorts tables on a worker. Reads
+remain sequential, avoiding a burst of SQL connections and simultaneous tables.
+Selectors are held by the existing busy gate; filter changes/disposal invalidate
+results, and only a complete current batch can bind and enable Export. Names are
+captured from visible rows or resolved asynchronously. Existing transaction
+filtering, distinct charge totals, payments and opening balance are retained.
+
+**Verification:** 7 portable batch tests pass for immediate caller return, ordered
+assembly, cancellation, failed-read stopping and one-at-a-time reads. Synthetic
+profile: 32 delayed 8-ms queries finished in 266 ms with 62 caller heartbeats and
+maximum 1 active read. This excludes real SQL and WinForms and is not a deployment
+speed/RAM claim. Existing performance suites also pass (20,028 + 2,040 + 10,108).
+App and Windows smoke project build without warnings/errors; added delayed
+multi-student assembly/identical-total/export fixtures. Real SQL latency, Windows
+responsiveness and resource measurements remain outstanding. No SQL changes.

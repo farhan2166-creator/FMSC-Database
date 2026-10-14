@@ -134,6 +134,7 @@ internal static partial class Program
             CheckPaymentDetailGeneration();
             CheckAnnualReceiptPreparationGuard();
             CheckStatementRegenerationFreshness();
+            CheckAsyncStatementAssembly();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();
