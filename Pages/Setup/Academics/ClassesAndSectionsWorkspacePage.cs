@@ -2,7 +2,7 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Setup.Academics;
 public sealed class ClassesAndSectionsWorkspacePage : UserControl, IBusyPage
 {
-    // Small setup drafts remain freely abandonable; submitted writes must finish.
+    // Owner decision: small setup drafts stay prompt-free; submitted writes must finish.
     private readonly ClassesPage classes;
     private readonly SectionsPage sections;
     public bool IsBusy => classes.IsBusy || sections.IsBusy;
