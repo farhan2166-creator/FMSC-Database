@@ -111,3 +111,16 @@ selection and Students.Administer/SQL guards are preserved.
 Added pending family-action, overlap refusal and full-completion fixtures using
 delayed delegates, with lookup initialization disabled only in the test seam.
 Native delayed SQL and shell leave acceptance remains required. No SQL changes.
+
+## FQA-09 — Duplicate Confirm/Dismiss decisions can overlap
+
+**Confirmed and fixed.** Scan and resolution batches now share RunBusyAsync and
+hold all conflicting page controls. Selection events cannot re-enable either
+decision during a batch. Captured ReviewIds, individual SQL calls, partial-result
+accounting and permission checks are retained; no batch auto-retry is added.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added selected-pair tests for both decision buttons remaining disabled during
+selection changes, both handler paths refusing overlap, scan refusal and settled
+restoration. Native SQL-delayed multi-row acceptance remains required. The host
+leave-contract gap is tracked separately under FQA-10. No SQL changes.

@@ -115,7 +115,7 @@ public sealed class DuplicateStudentAuditPage : V2Page
     {
         if (IsDisposed)
             return;
-        bool hasSelection = SelectedPairs().Count > 0;
+        bool hasSelection = !BusyOperationRunning&&SelectedPairs().Count > 0;
         if (!_confirmButton.IsDisposed)
             _confirmButton.Enabled = hasSelection;
         if (!_dismissButton.IsDisposed)
@@ -253,7 +253,8 @@ public sealed class DuplicateStudentAuditPage : V2Page
         }
         catch (Exception ex) { Fail(ex); }
     }
-    private async Task ScanAsync()
+    private Task ScanAsync()=>RunBusyAsync("Scanning duplicate candidates…",ScanCoreAsync,this);
+    private async Task ScanCoreAsync()
     {
         try
         {
@@ -267,7 +268,8 @@ public sealed class DuplicateStudentAuditPage : V2Page
         }
         catch (Exception ex) { Fail(ex); }
     }
-    private async Task ResolveSelectedAsync(string status)
+    private Task ResolveSelectedAsync(string status)=>RunBusyAsync("Updating selected duplicate candidates…",()=>ResolveSelectedCoreAsync(status),this);
+    private async Task ResolveSelectedCoreAsync(string status)
     {
         try
         {
