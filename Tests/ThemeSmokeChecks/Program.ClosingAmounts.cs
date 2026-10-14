@@ -18,7 +18,7 @@ internal static partial class Program
         bool Refused(string text)
         {
             var args = (DataGridViewCellValidatingEventArgs)Activator.CreateInstance(typeof(DataGridViewCellValidatingEventArgs), flags, null, new object[] { grid.Columns["Actual Amount"].Index, 0, text }, null)!;
-            typeof(DataGridView).GetMethod("OnCellValidating", flags)!.Invoke(grid, new object[] { args }); return args.Cancel;
+            typeof(DataGridView).GetMethod("OnCellValidating", flags, null, new[] { typeof(DataGridViewCellValidatingEventArgs) }, null)!.Invoke(grid, new object[] { args }); return args.Cancel;
         }
         Check(Refused("100.50") && Refused("100.999"), "Closing grid refuses fractions without rounding");
         Check(!Refused("100") && !Refused("0") && !Refused(""), "Closing grid accepts whole amounts, explicit zero and unchecked blank");
