@@ -25,6 +25,21 @@ public class ApplicationWindowForm : Form
         KeyboardShortcutHints.Register(this);
     }
     internal PageActionShortcutController ShortcutController => saveShortcutController;
+    public override Size MinimumSize
+    {
+        get => base.MinimumSize;
+        set
+        {
+            // Form's setter clamps to the current physical monitor. Retain the
+            // requested size before that clamp so moving back can restore it.
+            if (!fittingWindow)
+            {
+                requestedMinimum = value;
+                minimumDpi = geometryDpi;
+            }
+            base.MinimumSize = value;
+        }
+    }
     protected void SetSaveShortcut(ModernButton button) => saveShortcutController.SetSaveButton(button);
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
@@ -104,7 +119,13 @@ public class ApplicationWindowForm : Form
                 if (!ReferenceEquals(child, caption)) child.Scale(factor);
             if (resizeWindow)
             {
-                MinimumSize = DpiLayout.ChangeDpi(MinimumSize, previous, dpi);
+                fittingWindow = true;
+                try
+                {
+                    MinimumSize = DpiLayout.ChangeDpi(requestedMinimum ?? MinimumSize,
+                        minimumDpi > 0 ? minimumDpi : previous, dpi);
+                }
+                finally { fittingWindow = false; }
                 ClientSize = DpiLayout.ChangeDpi(ClientSize, previous, dpi);
             }
         }
