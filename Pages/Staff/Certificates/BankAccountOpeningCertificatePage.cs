@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using FMSC_SMS.Core;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Staff.Certificates;
@@ -6,10 +7,13 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     private readonly StaffPicker staff = new();
     public bool IsBusy=>BusyOperationRunning;
     public string BusyMessage=>"The bank certificate is being created. Wait for the result and history reload before leaving.";
+    private bool recoveryBlocked;
+    private MutationIntent? pendingCertificate;
+    private readonly ModernButton checkOutcome=new(){Text="Check Save Outcome",Width=AppScale.Scale(170)};
     private string? _baseline;
     private string Snapshot() => string.Join("\u001f", bankName.Text, branchName.Text, designation.Text, monthlyIncome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), purpose.Text, certificateDate.Value.Date.ToString("yyyy-MM-dd"));
-    public bool HasUnsavedChanges => _baseline is not null && _baseline != Snapshot();
-    public string UnsavedChangesMessage => "This staff certificate has unsaved changes. Leaving will discard them.";
+    public bool HasUnsavedChanges => recoveryBlocked || _baseline is not null && _baseline != Snapshot();
+    public string UnsavedChangesMessage => recoveryBlocked?"This certificate creation needs outcome checking. Its recovery record is retained when you leave. Do not create it again before checking.":"This staff certificate has unsaved changes. Leaving will discard them.";
     private bool ConfirmDiscard() => ModernMessageDialog.ConfirmDiscardIfDirty(FindForm(), () => HasUnsavedChanges, UnsavedChangesMessage);
     private void CaptureBaseline() => _baseline = Snapshot();
 
@@ -55,7 +59,8 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
-    public BankAccountOpeningCertificatePage()
+    public BankAccountOpeningCertificatePage():this(true){ }
+    internal BankAccountOpeningCertificatePage(bool initialize)
         : base("Bank Account Opening Certificate", "Record and print bank account opening request letters for staff.")
     {
         bankName.PlaceholderText =
@@ -73,31 +78,11 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         monthlyIncome.WholeRupeesOnly = true;
         monthlyIncome.DecimalPlaces = 0;
         monthlyIncome.ThousandsSeparator = true;
-        /* dbo.CreateBankAccountOpeningCertificate has no duplicate guard, and the certificate table has no unique constraint on (AdmissionId, ...). */
-        createCertificateButton.Click += async (_, _) => {
-            if (IsBusy||!createCertificateButton.Enabled)
-                return;
-            /* (D-H3) - the write owns the page until it settles, so the two controls that can move the context out from under it are held as well. */
-            var heldDuringCreate = new List<(Control Control, bool WasEnabled)>
-            {
-                (staff, staff.Enabled),
-                (Grid, Grid.Enabled)
-            };
-            createCertificateButton.Enabled = false;
-            foreach (var (control, _) in heldDuringCreate)
-                control.Enabled = false;
-            try
-            {
-                await CreateCertificate();
-            }
-            finally
-            {
-                foreach (var (control, wasEnabled) in heldDuringCreate)
-                {
-                    if (!control.IsDisposed)
-                        control.Enabled = wasEnabled;
-                }
-            }
+        checkOutcome.Click+=async(_,_)=>await CheckCertificateOutcomeAsync();
+        createCertificateButton.Click+=async(_,_)=>
+        {
+            if(IsBusy||!createCertificateButton.Enabled)return;
+            await CreateCertificate();
         };
         updateCertificateButton.Click +=
             (_, _) => UpdateCertificate();
@@ -112,7 +97,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         refreshButton.Click +=
             (_, _) => RefreshCertificates();
         RelocateFromActions(createCertificateButton, clearButton);
-        staff.SelectionChangeGuard = _ => ConfirmDiscard();
+        staff.SelectionChangeGuard = _ => !IsBusy&&!recoveryBlocked&&ConfirmDiscard();
         staff.SelectionCleared += (_, _) => { if (!suppressStaffChanged) StaffChanged(); };
         staff.SearchFailed += ex => Fail(ex);
         staff.UserSelectionChanged +=
@@ -123,11 +108,12 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             };
         Grid.CellMouseClick +=
             Grid_CellMouseClick;
-        Defer(
+        if(initialize)Defer(
             () => {
                 /* The ORDER here was the defect. Resetting first and binding second leaves the list populated with nothing selected, which is what opening this page means. */
                 ResetToStart();
                 BindStaff();
+                ReadCertificateRecovery();
             });
         var details =
             HumanUi.Card(
@@ -175,7 +161,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
                 "Bank Account Opening Certificates",
                 "A staff member may have more than one of these. Select a row to edit or print it.");
         var certificateActions =
-            CertificateButtonRow.Create(printButton, refreshButton);
+            CertificateButtonRow.Create(printButton, refreshButton, checkOutcome);
         certificateActions.Dock =
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
@@ -205,7 +191,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         purpose.TextChanged += (_, _) => ApplyWorkflowState();
         certificateDate.ValueChanged += (_, _) => ApplyWorkflowState();
         monthlyIncome.ValueChanged += (_, _) => ApplyWorkflowState();
-        ApplyWorkflowState();
+        if(initialize)ReadCertificateRecovery();else ApplyWorkflowState();
     }
     private void BindStaff()
     {
@@ -307,8 +293,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     private void SelectSavedCertificate(int id)
     {
         CaptureBaseline();
-        CertificateRecordOrder.Select(Grid, "BankAccountOpeningCertificateId", id,
-            index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
+        SelectCertificateById(id);
     }
     private void FormatCertificateGrid()
     {
@@ -346,7 +331,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     }
     private void Grid_CellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
     {
-        if (e.Button != MouseButtons.Left ||
+        if (IsBusy||recoveryBlocked||e.Button != MouseButtons.Left ||
             e.RowIndex < 0 ||
             e.RowIndex >= certificateResults.Rows.Count)
         {
@@ -410,27 +395,34 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             staff.SelectedId > 0;
         bool hasSelection =
             selectedBankAccountOpeningCertificateId > 0;
-        staff.Enabled = true;
-        bankName.Enabled = hasStaff;
-        branchName.Enabled = hasStaff;
-        designation.Enabled = hasStaff;
-        monthlyIncome.Enabled = hasStaff;
-        purpose.Enabled = hasStaff;
-        certificateDate.Enabled = hasStaff;
+        staff.Enabled = !recoveryBlocked;
+        Grid.Enabled = !recoveryBlocked;
+        checkOutcome.Enabled=recoveryBlocked&&!IsBusy;
+        bankName.Enabled = hasStaff&&!recoveryBlocked;
+        branchName.Enabled = hasStaff&&!recoveryBlocked;
+        designation.Enabled = hasStaff&&!recoveryBlocked;
+        monthlyIncome.Enabled = hasStaff&&!recoveryBlocked;
+        purpose.Enabled = hasStaff&&!recoveryBlocked;
+        certificateDate.Enabled = hasStaff&&!recoveryBlocked;
         createCertificateButton.Enabled =
-            hasStaff &&
+            !recoveryBlocked&&hasStaff &&
             !hasSelection;
         updateCertificateButton.Enabled =
-            hasStaff &&
+            !recoveryBlocked&&hasStaff &&
             hasSelection && HasCertificateEdits;
         newButton.Enabled =
-            hasStaff &&
+            !recoveryBlocked&&hasStaff &&
             hasSelection;
-        clearButton.Enabled = true;
+        clearButton.Enabled = !recoveryBlocked;
         refreshButton.Enabled =
-            hasStaff;
+            hasStaff&&!recoveryBlocked;
         printButton.Enabled =
             hasSelection && !HasCertificateEdits && CurrentUser.HasPermission("Certificates.Print");
+        if(recoveryBlocked)
+        {
+            SetStatus((pendingCertificate?.Summary??"An earlier certificate creation")+" · Outcome needs checking. Use Check Save Outcome; do not create it again.",PageStatusKind.Warning);
+            return;
+        }
         if (!hasStaff)
         {
             SetStatus("Select a staff member.");
@@ -445,7 +437,12 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         SetStatus(
             "Enter bank, branch, designation and purpose to create. Select a saved certificate to edit or print.");
     }
-    private Task CreateCertificate()=>RunBusyAsync(BusyMessage,CreateCertificateCoreAsync,this);
+    private async Task CreateCertificate()
+    {
+        if(recoveryBlocked){Warn("Check the earlier save outcome before creating another certificate.");return;}
+        try{await RunBusyAsync(BusyMessage,CreateCertificateCoreAsync,this);}
+        finally{if(!IsDisposed)checkOutcome.Enabled=recoveryBlocked;}
+    }
     private async Task CreateCertificateCoreAsync()
     {
         if (!ValidateRequiredInputs())
@@ -466,33 +463,18 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             int staffId =
                 staff.SelectedId;
             createCertificateButton.Enabled = false;
-            // awaited so the caller's disabled button covers the whole write. @UserId is passed explicitly and equals CurrentUser.UserId, so ExecuteUserAsync's automatic injection supplies the same value.
-            await DatabaseHelper.ExecuteUserAsync(
-                "CreateBankAccountOpeningCertificate",
-                DatabaseHelper.P(
-                    "@UserId",
-                    CurrentUser.UserId),
-                DatabaseHelper.Int(
-                    "@StaffId",
-                    staffId),
-                DatabaseHelper.P(
-                    "@Designation",
-                    designation.Text.Trim()),
-                DatabaseHelper.P(
-                    "@BankName",
-                    bankName.Text.Trim()),
-                DatabaseHelper.P(
-                    "@BranchName",
-                    branchName.Text.Trim()),
-                DatabaseHelper.P(
-                    "@MonthlyIncome",
-                    monthlyIncome.Value),
-                DatabaseHelper.P(
-                    "@Purpose",
-                    purpose.Text.Trim()),
-                DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date));
+            var saved=await SubmitCertificateAsync(
+                $"Bank letter · Staff {staffId} · {bankName.Text.Trim()} · {certificateDate.Value:dd MMM yyyy}",
+                DatabaseHelper.Int("@StaffId",staffId),
+                DatabaseHelper.P("@Designation",designation.Text.Trim()),
+                DatabaseHelper.P("@BankName",bankName.Text.Trim()),
+                DatabaseHelper.P("@BranchName",branchName.Text.Trim()),
+                DatabaseHelper.P("@MonthlyIncome",monthlyIncome.Value),
+                DatabaseHelper.P("@Purpose",purpose.Text.Trim()),
+                DatabaseHelper.Date("@CertificateDate",certificateDate.Value.Date));
+            if(saved is null)return;
             successMessage =
-                "Certificate created successfully.";
+                $"Certificate {saved.RecordId} created successfully.";
             /* (D-H2) - reload only while the staff member this certificate was created for is still the selected one, or the list would be shown under a different member's name and… */
             if (IsDisposed ||
                 staff.SelectedId != staffId)
@@ -502,15 +484,17 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             ClearCertificateFields();
             ClearCertificateSelection();
             historyRefreshed=LoadCertificates(staffId,reportError:false)&&certificateResults.Rows.Count>0;
-            if(historyRefreshed)SelectSavedCertificate(0);
+            historyRefreshed=historyRefreshed&&certificateResults.AsEnumerable().Any(r=>GetInt(r,"BankAccountOpeningCertificateId")==saved.RecordId);
+            if(historyRefreshed)SelectSavedCertificate(saved.RecordId);
         }
         catch (Exception ex)
         {
-            Fail(ex);
+            ReadCertificateRecovery();
+            if(recoveryBlocked)Warn("The certificate may already be created. Use Check Save Outcome before creating another. "+DbMessage.UserMessage(ex));else Fail(ex);
         }
         finally
         {
-            ApplyWorkflowState();
+            if(!IsDisposed)ApplyWorkflowState();
             if (successMessage is not null)
             {
                 if(historyRefreshed)Info(successMessage);
@@ -518,8 +502,72 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             }
         }
     }
+    private void ReadCertificateRecovery()
+    {
+        bool wasBlocked=recoveryBlocked;
+        try
+        {
+            pendingCertificate??=MutationRecoveryJournal.ReadPending(MutationKind.BankCertificateCreate);
+            recoveryBlocked=pendingCertificate is not null;
+            if(wasBlocked&&!recoveryBlocked){ClearCertificateSelection();ClearCertificateFields();Grid.ClearSelection();Grid.CurrentCell=null;}
+        }
+        catch(Exception ex)
+        {
+            recoveryBlocked=true;ApplyWorkflowState();
+            Warn("Retain the certificate recovery record for review. Do not create the certificate again. "+DbMessage.UserMessage(ex));return;
+        }
+        ApplyWorkflowState();
+    }
+    private async Task<MutationResult?> SubmitCertificateAsync(string summary,params SqlParameter[] args)
+    {
+        int user=CurrentUser.UserId;string scope=await RecoverableMutationWriter.GetScopeAsync();
+        if(IsDisposed||CurrentUser.UserId!=user)throw new InvalidOperationException("The certificate page or signed-in operator changed before submission.");
+        MutationWriteResult outcome;MutationIntent intent;
+        using(var journal=MutationRecoveryJournal.Begin(MutationKind.BankCertificateCreate,user,scope,RecoverableMutationWriter.PayloadHash(MutationKind.BankCertificateCreate,user,args),summary))
+        {
+            intent=journal.Intent;pendingCertificate=intent;recoveryBlocked=true;ApplyWorkflowState();
+            outcome=await RecoverableMutationWriter.SaveAsync(intent,args);
+        }
+        if(outcome.Outcome==MutationOutcome.Unconfirmed){Warn("The certificate creation outcome is unknown. Use Check Save Outcome; do not create it again.");return null;}
+        MutationRecoveryJournal.ClearVerified(intent);pendingCertificate=null;recoveryBlocked=false;
+        if(outcome.Outcome==MutationOutcome.Rejected)System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(outcome.Error!).Throw();
+        LookupDataCache.OperationCompleted("CreateBankAccountOpeningCertificate");
+        return outcome.Result!;
+    }
+    private async Task CheckCertificateOutcomeAsync()
+    {
+        if(IsBusy||IsDisposed)return;ReadCertificateRecovery();if(pendingCertificate is null)return;
+        try
+        {
+            await RunBusyAsync("Checking the earlier certificate creation outcome…",async()=>
+            {
+                MutationResult? verified=null;bool checkedOutcome=false;
+                try
+                {
+                    var intent=pendingCertificate!;var saved=await RecoverableMutationWriter.CheckAsync(intent);verified=saved;checkedOutcome=true;
+                    MutationRecoveryJournal.ClearVerified(intent);pendingCertificate=null;recoveryBlocked=false;
+                    if(IsDisposed)return;
+                    ClearCertificateSelection();ClearCertificateFields();Grid.ClearSelection();Grid.CurrentCell=null;
+                    if(saved is null){ApplyWorkflowState();Warn("The earlier certificate was not created. Reload staff history and deliberately create it only if still needed.");return;}
+                    LookupDataCache.OperationCompleted("CreateBankAccountOpeningCertificate");
+                    suppressStaffChanged=true;
+                    try{if(staff.SelectedId!=saved.SubjectId)staff.SetStaff(saved.SubjectId,"Recovered staff member");}
+                    finally{suppressStaffChanged=false;}
+                    bool loaded=LoadCertificates(saved.SubjectId,reportError:false)&&certificateResults.AsEnumerable().Any(r=>GetInt(r,"BankAccountOpeningCertificateId")==saved.RecordId);
+                    if(loaded){var row=certificateResults.AsEnumerable().First(r=>GetInt(r,"BankAccountOpeningCertificateId")==saved.RecordId);staff.SetStaff(saved.SubjectId,GetString(row,"StaffName"));SelectSavedCertificate(saved.RecordId);Info($"Earlier certificate {saved.RecordId} was created. The exact saved certificate is selected.");}
+                    else Warn($"Earlier certificate {saved.RecordId} was created. History could not be refreshed or verified. Reload history; do not create it again.");
+                }
+                catch(Exception ex)
+                {
+                    if(!IsDisposed)Warn((checkedOutcome?(verified is null?"The earlier certificate was not created, but recovery cleanup failed. Reopen this page before creating it. ":"The earlier certificate is recorded, but the screen or recovery file could not be refreshed. Do not create it again. Reopen this page or reload history. "):"The certificate outcome is still unresolved. Keep recovery and do not create it again. ")+DbMessage.UserMessage(ex));
+                }
+            },this);
+        }
+        finally{if(!IsDisposed)checkOutcome.Enabled=recoveryBlocked;}
+    }
     private void UpdateCertificate()
     {
+        if(IsBusy||recoveryBlocked)return;
         int savedCertificateId = selectedBankAccountOpeningCertificateId;
         // Finding 12 - see CreateCertificate: the confirmation is set last.
         string? successMessage =
@@ -613,6 +661,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     }
     private void StartNewCertificate()
     {
+        if(IsBusy||recoveryBlocked)return;
         ClearCertificateSelection();
         ClearCertificateFields();
         Grid.ClearSelection();
@@ -667,6 +716,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     }
     private void RefreshCertificates()
     {
+        if(IsBusy||recoveryBlocked)return;
         if (!ConfirmDiscard()) return;
         int staffId =
             staff.SelectedId;
@@ -746,6 +796,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     }
     private void ClearForm()
     {
+        if(IsBusy||recoveryBlocked)return;
         if (!ConfirmDiscard()) return;
         suppressStaffChanged = true;
         try

@@ -22,6 +22,38 @@ SqlParameter[] Refund(decimal amount)=>new[]{DatabaseHelper.Int("@AdmissionId",a
 string scope=await RecoverableMutationWriter.GetScopeAsync();
 MutationIntent Intent(MutationKind kind,SqlParameter[] parameters)=>new(Guid.NewGuid(),kind,CurrentUser.UserId,scope,RecoverableMutationWriter.PayloadHash(kind,CurrentUser.UserId,parameters),"Disposable exact operation",DateTime.UtcNow);
 int Refunds()=>Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.FeePayments WHERE RelatedFeePaymentId=@Payment AND PaymentMethod=N'Refund' AND Status=N'Completed'",DatabaseHelper.Int("@Payment",payment)).Rows[0][0]);
+if(args.Contains("--bank"))
+{
+    int staffId=Convert.ToInt32(Query("SELECT TOP(1) StaffId FROM dbo.Staff WHERE StaffName=N'FQA bank fixture' ORDER BY StaffId DESC").Rows[0][0]);
+    SqlParameter[] Bank()=>new[]{DatabaseHelper.Int("@StaffId",staffId),DatabaseHelper.P("@Designation","Teacher"),DatabaseHelper.P("@BankName","Audit Bank"),DatabaseHelper.P("@BranchName","Audit Branch"),DatabaseHelper.P("@MonthlyIncome",10000m),DatabaseHelper.P("@Purpose","Payroll"),DatabaseHelper.Date("@CertificateDate",DateTime.Today)};
+    int Certificates()=>Convert.ToInt32(Query("SELECT COUNT(*) FROM dbo.BankAccountOpeningCertificates WHERE StaffId=@Staff",DatabaseHelper.Int("@Staff",staffId)).Rows[0][0]);
+    var bankArgs=Bank();var bankIntent=Intent(MutationKind.BankCertificateCreate,bankArgs);int count=Certificates();
+    var lostBank=await RecoverableMutationWriter.SaveAsync(bankIntent,bankArgs,t=>{t.Commit();throw new IOException("Injected lost bank create acknowledgement");});
+    Check(lostBank.Outcome==MutationOutcome.Unconfirmed&&Certificates()==count+1,"actual bank create commit with lost acknowledgement is unresolved with one certificate");
+    var found=await RecoverableMutationWriter.CheckAsync(bankIntent);
+    Check(found is not null&&found.Kind==MutationKind.BankCertificateCreate&&found.SubjectId==staffId&&found.RecordId>0,"read-only bank recovery returns the authoritative staff and certificate ID");
+    Check(Query("SELECT StaffId FROM dbo.BankAccountOpeningCertificates WHERE BankAccountOpeningCertificateId=@ID",DatabaseHelper.Int("@ID",found!.RecordId)).Rows[0][0].Equals(staffId),"the recovered ID identifies that exact persisted staff certificate");
+    var again=await RecoverableMutationWriter.SaveAsync(bankIntent,bankArgs);Check(again.Outcome==MutationOutcome.Saved&&again.Result==found&&Certificates()==count+1,"same bank request replay cannot create another certificate");
+    var changed=Bank();changed.First(p=>p.ParameterName=="@BankName").Value="Another Bank";
+    try{await RecoverableMutationWriter.SaveAsync(bankIntent,changed);throw new Exception("Changed bank request accepted");}catch(InvalidOperationException){Check(true,"changed bank details cannot reuse a completed request identity");}
+    var concurrentArgs=Bank();var concurrent=Intent(MutationKind.BankCertificateCreate,concurrentArgs);count=Certificates();
+    var both=await Task.WhenAll(RecoverableMutationWriter.SaveAsync(concurrent,concurrentArgs),RecoverableMutationWriter.SaveAsync(concurrent,concurrentArgs));
+    Check(both.All(r=>r.Outcome==MutationOutcome.Saved)&&both[0].Result==both[1].Result&&Certificates()==count+1,"concurrent copies of a bank create request produce exactly one certificate");
+    var brokenArgs=Bank();var broken=Intent(MutationKind.BankCertificateCreate,brokenArgs);count=Certificates();
+    Query("CREATE TRIGGER dbo.FMSC_FailMutationMarker ON dbo.MutationRequests AFTER INSERT AS BEGIN SET NOCOUNT ON;THROW 57699,'Injected marker failure',1;END;");
+    try{var failed=await RecoverableMutationWriter.SaveAsync(broken,brokenArgs);Check(failed.Outcome!=MutationOutcome.Saved,"bank marker failure cannot acknowledge successful creation");}
+    finally{Query("DROP TRIGGER dbo.FMSC_FailMutationMarker");}
+    Check(Certificates()==count&&await RecoverableMutationWriter.CheckAsync(broken) is null,"bank certificate and marker roll back together after marker failure");
+    var optional=Bank();optional.First(p=>p.ParameterName=="@MonthlyIncome").Value=DBNull.Value;
+    var optionalIntent=Intent(MutationKind.BankCertificateCreate,optional);var optionalSaved=await RecoverableMutationWriter.SaveAsync(optionalIntent,optional);
+    Check(optionalSaved.Outcome==MutationOutcome.Saved&&optionalSaved.Result!.Amount==0m,"bank income remains optional through durable creation");
+    int accountantId=Convert.ToInt32(Query("SELECT TOP(1) U.UserId FROM dbo.Users U JOIN dbo.Roles R ON R.RoleId=U.RoleId WHERE R.RoleName=N'Accountant'").Rows[0][0]);CurrentUser.UserId=accountantId;
+    try{await RecoverableMutationWriter.CheckAsync(bankIntent);throw new Exception("Unauthorized bank recovery accepted");}catch(SqlException e) when(e.Number==50003){Check(true,"bank recovery cannot bypass current certificate permissions");}
+    var deniedBankArgs=Bank();var deniedIntent=Intent(MutationKind.BankCertificateCreate,deniedBankArgs);count=Certificates();var deniedBank=await RecoverableMutationWriter.SaveAsync(deniedIntent,deniedBankArgs);
+    Check(deniedBank.Outcome==MutationOutcome.Rejected&&Certificates()==count,"Accountant retains its access and cannot acquire bank creation through recovery");CurrentUser.UserId=admin;
+    Check(await RecoverableMutationWriter.CheckAsync(deniedIntent) is null,"Administrator can verify a refused bank request without creating it");
+    Console.WriteLine($"PASS: {checks} native bank-certificate recovery checks.");return;
+}
 if(args.Contains("--adjustment-types"))
 {
     foreach(string type in new[]{"Correction","Reversal"})

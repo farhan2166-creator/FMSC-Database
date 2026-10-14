@@ -71,13 +71,48 @@ internal static partial class Program
     private static void CheckBankCertificateBusy()
     {
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
-        using var page=new FMSC_SMS.Pages.Staff.Certificates.BankAccountOpeningCertificatePage();
+        using var page=new FMSC_SMS.Pages.Staff.Certificates.BankAccountOpeningCertificatePage(false);
         var reply=new TaskCompletionSource();Func<Task> create=()=>reply.Task;
         var task=(Task<bool>)typeof(V2Page).GetMethod("RunBusyAsync",flags)!.Invoke(page,new object[]{page.BusyMessage,create,new Control[]{page}})!;
         Check(page.IsBusy&&!page.Enabled,"Staff bank certificate creation exposes its full operation and holds New, Clear, Refresh, field and selection controls");
         reply.SetResult();PumpUntil(()=>task.IsCompleted,"Bank certificate operation fixture settles");
         Check(task.Result&&!page.IsBusy&&page.Enabled,"Bank certificate completion releases the page after history work settles");
         Check(!page.IsHandleCreated,"Bank certificate busy fixture starts no staff lookup or SQL creation");
+    }
+
+    private static void CheckBankCertificateRecoveryGuard()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        var type=typeof(FMSC_SMS.Pages.Staff.Certificates.BankAccountOpeningCertificatePage);
+        using var page=new FMSC_SMS.Pages.Staff.Certificates.BankAccountOpeningCertificatePage(false);
+        type.GetField("recoveryBlocked",flags)!.SetValue(page,true);type.GetMethod("ApplyWorkflowState",flags)!.Invoke(page,null);
+        var outcome=(ModernButton)type.GetField("checkOutcome",flags)!.GetValue(page)!;
+        var create=(ModernButton)type.GetField("createCertificateButton",flags)!.GetValue(page)!;
+        var update=(ModernButton)type.GetField("updateCertificateButton",flags)!.GetValue(page)!;
+        Check(outcome.Enabled&&!create.Enabled&&!update.Enabled&&page.HasUnsavedChanges,"Pending bank creation exposes exact recovery and blocks conflicting writes");
+        var task=(Task)type.GetMethod("CreateCertificate",flags)!.Invoke(page,null)!;
+        Check(task.IsCompletedSuccessfully&&!page.IsBusy,"Pending certificate runtime guard refuses another create before SQL or validation");
+        foreach(string action in new[]{"StartNewCertificate","ClearForm","RefreshCertificates","UpdateCertificate"})type.GetMethod(action,flags)!.Invoke(page,null);
+        Check(page.HasUnsavedChanges&&page.UnsavedChangesMessage.Contains("retained")&&!page.IsHandleCreated,"Pending certificate identity survives direct conflicting actions and explains retained recovery on leaving");
+    }
+
+    private static void CheckBankCertificateExactSelection()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        var type=typeof(FMSC_SMS.Pages.Staff.Certificates.BankAccountOpeningCertificatePage);
+        using var page=new FMSC_SMS.Pages.Staff.Certificates.BankAccountOpeningCertificatePage(false);
+        ((StaffPicker)type.GetField("staff",flags)!.GetValue(page)!).SetStaff(101,"Fixture staff");
+        var rows=new System.Data.DataTable();rows.Columns.Add("BankAccountOpeningCertificateId",typeof(int));
+        rows.Columns.Add("BankName");rows.Columns.Add("BranchName");rows.Columns.Add("Designation");rows.Columns.Add("Purpose");rows.Columns.Add("MonthlyIncome",typeof(decimal));rows.Columns.Add("CertificateDate",typeof(DateTime));
+        rows.Rows.Add(999,"Newer unrelated letter","Branch","Teacher","Payroll",10000m,DateTime.Today);
+        rows.Rows.Add(123,"Exact saved letter","Branch","Teacher","Payroll",10000m,DateTime.Today);
+        type.GetField("certificateResults",flags)!.SetValue(page,rows);
+        var reply=new TaskCompletionSource();Func<Task> busy=()=>reply.Task;
+        var task=(Task<bool>)typeof(V2Page).GetMethod("RunBusyAsync",flags)!.Invoke(page,new object[]{page.BusyMessage,busy,new Control[]{page}})!;
+        type.GetMethod("SelectSavedCertificate",flags)!.Invoke(page,new object[]{123});
+        Check((int)type.GetField("selectedBankAccountOpeningCertificateId",flags)!.GetValue(page)! ==123&&((ModernTextBox)type.GetField("bankName",flags)!.GetValue(page)!).Text=="Exact saved letter","Post-save selection uses the returned exact ID even when a newer certificate exists and the page is busy");
+        reply.SetResult();PumpUntil(()=>task.IsCompleted,"Exact bank selection fixture settles");
+        Check(!page.HasUnsavedChanges&&!page.IsHandleCreated,"Authoritative certificate selection captures a clean editor without SQL or a popup");
     }
 
 }

@@ -350,3 +350,46 @@ actual Windows interaction and real transport loss remain acceptance work.
 The native harness reports NU1900 because NuGet vulnerability metadata is currently
 unreachable; this did not prevent compilation or SQL checks. The uploaded DACPAC's
 full new baseline approval remains a separate review, not silently replaced here.
+
+
+## FQA-25 — Lost bank-create acknowledgement permits another certificate
+
+**Confirmed and fixed.** Disposable SQL reproduced two certificates after repeating
+identical Create parameters with the first committed reply discarded. The bank
+page now uses migration 6's exact request protocol: durable local intent before
+SQL, atomic business row/result marker, retained unknown outcome and an explicit
+read-only Check Save Outcome. Create/Update and context-changing actions are
+blocked while unresolved, including direct handler calls. Leaving explains that
+recovery is retained. Corrupt/foreign recovery is preserved rather than discarded.
+
+Normal save and positive recovery select the returned certificate ID, never the
+newest row guessed from history. Confirmed absence clears the old draft and requires
+a deliberate new create; no automatic write retry. A committed result remains
+qualified success when history cannot be verified. Optional income and existing
+certificate permissions are preserved. Recovery control sits beside history
+Refresh; the existing four editor action buttons remain together.
+
+**Verification:** 12 native SQL checks passed for actual commit/lost acknowledgement,
+exact ID reconciliation, same-request and concurrent replay, changed payload,
+marker-failure atomic rollback, optional income and permission refusal. All writes
+used the disposable clone described under FQA-06, never school files. Application
+and Windows smoke project compile with zero warnings/errors. Actual-page pending
+recovery and exact-ID selection fixtures were added, but require native Windows
+execution. The native harness retains the NU1900 metadata warning described above.
+No additional migration beyond `Migrations/6.sql` is required.
+
+## Pass completion and acceptance limits
+
+All 25 numbered FQA findings now have a verified source disposition and an
+independent fix commit. FQA-06/FQA-25 were first reproduced on disposable SQL;
+FQA-03 was resolved as a navigation policy; FQA-20 removes source-proven UI-thread
+aggregation and has a synthetic responsiveness measurement, not a claim of measured
+school-database speed. This completes this report's implementation pass.
+
+Native Windows interaction remains to exercise compiled GUI fixtures and the
+report's deployment acceptance scenarios, including actual connection interruption,
+printing, DPI, close/sign-out and restore. This pass is not a claim of exhaustive
+or crash-free deployment certification. The user's uploaded v4 DACPAC was reviewed
+for these relevant procedures; formal full-artifact baseline approval remains
+separate. Apply numbered migration 6 after 5 when upgrading an existing database;
+this pass has not modified or replaced the user's school database or DACPAC.
