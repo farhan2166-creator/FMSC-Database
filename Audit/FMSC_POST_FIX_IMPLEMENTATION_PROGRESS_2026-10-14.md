@@ -110,3 +110,21 @@ creation; clean default actions without prompts. Use a disposable database copy
 for SQL-dependent acceptance. Real process restart/network interruption, printer
 preview/physical printing and intended screen DPI/resolution remain unexecuted
 here. No additional SQL migration is required by these three UI fixes.
+
+
+## Windows CI execution and an additional durability correction
+
+The owner added a Windows desktop CI workflow while this pass was underway.
+A draft validation PR adds the focused --post-fix step to that runner. Its first
+execution on Windows Server 2022 / .NET SDK 8.0.426 passed all 26 actual-page/host
+contract checks and both Release builds with zero warnings/errors. It then
+exposed an existing Windows concurrency defect: the 24-writer AtomicTextFile
+regression failed with UnauthorizedAccessException during overlapping replacements.
+
+Corrected the settings publisher with a short, per-path named publication mutex.
+Temporary files still flush independently before acquiring it; publication is
+serialized across processes within the same user/session, with a bounded wait
+and disposed handles. Failed encodings, read-only targets and cleanup preserve
+the existing file. Added Windows read-only preservation/temporary-cleanup checks;
+the original concurrent-writer regression remains enabled. No database changes.
+CI results for this correction are recorded after its repeat validation completes.

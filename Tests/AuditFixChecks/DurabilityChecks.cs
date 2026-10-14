@@ -38,6 +38,19 @@ internal static class DurabilityChecks
             Check(versions.Contains(File.ReadAllText(settings)), "Concurrent settings writers must publish a complete version");
             Check(!Directory.EnumerateFiles(folder, "*.tmp").Any(), "Temporary settings files must be cleaned up");
 
+            if(OperatingSystem.IsWindows())
+            {
+                File.WriteAllText(settings,"read-only original");File.SetAttributes(settings,FileAttributes.ReadOnly);
+                try
+                {
+                    try{AtomicTextFile.Write(settings,"must not replace");throw new Exception("Expected read-only refusal");}
+                    catch(Exception ex) when(ex is IOException or UnauthorizedAccessException){checks++;}
+                    Check(File.ReadAllText(settings)=="read-only original","Serializing settings writers must still preserve a genuinely unwritable destination");
+                    Check(!Directory.EnumerateFiles(folder,"*.tmp").Any(),"Refused Windows replacement cleans the staged file");
+                }
+                finally{File.SetAttributes(settings,FileAttributes.Normal);}
+            }
+
             string photo = Path.Combine(folder, "photo.bin");
             byte[] original = { 1, 2, 3, 4, 5 };
             await File.WriteAllBytesAsync(photo, original);

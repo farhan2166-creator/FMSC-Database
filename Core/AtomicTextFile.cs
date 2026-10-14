@@ -1,4 +1,5 @@
 using System.Text;
+using System.Security.Cryptography;
 
 namespace FMSC_SMS.Core;
 
@@ -20,7 +21,21 @@ internal static class AtomicTextFile
                 writer.Flush();
                 stream.Flush(flushToDisk: true);
             }
-            File.Move(temporary, fullPath, overwrite: true);
+            // Windows can refuse overlapping MoveFileEx replacements of one target.
+            // Serialize only publication, across windows of the same user/session;
+            // every temporary file is still flushed before acquiring this gate.
+            string key=OperatingSystem.IsWindows()?fullPath.ToUpperInvariant():fullPath;
+            string name=@"Local\FMSC_SMS.AtomicText."+Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)));
+            using var gate=new Mutex(false,name);
+            bool held=false;
+            try
+            {
+                try{held=gate.WaitOne(TimeSpan.FromSeconds(10));}
+                catch(AbandonedMutexException){held=true;}
+                if(!held)throw new IOException("Another settings save is still finishing. Try saving again.");
+                File.Move(temporary,fullPath,overwrite:true);
+            }
+            finally{if(held)gate.ReleaseMutex();}
         }
         finally
         {
