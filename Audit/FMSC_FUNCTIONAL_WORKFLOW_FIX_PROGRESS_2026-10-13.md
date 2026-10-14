@@ -166,3 +166,16 @@ aggregates dirty state from all cached tabs for shell navigation/close.
 Added loaded-clean, changed reason, billing-date, missing-record and hidden-tab
 aggregation fixtures. Native GUI/discard-dialog acceptance remains required.
 No SQL changes.
+
+## FQA-02 — Adjustment draft carries from one payment to another
+
+**Confirmed and fixed.** Adjustment amount, reason and transaction date are now
+owned by the (student, payment) identity. Changing identity clears those fields;
+reselecting the same identity retains its in-progress values. UpdateActionMode
+still derives locked full-reversal amounts and the existing final confirmation
+and SQL eligibility checks remain in place.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added actual payment-grid fixtures for same-payment preservation, A→B→A resets,
+date reset and a changed student context. No financial write is submitted in
+these fixtures; native GUI execution remains required. No SQL changes.

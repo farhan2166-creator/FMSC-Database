@@ -130,6 +130,7 @@ internal static partial class Program
             CheckStudentReviewBusyHost();
             CheckStudentCorrectionBusy();
             CheckCorrectionDraftTracking();
+            CheckPaymentAdjustmentContext();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();

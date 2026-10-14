@@ -22,6 +22,14 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
     private int enrollmentId;
     private int selectedPaymentId;
     private decimal selectedPaymentAmount;
+    private (int Admission,int Payment) adjustmentDraftContext;
+    private void ResetAdjustmentDraftForSelection()
+    {
+        var context=(admissionId,selectedPaymentId);
+        if(context==adjustmentDraftContext)return;
+        adjustmentDraftContext=context;
+        actionAmount.Text="0";reason.Clear();transactionDate.Value=DateTime.Today;
+    }
     private string selectedStudentName = string.Empty;
     /// <summary>The raw GetFeeStatement result, kept so the selected grid row can be traced back to its EnrollmentId.</summary>
     private DataTable paymentRows = new();
@@ -30,7 +38,8 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
     private bool updatingOperation;
     private readonly Label eligibilityNote=new() { AutoSize=true,Dock=DockStyle.Fill,
         Font=AppTheme.SmallFont,ForeColor=AppTheme.MutedText,Padding=new Padding(6) };
-    public StudentFeeAdjustmentsPage()
+    public StudentFeeAdjustmentsPage() : this(true) { }
+    internal StudentFeeAdjustmentsPage(bool initialize)
         : base(
             PageTitles.StudentFeeCorrections,
             "Review payments and record refunds or corrections.")
@@ -43,7 +52,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
         reason.Width = AppScale.Scale(300);
         ConfigureDecimalInput(actionAmount);
         /* The shared student finder (StudentPicker): type in the box and the list narrows on every keystroke. */
-        StudentSearchCache.Warm();
+        if(initialize)StudentSearchCache.Warm();
         /* The operator edited the box away from the student this page loaded, so that student is dropped before anything else runs. */
         student.SelectionCleared += async (_, _) => {
             ++studentSearchVersion;
@@ -234,6 +243,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
         UpdateActionMode();
         int chosen=student.SelectedId;
         admissionId=chosen;
+        ResetAdjustmentDraftForSelection();
         if(chosen<=0) { UiHelper.SetGridEmptyMessage(payments,NoStudentGridMessage);return; }
         selectedStudentName=student.Text;
         int userId=CurrentUser.UserId;
@@ -289,7 +299,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
     private void OnPaymentSelected()
     {
         if (payments.CurrentRow is null || payments.CurrentRow.Index < 0)
-        { selectedPaymentId=0;selectedPaymentAmount=0m;enrollmentId=0;UpdateActionMode();return; }
+        { selectedPaymentId=0;selectedPaymentAmount=0m;enrollmentId=0;ResetAdjustmentDraftForSelection();UpdateActionMode();return; }
         DataGridViewRow row = payments.CurrentRow;
         selectedPaymentId = Convert.ToInt32(row.Cells["PaymentId"].Value ?? 0);
         selectedPaymentAmount = Convert.ToDecimal(row.Cells["Amount"].Value ?? 0m);
@@ -298,6 +308,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
             .Where(r => GetInt(r, "FeePaymentId") == selectedPaymentId)
             .Select(r => GetInt(r, "EnrollmentId"))
             .FirstOrDefault();
+        ResetAdjustmentDraftForSelection();
         UpdateActionMode();
     }
     /// <summary>Each operation needs a different amount rule. Reversal is the payment's full amount and is therefore locked; Correction and Refund are entered by the operator.</summary>
