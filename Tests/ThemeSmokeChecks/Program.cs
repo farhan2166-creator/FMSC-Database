@@ -138,6 +138,7 @@ internal static partial class Program
             CheckAsyncStatementAssembly();
             CheckNewCertificateDrafts();
             CheckRegularNewCertificateDraft();
+            CheckCertificateNewDiscard();
             CheckBankCertificateBusy();
             CheckBankCertificateRecoveryGuard();
             CheckBankCertificateExactSelection();

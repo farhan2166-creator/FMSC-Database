@@ -37,3 +37,18 @@ new-date edits, Stay without reads, revert, accepted Refresh/Next, saved-record
 edits and post-save field clearing. App and Windows smoke project compile with
 zero warnings/errors; native Windows interaction remains unexecuted here.
 No SQL changes. The two New-button bypasses are the separate RFA-03 change.
+
+
+## RFA-03 — New commands bypass dirty checks
+
+Confirmed Regular's explicit confirmDiscard:false and Bank's unguarded field
+clearing. Regular New now follows its normal ClearForm discard contract; Bank New
+checks its existing dirty predicate before clearing. Stay retains the selected
+record/editor, accepted discard starts a clean editor, and clean/repeated New
+remains prompt-free. Active saves and unresolved bank recovery remain unconditional
+refusals before discard; New performs no database write.
+
+Added actual-page confirmation fixtures for both saved editors: Stay, discard,
+clean/repeated New, regular write-busy refusal and bank unresolved-recovery refusal.
+App and Windows smoke project compile with zero warnings/errors. Native Windows
+execution remains outstanding. No SQL changes or additional migration required.

@@ -647,7 +647,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     private void StartNewCertificate()
     {
         if (creatingCertificate) return;
-        ClearForm(confirmDiscard: false);
+        ClearForm();
     }
     private void PrintSelected()
     {

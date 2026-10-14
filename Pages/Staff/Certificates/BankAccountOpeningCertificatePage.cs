@@ -7,6 +7,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     private readonly StaffPicker staff = new();
     public bool IsBusy=>BusyOperationRunning;
     public string BusyMessage=>"The bank certificate is being created. Wait for the result and history reload before leaving.";
+    private readonly Func<string,bool>? discardConfirmation;
     private bool recoveryBlocked;
     private MutationIntent? pendingCertificate;
     private readonly ModernButton checkOutcome=new(){Text="Check Save Outcome",Width=AppScale.Scale(170)};
@@ -14,7 +15,8 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     private string Snapshot() => string.Join("\u001f", bankName.Text, branchName.Text, designation.Text, monthlyIncome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), purpose.Text, certificateDate.Value.Date.ToString("yyyy-MM-dd"));
     public bool HasUnsavedChanges => recoveryBlocked || _baseline is not null && _baseline != Snapshot();
     public string UnsavedChangesMessage => recoveryBlocked?"This certificate creation needs outcome checking. Its recovery record is retained when you leave. Do not create it again before checking.":"This staff certificate has unsaved changes. Leaving will discard them.";
-    private bool ConfirmDiscard() => ModernMessageDialog.ConfirmDiscardIfDirty(FindForm(), () => HasUnsavedChanges, UnsavedChangesMessage);
+    private bool ConfirmDiscard()=>!HasUnsavedChanges||
+        (discardConfirmation?.Invoke(UnsavedChangesMessage)??ModernMessageDialog.ConfirmDiscardIfDirty(FindForm(),()=>HasUnsavedChanges,UnsavedChangesMessage));
     private void CaptureBaseline() => _baseline = Snapshot();
 
     private readonly ModernTextBox bankName =
@@ -60,9 +62,10 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         Width = AppScale.Scale(120)
     };
     public BankAccountOpeningCertificatePage():this(true){ }
-    internal BankAccountOpeningCertificatePage(bool initialize)
+    internal BankAccountOpeningCertificatePage(bool initialize,Func<string,bool>? discardConfirmation=null)
         : base("Bank Account Opening Certificate", "Record and print bank account opening request letters for staff.")
     {
+        this.discardConfirmation=discardConfirmation;
         bankName.PlaceholderText =
             "e.g. Meezan Bank, Allied Bank";
         bankName.MaxLength = 100;
@@ -661,7 +664,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     }
     private void StartNewCertificate()
     {
-        if(IsBusy||recoveryBlocked)return;
+        if(IsBusy||recoveryBlocked||!ConfirmDiscard())return;
         ClearCertificateSelection();
         ClearCertificateFields();
         Grid.ClearSelection();
