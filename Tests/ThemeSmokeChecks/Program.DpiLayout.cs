@@ -10,6 +10,7 @@ internal static partial class Program
         try
         {
             CheckDpiGeometryAndMinimum();
+            CheckDialogScrollHost();
             // Synthetic client areas and DPI fields exercise the production
             // helpers on Windows controls. This does NOT change monitor settings
             // or establish physical multi-monitor acceptance.
@@ -100,6 +101,29 @@ internal static partial class Program
 
     private static IEnumerable<Control> Descendants(Control root) => root.Controls.Cast<Control>()
         .SelectMany(child => new[] { child }.Concat(Descendants(child)));
+
+    private static void CheckDialogScrollHost()
+    {
+        AppScale.Recompute(new Size(1280, 720), UiDpi.SystemDpi);
+        using var form = new ApplicationWindowForm { ClientSize = new Size(900, 650), MinimumSize = new Size(900, 650) };
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var draft = HumanUi.TextBox(); draft.Text = "Keep the dialog draft"; draft.IsInvalid = true;
+        var close = new ModernButton { Text = "Close", Width = 130 };
+        root.Controls.Add(draft, 0, 0); root.Controls.Add(HumanUi.ButtonRow(close), 0, 1);
+        form.Controls.Add(root); form.Show(); Application.DoEvents();
+        Check(root.Parent is ResponsiveViewport, "The shared window integrates a scroll host for non-scrollable dialog content");
+        var viewport = (ResponsiveViewport)root.Parent!;
+        Size original = root.Size;
+        form.FitToWorkingArea(new Rectangle(0, 0, 640, 400), form.DeviceDpi); Application.DoEvents();
+        viewport.ScrollControlIntoView(close); Application.DoEvents();
+        Check(viewport.ClientRectangle.Contains(viewport.RectangleToClient(close.RectangleToScreen(close.ClientRectangle))),
+            "A fitted dialog's bottom action is fully accessible through its installed scroll host");
+        Check(root.Width >= original.Width && root.Height >= original.Height && draft.Text == "Keep the dialog draft" && draft.IsInvalid,
+            "Working-area fitting retains readable content and the current draft");
+        form.Hide();
+    }
 
     private static void CheckDpiGeometryAndMinimum()
     {
