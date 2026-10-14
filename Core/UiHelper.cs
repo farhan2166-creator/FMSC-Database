@@ -490,8 +490,6 @@ namespace FMSC_SMS.Core
                 false;
             Color accent = GridAccent(grid);
             ApplyGridHeaderStyle(grid, accent);
-            grid.ColumnHeadersHeight =
-                AppMetrics.GridHeaderHeight;
             grid.DefaultCellStyle.Font =
                 UiDpi.ForControl(grid, AppTheme.NormalFont);
             grid.DefaultCellStyle.ForeColor =
@@ -508,14 +506,14 @@ namespace FMSC_SMS.Core
                     ForeColor = AppTheme.Text,
                     SelectionBackColor = AppTheme.Tint(accent, 0.88f),
                     SelectionForeColor = AppTheme.HeadingText,
-                    Padding = new Padding(AppMetrics.SpacingSm, 0, AppMetrics.SpacingSm, 0)
+                    Padding = new Padding(UiDpi.Metric(grid, AppMetrics.SpacingSm), 0, UiDpi.Metric(grid, AppMetrics.SpacingSm), 0)
                 };
             grid.ColumnHeadersDefaultCellStyle.Alignment =
                 DataGridViewContentAlignment.MiddleLeft;
             grid.ColumnHeadersDefaultCellStyle.Padding =
-                new Padding(AppMetrics.SpacingSm, 0, AppMetrics.SpacingSm, 0);
+                new Padding(UiDpi.Metric(grid, AppMetrics.SpacingSm), 0, UiDpi.Metric(grid, AppMetrics.SpacingSm), 0);
             grid.DefaultCellStyle.Padding =
-                new Padding(AppMetrics.SpacingSm, 0, AppMetrics.SpacingSm, 0);
+                new Padding(UiDpi.Metric(grid, AppMetrics.SpacingSm), 0, UiDpi.Metric(grid, AppMetrics.SpacingSm), 0);
             grid.SelectionMode =
                 DataGridViewSelectionMode.FullRowSelect;
             grid.MultiSelect = false;

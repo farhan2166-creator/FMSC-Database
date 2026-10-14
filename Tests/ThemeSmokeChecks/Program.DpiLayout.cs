@@ -80,6 +80,16 @@ internal static partial class Program
                 viewport.ScrollControlIntoView(cancel); Application.DoEvents();
                 Rectangle visibleButton = viewport.RectangleToClient(cancel.RectangleToScreen(cancel.ClientRectangle));
                 Check(viewport.ClientRectangle.Contains(visibleButton), "The footer action is reachable by scrolling at every synthetic size/DPI");
+                // A dialog's monitor may differ from the shell's metric context.
+                AppScale.Recompute(new Size(1280, 720), 96);
+                HumanUi.ApplyGridStyle(grid, AppTheme.Primary); TabStrip.Repaint(tabs);
+                Check(grid.ColumnHeadersHeight >= AppMetrics.TextHeight(grid.ColumnHeadersDefaultCellStyle.Font!) + DpiLayout.Pixels(14, dpi),
+                    "Grid headers retain monitor-relative headroom independently of the shell DPI");
+                Check(grid.RowTemplate.Height >= AppMetrics.TextHeight(grid.DefaultCellStyle.Font!) + DpiLayout.Pixels(12, dpi),
+                    "Grid rows retain monitor-relative headroom independently of the shell DPI");
+                Check(tabButtons.All(button => button.Height >= AppMetrics.TextHeight(button.Font)),
+                    "Tab navigation remains readable when the dialog and shell DPI differ");
+                AppScale.Recompute(available, dpi);
                 // Restore fake framework fields before native handle disposal.
                 foreach (Control control in Descendants(root).Prepend(root)) deviceDpi.SetValue(control, UiDpi.SystemDpi);
                 owner.Hide();
@@ -111,5 +121,12 @@ internal static partial class Program
         Check(form.MinimumSize.Width < originalMinimum.Width, "Small work areas temporarily bound the window minimum");
         form.FitToWorkingArea(new Rectangle(0, 0, 1920, 1040), 96);
         Check(form.MinimumSize == originalMinimum, "Larger work areas restore the intended minimum rather than retaining the small-monitor clamp");
+        using var primed = new ApplicationWindowForm();
+        AppScale.Recompute(new Size(2560, 1440), 192);
+        primed.CaptureLayoutDpi();
+        var scaledInput = new ModernTextBox { Height = AppScale.Scale(40) }; primed.Controls.Add(scaledInput);
+        primed.ApplyDpiGeometry(192, resizeWindow: true);
+        Check(scaledInput.Height == 80, "Controls built after priming the shell DPI do not receive another initial scaling pass");
+        AppScale.Recompute(new Size(1280, 720), 96);
     }
 }

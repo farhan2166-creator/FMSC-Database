@@ -25,6 +25,7 @@ public class ApplicationWindowForm : Form
         KeyboardShortcutHints.Register(this);
     }
     internal PageActionShortcutController ShortcutController => saveShortcutController;
+    internal void CaptureLayoutDpi() => geometryDpi = AppScale.Dpi;
     public override Size MinimumSize
     {
         get => base.MinimumSize;

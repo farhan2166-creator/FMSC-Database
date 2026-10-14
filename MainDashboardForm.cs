@@ -91,6 +91,8 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         BackColor = AppTheme.PageBackground;
         // Establish the adaptive scale factor from the actual screen working area *before* any sidebar/topbar/page is built, using a deterministic estimate of the chrome this form is about to…
         PrimeInitialScale();
+        // The shell establishes its metric context before constructing controls.
+        CaptureLayoutDpi();
         Font = AppTheme.NormalFont;
         Build();
         KeyPreview = true;

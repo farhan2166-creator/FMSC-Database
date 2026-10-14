@@ -112,7 +112,8 @@ public static class TabStrip
             arranging = true;
             try
             {
-                int minimumWidth = entries.Max(entry => AppMetrics.TextWidth(entry.Page.Text, AppTheme.ButtonFont, AppScale.Scale(40)));
+                int minimumWidth = entries.Max(entry => AppMetrics.TextWidth(entry.Page.Text,
+                    UiDpi.ForControl(entry.Button, AppTheme.ButtonFont), UiDpi.Metric(this, AppScale.Scale(40))));
                 int count = Math.Min(entries.Count, Math.Max(1, ClientSize.Width / Math.Max(1, minimumWidth)));
                 int rows = (entries.Count + count - 1) / count;
                 if (columns != count)
@@ -129,7 +130,7 @@ public static class TabStrip
                     columns = count;
                     buttons.ResumeLayout(true);
                 }
-                RowStyles[0].Height = rows * AppMetrics.ButtonRowHeight;
+                RowStyles[0].Height = rows * UiDpi.Metric(this, AppMetrics.ButtonRowHeight);
             }
             finally { arranging = false; }
         }

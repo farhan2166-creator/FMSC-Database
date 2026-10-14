@@ -353,17 +353,15 @@ public static class HumanUi
         grid.AllowUserToResizeRows = false;
         UiHelper.ApplyGridHeaderStyle(grid, accent);
         grid.ColumnHeadersDefaultCellStyle.Padding =
-            new Padding(AppMetrics.SpacingSm, 0, AppMetrics.SpacingSm, 0);
+            new Padding(UiDpi.Metric(grid, AppMetrics.SpacingSm), 0, UiDpi.Metric(grid, AppMetrics.SpacingSm), 0);
         grid.DefaultCellStyle.Font = UiDpi.ForControl(grid, AppTheme.NormalFont);
         grid.DefaultCellStyle.ForeColor = AppTheme.Text;
         grid.DefaultCellStyle.BackColor = AppTheme.Surface;
         grid.DefaultCellStyle.SelectionBackColor = AppTheme.Tint(accent, 0.88f);
         grid.DefaultCellStyle.SelectionForeColor = AppTheme.Text;
         grid.DefaultCellStyle.Padding =
-            new Padding(AppMetrics.SpacingSm, 0, AppMetrics.SpacingSm, 0);
+            new Padding(UiDpi.Metric(grid, AppMetrics.SpacingSm), 0, UiDpi.Metric(grid, AppMetrics.SpacingSm), 0);
         grid.AlternatingRowsDefaultCellStyle.BackColor = AppTheme.SurfaceSecondary;
-        grid.RowTemplate.Height = AppMetrics.GridRowHeight;
-        grid.ColumnHeadersHeight = AppMetrics.GridHeaderHeight;
         UiHelper.ApplyGridPresentation(grid);
     }
     public static string Humanize(string value)

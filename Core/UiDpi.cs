@@ -29,6 +29,11 @@ internal static class UiDpi
     internal static Font ForControl(Control control, Font reference) =>
         ForDpi(reference, control.IsHandleCreated ? control.DeviceDpi : SystemDpi);
 
+    // Shared metrics follow the shell. A dialog can be on another monitor;
+    // convert only at the boundary where an existing metric is reapplied.
+    internal static int Metric(Control control, int value) => !control.IsHandleCreated ? value :
+        (int)Math.Round(value * (double)control.DeviceDpi / AppScale.Dpi);
+
     internal static Font ForDpi(Font reference, int dpi)
     {
         if (dpi == SystemDpi) return reference;
