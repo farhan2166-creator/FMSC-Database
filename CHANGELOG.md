@@ -5,6 +5,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 ## [Unreleased]
 
 ### Fixed
+- Admission closure and legacy go-live hold review inputs, reject obsolete previews, and prevent closing during pending operations (UFA-02).
 - Certificate creation keeps inputs locked and refuses repeat submission until the pending write finishes (UFA-01).
 
 ### Documentation
