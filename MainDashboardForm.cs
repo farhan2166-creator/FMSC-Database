@@ -42,6 +42,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     private bool? _sidebarCompactOverride;
     private bool? _lastAutomaticCompactMode;
     private readonly List<DashboardNavButton> navButtons = new();
+    private readonly List<NavigationCommand> navigationCommands = new();
     private readonly Dictionary<Keys,DashboardNavButton> navigationShortcutTargets=new();
     /* which module/title each sidebar entry opens, so a page reached from a Quick Action or from Open Report can highlight the same entry the sidebar would. */
     private readonly Dictionary<DashboardNavButton, string> navTargets = new();
@@ -346,9 +347,9 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     }
     private void ShowCommandPalette(string? query = null)
     {
-        using var dialog = new CommandPaletteDialog(navButtons, query);
-        if (dialog.ShowDialog(this) == DialogResult.OK && dialog.SelectedButton != null)
-            dialog.SelectedButton.PerformClick();
+        using var dialog = new CommandPaletteDialog(navigationCommands, query);
+        if (dialog.ShowDialog(this) == DialogResult.OK && dialog.SelectedCommand != null)
+            dialog.SelectedCommand.Execute();
         ReleaseTopBarFocus();
     }
     /* The search box and the Ctrl+K button are shortcuts, not places to work. */
@@ -842,9 +843,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             accent,
             false,
             fontOverride);
-        button.Click += (_, _) => {
-            NavigateTo(factory, module, title);
-        };
+        var command = new NavigationCommand(AppHotKeys.PlainCaption(text), () => {
+            if (string.IsNullOrWhiteSpace(permission) || CurrentUser.HasPermission(permission))
+                NavigateTo(factory, module, title);
+        });
+        navigationCommands.Add(command);
+        button.Click += (_, _) => command.Execute();
         navTargets[button] = NavKey(module, title);
         navButtons.Add(button);
         flow.Controls.Add(button);
@@ -938,12 +942,15 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Staff Management" => "Staff details and records. Open Employment for a selected staff member.",
                 _ => item.Title
             });
-            child.Click += (_, _) => {
+            var command = new NavigationCommand(AppHotKeys.PlainCaption(item.Text), () => {
+                if (!string.IsNullOrWhiteSpace(item.Permission) && !CurrentUser.HasPermission(item.Permission)) return;
                 NavigateTo(
                     item.Factory,
                     item.Module,
                     item.Title);
-            };
+            });
+            navigationCommands.Add(command);
+            child.Click += (_, _) => command.Execute();
             navTargets[child] = NavKey(item.Module, item.Title);
             navButtons.Add(child);
             children.Controls.Add(child);
@@ -1612,6 +1619,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         try
         {
             navButtons.Clear();
+            navigationCommands.Clear();
             navigationShortcutTargets.Clear();ShortcutController.ClearLocalShortcuts();
             /* The entries are rebuilt below, so the old buttons' targets go with them rather than keeping disposed buttons alive in this map. */
             navTargets.Clear();

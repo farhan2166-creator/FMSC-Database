@@ -2,8 +2,10 @@ using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Configuration;
 /// <summary>Adjust Fees tab: raise or lower many fee configurations at once, by a percentage or a flat amount, with optional rounding.</summary>
-public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
+public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChanges
 {
+    public bool HasUnsavedChanges => IsDirty();
+    public string UnsavedChangesMessage => "Discard the unapplied bulk fee-rate changes?";
     private sealed class PlanRow
     {
         public int FeeConfigurationId;
@@ -127,6 +129,8 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
     /// <summary>how many configurations the atomic call applied. See the copy dialog above: all-or-nothing, so on success this is the plan size.</summary>
     public int AppliedCount { get; private set; }
     public BulkFeeRateChangesForm(int currentCampusId = 0, int currentClassId = 0)
+        : this(currentCampusId, currentClassId, true) { }
+    internal BulkFeeRateChangesForm(int currentCampusId, int currentClassId, bool initialize)
     {
         Text = PageTitles.BulkFeeRateChanges;
         StartPosition = FormStartPosition.CenterParent;
@@ -140,7 +144,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
         Font = AppTheme.NormalFont;
         BuildLayout();
         SetSaveShortcut(applyButton);
-        LoadScopeSources(currentCampusId, currentClassId);
+        if (initialize) LoadScopeSources(currentCampusId, currentClassId);
         campusScope.SelectedIndexChanged += (_, _) => ReloadClassScope();
         previewButton.Click += (_, _) => RunPreview();
         applyButton.Click += (_, _) => Apply();
@@ -156,7 +160,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
         directionIncrease.CheckedChanged += (_, _) => InvalidateBulkPreview();
         directionDecrease.CheckedChanged += (_, _) => InvalidateBulkPreview();
         /* The choices the dialog opened with, taken once the initial scope has finished loading. */
-        loadedSnapshot = EditorState();
+        CaptureAppliedBaseline();
         /* The window's own close (X, Alt+F4, Esc) is guarded the same way; programmatic closes are left alone. */
         FormClosing += (_, e) => {
             if (e.CloseReason == CloseReason.UserClosing)
@@ -586,6 +590,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
             typePercentage.Checked ? "1" : "0",
             directionIncrease.Checked ? "1" : "0",
             adjustmentValue.Value.ToString("0.####"));
+    private void CaptureAppliedBaseline() { loadedSnapshot = EditorState(); discardConfirmed = false; }
     /// <summary>True when the dialog holds choices the operator has not applied.</summary>
     private bool IsDirty() =>
         !savedSuccessfully &&
@@ -682,6 +687,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
             FeeConfigurationChanges.NotifyChanged();
             if (embedded)
             {
+                CaptureAppliedBaseline();
                 /* The tab stays open. The plan is spent - the amounts it was built from have just changed - so it is cleared and a new preview is required. */
                 string done = $"Adjusted {AppliedCount} fee configuration(s). Preview again to see the current amounts.";
                 appliedPreviewSignature = null;

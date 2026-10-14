@@ -314,7 +314,7 @@ public sealed class WelcomePage : UserControl
         ("Fee Collection", "Finance", () => new FeeCollectionPage(), () => CurrentUser.HasPermission("Fees.Collect")),
         ("Student Profile", "Students", () => new StudentProfilePage(Navigate), () => CurrentUser.HasPermission("Students.View")),
         ("Quick Registration", "Students", () => new QuickRegistrationPage(Navigate), () => QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)),
-        ("Student Reports", "Students", () => new StudentReportsPage(), () => CurrentUser.HasPermission("Students.View")),
+        ("Student Reports", "Students", () => new StudentReportsPage(), () => CurrentUser.HasPermission("Students.View") && CurrentUser.HasPermission("Reports.View")),
         ("Reports", "Reports", () => new ReportsHomePage(Navigate), () => CurrentUser.HasPermission("Reports.View"))
         };
         var visibleActions = actions

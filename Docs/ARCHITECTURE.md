@@ -42,7 +42,9 @@ The page organization and navigation group names are documented in [PROJECT_STRU
 - **Use SQL-side transaction and permission enforcement** for financial/state-changing work. A button disabled in WinForms is not a substitute for server authorization.
 - **Unknown commit acknowledgment is not a failed transaction.** Several admission, fee and certificate flows use request IDs/reconciliation; preserve original IDs and payload identity when retrying, and explicitly expose unresolved outcomes.
 - Preserve whole-rupee validation, paid-charge protections, historical student placement, backup recovery identity and owner-approved business rules. See [master audit](../Audit/FMSC_MASTER_AUDIT.md).
-- Preserve page-level busy/dirty contracts (`IBusyPage`, unsaved-edit guards, modal close protection); support cancel/stay without silent loss.
+- Preserve page-level busy/dirty contracts (`IBusyPage`, unsaved-edit guards, modal close protection); support cancel/stay without silent loss. Apply draft prompts selectively to substantial work. The owner explicitly permits small Classes & Sections drafts to be abandoned; their workspace forwards busy writes without implementing `IUnsavedChanges`. Embedded bulk fee-rate changes expose their existing dirty contract and reset the baseline after applying.
+- Hold submission-defining controls across awaited writes and refreshes with the existing `BusyScope`. Admission lifecycle modal close guards distinguish a pending operation from an idle, freely abandonable dialog.
+- Command palette destinations use permission-filtered `NavigationCommand` records; sidebar visibility and expansion are presentation state, not navigation eligibility. Destination callbacks retain the shell leave guard and recheck their permissions.
 - Use shared report/CSV/PDF utilities and sanitize exported data appropriately.
 - Avoid unnecessary synchronous DB reads on the UI thread. Keep reloads tied to active selection/context.
 

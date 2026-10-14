@@ -26,6 +26,22 @@ Assert((decimal)Tvp.FeeAllocations(new[]{(1L,-100m)}).Rows[0]["Amount"]==-100m,"
 Assert((decimal)WholeRupees.ValidateParameter("@ExpectedBalance",999.50m)! == 999.50m,"Existing fractional state can be inspected without rounding");
 Assert(WholeRupees.ValidateParameter("@Amount",null) is null,"Optional monetary parameters");
 
+var closingAmounts = new DataTable();
+closingAmounts.Columns.Add("Payment Method");
+foreach (string column in new[] { "Recorded Amount", "Actual Amount", "Difference" }) closingAmounts.Columns.Add(column, typeof(decimal));
+closingAmounts.Rows.Add("Cash", 100m, 90m, -10m);
+closingAmounts.Rows.Add("Refund", -10m, DBNull.Value, DBNull.Value);
+closingAmounts.Rows.Add("Correction", 0m, DBNull.Value, DBNull.Value);
+var printableClosing = DailyClosingSummary.CreatePrintable(closingAmounts);
+var closingTotal = printableClosing.Rows[3];
+Assert((decimal)closingTotal["Recorded Amount"] == 90m && (decimal)closingTotal["Actual Amount"] == 90m && (decimal)closingTotal["Difference"] == 0m, "Closing print tolerates blank adjustment actuals and retains recorded net semantics");
+Assert(closingAmounts.Rows.Count == 3 && closingAmounts.Rows[1].IsNull("Actual Amount") && printableClosing.Rows[1].IsNull("Actual Amount"), "Printing leaves source and adjustment blanks unchanged");
+closingAmounts.Rows[0]["Actual Amount"] = DBNull.Value;
+var uncheckedClosing = DailyClosingSummary.CreatePrintable(closingAmounts).Rows[3];
+Assert(uncheckedClosing.IsNull("Actual Amount") && uncheckedClosing.IsNull("Difference"), "An unchecked ordinary payment method does not print a completed actual total");
+closingAmounts.Rows[0]["Actual Amount"] = 90.25m;
+Assert((decimal)DailyClosingSummary.CreatePrintable(closingAmounts).Rows[3]["Actual Amount"] == 90.25m, "Historical closing amounts remain exact without silent rounding");
+
 DataTable Fees(){var t=new DataTable();t.Columns.Add("FeeTypeId",typeof(int));t.Columns.Add("Amount",typeof(decimal));t.Columns.Add("Frequency",typeof(string));t.Columns.Add("IsMandatory",typeof(bool));t.Columns.Add("IsTransportLinked",typeof(bool));t.Rows.Add(1,2000m,"Monthly",true,false);t.Rows.Add(2,500m,"Yearly",false,false);return t;}
 Assert(InputParse.TryWholeAmount("Rs. 1000.00",out decimal parsedWhole)&&parsedWhole==1000m,"Whole-rupee UI parsing accepts currency prefixes");
 Assert(!InputParse.TryWholeAmount("999.50",out decimal fractionalDraft)&&fractionalDraft==999.50m,"Fractional UI draft is rejected without rounding");

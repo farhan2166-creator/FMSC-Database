@@ -1,7 +1,12 @@
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Setup.Academics;
-public sealed class ClassesAndSectionsWorkspacePage : UserControl
+public sealed class ClassesAndSectionsWorkspacePage : UserControl, IBusyPage
 {
+    // Owner decision: small setup drafts stay prompt-free; submitted writes must finish.
+    private readonly ClassesPage classes;
+    private readonly SectionsPage sections;
+    public bool IsBusy => classes.IsBusy || sections.IsBusy;
+    public string BusyMessage => classes.IsBusy ? classes.BusyMessage : sections.BusyMessage;
     public ClassesAndSectionsWorkspacePage()
     {
         Dock = DockStyle.Fill;
@@ -23,8 +28,8 @@ public sealed class ClassesAndSectionsWorkspacePage : UserControl
         };
         split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        var classes = new ClassesPage(splitEditorAndRecords: false);
-        var sections = new SectionsPage(splitEditorAndRecords: false);
+        classes = new ClassesPage(splitEditorAndRecords: false);
+        sections = new SectionsPage(splitEditorAndRecords: false);
         classes.PrepareForEmbedding(keepActions: true);
         sections.PrepareForEmbedding(keepActions: true);
         split.Controls.Add(Wrap("CLASSES", classes), 0, 0);

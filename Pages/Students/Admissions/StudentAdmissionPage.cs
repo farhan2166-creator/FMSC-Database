@@ -4269,12 +4269,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         if (!IsDisposed && savedAdmissionReadyForNext && currentAdmissionId > 0)
             StartNewAdmission();
     }
+    private BusyScope HoldSubmittedInputs() => BeginBusy(string.Empty, this);
     private async Task SaveNewAdmissionAsync()
     {
         using var numberingInputs=BeginBusy(string.Empty,admissionDate,Year,admissionIdValue);
         try
         {
-            admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId,HistoricalAdmission);
+            using (HoldSubmittedInputs())
+                admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId,HistoricalAdmission);
             /* UX - every problem is marked on its own field at once (border + a few words on the caption), the first one takes focus. */
             if (!ValidateAdmissionInline(isNew: true))
                 return;
@@ -4292,12 +4294,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 dob.Focus();
                 return;
             }
-            if (!await ConfirmNotDuplicateAsync(studentName, fatherName.Text.Trim()))
-                return;
+            using (HoldSubmittedInputs())
+                if (!await ConfirmNotDuplicateAsync(studentName, fatherName.Text.Trim()))
+                    return;
             /* Read before anything is written: an unreadable discount stops the save here, where nothing has happened yet, rather than after the student is admitted. */
             var typedDiscounts = new List<(int feeTypeId, decimal discount)>();
             if (!HistoricalAdmission && !TryBuildTypedDiscountsByFeeType(out typedDiscounts))
                 return;
+            using var submittedInputs = HoldSubmittedInputs();
             string? bloodGroup =
                 blood.SelectedIndex > 0
                     ? blood.Text.Trim()
@@ -4595,6 +4599,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 if (_pendingPhotoData is not null)
                 {
                     int photoStudent = currentAdmissionId, photoVersion = admissionLoadVersion;
+                    using var photoInputs = HoldSubmittedInputs();
                     bool stored = await PersistPendingPhotoIfAnyAsync(photoStudent);
                     if (!IsDisposed && currentAdmissionId == photoStudent && admissionLoadVersion == photoVersion && stored)
                         SetStatus("Photo saved. Student details were not changed.", PageStatusKind.Success);
@@ -4617,6 +4622,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if (!TryBuildFeeDiscountPlan(out var feeDiscounts))
                 return;
             if (IsDisposed || currentAdmissionId != savedStudent || admissionLoadVersion != savedVersion) return;
+            using var submittedInputs = HoldSubmittedInputs();
             await SaveDetailsAndDiscountsAsync(
                 savedStudent,
                 studentName,
