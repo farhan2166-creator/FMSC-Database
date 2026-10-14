@@ -47,6 +47,14 @@ The Windows CI additionally builds and runs focused WinForms page/host tests and
 
 Run status, download availability and retention are shown in the [Actions tab](../../actions). No GitHub workflow installs onto a school PC or publishes a public release.
 
+## Dependency updates and secret checks
+
+[Dependabot](.github/dependabot.yml) proposes weekly Monday updates for NuGet packages in the application/test projects and GitHub Actions. Minor/patch updates are grouped, with at most three open version-update PRs per ecosystem. Updates require human review and passing Windows CI; there is no automatic merge or package-version change in this configuration.
+
+[Security Checks](.github/workflows/fmsc-security.yml) runs on pull requests and pushes to `main`. It uses the free, MIT-licensed Gitleaks CLI to scan fetched history and staged changes, and blocks database snapshots/backups, private key containers and sensitive configuration file names. Failure output identifies files/rules without printing credential values or uploading scanner reports. No paid security service or additional token is required; ordinary private-repository Actions usage limits apply.
+
+For handling failures, local commands, narrow fixture exceptions and reviewing update PRs, see [development workflow](Docs/DEVELOPMENT_WORKFLOW.md#security-checks). These checks start running from this PR; scheduled Dependabot updates activate after the configuration is reviewed and merged into `main`.
+
 ## Source of truth and change policy
 
 The executable's project version is maintained in [FMSC_SMS.csproj](FMSC_SMS.csproj); the required **database schema version** is independently declared and validated by the code and installer. Do not equate those version numbers.

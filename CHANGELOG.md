@@ -18,6 +18,11 @@ The following end-user-flow corrections are proposed in [PR #8](https://github.c
 - Admission closure and legacy go-live hold review inputs, reject obsolete previews, and prevent closing during pending operations (UFA-02).
 - Certificate creation keeps inputs locked and refuses repeat submission until the pending write finishes (UFA-01).
 
+### Security
+- Added weekly Dependabot proposals for application/test NuGet packages and GitHub Actions, with grouped minor/patch updates, bounded open PRs and human review.
+- Added read-only Gitleaks CLI and sensitive-file checks on pull requests and pushes to `main`, with checksum-pinned downloads, temporary redacted reports and exact synthetic-fixture exceptions. No paid service or automatic merging is enabled.
+- Added disposable detection/redaction regression tests and guidance for security failures and dependency review. Application, SQL, database compatibility and installer behavior are unchanged.
+
 ### Documentation
 - Added a project overview and operator, installation, recovery, architecture, release-readiness, and development-workflow guides.
 - Added a pull-request template prompting contributors and Codex to explain behavior changes, safety implications, tests, and manual acceptance requirements.
