@@ -256,7 +256,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             Fail(ex);
         }
     }
-    private void LoadCertificates(int staffId)
+    private bool LoadCertificates(int staffId,bool reportError=true)
     {
         try
         {
@@ -268,7 +268,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
                 Bind(certificateResults);
                 FormatCertificateGrid();
                 ApplyWorkflowState();
-                return;
+                return true;
             }
             DataTable table =
                 DatabaseHelper.QueryUser(
@@ -290,16 +290,18 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
                 FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException43, "BankAccountOpeningCertificatePage: LoadCertificates fallback");
             }
             ApplyWorkflowState();
+            return true;
         }
         catch (Exception ex)
         {
-            Fail(ex);
+            if(reportError)Fail(ex);else AppExceptionHandler.LogNonFatal(ex,"Bank certificate history after confirmed save");
             /* Finding 11 - the load failed, so the grid must not keep showing the previous staff member's certificates, and the buttons must be recomputed for the empty list. */
             certificateResults =
                 new DataTable();
             Bind(certificateResults);
             FormatCertificateGrid();
             ApplyWorkflowState();
+            return false;
         }
     }
     private void SelectSavedCertificate(int id)
@@ -451,6 +453,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         /* Finding 12 - Info writes the status line, but the reload below calls Bind ("N record(s)") and ApplyWorkflowState after it. */
         string? successMessage =
             null;
+        bool historyRefreshed=true;
         try
         {
             if (staff.SelectedId <= 0)
@@ -498,8 +501,8 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             }
             ClearCertificateFields();
             ClearCertificateSelection();
-            LoadCertificates(staffId);
-            SelectSavedCertificate(0);
+            historyRefreshed=LoadCertificates(staffId,reportError:false)&&certificateResults.Rows.Count>0;
+            if(historyRefreshed)SelectSavedCertificate(0);
         }
         catch (Exception ex)
         {
@@ -510,7 +513,8 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             ApplyWorkflowState();
             if (successMessage is not null)
             {
-                Info(successMessage);
+                if(historyRefreshed)Info(successMessage);
+                else Warn(successMessage+" History could not be refreshed or verified. Reload before acting further; do not repeat the save because this read failed.");
             }
         }
     }
@@ -520,6 +524,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         // Finding 12 - see CreateCertificate: the confirmation is set last.
         string? successMessage =
             null;
+        bool historyRefreshed=true;
         try
         {
             if (selectedBankAccountOpeningCertificateId <= 0)
@@ -560,8 +565,8 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
                 "Certificate updated successfully.";
             ClearCertificateFields();
             ClearCertificateSelection();
-            LoadCertificates(staffId);
-            SelectSavedCertificate(savedCertificateId);
+            historyRefreshed=LoadCertificates(staffId,reportError:false)&&certificateResults.Rows.Count>0;
+            if(historyRefreshed)SelectSavedCertificate(savedCertificateId);
         }
         catch (Exception ex)
         {
@@ -572,7 +577,8 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             ApplyWorkflowState();
             if (successMessage is not null)
             {
-                Info(successMessage);
+                if(historyRefreshed)Info(successMessage);
+                else Warn(successMessage+" History could not be refreshed or verified. Reload before acting further; do not repeat the save because this read failed.");
             }
         }
     }

@@ -277,3 +277,17 @@ through SQL and history reload; the existing staff/row restoration is preserved.
 Added an actual-page delayed operation fixture for owner busy visibility,
 conflicting control hold and settled restoration. Native delayed Create,
 close/sign-out and return-ID acceptance remains required. No SQL changes.
+
+## FQA-23 — Bank-certificate save success hides a failed history reload
+
+**Confirmed and fixed.** The bank history loader now returns an explicit result.
+Create/Update preserve confirmed save feedback separately from history reads;
+a failed or empty post-save history produces a qualified warning directing reload
+and no repeat save. Only verified nonempty history is used for saved-row selection.
+Post-save read errors are logged without a second generic failure popup masking
+the confirmed outcome. Ordinary manual-read failures retain their error handling.
+
+**Verification:** Traced both successful-write/failed-read branches and empty
+history handling; app and Windows smoke project build without warnings/errors.
+Native injected SQL history failure remains required. FQA-25's lost Create reply
+is a separate verification item. No SQL changes.
