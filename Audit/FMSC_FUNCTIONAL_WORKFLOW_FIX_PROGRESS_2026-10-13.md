@@ -218,3 +218,16 @@ branch and current-student/load-version guards; app and Windows smoke project
 build without warnings/errors. Native successful-write/failed-read injection is
 still required. This does not resolve FQA-06's separate lost-write-response risk.
 No SQL changes.
+
+## FQA-19 — Failed statement regeneration leaves old Export current
+
+**Confirmed and fixed.** Starting Generate Statement now clears the applied
+signature and disables Export before validation or SQL. Only complete successful
+binding/totals restore export eligibility. A failure explicitly labels the visible
+snapshot as not refreshed. The previous table can remain for reference, with
+student selection and dates retained for another generation attempt.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added an actual-page rejected-generation fixture asserting old export/signature
+invalidation and previous-table retention without reaching SQL. Native SQL failure
+and GUI status acceptance remains required. No SQL changes.

@@ -133,6 +133,7 @@ internal static partial class Program
             CheckPaymentAdjustmentContext();
             CheckPaymentDetailGeneration();
             CheckAnnualReceiptPreparationGuard();
+            CheckStatementRegenerationFreshness();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();

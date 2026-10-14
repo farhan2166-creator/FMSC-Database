@@ -1244,6 +1244,11 @@ public sealed class StudentAccountStatementPage : V2Page
     }
     private void LoadStatement()
     {
+        // Every regeneration attempt invalidates the old financial snapshot,
+        // including a failed attempt under exactly the same filters.
+        _appliedFilterSignature=string.Empty;
+        SetReportActionsEnabled(false);
+        SetStatus("Generating statement. The previous snapshot is not current and cannot be exported.");
         try
         {
             if (!ReportUi.ValidDateRange(
@@ -1307,6 +1312,7 @@ public sealed class StudentAccountStatementPage : V2Page
         catch (Exception ex)
         {
             Fail(ex);
+            SetStatus("Statement could not be refreshed. The previous snapshot is not current; generate again before exporting. "+DbMessage.UserMessage(ex),PageStatusKind.Warning);
         }
     }
     private static DataTable CreateStatementTable()
