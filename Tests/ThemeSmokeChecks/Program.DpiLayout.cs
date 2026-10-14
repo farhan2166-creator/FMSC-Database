@@ -22,7 +22,7 @@ internal static partial class Program
                 using var owner = new Form { AutoScaleMode = AutoScaleMode.None, StartPosition = FormStartPosition.Manual, ClientSize = available };
                 var root = new TableLayoutPanel { ColumnCount = 1, RowCount = 3, Padding = new Padding(AppMetrics.PagePadding) };
                 root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-                root.RowStyles.Add(new RowStyle(SizeType.Absolute, 2 * AppMetrics.FieldRowHeight));
+                root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(2)));
                 root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
                 root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
                 var fields = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty };
@@ -37,10 +37,14 @@ internal static partial class Program
                 fields.Controls.Add(HumanUi.Field("Date", date), 0, 1);
                 fields.Controls.Add(HumanUi.Field("Notes", notes), 1, 1);
                 var grid = HumanUi.Grid(); grid.Dock = DockStyle.Fill; grid.Columns.Add("Student", "Student name"); grid.Rows.Add("Synthetic student");
+                var card = HumanUi.Card("Student information", "Synthetic layout fixture"); card.Content.Controls.Add(fields);
+                var tabs = new TabControl(); tabs.TabPages.Add("Students"); tabs.TabPages.Add("Fee details");
+                tabs.TabPages[0].Controls.Add(grid);
+                var tabHost = TabStrip.CreateHost(tabs);
                 var save = new ModernButton { Text = "Save", Width = AppScale.Scale(130) };
                 var cancel = new ModernButton { Text = "Close", Width = AppScale.Scale(130) };
                 var actions = HumanUi.ButtonRow(save, cancel); actions.Dock = DockStyle.Fill;
-                root.Controls.Add(fields, 0, 0); root.Controls.Add(grid, 0, 1); root.Controls.Add(actions, 0, 2);
+                root.Controls.Add(card, 0, 0); root.Controls.Add(tabHost, 0, 1); root.Controls.Add(actions, 0, 2);
                 Size contentMinimum = new(AppScale.Scale(900), AppScale.Scale(660));
                 root.Size = contentMinimum;
                 using var viewport = new ResponsiveViewport(root, contentMinimum); owner.Controls.Add(viewport);
@@ -61,6 +65,16 @@ internal static partial class Program
                 Check(choice.Height >= choice.Controls.OfType<ComboBox>().Single().PreferredHeight, "Combo input has room for its native font");
                 Check(grid.ColumnHeadersHeight >= AppMetrics.TextHeight(grid.ColumnHeadersDefaultCellStyle.Font!), "Grid headers fit the current font");
                 Check(grid.RowTemplate.Height >= AppMetrics.TextHeight(grid.DefaultCellStyle.Font!), "Grid rows fit the current font");
+                var headings = card.Header.Controls.OfType<Label>().ToArray();
+                Check(headings.All(label => card.Header.ClientRectangle.Contains(label.Bounds)) &&
+                    !headings[0].Bounds.IntersectsWith(headings[1].Bounds), "Card title and guidance fit without overlap");
+                Check(Math.Abs(tabs.Font.Size - UiDpi.ForControl(tabs, AppTheme.ButtonFont).Size) < 0.02f,
+                    "Tab appearance refresh preserves monitor-relative fonts");
+                var tabButtons = Descendants(tabHost).OfType<ModernButton>().ToArray();
+                Check(tabButtons.Length == 2 && tabButtons.All(button => button.Height >= AppMetrics.TextHeight(button.Font) &&
+                    button.Width >= AppMetrics.TextWidth(button.Text, button.Font, 0)), "Tab navigation captions remain readable and clickable");
+                Check(choice.Width <= choice.MaximumSize.Width && date.Width <= date.MaximumSize.Width,
+                    "Fixed-purpose fields retain their font-based width cap on large clients");
                 Check(root.Width >= contentMinimum.Width && root.Height >= contentMinimum.Height, "A small viewport preserves readable content instead of shrinking it");
                 Check(root.Width >= viewport.ClientSize.Width && root.Height >= viewport.ClientSize.Height, "Large viewports expand the content and grid");
                 viewport.ScrollControlIntoView(cancel); Application.DoEvents();

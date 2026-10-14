@@ -5,7 +5,7 @@ public static class TabStrip
 {
     public static void Apply(TabControl tabs, Color accent)
     {
-        tabs.Font = AppTheme.ButtonFont;
+        tabs.Font = UiDpi.ForControl(tabs, AppTheme.ButtonFont);
         tabs.Multiline = false;
         tabs.ShowToolTips = true;
     }
@@ -15,7 +15,7 @@ public static class TabStrip
     public static void ApplyButtonTheme(Button button, bool active)
     {
         if (button is not ModernButton modern) return;
-        modern.Font = AppTheme.ButtonFont;
+        modern.Font = UiDpi.ForControl(modern, AppTheme.ButtonFont);
         // Tab captions such as "Reverse a Posting" are navigation, not destructive actions.
         modern.ThemeRole = active ? "TabActive" : "TabInactive";
         modern.ApplyTheme();
@@ -23,7 +23,7 @@ public static class TabStrip
 
     public static void Repaint(TabControl tabs)
     {
-        tabs.Font = AppTheme.ButtonFont;
+        tabs.Font = UiDpi.ForControl(tabs, AppTheme.ButtonFont);
         if (tabs.Parent?.Parent is TabHost host) host.RefreshAppearance();
     }
 
