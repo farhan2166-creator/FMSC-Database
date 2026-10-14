@@ -95,6 +95,19 @@ jobs:
             echo 'No retained owned SQL container state.'
           fi
 
+      - name: Validate evidence before publishing
+        if: always()
+        run: |
+          if test -f Tests/LifecycleSqlChecks/run.py; then
+            python - <<'PY'
+          import os, runpy
+          from pathlib import Path
+          module = runpy.run_path('Tests/LifecycleSqlChecks/run.py')
+          module['validate_evidence'](Path(os.environ['RUNNER_TEMP']) / 'fmsc-level1-evidence')
+          print('PASS: artifact payload is restricted to sanitized report.json and summary.md.')
+          PY
+          fi
+
       - name: Publish sanitized step summary
         if: always()
         run: |

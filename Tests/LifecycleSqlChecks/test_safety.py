@@ -61,6 +61,20 @@ class SafetyTests(unittest.TestCase):
             text = (Path(folder) / "summary.md").read_text()
             self.assertIn("FAIL: 1", text); self.assertIn("Payment allocation does not reconcile.", text)
             self.assertNotIn("ConnectionString", text); self.assertNotIn("Password", text)
+            runner.validate_evidence(Path(folder))
+
+    def test_evidence_refuses_student_payload_and_extra_files(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            report = {"commit": "a" * 40, "runId": str(uuid.uuid4()), "result": "PASS", "limitations": [],
+                      "scenarios": [{"name": "Ayaan Example", "result": "PASS", "assertions": 1, "seconds": 0}]}
+            runner.write_evidence(root, report)
+            with self.assertRaisesRegex(ValueError, "student payload"):
+                runner.validate_evidence(root)
+            report["scenarios"][0]["name"] = "Admission"
+            runner.write_evidence(root, report); (root / "database.bak").write_text("Synthetic forbidden file")
+            with self.assertRaisesRegex(ValueError, "exactly the two"):
+                runner.validate_evidence(root)
 
 
 if __name__ == "__main__":

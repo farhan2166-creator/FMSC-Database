@@ -149,6 +149,27 @@ def write_evidence(output, report):
     (output / "summary.md").write_text("\n".join(summary) + "\n")
 
 
+def validate_evidence(output, forbidden=()):
+    allowed = {"commit", "runId", "result", "schemaVersion", "engine", "scenarios", "limitations", "expectedRefusals", "sourceDacpacSha256", "modelSha256"}
+    report = json.loads((output / "report.json").read_text())
+    if set(report) - allowed or report["result"] not in ("PASS", "FAIL", "BLOCKED"):
+        raise ValueError("Unexpected evidence metadata.")
+    permitted = {"name", "result", "assertions", "seconds", "assertion", "category", "sqlError"}
+    for scenario in report["scenarios"]:
+        if set(scenario) - permitted or scenario["result"] not in ("PASS", "FAIL", "BLOCKED"):
+            raise ValueError("Unexpected scenario payload.")
+    if report["result"] == "PASS" and any(s["result"] != "PASS" for s in report["scenarios"]):
+        raise ValueError("Failed/blocked scenarios cannot be reported as PASS.")
+    payload = (output / "report.json").read_text() + (output / "summary.md").read_text()
+    blocked = ["Password=", "MSSQL_SA_PASSWORD", "FMSC_AUDIT_CONNECTION", "ConnectionString", "PasswordHash", "PasswordSalt",
+               "Ayaan Example", "Zara Example", "Fictional student address"] + list(forbidden)
+    if any(value and value.lower() in payload.lower() for value in blocked):
+        raise ValueError("Sensitive/student payload detected in evidence; upload refused.")
+    if {p.name for p in output.iterdir()} != {"report.json", "summary.md"}:
+        raise ValueError("Evidence directory must contain exactly the two approved files.")
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path)
@@ -333,6 +354,15 @@ def main():
         report["scenarios"] += [{"name": name, "result": "BLOCKED", "assertions": 0, "seconds": 0, "assertion": "An earlier prerequisite did not complete."} for name in STAGES if name not in existing_names]
         report["result"] = "FAIL" if failed or any(s["result"] != "PASS" for s in report["scenarios"]) else "PASS"
         write_evidence(output, report)
+        try:
+            validate_evidence(output, [secret, env.get("FMSC_AUDIT_CONNECTION", "")])
+        except ValueError:
+            # Replace unsafe content with a fixed failure, never a captured payload.
+            write_evidence(output, {"commit": report["commit"], "runId": str(token), "result": "FAIL", "limitations": ["Unsafe evidence was withheld."],
+                "scenarios": [{"name": "Evidence sanitization", "result": "FAIL", "assertions": 0, "seconds": 0,
+                               "assertion": "Sensitive/unexpected payload detected; original evidence was withheld.", "category": "Test infrastructure"}]})
+            raise
+        print((output / "summary.md").read_text(), flush=True)
     return 1 if report["result"] != "PASS" else 0
 
 
