@@ -2,12 +2,17 @@ using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Students.Admissions;
 namespace FMSC_SMS.Pages.Students.Maintenance;
 
-public sealed class StudentDataReviewPage : UserControl
+public sealed class StudentDataReviewPage : UserControl, IBusyPage
 {
+    private readonly TabControl tabs;
+    private IEnumerable<IBusyPage> BusyChildren=>tabs.TabPages.Cast<TabPage>().SelectMany(tab=>tab.Controls.Cast<Control>()).OfType<IBusyPage>();
+    public bool IsBusy=>BusyChildren.Any(page=>page.IsBusy);
+    public string BusyMessage=>BusyChildren.FirstOrDefault(page=>page.IsBusy)?.BusyMessage??"Wait for the current review operation to finish.";
     public StudentDataReviewPage(Action<Func<Control>,string,string> navigate)
     {
         Dock=DockStyle.Fill;
-        var tabs=new TabControl{Dock=DockStyle.Fill,Font=AppTheme.NormalFont};
+        tabs=new TabControl{Dock=DockStyle.Fill,Font=AppTheme.NormalFont};
+        tabs.Selecting+=(_,e)=>{if(IsBusy)e.Cancel=true;};
         void Add(string title,Func<Control> factory){var tab=new TabPage(title){BackColor=AppTheme.Surface,Tag=factory};tabs.TabPages.Add(tab);}
         var legacyTab=new TabPage("Legacy Verification"){BackColor=AppTheme.Surface};
         legacyTab.Tag=(Func<Control>)(()=>{

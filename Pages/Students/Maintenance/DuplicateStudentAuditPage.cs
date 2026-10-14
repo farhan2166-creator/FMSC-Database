@@ -1,8 +1,10 @@
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Students.Maintenance;
 /// <summary>Runs a fuzzy (soundex-based) name/father-name + exact-DOB sweep across all admitted students and surfaces candidate pairs for manual review, in the same "detect -> review -> decide" spirit as StudentRecordChecksPage.</summary>
-public sealed class DuplicateStudentAuditPage : V2Page
+public sealed class DuplicateStudentAuditPage : V2Page, IBusyPage
 {
+    public bool IsBusy=>BusyOperationRunning;
+    public string BusyMessage=>"Duplicate review is being updated. Wait for the scan or selected batch and its refresh to finish.";
     public DuplicateStudentAuditPage(Action<Func<Control>,string,string>? navigate = null)
         : base(
             "Find Duplicate Students",

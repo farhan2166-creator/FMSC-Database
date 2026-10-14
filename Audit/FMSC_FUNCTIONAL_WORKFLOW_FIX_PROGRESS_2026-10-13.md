@@ -124,3 +124,17 @@ Added selected-pair tests for both decision buttons remaining disabled during
 selection changes, both handler paths refusing overlap, scan refusal and settled
 restoration. Native SQL-delayed multi-row acceptance remains required. The host
 leave-contract gap is tracked separately under FQA-10. No SQL changes.
+
+## FQA-10 — Duplicate batch/scan can outlive its workspace
+
+**Confirmed and fixed.** DuplicateStudentAuditPage advertises its existing shared
+operation gate through IBusyPage. StudentDataReviewPage forwards active state
+and its message from every loaded tab and refuses tab changes while any child
+is busy. The dashboard therefore blocks departure through full scan/resolution
+and refresh, including a cached child that is not currently selected.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added real-host fixtures using inert cached children for hidden-child visibility,
+tab refusal and settled navigation; extended the actual duplicate-page fixture
+with its busy contract. Native delayed SQL/navigation execution remains required.
+No SQL changes.

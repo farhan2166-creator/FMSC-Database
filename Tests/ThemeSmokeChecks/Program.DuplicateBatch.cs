@@ -16,6 +16,7 @@ internal static partial class Program
         Check(confirm.Enabled&&dismiss.Enabled,"A selected duplicate pair initially offers both deliberate decisions");
         var reply=new TaskCompletionSource();Func<Task> operation=()=>reply.Task;
         var pending=(Task<bool>)typeof(V2Page).GetMethod("RunBusyAsync",flags)!.Invoke(page,new object[]{"Batch fixture",operation,new Control[]{page}})!;
+        Check(((IBusyPage)page).IsBusy,"Duplicate scan/batch exposes its active state to its workspace");
         grid.Rows[1].Selected=true;update.Invoke(page,null);
         Check(!confirm.Enabled&&!dismiss.Enabled,"Changing selection cannot re-enable either duplicate decision during a batch");
         foreach(var status in new[]{"Confirmed","Dismissed"})
@@ -29,4 +30,22 @@ internal static partial class Program
         Check(confirm.Enabled&&dismiss.Enabled&&page.Enabled,"Settled batch restores decisions from the actual remaining selection");
         Check(!page.IsHandleCreated,"Duplicate concurrency fixture invokes no SQL scan or resolution");
     }
+    private static void CheckStudentReviewBusyHost()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        using var window=new Form{ClientSize=new Size(960,640)};
+        using var host=new StudentDataReviewPage((_,_,_)=>{});
+        var tabs=(TabControl)typeof(StudentDataReviewPage).GetField("tabs",flags)!.GetValue(host)!;
+        // Supply inert cached pages so the real host runs without starting SQL.
+        tabs.TabPages[0].Controls.Add(new Panel());
+        var child=new ModalGuardFixture{IsBusy=true};tabs.TabPages[1].Controls.Add(child);
+        window.Controls.Add(host);window.Show();Application.DoEvents();
+        Check(host.IsBusy&&host.BusyMessage==child.BusyMessage,"Student Review forwards an active operation from every cached child, including a hidden tab");
+        tabs.SelectedIndex=1;Application.DoEvents();
+        Check(tabs.SelectedIndex==0,"Student Review refuses tab switches while any cached child operation is pending");
+        child.IsBusy=false;tabs.SelectedIndex=1;Application.DoEvents();
+        Check(tabs.SelectedIndex==1&&!host.IsBusy,"Student Review resumes tab navigation after the cached operation settles");
+        window.Close();
+    }
+
 }
