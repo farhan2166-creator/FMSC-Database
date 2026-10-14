@@ -91,7 +91,7 @@ jobs:
       # Artifacts are accessible only to authorized viewers of this private repo.
       # No gh release create, deployment, school SQL connection, or public upload.
       - name: Upload private Windows ZIP
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: FMSC_SMS-Windows-x64-app-only-${{ github.run_number }}
           path: out/windows-x64-app/
