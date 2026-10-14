@@ -297,7 +297,8 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
             SetStatus($"Unable to read the selected NOC: {DbMessage.UserMessage(ex)}", true);
         }
     }
-    private void ApplyWorkflowState()
+    private void ApplyWorkflowState() => ApplyWorkflowStateAndStatus(true);
+    private void ApplyWorkflowStateAndStatus(bool showStatus)
     {
         student.Enabled = Grid.Enabled = !creatingCertificate;
         if (creatingCertificate)
@@ -326,6 +327,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
             hasStudent;
         printButton.Enabled =
             hasSelection && !HasCertificateEdits && CurrentUser.HasPermission("Certificates.Print");
+        if (!showStatus) return;
         if (!hasStudent)
         {
             SetStatus(UiText.Prompts.SearchForStudent);
@@ -351,7 +353,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         finally
         {
             creatingCertificate = false;
-            if (!IsDisposed) ApplyWorkflowState();
+            if (!IsDisposed) ApplyWorkflowStateAndStatus(false);
         }
     }
     private async Task CreateCertificate()

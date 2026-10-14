@@ -71,6 +71,8 @@ internal static partial class Program
                 pending.GetAwaiter().GetResult();
                 Check(writes == 1 && reads == 1 && page.Enabled && !((IBusyPage)page).IsBusy,
                     kind + " restores the page only after the original write and refresh finish");
+                var status = (Label)typeof(V2Page).GetField("StatusLabel", flags)!.GetValue(page)!;
+                Check(status.Text.Contains("created successfully"), kind + " completion keeps its explicit save result after controls are restored");
             }
         }
         finally { CurrentUser.SignIn(previous.UserId, previous.Username, previous.RoleName, previous.MustChangePassword, previous.Item5); }

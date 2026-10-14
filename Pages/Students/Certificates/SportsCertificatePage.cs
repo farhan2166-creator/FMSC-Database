@@ -320,7 +320,8 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
             SetStatus($"Unable to read the selected sports certificate: {DbMessage.UserMessage(ex)}", true);
         }
     }
-    private void ApplyWorkflowState()
+    private void ApplyWorkflowState() => ApplyWorkflowStateAndStatus(true);
+    private void ApplyWorkflowStateAndStatus(bool showStatus)
     {
         student.Enabled = Grid.Enabled = !creatingCertificate;
         if (creatingCertificate)
@@ -351,6 +352,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
             hasStudent;
         printButton.Enabled =
             hasSelection && !HasCertificateEdits && CurrentUser.HasPermission("Certificates.Print");
+        if (!showStatus) return;
         if (!hasStudent)
         {
             SetStatus(UiText.Prompts.SearchForStudent);
@@ -376,7 +378,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         finally
         {
             creatingCertificate = false;
-            if (!IsDisposed) ApplyWorkflowState();
+            if (!IsDisposed) ApplyWorkflowStateAndStatus(false);
         }
     }
     private async Task CreateCertificate()
