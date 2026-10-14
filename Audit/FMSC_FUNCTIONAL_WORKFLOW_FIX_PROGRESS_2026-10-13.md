@@ -138,3 +138,17 @@ Added real-host fixtures using inert cached children for hidden-child visibility
 tab refusal and settled navigation; extended the actual duplicate-page fixture
 with its busy contract. Native delayed SQL/navigation execution remains required.
 No SQL changes.
+
+## FQA-11 — Student Record Checks correction writes lack a composite guard
+
+**Confirmed and fixed.** Status save, placement save, missing-record creation and
+date review now enter one shared correction gate and hold the whole page through
+preflight, SQL and post-save reads. Beginning a correction invalidates older mode
+reads. IBusyPage forwards this state through the FQA-10 review host, preventing
+conflicting corrections and workspace departure. Existing correction rules and
+permission checks remain; synchronous SQL performance is a separate concern.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added delayed actual-page correction tests for composite-host busy visibility,
+whole-page control hold, overlapping correction refusal and settled restoration.
+Native SQL and GUI execution remains required. No SQL changes.

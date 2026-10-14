@@ -48,4 +48,21 @@ internal static partial class Program
         window.Close();
     }
 
+    private static void CheckStudentCorrectionBusy()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        var type=typeof(StudentRecordChecksPage);
+        using var page=(StudentRecordChecksPage)Activator.CreateInstance(type,flags,null,new object?[]{null,false},null)!;
+        using var host=new StudentDataReviewPage((_,_,_)=>{});
+        var tabs=(TabControl)typeof(StudentDataReviewPage).GetField("tabs",flags)!.GetValue(host)!;tabs.TabPages[1].Controls.Add(page);
+        var reply=new TaskCompletionSource();Func<Task> correction=()=>reply.Task;
+        var run=type.GetMethod("RunCorrectionAsync",flags)!;var task=(Task)run.Invoke(page,new object[]{correction})!;
+        Check(page.IsBusy&&host.IsBusy&&!page.Enabled,"Student correction holds conflicting controls and is visible through the cached Review host during preflight/write/refresh");
+        int repeats=0;Func<Task> another=()=>{repeats++;return Task.CompletedTask;};var denied=(Task)run.Invoke(page,new object[]{another})!;
+        Check(denied.IsCompletedSuccessfully&&repeats==0,"A second correction cannot overlap an active correction");
+        reply.SetResult();PumpUntil(()=>task.IsCompleted,"Record correction fixture settles");
+        Check(task.IsCompletedSuccessfully&&!host.IsBusy&&page.Enabled,"Full correction completion releases the Review host busy state");
+        Check(!page.IsHandleCreated,"Record correction fixture starts no SQL preflight or write");
+    }
+
 }

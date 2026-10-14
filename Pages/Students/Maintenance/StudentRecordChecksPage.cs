@@ -2,7 +2,7 @@ using System.Text;
 using System.Text.Json;
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Students.Maintenance;
-public sealed class StudentRecordChecksPage : V2Page
+public sealed class StudentRecordChecksPage : V2Page, IBusyPage
 {
     private readonly StudentPicker student = new();
     private string gridMode = "Findings";
@@ -127,7 +127,11 @@ public sealed class StudentRecordChecksPage : V2Page
     private int bodyGap;
     private bool CanCorrect => CurrentUser.HasPermission("Students.Administer");
     private readonly Action<Func<Control>, string, string>? navigate;
-    public StudentRecordChecksPage(Action<Func<Control>, string, string>? navigate = null)
+    public bool IsBusy=>BusyOperationRunning;
+    public string BusyMessage=>"A student-record correction is being reviewed or saved. Wait for the result and refresh before leaving.";
+    private Task RunCorrectionAsync(Func<Task> correction)=>RunBusyAsync(BusyMessage,async()=>{++gridModeVersion;await correction();},this);
+    public StudentRecordChecksPage(Action<Func<Control>, string, string>? navigate = null) : this(navigate,true) { }
+    internal StudentRecordChecksPage(Action<Func<Control>, string, string>? navigate,bool initialize)
         : base(
             PageTitles.StudentRecordChecks,
             "Review discrepancies, then open Admission to correct the student record.")
@@ -135,10 +139,10 @@ public sealed class StudentRecordChecksPage : V2Page
         this.navigate = navigate;
         /* all three of these write corrections, so each is guarded against a double submit. Scan and Export only read. */
         var scan = AddBusyAction("Scan", () => SetGridMode("Findings"), "Primary");
-        var saveStatus = AddBusyAction("Save Status", SaveStatus, "Success");
-        var saveEnrollment = saveEnrollmentAction = AddBusyAction("Save Placement", SaveEnrollment, "Success");
-        var addEnrollment = addEnrollmentAction = AddBusyAction("Create Missing Record", AddEnrollment, "Success");
-        var repairDates=repairDatesAction=AddBusyAction("Review Dates",()=>RepairDatesFromEditor(),"Secondary");
+        var saveStatus = AddBusyAction("Save Status", ()=>RunCorrectionAsync(SaveStatus), "Success");
+        var saveEnrollment = saveEnrollmentAction = AddBusyAction("Save Placement", ()=>RunCorrectionAsync(SaveEnrollment), "Success");
+        var addEnrollment = addEnrollmentAction = AddBusyAction("Create Missing Record", ()=>RunCorrectionAsync(AddEnrollment), "Success");
+        var repairDates=repairDatesAction=AddBusyAction("Review Dates",()=>RunCorrectionAsync(RepairDatesFromEditor),"Secondary");
         newEnrollmentAction.Click+=(_,_)=>BeginMissingEnrollment();
         GateAction(repairDates,"Students.Administer");
         var export = AddExportAction("Student_Consistency_Findings");
@@ -149,7 +153,7 @@ public sealed class StudentRecordChecksPage : V2Page
         GateAction(addEnrollment, "Students.Administer");
         RelocateFromActions(saveStatus, saveEnrollment, addEnrollment, repairDates);
         /* The constructor cannot await and BuildStudentSearch is now async Task. The discard marks that as deliberate. */
-        _ = BuildStudentSearch();
+        if(initialize)_ = BuildStudentSearch();
         BuildStatusEditor();
         BuildEnrollmentEditor();
         modeFindings.Click += async (_, _) => await SetGridMode("Findings");
