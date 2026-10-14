@@ -1,0 +1,138 @@
+name: FMSC Level 1 lifecycle SQL
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Tests/**'
+      - 'Core/**'
+      - 'Pages/Students/**'
+      - 'Pages/Finance/**'
+      - 'Pages/Administration/**'
+      - 'DatabaseHelper.cs'
+      - 'FMSC_SMS.csproj'
+      - 'FMSC.dacpac'
+      - 'Migrations/**'
+      - 'Tools/**'
+      - '.github/workflows/fmsc-lifecycle-sql-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Tests/**'
+      - 'Core/**'
+      - 'Pages/Students/**'
+      - 'Pages/Finance/**'
+      - 'Pages/Administration/**'
+      - 'DatabaseHelper.cs'
+      - 'FMSC_SMS.csproj'
+      - 'Tools/**'
+      - 'FMSC.dacpac'
+      - 'Migrations/**'
+      - '.github/workflows/fmsc-lifecycle-sql-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fmsc-level1-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lifecycle-sql:
+    name: Real SQL lifecycle and persisted-state checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Initialize failure evidence before checkout or tooling
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          folder = Path(os.environ['RUNNER_TEMP']) / 'fmsc-level1-evidence'
+          folder.mkdir()
+          report = {'commit': os.environ['GITHUB_SHA'], 'runId': os.environ['GITHUB_RUN_ID'],
+                    'result': 'BLOCKED', 'schemaVersion': '6', 'engine': None,
+                    'scenarios': [{'name': 'Checkout/tooling/harness startup', 'result': 'BLOCKED',
+                                   'assertions': 0, 'seconds': 0, 'assertion': 'The harness has not started.'}],
+                    'limitations': ['No SQL execution is claimed until the harness replaces this startup evidence.']}
+          (folder / 'report.json').write_text(json.dumps(report, indent=2))
+          (folder / 'summary.md').write_text('# FMSC Level 1: BLOCKED\n\nCommit: ' + os.environ['GITHUB_SHA'] + '\n\nInspect the failed checkout/tooling step. No SQL execution is claimed.\n')
+          PY
+
+      - name: Check out test source without exported school rows
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/FMSC.dacpac
+
+      - name: Install .NET 8
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Verify test safety and schema-only provenance
+        run: |
+          test ! -f FMSC.dacpac
+          python -m unittest discover -s Tests/LifecycleSqlChecks -p 'test_*.py' -v
+
+      - name: Provision fictional school and execute real lifecycle
+        run: >-
+          python Tests/LifecycleSqlChecks/run.py
+          --output "$RUNNER_TEMP/fmsc-level1-evidence"
+          --state "$RUNNER_TEMP/fmsc-level1-owner.json"
+
+      - name: Confirm cleanup even after failure or cancellation
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/fmsc-level1-owner.json"; then
+            python Tests/LifecycleSqlChecks/run.py --cleanup \
+              --output "$RUNNER_TEMP/fmsc-level1-evidence" \
+              --state "$RUNNER_TEMP/fmsc-level1-owner.json"
+          else
+            echo 'No retained owned SQL container state.'
+          fi
+
+      - name: Validate evidence before publishing
+        if: always()
+        run: |
+          if test -f Tests/LifecycleSqlChecks/run.py; then
+            python - <<'PY'
+          import os, runpy
+          from pathlib import Path
+          module = runpy.run_path('Tests/LifecycleSqlChecks/run.py')
+          module['validate_evidence'](Path(os.environ['RUNNER_TEMP']) / 'fmsc-level1-evidence')
+          print('PASS: artifact payload is restricted to sanitized report.json and summary.md.')
+          PY
+          fi
+
+      - name: Publish sanitized step summary
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/fmsc-level1-evidence/summary.md"; then
+            cat "$RUNNER_TEMP/fmsc-level1-evidence/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Level 1 did not reach the harness. Inspect the failed checkout/tooling step; no SQL success is claimed.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload sanitized evidence only
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fmsc-level1-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/fmsc-level1-evidence/report.json
+            ${{ runner.temp }}/fmsc-level1-evidence/summary.md
+          if-no-files-found: error
+          retention-days: 7
+
+# No pull_request_target, repository secrets, school connections, data-file mounts,
+# database/raw-log uploads, public releases, or continue-on-error. Existing desktop CI
+# remains responsible for Windows control/PDF contracts on the same PR.

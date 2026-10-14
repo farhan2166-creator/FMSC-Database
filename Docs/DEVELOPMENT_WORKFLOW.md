@@ -49,6 +49,10 @@ For Windows PowerShell provenance and disposable publish tests, see [CI workflow
 
 Avoid direct merges that bypass review for sensitive changes. A Codex PR is a proposal until reviewed and merged; neither tests nor documentation automatically imply production sign-off.
 
+## Level 1 SQL integration
+
+The separate [Level 1 lifecycle workflow](../.github/workflows/fmsc-lifecycle-sql-ci.yml) provisions an owned disposable SQL Server container and fictional school. See [LEVEL1_TESTING.md](LEVEL1_TESTING.md) for real admission-to-promotion SQL assertions, schema-only provenance, cleanup, evidence and local execution. Its passing result complements Windows CI; it does not approve interactive UI or production deployment.
+
 ## Security checks
 
 [FMSC Security Checks](../.github/workflows/fmsc-security.yml) is a read-only PR/`main`-push workflow, separate from the existing Windows checks. It downloads **Gitleaks CLI 8.30.1** from its official release and verifies a pinned SHA-256 before running it. The CLI is MIT-licensed and works with private repositories without a Gitleaks action license, PAT or GitHub Advanced Security subscription. Normal Actions minutes/storage limits still apply.
