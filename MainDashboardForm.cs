@@ -636,17 +636,11 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Students.Family"),
             Section("PROMOTION"),
             new(
-                "Bulk Promotion",
+                PageTitles.StudentPromotion,
                 () => new BulkPromotionPage(
                     (factory, module, title) => NavigateTo(factory, module, title)),
                 "Promotion",
-                "Bulk Promotion",
-                "Enrollment.Manage"),
-            new(
-                "Promotion History",
-                () => new PromotionHistoryPage(),
-                "Promotion",
-                "Promotion History",
+                PageTitles.StudentPromotion,
                 "Enrollment.Manage"),
             Section("ADMISSION & DATA REVIEW"),
             new(

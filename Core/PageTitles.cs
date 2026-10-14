@@ -9,6 +9,7 @@ public static class PageTitles
     public const string Admissions = "Student Admissions";
     public const string StudentCertificates = "Student Certificates";
     public const string StudentTransfers = "Transfers / Re-Admission";
+    public const string StudentPromotion = "Student Promotion";
     public const string StudentRecordChecks = "Student Data Review";
     public const string CampusAssignments = "Campus Classes / Sections";
     public const string ClassesSections = "Classes & Sections";

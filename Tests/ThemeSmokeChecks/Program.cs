@@ -21,6 +21,7 @@ internal static partial class Program
             CheckPdfFileDurability();
             CheckDpiResponsiveLayouts();
             CheckShortcutPermissions();
+            CheckPromotionHistoryEntry();
             CheckClosingWholeAmounts();
             CheckPaletteDestinations();
             CheckSubmittedInputHolds();

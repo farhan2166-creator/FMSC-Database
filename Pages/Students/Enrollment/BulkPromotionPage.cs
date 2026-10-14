@@ -90,6 +90,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         Text = UiText.Actions.Clear,
         Width = AppScale.Scale(120)
     };
+    private readonly ModernButton historyButton;
     private DataTable? candidateData;
     /* Appears after a promotion: the promoted students cannot be billed until their return is confirmed, so it offers Confirm Return Admission (on the student, when just one was promoted). */
     private readonly NextStepBar nextSteps;
@@ -102,9 +103,14 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
     private int busyCount;
     /// <param name="navigate">The shell's navigate delegate, so the step after promoting (Confirm Return Admission) can open the next screen.</param>
     public BulkPromotionPage(Action<Func<Control>, string, string>? navigate = null)
-        : base("Bulk Promotion", "Move a class or selected students to their next class.")
+        : this(navigate, initialize: true) { }
+    internal BulkPromotionPage(Action<Func<Control>, string, string>? navigate, bool initialize)
+        : base(PageTitles.StudentPromotion, "Move a class or selected students to their next class.")
     {
         nextSteps = new NextStepBar(navigate, Fail);
+        historyButton = AddAction("View Promotion History", (_, _) => OpenHistory(), "Secondary");
+        RelocateFromActions(historyButton);
+        SetToolTip(historyButton, "Review completed promotions for the selected source year, class and section. Leave filters blank to view all history.");
         sourceCampusField =
             HumanUi.Field("Source Campus", sourceCampus, true);
         sourceYearField =
@@ -135,7 +141,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         destinationYear.UserSelectionChanged += (_, _) => OnDestinationYearChanged();
         destinationClass.UserSelectionChanged += async (_, _) => await OnDestinationClassChanged();
         destinationSection.UserSelectionChanged += (_, _) => ApplyStateAndHint();
-        Defer(async () => {
+        if (initialize) Defer(async () => {
             await Task.WhenAll(
                 BindCampuses(),
                 BindYears(),
@@ -143,6 +149,39 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             ClearForm();
         });
         BuildPage();
+        ApplyState();
+    }
+    private void OpenHistory()
+    {
+        if (busyCount > 0 || processing || IsDisposed) return;
+        if (!CurrentUser.HasPermission("Enrollment.Manage"))
+        {
+            SetStatus("Promotion history is not enabled for your account.", PageStatusKind.Warning);
+            return;
+        }
+        try
+        {
+            using var dialog = CreateHistoryDialog();
+            dialog.ShowDialog(FindForm());
+        }
+        catch (Exception ex) { Fail(ex); }
+    }
+    private ApplicationWindowForm CreateHistoryDialog()
+    {
+        var dialog = new ApplicationWindowForm {
+            Text = "Promotion History",
+            StartPosition = FormStartPosition.CenterParent,
+            ClientSize = new Size(AppScale.Scale(1100), AppScale.Scale(680)),
+            MinimumSize = new Size(AppScale.Scale(800), AppScale.Scale(480)),
+            BackColor = AppTheme.PageBackground,
+            ShowInTaskbar = false
+        };
+        try
+        {
+            dialog.Controls.Add(new PromotionHistoryPage(sourceYear.SelectedId, sourceClass.SelectedId, sourceSection.SelectedId));
+            return dialog;
+        }
+        catch { dialog.Dispose(); throw; }
     }
     private void ConfigureTables()
     {
@@ -347,7 +386,8 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         var setupCard =
             HumanUi.Card(
                 "Promotion Details",
-                "Choose the current class, next class and promotion date.");
+                "Choose the current class, next class and promotion date.",
+                accessory: historyButton);
         setupCard.Content.Controls.Add(promotionSetupTable);
         var candidatesCard =
             HumanUi.Card(
@@ -705,6 +745,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         holdAllButton.Enabled = idle && hasRows;
         promoteSelectedButton.Enabled = idle && PromoteBlockReason() is null;
         clearButton.Enabled = idle;
+        historyButton.Enabled = idle && !processing && CurrentUser.HasPermission("Enrollment.Manage");
     }
     /// <summary>ApplyState, and while candidates are loaded, a live "N ticked ... " line saying what is still needed.</summary>
     private void ApplyStateAndHint()
@@ -970,7 +1011,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                     $"Promote: {promoteCount:N0}\n" +
                     $"Hold Back: {holdCount:N0}\n\n" +
                     "A new placement will be created in the destination academic year for each processed student.",
-                    "Confirm Bulk Promotion",
+                    "Confirm Student Promotion",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question);
             if (confirm !=
@@ -1041,7 +1082,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             {
                 /* The procedure ran, but this build could not read its result row. Say exactly that: the outcome is unknown, so nothing here may be worded as a completed promotion. */
                 Warn(
-                    $"The bulk promotion request was sent for {attempted:N0} student(s), but the " +
+                    $"The student promotion request was sent for {attempted:N0} student(s), but the " +
                     "server's own result could not be read, so this screen cannot confirm how many " +
                     "students were actually processed.\n\n" +
                     $"Ticked as Promote: {promoteCount:N0}\n" +
@@ -1062,7 +1103,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                 ? 0
                 : Convert.ToInt32(serverResult["HeldBackCount"]);
             string outcome =
-                $"Bulk promotion result from the server:\n\n" +
+                $"Student promotion result from the server:\n\n" +
                 $"Selected: {attempted:N0} student(s)\n" +
                 $"Processed: {processed:N0}\n" +
                 $"Promoted: {promoted:N0}\n" +
@@ -1140,7 +1181,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         SetStatus(
             sourceYear.Items.Count <= 1
                 ? "No academic year has a later year to promote into. Add the next academic year first."
-                : "Bulk promotion workflow ready.",
+                : "Student promotion workflow ready.",
             sourceYear.Items.Count <= 1);
     }
     /// <summary>The list's leading "-- Select --" row, or nothing when the list is empty.</summary>

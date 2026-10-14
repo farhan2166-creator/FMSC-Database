@@ -1,5 +1,6 @@
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Reports;
+using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Enrollment;
 public sealed class PromotionHistoryPage : V2Page
 {
@@ -7,6 +8,8 @@ public sealed class PromotionHistoryPage : V2Page
     private readonly LookupBox cls = new();
     private readonly LookupBox section = new();
     private readonly ModernButton exportButton;
+    private readonly Func<string, SqlParameter[], DataTable> query;
+    private readonly (int Year, int Class, int Section) initialFilters;
     /* The filter values that produced the rows currently in the grid. Empty until a load has actually produced a batch history. */
     private string _appliedFilterSignature = string.Empty;
     private readonly Label summary = new() {
@@ -17,9 +20,15 @@ public sealed class PromotionHistoryPage : V2Page
         ForeColor = AppTheme.MutedText,
         TextAlign = ContentAlignment.MiddleLeft
     };
-    public PromotionHistoryPage()
+    public PromotionHistoryPage(int sourceAcademicYearId = 0, int sourceClassId = 0, int sourceSectionId = 0)
+        : this(sourceAcademicYearId, sourceClassId, sourceSectionId,
+            (procedure, parameters) => DatabaseHelper.QueryUser(procedure, parameters)) { }
+    internal PromotionHistoryPage(int sourceAcademicYearId, int sourceClassId, int sourceSectionId,
+        Func<string, SqlParameter[], DataTable> query)
         : base("Promotion History", "Review completed promotions and the students included.")
     {
+        this.query = query;
+        initialFilters = (sourceAcademicYearId, sourceClassId, sourceSectionId);
         var load = AddAction("Load", (_, _) => LoadData(), "Secondary");
         var export = AddExportAction("Promotion_Batch_History");
         var clear = AddAction(UiText.Actions.Clear, (_, _) => ClearForm(), "Secondary");
@@ -51,13 +60,25 @@ public sealed class PromotionHistoryPage : V2Page
         root.Controls.Add(historyCard, 0, 2);
         SetContent(root);
         exportButton = export;
+        SetReportActionsEnabled(false);
         /* The grid keeps showing the batches an earlier load produced, so a filter change has to be recorded here. */
         foreach (var filter in new[] { year, cls, section })
             filter.SelectedIndexChanged += (_, _) => OnFiltersChanged();
         Defer(() => {
-            BindLookups();
-            LoadData();
+            if (BindLookups() && ApplyInitialFilters()) LoadData();
         });
+    }
+    private bool ApplyInitialFilters()
+    {
+        foreach (var (lookup, id) in new[] { (year, initialFilters.Year), (cls, initialFilters.Class), (section, initialFilters.Section) })
+        {
+            if (id <= 0) continue;
+            lookup.SelectedValue = id;
+            if (lookup.SelectedId == id) continue;
+            SetStatus("A selected source filter is no longer available. Choose filters and use Load to view history.", true);
+            return false;
+        }
+        return true;
     }
     private string FilterSignature() =>
         $"{year.SelectedId}|{cls.SelectedId}|{section.SelectedId}";
@@ -77,28 +98,32 @@ public sealed class PromotionHistoryPage : V2Page
         else
             SetStatus("Filters changed. Use Load again before exporting.", true);
     }
-    private void BindLookups()
+    private bool BindLookups()
     {
         try
         {
-            year.Bind(DatabaseHelper.QueryUser("GetAcademicYears"), "AcademicYearId", "YearName");
-            cls.Bind(DatabaseHelper.QueryUser("GetClasses"), "ClassId", "ClassName");
-            section.Bind(ReportUi.SectionFilterList(), "SectionId", "SectionName");
+            year.Bind(query("GetAcademicYears", Array.Empty<SqlParameter>()), "AcademicYearId", "YearName");
+            cls.Bind(query("GetClasses", Array.Empty<SqlParameter>()), "ClassId", "ClassName");
+            section.Bind(query("GetSections", Array.Empty<SqlParameter>()), "SectionId", "SectionName");
+            return true;
         }
         catch (Exception ex)
         {
             Fail(ex);
+            return false;
         }
     }
     private void LoadData()
     {
         try
         {
-            var data = DatabaseHelper.QueryUser(
+            var data = query(
                 "GetPromotionBatchesFiltered",
-                DatabaseHelper.Int("@SourceAcademicYearId", year.SelectedId),
-                DatabaseHelper.Int("@SourceClassId", cls.SelectedId),
-                DatabaseHelper.Int("@SourceSectionId", section.SelectedId));
+                new[] {
+                    DatabaseHelper.Int("@SourceAcademicYearId", year.SelectedId),
+                    DatabaseHelper.Int("@SourceClassId", cls.SelectedId),
+                    DatabaseHelper.Int("@SourceSectionId", section.SelectedId)
+                });
             Bind(data);
             UpdateSummary(data);
             /* The load is synchronous, so the filters cannot move while the query runs: a successful load belongs to the filters now selected. */
