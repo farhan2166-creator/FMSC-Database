@@ -61,3 +61,5 @@ For installation and recovery issues, use [installation](INSTALLATION.md) and [b
 Certificate creation holds the selected student and certificate inputs until saving and refresh finish. Wait for the result before starting another certificate.
 
 Small Classes & Sections setup drafts can be left without a discard prompt. Wait for an active save to finish. Unapplied bulk fee-rate adjustments are protected when leaving the finance workspace.
+
+Daily Collection Closing accepts whole-rupee actual amounts. Leave Refund/Correction actuals blank and explain their impact in Notes. Historical fractional closing amounts remain visible at their stored precision; printing does not round them to whole rupees.

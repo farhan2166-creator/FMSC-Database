@@ -55,7 +55,15 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
                 Grid.Columns[e.ColumnIndex].Name != "Actual Amount") return;
             dirty = true; UpdateDifference(e.RowIndex); UpdateActions();
         };
-        Grid.DataError += (_, e) => { e.ThrowException = false; Warn("Enter a valid amount using up to two decimal places."); };
+        Grid.DataError += (_, e) => { e.ThrowException = false; Warn("Enter a valid whole-rupee amount. Fractions are not rounded."); };
+        Grid.CellValidating += (_, e) => {
+            if (loading || e.RowIndex < 0 || e.ColumnIndex < 0 ||
+                Grid.Columns[e.ColumnIndex].Name != "Actual Amount" || Grid.Rows[e.RowIndex].Cells[e.ColumnIndex].ReadOnly) return;
+            string text = Convert.ToString(e.FormattedValue) ?? "";
+            bool valid = string.IsNullOrWhiteSpace(text) || InputParse.TryWholeAmount(text, out decimal _);
+            e.Cancel = !valid;
+            Grid.Rows[e.RowIndex].ErrorText = valid ? "" : "Enter a whole-rupee actual amount. Fractions are not rounded.";
+        };
         Grid.CurrentCellDirtyStateChanged += (_, _) => {
             if (!loading && Grid.IsCurrentCellDirty &&
             Grid.CurrentCell?.OwningColumn.Name == "Actual Amount") { dirty = true; UpdateActions(); }
@@ -159,7 +167,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
             if (IsAdjustment(row)) continue;
             if (row.IsNull("Actual Amount")) { Warn($"Enter the actual amount for {row["Payment Method"]}."); return; }
             decimal value = Convert.ToDecimal(row["Actual Amount"]);
-            if (decimal.Round(value, 2) != value) { Warn("Use no more than two decimal places."); return; }
+            if (!WholeRupees.IsWhole(value)) { Warn("Closing actual amounts must be whole rupees. Fractions are not rounded."); return; }
             actual.Add(new { Method = Convert.ToString(row["Payment Method"]), Amount = value });
         }
         busy = true; UpdateActions();
@@ -208,7 +216,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
             GridPrintJob.ShowPreview(FindForm(), school, "Daily Collection Closing",
                 $"{loadedDay:dd-MMM-yyyy} · {state["ClosingStatus"]} · Revision {state["Revision"]}\n" +
                 $"Submitted: {state["SubmittedBy"]} {state["SubmittedAt"]} · Approved: {state["ApprovedBy"]} {state["ApprovedAt"]}\nNotes: {notes.Text}",
-                printable, CurrentUser.Username, "N0");
+                printable, CurrentUser.Username, "N2");
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
         finally { busy = false; if (!IsDisposed) UpdateActions(); }
