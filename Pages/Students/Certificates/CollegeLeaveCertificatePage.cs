@@ -1,11 +1,17 @@
 using FMSC_SMS.Core;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
-public sealed class CollegeLeaveCertificatePage : V2Page
+public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
 {
     private const string CertificateTypeName = "College";
     private const int MaxDuplicateIssues = 2;
     private readonly StudentPicker student = new();
+    private string? draftBaseline;
+    private string DraftSnapshot()=>System.Text.Json.JsonSerializer.Serialize(new {Date=leave.Value.Date,Confirmed=leave.Checked,Promoted=promoted.SelectedId,Academic=academic.Text.Trim(),Attendance=attendance.Text.Trim(),Remarks=remarks.Text.Trim()});
+    private void CaptureDraftBaseline()=>draftBaseline=DraftSnapshot();
+    public bool HasUnsavedChanges=>student.SelectedId>0&&selectedLeaveRecordId==0&&!HasCertificateForCurrentEnrollment()&&draftBaseline is not null&&draftBaseline!=DraftSnapshot();
+    public string UnsavedChangesMessage=>"The new certificate has unsaved details. Discard this draft?";
+    private bool ConfirmDraftDiscard()=>!HasUnsavedChanges||Confirm(UnsavedChangesMessage,UiText.Dialogs.UnsavedChanges);
     private readonly LeaveFeeReviewBar feeReview;
     private readonly ModernTextBox currentClass =
         HumanUi.TextBox(false, 150);
@@ -55,7 +61,8 @@ public sealed class CollegeLeaveCertificatePage : V2Page
         Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
-    public CollegeLeaveCertificatePage()
+    public CollegeLeaveCertificatePage() : this(true) { }
+    internal CollegeLeaveCertificatePage(bool initialize)
         : base("College Leaving Certificate", "Create, issue, collect and print leaving certificates for college students.")
     {
         feeReview = new LeaveFeeReviewBar(() => student.SelectedId, () => currentEnrollmentId, () => leave.Value.Date, () => HasCertificateForCurrentEnrollment());
@@ -84,7 +91,8 @@ public sealed class CollegeLeaveCertificatePage : V2Page
         currentClass.TabStop = false;
         TrackStudentSearchStatus(student);
         /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
-        StudentSearchCache.Warm();
+        if(initialize)StudentSearchCache.Warm();
+        student.SelectionChangeGuard=_=>ConfirmDraftDiscard();
         /* Only college students are offered (the class's academic program is College). */
         student.RowFilter = row =>
             row.Table.Columns.Contains("ProgramType") &&
@@ -244,6 +252,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page
         {
             Fail(ex);
         }
+        finally{CaptureDraftBaseline();}
     }
     /// <summary>Finding 5 - ported from the school Leave page.</summary>
     private bool TryPrefillLeaveDateFromExistingWithdrawal(int admissionId)
@@ -407,6 +416,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page
     }
     private void Grid_CellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
     {
+        if(e.RowIndex>=0&&!ConfirmDraftDiscard()){Grid.ClearSelection();Grid.CurrentCell=null;return;}
         if (e.Button != MouseButtons.Left ||
             e.RowIndex < 0 ||
             e.RowIndex >= certificateResults.Rows.Count)
@@ -1240,6 +1250,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page
     }
     private void RefreshCertificates()
     {
+        if(!ConfirmDraftDiscard())return;
         if (student.SelectedId <= 0) return;
         int selectedId = selectedIssueId;
         LoadCertificates(student.SelectedId);
@@ -1293,6 +1304,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page
     }
     private void ClearForm()
     {
+        if(!ConfirmDraftDiscard())return;
         suppressStudentChanged = true;
         try
         {

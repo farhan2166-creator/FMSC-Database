@@ -135,6 +135,7 @@ internal static partial class Program
             CheckAnnualReceiptPreparationGuard();
             CheckStatementRegenerationFreshness();
             CheckAsyncStatementAssembly();
+            CheckNewCertificateDrafts();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();

@@ -250,3 +250,18 @@ speed/RAM claim. Existing performance suites also pass (20,028 + 2,040 + 10,108)
 App and Windows smoke project build without warnings/errors; added delayed
 multi-student assembly/identical-total/export fixtures. Real SQL latency, Windows
 responsiveness and resource measurements remain outstanding. No SQL changes.
+
+## FQA-21 — New certificate drafts are lost on selection/departure
+
+**Confirmed and fixed.** Character, School Leave and College Leave editors now
+expose loaded-baseline dirty tracking for new drafts. User student changes,
+Next Student, Refresh and switching to an issuance check discard first; declining
+an issuance switch clears its misleading highlight without changing the draft.
+The certificate hub's modal route attaches the common page-close guard. Existing
+read-only issuances/reprint wording are not treated as new persisted drafts;
+exam-type storage and optional leaving-clearance business rules are unchanged.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added all-three-editor fixtures for clean loaded defaults, edited wording, modal
+Stay, existing-issuance exclusion and unbound defaults. Native student-picker,
+refresh and real create/print acceptance remains required. No SQL changes.

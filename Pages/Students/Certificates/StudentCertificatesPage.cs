@@ -145,6 +145,7 @@ public sealed class StudentCertificatesPage : V2Page
         var control = factory();
         control.Dock = DockStyle.Fill;
         dialog.Controls.Add(control);
+        ModalPageCloseGuard.Attach(dialog,control);
         dialog.ShowDialog(FindForm());
     }
 }
