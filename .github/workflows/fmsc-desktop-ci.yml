@@ -43,6 +43,10 @@ jobs:
       - name: Compile native WinForms smoke checks
         run: dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
 
+      - name: Run focused post-fix Windows control contracts
+        timeout-minutes: 5
+        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --post-fix
+
       - name: Run portable audit regression checks
         run: dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
 
@@ -63,5 +67,6 @@ jobs:
 # - No installation, signing, or publishing: the release publish target requires
 #   the owner's validated LocalDB MSI and (for fresh installs) detached MDF/LDF.
 # - No SQL mutation/integration tests: those require a disposable test database.
-# - WinForms smoke checks are compiled here, not executed on an unattended runner.
-#   Execute native UI/DPI/printing smoke tests on an interactive Windows desktop.
+# - Only --post-fix control contracts execute here, using injected reads and
+#   confirmation decisions with startup disabled. No school SQL is used.
+# - Full native UI/DPI/printing acceptance needs an interactive Windows desktop.
