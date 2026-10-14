@@ -29,5 +29,10 @@ internal static partial class Program
         Check(bulk.HasUnsavedChanges && workspace.HasUnsavedChanges, "Meaningful bulk fee-rate changes reach the shell dirty contract");
         amount.Value = 0;
         Check(!workspace.HasUnsavedChanges, "Reverting a bulk adjustment restores the clean shell contract");
+        amount.Value = 10;
+        typeof(BulkFeeRateChangesForm).GetMethod("CaptureAppliedBaseline", flags)!.Invoke(bulk, null);
+        Check(!workspace.HasUnsavedChanges, "A committed embedded bulk adjustment does not leave a stale discard warning");
+        amount.Value = 20;
+        Check(workspace.HasUnsavedChanges, "Further bulk adjustment edits are protected after a previous successful apply");
     }
 }

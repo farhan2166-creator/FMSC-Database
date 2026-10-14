@@ -160,7 +160,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         directionIncrease.CheckedChanged += (_, _) => InvalidateBulkPreview();
         directionDecrease.CheckedChanged += (_, _) => InvalidateBulkPreview();
         /* The choices the dialog opened with, taken once the initial scope has finished loading. */
-        loadedSnapshot = EditorState();
+        CaptureAppliedBaseline();
         /* The window's own close (X, Alt+F4, Esc) is guarded the same way; programmatic closes are left alone. */
         FormClosing += (_, e) => {
             if (e.CloseReason == CloseReason.UserClosing)
@@ -590,6 +590,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
             typePercentage.Checked ? "1" : "0",
             directionIncrease.Checked ? "1" : "0",
             adjustmentValue.Value.ToString("0.####"));
+    private void CaptureAppliedBaseline() { loadedSnapshot = EditorState(); discardConfirmed = false; }
     /// <summary>True when the dialog holds choices the operator has not applied.</summary>
     private bool IsDirty() =>
         !savedSuccessfully &&
@@ -686,6 +687,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
             FeeConfigurationChanges.NotifyChanged();
             if (embedded)
             {
+                CaptureAppliedBaseline();
                 /* The tab stays open. The plan is spent - the amounts it was built from have just changed - so it is cleared and a new preview is required. */
                 string done = $"Adjusted {AppliedCount} fee configuration(s). Preview again to see the current amounts.";
                 appliedPreviewSignature = null;
