@@ -78,7 +78,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
             $"Submitted by: {state["SubmittedBy"]} · Approved by: {state["ApprovedBy"]}",
             Convert.ToString(state["ClosingStatus"])!.StartsWith("Needs review"));
     }
-    private static bool IsAdjustment(DataRow row) => Convert.ToString(row["Payment Method"]) is "Refund" or "Correction";
+    private static bool IsAdjustment(DataRow row) => DailyClosingSummary.IsAdjustment(row);
     private ModernButton AddClosingAction(string text, Func<Task> operation, string role) =>
         AddBusyAction(text, async () => {
             try { await operation(); }
@@ -204,16 +204,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
                 !Equals(current["ClosingStatus"], state["ClosingStatus"])) { Warn("This day changed. Load it again before printing."); return; }
             string school = await InstitutionProfile.GetNameAsync();
             if (string.IsNullOrWhiteSpace(school)) { Warn("Complete School Profile before printing."); return; }
-            var printable = amounts.Copy();
-            var total = printable.NewRow();
-            total["Payment Method"] = "TOTAL NET";
-            total["Recorded Amount"] = amounts.AsEnumerable().Sum(r => Convert.ToDecimal(r["Recorded Amount"]));
-            if (amounts.AsEnumerable().Where(r => !IsAdjustment(r)).All(r => !r.IsNull("Actual Amount")))
-            {
-                total["Actual Amount"] = amounts.AsEnumerable().Sum(r => Convert.ToDecimal(r["Actual Amount"]));
-                total["Difference"] = Convert.ToDecimal(total["Actual Amount"]) - Convert.ToDecimal(total["Recorded Amount"]);
-            }
-            printable.Rows.Add(total);
+            var printable = DailyClosingSummary.CreatePrintable(amounts);
             GridPrintJob.ShowPreview(FindForm(), school, "Daily Collection Closing",
                 $"{loadedDay:dd-MMM-yyyy} · {state["ClosingStatus"]} · Revision {state["Revision"]}\n" +
                 $"Submitted: {state["SubmittedBy"]} {state["SubmittedAt"]} · Approved: {state["ApprovedBy"]} {state["ApprovedAt"]}\nNotes: {notes.Text}",
