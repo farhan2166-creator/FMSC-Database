@@ -2608,6 +2608,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         UpdateProcessCollectionAvailability();
     }
     /* This is a business operation (it posts a payment/refund/reversal), not an event boundary, so it returns Task and can be awaited, sequenced and tested. */
+    private BusyScope HoldSubmittedInputs() => BeginBusy(string.Empty, this);
     private async Task ProcessTransaction()
     {
         if (transactionBusy)
@@ -2984,6 +2985,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             {
                 return;
             }
+            using var submittedInputs = HoldSubmittedInputs();
             /* A failure on the third child left the first two children's money committed while the operator was told the collection had failed. */
             DataTable result;
             string recoverySummary = description + "\r\nStudents: " + string.Join(", ",
