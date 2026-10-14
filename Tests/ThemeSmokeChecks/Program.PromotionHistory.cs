@@ -32,7 +32,7 @@ internal static partial class Program
                 new object?[] { null, false }, null)!;
             var promotionType = typeof(BulkPromotionPage);
             T Field<T>(string name) => (T)promotionType.GetField(name, flags)!.GetValue(promotion)!;
-            void Invoke(string name) => promotionType.GetMethod(name, flags)!.Invoke(promotion, null);
+            void Invoke(string name) => promotionType.GetMethod(name, flags, null, Type.EmptyTypes, null)!.Invoke(promotion, null);
             DataTable Lookup(string key, string text, params (int Id, string Name)[] rows)
             {
                 var table = new DataTable(); table.Columns.Add(key, typeof(int)); table.Columns.Add(text, typeof(string));

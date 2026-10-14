@@ -6,7 +6,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Changed
 
-- Renamed Bulk Promotion to **Student Promotion** and moved Promotion History into a window opened from the promotion-details header. History starts with the selected source filters, remains independently filterable and leaves the promotion draft intact. Existing permissions, promotion processing and SQL contracts are unchanged.
+- [PR #15](https://github.com/farhan2166-creator/FMSC-Database/pull/15) renames Bulk Promotion to **Student Promotion** and moves Promotion History into a window opened from the promotion-details header. History starts with the selected source filters, remains independently filterable and leaves the promotion draft intact. Existing permissions, promotion processing and SQL contracts are unchanged.
 
 ### Testing
 
