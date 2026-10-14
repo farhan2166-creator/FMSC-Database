@@ -2,9 +2,15 @@ using System.Text;
 using System.Text.Json;
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Students.Maintenance;
-public sealed class StudentRecordChecksPage : V2Page, IBusyPage
+public sealed class StudentRecordChecksPage : V2Page, IBusyPage, IUnsavedChanges
 {
     private readonly StudentPicker student = new();
+    private string? statusDraftBaseline,enrollmentDraftBaseline;
+    private string StatusDraftState()=>JsonSerializer.Serialize(new{Status=statusCombo.Text,Withdrawal=withdrawalDate.Checked?(DateTime?)withdrawalDate.Value.Date:null,Reason=statusReason.Text.Trim()});
+    private string EnrollmentDraftState()=>JsonSerializer.Serialize(new{selectedEnrollmentId,creatingEnrollment,Placement=classSection.SelectedId,Year=academicYear.SelectedId,Status=enrollmentStatusCombo.Text,Start=enrollmentDate.Value.Date,Leave=leavingDate.Checked?(DateTime?)leavingDate.Value.Date:null,Billing=billingStartDate.Checked?(DateTime?)billingStartDate.Value.Date:null,Legacy=allowLegacyDates.Checked,Reason=enrollmentReason.Text.Trim()});
+    private void CaptureCorrectionBaselines(){statusDraftBaseline=StatusDraftState();enrollmentDraftBaseline=EnrollmentDraftState();}
+    public bool HasUnsavedChanges=>CanCorrect&&student.SelectedId>0&&(creatingEnrollment||statusDraftBaseline is not null&&statusDraftBaseline!=StatusDraftState()||enrollmentDraftBaseline is not null&&enrollmentDraftBaseline!=EnrollmentDraftState());
+    public string UnsavedChangesMessage=>"The student-record correction has unsaved status, placement or reason changes. Discard them?";
     private string gridMode = "Findings";
     /* The three mode loads are async but were guarded only against the student changing. */
     private int gridModeVersion;
@@ -137,6 +143,7 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage
             "Review discrepancies, then open Admission to correct the student record.")
     {
         this.navigate = navigate;
+        student.SelectionChangeGuard=_=>!IsBusy&&(!HasUnsavedChanges||Confirm(UnsavedChangesMessage,UiText.Dialogs.UnsavedChanges));
         /* all three of these write corrections, so each is guarded against a double submit. Scan and Export only read. */
         var scan = AddBusyAction("Scan", () => SetGridMode("Findings"), "Primary");
         var saveStatus = AddBusyAction("Save Status", ()=>RunCorrectionAsync(SaveStatus), "Success");
@@ -576,6 +583,7 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage
     }
     private async Task LoadStudentSnapshot()
     {
+        statusDraftBaseline=enrollmentDraftBaseline=null;
         selectedEnrollmentId = 0;
         creatingEnrollment=false;UpdateEnrollmentActions();
         /* (#10) - a student switch has to clear the ENROLLMENT editor as well as the status one. ClearForm already resets these five; this is the switch path. */
@@ -615,6 +623,7 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage
             }
             UpdateStudentContextHeader(raw);
             statusReason.Clear();
+            CaptureCorrectionBaselines();
         }
         catch (Exception ex) { ClearSnapshotDisplay(); Fail(ex); }
         if (!IsDisposed)
@@ -1078,6 +1087,7 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage
         if (match.Table.Columns.Contains("ClassSectionId"))
             classSection.SelectedValue = Convert.ToInt32(match["ClassSectionId"]);
         enrollmentReason.Clear();
+        enrollmentDraftBaseline=EnrollmentDraftState();
     }
     private Task QuickFix(DataRow finding)
     {
@@ -1439,6 +1449,7 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage
     }
     private async Task ClearForm(bool clearStudentBox = true)
     {
+        if(HasUnsavedChanges&&!Confirm(UnsavedChangesMessage,UiText.Dialogs.UnsavedChanges))return;
         if (clearStudentBox)
             student.Clear();
         selectedEnrollmentId = 0;
@@ -1460,6 +1471,7 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage
         ShowCorrectionTab(CorrectionTab.Status);
         UpdateCorrectionHeader();
         await SetGridMode("Findings");
+        CaptureCorrectionBaselines();
         SetStatus("Cleared.");
     }
 }

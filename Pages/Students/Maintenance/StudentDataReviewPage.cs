@@ -2,10 +2,13 @@ using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Students.Admissions;
 namespace FMSC_SMS.Pages.Students.Maintenance;
 
-public sealed class StudentDataReviewPage : UserControl, IBusyPage
+public sealed class StudentDataReviewPage : UserControl, IBusyPage, IUnsavedChanges
 {
     private readonly TabControl tabs;
     private IEnumerable<IBusyPage> BusyChildren=>tabs.TabPages.Cast<TabPage>().SelectMany(tab=>tab.Controls.Cast<Control>()).OfType<IBusyPage>();
+    private IEnumerable<IUnsavedChanges> DraftChildren=>tabs.TabPages.Cast<TabPage>().SelectMany(tab=>tab.Controls.Cast<Control>()).OfType<IUnsavedChanges>();
+    public bool HasUnsavedChanges=>DraftChildren.Any(page=>page.HasUnsavedChanges);
+    public string UnsavedChangesMessage=>DraftChildren.FirstOrDefault(page=>page.HasUnsavedChanges)?.UnsavedChangesMessage??"Discard the unsaved review changes?";
     public bool IsBusy=>BusyChildren.Any(page=>page.IsBusy);
     public string BusyMessage=>BusyChildren.FirstOrDefault(page=>page.IsBusy)?.BusyMessage??"Wait for the current review operation to finish.";
     public StudentDataReviewPage(Action<Func<Control>,string,string> navigate)

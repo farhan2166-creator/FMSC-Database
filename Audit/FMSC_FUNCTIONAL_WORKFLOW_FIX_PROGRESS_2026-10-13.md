@@ -152,3 +152,17 @@ permission checks remain; synchronous SQL performance is a separate concern.
 Added delayed actual-page correction tests for composite-host busy visibility,
 whole-page control hold, overlapping correction refusal and settled restoration.
 Native SQL and GUI execution remains required. No SQL changes.
+
+## FQA-14 — Unsubmitted correction drafts are invisible to workspace leave
+
+**Confirmed and fixed.** StudentRecordChecksPage implements IUnsavedChanges using
+separate loaded snapshots for status and placement/date/reason fields, including
+missing-record intent. Programmatic successful loads establish clean baselines;
+default fields without a selected student are not drafts. User student changes
+and explicit Clear check discard before replacing the draft. StudentDataReviewPage
+aggregates dirty state from all cached tabs for shell navigation/close.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added loaded-clean, changed reason, billing-date, missing-record and hidden-tab
+aggregation fixtures. Native GUI/discard-dialog acceptance remains required.
+No SQL changes.

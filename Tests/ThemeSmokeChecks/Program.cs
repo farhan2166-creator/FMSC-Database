@@ -129,6 +129,7 @@ internal static partial class Program
             CheckDuplicateBatchSerialization();
             CheckStudentReviewBusyHost();
             CheckStudentCorrectionBusy();
+            CheckCorrectionDraftTracking();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();
