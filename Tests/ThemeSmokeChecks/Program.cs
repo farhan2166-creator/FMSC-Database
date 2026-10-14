@@ -11,10 +11,18 @@ internal static partial class Program
     }
 
     [STAThread]
-    private static void Main()
+    private static void Main(string[] args)
     {
         // Run on a disposable Windows test profile; no SQL/database is used.
         Application.EnableVisualStyles();
+        if(args.Contains("--post-fix"))
+        {
+            CheckQuickRegistrationTabGuard();
+            CheckRegularNewCertificateDraft();
+            CheckCertificateNewDiscard();
+            Console.WriteLine($"PASS: {checks} focused post-fix Windows UI contract checks.");
+            return;
+        }
         var originalTheme = AppTheme.CurrentTheme;
         try
         {

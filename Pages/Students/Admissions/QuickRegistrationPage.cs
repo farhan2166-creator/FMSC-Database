@@ -163,7 +163,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         family.RowFilter=row=>savedStudent==0||Convert.ToInt32(row["AdmissionId"])!=savedStudent;
         family.SelectionCleared+=(_,_)=>{if(applyingRegistration)return;++familyLoadVersion;if(savedStudent==0){familyAnchor=0;familyReference="";}loadingFamily=false;UpdateActions();};
         placement.SelectedIndexChanged+=async(_,_)=>{if(!applyingRegistration)await LoadFeesAsync();};
-        Load+=async(_,_)=>{await LoadLookupsAsync();if(recoveryBlocked)await CheckSaveOutcomeAsync(afterSave:true);else if(preselectRegistrationId>0)await LoadRegistrationAsync(preselectRegistrationId);};UpdateActions();
+        if(initialize)Load+=async(_,_)=>{await LoadLookupsAsync();if(recoveryBlocked)await CheckSaveOutcomeAsync(afterSave:true);else if(preselectRegistrationId>0)await LoadRegistrationAsync(preselectRegistrationId);};UpdateActions();
         SetStatus("Enter the student and placement, review the opening fees, then Save Registration. Use Link Existing Parent for another child of the same parent.");
         if(initialize)ReadRecoveryRecord();UpdateActions();
     }

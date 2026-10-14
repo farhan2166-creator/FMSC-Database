@@ -10,6 +10,15 @@ DataTable Query(string sql,params SqlParameter[] parameters){using var c=Databas
 int checks=0;void Check(bool ok,string label){if(!ok)throw new Exception(label);checks++;Console.WriteLine("PASS: "+label);}
 string Resource(string name){using var input=typeof(MutationKind).Assembly.GetManifestResourceStream(name)!;using var reader=new StreamReader(input);return reader.ReadToEnd();}
 if(args.Contains("--compatibility")){using var c=DatabaseHelper.GetConnection();c.Open();DatabaseCompatibility.Validate(c);Console.WriteLine("PASS: uploaded schema 6 meets production startup and restore compatibility requirements.");return;}
+if(args.Contains("--upgrade-from-4"))
+{
+    using var c=DatabaseHelper.GetConnection();c.Open();c.InfoMessage+=(_,e)=>Console.WriteLine(e.Message);
+    foreach(int version in new[]{5,6})
+    {
+        using var q=new SqlCommand(Resource($"Migration{version}Checks.sql"),c){CommandTimeout=120};q.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource($"Migration{version}.sql")});q.ExecuteNonQuery();
+    }
+    DatabaseCompatibility.Validate(c);Console.WriteLine("PASS: prior user-supplied schema-4 data survives ordered 5/6 upgrades, injected rollback, rerun and current startup validation.");return;
+}
 if(args.Contains("--migration")){
     using var c=DatabaseHelper.GetConnection();c.Open();c.InfoMessage+=(_,e)=>Console.WriteLine(e.Message);
     using var q=new SqlCommand(Resource("Migration6Checks.sql"),c){CommandTimeout=120};q.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource("Migration6.sql")});q.ExecuteNonQuery();
@@ -17,6 +26,7 @@ if(args.Contains("--migration")){
 }
 CurrentUser.UserId=Convert.ToInt32(Query("SELECT TOP(1) U.UserId FROM dbo.Users U JOIN dbo.Roles R ON R.RoleId=U.RoleId WHERE R.RoleName=N'Administrator'").Rows[0][0]);
 int admin=CurrentUser.UserId;
+if(args.Contains("--additional-fee")){await AdditionalFeeChecks.RunAsync(admin);return;}
 var original=Query("SELECT TOP(1) FeePaymentId,AdmissionId,EnrollmentId FROM dbo.FeePayments WHERE Remarks=N'Audit initial collection' AND Status=N'Completed' ORDER BY FeePaymentId DESC").Rows[0];
 int payment=(int)original["FeePaymentId"],admission=(int)original["AdmissionId"],enrollment=(int)original["EnrollmentId"];
 SqlParameter[] Refund(decimal amount)=>new[]{DatabaseHelper.Int("@AdmissionId",admission),DatabaseHelper.Int("@EnrollmentId",enrollment),DatabaseHelper.P("@TransactionType","Refund"),DatabaseHelper.P("@Amount",amount),DatabaseHelper.Date("@TransactionDate",DateTime.Today),DatabaseHelper.P("@PaymentMethod",null),DatabaseHelper.P("@ReferenceNumber",null),DatabaseHelper.P("@Remarks","Exact mutation request fixture"),DatabaseHelper.Int("@FeePaymentId",payment),new SqlParameter("@BillingChargeId",SqlDbType.BigInt){Value=DBNull.Value},new SqlParameter("@Allocations",SqlDbType.Structured){TypeName="dbo.FeePaymentAllocationType",Value=Tvp.FeeAllocations(Array.Empty<(long,decimal)>())}};

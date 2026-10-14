@@ -9,7 +9,9 @@
 **Disposition:** The 25 numbered FQA items have corresponding fix commits and source implementations; release-level acceptance **remains open**. This report identifies **three additional source-level issues** (RFA-01 to RFA-03), plus deployment and SQL fault-injection work that must not be conflated with confirmed defects.  
 **Repo mutations:** This report only. No application, migration, executable, or test project edits.
 
-Related documents: [Functional deep audit](FMSC_FUNCTIONAL_WORKFLOW_DEEP_AUDIT_2026-10-13.md) and [Codex fix progress](FMSC_FUNCTIONAL_WORKFLOW_FIX_PROGRESS_2026-10-13.md).
+Related documents: [consolidated historical audits](FMSC_CONSOLIDATED_HISTORICAL_AUDITS_2026-10-14.md).
+
+**Implementation follow-up:** [RFA fixes and acceptance evidence](FMSC_POST_FIX_IMPLEMENTATION_PROGRESS_2026-10-14.md); [uploaded schema-6 verification](FMSC_DACPAC_SCHEMA6_VERIFICATION_2026-10-14.md). The findings below retain their original pinned-baseline evidence.
 
 ## 1. Executive conclusion
 
