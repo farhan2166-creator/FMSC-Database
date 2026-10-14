@@ -20,6 +20,7 @@
     <Compile Include="../../Core/AtomicTextFile.cs" Link="AtomicTextFile.cs" />
     <Compile Include="../../Core/StudentPhotoInput.cs" Link="StudentPhotoInput.cs" />
     <Compile Include="../../Core/DashboardData.cs" Link="DashboardData.cs" />
+    <Compile Include="../../Core/RecoverableMutation.cs" Link="RecoverableMutation.cs" />
     <Compile Include="../../Core/QuickRegistrationRecovery.cs" Link="QuickRegistrationRecovery.cs" />
     <Compile Include="../../Core/QuickRegistrationRecoveryJournal.cs" Link="QuickRegistrationRecoveryJournal.cs" />
     <Compile Include="../../Core/QuickRegistrationView.cs" Link="QuickRegistrationView.cs" />

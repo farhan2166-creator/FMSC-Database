@@ -56,3 +56,5 @@ Console.WriteLine($"PASS: {RegistrationBillChecks.Run()} student and family bill
 Console.WriteLine($"PASS: {QuickRegistrationRecoveryChecks.Run()} registration commit-outcome and durable recovery checks.");
 
 if(args.Contains("--profile-search"))ReviewFilterProfile.Run();
+
+Console.WriteLine($"PASS: {MutationRecoveryChecks.Run()} mutation commit-outcome and durable journal checks.");

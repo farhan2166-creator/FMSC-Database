@@ -139,6 +139,7 @@ internal static partial class Program
             CheckBankCertificateBusy();
             CheckReturnAdmissionDraft();
             CheckProfileShortcutContext();
+            CheckAdjustmentRecoveryGuard();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();

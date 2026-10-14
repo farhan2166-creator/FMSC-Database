@@ -3,12 +3,17 @@ using FMSC_SMS.Pages.Reports;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.StudentAccounts;
 /// <summary>Complete student payment history with eligibility-aware adjustment controls.</summary>
-public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
+public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChanges
 {
     private readonly LatestReadScope detailReads=new();
     private readonly Func<int,int,int,Task<DataTable>> readPaymentDetails;
     private readonly Action<DataTable>? showPaymentDetails;
+    private bool recoveryBlocked;
+    private MutationIntent? pendingAdjustment;
+    private readonly ModernButton checkOutcome;
     private bool adjusting;
+    public bool HasUnsavedChanges=>recoveryBlocked;
+    public string UnsavedChangesMessage=>"A payment adjustment still needs verification. Its recovery record will be retained when you leave. Check Save Outcome when you return; do not repeat it.";
     public bool IsBusy => adjusting;
     public string BusyMessage => "Please wait for the payment adjustment to finish recording.";
     private readonly StudentPicker student = new();
@@ -81,6 +86,9 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
         /* Correction / Refund / Reversal move money that has already been collected, so a duplicate submission is a duplicate financial transaction. */
         executeButton = AddBusyAction("Execute Adjustment", ExecuteAsync, "Danger");
         detailsButton=AddBusyAction("View Details",ViewPaymentDetailsAsync,"Secondary");
+        checkOutcome=AddAction("Check Save Outcome",async(_,_)=>await CheckAdjustmentOutcomeAsync(),"Secondary");
+        checkOutcome.Visible=false;
+        RelocateFromActions(checkOutcome);
         /* ExecuteAsync checks its own preconditions at the top of its handler - a student must have been loaded and one recorded payment selected. */
         executeButton.EnabledChanged += (_, _) => {
             if (executeButton.Enabled && !ExecuteIsAvailable())
@@ -129,7 +137,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
         adjustmentFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
         adjustmentFields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         adjustmentFields.Controls.Add(fields,0,0);
-        var adjustmentButtons=HumanUi.ButtonRow(load,detailsButton,executeButton);
+        var adjustmentButtons=HumanUi.ButtonRow(load,detailsButton,executeButton,checkOutcome);
         adjustmentButtons.Dock=DockStyle.Top;
         adjustmentFields.Controls.Add(adjustmentButtons,0,1);
         adjustmentCard.Content.Controls.Add(adjustmentFields);
@@ -182,6 +190,8 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
                 "Select the student from the results to see their payment history.");
             return Task.CompletedTask;
         });
+        if(initialize){ReadAdjustmentRecovery();if(recoveryBlocked)Defer(CheckAdjustmentOutcomeAsync);}
+
     }
     private static void ConfigureDecimalInput(ModernTextBox box)
     {
@@ -191,6 +201,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
             if (e.KeyChar == '.' && box.Text.Contains('.'))
                 e.Handled = true;
         };
+
     }
     private const string NoStudentGridMessage =
         "Select a student above to see the payments recorded for them.";
@@ -365,7 +376,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
     }
     /// <summary>The two preconditions ExecuteAsync checks at the top of its handler before it will do anything: a student must have been loaded (admissionId) and one recorded payment must be selected (selectedPaymentId).</summary>
     private bool ExecuteIsAvailable() =>
-        admissionId > 0 && selectedPaymentId > 0 && payments.CurrentRow?.Tag is PaymentAdjustmentState state &&
+        !recoveryBlocked&&admissionId > 0 && selectedPaymentId > 0 && payments.CurrentRow?.Tag is PaymentAdjustmentState state &&
         state.Actions.Contains(operation.Text);
     /// <summary>derives the enabled state of Execute Adjustment from the current selection, so an unavailable action is not offered as a normal operation.</summary>
     private void ApplyActionAvailability()
@@ -374,10 +385,12 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
             return;
         executeButton.Enabled = ExecuteIsAvailable();
         if(detailsButton is not null) detailsButton.Enabled=selectedPaymentId>0;
+        if(checkOutcome is not null){checkOutcome.Visible=recoveryBlocked;checkOutcome.Enabled=recoveryBlocked&&!adjusting;}
     }
     private async Task ExecuteAsync()
     {
-        if (adjusting) return;
+        if (adjusting||recoveryBlocked) return;
+        ++paymentsLoadVersion;detailReads.Cancel();
         adjusting = true;
         using var hold = new BusyScope(string.Empty,
             new Control[] { student, payments, operation, actionAmount, reason, transactionDate, detailsButton },
@@ -478,8 +491,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
                 TypeName = "dbo.FeePaymentAllocationType",
                 Value = Tvp.FeeAllocations(Array.Empty<(long, decimal)>())
             };
-            DataTable result = await DatabaseHelper.QueryUserAsync(
-                "ProcessFeeTransaction",
+            DataTable? result = await SubmitAdjustmentAsync($"{transactionType} · Payment {selectedPaymentId} · Rs. {amount:N0} · {transactionDate.Value:dd MMM yyyy}",
                 DatabaseHelper.Int("@AdmissionId", admissionId),
                 DatabaseHelper.Int("@EnrollmentId", enrollmentId),
                 DatabaseHelper.P("@TransactionType", transactionType),
@@ -491,6 +503,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
                 DatabaseHelper.NullableInt("@FeePaymentId", selectedPaymentId),
                 new SqlParameter("@BillingChargeId", SqlDbType.BigInt) { Value = DBNull.Value },
                 emptyAllocations);
+            if(result is null)return;
             string receipt = result.Rows.Count > 0 && result.Columns.Contains("ReceiptNumber")
                 ? GetText(result.Rows[0], "ReceiptNumber")
                 : string.Empty;
@@ -512,9 +525,64 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
         }
         catch (Exception ex)
         {
-            Fail(ex);
+            ReadAdjustmentRecovery();
+            if(recoveryBlocked)Warn("The adjustment may already be recorded. Use Check Save Outcome before submitting another adjustment. "+DbMessage.UserMessage(ex));else Fail(ex);
         }
-        finally { adjusting = false; }
+        finally { adjusting = false;if(!IsDisposed)ApplyActionAvailability(); }
+    }
+    private void ReadAdjustmentRecovery()
+    {
+        bool wasBlocked=recoveryBlocked;
+        try
+        {
+            pendingAdjustment??=MutationRecoveryJournal.ReadPending(MutationKind.FeeAdjustment);recoveryBlocked=pendingAdjustment is not null;
+            if(wasBlocked&&!recoveryBlocked)
+            {
+                selectedPaymentId=0;selectedPaymentAmount=0m;enrollmentId=0;payments.ClearSelection();payments.CurrentCell=null;
+                SetStatus("Another window resolved the recovery record. Reload payments before choosing another adjustment.",PageStatusKind.Warning);
+            }
+        }
+        catch(Exception ex){recoveryBlocked=true;SetStatus("Retain the adjustment recovery record for review. Do not repeat the adjustment. "+DbMessage.UserMessage(ex),PageStatusKind.Warning);}
+        ApplyActionAvailability();
+        if(pendingAdjustment is not null)SetStatus(pendingAdjustment.Summary+" · Outcome needs checking. Use Check Save Outcome.",PageStatusKind.Warning);
+    }
+    private async Task<DataTable?> SubmitAdjustmentAsync(string summary,params SqlParameter[] args)
+    {
+        int user=CurrentUser.UserId;string scope=await RecoverableMutationWriter.GetScopeAsync();
+        if(IsDisposed||CurrentUser.UserId!=user)throw new InvalidOperationException("The adjustment page or signed-in operator changed before submission.");
+        MutationWriteResult outcome;MutationIntent intent;
+        using(var journal=MutationRecoveryJournal.Begin(MutationKind.FeeAdjustment,user,scope,RecoverableMutationWriter.PayloadHash(MutationKind.FeeAdjustment,user,args),summary))
+        {
+            intent=journal.Intent;pendingAdjustment=intent;recoveryBlocked=true;ApplyActionAvailability();
+            outcome=await RecoverableMutationWriter.SaveAsync(intent,args);
+        }
+        if(outcome.Outcome==MutationOutcome.Unconfirmed){SetStatus("The adjustment outcome is unknown. Use Check Save Outcome; do not repeat it.",PageStatusKind.Warning);return null;}
+        MutationRecoveryJournal.ClearVerified(intent);pendingAdjustment=null;recoveryBlocked=false;ApplyActionAvailability();
+        if(outcome.Outcome==MutationOutcome.Rejected){System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(outcome.Error!).Throw();}
+        LookupDataCache.OperationCompleted("ProcessFeeTransaction");
+        return outcome.Result!.ToTable();
+    }
+    private async Task CheckAdjustmentOutcomeAsync()
+    {
+        if(adjusting||IsDisposed)return;ReadAdjustmentRecovery();if(pendingAdjustment is null)return;
+        adjusting=true;ApplyActionAvailability();
+        MutationResult? verified=null;bool checkedOutcome=false;
+        try
+        {
+            var intent=pendingAdjustment;var saved=await RecoverableMutationWriter.CheckAsync(intent);verified=saved;checkedOutcome=true;
+            MutationRecoveryJournal.ClearVerified(intent);pendingAdjustment=null;recoveryBlocked=false;
+            selectedPaymentId=0;selectedPaymentAmount=0m;enrollmentId=0;payments.ClearSelection();payments.CurrentCell=null;
+            if(saved is null){SetStatus("The earlier adjustment was not recorded. Reload payments and deliberately submit it again only if still needed.",PageStatusKind.Warning);return;}
+            LookupDataCache.OperationCompleted("ProcessFeeTransaction");
+            reason.Clear();actionAmount.Text="0";
+            var found=await StudentSearchCache.FindByAdmissionIdAsync(saved.SubjectId);
+            if(IsDisposed)return;
+            if(found is not null)student.SetStudent(found);else student.SetStudent(saved.SubjectId,"Recovered student");
+            string message=$"Earlier {saved.TransactionType.ToLowerInvariant()} recorded."+(string.IsNullOrWhiteSpace(saved.Receipt)?"":$" Receipt: {saved.Receipt}.");
+            await LoadPaymentsAsync(message,saved.SubjectId);
+        }
+        catch(Exception ex){if(!IsDisposed)Warn((checkedOutcome?(verified is null?"The earlier adjustment was not recorded, but recovery cleanup failed. Reopen this page before submitting again. ":"The earlier adjustment is recorded, but the screen or recovery file could not be refreshed. Do not repeat it. Reopen this page or reload payments. "):"The adjustment outcome is still unresolved. Keep recovery and do not submit it again. ")+DbMessage.UserMessage(ex));}
+        finally{adjusting=false;if(!IsDisposed)ApplyActionAvailability();}
     }
     private async Task ViewPaymentDetailsAsync()
     {

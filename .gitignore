@@ -331,3 +331,9 @@ Database/*.bak
 !/Tests/AdministrationSqlChecks/*.csproj
 
 !Tests/AdministrationSqlChecks/*.sql
+
+!/Tests/MutationSqlChecks/
+/Tests/MutationSqlChecks/*
+!/Tests/MutationSqlChecks/*.cs
+!/Tests/MutationSqlChecks/*.csproj
+!/Tests/MutationSqlChecks/*.sql

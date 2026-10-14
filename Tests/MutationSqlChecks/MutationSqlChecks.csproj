@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+    <Compile Include="../../Core/RecoverableMutation.cs" Link="RecoverableMutation.cs" />
+    <Compile Include="../../Core/RecoverableMutationWriter.cs" Link="RecoverableMutationWriter.cs" />
+    <Compile Include="../../Core/WholeRupees.cs" Link="WholeRupees.cs" />
+    <Compile Include="../../Core/Tvp.cs" Link="Tvp.cs" />
+    <Compile Include="../../Core/DatabaseCompatibility.cs" Link="DatabaseCompatibility.cs" />
+    <Compile Include="../../Core/DatabaseCompatibilityFailure.cs" Link="DatabaseCompatibilityFailure.cs" />
+    <EmbeddedResource Include="../../Core/DatabaseCompatibilityRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseCompatibilityRequirements.json" />
+    <EmbeddedResource Include="../../Core/DatabaseMigrationRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseMigrationRequirements.json" />
+    <EmbeddedResource Include="../../Migrations/6.sql" LogicalName="Migration6.sql" />
+    <EmbeddedResource Include="Migration6Checks.sql" LogicalName="Migration6Checks.sql" />
+    <Using Include="System.Data" /><Using Include="FMSC_SMS" />
+  </ItemGroup>
+</Project>

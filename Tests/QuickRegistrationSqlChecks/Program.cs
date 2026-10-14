@@ -23,16 +23,17 @@ if(args.Contains("--migration-4"))
     using var command=new SqlCommand(Resource("Migration4Checks.sql"),connection){CommandTimeout=120};
     command.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource("Migration4.sql")});command.ExecuteNonQuery();
     using(var upgrade=new SqlCommand(Resource("Migration5Checks.sql"),connection){CommandTimeout=120}){upgrade.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource("Migration5.sql")});upgrade.ExecuteNonQuery();}
+    using(var latest=new SqlCommand(Resource("Migration6.sql"),connection){CommandTimeout=120})latest.ExecuteNonQuery();
     DatabaseCompatibility.Validate(connection);
     Console.WriteLine("PASS: application startup contract validates migration 4's additive table, columns, uniqueness and foreign keys");
-    Console.WriteLine("PASS: 9 migration-4 checks plus 4 migration-5 rollback, rerun and preservation checks on a disposable version-3 database.");
+    Console.WriteLine("PASS: 9 migration-4 checks plus 4 migration-5 rollback, rerun and preservation checks, upgraded to schema 6 on a disposable version-3 database.");
     return;
 }
 int checks=0;
 void Assert(bool ok,string label){if(!ok)throw new Exception(label);Console.WriteLine("PASS: "+label);checks++;}
 async Task Refused(Func<Task> action,string label)
 {try{await action();}catch(InvalidOperationException e) when(e.Message.Contains("changed",StringComparison.OrdinalIgnoreCase)){Console.WriteLine("PASS: "+label);checks++;return;}throw new Exception("Expected stale-state refusal: "+label);}
-Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="5","migration 5 installed on clone");
+Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="6","migration 6 installed on clone");
 using(var compatible=DatabaseHelper.GetConnection()){
     compatible.Open();DatabaseCompatibility.Validate(compatible);
     Assert(true,"production startup/restore compatibility contract accepts migrated schema");
@@ -306,7 +307,7 @@ using(var c=DatabaseHelper.GetConnection()){
 Query("ALTER TABLE dbo.QuickRegistrationRequests DROP CONSTRAINT UQ_QuickRegistrationRequests_AdmissionId;");
 try{
     try{using var missing=DatabaseHelper.GetConnection();missing.Open();DatabaseCompatibility.Validate(missing);throw new Exception("Missing request uniqueness passed startup");}
-    catch(DatabaseCompatibilityException){Assert(true,"startup rejects a version-5 database missing the new recovery uniqueness safeguard");}
+    catch(DatabaseCompatibilityException){Assert(true,"startup rejects a migrated database missing quick-registration recovery uniqueness");}
 }finally{Query("ALTER TABLE dbo.QuickRegistrationRequests ADD CONSTRAINT UQ_QuickRegistrationRequests_AdmissionId UNIQUE(AdmissionId);");}
 // Quick Registration fee controls and optional phone exercise production SQL.
 var optional=Query("""

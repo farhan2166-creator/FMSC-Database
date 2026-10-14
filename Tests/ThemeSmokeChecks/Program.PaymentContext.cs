@@ -38,4 +38,16 @@ internal static partial class Program
         var late=Start();page.Dispose();pending.Dequeue().SetResult(new DataTable());PumpUntil(()=>late.IsCompleted,"Disposed details response settles");Check(previews==1&&late.IsCompletedSuccessfully,"Payment details cannot open after their owner is disposed");
     }
 
+    private static void CheckAdjustmentRecoveryGuard()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(StudentFeeAdjustmentsPage);
+        using var page=(StudentFeeAdjustmentsPage)Activator.CreateInstance(type,flags,null,new object[]{false},null)!;
+        type.GetField("recoveryBlocked",flags)!.SetValue(page,true);type.GetMethod("ApplyActionAvailability",flags)!.Invoke(page,null);
+        var check=(ModernButton)type.GetField("checkOutcome",flags)!.GetValue(page)!;var execute=(ModernButton)type.GetField("executeButton",flags)!.GetValue(page)!;
+        Check(check.Enabled&&!execute.Enabled&&page.HasUnsavedChanges,"An unresolved adjustment exposes its exact outcome check and blocks another financial write");
+        var refused=(Task)type.GetMethod("ExecuteAsync",flags)!.Invoke(page,null)!;
+        Check(refused.IsCompletedSuccessfully&&!page.IsBusy,"Runtime submission guard refuses a write while recovery is unresolved before any validation or SQL");
+        Check(page.UnsavedChangesMessage.Contains("retained")&&!page.IsHandleCreated,"Leaving unresolved adjustment explains durable recovery without starting database work");
+    }
+
 }

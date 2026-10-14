@@ -318,3 +318,35 @@ selection guidance. Existing target factories and role/SQL gates are unchanged.
 Added blank-profile refusal, selected-student navigation and cleared-identity
 fixtures without opening destination forms or querying SQL. Native keyboard and
 permission acceptance remains required. No SQL changes.
+
+
+## FQA-06 — An uncertain fee-adjustment reply permits a duplicate refund
+
+**Confirmed and fixed.** Reproduced two partial refunds using identical ordinary
+procedure parameters after discarding the first committed reply. Each adjustment
+now persists a small, flushed local request identity before SQL, commits the
+existing operation and its exact result marker together, and blocks further
+adjustments while its outcome is uncertain. Check Save Outcome performs a locked,
+read-only lookup; unresolved or damaged recovery is retained. Confirmed recovery
+clears the old payment selection, shows the authoritative receipt and refreshes
+history; confirmed absence requires deliberate reselection, with no automatic
+write retry. Cross-database, changed-payload and unauthorized recovery are refused.
+
+**SQL:** `Migrations/6.sql` atomically upgrades version 5 to 6 with request/result
+foreign keys and JSON/type safeguards. Business procedures, role definitions and
+existing school records are unchanged. App and installer require version 6;
+startup verifies the additive schema. The shared protocol also supports bank
+creation, whose page integration is the separate FQA-25 change.
+
+**Verification:** 14 portable recovery/journal checks; 21 native SQL recovery
+checks covering lost committed replies for Refund/Correction/Reversal, same-request
+and concurrent replay, marker-failure rollback, locked unresolved requests, scope,
+payload and permission rejection; four migration rollback/rerun/preservation
+checks and startup validation; all 72 existing quick-registration SQL checks also
+pass on schema 6. App and Windows smoke project build with zero warnings/errors. SQL ran only on a disposable loopback clone of the
+reviewed v3 DACPAC plus migrations; the relevant procedure bodies in the uploaded
+v4 DACPAC were compared and are identical. Windows page recovery fixtures compile;
+actual Windows interaction and real transport loss remain acceptance work.
+The native harness reports NU1900 because NuGet vulnerability metadata is currently
+unreachable; this did not prevent compilation or SQL checks. The uploaded DACPAC's
+full new baseline approval remains a separate review, not silently replaced here.
