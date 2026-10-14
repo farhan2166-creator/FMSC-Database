@@ -17,6 +17,14 @@ internal static partial class Program
         Application.EnableVisualStyles();
         if(args.Contains("--post-fix"))
         {
+            CheckShortcutPermissions();
+            CheckClosingWholeAmounts();
+            CheckPaletteDestinations();
+            CheckSubmittedInputHolds();
+            CheckMeaningfulCertificateContent();
+            CheckSelectiveWorkspaceGuards();
+            CheckLifecycleCloseGuard();
+            CheckCertificateSubmissionGuard();
             CheckQuickRegistrationTabGuard();
             CheckRegularNewCertificateDraft();
             CheckCertificateNewDiscard();

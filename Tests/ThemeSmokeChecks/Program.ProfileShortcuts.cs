@@ -1,10 +1,22 @@
 using System.Reflection;
 using FMSC_SMS.Core;
+using FMSC_SMS.Pages.Security;
 using FMSC_SMS.Pages.Students.Profile;
 
 internal static partial class Program
 {
     private static void CheckProfileShortcutContext()
+    {
+        var previous = (CurrentUser.UserId, CurrentUser.Username, CurrentUser.RoleName,
+            CurrentUser.MustChangePassword, CurrentUser.GetPermissions().ToArray());
+        try
+        {
+            CurrentUser.SignIn(903, "Profile fixture", "Administrator", false, Array.Empty<string>());
+            CheckAdministratorProfileShortcuts();
+        }
+        finally { CurrentUser.SignIn(previous.UserId, previous.Username, previous.RoleName, previous.MustChangePassword, previous.Item5); }
+    }
+    private static void CheckAdministratorProfileShortcuts()
     {
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;int opens=0;
         Action<Func<Control>,string,string> navigate=(_,_,_)=>opens++;

@@ -6,6 +6,26 @@
 
 > **Release acceptance: PENDING.** A passing Windows CI build verifies automated tests, not a complete installer on a real school PC. Do not deploy as an unqualified production release until the deployment and operator checks below are recorded. This document is a consolidation of recorded evidence, not a new execution of all tests.
 
+## End-user-flow corrections under review
+
+The merged [end-user-flow audit](FMSC_END_USER_FLOW_AUDIT_2026-10-14.md) remains historical evidence at its reviewed source. [PR #8](https://github.com/farhan2166-creator/FMSC-Database/pull/8) proposes the corrections below on a separate branch; it is not an automatic merge or deployment approval.
+
+**Reviewed implementation:** [`5b664f3952feeef339a0af1b9ca4c39c553357a2`](https://github.com/farhan2166-creator/FMSC-Database/commit/5b664f3952feeef339a0af1b9ca4c39c553357a2). [Windows CI run 38554464212](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38554464212) completed successfully: Release compilation (zero warnings/errors), 148 focused Windows control checks, 657 portable checks, 32,183 synthetic performance/state checks, 273 SQL-module fingerprints, 12 schema-artifact tests, Windows PowerShell verification, full disposable publication and altered-DACPAC rejection. These are focused automated checks, not an interactive deployment acceptance.
+
+| Finding | Current correction / owner decision | Automated evidence and remaining acceptance |
+|---|---|---|
+| UFA-01 | Sports/Provisional/NOC creation rejects re-entry, holds all inputs and preserves save-result feedback | Actual delayed injected writes, forced field events and duplicate/direct-action attempts; live SQL/network outcome acceptance remains |
+| UFA-02 | Lifecycle dialogs refuse closing during review/apply, hold review inputs and discard obsolete responses | Delayed preview/apply, stale review, failure/retry and Changed-before-close fixtures; actual closure/go-live on disposable representative SQL remains |
+| UFA-03 | Classes & Sections forwards busy saves. **Owner accepts abandoning small setup drafts without a new prompt.** Embedded bulk fee drafts reach the shell and reset after successful apply | Selective workspace contract, revert/commit/new-edit baseline fixtures; real bulk apply and navigation acceptance remains |
+| UFA-04 | Meaningful new sports/provisional content is dirty; date-only untouched dialogs remain abandonable | Content/subject, clear/revert and modal Stay fixtures; normal operator flow acceptance remains |
+| UFA-05 | Submitted admission/collection inputs stay held across asynchronous writes and refreshes | Native input-scope restoration and actual delayed photo-only admission Save; full fee transaction SQL and failed-refresh acceptance remains |
+| UFA-06 | Ctrl+K uses permitted destinations, independent of hidden/captionless sidebar buttons | Compact/hidden destination search, dispatch and permission recheck fixtures; keyboard/DPI acceptance remains |
+| UFA-07 | Closing print skips intentionally blank adjustment actuals without inventing counted values | Portable net-total, unchecked-method, source-preservation and historical precision fixtures; physical print acceptance remains |
+| UFA-08 | New closing actuals require whole rupees; printing preserves existing two-decimal history | Native cell-validation and Submit-before-SQL rejection; historical fractional SQL records remain unchanged and should be reviewed manually |
+| UFA-09 | Report/photo/family/receipt shortcuts follow destination requirements; read-only review stays accessible | Native viewing-only, Accountant access subsets and full-authority Administrator fixtures; real account acceptance remains |
+
+No SQL, migration, reviewed DACPAC, installer, financial transaction/recovery implementation or role-grant definitions changed in this patch. Schema provenance and all 273 SQL-module fingerprints remain verified. Earlier installer/release statuses below retain their original evidence; this UI patch does not revalidate a production installation.
+
 ## Active status
 
 | Finding or area | Current disposition | What is still needed |

@@ -7,7 +7,7 @@
 1. Open the installed FMSC_SMS shortcut or executable.
 2. If the database connection screen appears, wait for it to confirm the correct school data. If it reports an error, follow [connection recovery](BACKUP_RECOVERY.md#when-the-app-cannot-connect); do not create a replacement database.
 3. Sign in using your authorized account. A first-run setup or required password-change prompt must be completed by the appropriate administrator.
-4. Open the relevant workspace from the dashboard or navigation. Use the navigation groups below rather than editing database files manually.
+4. Open the relevant workspace from the dashboard or navigation. Ctrl+K searches all destinations your account can open, including collapsed and compact sidebar entries. Use the navigation groups below rather than editing database files manually.
 
 ## Common workspaces
 
@@ -41,16 +41,27 @@ Screen naming and source mapping: [PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md
 
 **Quick Registration:** Creates a pending student with temporary reference and reviewed opening charges. The **Registration Form** supports editing pending details; **Pending Registrations** supports searching and reviewing. Confirmation allocates official admission and registration numbers. Pending students are excluded from normal monthly fee posting, promotion and official certificates. Existing paid charges must not be casually reversed or reposted.
 
+Admission saves hold the submitted details until saving and refresh finish. For **Mark as Left / Cancel Registration** or **Legacy Go Live**, Review holds the inputs; changing them after review requires another review. Wait for a pending operation to finish before closing.
+
 For business-rule context see [ADMISSION_WORKFLOW.md](../ADMISSION_WORKFLOW.md). The current runtime requires schema 6 even if historical text in that file refers to older database versions.
 
 ## Unsaved edits and unresolved transactions
 
 - If **Stay / Discard** is offered, select **Stay** to keep the current unsaved draft.
-- If an operation is busy, wait; the app intentionally blocks navigation during several write flows.
+- Small Classes & Sections drafts can be left without a discard prompt; active saves must finish. Bulk fee-rate adjustments are protected when leaving the finance workspace, and a successful apply starts a clean baseline.
+- New sports/provisional certificate wording and result details use the existing discard guards. Opening an untouched dialog or changing only its new default date remains freely abandonable.
+- Certificate creation holds inputs through saving and refresh, refuses a second submission, and preserves the returned result message.
+- Admission and fee collection hold submitted inputs until the pending write and refresh finish. Correct invalid entries before submission; failed saves restore editing.
 - If a save times out, disconnects or gives uncertain feedback, **do not create a new transaction to test whether it worked**. Use the page's reconciliation action, then ask the administrator if necessary.
 - A printed report or exported CSV/PDF is a copy of selected data; verify filters and avoid sharing student or financial documents with unauthorized recipients.
 
+## Daily Collection Closing
+
+Enter whole-rupee actual amounts. Leave Refund/Correction actuals blank and explain their impact in Notes; blank ordinary methods remain unchecked. Printed totals include recorded adjustments without inventing counted amounts. Historical stored fractions remain visible at their original precision and are not silently rounded when printing.
+
 ## Roles, personal data and help
+
+Administrator retains full authority, and Accountant grants are unchanged. Dashboard Student Reports requires student and report access. Profile photo/family/receipt shortcuts follow their destination permissions; read-only student data review remains available with student viewing access. Disabled shortcuts explain missing access or student selection.
 
 Administrators maintain user accounts and permissions. General tasks require role-specific access; do not use another employee's login to bypass permissions.
 
