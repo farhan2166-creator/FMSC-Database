@@ -48,7 +48,8 @@ internal static partial class Program
             {
                 var lookup = Field<LookupBox>(item.Field); lookup.Bind(item.Data, item.Key, item.Text); lookup.SelectedValue = item.Id;
             }
-            var candidates = new DataTable(); candidates.Columns.Add("Selected", typeof(bool)); candidates.Rows.Add(true);
+            var candidates = new DataTable(); candidates.Columns.Add("Selected", typeof(bool));
+            candidates.Columns.Add("Decision", typeof(string)); candidates.Rows.Add(true, "PROMOTE");
             promotionType.GetField("candidateData", flags)!.SetValue(promotion, candidates);
             Field<ModernTextBox>("remarks").Text = "Retain this promotion draft";
             using var parent = new Form { ClientSize = new Size(1080, 650), AutoScaleMode = AutoScaleMode.None };
