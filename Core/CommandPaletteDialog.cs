@@ -1,11 +1,15 @@
 namespace FMSC_SMS.Core;
+public sealed record NavigationCommand(string Caption, Action Execute)
+{
+    public override string ToString() => Caption;
+}
 public sealed class CommandPaletteDialog : ApplicationWindowForm
 {
     private readonly TextBox search = new();
     private readonly ListBox results = new();
-    private readonly IReadOnlyList<Control> source;
-    public Button? SelectedButton { get; private set; }
-    public CommandPaletteDialog(IReadOnlyList<Control> source, string? initialQuery = null)
+    private readonly IReadOnlyList<NavigationCommand> source;
+    public NavigationCommand? SelectedCommand { get; private set; }
+    public CommandPaletteDialog(IReadOnlyList<NavigationCommand> source, string? initialQuery = null)
     {
         this.source = source;
         Text = "Search FMSC";
@@ -97,14 +101,14 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
         results.Items.Clear();
         /* UX - every word typed has to match, in any order ("fee coll" or "collection fee"), instead of the whole phrase having to appear exactly as typed. */
         var words = query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        foreach (var button in source)
+        foreach (var command in source)
         {
-            if (!button.Visible || string.IsNullOrWhiteSpace(button.Text))
+            if (string.IsNullOrWhiteSpace(command.Caption))
                 continue;
-            string caption=AppHotKeys.PlainCaption(button.Text);
+            string caption=command.Caption;
             if (words.Length > 0 && !words.All(w => caption.Contains(w, StringComparison.OrdinalIgnoreCase)))
                 continue;
-            results.Items.Add(caption);
+            results.Items.Add(command);
         }
         results.EndUpdate();
         if (results.Items.Count > 0)
@@ -132,10 +136,10 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
     }
     private void Accept()
     {
-        if (results.SelectedItem is not string text)
+        if (results.SelectedItem is not NavigationCommand command)
             return;
-        SelectedButton = source.FirstOrDefault(b => b.Visible && string.Equals(AppHotKeys.PlainCaption(b.Text), text, StringComparison.Ordinal)) as Button;
-        if (SelectedButton != null)
+        SelectedCommand = command;
+        if (SelectedCommand != null)
             DialogResult = DialogResult.OK;
     }
 }
