@@ -5,10 +5,11 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import urllib.error
 import urllib.request
 
-from refresh_dacpac import ROOT, SYNC_PATHS, Refusal, git, verify
+from refresh_dacpac import ROOT, SYNC_PATHS, Refusal, git, verify, select_approval_anchor
 
 WORKFLOWS = ("fmsc-desktop-ci.yml", "fmsc-security.yml", "fmsc-lifecycle-sql-ci.yml")
 
@@ -32,8 +33,9 @@ class GitHub:
 def publish(project, anchor, source, repository, actor, event, ref, api):
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) or not re.fullmatch(r"[A-Za-z0-9_\[\]-]{1,100}", actor):
         raise Refusal("INVALID_GITHUB_IDENTITY")
-    if not re.fullmatch(r"[a-f0-9]{40}", source) or source != anchor:
-        raise Refusal("DEFAULT_BRANCH_APPROVAL_ANCHOR_REQUIRED")
+    if not re.fullmatch(r"[a-f0-9]{40}", source) or not re.fullmatch(r"[a-f0-9]{40}", anchor):
+        raise Refusal("FULL_SOURCE_AND_APPROVAL_COMMITS_REQUIRED")
+    git(project, "merge-base", "--is-ancestor", anchor, source)
     base = "/repos/" + repository
     info = api("GET", base)
     default = info["default_branch"]
@@ -97,12 +99,14 @@ def publish(project, anchor, source, repository, actor, event, ref, api):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=ROOT)
-    parser.add_argument("--approval-ref", required=True)
+    parser.add_argument("--approval-ref", help="Explicit reviewed anchor for local maintainers; Actions always computes its own pre-refresh anchor.")
     args = parser.parse_args()
     try:
-        result = publish(args.project, args.approval_ref, os.environ["GITHUB_SHA"], os.environ["GITHUB_REPOSITORY"],
+        source = os.environ["GITHUB_SHA"]
+        anchor = args.approval_ref or select_approval_anchor(args.project, source, os.environ["GITHUB_EVENT_NAME"], os.environ.get("GITHUB_EVENT_BEFORE", ""))
+        result = publish(args.project, anchor, source, os.environ["GITHUB_REPOSITORY"],
                          os.environ["GITHUB_TRIGGERING_ACTOR"], os.environ["GITHUB_EVENT_NAME"], os.environ["GITHUB_REF"], GitHub(os.environ["GH_TOKEN"]))
-    except (Refusal, KeyError, OSError, ValueError) as ex:
+    except (Refusal, KeyError, OSError, ValueError, subprocess.SubprocessError) as ex:
         code = str(ex) if isinstance(ex, Refusal) else "PUBLISHER_CONFIGURATION_OR_CONNECTION_FAILED"
         print("DACPAC PR publication refused: " + code)
         print("For HTTP 403, check repository Settings > Actions > General > Allow GitHub Actions to create and approve pull requests. No token or visibility change is automatic.")

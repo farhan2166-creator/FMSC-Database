@@ -5,7 +5,7 @@ A re-export can change ZIP/export metadata without changing schema or data. Appl
 ## Owner workflow
 
 1. Commit the refreshed `FMSC.dacpac` to the private repository as usual. Keep original MDF/LDF, backups and credentials off GitHub. Do not edit approval hashes manually.
-2. **FMSC DACPAC refresh verification** compares it with the previously approved Git blob, anchored to trusted default/base-branch records. PR comparison is read-only. Automatic writing starts only when the source is on the trusted default branch.
+2. **FMSC DACPAC refresh verification** compares it with the previously approved Git blob. Pushes use the previous main commit, PRs use their trusted base, and manual default-branch runs use the parent of the latest artifact change. A refresh cannot approve itself by changing all hashes together. PR comparison is read-only; writing starts only on the trusted default branch.
 3. A safe `main` refresh prepares `automation/dacpac-refresh-<source-commit>` and a focused synchronization PR. It preserves `FMSC.dacpac` and updates only the alignment records below.
 4. Review **Desktop CI**, **Security Checks** and **Level 1 lifecycle SQL** on that exact revision, then merge manually. GITHUB_TOKEN-created PRs suppress ordinary PR events, so the publisher explicitly dispatches those existing workflows on the generated branch.
 5. Update older feature branches from the corrected `main` before retesting. A later export is compared with the newly approved artifact.

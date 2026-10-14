@@ -46,6 +46,29 @@ def git_blob(data):
     return hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
 
 
+def select_approval_anchor(project, source, event, before=""):
+    if not re.fullmatch(r"[a-f0-9]{40}", source):
+        raise Refusal("FULL_SOURCE_COMMIT_REQUIRED")
+    if event == "push":
+        if not re.fullmatch(r"[a-f0-9]{40}", before) or before == "0" * 40:
+            raise Refusal("PREVIOUS_MAIN_COMMIT_REQUIRED")
+        anchor = before
+    elif event == "workflow_dispatch":
+        # Compare with the approval BEFORE the latest artifact change. A commit
+        # cannot bless changed school data merely by editing all hashes too.
+        changes = git(project, "rev-list", "--first-parent", source, "--", "FMSC.dacpac").decode().splitlines()
+        if not changes: raise Refusal("PREVIOUS_ARTIFACT_APPROVAL_NOT_FOUND")
+        try: anchor = git(project, "rev-parse", changes[0] + "^1").decode().strip()
+        except subprocess.SubprocessError: raise Refusal("PREVIOUS_ARTIFACT_APPROVAL_NOT_FOUND") from None
+    else:
+        raise Refusal("UNTRUSTED_SYNCHRONIZATION_EVENT")
+    try:
+        subprocess.run(["git", "-C", str(project), "merge-base", "--is-ancestor", anchor, source],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+    except subprocess.SubprocessError: raise Refusal("APPROVAL_ANCHOR_NOT_IN_SOURCE_HISTORY") from None
+    return anchor
+
+
 def read_json(data):
     def pairs(items):
         value = {}
@@ -357,18 +380,28 @@ def write_report(folder, report):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=ROOT)
-    parser.add_argument("--approval-ref", required=True, help="Full trusted default/base commit; approvals and baseline come from its Git history.")
+    parser.add_argument("--approval-ref", help="Explicit full reviewed base commit. Workflow operation selects a pre-refresh anchor automatically.")
     parser.add_argument("--report-dir", type=Path, required=True)
     parser.add_argument("--sync", action="store_true", help="Write only alignment proved safe by this verification.")
     args = parser.parse_args()
-    report, updates = verify(args.project.resolve(), args.approval_ref)
+    anchor = args.approval_ref
+    if anchor is None:
+        try:
+            anchor = select_approval_anchor(args.project.resolve(), os.environ["GITHUB_SHA"], os.environ["GITHUB_EVENT_NAME"], os.environ.get("GITHUB_EVENT_BEFORE", ""))
+        except (Refusal, KeyError, OSError, subprocess.SubprocessError) as ex:
+            code = str(ex) if isinstance(ex, Refusal) else "TRUSTED_APPROVAL_CONTEXT_UNAVAILABLE"
+            write_report(args.report_dir, {"result": "REVIEW_REQUIRED", "approvalCommit": "unavailable", "policy": "exact-model-and-data-v1",
+                "differences": [], "reasons": [code], "changedApprovalFiles": [], "fixtureRegenerated": False})
+            print("DACPAC refresh refused: " + code + ". For local use, supply a full reviewed --approval-ref.")
+            return 1
+    report, updates = verify(args.project.resolve(), anchor)
     if args.sync and report["result"] != "REVIEW_REQUIRED":
         original = {name: (args.project / name).read_bytes() for name in updates}
         try:
             if sha((args.project / "FMSC.dacpac").read_bytes()) != report["candidatePackageSha256"]:
                 raise Refusal("CANDIDATE_CHANGED_BEFORE_SYNCHRONIZATION")
             synchronize(args.project.resolve(), updates)
-            confirmed, _ = verify(args.project.resolve(), args.approval_ref)
+            confirmed, _ = verify(args.project.resolve(), anchor)
             if confirmed["result"] != "ALIGNED":
                 raise Refusal("SYNCHRONIZATION_POSTCHECK_FAILED")
         except Exception:

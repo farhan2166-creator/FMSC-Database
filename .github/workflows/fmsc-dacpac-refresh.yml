@@ -68,7 +68,8 @@ jobs:
       - name: Compare model, data and compatibility to trusted Git approval
         id: compare
         env:
-          APPROVAL_REF: ${{ github.event.pull_request.base.sha || github.sha }}
+          APPROVAL_REF: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
+          GITHUB_EVENT_BEFORE: ${{ github.event.before || '' }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
@@ -83,8 +84,12 @@ jobs:
             verifier=Tools/refresh_dacpac.py
             echo 'Bootstrap PR: verifier is under review; no write operation is permitted.'
           fi
-          python "$verifier" --project "$GITHUB_WORKSPACE" \
-            --approval-ref "$APPROVAL_REF" --report-dir "$RUNNER_TEMP/fmsc-refresh-evidence"
+          if test -n "$APPROVAL_REF"; then
+            python "$verifier" --project "$GITHUB_WORKSPACE" --approval-ref "$APPROVAL_REF" \
+              --report-dir "$RUNNER_TEMP/fmsc-refresh-evidence"
+          else
+            python "$verifier" --project "$GITHUB_WORKSPACE" --report-dir "$RUNNER_TEMP/fmsc-refresh-evidence"
+          fi
           python - <<'PY'
           import json, os
           from pathlib import Path
@@ -139,7 +144,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
-        run: python3 Tools/publish_dacpac_refresh.py --approval-ref "$GITHUB_SHA"
+          GITHUB_EVENT_BEFORE: ${{ github.event.before || '' }}
+        run: python3 Tools/publish_dacpac_refresh.py
 
 # The short publisher job rechecks source/actor permissions and compares again.
 # It executes only reviewed default-branch Python, never candidate PR code.

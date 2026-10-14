@@ -324,6 +324,31 @@ class RefreshChecks(unittest.TestCase):
         with self.assertRaisesRegex(refresh.Refusal, "REFRESH_REQUIRES_REVIEW"): run()
         self.assertFalse(any(method != "GET" for method, _, _ in calls))
 
+    def test_push_uses_previous_approval_not_self_declared_hashes(self):
+        run, _, _, source = self.publisher_fixture()
+        self.assertEqual(self.anchor, refresh.select_approval_anchor(self.root, source, "push", self.anchor))
+        self.assertEqual(self.anchor, refresh.select_approval_anchor(self.root, source, "workflow_dispatch"))
+
+    def test_material_data_cannot_self_approve_on_manual_dispatch(self):
+        parts = self.parts.copy(); parts["Data/dbo.SyntheticFixture/rows.BCP"] += b"fictional added row"
+        value = self.candidate(parts)
+        _, _, _, actual = refresh.fingerprint(refresh.archive(value), value)
+        contract = copy.deepcopy(self.contract); contract["schemaArtifact"]["sha256"] = actual["packageSha256"]
+        provenance = self.provenance | {"sourceGitBlob": refresh.git_blob(value), "sourcePackageSha256": actual["packageSha256"]}
+        for name, record in {refresh.APPROVAL: actual, refresh.CONTRACT: contract, refresh.PROVENANCE: provenance}.items():
+            (self.root / name).write_text(json.dumps(record))
+        subprocess.run(["git", "-C", str(self.root), "add", "."], check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(self.root), "-c", "commit.gpgsign=false", "commit", "-m", "Synthetic self-declared approval"], check=True, capture_output=True)
+        source = refresh.git(self.root, "rev-parse", "HEAD").decode().strip()
+        selected = refresh.select_approval_anchor(self.root, source, "workflow_dispatch")
+        self.assertEqual(self.anchor, selected)
+        report, updates = refresh.verify(self.root, selected)
+        self.assertEqual("REVIEW_REQUIRED", report["result"]); self.assertFalse(updates); self.assertIn("PAYLOAD_CHANGED", report["reasons"])
+
+    def test_invalid_push_anchor_refused(self):
+        with self.assertRaisesRegex(refresh.Refusal, "PREVIOUS_MAIN_COMMIT_REQUIRED"):
+            refresh.select_approval_anchor(self.root, self.anchor, "push", "0" * 40)
+
     def test_synchronization_rolls_back_on_write_failure(self):
         self.candidate(); _, updates = self.check()
         original = {p: (self.root / p).read_bytes() for p in updates}
