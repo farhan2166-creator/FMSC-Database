@@ -4,6 +4,9 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ## [Unreleased]
 
+### Fixed
+- Certificate creation keeps inputs locked and refuses repeat submission until the pending write finishes (UFA-01).
+
 ### Documentation
 - Added a project overview and operator, installation, recovery, architecture, release-readiness, and development-workflow guides.
 - Added a pull-request template prompting contributors and Codex to explain behavior changes, safety implications, tests, and manual acceptance requirements.

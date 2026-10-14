@@ -1,4 +1,5 @@
 using FMSC_SMS.Core;
+using Microsoft.Data.SqlClient;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyPage
@@ -8,6 +9,8 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     public bool IsBusy => creatingCertificate;
     public string BusyMessage => "Please wait for the certificate to finish saving.";
     private bool creatingCertificate;
+    private readonly Func<SqlParameter[], Task> writeCertificate;
+    private readonly Func<int, DataTable> readCertificates;
     private readonly StudentPicker student = new();
     private readonly ModernDatePicker certificateDate =
         HumanUi.Date();
@@ -43,37 +46,15 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
-    public NoObjectionCertificatePage()
+    public NoObjectionCertificatePage() : this(true) { }
+    internal NoObjectionCertificatePage(bool initialize, Func<SqlParameter[], Task>? writeCertificate = null,
+        Func<int, DataTable>? readCertificates = null)
         : base("No Objection Certificate", "Record and print No Objection Certificates (NOC) for students.")
     {
+        this.writeCertificate = writeCertificate ?? (args => DatabaseHelper.ExecuteUserAsync("CreateNoObjectionCertificate", args));
+        this.readCertificates = readCertificates ?? (id => DatabaseHelper.QueryUser("GetNoObjectionCertificateRecords", DatabaseHelper.Int("@AdmissionId", id)));
         /* dbo.CreateNoObjectionCertificate has no duplicate guard, and the certificate table has no unique constraint on (AdmissionId, ...). */
-        createCertificateButton.Click += async (_, _) => {
-            if (!createCertificateButton.Enabled)
-                return;
-            /* Finding 10 (D-H3, ported from the Bank page) - the write owns the page until it settles, so the student picker and the records grid are held too. */
-            var heldDuringCreate = new List<(Control Control, bool WasEnabled)>
-            {
-                (student, student.Enabled),
-                (Grid, Grid.Enabled)
-            };
-            creatingCertificate = true;
-            createCertificateButton.Enabled = false;
-            foreach (var (control, _) in heldDuringCreate)
-                control.Enabled = false;
-            try
-            {
-                await CreateCertificate();
-            }
-            finally
-            {
-                creatingCertificate = false;
-                foreach (var (control, wasEnabled) in heldDuringCreate)
-                {
-                    if (!control.IsDisposed)
-                        control.Enabled = wasEnabled;
-                }
-            }
-        };
+        createCertificateButton.Click += async (_, _) => await RunCreateCertificateAsync();
         updateCertificateButton.Click +=
             (_, _) => UpdateCertificate();
         newButton.Click +=
@@ -89,7 +70,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         RelocateFromActions(createCertificateButton, clearButton);
         TrackStudentSearchStatus(student);
         /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
-        StudentSearchCache.Warm();
+        if (initialize) StudentSearchCache.Warm();
         student.SelectionChangeGuard = _ => !creatingCertificate &&
             (!HasCertificateEdits || Confirm("Discard the unsaved certificate changes and choose another student?", UiText.Dialogs.UnsavedChanges));
         student.UserSelectionChanged +=
@@ -106,7 +87,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
             };
         Grid.CellMouseClick +=
             Grid_CellMouseClick;
-        Defer(
+        if (initialize) Defer(
             () => {
                 ResetToStart();
             });
@@ -211,10 +192,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 ApplyWorkflowState();
                 return;
             }
-            DataTable table =
-                DatabaseHelper.QueryUser(
-                    "GetNoObjectionCertificateRecords",
-                    DatabaseHelper.Int("@AdmissionId", admissionId));
+            DataTable table = readCertificates(admissionId);
             certificateResults = CertificateRecordOrder.NewestFirst(table, "NoObjectionCertificateId");
             Bind(certificateResults);
             FormatCertificateGrid();
@@ -321,6 +299,13 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     }
     private void ApplyWorkflowState()
     {
+        student.Enabled = Grid.Enabled = !creatingCertificate;
+        if (creatingCertificate)
+        {
+            createCertificateButton.Enabled = updateCertificateButton.Enabled = newButton.Enabled =
+                clearButton.Enabled = refreshButton.Enabled = printButton.Enabled = false;
+            return;
+        }
         bool hasStudent =
             student.SelectedId > 0;
         bool hasSelection =
@@ -354,6 +339,21 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         }
         SetStatus("Confirm the date to create the NOC. Select a saved NOC to edit or print.");
     }
+    private async Task RunCreateCertificateAsync()
+    {
+        if (creatingCertificate || IsDisposed || !createCertificateButton.Enabled) return;
+        creatingCertificate = true;
+        ApplyWorkflowState();
+        try
+        {
+            await CreateCertificate();
+        }
+        finally
+        {
+            creatingCertificate = false;
+            if (!IsDisposed) ApplyWorkflowState();
+        }
+    }
     private async Task CreateCertificate()
     {
         if (!ValidateRequiredInputs())
@@ -376,15 +376,15 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 certificateDate.Value.Date;
             createCertificateButton.Enabled = false;
             // awaited so the caller's disabled button covers the whole write. @UserId is passed explicitly and equals CurrentUser.UserId, so ExecuteUserAsync's automatic injection supplies the same value.
-            await DatabaseHelper.ExecuteUserAsync(
-                "CreateNoObjectionCertificate",
+            using var hold = BeginBusy(BusyMessage, this);
+            await writeCertificate(new[] {
                 DatabaseHelper.P(
                     "@UserId",
                     CurrentUser.UserId),
                 DatabaseHelper.Int(
                     "@AdmissionId",
                     admissionId),
-                DatabaseHelper.Date("@CertificateDate", certDate));
+                DatabaseHelper.Date("@CertificateDate", certDate) });
             successMessage =
                 "NOC created successfully.";
             /* refresh only when the student this certificate was created for is still the selected one. The success message above stays: the write did happen. */
@@ -410,6 +410,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     }
     private void UpdateCertificate()
     {
+        if (creatingCertificate) return;
         int savedCertificateId = selectedNoObjectionCertificateId;
         // Finding 12 - see CreateCertificate: the confirmation is set last.
         string? successMessage =
@@ -488,6 +489,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     }
     private void PrintSelected()
     {
+        if (creatingCertificate) return;
         if (!printButton.Enabled) return;
         // Finding 13 - the preview is modal; park the search while it is open.
         try
@@ -528,6 +530,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     }
     private void RefreshCertificates()
     {
+        if (creatingCertificate) return;
         if (HasCertificateEdits && !Confirm("Discard the unsaved changes and refresh certificates?", "Refresh Certificates")) return;
         if (student.SelectedId <= 0) return;
         int selectedId = selectedNoObjectionCertificateId;
@@ -564,6 +567,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     }
     private void ClearForm()
     {
+        if (creatingCertificate) return;
         if (HasCertificateEdits && !Confirm("Discard the unsaved changes and choose another student?", "Next Student")) return;
         suppressStudentChanged = true;
         try

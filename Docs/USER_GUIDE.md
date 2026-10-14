@@ -57,3 +57,5 @@ Administrators maintain user accounts and permissions. General tasks require rol
 Never email or commit the live `FMSC_DB.mdf`, `FMSC_DB_log.ldf`, `.bak` backups, or student reports to a public repository or support ticket. When reporting a bug, record the screen, steps, expected/actual result, approximate time and **sanitized** screenshot/log only.
 
 For installation and recovery issues, use [installation](INSTALLATION.md) and [backup/recovery](BACKUP_RECOVERY.md).
+
+Certificate creation holds the selected student and certificate inputs until saving and refresh finish. Wait for the result before starting another certificate.

@@ -1,4 +1,5 @@
 using FMSC_SMS.Core;
+using Microsoft.Data.SqlClient;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
@@ -8,6 +9,8 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     public bool IsBusy => creatingCertificate;
     public string BusyMessage => "Please wait for the certificate to finish saving.";
     private bool creatingCertificate;
+    private readonly Func<SqlParameter[], Task> writeCertificate;
+    private readonly Func<int, DataTable> readCertificates;
     private readonly StudentPicker student = new();
     private readonly ModernTextBox sportName =
         HumanUi.TextBox(false, 200);
@@ -47,40 +50,18 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
-    public SportsCertificatePage()
+    public SportsCertificatePage() : this(true) { }
+    internal SportsCertificatePage(bool initialize, Func<SqlParameter[], Task>? writeCertificate = null,
+        Func<int, DataTable>? readCertificates = null)
         : base("Sports Certificate", "Record and print sports certificates for students.")
     {
+        this.writeCertificate = writeCertificate ?? (args => DatabaseHelper.ExecuteUserAsync("CreateSportsCertificate", args));
+        this.readCertificates = readCertificates ?? (id => DatabaseHelper.QueryUser("GetSportsCertificateRecords", DatabaseHelper.Int("@AdmissionId", id)));
         sportName.MaxLength = 200;
         performance.MaxLength = 1000;
         ConfigureFieldSuggestions();
         /* dbo.CreateSportsCertificate has no duplicate guard, and the certificate table has no unique constraint on (AdmissionId, ...). */
-        createCertificateButton.Click += async (_, _) => {
-            if (!createCertificateButton.Enabled)
-                return;
-            /* Finding 10 (D-H3, ported from the Bank page) - the write owns the page until it settles, so the student picker and the records grid are held too. */
-            var heldDuringCreate = new List<(Control Control, bool WasEnabled)>
-            {
-                (student, student.Enabled),
-                (Grid, Grid.Enabled)
-            };
-            creatingCertificate = true;
-            createCertificateButton.Enabled = false;
-            foreach (var (control, _) in heldDuringCreate)
-                control.Enabled = false;
-            try
-            {
-                await CreateCertificate();
-            }
-            finally
-            {
-                creatingCertificate = false;
-                foreach (var (control, wasEnabled) in heldDuringCreate)
-                {
-                    if (!control.IsDisposed)
-                        control.Enabled = wasEnabled;
-                }
-            }
-        };
+        createCertificateButton.Click += async (_, _) => await RunCreateCertificateAsync();
         updateCertificateButton.Click +=
             (_, _) => UpdateCertificate();
         newButton.Click +=
@@ -96,7 +77,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         RelocateFromActions(createCertificateButton, clearButton);
         TrackStudentSearchStatus(student);
         /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
-        StudentSearchCache.Warm();
+        if (initialize) StudentSearchCache.Warm();
         student.SelectionChangeGuard = _ => !creatingCertificate &&
             (!HasCertificateEdits || Confirm("Discard the unsaved certificate changes and choose another student?", UiText.Dialogs.UnsavedChanges));
         student.UserSelectionChanged +=
@@ -113,11 +94,11 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
             };
         Grid.CellMouseClick +=
             Grid_CellMouseClick;
-        Defer(
+        if (initialize) Defer(
             () => {
                 ResetToStart();
             });
-        Defer(LoadFieldSuggestions);
+        if (initialize) Defer(LoadFieldSuggestions);
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
@@ -225,10 +206,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
                 ApplyWorkflowState();
                 return;
             }
-            DataTable table =
-                DatabaseHelper.QueryUser(
-                    "GetSportsCertificateRecords",
-                    DatabaseHelper.Int("@AdmissionId", admissionId));
+            DataTable table = readCertificates(admissionId);
             certificateResults = CertificateRecordOrder.NewestFirst(table, "SportsCertificateId");
             Bind(certificateResults);
             FormatCertificateGrid();
@@ -341,6 +319,13 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     }
     private void ApplyWorkflowState()
     {
+        student.Enabled = Grid.Enabled = !creatingCertificate;
+        if (creatingCertificate)
+        {
+            createCertificateButton.Enabled = updateCertificateButton.Enabled = newButton.Enabled =
+                clearButton.Enabled = refreshButton.Enabled = printButton.Enabled = false;
+            return;
+        }
         bool hasStudent =
             student.SelectedId > 0;
         bool hasSelection =
@@ -376,6 +361,21 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         }
         SetStatus("Enter sport and performance to create. Select a saved certificate to edit or print.");
     }
+    private async Task RunCreateCertificateAsync()
+    {
+        if (creatingCertificate || IsDisposed || !createCertificateButton.Enabled) return;
+        creatingCertificate = true;
+        ApplyWorkflowState();
+        try
+        {
+            await CreateCertificate();
+        }
+        finally
+        {
+            creatingCertificate = false;
+            if (!IsDisposed) ApplyWorkflowState();
+        }
+    }
     private async Task CreateCertificate()
     {
         if (!ValidateRequiredInputs())
@@ -398,8 +398,8 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
                 certificateDate.Value.Date;
             createCertificateButton.Enabled = false;
             // awaited so the caller's disabled button covers the whole write. @UserId is passed explicitly and equals CurrentUser.UserId, so ExecuteUserAsync's automatic injection supplies the same value.
-            await DatabaseHelper.ExecuteUserAsync(
-                "CreateSportsCertificate",
+            using var hold = BeginBusy(BusyMessage, this);
+            await writeCertificate(new[] {
                 DatabaseHelper.P(
                     "@UserId",
                     CurrentUser.UserId),
@@ -415,7 +415,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
                         sportName.Text)),
                 DatabaseHelper.P(
                     "@Performance",
-                    DatabaseHelper.OptionalText(performance.Text)));
+                    DatabaseHelper.OptionalText(performance.Text)) });
             successMessage =
                 "Sports certificate created successfully.";
             AddSuggestionIfNew(sportName, sportName.Text);
@@ -443,6 +443,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     }
     private void UpdateCertificate()
     {
+        if (creatingCertificate) return;
         int savedCertificateId = selectedSportsCertificateId;
         // Finding 12 - see CreateCertificate: the confirmation is set last.
         string? successMessage =
@@ -541,6 +542,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     }
     private void PrintSelected()
     {
+        if (creatingCertificate) return;
         if (!printButton.Enabled) return;
         // Finding 13 - the preview is modal; park the search while it is open.
         try
@@ -626,6 +628,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     }
     private void RefreshCertificates()
     {
+        if (creatingCertificate) return;
         if (HasCertificateEdits && !Confirm("Discard the unsaved changes and refresh certificates?", "Refresh Certificates")) return;
         if (student.SelectedId <= 0) return;
         int selectedId = selectedSportsCertificateId;
@@ -664,6 +667,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     }
     private void ClearForm()
     {
+        if (creatingCertificate) return;
         if (HasCertificateEdits && !Confirm("Discard the unsaved changes and choose another student?", "Next Student")) return;
         suppressStudentChanged = true;
         try
