@@ -59,3 +59,5 @@ Never email or commit the live `FMSC_DB.mdf`, `FMSC_DB_log.ldf`, `.bak` backups,
 For installation and recovery issues, use [installation](INSTALLATION.md) and [backup/recovery](BACKUP_RECOVERY.md).
 
 Certificate creation holds the selected student and certificate inputs until saving and refresh finish. Wait for the result before starting another certificate.
+
+Small Classes & Sections setup drafts can be left without a discard prompt. Wait for an active save to finish. Unapplied bulk fee-rate adjustments are protected when leaving the finance workspace.

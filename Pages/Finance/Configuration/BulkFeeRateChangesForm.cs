@@ -2,8 +2,10 @@ using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Configuration;
 /// <summary>Adjust Fees tab: raise or lower many fee configurations at once, by a percentage or a flat amount, with optional rounding.</summary>
-public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
+public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChanges
 {
+    public bool HasUnsavedChanges => IsDirty();
+    public string UnsavedChangesMessage => "Discard the unapplied bulk fee-rate changes?";
     private sealed class PlanRow
     {
         public int FeeConfigurationId;
@@ -127,6 +129,8 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
     /// <summary>how many configurations the atomic call applied. See the copy dialog above: all-or-nothing, so on success this is the plan size.</summary>
     public int AppliedCount { get; private set; }
     public BulkFeeRateChangesForm(int currentCampusId = 0, int currentClassId = 0)
+        : this(currentCampusId, currentClassId, true) { }
+    internal BulkFeeRateChangesForm(int currentCampusId, int currentClassId, bool initialize)
     {
         Text = PageTitles.BulkFeeRateChanges;
         StartPosition = FormStartPosition.CenterParent;
@@ -140,7 +144,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm
         Font = AppTheme.NormalFont;
         BuildLayout();
         SetSaveShortcut(applyButton);
-        LoadScopeSources(currentCampusId, currentClassId);
+        if (initialize) LoadScopeSources(currentCampusId, currentClassId);
         campusScope.SelectedIndexChanged += (_, _) => ReloadClassScope();
         previewButton.Click += (_, _) => RunPreview();
         applyButton.Click += (_, _) => Apply();
