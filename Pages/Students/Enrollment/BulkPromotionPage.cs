@@ -110,7 +110,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         nextSteps = new NextStepBar(navigate, Fail);
         historyButton = AddAction("View Promotion History", (_, _) => OpenHistory(), "Secondary");
         RelocateFromActions(historyButton);
-        SetToolTip(historyButton, "Review completed promotions for the selected source year, class and section. Leave filters blank to view all history.");
+        SetToolTip(historyButton, "Review completed promotions for the selected source year, class and section. Leave filters blank to view all history. Report access is required.");
         sourceCampusField =
             HumanUi.Field("Source Campus", sourceCampus, true);
         sourceYearField =
@@ -154,9 +154,9 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
     private void OpenHistory()
     {
         if (busyCount > 0 || processing || IsDisposed) return;
-        if (!CurrentUser.HasPermission("Enrollment.Manage"))
+        if (!CurrentUser.HasPermission("Enrollment.Manage") || !CurrentUser.HasPermission("Reports.View"))
         {
-            SetStatus("Promotion history is not enabled for your account.", PageStatusKind.Warning);
+            SetStatus("Viewing promotion history requires enrollment management and report access.", PageStatusKind.Warning);
             return;
         }
         try
@@ -747,7 +747,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         holdAllButton.Enabled = idle && hasRows;
         promoteSelectedButton.Enabled = idle && PromoteBlockReason() is null;
         clearButton.Enabled = idle;
-        historyButton.Enabled = idle && !processing && CurrentUser.HasPermission("Enrollment.Manage");
+        historyButton.Enabled = idle && !processing && CurrentUser.HasPermission("Enrollment.Manage") && CurrentUser.HasPermission("Reports.View");
     }
     /// <summary>ApplyState, and while candidates are loaded, a live "N ticked ... " line saying what is still needed.</summary>
     private void ApplyStateAndHint()

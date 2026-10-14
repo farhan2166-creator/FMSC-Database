@@ -27,7 +27,7 @@ internal static partial class Program
                 Check(commands.All(c => c.Caption is not ("Promotion History" or "Bulk Promotion")),
                     "The sidebar and command palette have one promotion destination");
             }
-            CurrentUser.SignIn(911, "Promotion fixture", "Operator", false, new[] { "Enrollment.Manage" });
+            CurrentUser.SignIn(911, "Promotion fixture", "Operator", false, new[] { "Enrollment.Manage", "Reports.View" });
             using var promotion = (BulkPromotionPage)Activator.CreateInstance(typeof(BulkPromotionPage), flags, null,
                 new object?[] { null, false }, null)!;
             var promotionType = typeof(BulkPromotionPage);
@@ -75,7 +75,12 @@ internal static partial class Program
             Invoke("ApplyState"); Check(!historyButton.Enabled, "History follows the current account's permission");
             Invoke("OpenHistory");
             Check(Application.OpenForms.Count == 1, "Direct history dispatch cannot bypass revoked access");
-            CurrentUser.SignIn(911, "Promotion fixture", "Operator", false, new[] { "Enrollment.Manage" }); Invoke("ApplyState");
+            CurrentUser.SignIn(913, "Promotion-only fixture", "Operator", false, new[] { "Enrollment.Manage" }); Invoke("ApplyState");
+            Check(!historyButton.Enabled, "Enrollment permission alone cannot bypass the history procedure's Reports.View requirement");
+            Invoke("OpenHistory"); Check(Application.OpenForms.Count == 1, "Direct history dispatch rechecks report access");
+            CurrentUser.SignIn(914, "Administrator fixture", "Administrator", false, Array.Empty<string>()); Invoke("ApplyState");
+            Check(historyButton.Enabled, "Administrator retains full promotion-history authority");
+            CurrentUser.SignIn(911, "Promotion fixture", "Operator", false, new[] { "Enrollment.Manage", "Reports.View" }); Invoke("ApplyState");
 
             using var dialog = (ApplicationWindowForm)promotionType.GetMethod("CreateHistoryDialog", flags)!.Invoke(promotion, null)!;
             var originalHistory = (PromotionHistoryPage)dialog.Controls[0];
@@ -114,7 +119,7 @@ internal static partial class Program
             historyType.GetMethod("ClearForm", flags)!.Invoke(history, null);
             Check(!export.Enabled && HistoryField<Label>("summary").Text.Length == 0, "Clear removes the displayed history and disables export");
             historyType.GetMethod("LoadData", flags)!.Invoke(history, null);
-            Check(reads.Last().All(p => p.Value == DBNull.Value), "Blank history filters still support viewing all completed promotions");
+            Check(reads.Last().All(p => Convert.ToInt32(p.Value) == 0), "Blank history filters use the production procedure's zero-as-all contract");
             dialog.Close();
             Check(ReferenceEquals(promotionType.GetField("candidateData", flags)!.GetValue(promotion), candidates) &&
                 (bool)candidates.Rows[0]["Selected"] && Field<ModernTextBox>("remarks").Text == "Retain this promotion draft" &&

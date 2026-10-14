@@ -53,7 +53,7 @@ For business-rule context see [ADMISSION_WORKFLOW.md](../ADMISSION_WORKFLOW.md).
 
 Open **Student Promotion** (previously Bulk Promotion) to choose the source and destination placement, review candidates and process ticked students. **View Promotion History**, at the top right of Promotion Details, opens completed batches in a separate window using the selected source year, class and section. Blank source filters show all history. You can change the history filters and use **Load**, or clear them to review other batches. Closing the window keeps your promotion selections and remarks intact.
 
-Promotion History is reached from this button rather than a separate navigation item. Both promotion and history retain the existing Enrollment Management permission; Administrator retains full access. The history button is unavailable while candidates are loading or promotions are processing. After promoting students, continue to Confirm Return Admission as before.
+Promotion History is reached from this button rather than a separate navigation item. Student Promotion retains the existing Enrollment Management permission; viewing history also requires the existing report-viewing permission enforced by SQL. Administrator retains full access. The history button is unavailable while candidates are loading or promotions are processing. After promoting students, continue to Confirm Return Admission as before.
 
 ## Unsaved edits and unresolved transactions
 
