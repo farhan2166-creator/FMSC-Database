@@ -220,6 +220,18 @@ ServiceFabricBackup/
 *.mdf
 *.ldf
 *.ndf
+*.bak
+# Private configuration and key containers belong outside source control.
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+secrets.json
+credentials.json
+appsettings.Production.json
+appsettings.*.local.json
+*.p12
 # Business Intelligence projects
 *.rdl.data
 *.bim.layout
