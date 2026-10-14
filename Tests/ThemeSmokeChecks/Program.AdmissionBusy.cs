@@ -68,4 +68,16 @@ internal static partial class Program
         Check(!page.IsHandleCreated,"Annual receipt guard fixture starts no SQL or native report preview");
     }
 
+    private static void CheckBankCertificateBusy()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        using var page=new FMSC_SMS.Pages.Staff.Certificates.BankAccountOpeningCertificatePage();
+        var reply=new TaskCompletionSource();Func<Task> create=()=>reply.Task;
+        var task=(Task<bool>)typeof(V2Page).GetMethod("RunBusyAsync",flags)!.Invoke(page,new object[]{page.BusyMessage,create,new Control[]{page}})!;
+        Check(page.IsBusy&&!page.Enabled,"Staff bank certificate creation exposes its full operation and holds New, Clear, Refresh, field and selection controls");
+        reply.SetResult();PumpUntil(()=>task.IsCompleted,"Bank certificate operation fixture settles");
+        Check(task.Result&&!page.IsBusy&&page.Enabled,"Bank certificate completion releases the page after history work settles");
+        Check(!page.IsHandleCreated,"Bank certificate busy fixture starts no staff lookup or SQL creation");
+    }
+
 }

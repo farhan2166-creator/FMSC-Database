@@ -265,3 +265,15 @@ exam-type storage and optional leaving-clearance business rules are unchanged.
 Added all-three-editor fixtures for clean loaded defaults, edited wording, modal
 Stay, existing-issuance exclusion and unbound defaults. Native student-picker,
 refresh and real create/print acceptance remains required. No SQL changes.
+
+## FQA-22 — Staff bank-certificate creation lacks a full busy contract
+
+**Confirmed and fixed.** Create now uses the shared RunBusyAsync gate and holds
+the whole page, so New/Clear/Refresh, editor fields, staff and history cannot
+conflict with the submitted create. IBusyPage advertises the complete operation
+through SQL and history reload; the existing staff/row restoration is preserved.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added an actual-page delayed operation fixture for owner busy visibility,
+conflicting control hold and settled restoration. Native delayed Create,
+close/sign-out and return-ID acceptance remains required. No SQL changes.

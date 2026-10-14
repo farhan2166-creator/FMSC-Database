@@ -1,9 +1,11 @@
 using FMSC_SMS.Core;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Staff.Certificates;
-public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges
+public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
     private readonly StaffPicker staff = new();
+    public bool IsBusy=>BusyOperationRunning;
+    public string BusyMessage=>"The bank certificate is being created. Wait for the result and history reload before leaving.";
     private string? _baseline;
     private string Snapshot() => string.Join("\u001f", bankName.Text, branchName.Text, designation.Text, monthlyIncome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), purpose.Text, certificateDate.Value.Date.ToString("yyyy-MM-dd"));
     public bool HasUnsavedChanges => _baseline is not null && _baseline != Snapshot();
@@ -73,7 +75,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges
         monthlyIncome.ThousandsSeparator = true;
         /* dbo.CreateBankAccountOpeningCertificate has no duplicate guard, and the certificate table has no unique constraint on (AdmissionId, ...). */
         createCertificateButton.Click += async (_, _) => {
-            if (!createCertificateButton.Enabled)
+            if (IsBusy||!createCertificateButton.Enabled)
                 return;
             /* (D-H3) - the write owns the page until it settles, so the two controls that can move the context out from under it are held as well. */
             var heldDuringCreate = new List<(Control Control, bool WasEnabled)>
@@ -441,7 +443,8 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges
         SetStatus(
             "Enter bank, branch, designation and purpose to create. Select a saved certificate to edit or print.");
     }
-    private async Task CreateCertificate()
+    private Task CreateCertificate()=>RunBusyAsync(BusyMessage,CreateCertificateCoreAsync,this);
+    private async Task CreateCertificateCoreAsync()
     {
         if (!ValidateRequiredInputs())
             return;
