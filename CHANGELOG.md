@@ -5,6 +5,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 ## [Unreleased]
 
 ### Fixed
+- New sports and provisional certificate content participates in existing leave/discard guards. Date-only untouched dialogs remain freely abandonable (UFA-04).
 - Classes & Sections forwards active-save state without adding setup-draft prompts. Bulk fee-rate drafts retain their existing discard protection when embedded (UFA-03).
 - Admission closure and legacy go-live hold review inputs, reject obsolete previews, and prevent closing during pending operations (UFA-02).
 - Certificate creation keeps inputs locked and refuses repeat submission until the pending write finishes (UFA-01).

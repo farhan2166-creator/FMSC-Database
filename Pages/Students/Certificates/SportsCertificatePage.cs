@@ -22,7 +22,10 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     private DataTable certificateResults = new();
     private string? savedEditorSnapshot;
     private string EditorSnapshot() => string.Join("\u001f", sportName.Text, performance.Text, certificateDate.Value.Date.ToString("yyyy-MM-dd"));
-    private bool HasCertificateEdits => selectedSportsCertificateId > 0 && savedEditorSnapshot is not null && savedEditorSnapshot != EditorSnapshot();
+    private bool HasCertificateEdits => student.SelectedId > 0 &&
+        (selectedSportsCertificateId > 0
+            ? savedEditorSnapshot is not null && savedEditorSnapshot != EditorSnapshot()
+            : !string.IsNullOrWhiteSpace(sportName.Text) || !string.IsNullOrWhiteSpace(performance.Text));
     /* Finding 13 - a search debounce tick that lands while a modal (print preview, confirmation) is open runs inside that modal's message loop and re-binds the picker underneath it. */
     private bool suppressStudentChanged;
     private int selectedSportsCertificateId;

@@ -47,8 +47,13 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
     private DataTable studentResults => student.Source;
     private DataTable certificateResults = new();
     private string? savedEditorSnapshot;
-    private string EditorSnapshot() => string.Join("\u001f", examType.Text, examYear.Text, boardName.Text, rollNumber.Text, marksObtained.Text, marksOutOf.Text, grade.Text, otherSubjects.Text, certificateDate.Value.Date.ToString("yyyy-MM-dd"), string.Join("|", subjectsList.CheckedItems.Cast<object>().Select(item => item.ToString())));
-    private bool HasCertificateEdits => selectedProvisionalCertificateId > 0 && savedEditorSnapshot is not null && savedEditorSnapshot != EditorSnapshot();
+    private string? newContentSnapshot;
+    private string EditorSnapshot() => ContentSnapshot() + "\u001f" + certificateDate.Value.Date.ToString("yyyy-MM-dd");
+    private string ContentSnapshot() => string.Join("\u001f", examType.Text, examYear.Text, boardName.Text, rollNumber.Text, marksObtained.Text, marksOutOf.Text, grade.Text, otherSubjects.Text, string.Join("|", subjectsList.CheckedItems.Cast<object>().Select(item => item.ToString())));
+    private bool HasCertificateEdits => student.SelectedId > 0 &&
+        (selectedProvisionalCertificateId > 0
+            ? savedEditorSnapshot is not null && savedEditorSnapshot != EditorSnapshot()
+            : newContentSnapshot is not null && newContentSnapshot != ContentSnapshot());
     private DataTable subjectsTable = new();
     /* Finding 3 - subject ids of the entries appended to the list below because the selected certificate holds them but the current subject list does not. */
     private readonly List<int> savedSubjectIds = new();
@@ -428,6 +433,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             }
             if (!changingSubjectChecks && IsHandleCreated) BeginInvoke(new MethodInvoker(ApplyWorkflowState));
         };
+        newContentSnapshot = ContentSnapshot();
         ApplyWorkflowState();
     }
     private void BindSubjects()
@@ -1275,6 +1281,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         certificateDate.Value =
             DateTime.Today;
         UncheckAllSubjects();
+        newContentSnapshot = ContentSnapshot();
     }
     private void ClearCertificateSelection()
     {
