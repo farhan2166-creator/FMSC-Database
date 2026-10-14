@@ -4,7 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
     <Compile Include="../../Core/AsyncTableLoader.cs" Link="AsyncTableLoader.cs" />
     <Compile Include="../../Core/LookupDataCache.cs" Link="LookupDataCache.cs" />
     <Compile Include="../../Core/LookupDisplayOrder.cs" Link="LookupDisplayOrder.cs" />
