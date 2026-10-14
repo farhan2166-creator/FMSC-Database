@@ -115,12 +115,13 @@ internal static partial class Program
         form.Controls.Add(root); form.Show(); Application.DoEvents();
         Check(root.Parent is ResponsiveViewport, "The shared window integrates a scroll host for non-scrollable dialog content");
         var viewport = (ResponsiveViewport)root.Parent!;
-        Size original = root.Size;
+        // The initial viewport can expand beyond the retained content minimum.
+        Size required = (Size)typeof(ResponsiveViewport).GetField("contentMinimum", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(viewport)!;
         form.FitToWorkingArea(new Rectangle(0, 0, 640, 400), form.DeviceDpi); Application.DoEvents();
         viewport.ScrollControlIntoView(close); Application.DoEvents();
         Check(viewport.ClientRectangle.Contains(viewport.RectangleToClient(close.RectangleToScreen(close.ClientRectangle))),
             "A fitted dialog's bottom action is fully accessible through its installed scroll host");
-        Check(root.Width >= original.Width && root.Height >= original.Height && draft.Text == "Keep the dialog draft" && draft.IsInvalid,
+        Check(root.Width >= required.Width && root.Height >= required.Height && draft.Text == "Keep the dialog draft" && draft.IsInvalid,
             "Working-area fitting retains readable content and the current draft");
         form.Hide();
     }
