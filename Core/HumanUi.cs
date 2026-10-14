@@ -174,6 +174,11 @@ public static class HumanUi
             control is StudentPicker ||
             control is ModernTextBox { Multiline: false };
         if (singleLineInput) control.Height = AppMetrics.InputControlHeight;
+        // These fixed-purpose fields should not grow to a monitor-wide entry
+        // box. The cap follows the existing font, not a resolution breakpoint.
+        if (control is ModernComboBox or ModernDatePicker or ModernNumericTextBox && control.MaximumSize.Width == 0)
+            control.MaximumSize = new Size(AppMetrics.TextWidth(new string('M', 24), AppTheme.NormalFont,
+                AppScale.Scale(40)), control.MaximumSize.Height);
         if (fillHeight && !singleLineInput)
         {
             control.Dock = DockStyle.Fill;
@@ -348,17 +353,15 @@ public static class HumanUi
         grid.AllowUserToResizeRows = false;
         UiHelper.ApplyGridHeaderStyle(grid, accent);
         grid.ColumnHeadersDefaultCellStyle.Padding =
-            new Padding(AppMetrics.SpacingSm, 0, AppMetrics.SpacingSm, 0);
-        grid.DefaultCellStyle.Font = AppTheme.NormalFont;
+            new Padding(UiDpi.Metric(grid, AppMetrics.SpacingSm), 0, UiDpi.Metric(grid, AppMetrics.SpacingSm), 0);
+        grid.DefaultCellStyle.Font = UiDpi.ForControl(grid, AppTheme.NormalFont);
         grid.DefaultCellStyle.ForeColor = AppTheme.Text;
         grid.DefaultCellStyle.BackColor = AppTheme.Surface;
         grid.DefaultCellStyle.SelectionBackColor = AppTheme.Tint(accent, 0.88f);
         grid.DefaultCellStyle.SelectionForeColor = AppTheme.Text;
         grid.DefaultCellStyle.Padding =
-            new Padding(AppMetrics.SpacingSm, 0, AppMetrics.SpacingSm, 0);
+            new Padding(UiDpi.Metric(grid, AppMetrics.SpacingSm), 0, UiDpi.Metric(grid, AppMetrics.SpacingSm), 0);
         grid.AlternatingRowsDefaultCellStyle.BackColor = AppTheme.SurfaceSecondary;
-        grid.RowTemplate.Height = AppMetrics.GridRowHeight;
-        grid.ColumnHeadersHeight = AppMetrics.GridHeaderHeight;
         UiHelper.ApplyGridPresentation(grid);
     }
     public static string Humanize(string value)

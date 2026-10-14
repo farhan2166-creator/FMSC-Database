@@ -47,7 +47,8 @@ namespace FMSC_SMS.Core
         /// Wrapped content may grow beyond this height, but short text must not collapse it.</summary>
         private static void ApplyGridRowMetrics(DataGridView grid, int startIndex = 0, int? rowCount = null)
         {
-            int height = AppMetrics.GridRowHeight;
+            int height = Math.Max(UiDpi.Metric(grid, AppMetrics.GridRowHeight),
+                AppMetrics.TextHeight(UiDpi.ForControl(grid, AppTheme.NormalFont)) + UiDpi.Metric(grid, AppScale.Scale(12)));
             grid.RowTemplate.MinimumHeight = height;
             grid.RowTemplate.Height = height;
             int endIndex = Math.Min(grid.Rows.Count, startIndex + (rowCount ?? grid.Rows.Count));
@@ -88,7 +89,9 @@ namespace FMSC_SMS.Core
             header.ForeColor = AppTheme.HeadingText;
             header.SelectionBackColor = back;
             header.SelectionForeColor = AppTheme.HeadingText;
-            header.Font = AppTheme.ButtonFont;
+            header.Font = UiDpi.ForControl(grid, AppTheme.ButtonFont);
+            grid.ColumnHeadersHeight = Math.Max(UiDpi.Metric(grid, AppMetrics.GridHeaderHeight),
+                AppMetrics.TextHeight(header.Font) + UiDpi.Metric(grid, AppScale.Scale(14)));
             grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
         }
         private static void GridCellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
@@ -506,7 +509,7 @@ namespace FMSC_SMS.Core
                     column.DefaultCellStyle.Alignment =
                         DataGridViewContentAlignment.MiddleCenter;
                     column.DefaultCellStyle.Font =
-                        AppTheme.ButtonFont;
+                        UiDpi.ForControl(grid, AppTheme.ButtonFont);
                 }
                 else if (column.Tag is null &&
                          column is DataGridViewTextBoxColumn &&
@@ -721,7 +724,7 @@ namespace FMSC_SMS.Core
                     UiTextWidthCache.Measure(string.IsNullOrWhiteSpace(column.HeaderText)
                             ? " "
                             : column.HeaderText,
-                        headerFont) + Math.Max(AppScale.Scale(24), column.HeaderCell.InheritedStyle.Padding.Horizontal + AppScale.Scale(8));
+                        headerFont) + Math.Max(UiDpi.Metric(grid, AppScale.Scale(24)), column.HeaderCell.InheritedStyle.Padding.Horizontal + UiDpi.Metric(grid, AppScale.Scale(8)));
                 int contentWidth = 0;
                 int sampleCount =
                     Math.Min(grid.Rows.Count, 40);
@@ -766,13 +769,13 @@ namespace FMSC_SMS.Core
                         FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException24, "UiHelper.Grid: MeasureNaturalColumnWidth fallback");
                     }
                 }
-                int MinimumColumnWidth = AppScale.Scale(80);
+                int MinimumColumnWidth = UiDpi.Metric(grid, AppScale.Scale(80));
                 /* The ceiling is the one MasterPage's own measurement uses. */
-                int MaximumColumnWidth = AppScale.Scale(600);
+                int MaximumColumnWidth = UiDpi.Metric(grid, AppScale.Scale(600));
                 int desiredWidth =
                     Math.Max(
                         MinimumColumnWidth,
-                        Math.Max(headerWidth, contentWidth + Math.Max(AppScale.Scale(24), (grid.DefaultCellStyle?.Padding.Horizontal ?? 0) + AppScale.Scale(8))));
+                        Math.Max(headerWidth, contentWidth + Math.Max(UiDpi.Metric(grid, AppScale.Scale(24)), (grid.DefaultCellStyle?.Padding.Horizontal ?? 0) + UiDpi.Metric(grid, AppScale.Scale(8)))));
                 desiredWidth =
                     Math.Min(desiredWidth, MaximumColumnWidth);
                 return desiredWidth;

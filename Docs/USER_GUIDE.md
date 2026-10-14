@@ -9,6 +9,10 @@
 3. Sign in using your authorized account. A first-run setup or required password-change prompt must be completed by the appropriate administrator.
 4. Open the relevant workspace from the dashboard or navigation. Ctrl+K searches all destinations your account can open, including collapsed and compact sidebar entries. Use the navigation groups below rather than editing database files manually.
 
+## Display scaling and smaller screens
+
+Use Windows display scaling for readable text. The application follows the monitor's DPI and usable desktop area. On smaller screens, dialog content may scroll; use the scrollbars or Tab to reach fields and bottom actions. Enlarging a window gives grids and flexible content more space while standard entry controls retain sensible dimensions. Printing and report zoom controls retain their existing behavior.
+
 ## Common workspaces
 
 | Work | Where to start | Operational caution |

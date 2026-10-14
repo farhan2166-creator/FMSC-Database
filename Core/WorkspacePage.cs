@@ -232,7 +232,7 @@ public sealed class WorkspacePage : UserControl, IUnsavedChanges, IWorkspaceStat
             _rootLayout.RowStyles[0].Height = _embedded ? 0 :
                 titleLabelHeight +
                 AppMetrics.PageHeaderContentHeightAllowance;
-            _titleLabel.Font = AppTheme.PageTitleFont;
+            _titleLabel.Font = UiDpi.ForControl(_titleLabel, AppTheme.PageTitleFont);
         }
         TabStrip.Repaint(_tabs);
         ResumeLayout(true);

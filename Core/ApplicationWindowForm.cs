@@ -8,14 +8,39 @@ public class ApplicationWindowForm : Form
     private ApplicationTitleBar? caption;
     private Icon? schoolIcon;
     private Size? requestedClientSize;
+    private int geometryDpi = AppScale.Dpi;
+    private Size? requestedMinimum;
+    private int minimumDpi;
+    private bool windowReady;
+    private bool fittingWindow;
+    private Rectangle lastWorkingArea;
+    private ResponsiveViewport? viewport;
     private readonly ToolTip saveShortcutTip = new();
     private readonly PageActionShortcutController saveShortcutController;
     public ApplicationWindowForm()
     {
+        // Shared metrics own geometry. Do not add a second Font/Dpi autoscale pass.
+        AutoScaleMode = AutoScaleMode.None;
         saveShortcutController = new PageActionShortcutController(this, saveShortcutTip);
         KeyboardShortcutHints.Register(this);
     }
     internal PageActionShortcutController ShortcutController => saveShortcutController;
+    internal void CaptureLayoutDpi() => geometryDpi = AppScale.Dpi;
+    public override Size MinimumSize
+    {
+        get => base.MinimumSize;
+        set
+        {
+            // Form's setter clamps to the current physical monitor. Retain the
+            // requested size before that clamp so moving back can restore it.
+            if (!fittingWindow)
+            {
+                requestedMinimum = value;
+                minimumDpi = geometryDpi;
+            }
+            base.MinimumSize = value;
+        }
+    }
     protected void SetSaveShortcut(ModernButton button) => saveShortcutController.SetSaveButton(button);
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
@@ -42,6 +67,7 @@ public class ApplicationWindowForm : Form
     }
     protected override void OnLoad(EventArgs e)
     {
+        if (TopLevel) ApplyDpiGeometry(DeviceDpi, resizeWindow: true);
         if (UsesCaption && caption is null)
         {
             string path = Path.Combine(AppContext.BaseDirectory, "Assets", "FMSC_Logo Icon.ico");
@@ -60,13 +86,70 @@ public class ApplicationWindowForm : Form
             Controls.Add(caption);
         }
         UiHelper.ApplyThemeToForm(this);
+        PrepareResponsiveContent();
         base.OnLoad(e);
+        windowReady = true;
         FitWorkingArea();
     }
     protected override void OnDpiChanged(DpiChangedEventArgs e)
     {
         base.OnDpiChanged(e);
+        if (e.Cancel || !TopLevel) return;
+        ApplyDpiGeometry(e.DeviceDpiNew, resizeWindow: false);
+        AppMetrics.InvalidateScaleCache();
+        UiHelper.RefreshControlsForScaleChange(this);
         FitWorkingArea();
+    }
+    protected override bool OnGetDpiScaledSize(int deviceDpiOld, int deviceDpiNew, ref Size desiredSize)
+    {
+        desiredSize = DpiLayout.ChangeDpi(Size, deviceDpiOld, deviceDpiNew);
+        return true;
+    }
+    internal void ApplyDpiGeometry(int dpi, bool resizeWindow)
+    {
+        if (dpi == geometryDpi || dpi <= 0) return;
+        int previous = geometryDpi;
+        geometryDpi = dpi;
+        SuspendLayout();
+        try
+        {
+            var factor = new SizeF(dpi / (float)previous, dpi / (float)previous);
+            viewport?.ChangeDpi(previous, dpi);
+            // The custom caption already handles its own native DPI notification.
+            foreach (Control child in Controls)
+                if (!ReferenceEquals(child, caption)) child.Scale(factor);
+            if (resizeWindow)
+            {
+                fittingWindow = true;
+                try
+                {
+                    MinimumSize = DpiLayout.ChangeDpi(requestedMinimum ?? MinimumSize,
+                        minimumDpi > 0 ? minimumDpi : previous, dpi);
+                }
+                finally { fittingWindow = false; }
+                ClientSize = DpiLayout.ChangeDpi(ClientSize, previous, dpi);
+            }
+        }
+        finally { ResumeLayout(true); }
+    }
+    private void PrepareResponsiveContent()
+    {
+        if (!TopLevel || this is FMSC_SMS.MainDashboardForm || viewport is not null) return;
+        Control? root = Controls.Cast<Control>().FirstOrDefault(child => child.Dock == DockStyle.Fill && child != caption);
+        // Reports, grids and existing scroll hosts already own their viewport.
+        if (root is null || root is DataGridView || root is ListBox ||
+            root is ScrollableControl { AutoScroll: true } ||
+            root.GetType().Namespace?.StartsWith("Microsoft.Reporting", StringComparison.Ordinal) == true) return;
+        Size minimum = root.Size;
+        Controls.Remove(root);
+        viewport = new ResponsiveViewport(root, minimum);
+        Controls.Add(viewport);
+        caption?.BringToFront();
+    }
+    protected override void OnLocationChanged(EventArgs e)
+    {
+        base.OnLocationChanged(e);
+        if (windowReady && Screen.FromControl(this).WorkingArea != lastWorkingArea) FitWorkingArea();
     }
     protected override void OnShown(EventArgs e)
     {
@@ -106,11 +189,24 @@ public class ApplicationWindowForm : Form
     }
     private void FitWorkingArea()
     {
-        if (!TopLevel || WindowState != FormWindowState.Normal) return;
+        if (!TopLevel || fittingWindow || WindowState == FormWindowState.Minimized) return;
         Rectangle workingArea = Screen.FromControl(this).WorkingArea;
-        var fitted=WorkingAreaLayout.Fit(Bounds,MinimumSize,workingArea);
-        MinimumSize=fitted.MinimumSize;
-        Bounds=fitted.Bounds;
+        FitToWorkingArea(workingArea, DeviceDpi);
+    }
+    internal void FitToWorkingArea(Rectangle workingArea, int dpi)
+    {
+        requestedMinimum ??= MinimumSize;
+        if (minimumDpi == 0) minimumDpi = dpi;
+        var minimum = DpiLayout.ChangeDpi(requestedMinimum.Value, minimumDpi, dpi);
+        var fitted = WorkingAreaLayout.Fit(Bounds, minimum, workingArea, dpi);
+        fittingWindow = true;
+        try
+        {
+            lastWorkingArea = workingArea;
+            MinimumSize = fitted.MinimumSize;
+            if (WindowState == FormWindowState.Normal) Bounds = fitted.Bounds;
+        }
+        finally { fittingWindow = false; }
     }
     protected override void Dispose(bool disposing)
     {
