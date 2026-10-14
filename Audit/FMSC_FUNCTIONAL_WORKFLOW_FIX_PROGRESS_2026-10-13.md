@@ -204,3 +204,17 @@ before continuing or opening a preview. Receipt contents still use captured IDs.
 Added actual-page preparation fixtures for held student/year controls, owner busy
 visibility and settled restoration. Native delayed SQL/RDLC preview acceptance
 remains required. No SQL changes.
+
+## FQA-13 — Confirmed adjustment success is hidden by failed history reload
+
+**Confirmed and fixed.** The payment-history loader now distinguishes a normal
+read failure from a read after a confirmed adjustment response. The latter keeps
+the exact completion/receipt message, explains that the adjustment was recorded
+and only history failed to refresh, and directs reload instead of repeating the
+financial command. Existing selection clearing and SQL behavior are retained.
+
+**Verification:** Traced the confirmed-write → completion message → load failure
+branch and current-student/load-version guards; app and Windows smoke project
+build without warnings/errors. Native successful-write/failed-read injection is
+still required. This does not resolve FQA-06's separate lost-write-response risk.
+No SQL changes.

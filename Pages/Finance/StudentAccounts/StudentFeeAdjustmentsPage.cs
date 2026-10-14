@@ -303,7 +303,15 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
             if (completionMessage is not null && completedAdmissionId == chosen)
                 Info(completionMessage);
         }
-        catch(Exception ex) { if(!IsDisposed && version==paymentsLoadVersion) Fail(ex); }
+        catch(Exception ex)
+        {
+            if(!IsDisposed&&version==paymentsLoadVersion)
+            {
+                if(completionMessage is not null&&completedAdmissionId==chosen)
+                    Warn(completionMessage+" Payment history could not be refreshed. The adjustment is recorded; reload payments before acting further. Do not repeat it because this reload failed. "+DbMessage.UserMessage(ex));
+                else Fail(ex);
+            }
+        }
     }
     private void OnPaymentSelected()
     {
