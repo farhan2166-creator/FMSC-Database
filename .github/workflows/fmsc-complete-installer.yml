@@ -50,6 +50,10 @@ jobs:
         shell: powershell
         run: .\Installer\VerifySchemaArtifact.ps1 -ProjectDirectory .
 
+      - name: Verify publish validation from PowerShell 7
+        shell: pwsh
+        run: .\Tools\TestPublishPowerShell.ps1 -ProjectDirectory .
+
       # SQL Server 2022 Express LocalDB's standalone x64 MSI from Microsoft.
       # Validate its Authenticode signature before including it in the package.
       # Never use an unsigned mirror or download from the school database.

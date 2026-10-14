@@ -91,7 +91,11 @@
 	     prerequisites/copying. Normal full release publishing remains validated. -->
 	<!-- Validate installer, prerequisite, migrations and any supplied database snapshot before publishing. -->
 	<Target Name="ValidateDeploymentAssets" BeforeTargets="PrepareForPublish" Condition="'$(CIAppOnlyBundle)' != 'true' Or '$(GITHUB_ACTIONS)' != 'true'">
-        <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Installer\VerifySchemaArtifact.ps1&quot; -ProjectDirectory &quot;$(MSBuildProjectDirectory)&quot;" />
+        <!-- Publishing from pwsh can pass its PowerShell 7 module path through dotnet.
+             These Windows PowerShell 5.1 children need their own built-in modules,
+             including the FileHash script module. Scope the path to the child only. -->
+        <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Installer\VerifySchemaArtifact.ps1&quot; -ProjectDirectory &quot;$(MSBuildProjectDirectory)&quot;"
+              EnvironmentVariables="PSModulePath=$(SystemRoot)\System32\WindowsPowerShell\v1.0\Modules" />
 		<PropertyGroup>
 			<DeploymentDatabaseDirectory Condition="'$(DeploymentDatabaseDirectory)' == ''">$(MSBuildProjectDirectory)\..\Database</DeploymentDatabaseDirectory>
 			<DeploymentMigrationDirectory Condition="'$(DeploymentMigrationDirectory)' == ''">$(MSBuildProjectDirectory)\Migrations</DeploymentMigrationDirectory>
@@ -116,7 +120,8 @@
 		<Error Condition="'@(_RequiredDeploymentFile)' != '' AND !Exists('%(FullPath)')" Text="Required release asset is missing: %(FullPath). Publishing has been stopped." />
 		<!-- LocalDB must be bundled; sqlcmd can be resolved by the installer. The self-contained publish includes the .NET Desktop Runtime. -->
 		<Error Condition="!Exists('$(LocalDbMsiPath)')" Text="Required LocalDB prerequisite is missing: $(LocalDbMsiPath). Supply LocalDbMsiPath or place SqlLocalDB.msi in ..\Tools or ..\LocalDB." />
-		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Installer\ValidateReleaseAssets.ps1&quot; -DatabaseDirectory &quot;$(DeploymentDatabaseDirectory)&quot; -LocalDbMsiPath &quot;$(LocalDbMsiPath)&quot;" />
+		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Installer\ValidateReleaseAssets.ps1&quot; -DatabaseDirectory &quot;$(DeploymentDatabaseDirectory)&quot; -LocalDbMsiPath &quot;$(LocalDbMsiPath)&quot;"
+              EnvironmentVariables="PSModulePath=$(SystemRoot)\System32\WindowsPowerShell\v1.0\Modules" />
 		<Error Condition="'@(_RequiredSqlMigration)' == '' AND '$(_RequiredSchemaVersionNumber)' &gt; '$(BaselineDatabaseVersion)'" Text="FIX 36: the release requires database schema version $(_RequiredSchemaVersion) but no SQL migration files were found under $(DeploymentMigrationDirectory). A release artifact cannot reach that version without its migration chain." />
 		<Message Condition="'@(_RequiredSqlMigration)' == '' AND '$(_RequiredSchemaVersionNumber)' &lt;= '$(BaselineDatabaseVersion)'" Importance="high" Text="FIX 36: release requires schema version $(_RequiredSchemaVersion), which a fresh install already has, so no migration is needed and ..\Migrations may be empty." />
 	</Target>

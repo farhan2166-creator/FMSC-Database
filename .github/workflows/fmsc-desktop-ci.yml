@@ -63,6 +63,10 @@ jobs:
         shell: powershell
         run: .\Installer\VerifySchemaArtifact.ps1 -ProjectDirectory .
 
+      - name: Verify MSBuild PowerShell module isolation and provenance rejection
+        shell: pwsh
+        run: .\Tools\TestPublishPowerShell.ps1 -ProjectDirectory .
+
 # Safety boundaries:
 # - No installation, signing, or publishing: the release publish target requires
 #   the owner's validated LocalDB MSI and (for fresh installs) detached MDF/LDF.
