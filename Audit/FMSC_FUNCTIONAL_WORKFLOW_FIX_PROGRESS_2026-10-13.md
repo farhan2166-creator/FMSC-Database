@@ -291,3 +291,17 @@ the confirmed outcome. Ordinary manual-read failures retain their error handling
 history handling; app and Windows smoke project build without warnings/errors.
 Native injected SQL history failure remains required. FQA-25's lost Create reply
 is a separate verification item. No SQL changes.
+
+## FQA-24 — Confirm Return silently discards edited opening fees
+
+**Confirmed and fixed.** Return admission tracks a clean loaded snapshot of fee
+amounts/discounts, return date and transport, including an active uncommitted cell.
+The modal uses ModalPageCloseGuard: clean Cancel/X remains prompt-free, edits
+require discard, and confirmation remains an unconditional busy close block.
+A confirmed successful return clears draft intent before its completion close.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added actual-page snapshots for loaded-clean, amount, discount, transport/date,
+active confirmation and committed draft clearing. Common modal decision fixtures
+cover Stay/discard and busy closure. Native Windows acceptance remains required.
+No SQL changes.

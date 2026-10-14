@@ -2,7 +2,7 @@ using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Enrollment;
 /// <summary>Confirms that a promoted student has returned before new-year billing starts.</summary>
-public sealed class ConfirmReturnAdmissionPage : V2Page
+public sealed class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges, IBusyPage
 {
     /* A text box you can type into (name, admission or registration number), with a drop-down arrow that lists every promoted student still awaiting return. */
     private readonly StudentPicker pendingStudent = new() {
@@ -55,6 +55,16 @@ public sealed class ConfirmReturnAdmissionPage : V2Page
         Text = "—"
     };
     private DataTable? feeRows;
+    private string? returnDraftBaseline;
+    private string ReturnDraftState()=>System.Text.Json.JsonSerializer.Serialize(new{
+        Enrollment=pendingStudent.SelectedId,Date=returnDate.Value.Date,Transport=transport.Checked,
+        Fees=feeRows?.AsEnumerable().OrderBy(row=>Convert.ToInt32(row["FeeTypeId"])).Select(row=>new{
+            Id=Convert.ToInt32(row["FeeTypeId"]),Amount=Convert.ToString(row["Amount"],System.Globalization.CultureInfo.InvariantCulture),Discount=Convert.ToString(row["DiscountAmount"],System.Globalization.CultureInfo.InvariantCulture)})});
+    private void CaptureReturnDraftBaseline()=>returnDraftBaseline=ReturnDraftState();
+    public bool HasUnsavedChanges=>pendingStudent.SelectedId>0&&feeRows is not null&&returnDraftBaseline is not null&&(fees.IsCurrentCellDirty||returnDraftBaseline!=ReturnDraftState());
+    public string UnsavedChangesMessage=>"The return admission has unsaved opening-fee, discount, date or transport changes. Discard them?";
+    public bool IsBusy=>confirmingReturn;
+    public string BusyMessage=>"Return admission is being confirmed. Wait for its result before leaving.";
     private DataTable? pendingRows;
     private int loadVersion;
     private bool confirmingReturn;
@@ -67,7 +77,8 @@ public sealed class ConfirmReturnAdmissionPage : V2Page
     /// <param name="preselectAdmissionId">Opens with this student already chosen (0 = none), when they are awaiting return.</param>
     public ConfirmReturnAdmissionPage(
         Action<Func<Control>, string, string>? navigate = null,
-        int preselectAdmissionId = 0, bool compactDialog = false)
+        int preselectAdmissionId = 0, bool compactDialog = false) : this(navigate,preselectAdmissionId,compactDialog,true) { }
+    internal ConfirmReturnAdmissionPage(Action<Func<Control>,string,string>? navigate,int preselectAdmissionId,bool compactDialog,bool initialize)
         : base("Confirm Return Admission",
             "Review the class fees and confirm the returning student’s admission.")
     {
@@ -210,7 +221,7 @@ public sealed class ConfirmReturnAdmissionPage : V2Page
         pendingStudent.SelectionCleared += (_, _) =>
             ClearFees("Select a returning student.");
         pendingStudent.SearchFailed += ex => Fail(ex);
-        Defer(() => LoadPendingAsync(preselectAdmissionId));
+        if(initialize)Defer(() => LoadPendingAsync(preselectAdmissionId));
     }
     private static Control ReturnAmountField(string caption, Label value)
     {
@@ -305,6 +316,7 @@ public sealed class ConfirmReturnAdmissionPage : V2Page
                 confirmButton.Enabled = rows.Rows.Count > 0 && CurrentUser.HasPermission("Students.Administer");
             fees.DataSource = rows;
             UpdateTotal();
+            CaptureReturnDraftBaseline();
         }
         catch (Exception ex) { Fail(ex); }
     }
@@ -436,6 +448,7 @@ public sealed class ConfirmReturnAdmissionPage : V2Page
             {
                 admissionId = Convert.ToInt32(confirmed.Rows[0]["AdmissionId"]);
             }
+            returnDraftBaseline=null;
             Info("Return admission confirmed. Opening charges are ready in Fee Collection." + billingFrom);
             StudentSearchCache.Invalidate();
             if (compactDialog)

@@ -14,7 +14,8 @@ internal sealed class ConfirmReturnAdmissionDialog : ApplicationWindowForm
         MinimumSize = Size;
         var workflow = new ConfirmReturnAdmissionPage(preselectAdmissionId: admissionId, compactDialog: true) { Dock = DockStyle.Fill };
         Controls.Add(workflow);
-        FormClosing += (_, e) => { if (workflow.IsConfirmingReturn) e.Cancel = true; };
-        workflow.ReturnConfirmed += (_, _) => BeginInvoke((MethodInvoker)(() => { DialogResult = DialogResult.OK; Close(); }));
+        bool completed=false;
+        ModalPageCloseGuard.Attach(this,workflow,()=>completed);
+        workflow.ReturnConfirmed += (_, _) => {completed=true;BeginInvoke((MethodInvoker)(() => { DialogResult = DialogResult.OK; Close(); }));};
     }
 }

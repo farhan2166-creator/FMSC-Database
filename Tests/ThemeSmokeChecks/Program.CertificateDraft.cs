@@ -27,4 +27,21 @@ internal static partial class Program
             Check(!page.IsHandleCreated,"Certificate dirty fixtures start no SQL read or certificate creation");
         }
     }
+    private static void CheckReturnAdmissionDraft()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(FMSC_SMS.Pages.Students.Enrollment.ConfirmReturnAdmissionPage);
+        using var page=(Control)Activator.CreateInstance(type,flags,null,new object?[]{null,0,true,false},null)!;page.BindingContext=new BindingContext();
+        ((StudentPicker)type.GetField("pendingStudent",flags)!.GetValue(page)!).SetStudent(1,"Student");
+        var rows=new System.Data.DataTable();rows.Columns.Add("FeeTypeId",typeof(int));rows.Columns.Add("FeeTypeName");rows.Columns.Add("Frequency");rows.Columns.Add("Amount",typeof(decimal));rows.Columns.Add("DiscountAmount",typeof(decimal));rows.Rows.Add(1,"Tuition","Monthly",100m,10m);
+        type.GetField("feeRows",flags)!.SetValue(page,rows);((DataGridView)type.GetField("fees",flags)!.GetValue(page)!).DataSource=rows;
+        var capture=type.GetMethod("CaptureReturnDraftBaseline",flags)!;capture.Invoke(page,null);var dirty=(IUnsavedChanges)page;
+        Check(!dirty.HasUnsavedChanges,"Loaded return fees/date/transport are a clean cancellable context");
+        rows.Rows[0]["Amount"]=120m;Check(dirty.HasUnsavedChanges,"Changed opening fee amount is a protected return draft");capture.Invoke(page,null);
+        rows.Rows[0]["DiscountAmount"]=20m;Check(dirty.HasUnsavedChanges,"Changed opening discount is tracked before confirmation");capture.Invoke(page,null);
+        ((CheckBox)type.GetField("transport",flags)!.GetValue(page)!).Checked=true;Check(dirty.HasUnsavedChanges,"Transport intent is part of the return draft");capture.Invoke(page,null);
+        ((ModernDatePicker)type.GetField("returnDate",flags)!.GetValue(page)!).Value=DateTime.Today.AddDays(-1);Check(dirty.HasUnsavedChanges,"Changed billing/return date is a protected draft");
+        type.GetField("confirmingReturn",flags)!.SetValue(page,true);Check(((IBusyPage)page).IsBusy,"Submitted return confirmation has a strict busy contract separate from its draft");
+        type.GetField("confirmingReturn",flags)!.SetValue(page,false);type.GetField("returnDraftBaseline",flags)!.SetValue(page,null);Check(!dirty.HasUnsavedChanges,"Confirmed return clears draft intent before its success close");
+    }
+
 }
