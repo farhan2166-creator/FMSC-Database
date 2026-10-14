@@ -17,6 +17,14 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Record checked-out source revision
+        shell: pwsh
+        run: |
+          $revision = git rev-parse HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to identify the checked-out source.' }
+          Write-Host "Checked-out source revision: $revision"
+          "Source revision: $revision" | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
       - name: Install .NET 8 SDK
         uses: actions/setup-dotnet@v4
         with:
@@ -50,7 +58,7 @@ jobs:
         shell: powershell
         run: .\Installer\VerifySchemaArtifact.ps1 -ProjectDirectory .
 
-      - name: Verify publish validation from PowerShell 7
+      - name: Test full PortableRelease publishing (disposable prerequisite fixture)
         shell: pwsh
         run: .\Tools\TestPublishPowerShell.ps1 -ProjectDirectory .
 

@@ -1,5 +1,6 @@
-# Exercise the actual MSBuild prerequisite target from PowerShell 7. No publish,
-# installation or SQL connection occurs; the file fixture tests readability only.
+# Exercise the full PortableRelease publish from PowerShell 7 in a disposable
+# directory. Its prerequisite is a readability fixture, not a real MSI; this
+# output is never uploaded/installed. No SQL connection or school data is used.
 param([string]$ProjectDirectory = (Split-Path $PSScriptRoot -Parent))
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
@@ -16,15 +17,36 @@ try {
     $prerequisite = Join-Path $scratch 'readability fixture.txt'
     Set-Content -LiteralPath $prerequisite -Value 'Test fixture; not an installer.'
 
+    # Explicitly make Get-FileHash unusable in Windows PowerShell. The verifier
+    # must still validate both SHA256 fingerprints using streaming .NET APIs.
+    $withoutFileHash = Join-Path $scratch 'verify without FileHash.ps1'
+    @'
+param([string]$ProjectDirectory)
+$ErrorActionPreference = 'Stop'
+$env:PSModulePath = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/Modules'
+function Get-FileHash { throw 'This verifier must not call Get-FileHash.' }
+& (Join-Path $ProjectDirectory 'Installer/VerifySchemaArtifact.ps1') -ProjectDirectory $ProjectDirectory
+'@ | Set-Content -LiteralPath $withoutFileHash
+    $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $withoutFileHash -ProjectDirectory $ProjectDirectory 2>&1
+    $code = $LASTEXITCODE
+    if ($code -ne 0 -or ($output -join "`n") -notmatch 'Reviewed DACPAC provenance and SQL model fingerprint verified\.') {
+        throw "DACPAC verification must work without Get-FileHash:`n$($output -join "`n")"
+    }
+    Write-Host 'PASS: Windows PowerShell verifies package/model SHA256 without Get-FileHash.'
+
     # Deliberately omit Windows PowerShell modules from the parent environment.
     # The real MSBuild Exec tasks must supply the correct path to both children.
     $env:PSModulePath = Join-Path $PSHOME 'Modules'
-    $output = & dotnet msbuild (Join-Path $ProjectDirectory 'FMSC_SMS.csproj') `
-        -target:ValidateDeploymentAssets -nologo -verbosity:minimal `
-        "-property:LocalDbMsiPath=$prerequisite" "-property:DeploymentDatabaseDirectory=$database" 2>&1
+    $release = Join-Path $scratch 'release output'
+    $application = Join-Path $release 'FMSC_SMS'
+    $output = & dotnet publish (Join-Path $ProjectDirectory 'FMSC_SMS.csproj') `
+        -c Release -r win-x64 --self-contained true -p:PublishProfile=PortableRelease `
+        "-p:PublishDir=$application/" "-p:ReleaseRoot=$release/" `
+        "-p:LocalDbMsiPath=$prerequisite" "-p:DeploymentDatabaseDirectory=$database" `
+        -p:PublishSingleFile=false -p:PublishTrimmed=false 2>&1
     $code = $LASTEXITCODE
     if ($code -ne 0) {
-        throw "Publish prerequisite validation failed from PowerShell 7:`n$($output -join "`n")"
+        throw "Full PortableRelease publish failed from PowerShell 7:`n$($output -join "`n")"
     }
     $text = $output -join "`n"
     if ($text -notmatch 'Reviewed DACPAC provenance and SQL model fingerprint verified\.' -or
@@ -34,7 +56,16 @@ try {
     if ($env:PSModulePath -ne (Join-Path $PSHOME 'Modules')) {
         throw 'Validation changed the parent PowerShell module path.'
     }
-    Write-Host 'PASS: both MSBuild validation scripts run with a PowerShell-7-only parent module path.'
+    foreach ($relative in @('FMSC_SMS/FMSC_SMS.exe', 'FMSC_SMS/FMSC_SMS.dll',
+        'FMSC_SMS/FMSC_SMS.deps.json', 'FMSC_SMS/FMSC_SMS.runtimeconfig.json',
+        'core.ps1', 'Install FMSC_SMS.bat', 'Tools/SqlLocalDB.msi',
+        'Migrations/2.sql', 'Migrations/3.sql', 'Migrations/4.sql', 'Migrations/5.sql', 'Migrations/6.sql')) {
+        $file = Join-Path $release $relative
+        if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0) {
+            throw "Full publish did not copy its required output: $relative"
+        }
+    }
+    Write-Host 'PASS: full PortableRelease publish, both validation scripts and installer/migration copies with a PowerShell-7-only parent module path.'
 
     # A disposable project copy proves that provenance rejection still blocks
     # the same target. Never change the reviewed package in the working tree.
