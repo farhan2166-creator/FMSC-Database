@@ -138,6 +138,7 @@ internal static partial class Program
             CheckNewCertificateDrafts();
             CheckBankCertificateBusy();
             CheckReturnAdmissionDraft();
+            CheckProfileShortcutContext();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();

@@ -305,3 +305,16 @@ Added actual-page snapshots for loaded-clean, amount, discount, transport/date,
 active confirmation and committed draft clearing. Common modal decision fixtures
 cover Stay/discard and busy closure. Native Windows acceptance remains required.
 No SQL changes.
+
+## FQA-03 — Blank profile shortcuts have ambiguous destinations
+
+**UX policy resolved and implemented.** Open Admissions remains a general entry
+point for new admissions and the selected record. Photo, family, record-check and
+annual-receipt shortcuts require a committed profile student: unavailable until
+selection, reset when cleared, and guarded again in the click handler with inline
+selection guidance. Existing target factories and role/SQL gates are unchanged.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added blank-profile refusal, selected-student navigation and cleared-identity
+fixtures without opening destination forms or querying SQL. Native keyboard and
+permission acceptance remains required. No SQL changes.

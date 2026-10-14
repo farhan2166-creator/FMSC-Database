@@ -8,6 +8,8 @@ public sealed class StudentProfilePage : V2Page
 {
     private readonly Action<Func<Control>, string, string>? navigate;
     private readonly StudentPicker student = new();
+    private readonly List<ModernButton> studentShortcuts=new();
+    private void UpdateStudentShortcuts(){foreach(var button in studentShortcuts)button.Enabled=student.SelectedId>0;}
     private readonly LatestReadScope profileReads = new();
     private readonly ModernButton feeHistoryButton = new() { Text="Fee Change History", Enabled=false };
     private bool loadingFeeHistory;
@@ -68,7 +70,8 @@ public sealed class StudentProfilePage : V2Page
         Text = "This student does not currently belong to a family.",
         Visible = false
     };
-    public StudentProfilePage(Action<Func<Control>, string, string>? navigate = null)
+    public StudentProfilePage(Action<Func<Control>, string, string>? navigate = null) : this(navigate,true) { }
+    internal StudentProfilePage(Action<Func<Control>, string, string>? navigate,bool initialize)
         : base(
             "Student Profile",
             "View a student’s details, family, balance and history.")
@@ -78,15 +81,16 @@ public sealed class StudentProfilePage : V2Page
         Disposed += (_, _) => profileReads.Dispose();
         this.navigate = navigate;
         student.UserSelectionChanged += async (_, _) => await LoadProfileAsync();
-        student.UserSelectionChanged += (_, _) => UpdateFeeHistoryAvailability();
+        student.UserSelectionChanged += (_, _) => {UpdateFeeHistoryAvailability();UpdateStudentShortcuts();};
         /* Editing the box away from the student on screen drops that student's profile, so nothing is shown under a name that is no longer in the box. */
         student.SelectionCleared += (_, _) => {
             ClearProfile();
             UpdateFeeHistoryAvailability();
+            UpdateStudentShortcuts();
             SetStatus("Select a student to view their profile.");
         };
         student.SearchFailed += ex => Fail(ex);
-        StudentSearchCache.Warm();
+        if(initialize)StudentSearchCache.Warm();
         UiHelper.SetGridPlaceholderMessage(contextGrid, UiText.EmptyGrid.SelectStudent);
         UiHelper.SetGridPlaceholderMessage(familyGrid, UiText.EmptyGrid.SelectStudent);
         UiHelper.SetGridPlaceholderMessage(timelineGrid, UiText.EmptyGrid.SelectStudent);
@@ -246,7 +250,7 @@ public sealed class StudentProfilePage : V2Page
         };
         var recordRow = Row();
         recordRow.Controls.Add(
-            JumpButton("Open Admissions", id => new StudentAdmissionPage(navigate, preselectAdmissionId: id), title: PageTitles.Admissions));
+            JumpButton("Open Admissions", id => new StudentAdmissionPage(navigate, preselectAdmissionId: id), title: PageTitles.Admissions,requireStudent:false));
         recordRow.Controls.Add(
             JumpButton("Open Family / Siblings", id => new StudentFamilyPage(id)));
         recordRow.Controls.Add(
@@ -279,7 +283,7 @@ public sealed class StudentProfilePage : V2Page
     }
     private void UpdateFeeHistoryAvailability() => feeHistoryButton.Enabled=!loadingFeeHistory && student.SelectedId>0
         && CurrentUser.HasPermission("Fees.View") && CurrentUser.HasPermission("Fees.Statement.View");
-    private ModernButton JumpButton(string text, Func<int, Control> factory, string module = "Students", string? title = null)
+    private ModernButton JumpButton(string text, Func<int, Control> factory, string module = "Students", string? title = null,bool requireStudent=true)
     {
         var button = new ModernButton {
             Text = text,
@@ -293,8 +297,11 @@ public sealed class StudentProfilePage : V2Page
         };
         AppMetrics.FitButtonWidth(button, minWidth: 150);
         button.SetOutlineColors(AppTheme.InputBorder, AppTheme.Primary, AppTheme.Surface);
+        if(requireStudent){studentShortcuts.Add(button);button.Enabled=student.SelectedId>0;SetToolTip(button,"Select a student in this profile first.");}
+        else SetToolTip(button,"Open Admissions to start a new admission or edit the selected student.");
         button.Click += (_, _) => {
             int admissionId = student.SelectedId;
+            if(requireStudent&&admissionId<=0){SetStatus("Select a student in Student Profile before opening this action.",PageStatusKind.Warning);student.Focus();return;}
             Func<Control> openPage = () => factory(admissionId);
             if (navigate is not null)
             {
@@ -603,6 +610,7 @@ public sealed class StudentProfilePage : V2Page
             : string.Empty;
     private void ClearProfile()
     {
+        UpdateStudentShortcuts();
         profileReads.Cancel();
         nameLabel.Text =
             "Select a student to see their full profile.";
