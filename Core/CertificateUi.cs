@@ -3,13 +3,18 @@ namespace FMSC_SMS.Core;
 internal static class CertificateUi
 {
     internal static bool ConfirmCertificateSelection(IWin32Window? owner, DataGridView grid,
-        string idColumn, int currentId, int requestedId, bool hasEdits)
+        string idColumn, int currentId, int requestedId, bool hasEdits,Func<bool>? confirmDiscard=null)
     {
         if (!hasEdits) return true;
         if (requestedId == currentId) return false;
-        if (ModernMessageDialog.Confirm(owner,
+        if(confirmDiscard?.Invoke()??ModernMessageDialog.Confirm(owner,
             "Discard the unsaved certificate changes and select another certificate?",
-            UiText.Dialogs.UnsavedChanges)) return true;
+            UiText.Dialogs.UnsavedChanges))return true;
+        if(currentId<=0)
+        {
+            // Stay in a new draft: there is no saved row to restore.
+            grid.ClearSelection();grid.CurrentCell=null;return false;
+        }
         if (grid.Columns.Contains(idColumn))
         {
             foreach (DataGridViewRow row in grid.Rows)

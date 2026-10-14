@@ -3,7 +3,20 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
-    public bool HasUnsavedChanges => HasCertificateEdits;
+    private DateTime? newCertificateDateBaseline;
+    private int newDraftStudent;
+    private readonly Func<string,bool>? discardConfirmation;
+    private readonly Func<int,DataTable> readCertificates;
+    public bool HasUnsavedChanges => HasCertificateEdits ||
+        student.SelectedId>0 && student.SelectedId==newDraftStudent && selectedRegularStudentCertificateId==0 &&
+        newCertificateDateBaseline.HasValue && certificateDate.Value.Date!=newCertificateDateBaseline.Value;
+    private bool ConfirmDraftDiscard(string message)=>!HasUnsavedChanges||
+        (discardConfirmation?.Invoke(message)??Confirm(message,UiText.Dialogs.UnsavedChanges));
+    private void CaptureNewCertificateBaseline()
+    {
+        newDraftStudent=student.SelectedId;
+        newCertificateDateBaseline=newDraftStudent>0?certificateDate.Value.Date:null;
+    }
     public string UnsavedChangesMessage => "Discard the unsaved certificate changes?";
     public bool IsBusy => creatingCertificate;
     public string BusyMessage => "Please wait for the certificate to finish saving.";
@@ -52,9 +65,12 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
-    public RegularStudentCertificatePage()
+    public RegularStudentCertificatePage():this(true){ }
+    internal RegularStudentCertificatePage(bool initialize,Func<string,bool>? discardConfirmation=null,Func<int,DataTable>? readCertificates=null)
         : base("Regular Student Certificate", "Record and print regular student (proof of placement) certificates.")
     {
+        this.discardConfirmation=discardConfirmation;
+        this.readCertificates=readCertificates??(id=>DatabaseHelper.QueryUser("GetRegularStudentCertificateRecords",DatabaseHelper.Int("@AdmissionId",id)));
         className.MaxLength = 100;
         className.ReadOnly = true;
         className.TabStop = false;
@@ -105,11 +121,11 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         RelocateFromActions(createCertificateButton, clearButton);
         TrackStudentSearchStatus(student);
         /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
-        StudentSearchCache.Warm();
+        if(initialize)StudentSearchCache.Warm();
         /* dbo.Create...Certificate refuses a student with no date of birth (58505), so such students are not offered. */
         student.RowFilter = row => !row.IsNull("DateOfBirth");
         student.SelectionChangeGuard = _ => !creatingCertificate &&
-            (!HasCertificateEdits || Confirm("Discard the unsaved certificate changes and choose another student?", UiText.Dialogs.UnsavedChanges));
+            ConfirmDraftDiscard("Discard the unsaved certificate changes and choose another student?");
         student.UserSelectionChanged +=
             (_, _) => {
                 if (suppressStudentChanged)
@@ -125,7 +141,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         Grid.SelectionChanged += GridSelectionChanged;
         className.TextChanged += (_, _) => { if (!loadingCertificates) ApplyWorkflowState(); };
         certificateDate.ValueChanged += (_, _) => { if (!loadingCertificates) ApplyWorkflowState(); };
-        Defer(
+        if(initialize)Defer(
             () => {
                 ResetToStart();
             });
@@ -236,6 +252,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         {
             Fail(ex);
         }
+        finally{if(selectedRegularStudentCertificateId==0)CaptureNewCertificateBaseline();}
     }
     private void LoadCertificates(int admissionId)
     {
@@ -253,10 +270,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
                 ApplyWorkflowState();
                 return;
             }
-            DataTable table =
-                DatabaseHelper.QueryUser(
-                    "GetRegularStudentCertificateRecords",
-                    DatabaseHelper.Int("@AdmissionId", admissionId));
+            DataTable table = readCertificates(admissionId);
             certificateResults =
                 table.Copy();
             if (certificateResults.Columns.Contains("CertificateDate") && certificateResults.Columns.Contains("RegularStudentCertificateId"))
@@ -365,7 +379,8 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             try
             {
                 if (!ConfirmCertificateSelection(FindForm(), Grid, "RegularStudentCertificateId",
-                    selectedRegularStudentCertificateId, regularStudentCertificateId, HasCertificateEdits)) return;
+                    selectedRegularStudentCertificateId, regularStudentCertificateId, HasUnsavedChanges,
+                    ()=>ConfirmDraftDiscard("Discard the unsaved certificate changes and select another certificate?"))) return;
             }
             finally { restoringCertificateSelection = false; }
             selectedRegularStudentCertificateId =
@@ -676,11 +691,8 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     }
     private void RefreshCertificates()
     {
-        if (student.SelectedId <= 0)
-            return;
-        if (selectedRegularStudentCertificateId > 0 &&
-            (className.Text.Trim() != savedClassName.Trim() || certificateDate.Value.Date != savedCertificateDate)
-            && !Confirm("Discard the unsaved changes and refresh certificates?", "Refresh Certificates")) return;
+        if (creatingCertificate||student.SelectedId<=0)return;
+        if(!ConfirmDraftDiscard("Discard the unsaved changes and refresh certificates?"))return;
         if (selectedRegularStudentCertificateId > 0)
         {
             int id = selectedRegularStudentCertificateId;
@@ -688,8 +700,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             SelectCertificate(id);
             return;
         }
-        LoadCertificates(student.SelectedId);
-        SelectCurrentClassCertificate();
+        StudentChanged();
     }
     private void ClearCertificateFields()
     {
@@ -697,10 +708,12 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         className.Clear();
         certificateDate.Value =
             DateTime.Today;
+        CaptureNewCertificateBaseline();
     }
     private void ClearCertificateSelection()
     {
         selectedRegularStudentCertificateId = 0;
+        newCertificateDateBaseline=null;
     }
     private void ResetToStart()
     {
@@ -724,8 +737,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     private void ClearForm(bool confirmDiscard = true)
     {
         if (creatingCertificate) return;
-        if (confirmDiscard && HasCertificateEdits &&
-            !Confirm("Discard the unsaved changes and choose another student?", "Next Student")) return;
+        if(confirmDiscard&&!ConfirmDraftDiscard("Discard the unsaved changes and choose another student?"))return;
         suppressStudentChanged = true;
         try
         {

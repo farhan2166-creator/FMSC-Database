@@ -19,3 +19,21 @@ Added actual-host selection fixtures for new/saved write states, settled release
 fee/family loading, retained unknown outcomes and a busy sibling child. App and
 Windows smoke project compile with zero warnings/errors. Native delayed-save and
 mouse/keyboard tab scenarios remain Windows acceptance work. No SQL changes.
+
+
+## RFA-02 — Regular Student Certificate new-date drafts
+
+Confirmed HasUnsavedChanges excluded every new issue. Added a student-bound loaded
+baseline for the editable new-issue date. Reverted/default dates and an unselected
+student stay clean. Saved certificates retain their original class/date snapshot.
+Student changes, Next Student, Refresh, saved-row selection and shell leave now
+consult the same dirty predicate. A declined saved-row switch clears the unaccepted
+highlight when the editor remains a new draft. Stay preserves context without a reload;
+accepted new-draft Refresh reloads student defaults and establishes a clean
+baseline. Confirmed save clearing retires the earlier draft intent.
+
+Added actual-page injected-read/confirmation fixtures covering clean defaults,
+new-date edits, Stay without reads, revert, accepted Refresh/Next, saved-record
+edits and post-save field clearing. App and Windows smoke project compile with
+zero warnings/errors; native Windows interaction remains unexecuted here.
+No SQL changes. The two New-button bypasses are the separate RFA-03 change.
