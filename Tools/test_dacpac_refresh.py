@@ -167,6 +167,22 @@ class RefreshChecks(unittest.TestCase):
 
     def test_corrupted_zip(self): (self.root / "FMSC.dacpac").write_bytes(b"invalid zip"); self.refuse("INVALID_PACKAGE_OR_PROVENANCE")
 
+    def test_hidden_zip_comment(self):
+        self.candidate()
+        with zipfile.ZipFile(self.root / "FMSC.dacpac", "a") as z: z.comment = b"fictional extra payload"
+        self.refuse("UNSUPPORTED_ZIP_METADATA_OR_HIDDEN_PAYLOAD")
+
+    def test_hidden_trailing_payload(self):
+        data = self.candidate(); (self.root / "FMSC.dacpac").write_bytes(data + b"fictional trailing payload")
+        self.refuse("UNSUPPORTED_ZIP_METADATA_OR_HIDDEN_PAYLOAD")
+
+    def test_hidden_entry_extra(self):
+        data = io.BytesIO()
+        with zipfile.ZipFile(data, "w") as z:
+            for name, payload in self.parts.items():
+                entry = zipfile.ZipInfo(name); entry.extra = b"\xff\xff\x04\x00demo"; z.writestr(entry, payload)
+        (self.root / "FMSC.dacpac").write_bytes(data.getvalue()); self.refuse("UNSUPPORTED_ZIP_METADATA_OR_HIDDEN_PAYLOAD")
+
     def test_duplicate_entry(self):
         self.candidate()
         with warnings.catch_warnings(), zipfile.ZipFile(self.root / "FMSC.dacpac", "a") as z:

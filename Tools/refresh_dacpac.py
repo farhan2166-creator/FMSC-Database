@@ -4,7 +4,6 @@ Only reports and explicitly verified approval records are written. No SQL is run
 no archive is extracted, and no exported row or SQL body enters the report.
 """
 import argparse
-import collections
 import copy
 import datetime
 import hashlib
@@ -84,6 +83,10 @@ def archive(data):
         raise Refusal("PACKAGE_SIZE_LIMIT")
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         entries = z.infolist()
+        # Arbitrary ZIP comments/extras or trailing bytes can carry an additional
+        # payload. They are not part of the supported timestamp-only refresh.
+        if z.comment or any(e.comment or e.extra for e in entries) or data.rfind(b"PK\x05\x06") + 22 != len(data) or entries and min(e.header_offset for e in entries) != 0:
+            raise Refusal("UNSUPPORTED_ZIP_METADATA_OR_HIDDEN_PAYLOAD")
         names = [e.filename for e in entries]
         if len(entries) > 4096 or len(names) != len(set(names)):
             raise Refusal("DUPLICATE_OR_EXCESSIVE_ZIP_ENTRIES")

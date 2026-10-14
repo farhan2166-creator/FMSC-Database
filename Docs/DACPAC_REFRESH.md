@@ -20,7 +20,7 @@ Enable **Settings → Actions → General → Workflow permissions → Allow Git
 
 ## Automatic approval boundary
 
-- ZIP CRC, safe unique entry paths, size/expansion limits and internal model checksum must pass. XML declarations/entities, external relationship targets and missing package entries are refused.
+- ZIP CRC, safe unique entry paths, size/expansion limits and internal model checksum must pass. XML declarations/entities, external relationship targets, ZIP comments/extra fields/trailing payloads and missing package entries are refused.
 - The **entire `model.xml` must be byte-identical** to the anchored reviewed model, and every existing SQL module fingerprint must match. This includes all tables, nested columns/types, constraints, indexes, keys, dependencies/relationships, permissions, extended properties and model options, plus procedure/function/trigger bodies and signatures.
 - Every exported-data entry and other deployment payload must be byte-identical, with the same inventory. New, modified or removed school data always stops automatic alignment, even with unchanged SQL. No row data is parsed, printed, reseeded or uploaded.
 - Production compatibility/recovery requirements and schema version must stay unchanged, except for the package hash in the compatibility manifest. Existing inventory and whole-rupee checks must pass; the current required version remains **6**.
