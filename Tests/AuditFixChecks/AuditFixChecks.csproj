@@ -14,6 +14,8 @@
     <Compile Include="../../Core/InputParse.cs" Link="InputParse.cs" />
     <Compile Include="../../Core/Tvp.cs" Link="Tvp.cs" />
     <Compile Include="../../Core/AdmissionReviewFilter.cs" Link="AdmissionReviewFilter.cs" />
+    <Compile Include="../../Core/AppScale.cs" Link="AppScale.cs" />
+    <Compile Include="../../Core/DpiLayout.cs" Link="DpiLayout.cs" />
     <Compile Include="../../Core/WorkingAreaLayout.cs" Link="WorkingAreaLayout.cs" />
     <Compile Include="../../Core/DatabaseCompatibilityFailure.cs" Link="DatabaseCompatibilityFailure.cs" />
     <Compile Include="../../Core/DatabaseRecoveryException.cs" Link="DatabaseRecoveryException.cs" />

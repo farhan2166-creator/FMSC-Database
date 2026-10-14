@@ -5,7 +5,7 @@ public static class TabStrip
 {
     public static void Apply(TabControl tabs, Color accent)
     {
-        tabs.Font = AppTheme.ButtonFont;
+        tabs.Font = UiDpi.ForControl(tabs, AppTheme.ButtonFont);
         tabs.Multiline = false;
         tabs.ShowToolTips = true;
     }
@@ -15,7 +15,7 @@ public static class TabStrip
     public static void ApplyButtonTheme(Button button, bool active)
     {
         if (button is not ModernButton modern) return;
-        modern.Font = AppTheme.ButtonFont;
+        modern.Font = UiDpi.ForControl(modern, AppTheme.ButtonFont);
         // Tab captions such as "Reverse a Posting" are navigation, not destructive actions.
         modern.ThemeRole = active ? "TabActive" : "TabInactive";
         modern.ApplyTheme();
@@ -23,7 +23,7 @@ public static class TabStrip
 
     public static void Repaint(TabControl tabs)
     {
-        tabs.Font = AppTheme.ButtonFont;
+        tabs.Font = UiDpi.ForControl(tabs, AppTheme.ButtonFont);
         if (tabs.Parent?.Parent is TabHost host) host.RefreshAppearance();
     }
 
@@ -112,7 +112,8 @@ public static class TabStrip
             arranging = true;
             try
             {
-                int minimumWidth = entries.Max(entry => AppMetrics.TextWidth(entry.Page.Text, AppTheme.ButtonFont, AppScale.Scale(40)));
+                int minimumWidth = entries.Max(entry => AppMetrics.TextWidth(entry.Page.Text,
+                    UiDpi.ForControl(entry.Button, AppTheme.ButtonFont), UiDpi.Metric(this, AppScale.Scale(40))));
                 int count = Math.Min(entries.Count, Math.Max(1, ClientSize.Width / Math.Max(1, minimumWidth)));
                 int rows = (entries.Count + count - 1) / count;
                 if (columns != count)
@@ -129,7 +130,7 @@ public static class TabStrip
                     columns = count;
                     buttons.ResumeLayout(true);
                 }
-                RowStyles[0].Height = rows * AppMetrics.ButtonRowHeight;
+                RowStyles[0].Height = rows * UiDpi.Metric(this, AppMetrics.ButtonRowHeight);
             }
             finally { arranging = false; }
         }

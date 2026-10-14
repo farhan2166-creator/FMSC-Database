@@ -14,9 +14,11 @@ internal static partial class Program
     private static void Main(string[] args)
     {
         // Run on a disposable Windows test profile; no SQL/database is used.
+        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         if(args.Contains("--post-fix"))
         {
+            CheckDpiResponsiveLayouts();
             CheckShortcutPermissions();
             CheckClosingWholeAmounts();
             CheckPaletteDestinations();

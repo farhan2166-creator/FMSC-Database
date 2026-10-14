@@ -44,23 +44,23 @@ namespace FMSC_SMS.Core
             AppScale.Scale(20, AppScale.SpacingScale);
         // DataGridView
         public static int GridRowHeight =>
-            Math.Max(38, TextHeight(AppTheme.NormalFont) + 12);
+            Math.Max(AppScale.Scale(38), TextHeight(AppTheme.NormalFont) + AppScale.Scale(12));
         public static int GridHeaderHeight =>
-            Math.Max(42, TextHeight(AppTheme.ButtonFont) + 14);
+            Math.Max(AppScale.Scale(42), TextHeight(AppTheme.ButtonFont) + AppScale.Scale(14));
         // Sidebar
         public const int SidebarExpandedWidth = 280;
         public const int SidebarCompactWidth = 72;
         public const int SidebarCompactBreakpoint = 1450;
-        public const int SidebarBrandHeight = 76;
-        public const int SidebarUserHeight = 68;
-        public const int SidebarCompactUserHeight = 54;
-        public const int SidebarAccountHeight = 72;
-        public const int SidebarModuleHeight = 46;
-        public const int SidebarChildHeight = 40;
-        public const int SidebarIconSize = 24;
-        public const int SidebarLogoSize = 42;
-        public const int SidebarAvatarSize = 38;
-        public const int SidebarToggleSize = 32;
+        public static int SidebarBrandHeight => AppScale.Scale(76);
+        public static int SidebarUserHeight => AppScale.Scale(68);
+        public static int SidebarCompactUserHeight => AppScale.Scale(54);
+        public static int SidebarAccountHeight => AppScale.Scale(72);
+        public static int SidebarModuleHeight => AppScale.Scale(46);
+        public static int SidebarChildHeight => AppScale.Scale(40);
+        public static int SidebarIconSize => AppScale.Scale(24);
+        public static int SidebarLogoSize => AppScale.Scale(42);
+        public static int SidebarAvatarSize => AppScale.Scale(38);
+        public static int SidebarToggleSize => AppScale.Scale(32);
         public const int SeparatorHeight = 1;
         // Authentication
         public const int AuthenticationTitleRowHeight = 70;
@@ -139,6 +139,7 @@ namespace FMSC_SMS.Core
         }
         public static int TextHeight(Font font)
         {
+            font = UiDpi.MeasurementFont(font);
             if (_textHeightCache.TryGetValue(font, out int cached))
                 return cached;
             using var probe = new Label {
@@ -155,6 +156,7 @@ namespace FMSC_SMS.Core
         }
         public static int TextWidth(string text, Font font, int horizontalPadding = 16)
         {
+            font = UiDpi.MeasurementFont(font);
             string measuredText = string.IsNullOrEmpty(text) ? " " : text;
             var key = (measuredText, font);
             // Keep long, potentially user-entered content out of this layout cache.
@@ -212,7 +214,7 @@ namespace FMSC_SMS.Core
         {
             int captionHeight =
                 Math.Max(16, TextHeight(AppTheme.ButtonFont));
-            return captionHeight + controlHeight + 8;
+            return captionHeight + controlHeight + SpacingSm;
         }
         public static int FieldRowHeight
         {
@@ -233,7 +235,7 @@ namespace FMSC_SMS.Core
                 hasSubtitle
                     ? Math.Max(14, TextHeight(AppTheme.NormalFont))
                     : 0;
-            return titleLineHeight + subtitleLineHeight + 5;
+            return titleLineHeight + subtitleLineHeight + 2 * SpacingXs;
         }
         public static int CardContentVerticalPadding =>
             2 * SpacingMd + SpacingSm;

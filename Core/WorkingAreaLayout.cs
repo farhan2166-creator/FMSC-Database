@@ -4,9 +4,10 @@ internal static class WorkingAreaLayout
 {
     internal sealed record Result(Rectangle Bounds,Size MinimumSize);
 
-    internal static Result Fit(Rectangle current,Size minimum,Rectangle workingArea)
+    internal static Result Fit(Rectangle current,Size minimum,Rectangle workingArea,int dpi = 96)
     {
-        var available=new Size(Math.Max(1,workingArea.Width-16),Math.Max(1,workingArea.Height-16));
+        int inset = DpiLayout.Pixels(16, dpi);
+        var available=new Size(Math.Max(1,workingArea.Width-inset),Math.Max(1,workingArea.Height-inset));
         var min=new Size(Math.Clamp(minimum.Width,0,available.Width),Math.Clamp(minimum.Height,0,available.Height));
         var size=new Size(Math.Clamp(current.Width,Math.Max(1,min.Width),available.Width),
             Math.Clamp(current.Height,Math.Max(1,min.Height),available.Height));

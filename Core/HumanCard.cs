@@ -33,10 +33,10 @@ public class HumanCard : RoundedPanel
         int accessoryHeadroom = accessory == null
             ? 0
             : Math.Max(0, AppMetrics.ButtonHeight + UiDesignSystem.Spacing.Xs * 2
-                - (titleLineHeight + subtitleLineHeight + 5));
+                - (titleLineHeight + subtitleLineHeight + UiDesignSystem.Spacing.Xs * 2));
         Header = new Panel {
             Dock = DockStyle.Top,
-            Height = titleLineHeight + subtitleLineHeight + 5 + accessoryHeadroom,
+            Height = titleLineHeight + subtitleLineHeight + UiDesignSystem.Spacing.Xs * 2 + accessoryHeadroom,
             BackColor = AppTheme.Surface,
             Tag = "ThemeCardHeader",
             Padding = new Padding(

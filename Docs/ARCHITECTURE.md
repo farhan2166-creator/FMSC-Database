@@ -37,6 +37,14 @@ The compatibility contract combines version requirements with schema structural 
 
 The page organization and navigation group names are documented in [PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md). Avoid adding a second helper for behavior that already lives in shared `Core` classes.
 
+## Shared DPI and layout ownership
+
+The application requests `PerMonitorV2` through WinForms application configuration. The existing programmatic UI retains `AutoScaleMode.None`: shared metrics own geometry, while Windows handles monitor-relative native fonts. `AppScale` calculates density from the available client area in 96-DPI units and converts geometry to device pixels once; font density remains separate. `ApplicationWindowForm` scales existing child geometry on monitor changes, excluding the caption that already handles its own DPI notifications. `UiDpi` preserves monitor-relative shared fonts and converts reapplied grid/tab metrics when a dialog is on a different monitor from the dashboard.
+
+Windows are bounded to the current working area without permanently losing their requested minimum size. Eligible top-level dialog content uses `ResponsiveViewport` to retain readable dimensions and provide scrolling on smaller work areas, then expand on larger ones. Existing scroll hosts, standalone grids and ReportViewer roots retain their own viewport behavior. Fixed-purpose combo, date and numeric fields use a font-based width cap; long-text fields remain flexible. Navigation destinations, theme colors and report zoom are unchanged.
+
+Portable sizing checks and Windows native-control fixtures cover synthetic client areas/DPI contexts. They do not change physical display settings or prove mixed-monitor behavior. Interactive acceptance must check 100%, 125%, 150% and 200% scaling at the supported resolutions, including dialog scrolling, grids, tabs, ReportViewer and repeated moves between monitors.
+
 ## Data correctness and safety contracts
 
 - **Use SQL-side transaction and permission enforcement** for financial/state-changing work. A button disabled in WinForms is not a substitute for server authorization.

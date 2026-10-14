@@ -538,17 +538,17 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             _titleLabel is not null)
         {
             _titleLabel.Font =
-                AppTheme.PageTitleFont;
+                UiDpi.ForControl(_titleLabel, AppTheme.PageTitleFont);
         }
         if (ContextLabel is not null)
             ContextLabel.Font =
-                AppTheme.NormalFont;
+                UiDpi.ForControl(ContextLabel, AppTheme.NormalFont);
         if (_headerGuidanceLabel is not null)
-            _headerGuidanceLabel.Font = AppTheme.NormalFont;
+            _headerGuidanceLabel.Font = UiDpi.ForControl(_headerGuidanceLabel, AppTheme.NormalFont);
         ScheduleHeaderFit();
         if (StatusLabel is not null)
             StatusLabel.Font =
-                AppTheme.NormalFont;
+                UiDpi.ForControl(StatusLabel, AppTheme.NormalFont);
         RefreshActionButtons();
         if (_embeddedActionBar is not null)
         {
@@ -574,12 +574,12 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 button.Tag as string ??
                 UiDesignSystem.Actions.Primary;
             button.Font =
-                AppTheme.ButtonFont;
+                UiDpi.ForControl(button, AppTheme.ButtonFont);
             button.Height =
                 AppMetrics.ButtonHeight;
             AppMetrics.FitButtonWidth(
                 button,
-                minWidth: 122);
+                minWidth: AppMetrics.ActionButtonMinimumWidth, horizontalPadding: AppScale.Scale(32));
             ApplyActionButtonTheme(
                 button,
                 role);
@@ -1203,7 +1203,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     {
         if (!Grid.Columns.Contains(columnName))
             return;
-        Grid.Columns[columnName].Width = width;
+        Grid.Columns[columnName].Width = DpiLayout.Pixels(width, Grid.DeviceDpi);
         Grid.Columns[columnName].FillWeight = Math.Max(width, 1);
     }
     protected void Bind(DataTable table)

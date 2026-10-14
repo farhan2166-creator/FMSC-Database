@@ -91,6 +91,8 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         BackColor = AppTheme.PageBackground;
         // Establish the adaptive scale factor from the actual screen working area *before* any sidebar/topbar/page is built, using a deterministic estimate of the chrome this form is about to…
         PrimeInitialScale();
+        // The shell establishes its metric context before constructing controls.
+        CaptureLayoutDpi();
         Font = AppTheme.NormalFont;
         Build();
         KeyPreview = true;
@@ -105,31 +107,14 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 0,
                 AppMetrics.DashboardMinimumWidth,
                 AppMetrics.DashboardMinimumHeight);
-        // Mirrors the sidebar auto-compact decision so the estimated content area matches what the form will actually end up with.
-        int sidebarWidth =
-            workingArea.Width < AppMetrics.SidebarCompactBreakpoint
-                ? AppMetrics.SidebarCompactWidth
-                : AppMetrics.SidebarExpandedWidth;
-        int estimatedTopBarHeight = DashboardTopBarHeight();
-        int estimatedStatusBarHeight = DashboardStatusBarHeight();
+        int dpi = UiDpi.SystemDpi;
+        AppScale.Recompute(workingArea.Size, dpi);
+        int sidebarWidth = workingArea.Width / DpiLayout.Factor(dpi) < AppMetrics.SidebarCompactBreakpoint
+            ? AppScale.Scale(AppMetrics.SidebarCompactWidth)
+            : AppScale.Scale(AppMetrics.SidebarExpandedWidth);
         var estimatedContent = new Size(
             Math.Max(1, workingArea.Width - sidebarWidth),
-            Math.Max(
-                1,
-                workingArea.Height -
-                estimatedTopBarHeight -
-                estimatedStatusBarHeight));
-        int dpi = 96;
-        try
-        {
-            using var g = Graphics.FromHwnd(IntPtr.Zero);
-            dpi = (int)Math.Round(g.DpiX);
-        }
-        catch (Exception nonFatalException83)
-        {
-            FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException83, "MainDashboardForm: PrimeInitialScale fallback");
-            // Best-effort only - fall back to 96 (100%) if unavailable.
-        }
+            Math.Max(1, workingArea.Height - DashboardTopBarHeight() - DashboardStatusBarHeight()));
         AppScale.Recompute(estimatedContent, dpi);
     }
     private void Build()
@@ -153,10 +138,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         AppScale.ScaleChanged += OnScaleChanged;
         _scaleDebounceTimer.Tick += OnScaleDebounceTick;
         Resize += OnFormResize;
-        DpiChanged += (_, _) => {
-            _scaleDebounceTimer.Stop();
-            _scaleDebounceTimer.Start();
-        };
+
         // Recompute against the actual per-page working area (inside the sidebar/topbar/status bar chrome), not the outer window size.
         Shown += (_, _) =>
             AppScale.Recompute(content.ClientSize, DeviceDpi);
@@ -193,6 +175,14 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         UpdateSidebarModeForWindowWidth();
         _scaleDebounceTimer.Stop();
         _scaleDebounceTimer.Start();
+    }
+    protected override void OnDpiChanged(DpiChangedEventArgs e)
+    {
+        base.OnDpiChanged(e);
+        if (e.Cancel) return;
+        _scaleDebounceTimer.Stop();
+        AppScale.Recompute(content.ClientSize, e.DeviceDpiNew);
+        UpdateSidebarModeForWindowWidth();
     }
     private void OnScaleDebounceTick(object? sender, EventArgs e)
     {
@@ -253,8 +243,8 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     private void OnScaleChanged(object? sender, EventArgs e)
     {
         AppMetrics.InvalidateScaleCache();
-        Font = AppTheme.NormalFont;
-        status.Font = AppTheme.NormalFont;
+        Font = UiDpi.ForControl(this, AppTheme.NormalFont);
+        status.Font = UiDpi.ForControl(status, AppTheme.NormalFont);
         RebuildSidebar();
         if (_currentIsDashboard && _currentFactory != null)
         {
@@ -283,18 +273,18 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     }
     private int SidebarWidth =>
         _sidebarCompact
-            ? AppMetrics.SidebarCompactWidth
-            : AppMetrics.SidebarExpandedWidth;
-    private int NavContentWidth => SidebarWidth - 20;
+            ? AppScale.Scale(AppMetrics.SidebarCompactWidth)
+            : AppScale.Scale(AppMetrics.SidebarExpandedWidth);
+    private int NavContentWidth => SidebarWidth - AppScale.Scale(20);
     private int ModuleRowWidth => NavContentWidth;
-    private int ChildRowWidth => ModuleRowWidth - 18;
+    private int ChildRowWidth => ModuleRowWidth - AppScale.Scale(18);
     private void UpdateSidebarModeForWindowWidth()
     {
         if (!IsHandleCreated || ClientSize.Width <= 0 || DeviceDpi <= 0)
             return;
-        // ClientSize is already in the logical coordinate space used by this DPI-aware WinForms application.
+        // PerMonitorV2 ClientSize is in device pixels; use logical width for this breakpoint.
         bool automaticCompact =
-            ClientSize.Width < AppMetrics.SidebarCompactBreakpoint;
+            ClientSize.Width / DpiLayout.Factor(DeviceDpi) < AppMetrics.SidebarCompactBreakpoint;
         if (_lastAutomaticCompactMode != automaticCompact)
         {
             _lastAutomaticCompactMode = automaticCompact;

@@ -294,7 +294,7 @@ namespace FMSC_SMS.Core
                 _themeRole is not ("Navigation" or "TabActive" or "TabInactive" or "Outline" or "Custom"))
             {
                 Height = AppMetrics.ButtonHeight;
-                Font = AppTheme.ButtonFont;
+                Font = UiDpi.ForControl(this, AppTheme.ButtonFont);
             }
         }
         private static string InferTextRole(string? text) =>

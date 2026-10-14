@@ -33,7 +33,7 @@ internal static class UiTheme
     {
         if (Styles.TryGetValue(control, out var existing)) return existing;
         var style = new Style {
-            Font = FontRole(control.Font),
+            Font = FontRole(control, control.Font),
             Foreground = ColorRole(control.ForeColor),
             Background = control is Form ? () => AppTheme.PageBackground :
                 IsHeaderContainer(control) ? () => Color.Transparent : ColorRole(control.BackColor),
@@ -43,7 +43,7 @@ internal static class UiTheme
         Styles.Add(control, style);
         // A validation or status update may deliberately choose a different shared role.
         bool CanRebind() => !style.Applying && !AppTheme.IsChangingTheme && !control.IsDisposed;
-        control.FontChanged += (_, _) => { if (CanRebind()) style.Font = FontRole(control.Font); };
+        control.FontChanged += (_, _) => { if (CanRebind()) style.Font = FontRole(control, control.Font); };
         control.ForeColorChanged += (_, _) => { if (CanRebind()) style.Foreground = ColorRole(control.ForeColor); };
         control.BackColorChanged += (_, _) => { if (CanRebind()) style.Background = ColorRole(control.BackColor); };
         if (!OwnsChildren(control))
@@ -104,7 +104,7 @@ internal static class UiTheme
                 HumanUi.ApplyGridStyle(grid, style.GridAccent?.Invoke() ?? UiHelper.SharedGridAccent(grid));
                 return;
             }
-            if (style.Font is not null) control.Font = style.Font();
+            if (style.Font is not null) control.Font = UiDpi.ForControl(control, style.Font());
             if (style.Foreground is not null) control.ForeColor = style.Foreground();
             if (style.Background is not null) control.BackColor = style.Background();
             switch (control.Tag as string)
@@ -130,7 +130,8 @@ internal static class UiTheme
         }
         finally { style.Applying = false; }
     }
-    private static Func<Font>? FontRole(Font font)
+    internal static bool IsReferenceFont(Font font) => FontRole(null, font) is not null;
+    private static Func<Font>? FontRole(Control? control, Font font)
     {
         Func<Font>[] roles = {
             () => AppTheme.NormalFont, () => AppTheme.BodyBoldFont, () => AppTheme.ButtonFont,
@@ -138,7 +139,8 @@ internal static class UiTheme
             () => AppTheme.HeadingFont, () => AppTheme.PageTitleFont, () => AppTheme.DisplayFont,
             () => AppTheme.SmallFont, () => AppTheme.FontSmallBold, () => AppTheme.FontTitle
         };
-        foreach (var role in roles) if (ReferenceEquals(font, role())) return role;
+        foreach (var role in roles)
+            if (ReferenceEquals(font, role()) || control is { IsHandleCreated: true } && control.DeviceDpi != UiDpi.SystemDpi && UiDpi.Matches(control, font, role())) return role;
         return font.Equals(Control.DefaultFont) ? () => AppTheme.NormalFont : null;
     }
     private static Func<Color>? ColorRole(Color color)

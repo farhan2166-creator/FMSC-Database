@@ -70,10 +70,10 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
         SuspendLayout();
         try
         {
-            Font = AppTheme.NormalFont;
+            Font = UiDpi.ForControl(this, AppTheme.NormalFont);
             ForeColor = AppTheme.Text;
             BackColor = AppTheme.SurfaceElevated;
-            _inner.Font = AppTheme.NormalFont;
+            _inner.Font = Font;
             _inner.ForeColor = AppTheme.Text;
             _inner.CalendarMonthBackground = AppTheme.SurfaceElevated;
             UiTheme.ApplyControl(this);

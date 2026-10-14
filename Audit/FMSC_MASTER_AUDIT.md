@@ -3,6 +3,7 @@
 **Updated:** 14 October 2026  
 **Reviewed source:** [`14aba80a8751322e04aa028f960e0a68efaf08f2`](https://github.com/farhan2166-creator/FMSC-Database/commit/14aba80a8751322e04aa028f960e0a68efaf08f2) for the read-only migration-retirement verification below. Historical findings retain their original source freezes.
 **Historical evidence:** [FMSC_HISTORICAL_AUDITS.md](FMSC_HISTORICAL_AUDITS.md)
+**Current post-merge audit:** [FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md](FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md) — read-only review of main 4c25103f4930; Windows desktop CI and security checks passed at this SHA, but current complete-installer and native/operator/database acceptance remain open. This supersedes only the older CI-status snapshot, not historical tests or recorded owner decisions.
 
 > **Release acceptance: PENDING.** A passing Windows CI build verifies automated tests, not a complete installer on a real school PC. Do not deploy as an unqualified production release until the deployment and operator checks below are recorded. This document is a consolidation of recorded evidence, not a new execution of all tests.
 
