@@ -9,6 +9,7 @@ DatabaseHelper.ConnectionString=connectionText;
 DataTable Query(string sql,params SqlParameter[] parameters){using var c=DatabaseHelper.GetConnection();c.Open();using var q=new SqlCommand(sql,c){CommandTimeout=120};q.Parameters.AddRange(parameters);var table=new DataTable();using var a=new SqlDataAdapter(q);a.Fill(table);return table;}
 int checks=0;void Check(bool ok,string label){if(!ok)throw new Exception(label);checks++;Console.WriteLine("PASS: "+label);}
 string Resource(string name){using var input=typeof(MutationKind).Assembly.GetManifestResourceStream(name)!;using var reader=new StreamReader(input);return reader.ReadToEnd();}
+if(args.Contains("--compatibility")){using var c=DatabaseHelper.GetConnection();c.Open();DatabaseCompatibility.Validate(c);Console.WriteLine("PASS: uploaded schema 6 meets production startup and restore compatibility requirements.");return;}
 if(args.Contains("--migration")){
     using var c=DatabaseHelper.GetConnection();c.Open();c.InfoMessage+=(_,e)=>Console.WriteLine(e.Message);
     using var q=new SqlCommand(Resource("Migration6Checks.sql"),c){CommandTimeout=120};q.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource("Migration6.sql")});q.ExecuteNonQuery();
