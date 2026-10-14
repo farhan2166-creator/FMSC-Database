@@ -146,12 +146,22 @@ def object_inventory(contents):
     root = xml(contents["model.xml"])
     ns = {"d": root.tag.split("}")[0][1:]}
     result = {}
-    for i, node in enumerate(root.findall("d:Model/d:Element", ns)):
+    model = root.find("d:Model", ns)
+    top = list(model)
+    # Named nested columns/parameters/types deserve their own diagnostic rows;
+    # anonymous top-level constraints are retained too. Never include values.
+    nodes = top + [e for e in model.findall(".//d:Element", ns) if e.get("Name") and e not in top]
+    for i, node in enumerate(nodes):
         kind = node.get("Type", "Unknown")
         name = node.get("Name")
         # Anonymous definitions are still checked; the full model is byte-strict.
         key = (kind, name or "anonymous:" + str(i))
-        result[key] = sha(ET.tostring(node, encoding="utf-8"))
+        facets = {}
+        for child in node:
+            field = child.get("Name")
+            if field:
+                facets[field] = sha(ET.tostring(child, encoding="utf-8"))
+        result[key] = {"sha256": sha(ET.tostring(node, encoding="utf-8")), "facets": facets}
     return result
 
 
@@ -165,8 +175,12 @@ def model_differences(old, new):
         kind, name = key
         if kind not in approved_kinds or not re.fullmatch(r"Sql[A-Za-z]{1,60}", kind): kind = "unknown-kind:" + sha(kind.encode())[:16]
         safe_name = name if key in a and re.fullmatch(r"[A-Za-z0-9_.$@\[\] :\-]{1,160}", name) else "object:" + sha(name.encode())[:16]
+        old_fields = a.get(key, {}).get("facets", {})
+        new_fields = b.get(key, {}).get("facets", {})
+        changed_fields = [field if field in old_fields and re.fullmatch(r"[A-Za-z0-9_]{1,80}", field) else "field:" + sha(field.encode())[:16]
+            for field in sorted(set(old_fields) | set(new_fields)) if old_fields.get(field) != new_fields.get(field)]
         rows.append({"kind": kind, "object": safe_name, "change": "added" if key not in a else "removed" if key not in b else "modified",
-                     "beforeSha256": a.get(key), "afterSha256": b.get(key)})
+                     "beforeSha256": a.get(key, {}).get("sha256"), "afterSha256": b.get(key, {}).get("sha256"), "changedFields": changed_fields})
     return rows
 
 
@@ -333,9 +347,9 @@ def write_report(folder, report):
     lines += ["", "Reasons: " + (", ".join(report["reasons"]) or "none"), "",
               "Synchronization files: " + (", ".join(report["changedApprovalFiles"]) or "none"),
               "Schema-only fixture regenerated: " + str(report["fixtureRegenerated"]), "",
-              "| Category | Object / entry | Change |", "|---|---|---|"]
+              "| Category | Object / entry | Change | Changed fields |", "|---|---|---|---|"]
     for row in report.get("differences", []) + report.get("modelObjects", []):
-        lines.append(f"| {row.get('category',row.get('kind'))} | {row.get('entry',row.get('object'))} | {row['change']} |")
+        lines.append(f"| {row.get('category',row.get('kind'))} | {row.get('entry',row.get('object'))} | {row['change']} | {', '.join(row.get('changedFields',[]))} |")
     lines += ["", "Exact-MDF/LDF compatibility and live data outcomes remain outside this offline check. Existing isolated SQL/Windows/security checks must pass on the proposed revision."]
     (folder / "summary.md").write_text("\n".join(lines) + "\n")
 

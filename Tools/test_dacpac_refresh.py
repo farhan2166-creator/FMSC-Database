@@ -145,7 +145,9 @@ class RefreshChecks(unittest.TestCase):
     def test_changed_sql_function(self): self.model_change("SqlScalarFunction"); self.refuse("SQL_MODULE_FINGERPRINTS_CHANGED")
     def test_changed_sql_trigger(self): self.model_change("SqlDmlTrigger"); self.refuse("SQL_MODULE_FINGERPRINTS_CHANGED")
     def test_changed_constraint(self): self.model_change("SqlCheckConstraint"); self.refuse("FULL_SCHEMA_MODEL_CHANGED")
-    def test_changed_table_column(self): self.model_change("SqlTable"); self.refuse("FULL_SCHEMA_MODEL_CHANGED")
+    def test_changed_table_column(self):
+        self.model_change("SqlTable"); report = self.refuse("FULL_SCHEMA_MODEL_CHANGED")
+        self.assertTrue(any(row["kind"] == "SqlSimpleColumn" and "IsNullable" in row["changedFields"] for row in report["modelObjects"]))
     def test_changed_index(self): self.model_change("SqlIndex"); self.refuse("FULL_SCHEMA_MODEL_CHANGED")
     def test_changed_relationship(self): self.model_change("SqlForeignKeyConstraint"); self.refuse("FULL_SCHEMA_MODEL_CHANGED")
 
