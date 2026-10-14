@@ -191,3 +191,16 @@ revive A's earlier response. A superseded error cannot overwrite the new context
 Added delayed read fixtures for A→B→A rejection, valid current preview and disposal
 using injected reads/preview callbacks. Existing portable latest-read tests passed
 with FQA-16. Native Windows execution remains required. No SQL changes.
+
+## FQA-12 — Annual receipts preview can arrive for an obsolete selection
+
+**Conditional source race verified and fixed.** Annual receipt preparation now
+uses the shared operation gate, holds the page's student/year controls and
+advertises IBusyPage through the full preview lifecycle. After receipt, identity,
+receipt-line and balance awaits it checks captured student/year and disposal
+before continuing or opening a preview. Receipt contents still use captured IDs.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added actual-page preparation fixtures for held student/year controls, owner busy
+visibility and settled restoration. Native delayed SQL/RDLC preview acceptance
+remains required. No SQL changes.

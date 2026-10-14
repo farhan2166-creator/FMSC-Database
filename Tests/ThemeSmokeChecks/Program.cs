@@ -132,6 +132,7 @@ internal static partial class Program
             CheckCorrectionDraftTracking();
             CheckPaymentAdjustmentContext();
             CheckPaymentDetailGeneration();
+            CheckAnnualReceiptPreparationGuard();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();

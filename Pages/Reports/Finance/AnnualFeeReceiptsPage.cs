@@ -1,13 +1,16 @@
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Reports.Finance;
-public sealed class AnnualFeeReceiptsPage : V2Page
+public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
 {
     private readonly StudentPicker student = new();
     private readonly LookupBox year = new();
     private bool suppressStudentEvents;
     /* View / Print Ledger reads the selected student and the selected academic year, so its availability is derived from those two selections instead of being left permanently enabled. */
     private ModernButton? ledgerAction;
-    public AnnualFeeReceiptsPage()
+    public bool IsBusy=>BusyOperationRunning;
+    public string BusyMessage=>"Annual receipts are being prepared. Wait for the preview before changing the student or year.";
+    public AnnualFeeReceiptsPage() : this(true) { }
+    internal AnnualFeeReceiptsPage(bool initialize)
         : base(
             PageTitles.AnnualFeeReceipts,
             "Print a student’s receipts for an academic year, oldest first.")
@@ -17,9 +20,9 @@ public sealed class AnnualFeeReceiptsPage : V2Page
         ledgerAction = view;
         // The page opens with neither a student nor a year chosen, so the one action it has starts disabled.
         ApplyActionAvailability();
-        Defer(BindYearsAsync);
+        if(initialize)Defer(BindYearsAsync);
         /* The shared student finder (StudentPicker): type in the box and the list narrows on every keystroke. */
-        StudentSearchCache.Warm();
+        if(initialize)StudentSearchCache.Warm();
         /* The box no longer names the student the page was pointed at (edited or cleared), so the action is re-derived. */
         student.SelectionCleared += (_, _) => {
             if (suppressStudentEvents)
@@ -133,7 +136,8 @@ public sealed class AnnualFeeReceiptsPage : V2Page
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
     }
-    private async Task ViewLedgerAsync()
+    private Task ViewLedgerAsync()=>RunBusyAsync(BusyMessage,ViewLedgerCoreAsync,this);
+    private async Task ViewLedgerCoreAsync()
     {
         if (!CurrentUser.HasPermission("Fees.Statement.View")) return;
         try
@@ -150,16 +154,19 @@ public sealed class AnnualFeeReceiptsPage : V2Page
             }
             int admissionId = student.SelectedId;
             int academicYearId = year.SelectedId;
+            bool Current()=>!IsDisposed&&student.SelectedId==admissionId&&year.SelectedId==academicYearId;
             DataTable data = await DatabaseHelper.QueryUserAsync(
                 "GetStudentAnnualFeeReceipts",
                 DatabaseHelper.Int("@AdmissionId", admissionId),
                 DatabaseHelper.Int("@AcademicYearId", academicYearId));
+            if(!Current())return;
             if (data.Rows.Count == 0)
             {
                 Warn("No paid fee receipts were found for this student in the selected academic year.");
                 return;
             }
             var institution = await InstitutionProfile.GetPrintIdentityAsync();
+            if(!Current())return;
             if (string.IsNullOrWhiteSpace(institution.Name))
             {
                 Warn("Check School Profile before printing receipts.");
@@ -174,6 +181,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page
                 if (string.IsNullOrWhiteSpace(receipt.Key)) continue;
                 var header = receipt.First();
                 var lines = await FeeReceiptPlacement.QueryLinesAsync(receipt.Key,"Fees.Statement.View");
+                if(!Current())return;
                 foreach (var enrollment in lines.AsEnumerable().Where(row => row.Field<int>("AdmissionId") == admissionId)
                     .GroupBy(row => row.Field<int>("EnrollmentId")))
                 {
@@ -200,6 +208,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page
                 return;
             }
             await FeeReceiptPlacement.ApplyCurrentBalanceAsync(receipts,"Fees.Statement.View");
+            if(!Current())return;
             ReceiptReportData.GroupPeriods(receipts);
             string reportPath = Path.Combine(
                 AppContext.BaseDirectory,
@@ -220,7 +229,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page
                 fitPageWidth: true,
                 reportDefinition: ReceiptReportLayout.Definition(reportPath,receipts,annualSheet: true));
         }
-        catch (Exception ex) { Fail(ex); }
+        catch (Exception ex) { if(!IsDisposed)Fail(ex); }
     }
     /// <summary>derives the enabled state of View / Print Ledger from the two selections ViewLedgerAsync itself requires at the top of its handler: a student (student.SelectedId) and an academic year (year.SelectedId).</summary>
     private void ApplyActionAvailability()

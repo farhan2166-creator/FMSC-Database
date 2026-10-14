@@ -55,4 +55,17 @@ internal static partial class Program
         Check(!page.IsHandleCreated,"Family fixture starts no SQL lookup or family write");
     }
 
+    private static void CheckAnnualReceiptPreparationGuard()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(FMSC_SMS.Pages.Reports.Finance.AnnualFeeReceiptsPage);
+        using var page=(Control)Activator.CreateInstance(type,flags,null,new object[]{false},null)!;
+        var reply=new TaskCompletionSource();Func<Task> prepare=()=>reply.Task;
+        var task=(Task<bool>)typeof(V2Page).GetMethod("RunBusyAsync",flags)!.Invoke(page,new object[]{((IBusyPage)page).BusyMessage,prepare,new Control[]{page}})!;
+        var student=(StudentPicker)type.GetField("student",flags)!.GetValue(page)!;var year=(LookupBox)type.GetField("year",flags)!.GetValue(page)!;
+        Check(((IBusyPage)page).IsBusy&&!student.Enabled&&!year.Enabled,"Annual receipt preparation holds student/year selections and publishes its preview work to the owner");
+        reply.SetResult();PumpUntil(()=>task.IsCompleted,"Annual receipt preparation fixture settles");
+        Check(task.Result&&!((IBusyPage)page).IsBusy&&student.Enabled&&year.Enabled,"Settled annual preview preparation releases the selection controls");
+        Check(!page.IsHandleCreated,"Annual receipt guard fixture starts no SQL or native report preview");
+    }
+
 }
