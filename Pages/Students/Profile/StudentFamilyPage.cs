@@ -1,7 +1,7 @@
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Students.Dialogs;
 namespace FMSC_SMS.Pages.Students.Profile;
-public sealed class StudentFamilyPage : V2Page
+public sealed class StudentFamilyPage : V2Page, IBusyPage
 {
     // Lists students who already belong to a family.
     private readonly StudentPicker student = new();
@@ -36,7 +36,8 @@ public sealed class StudentFamilyPage : V2Page
     private FamilyMemberCard? selectedCard;
     private int _familyLoadVersion;
     public StudentFamilyPage() : this(0) { }
-    public StudentFamilyPage(int preloadAdmissionId) : base(
+    public StudentFamilyPage(int preloadAdmissionId) : this(preloadAdmissionId,true) { }
+    internal StudentFamilyPage(int preloadAdmissionId,bool initialize) : base(
         "Family / Siblings",
         "Manage families and siblings. Create families in Student Admissions > Fees & Siblings.")
     {
@@ -61,7 +62,7 @@ public sealed class StudentFamilyPage : V2Page
         student.SelectionCleared += (_, _) => ClearMembersView();
         student.RowFilter = row => familyAdmissionIds.Contains(GetInt(row, "AdmissionId"));
         student.SearchFailed += ex => Fail(ex);
-        StudentSearchCache.Warm();
+        if(initialize)StudentSearchCache.Warm();
         Load += async (_, _) => await LoadStudentsAsync(
             preserveAdmissionId: preloadAdmissionId > 0 ? preloadAdmissionId : null,
             initialSelection: preloadAdmissionId > 0);
@@ -175,6 +176,8 @@ public sealed class StudentFamilyPage : V2Page
     private readonly bool _canChangeFamily =
         CurrentUser.HasPermission("Students.Administer");
     private bool familyActionBusy;
+    public bool IsBusy=>familyActionBusy;
+    public string BusyMessage=>"The family link is being updated. Wait for the result and refreshed family before leaving.";
     private async Task RunFamilyActionAsync(Func<Task> action)
     {
         if (familyActionBusy) return;

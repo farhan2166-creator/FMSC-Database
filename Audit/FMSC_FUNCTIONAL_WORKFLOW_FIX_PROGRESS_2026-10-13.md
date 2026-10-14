@@ -99,3 +99,15 @@ Collected-charge exclusions, scope validation and server result counts remain.
 Added actual-page shared-operation fixtures for busy visibility, conflicting
 control lock and settled restoration. Native delayed SQL/navigation acceptance
 remains outstanding. No SQL migration is needed.
+
+## FQA-08 — Family maintenance does not advertise its active write
+
+**Confirmed and fixed.** StudentFamilyPage now implements IBusyPage through its
+existing RunFamilyActionAsync flag. Both add/remove actions and their family
+reload remain protected by shell/modal leave guards. The existing action,
+selection and Students.Administer/SQL guards are preserved.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added pending family-action, overlap refusal and full-completion fixtures using
+delayed delegates, with lookup initialization disabled only in the test seam.
+Native delayed SQL and shell leave acceptance remains required. No SQL changes.

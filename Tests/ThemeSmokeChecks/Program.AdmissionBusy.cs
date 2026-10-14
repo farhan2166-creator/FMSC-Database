@@ -39,4 +39,20 @@ internal static partial class Program
         Check(!page.IsHandleCreated,"Reversal guard fixture never invokes real database posting or reversal");
     }
 
+    private static void CheckFamilyMaintenanceBusy()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        var type=typeof(FMSC_SMS.Pages.Students.Profile.StudentFamilyPage);
+        using var page=(Control)Activator.CreateInstance(type,flags,null,new object[]{0,false},null)!;
+        var run=type.GetMethod("RunFamilyActionAsync",flags)!;var reply=new TaskCompletionSource();Func<Task> action=()=>reply.Task;
+        var task=(Task)run.Invoke(page,new object[]{action})!;
+        Check(((IBusyPage)page).IsBusy,"Family maintenance publishes the pending link operation to shell and modal guards");
+        int repeats=0;Func<Task> repeat=()=>{repeats++;return Task.CompletedTask;};
+        var denied=(Task)run.Invoke(page,new object[]{repeat})!;
+        Check(denied.IsCompletedSuccessfully&&repeats==0,"A second family action cannot overlap a pending link change");
+        reply.SetResult();PumpUntil(()=>task.IsCompleted,"Family operation settles");
+        Check(task.IsCompletedSuccessfully&&!((IBusyPage)page).IsBusy,"The family guard stays active until its full action including reload completes");
+        Check(!page.IsHandleCreated,"Family fixture starts no SQL lookup or family write");
+    }
+
 }

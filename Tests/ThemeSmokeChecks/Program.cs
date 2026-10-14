@@ -125,6 +125,7 @@ internal static partial class Program
             CheckModalPageCloseGuard();
             CheckDailyClosingLeaveContract();
             CheckPostingReversalBusy();
+            CheckFamilyMaintenanceBusy();
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();
