@@ -55,13 +55,20 @@ internal static partial class Program
                         context + ": date text and calendar button have usable space");
                     Check(date.Value.Date == new DateTime(2026, 1, 15) && date.Checked,
                         context + ": layout and theme application preserve the selected date");
+                    DpiContextReset(field);
                     owner.Close();
+                    void DpiContextReset(Control control)
+                    {
+                        deviceDpi.SetValue(control, UiDpi.SystemDpi);
+                        foreach (Control child in control.Controls) DpiContextReset(child);
+                    }
                 }
             }
         }
         finally
         {
-            AppScale.Recompute(originalScale.Item1, originalScale.Item2);
+            AppScale.Recompute(new Size((int)(1280 * originalScale.RawFactor * DpiLayout.Factor(originalScale.Dpi)),
+                (int)(720 * originalScale.RawFactor * DpiLayout.Factor(originalScale.Dpi))), originalScale.Dpi);
             AppTheme.SetTheme(originalTheme);
         }
     }
