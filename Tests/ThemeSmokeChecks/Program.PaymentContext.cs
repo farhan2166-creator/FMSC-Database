@@ -23,4 +23,19 @@ internal static partial class Program
         Check(Field<ModernTextBox>("reason").Text=="","A student-context change also clears payment-specific draft inputs");
         Check(!page.IsHandleCreated,"Adjustment selection fixture starts no SQL lookup or financial write");
     }
+    private static void CheckPaymentDetailGeneration()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(StudentFeeAdjustmentsPage);
+        var pending=new Queue<TaskCompletionSource<DataTable>>();int previews=0;
+        Func<int,int,int,Task<DataTable>> read=(_,_,_)=>{var reply=new TaskCompletionSource<DataTable>();pending.Enqueue(reply);return reply.Task;};Action<DataTable> show=_=>previews++;
+        using var page=(StudentFeeAdjustmentsPage)Activator.CreateInstance(type,flags,null,new object[]{false,read,show},null)!;
+        var rows=new DataTable();rows.Columns.Add("FeePaymentId",typeof(int));rows.Rows.Add(1);rows.Rows.Add(2);type.GetField("paymentRows",flags)!.SetValue(page,rows);type.GetField("admissionId",flags)!.SetValue(page,41);
+        void Select(int id){type.GetField("selectedPaymentId",flags)!.SetValue(page,id);type.GetMethod("ResetAdjustmentDraftForSelection",flags)!.Invoke(page,null);}
+        Task Start()=>(Task)type.GetMethod("ViewPaymentDetailsAsync",flags)!.Invoke(page,null)!;
+        Select(1);var a=Start();Select(2);Select(1);pending.Dequeue().SetResult(new DataTable());PumpUntil(()=>a.IsCompleted,"Old payment detail reply settles");
+        Check(previews==0,"A→B→A cannot revive a details response from the previous selection generation");
+        Select(2);var b=Start();pending.Dequeue().SetResult(new DataTable());PumpUntil(()=>b.IsCompleted,"Current payment detail reply settles");Check(previews==1,"A current payment detail response still opens its intended preview");
+        var late=Start();page.Dispose();pending.Dequeue().SetResult(new DataTable());PumpUntil(()=>late.IsCompleted,"Disposed details response settles");Check(previews==1&&late.IsCompletedSuccessfully,"Payment details cannot open after their owner is disposed");
+    }
+
 }

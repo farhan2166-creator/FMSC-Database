@@ -179,3 +179,15 @@ and SQL eligibility checks remain in place.
 Added actual payment-grid fixtures for same-payment preservation, A→B→A resets,
 date reset and a changed student context. No financial write is submitted in
 these fixtures; native GUI execution remains required. No SQL changes.
+
+## FQA-05 — Delayed Payment Details can open over a newer selection
+
+**Conditional source race verified and fixed.** Detail reads now use LatestReadScope
+and compare captured student/payment/actor before showing data. Payment identity
+changes, history reload and disposal invalidate those requests; A→B→A cannot
+revive A's earlier response. A superseded error cannot overwrite the new context.
+
+**Verification:** App and Windows smoke project build without warnings/errors.
+Added delayed read fixtures for A→B→A rejection, valid current preview and disposal
+using injected reads/preview callbacks. Existing portable latest-read tests passed
+with FQA-16. Native Windows execution remains required. No SQL changes.

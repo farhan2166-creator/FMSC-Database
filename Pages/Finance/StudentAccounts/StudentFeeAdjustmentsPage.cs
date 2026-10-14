@@ -5,6 +5,9 @@ namespace FMSC_SMS.Pages.Finance.StudentAccounts;
 /// <summary>Complete student payment history with eligibility-aware adjustment controls.</summary>
 public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
 {
+    private readonly LatestReadScope detailReads=new();
+    private readonly Func<int,int,int,Task<DataTable>> readPaymentDetails;
+    private readonly Action<DataTable>? showPaymentDetails;
     private bool adjusting;
     public bool IsBusy => adjusting;
     public string BusyMessage => "Please wait for the payment adjustment to finish recording.";
@@ -27,6 +30,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
     {
         var context=(admissionId,selectedPaymentId);
         if(context==adjustmentDraftContext)return;
+        detailReads.Cancel();
         adjustmentDraftContext=context;
         actionAmount.Text="0";reason.Clear();transactionDate.Value=DateTime.Today;
     }
@@ -39,11 +43,15 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
     private readonly Label eligibilityNote=new() { AutoSize=true,Dock=DockStyle.Fill,
         Font=AppTheme.SmallFont,ForeColor=AppTheme.MutedText,Padding=new Padding(6) };
     public StudentFeeAdjustmentsPage() : this(true) { }
-    internal StudentFeeAdjustmentsPage(bool initialize)
+    internal StudentFeeAdjustmentsPage(bool initialize) : this(initialize,null,null) { }
+    internal StudentFeeAdjustmentsPage(bool initialize,Func<int,int,int,Task<DataTable>>? readPaymentDetails,Action<DataTable>? showPaymentDetails)
         : base(
             PageTitles.StudentFeeCorrections,
             "Review payments and record refunds or corrections.")
     {
+        this.readPaymentDetails=readPaymentDetails??ReadPaymentDetailsAsync;
+        this.showPaymentDetails=showPaymentDetails;
+        Disposed+=(_,_)=>detailReads.Dispose();
         transactionDate.Value = DateTime.Today;
         operation.Items.AddRange(new object[] { "Correction", "Refund", "Reversal" });
         operation.SelectedIndex = 0;
@@ -238,6 +246,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
     private async Task LoadPaymentsAsync(string? completionMessage, int? completedAdmissionId)
     {
         int version=++paymentsLoadVersion;
+        detailReads.Cancel();
         payments.Rows.Clear();
         selectedPaymentId=0;selectedPaymentAmount=0m;enrollmentId=0;
         UpdateActionMode();
@@ -507,19 +516,12 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
         if(selected is null) return;
         string receipt=GetText(selected,"ReceiptNumber");
         var state=payments.CurrentRow?.Tag as PaymentAdjustmentState;
-        var data=await Task.Run(()=>DatabaseHelper.QuerySql("""
-            EXEC dbo.RequirePermission @UserId,N'Fees.View';
-            SELECT F.FeeTypeName [Fee],B.BillingMonth [Billing Month],A.Amount [Amount (Rs.)],
-                P.Remarks [Reason]
-            FROM dbo.FeePayments P
-            JOIN dbo.FeePaymentAllocations A ON A.FeePaymentId=P.FeePaymentId
-            JOIN dbo.BillingCharges B ON B.BillingChargeId=A.BillingChargeId
-            JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
-            WHERE P.FeePaymentId=@PaymentId AND P.AdmissionId=@AdmissionId
-            ORDER BY A.FeePaymentAllocationId;
-            """,DatabaseHelper.Int("@UserId",userId),DatabaseHelper.Int("@PaymentId",paymentId),
-            DatabaseHelper.Int("@AdmissionId",studentId)));
-        if(IsDisposed) return;
+        var request=detailReads.Begin();
+        DataTable data;
+        try{data=await readPaymentDetails(userId,paymentId,studentId);}
+        catch(Exception ex){if(!IsDisposed&&detailReads.IsCurrent(request)&&admissionId==studentId&&selectedPaymentId==paymentId&&CurrentUser.UserId==userId)Fail(ex);return;}
+        if(IsDisposed||!detailReads.IsCurrent(request)||admissionId!=studentId||selectedPaymentId!=paymentId||CurrentUser.UserId!=userId)return;
+        if(showPaymentDetails is not null){showPaymentDetails(data);return;}
         using var dialog=new ApplicationWindowForm {
             Text="Payment Details",StartPosition=FormStartPosition.CenterParent,
             ClientSize=new Size(AppScale.Scale(900),AppScale.Scale(420)),ShowInTaskbar=false
@@ -540,6 +542,21 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage
         layout.Controls.Add(card,0,0);layout.Controls.Add(HumanUi.ButtonRow(close),0,1);
         dialog.Controls.Add(layout);dialog.CancelButton=close;
         dialog.ShowDialog(FindForm());
+    }
+    private static Task<DataTable> ReadPaymentDetailsAsync(int userId,int paymentId,int studentId)
+    {
+        return Task.Run(()=>DatabaseHelper.QuerySql("""
+            EXEC dbo.RequirePermission @UserId,N'Fees.View';
+            SELECT F.FeeTypeName [Fee],B.BillingMonth [Billing Month],A.Amount [Amount (Rs.)],
+                P.Remarks [Reason]
+            FROM dbo.FeePayments P
+            JOIN dbo.FeePaymentAllocations A ON A.FeePaymentId=P.FeePaymentId
+            JOIN dbo.BillingCharges B ON B.BillingChargeId=A.BillingChargeId
+            JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
+            WHERE P.FeePaymentId=@PaymentId AND P.AdmissionId=@AdmissionId
+            ORDER BY A.FeePaymentAllocationId;
+            """,DatabaseHelper.Int("@UserId",userId),DatabaseHelper.Int("@PaymentId",paymentId),
+            DatabaseHelper.Int("@AdmissionId",studentId)));
     }
     private static int GetInt(DataRow row, string column) =>
         row.Table.Columns.Contains(column) && row[column] != DBNull.Value
