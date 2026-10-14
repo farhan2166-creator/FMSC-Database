@@ -2,8 +2,9 @@
 
 Source: [independent regression audit](FMSC_POST_FIX_INDEPENDENT_REGRESSION_AUDIT_2026-10-14.md).
 Each finding is verified, implemented, checked and committed before the next.
-Native Windows GUI tests cannot run in this Linux workspace; compiled fixtures
-are not reported as executed acceptance tests.
+Initial fixes were built in the Linux workspace. The focused actual-control
+fixtures subsequently passed on Windows GitHub CI; see the execution evidence
+below. Interactive school-PC acceptance remains a separate scope.
 
 ## RFA-01 — Quick Registration internal tab context
 
@@ -35,7 +36,7 @@ baseline. Confirmed save clearing retires the earlier draft intent.
 Added actual-page injected-read/confirmation fixtures covering clean defaults,
 new-date edits, Stay without reads, revert, accepted Refresh/Next, saved-record
 edits and post-save field clearing. App and Windows smoke project compile with
-zero warnings/errors; native Windows interaction remains unexecuted here.
+zero warnings/errors; the focused contracts subsequently passed on Windows CI.
 No SQL changes. The two New-button bypasses are the separate RFA-03 change.
 
 
@@ -50,8 +51,9 @@ refusals before discard; New performs no database write.
 
 Added actual-page confirmation fixtures for both saved editors: Stay, discard,
 clean/repeated New, regular write-busy refusal and bank unresolved-recovery refusal.
-App and Windows smoke project compile with zero warnings/errors. Native Windows
-execution remains outstanding. No SQL changes or additional migration required.
+App and Windows smoke project compile with zero warnings/errors. The focused
+contracts subsequently passed on Windows CI. No SQL changes or additional
+migration required.
 
 
 ## RVA-01 — Additional-fee SQL replay verification
@@ -99,8 +101,9 @@ dotnet run --project Tests/ThemeSmokeChecks -- --post-fix
 ```
 
 These use injected reads/discard decisions and disabled startup/recovery-file
-initialization; they do not issue school database writes. This Linux workspace
-has no Windows executor, so no Windows-run pass is claimed.
+initialization; they do not issue school database writes. This workspace remains
+Linux; the owner-added GitHub Windows runner supplied the subsequent execution
+evidence below.
 
 On Windows, also verify real delayed registration save/update followed by mouse
 and keyboard tab attempts; failed/unknown save followed by Check Save Outcome;
@@ -116,7 +119,7 @@ here. No additional SQL migration is required by these three UI fixes.
 
 The owner added a Windows desktop CI workflow while this pass was underway.
 A draft validation PR adds the focused --post-fix step to that runner. Its first
-execution on Windows Server 2022 / .NET SDK 8.0.426 passed all 26 actual-page/host
+execution on Windows Server 2022 with .NET 8 SDK 8.0.426 installed passed all 26 actual-page/host
 contract checks and both Release builds with zero warnings/errors. It then
 exposed an existing Windows concurrency defect: the 24-writer AtomicTextFile
 regression failed with UnauthorizedAccessException during overlapping replacements.
@@ -127,4 +130,17 @@ serialized across processes within the same user/session, with a bounded wait
 and disposed handles. Failed encodings, read-only targets and cleanup preserve
 the existing file. Added Windows read-only preservation/temporary-cleanup checks;
 the original concurrent-writer regression remains enabled. No database changes.
-CI results for this correction are recorded after its repeat validation completes.
+The repeat validation passed completely:
+[Windows CI run 38516189607](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38516189607),
+validated head `a28742656ca1e42360b3529808a6fe6b27874d42` (PR merge build).
+It passed both Release builds with zero warnings/errors, all 26 focused UI
+contracts, 653 portable checks including the original 24-writer concurrency case
+and three Windows-only read-only checks, 32,183 performance/loading checks,
+273 SQL-module fingerprints, 12 schema-artifact regression tests and Windows
+PowerShell provenance validation. The Linux run independently retains 650 portable
+passes because the three filesystem-attribute cases are Windows-only.
+
+The CI change and settings correction are integrated onto main after successful
+Windows validation. This closes the focused Windows contract-execution gap for
+RFA-01/02/03. It does not certify full interactive delayed SQL, actual process
+restart/physical disconnection, installer/OS-user behavior, DPI or printers.

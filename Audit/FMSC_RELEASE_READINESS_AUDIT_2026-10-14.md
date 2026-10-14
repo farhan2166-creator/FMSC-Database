@@ -7,6 +7,8 @@
 **Method:** GitHub source/configuration/documentation review, source-path tracing, reported test evidence cross-check, and GitHub CI/status inspection. **No Windows application, installer, physical printer, live school SQL or restored school-like database was run in this audit.**  
 **Modifications:** This audit Markdown file only; no source code, installer, SQL, migrations, tests, permissions or school database is modified.
 
+**Subsequent implementation evidence:** [Post-fix progress](FMSC_POST_FIX_IMPLEMENTATION_PROGRESS_2026-10-14.md) records the committed RFA-02/03 corrections, ordered snapshot upgrades/restore, additional-fee SQL replay checks and successful focused Windows CI. This report below retains its original `fa44111` source freeze and deployment acceptance scope.
+
 > **RELEASE DECISION: NO-GO for an unqualified school-wide rollout at this review baseline.** This is an evidence- and workflow-based decision, **not** a claim that the reviewed DACPAC is corrupt or that the 25 earlier fixes failed. The necessary build/schema foundations are strong; the final acceptance evidence and several user-input/installer guards are still outstanding. A supervised test installation using a **disposable or verified restored clone** is appropriate once the exact package is frozen.
 
 ## A. Executive release gate
