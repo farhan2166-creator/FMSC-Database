@@ -68,6 +68,12 @@ def verify_baseline():
     requirement = re.search(r'RequiredDatabaseSchemaVersion\s*=\s*"(\d+)"', (ROOT / "DatabaseHelper.cs").read_text())
     if requirement is None or requirement.group(1) != "6":
         raise ValueError("Production schema requirement changed; review the fixture before running tests.")
+    def provider_version(project):
+        return next(e.get("Version") for e in ET.parse(project).getroot().iter("PackageReference") if e.get("Include") == "Microsoft.Data.SqlClient")
+    version = provider_version(ROOT / "FMSC_SMS.csproj")
+    for project in ("LifecycleSqlChecks", "QuickRegistrationSqlChecks", "MutationSqlChecks", "AdministrationSqlChecks", "PerformanceChecks"):
+        if provider_version(ROOT / "Tests" / project / (project + ".csproj")) != version:
+            raise ValueError("SQL test provider differs from the production package; review the dependency update.")
     provenance = json.loads((PROJECT / "Baseline/provenance.json").read_text())
     approved = json.loads((ROOT / "Core/ApprovedSchemaArtifact.json").read_text())
     blob = subprocess.check_output(["git", "ls-tree", "HEAD", "FMSC.dacpac"], cwd=ROOT, text=True).split()[2]
