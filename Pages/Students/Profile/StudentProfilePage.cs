@@ -9,7 +9,22 @@ public sealed class StudentProfilePage : V2Page
     private readonly Action<Func<Control>, string, string>? navigate;
     private readonly StudentPicker student = new();
     private readonly List<ModernButton> studentShortcuts=new();
-    private void UpdateStudentShortcuts(){foreach(var button in studentShortcuts)button.Enabled=student.SelectedId>0;}
+    private readonly Dictionary<ModernButton, (Func<bool> Allowed, bool RequireStudent)> shortcutAccess = new();
+    private void UpdateStudentShortcuts()
+    {
+        foreach (var (button, access) in shortcutAccess)
+        {
+            bool allowed = access.Allowed();
+            button.Enabled = allowed && (!access.RequireStudent || student.SelectedId > 0);
+            string hint = !allowed ? "This action is not enabled for your account."
+                : access.RequireStudent && student.SelectedId <= 0 ? "Select a student in this profile first."
+                : button.Text == "Manage Photo" ? "Choose or update this student's photo."
+                : button.Text == "Open " + PageTitles.AnnualFeeReceipts ? "Open annual receipts for this student."
+                : CurrentUser.HasPermission("Students.Administer") ? "Open this student's record."
+                : "Open the record for viewing. Editing requires student administration access.";
+            SetToolTip(button, hint);
+        }
+    }
     private readonly LatestReadScope profileReads = new();
     private readonly ModernButton feeHistoryButton = new() { Text="Fee Change History", Enabled=false };
     private bool loadingFeeHistory;
@@ -252,9 +267,9 @@ public sealed class StudentProfilePage : V2Page
         recordRow.Controls.Add(
             JumpButton("Open Admissions", id => new StudentAdmissionPage(navigate, preselectAdmissionId: id), title: PageTitles.Admissions,requireStudent:false));
         recordRow.Controls.Add(
-            JumpButton("Open Family / Siblings", id => new StudentFamilyPage(id)));
+            JumpButton("Open Family / Siblings", id => new StudentFamilyPage(id), permissions: new[] { "Students.Family" }));
         recordRow.Controls.Add(
-            JumpButton("Manage Photo", id => new StudentAdmissionPage(navigate, preselectAdmissionId: id, focusPhoto: true), title: PageTitles.Admissions));
+            JumpButton("Manage Photo", id => new StudentAdmissionPage(navigate, preselectAdmissionId: id, focusPhoto: true), title: PageTitles.Admissions, permissions: new[] { "Students.Administer" }));
         var lifecycleRow = Row();
         lifecycleRow.Controls.Add(
             JumpButton("Open " + PageTitles.StudentRecordChecks, id => new StudentRecordChecksPage(id)));
@@ -262,7 +277,7 @@ public sealed class StudentProfilePage : V2Page
             JumpButton(
                 "Open " + PageTitles.AnnualFeeReceipts,
                 id => new FMSC_SMS.Pages.Reports.Finance.AnnualFeeReceiptsPage(id),
-                module: "Finance"));
+                module: "Finance", permissions: new[] { "Fees.Statement.View" }));
         feeHistoryButton.Height=AppTheme.CompactButtonHeight;
         feeHistoryButton.Margin=new Padding(0,0,UiDesignSystem.Spacing.Sm,0);
         AppMetrics.FitButtonWidth(feeHistoryButton,minWidth:150);
@@ -283,7 +298,7 @@ public sealed class StudentProfilePage : V2Page
     }
     private void UpdateFeeHistoryAvailability() => feeHistoryButton.Enabled=!loadingFeeHistory && student.SelectedId>0
         && CurrentUser.HasPermission("Fees.View") && CurrentUser.HasPermission("Fees.Statement.View");
-    private ModernButton JumpButton(string text, Func<int, Control> factory, string module = "Students", string? title = null,bool requireStudent=true)
+    private ModernButton JumpButton(string text, Func<int, Control> factory, string module = "Students", string? title = null,bool requireStudent=true, params string[] permissions)
     {
         var button = new ModernButton {
             Text = text,
@@ -297,9 +312,13 @@ public sealed class StudentProfilePage : V2Page
         };
         AppMetrics.FitButtonWidth(button, minWidth: 150);
         button.SetOutlineColors(AppTheme.InputBorder, AppTheme.Primary, AppTheme.Surface);
-        if(requireStudent){studentShortcuts.Add(button);button.Enabled=student.SelectedId>0;SetToolTip(button,"Select a student in this profile first.");}
-        else SetToolTip(button,"Open Admissions to start a new admission or edit the selected student.");
+        if (permissions.Length == 0) permissions = new[] { "Students.View" };
+        bool Allowed() => permissions.All(CurrentUser.HasPermission);
+        shortcutAccess[button] = (Allowed, requireStudent);
+        if (requireStudent) studentShortcuts.Add(button);
+        UpdateStudentShortcuts();
         button.Click += (_, _) => {
+            if (!Allowed()) { SetStatus("This action is not enabled for your account.", PageStatusKind.Warning); return; }
             int admissionId = student.SelectedId;
             if(requireStudent&&admissionId<=0){SetStatus("Select a student in Student Profile before opening this action.",PageStatusKind.Warning);student.Focus();return;}
             Func<Control> openPage = () => factory(admissionId);
