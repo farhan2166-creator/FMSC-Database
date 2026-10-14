@@ -14,23 +14,17 @@ namespace FMSC_SMS.Core
         private static int _dpi = 96;
         public static event EventHandler? ScaleChanged;
         public static float RawFactor => _rawFactor;
+        public static int Dpi => _dpi;
         // Recompute the adaptive factor from the size of the actual per-page working area.
         public static void Recompute(Size clientSize, int dpi)
         {
             if (clientSize.Width <= 0 || clientSize.Height <= 0)
                 return;
-            // ClientSize is the available page area in pixels; pages use AutoScaleMode.None.
-            float widthFactor = clientSize.Width / (float)BaselineWidth;
-            float heightFactor = clientSize.Height / (float)BaselineHeight;
-            float factor = Math.Min(widthFactor, heightFactor);
-            // At high DPI settings (125%/150%+), non-vector chrome (window borders, scrollbars, the Windows taskbar) consumes a larger share of the physical screen than at 100%.
-            if (dpi >= 168) // 175%+
-                factor -= 0.06f;
-            else if (dpi >= 144) // 150%+
-                factor -= 0.04f;
-            else if (dpi >= 120) // 125%+
-                factor -= 0.02f;
-            factor = Math.Clamp(factor, MinRawFactor, MaxRawFactor);
+            dpi = dpi > 0 ? dpi : 96;
+            // WinForms client sizes are device pixels under PerMonitorV2.
+            // Density uses logical space; monitor scaling is applied exactly
+            // once by the shared geometry helpers, independently of density.
+            float factor = DpiLayout.Density(clientSize, dpi, MinRawFactor, MaxRawFactor);
             // A monitor-DPI change matters even when the adaptive factor stays the same:
             // point-sized fonts render at a different pixel height, so every text-derived
             // row/header measurement must be refreshed.
@@ -53,7 +47,7 @@ namespace FMSC_SMS.Core
         public static int Scale(int baseValue, float factor) =>
             baseValue <= 0
                 ? baseValue
-                : Math.Max(1, (int)Math.Round(baseValue * factor));
+                : Math.Max(1, (int)Math.Round(baseValue * factor * DpiLayout.Factor(_dpi)));
         public static int Scale(int baseValue) =>
             Scale(baseValue, _rawFactor);
         // Short alias used throughout the application.

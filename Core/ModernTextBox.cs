@@ -95,10 +95,10 @@ namespace FMSC_SMS.Core
         {
             if (IsDisposed || Disposing)
                 return;
-            Font = AppTheme.NormalFont;
+            Font = UiDpi.ForControl(this, AppTheme.NormalFont);
             ForeColor = AppTheme.Text;
             BackColor = AppTheme.SurfaceElevated;
-            _inner.Font = AppTheme.NormalFont;
+            _inner.Font = Font;
             _inner.ForeColor = AppTheme.Text;
             _inner.BackColor = AppTheme.SurfaceElevated;
             UiTheme.ApplyControl(this);
@@ -293,13 +293,15 @@ namespace FMSC_SMS.Core
                 using var path = CreateRoundedPath(new Rectangle(0, 0, Width, Height), _radius);
                 UiHelper.ReplaceRegion(this, new Region(path));
             }
-            int innerWidth =
-                Math.Max(0, Width - TextInsetLeft - TextInsetRight);
+            int left = LogicalToDeviceUnits(TextInsetLeft);
+            int right = LogicalToDeviceUnits(TextInsetRight);
+            int vertical = LogicalToDeviceUnits(MultilineVerticalInset);
+            int innerWidth = Math.Max(0, Width - left - right);
             if (_inner.Multiline)
             {
                 int innerHeight =
-                    Math.Max(0, Height - MultilineVerticalInset * 2);
-                _inner.SetBounds(TextInsetLeft, MultilineVerticalInset, innerWidth, innerHeight);
+                    Math.Max(0, Height - vertical * 2);
+                _inner.SetBounds(left, vertical, innerWidth, innerHeight);
             }
             else
             {
@@ -307,7 +309,7 @@ namespace FMSC_SMS.Core
                     Math.Min(_inner.PreferredHeight, Math.Max(0, Height - 2));
                 int top =
                     Math.Max(0, (Height - innerHeight) / 2);
-                _inner.SetBounds(TextInsetLeft, top, innerWidth, innerHeight);
+                _inner.SetBounds(left, top, innerWidth, innerHeight);
             }
             Invalidate();
         }

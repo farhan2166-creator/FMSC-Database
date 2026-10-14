@@ -986,20 +986,17 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
         {
             return;
         }
-        Font =
-            AppTheme.NormalFont;
+        Font = UiDpi.ForControl(this, AppTheme.NormalFont);
         ForeColor =
             AppTheme.Text;
         BackColor =
             AppTheme.SurfaceElevated;
-        _text.Font =
-            AppTheme.NormalFont;
+        _text.Font = Font;
         _text.ForeColor =
             AppTheme.Text;
         _text.BackColor =
             AppTheme.SurfaceElevated;
-        _list.Font =
-            AppTheme.NormalFont;
+        _list.Font = Font;
         _list.ForeColor =
             AppTheme.Text;
         _list.BackColor =

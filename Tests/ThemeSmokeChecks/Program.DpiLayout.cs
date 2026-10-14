@@ -1,0 +1,101 @@
+using System.Reflection;
+using FMSC_SMS.Core;
+
+internal static partial class Program
+{
+    private static void CheckDpiResponsiveLayouts()
+    {
+        Check(Application.HighDpiMode == HighDpiMode.PerMonitorV2, "Native control fixtures use the required per-monitor awareness");
+        var saved = (AppScale.Dpi, AppScale.RawFactor);
+        try
+        {
+            CheckDpiGeometryAndMinimum();
+            // Synthetic client areas and DPI fields exercise the production
+            // helpers on Windows controls. This does NOT change monitor settings
+            // or establish physical multi-monitor acceptance.
+            var deviceDpi = typeof(Control).GetField("_deviceDpi", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            foreach (int dpi in new[] { 96, 120, 144, 192 })
+            foreach (Size resolution in new[] { new Size(1280, 720), new Size(1366, 768), new Size(1920, 1080), new Size(2560, 1440), new Size(3840, 2160) })
+            {
+                Size available = new(resolution.Width - DpiLayout.Pixels(16, dpi), resolution.Height - DpiLayout.Pixels(72, dpi));
+                AppScale.Recompute(available, dpi);
+                using var owner = new Form { AutoScaleMode = AutoScaleMode.None, StartPosition = FormStartPosition.Manual, ClientSize = available };
+                var root = new TableLayoutPanel { ColumnCount = 1, RowCount = 3, Padding = new Padding(AppMetrics.PagePadding) };
+                root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+                root.RowStyles.Add(new RowStyle(SizeType.Absolute, 2 * AppMetrics.FieldRowHeight));
+                root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+                root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                var fields = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2, Margin = Padding.Empty };
+                fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+                fields.RowStyles.Add(new RowStyle(SizeType.Percent, 50)); fields.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+                var name = HumanUi.TextBox(); name.Text = "Synthetic student"; name.IsInvalid = true;
+                var notes = HumanUi.TextBox(); notes.Text = "Unsubmitted layout fixture";
+                var choice = HumanUi.Combo(); choice.Items.Add("Synthetic class"); choice.SelectedIndex = 0;
+                var date = HumanUi.Date(); date.Value = new DateTime(2026, 1, 15); date.Checked = true;
+                fields.Controls.Add(HumanUi.Field("Student name", name), 0, 0);
+                fields.Controls.Add(HumanUi.Field("Class", choice), 1, 0);
+                fields.Controls.Add(HumanUi.Field("Date", date), 0, 1);
+                fields.Controls.Add(HumanUi.Field("Notes", notes), 1, 1);
+                var grid = HumanUi.Grid(); grid.Dock = DockStyle.Fill; grid.Columns.Add("Student", "Student name"); grid.Rows.Add("Synthetic student");
+                var save = new ModernButton { Text = "Save", Width = AppScale.Scale(130) };
+                var cancel = new ModernButton { Text = "Close", Width = AppScale.Scale(130) };
+                var actions = HumanUi.ButtonRow(save, cancel); actions.Dock = DockStyle.Fill;
+                root.Controls.Add(fields, 0, 0); root.Controls.Add(grid, 0, 1); root.Controls.Add(actions, 0, 2);
+                Size contentMinimum = new(AppScale.Scale(900), AppScale.Scale(660));
+                root.Size = contentMinimum;
+                using var viewport = new ResponsiveViewport(root, contentMinimum); owner.Controls.Add(viewport);
+                owner.Show(); Application.DoEvents();
+                void Context(Control control)
+                {
+                    deviceDpi.SetValue(control, dpi);
+                    foreach (Control child in control.Controls) Context(child);
+                }
+                Context(root);
+                UiTheme.ApplyTree(root);
+                HumanUi.ApplyGridStyle(grid, AppTheme.Primary);
+                root.PerformLayout(); viewport.PerformLayout(); Application.DoEvents();
+                Check(name.Text == "Synthetic student" && name.IsInvalid && notes.Text == "Unsubmitted layout fixture" &&
+                    choice.SelectedIndex == 0 && date.Value.Date == new DateTime(2026, 1, 15), "DPI/layout reflow preserves values and validation state");
+                Check(name.Height >= name.Controls.OfType<TextBox>().Single().PreferredHeight, "Text input has room for its native font");
+                Check(name.ClientRectangle.Contains(name.Controls.OfType<TextBox>().Single().Bounds), "Text input inner bounds do not clip");
+                Check(choice.Height >= choice.Controls.OfType<ComboBox>().Single().PreferredHeight, "Combo input has room for its native font");
+                Check(grid.ColumnHeadersHeight >= AppMetrics.TextHeight(grid.ColumnHeadersDefaultCellStyle.Font!), "Grid headers fit the current font");
+                Check(grid.RowTemplate.Height >= AppMetrics.TextHeight(grid.DefaultCellStyle.Font!), "Grid rows fit the current font");
+                Check(root.Width >= contentMinimum.Width && root.Height >= contentMinimum.Height, "A small viewport preserves readable content instead of shrinking it");
+                Check(root.Width >= viewport.ClientSize.Width && root.Height >= viewport.ClientSize.Height, "Large viewports expand the content and grid");
+                viewport.ScrollControlIntoView(cancel); Application.DoEvents();
+                Rectangle visibleButton = viewport.RectangleToClient(cancel.RectangleToScreen(cancel.ClientRectangle));
+                Check(viewport.ClientRectangle.Contains(visibleButton), "The footer action is reachable by scrolling at every synthetic size/DPI");
+                // Restore fake framework fields before native handle disposal.
+                foreach (Control control in Descendants(root).Prepend(root)) deviceDpi.SetValue(control, UiDpi.SystemDpi);
+                owner.Hide();
+            }
+        }
+        finally { AppScale.Recompute(new Size((int)(1280 * saved.RawFactor * DpiLayout.Factor(saved.Dpi)), (int)(720 * saved.RawFactor * DpiLayout.Factor(saved.Dpi))), saved.Dpi); }
+    }
+
+    private static IEnumerable<Control> Descendants(Control root) => root.Controls.Cast<Control>()
+        .SelectMany(child => new[] { child }.Concat(Descendants(child)));
+
+    private static void CheckDpiGeometryAndMinimum()
+    {
+        AppScale.Recompute(new Size(1280, 720), 96);
+        using var form = new ApplicationWindowForm { ClientSize = new Size(800, 600), MinimumSize = new Size(700, 500) };
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 80)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        var text = new ModernTextBox { Text = "Keep this draft", Width = 200, Height = 40, IsInvalid = true };
+        root.Controls.Add(text); form.Controls.Add(root);
+        form.ApplyDpiGeometry(192, resizeWindow: true);
+        Check(text.Height == 80 && root.RowStyles[0].Height == 160, "Shared DPI handling scales fixed control and table geometry once");
+        Size twice = form.ClientSize;
+        form.ApplyDpiGeometry(192, resizeWindow: true);
+        Check(form.ClientSize == twice && text.Height == 80, "Repeated notification at the same DPI does not duplicate scaling");
+        form.ApplyDpiGeometry(96, resizeWindow: true);
+        Check(text.Height == 40 && text.Text == "Keep this draft" && text.IsInvalid, "Returning to the original DPI retains geometry and draft state");
+        Size originalMinimum = form.MinimumSize;
+        form.FitToWorkingArea(new Rectangle(0, 0, 640, 400), 96);
+        Check(form.MinimumSize.Width < originalMinimum.Width, "Small work areas temporarily bound the window minimum");
+        form.FitToWorkingArea(new Rectangle(0, 0, 1920, 1040), 96);
+        Check(form.MinimumSize == originalMinimum, "Larger work areas restore the intended minimum rather than retaining the small-monitor clamp");
+    }
+}

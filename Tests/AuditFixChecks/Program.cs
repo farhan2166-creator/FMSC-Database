@@ -74,3 +74,5 @@ Console.WriteLine($"PASS: {QuickRegistrationRecoveryChecks.Run()} registration c
 if(args.Contains("--profile-search"))ReviewFilterProfile.Run();
 
 Console.WriteLine($"PASS: {MutationRecoveryChecks.Run()} mutation commit-outcome and durable journal checks.");
+
+Console.WriteLine($"PASS: {DpiLayoutChecks.Run()} synthetic DPI density and monitor work-area checks.");

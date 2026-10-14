@@ -88,7 +88,7 @@ namespace FMSC_SMS.Core
             header.ForeColor = AppTheme.HeadingText;
             header.SelectionBackColor = back;
             header.SelectionForeColor = AppTheme.HeadingText;
-            header.Font = AppTheme.ButtonFont;
+            header.Font = UiDpi.ForControl(grid, AppTheme.ButtonFont);
             grid.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
         }
         private static void GridCellPainting(object? sender, DataGridViewCellPaintingEventArgs e)
@@ -506,7 +506,7 @@ namespace FMSC_SMS.Core
                     column.DefaultCellStyle.Alignment =
                         DataGridViewContentAlignment.MiddleCenter;
                     column.DefaultCellStyle.Font =
-                        AppTheme.ButtonFont;
+                        UiDpi.ForControl(grid, AppTheme.ButtonFont);
                 }
                 else if (column.Tag is null &&
                          column is DataGridViewTextBoxColumn &&

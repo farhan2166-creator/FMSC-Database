@@ -493,7 +493,7 @@ namespace FMSC_SMS.Core
             grid.ColumnHeadersHeight =
                 AppMetrics.GridHeaderHeight;
             grid.DefaultCellStyle.Font =
-                AppTheme.NormalFont;
+                UiDpi.ForControl(grid, AppTheme.NormalFont);
             grid.DefaultCellStyle.ForeColor =
                 AppTheme.Text;
             grid.DefaultCellStyle.BackColor =
