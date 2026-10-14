@@ -18,6 +18,7 @@ internal static partial class Program
         Application.EnableVisualStyles();
         if(args.Contains("--post-fix"))
         {
+            CheckPdfFileDurability();
             CheckDpiResponsiveLayouts();
             CheckShortcutPermissions();
             CheckClosingWholeAmounts();
