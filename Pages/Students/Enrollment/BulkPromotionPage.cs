@@ -388,6 +388,8 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                 "Promotion Details",
                 "Choose the current class, next class and promotion date.",
                 accessory: historyButton);
+        // Reserve the full right-hand header area before docking its text labels.
+        historyButton.SendToBack();
         setupCard.Content.Controls.Add(promotionSetupTable);
         var candidatesCard =
             HumanUi.Card(
