@@ -20,6 +20,7 @@ internal static partial class Program
             Check(!setup.IsBusy, "Completed setup saves release shell navigation");
         }
         using var bulk = new BulkFeeRateChangesForm(0, 0, false);
+        bulk.TopLevel = false; // Match CreateEmbedded: a form must be made a child before hosting.
         using var workspace = new WorkspacePage("Fees", "", ("Adjust rates", () => bulk));
         typeof(WorkspacePage).GetMethod("EnsureSelectedTab", flags)!.Invoke(workspace, null);
         Check(!workspace.HasUnsavedChanges, "Loaded bulk fee-rate defaults do not prompt");
