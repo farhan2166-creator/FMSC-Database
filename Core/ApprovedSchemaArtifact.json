@@ -1,5 +1,5 @@
 {
-  "packageSha256": "b66ec66f24f06fe1623445c0f433afb5cd8400270fd73612e273b7fa22f156a6",
+  "packageSha256": "d122cf2f9a3d03667b9c7d235911b1b90c573a04b6f22ab3521530f473c7a180",
   "modelSha256": "f151be03cd23e9cc4689d5261edcdfb03976f6500b7a9dc6028b94ba9946e7f6",
   "modules": {
     "[dbo].[AddStudentFeeAssignment]": "3391c7879a7c7e9b5c1d384468f73ed67bd6265ff9e7598bc97f5d0144876d3a",
