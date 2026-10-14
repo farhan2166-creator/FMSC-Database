@@ -15,15 +15,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install .NET 8 SDK
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
 
       - name: Install Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -91,7 +91,7 @@ jobs:
       # Artifacts are accessible only to authorized viewers of this private repo.
       # No gh release create, deployment, school SQL connection, or public upload.
       - name: Upload private Windows ZIP
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: FMSC_SMS-Windows-x64-app-only-${{ github.run_number }}
           path: out/windows-x64-app/
