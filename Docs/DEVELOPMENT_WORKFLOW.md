@@ -55,6 +55,8 @@ The separate [Level 1 lifecycle workflow](../.github/workflows/fmsc-lifecycle-sq
 
 ## Security checks
 
+For a re-exported `FMSC.dacpac`, follow [verified DACPAC refresh alignment](DACPAC_REFRESH.md). The dedicated workflow compares the entire model, module fingerprints and exported data with the anchored approval. Safe metadata-only refreshes prepare a focused alignment PR and run existing Windows/security/isolated SQL checks; material changes stop for review. Do not manually accept a new hash or merge before actual checks pass.
+
 [FMSC Security Checks](../.github/workflows/fmsc-security.yml) is a read-only PR/`main`-push workflow, separate from the existing Windows checks. It downloads **Gitleaks CLI 8.30.1** from its official release and verifies a pinned SHA-256 before running it. The CLI is MIT-licensed and works with private repositories without a Gitleaks action license, PAT or GitHub Advanced Security subscription. Normal Actions minutes/storage limits still apply.
 
 `Tools/check_security.py` checks fetched Git history and staged edits, including secrets or forbidden files added and subsequently deleted. It blocks `.mdf`, `.ldf`, `.ndf`, `.bak`, private key containers, `.env` files, `secrets.json`, `credentials.json`, production/local appsettings and private publish settings. Safe `.env.example`, `.env.sample` and `.env.template` names are allowed, but their contents are still scanned. `.gitignore` helps prevent accidental additions; it cannot protect files already tracked or force-added.

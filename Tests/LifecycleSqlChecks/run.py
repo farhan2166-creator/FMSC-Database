@@ -37,6 +37,12 @@ def schema_only(source, destination):
         raise ValueError("Approved DACPAC provenance differs; no derived fixture may be built.")
     keep = {"model.xml", "DacMetadata.xml", "[Content_Types].xml", "Origin.xml"}
     with zipfile.ZipFile(source) as original, zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as derived:
+        def write_entry(name, data):
+            # Stable ZIP metadata avoids regenerating a different fixture hash
+            # for the same approved schema during refresh verification.
+            entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            derived.writestr(entry, data)
         for name in sorted(keep):
             data = original.read(name)
             if name == "Origin.xml":
@@ -54,8 +60,8 @@ def schema_only(source, destination):
                     if child.tag.endswith("ContainsExportedData"):
                         child.text = "false"
                 data = ET.tostring(origin, encoding="utf-8", xml_declaration=True)
-            derived.writestr(name, data)
-        derived.writestr("_rels/.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships" />')
+            write_entry(name, data)
+        write_entry("_rels/.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships" />')
     with zipfile.ZipFile(destination) as result:
         if any(name.startswith("Data/") or name.upper().endswith(".BCP") for name in result.namelist()):
             raise ValueError("Exported table data must never enter a test package.")
