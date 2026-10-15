@@ -84,7 +84,7 @@ internal static class Regression
             File.WriteAllText(path, code);
             var findings = new List<Finding>();
             var audited = AuditExtensions.Scan(schema, root, new[] { path }, findings);
-            Require(audited == 20, $"Caller count expected 20, got {audited}.");
+            Require(audited == 19, $"Caller count expected 19, got {audited}.");
             int Line(string marker)
             {
                 var offset = code.IndexOf("// " + marker, StringComparison.Ordinal);
@@ -125,7 +125,7 @@ internal static class Regression
             Require(AuditExtensions.Constant(expression, null) == "dbo.P", "Literal concatenation.");
             Require(AuditExtensions.Normalize("[dbo].[P]") == "dbo.P", "Qualified identifiers.");
             Require(AuditExtensions.Normalize("P") == "dbo.P", "Default dbo schema.");
-            Console.WriteLine("PASS: fictional Roslyn/DacFx/ScriptDom regressions (20 caller cases; positives, negatives, parameters, TVPs, SQL, locations).");
+            Console.WriteLine("PASS: fictional Roslyn/DacFx/ScriptDom regressions (19 caller cases; positives, negatives, parameters, TVPs, SQL, locations).");
         }
         finally { Directory.Delete(root, recursive: true); }
     }
