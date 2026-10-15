@@ -86,6 +86,7 @@ internal static class Regression
                             DatabaseHelper.QuerySql("SELECT e.Id FROM dbo.Existing e"); // SQL_GOOD
                             DatabaseHelper.QuerySql("SELECT e.Id FROM dbo.Absent e"); // TABLE_MISSING
                             DatabaseHelper.QuerySql("SELECT e.NoSuch FROM dbo.Existing e"); // COLUMN_REVIEW
+                            DatabaseHelper.QuerySql("WITH Events AS (SELECT e.Id FROM dbo.Existing e) SELECT e.EventDate FROM Events e"); // CTE_ALIAS_GOOD
                             DatabaseHelper.QuerySql("SELECT " + Choose()); // DYNAMIC_SQL
                             DatabaseHelper.Query("dbo.TvpP", new SqlParameter("@Rows", SqlDbType.Structured) { TypeName = "dbo.RowT" }); // TVP_GOOD
                             DatabaseHelper.Query("dbo.TvpP", new SqlParameter("@Rows", SqlDbType.Structured) { TypeName = "dbo.Wrong" }); // TVP_MISSING
@@ -112,7 +113,7 @@ internal static class Regression
             File.WriteAllText(path, code);
             var findings = new List<Finding>();
             var audited = AuditExtensions.Scan(schema, root, new[] { path }, findings);
-            Require(audited == 35, $"Caller count expected 35, got {audited}.");
+            Require(audited == 36, $"Caller count expected 36, got {audited}.");
             int Line(string marker)
             {
                 var offset = code.IndexOf("// " + marker, StringComparison.Ordinal);
@@ -137,7 +138,7 @@ internal static class Regression
             foreach (var marker in new[] { "CONST_GOOD", "CONCAT_GOOD", "OPTIONAL_GOOD",
                 "USER_INJECT", "USER_SET", "ARRAY_GOOD", "SQL_GOOD", "TVP_GOOD", "CMD_TEXT", "CMD_DEFAULT_TEXT", "DECOY",
                 "NAMED_GOOD", "ALIAS_GOOD", "LOCAL_CONST", "USER_SYNC", "USER_SET_SYNC", "EXEC_GOOD",
-                "EXEC_USER", "EXEC_USER_ASYNC", "SCALAR_GOOD", "SCALAR_USER", "SCALAR_USER_ASYNC", "RAW_ASYNC" })
+                "EXEC_USER", "EXEC_USER_ASYNC", "SCALAR_GOOD", "SCALAR_USER", "SCALAR_USER_ASYNC", "RAW_ASYNC", "CTE_ALIAS_GOOD" })
                 Clean(marker);
             Expect("PROC_MISSING", "FAIL", "dbo.Gone");
             Expect("PARAM_MISSING", "FAIL", "@Bad");
@@ -159,7 +160,7 @@ internal static class Regression
             Require(AuditExtensions.Constant(expression, null) == "dbo.P", "Literal concatenation.");
             Require(AuditExtensions.Normalize("[dbo].[P]") == "dbo.P", "Qualified identifiers.");
             Require(AuditExtensions.Normalize("P") == "dbo.P", "Default dbo schema.");
-            Console.WriteLine("PASS: fictional Roslyn/DacFx/ScriptDom regressions (35 caller cases; positives, negatives, parameters, TVPs, SQL, locations).");
+            Console.WriteLine("PASS: fictional Roslyn/DacFx/ScriptDom regressions (36 caller cases; positives, negatives, parameters, TVPs, SQL, locations).");
         }
         finally { Directory.Delete(root, recursive: true); }
     }
