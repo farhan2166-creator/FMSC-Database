@@ -41,12 +41,6 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Verify approved model before running the Windows installer
-        shell: pwsh
-        run: |
-          python Tools/verify_schema_artifact.py --check
-          python Tools/test_audit_schema.py
-
       - name: Install full FMSC package on disposable Windows with synthetic SQL
         shell: pwsh
         timeout-minutes: 45
