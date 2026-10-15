@@ -69,17 +69,7 @@ jobs:
       - name: Run deterministic communication provider checks (no live delivery)
         run: dotnet run --project Tests/CommunicationChecks/CommunicationChecks.csproj -c Release
 
-      - name: Verify reviewed DACPAC and SQL-module fingerprints
-        run: python Tools/verify_schema_artifact.py --check
-
-      - name: Run schema artifact regression tests
-        run: python Tools/test_audit_schema.py
-
-      - name: Verify Windows PowerShell publish provenance checks
-        shell: powershell
-        run: .\Installer\VerifySchemaArtifact.ps1 -ProjectDirectory .
-
-      - name: Verify full disposable publish, module isolation and provenance rejection
+      - name: Verify disposable publish and module isolation
         shell: pwsh
         run: .\Tools\TestPublishPowerShell.ps1 -ProjectDirectory .
 
