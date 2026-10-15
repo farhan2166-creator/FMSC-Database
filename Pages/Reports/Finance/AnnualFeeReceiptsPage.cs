@@ -2,6 +2,7 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
 {
+    private readonly int initialAcademicYearId;
     private readonly StudentPicker student = new();
     private readonly LookupBox year = new();
     private bool suppressStudentEvents;
@@ -72,9 +73,10 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
         SetContent(root);
     }
     // Mirrors FeeCollectionPage's existing preloadAdmissionId constructor (same pattern, not a new one) - Defer + a dedicated load method that reuses the same GetStudents/FilterStudentsByAdmissionIdOrName/ BindStudentTable path SearchStudentsAsync already uses.
-    public AnnualFeeReceiptsPage(int preloadAdmissionId)
+    public AnnualFeeReceiptsPage(int preloadAdmissionId, int preloadAcademicYearId = 0)
         : this()
     {
+        initialAcademicYearId = preloadAcademicYearId;
         if (preloadAdmissionId > 0)
         {
             Defer(() => LoadStudentByAdmissionIdAsync(preloadAdmissionId));
@@ -129,7 +131,14 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
             {
                 year.Bind(raw, "AcademicYearId", "YearName");
                 /* The current year is what is asked for nearly every time; leaving it on "-- Select --" cost a click on every use. */
-                HumanUi.SelectCurrentAcademicYear(year, raw);
+                if (initialAcademicYearId > 0)
+                {
+                    if (raw.AsEnumerable().Any(row => Convert.ToInt32(row["AcademicYearId"]) == initialAcademicYearId))
+                        year.SelectedValue = initialAcademicYearId;
+                    else
+                        SetStatus("The statement's academic year is no longer available. Choose a year for receipts.", PageStatusKind.Warning);
+                }
+                else HumanUi.SelectCurrentAcademicYear(year, raw);
                 /* Bind selects the blank "-- Select --" row, so the year half of the action's rule is re-derived against the list that was just put in place. */
                 ApplyActionAvailability();
             }

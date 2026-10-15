@@ -267,7 +267,7 @@ public sealed class StudentProfilePage : V2Page
         recordRow.Controls.Add(
             JumpButton("Open Admissions", id => new StudentAdmissionPage(navigate, preselectAdmissionId: id), title: PageTitles.Admissions,requireStudent:false));
         recordRow.Controls.Add(
-            JumpButton("Open Family / Siblings", id => new StudentFamilyPage(id), permissions: new[] { "Students.Family" }));
+            JumpButton("Open Family / Siblings", id => new StudentFamilyPage(id), ownedWindow: true, permissions: new[] { "Students.Family" }));
         recordRow.Controls.Add(
             JumpButton("Manage Photo", id => new StudentAdmissionPage(navigate, preselectAdmissionId: id, focusPhoto: true), title: PageTitles.Admissions, permissions: new[] { "Students.Administer" }));
         var lifecycleRow = Row();
@@ -298,7 +298,7 @@ public sealed class StudentProfilePage : V2Page
     }
     private void UpdateFeeHistoryAvailability() => feeHistoryButton.Enabled=!loadingFeeHistory && student.SelectedId>0
         && CurrentUser.HasPermission("Fees.View") && CurrentUser.HasPermission("Fees.Statement.View");
-    private ModernButton JumpButton(string text, Func<int, Control> factory, string module = "Students", string? title = null,bool requireStudent=true, params string[] permissions)
+    private ModernButton JumpButton(string text, Func<int, Control> factory, string module = "Students", string? title = null,bool requireStudent=true, bool ownedWindow=false, params string[] permissions)
     {
         var button = new ModernButton {
             Text = text,
@@ -317,17 +317,30 @@ public sealed class StudentProfilePage : V2Page
         shortcutAccess[button] = (Allowed, requireStudent);
         if (requireStudent) studentShortcuts.Add(button);
         UpdateStudentShortcuts();
-        button.Click += (_, _) => {
+        button.Click += async (_, _) => {
             if (!Allowed()) { SetStatus("This action is not enabled for your account.", PageStatusKind.Warning); return; }
             int admissionId = student.SelectedId;
             if(requireStudent&&admissionId<=0){SetStatus("Select a student in Student Profile before opening this action.",PageStatusKind.Warning);student.Focus();return;}
             Func<Control> openPage = () => factory(admissionId);
-            if (navigate is not null)
+            if (navigate is not null && !ownedWindow)
             {
                 navigate(openPage, module, title ?? text.Replace("Open ", string.Empty));
                 return;
             }
-            using var dialog = new ApplicationWindowForm {
+            try
+            {
+                using var dialog = CreateShortcutDialog(text, openPage);
+                dialog.ShowDialog(FindForm());
+                if (ownedWindow && !IsDisposed && student.SelectedId == admissionId)
+                    await LoadProfileAsync();
+            }
+            catch (Exception ex) { if (!IsDisposed) Fail(ex); }
+        };
+        return button;
+    }
+    private static ApplicationWindowForm CreateShortcutDialog(string text, Func<Control> openPage)
+    {
+        var dialog = new ApplicationWindowForm {
                 Text = text,
                 StartPosition = FormStartPosition.CenterParent,
                 Width = AppScale.Scale(1200),
@@ -335,19 +348,18 @@ public sealed class StudentProfilePage : V2Page
                 MinimumSize = new Size(
                     AppScale.Scale(980),
                     AppScale.Scale(620)),
-                BackColor = AppTheme.PageBackground
+                BackColor = AppTheme.PageBackground,
+                ShowInTaskbar = false
             };
+        try
+        {
             var control = openPage();
             control.Dock = DockStyle.Fill;
             dialog.Controls.Add(control);
-            dialog.FormClosing += (_, e) => {
-                if (control is IBusyPage busy && busy.IsBusy) { e.Cancel = true; return; }
-                if (control is IUnsavedChanges pending && pending.HasUnsavedChanges)
-                    e.Cancel = !ModernMessageDialog.Confirm(dialog, pending.UnsavedChangesMessage, UiText.Dialogs.UnsavedChanges);
-            };
-            dialog.ShowDialog(FindForm());
-        };
-        return button;
+            ModalPageCloseGuard.Attach(dialog, control);
+            return dialog;
+        }
+        catch { dialog.Dispose(); throw; }
     }
     private async Task LoadProfileAsync()
     {

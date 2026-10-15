@@ -23,6 +23,9 @@ internal static partial class Program
             CheckDpiResponsiveLayouts();
             CheckShortcutPermissions();
             CheckPromotionHistoryEntry();
+            CheckStudentAccountFlow();
+            CheckStatementRegenerationFreshness();
+            CheckAsyncStatementAssembly();
             CheckClosingWholeAmounts();
             CheckPaletteDestinations();
             CheckSubmittedInputHolds();

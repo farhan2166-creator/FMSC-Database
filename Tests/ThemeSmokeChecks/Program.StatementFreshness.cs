@@ -24,6 +24,7 @@ internal static partial class Program
         var pending=new Queue<TaskCompletionSource<(DataTable,decimal)>>();
         Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>> read=(id,_,_)=>{var reply=new TaskCompletionSource<(DataTable,decimal)>();pending.Enqueue(reply);return reply.Task;};
         using var page=(StudentAccountStatementPage)Activator.CreateInstance(type,flags,null,new object[]{false,read},null)!;page.BindingContext=new BindingContext();
+        ((CheckBox)type.GetField("groupModeToggle",flags)!.GetValue(page)!).Checked=true;
         var selected=(HashSet<int>)type.GetField("manuallySelectedAdmissionIds",flags)!.GetValue(page)!;selected.UnionWith(new[]{1,2});
         DataTable Rows(int id){var rows=new DataTable();rows.Columns.Add("StudentName");rows.Columns.Add("TransactionType");rows.Columns.Add("TransactionId",typeof(long));rows.Columns.Add("TransactionDate",typeof(DateTime));rows.Columns.Add("DebitAmount",typeof(decimal));rows.Columns.Add("PaidAmount",typeof(decimal));rows.Rows.Add("Student "+id,"CHARGE",id,DateTime.Today,100m,0m);rows.Rows.Add("Student "+id,"PAYMENT",id+10,DateTime.Today,0m,40m);return rows;}
         var task=(Task)type.GetMethod("LoadStatement",flags)!.Invoke(page,null)!;
