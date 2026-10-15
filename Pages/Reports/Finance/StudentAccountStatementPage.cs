@@ -941,7 +941,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         manuallySelectedAdmissionIds.Clear();
         familySelections.Clear();
         studentSearchVersion++;
-        SetStatus("Filter changed. Click Search Students to load students.");
+        SetStatus("Filter changed. Use Find Students to load students.");
     }
     private void SelectFamilyForStudent(int admissionId)
     {
