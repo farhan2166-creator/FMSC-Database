@@ -3,8 +3,13 @@ namespace FMSC_SMS;
 internal static class Program
 {
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
+        if (args.Length > 0 && args[0] is "--verify-installation" or "--install-communication")
+        {
+            Environment.ExitCode = CommunicationInstallation.Run(args);
+            return;
+        }
         ApplicationConfiguration.Initialize();
         AppExceptionHandler.Register();
         MainDashboardForm.PrimeInitialScale();

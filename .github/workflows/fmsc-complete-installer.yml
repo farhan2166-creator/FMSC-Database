@@ -172,6 +172,7 @@ jobs:
             if ($actual -ne $expected) { throw "Packaged installer asset differs from checked-out source: $($pair[1])" }
           }
           & (Join-Path $env:GITHUB_WORKSPACE 'Tools/TestInstallerLocalDb.ps1') -InstallerPath (Join-Path $root 'core.ps1')
+          & (Join-Path $env:GITHUB_WORKSPACE 'Tools/TestCommunicationSetup.ps1') -InstallerPath (Join-Path $root 'core.ps1')
           $excluded = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.Extension.ToLowerInvariant() -in @('.mdf','.ldf','.bak') })
           if ($excluded.Count -gt 0) { throw 'Unexpected school database or backup file in the GitHub artifact.' }
 
@@ -205,9 +206,10 @@ jobs:
             ''
             'Includes the current self-contained .NET 8 app, SQL LocalDB 2022 MSI,'
             'pinned Microsoft sqlcmd tool, current installer core.ps1 and Migrations 2-7.'
-            'Migrations\7.sql is the optional Communication Center add-on. It requires'
-            'owner review and explicit installation consent in the same SQL connection;'
-            'it is not run automatically and does not change the approved base version 6.'
+            'The installer offers optional Communication Center setup (Migrations\7.sql)'
+            'before application activation. Choose Y to create a verified backup and'
+            'apply/verify it transactionally. Enter or N skips this optional step.'
+            'Existing valid modules are preserved. The approved base version stays 6.'
             'Review the included COMMUNICATION_CENTER.md before applying it.'
             'If silent LocalDB setup fails, this installer offers the official Microsoft'
             'wizard and reports verbose MSI log paths. An immediate old-style 1603 error'

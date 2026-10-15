@@ -22,7 +22,7 @@ SHA256SUMS.txt            Package content hashes
 
 After fixes are merged, start a **new** Complete Windows Installer ZIP run with **Run workflow → main**. Rerunning an older run rebuilds its original source commit. Check the source commit in the run summary and extracted `READ_ME_FIRST.txt`; do not mix an older `core.ps1` with newer application files. Packaging verifies the copied installer recovery helper and communication SQL against that checked-out revision.
 
-`Migrations/7.sql` is an optional, manually reviewed communication deployment. It does not advance the approved base version from 6 and is not executed automatically by the installer. Follow [Communication Center deployment](COMMUNICATION_CENTER.md#deployment-gate) on a disposable copy first.
+`Migrations/7.sql` is optional Communication Center support. It does not advance the approved base version from 6. After base compatibility verification, the installer asks **Install Communication Center database support now?** Choose **Y** to create a verified backup and install/verify it transactionally before application activation. Enter or N skips it; a valid existing module is preserved and an incompatible module is refused. Follow [Communication Center deployment](COMMUNICATION_CENTER.md#deployment-gate) on a disposable copy first. No provider is enabled and no existing role gains access automatically.
 
 ## Before a fresh install
 

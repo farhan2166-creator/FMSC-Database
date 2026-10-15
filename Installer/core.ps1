@@ -926,6 +926,47 @@ function Enable-StagedApplication {
         "Application activated: $AppDir"
 }
 # Keep MSI recovery independent of database updates so it can be tested with mocked msiexec.
+function Invoke-InstallationDatabaseCheck {
+    param([string]$Application, [string]$Mode, [string]$MigrationFile)
+    $arguments = @($Mode, ('"' + $SqlInstance + '"'), ('"' + $DatabaseName + '"'))
+    if ($Mode -eq '--install-communication') { $arguments += ('"' + $MigrationFile + '"') }
+    $process = Start-Process -FilePath $Application -ArgumentList $arguments -PassThru
+    $null = $process.Handle # Retain the exit-code handle even if the helper exits immediately.
+    if (-not $process.WaitForExit(180000)) {
+        try { $process.Kill() } catch { }
+        throw 'Database verification/setup timed out. Do not assume setup failed or retry SQL manually. Keep the verified backup and rerun the installer to inspect the module state.'
+    }
+    return $process.ExitCode
+}
+function Invoke-CommunicationSetup {
+    param([string]$Application, [string]$MigrationFile)
+    $state = Invoke-InstallationDatabaseCheck -Application $Application -Mode '--verify-installation'
+    if ($state -eq 0) {
+        Write-Log 'Communication Center is already installed and verified; no SQL was reapplied.'
+        return
+    }
+    if ($state -ne 10) {
+        throw "Database verification refused setup (code $state). Codes: 20=base schema incompatible; 21=existing communication schema incompatible; 23=connection/verification failure. No communication SQL was applied and the staged application was not activated."
+    }
+    Write-WarningMessage 'Communication Center database setup (Migrations\7.sql) has not been applied.'
+    Write-Host '  You may install it now. A verified backup is created first.' -ForegroundColor $ColorInfo
+    Write-Host '  Messaging remains disabled and paused; existing role grants are preserved.' -ForegroundColor $ColorInfo
+    $choice = Read-Host 'Install Communication Center database support now? (Y/N; Enter = No)'
+    if ($choice -notmatch '^[Yy]$') {
+        Write-Log 'Communication Center setup skipped by operator; the base application can still be updated.'
+        return
+    }
+    if (-not (Test-Path -LiteralPath $MigrationFile -PathType Leaf)) {
+        throw "Communication migration file is missing: $MigrationFile. No communication SQL was applied."
+    }
+    Write-Log 'Preparing Communication Center setup; base schema stays 6.'
+    $script:RecoveryBackupPath = New-PreMigrationBackup -FromVersion '6' -ToVersion '6_Communication1'
+    $result = Invoke-InstallationDatabaseCheck -Application $Application -Mode '--install-communication' -MigrationFile $MigrationFile
+    if ($result -ne 0) {
+        throw "Communication Center setup did not complete (code $result; 22=script differs from the application). The staged application was not activated. Keep the verified backup: $script:RecoveryBackupPath. A lost acknowledgement may mean COMMIT succeeded: rerun the installer for verification; do not rerun individual SQL batches."
+    }
+    Write-Log 'Communication Center setup verified. New installations are committed transactionally with messaging disabled and paused; existing settings are preserved. Base schema remains 6.'
+}
 function Invoke-LocalDbMsiInstallation {
     param([Parameter(Mandatory=$true)][string]$MsiPath,
           [Parameter(Mandatory=$true)][string]$LogDirectory)
@@ -1452,7 +1493,9 @@ try {
             'Database schema is already up to date.'
         Write-Success `
             'No database migration is required.'
-        # nothing needs to be migrated, so the staged application can be activated immediately: the schema it expects is already in place.
+        # Verify the complete base contract and offer the separately versioned
+        # optional communication module BEFORE activating the staged application.
+        Invoke-CommunicationSetup -Application (Join-Path $AppStagingDir 'FMSC_SMS.exe') -MigrationFile (Join-Path $MigrationsDir '7.sql')
         Write-Step `
             'Activating the staged application...'
         Enable-StagedApplication `
@@ -1671,6 +1714,7 @@ try {
         }
         Write-Success `
             'All required database migrations completed successfully.'
+        Invoke-CommunicationSetup -Application (Join-Path $AppStagingDir 'FMSC_SMS.exe') -MigrationFile (Join-Path $MigrationsDir '7.sql')
         Write-Step `
             'Activating the staged application...'
         Enable-StagedApplication `

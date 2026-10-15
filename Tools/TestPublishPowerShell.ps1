@@ -76,6 +76,20 @@ function Get-FileHash { throw 'This verifier must not call Get-FileHash.' }
     # Exercise the actual copied helper, not merely its source-tree counterpart.
     # Use a child scope so the test's mocked process/console commands stay local.
     & (Join-Path $ProjectDirectory 'Tools/TestInstallerLocalDb.ps1') -InstallerPath (Join-Path $release 'core.ps1')
+    & (Join-Path $ProjectDirectory 'Tools/TestCommunicationSetup.ps1') -InstallerPath (Join-Path $release 'core.ps1')
+    # Exercise the real published WinExe's headless path. These targets must be
+    # refused before any network/SQL connection or interactive startup occurs.
+    foreach ($arguments in @(
+        @('--verify-installation', 'remote.invalid', 'FMSC_DB'),
+        @('--verify-installation', '(localdb)\MSSQLLocalDB', 'master'),
+        @('--verify-installation'),
+        @('--install-communication', 'remote.invalid', 'FMSC_DB', 'missing.sql')
+    )) {
+        $process = Start-Process -FilePath (Join-Path $application 'FMSC_SMS.exe') -ArgumentList $arguments -PassThru
+        if (-not $process.WaitForExit(10000)) { $process.Kill(); throw 'Installer verification unexpectedly opened interactive startup.' }
+        if ($process.ExitCode -ne 23) { throw "Installer verification did not refuse an unsafe target: $($process.ExitCode)" }
+    }
+    Write-Host 'PASS: published installer CLI refuses remote, wrong-catalog and incomplete targets without interactive startup.'
     Write-Host 'PASS: published LocalDB recovery and top-level communication SQL match the checked-out revision.'
     Write-Host 'PASS: full PortableRelease publish, both validation scripts and installer/migration copies with a PowerShell-7-only parent module path.'
 
