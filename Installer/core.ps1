@@ -1643,8 +1643,8 @@ try {
             "Previous application kept for rollback: $AppRollbackDir"
         Pause-Long
     }
-    # Reject older data missing required features; update scripts are no longer bundled.
-    $NeedsLatestUpdates = Invoke-SqlMaster -Query "SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH('FMSC_DB.dbo.Students','AdmissionNumber') IS NULL OR OBJECT_ID('FMSC_DB.dbo.ReorderSchoolOfficials','P') IS NULL OR OBJECT_ID('FMSC_DB.dbo.SaveStudentDetailsWithFirstEnrollment','P') IS NULL OR OBJECT_ID('FMSC_DB.dbo.AdmitHistoricalStudent','P') IS NULL THEN 1 ELSE 0 END;"
+    # Reject databases lacking reviewed baseline features; do not require procedures absent from the approved schema.
+    $NeedsLatestUpdates = Invoke-SqlMaster -Query "SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH('FMSC_DB.dbo.Students','AdmissionNumber') IS NULL OR OBJECT_ID('FMSC_DB.dbo.SaveStudentDetailsWithFirstEnrollment','P') IS NULL OR OBJECT_ID('FMSC_DB.dbo.AdmitHistoricalStudent','P') IS NULL THEN 1 ELSE 0 END;"
     if (($NeedsLatestUpdates -join "`n") -match '(?m)^\s*1\s*$') {
         throw 'This database needs school-data updates that are not included in this application copy. Restore a backup made after the latest updates, or contact support to upgrade the older backup.'
     }
