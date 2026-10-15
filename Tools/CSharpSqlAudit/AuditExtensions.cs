@@ -479,10 +479,21 @@ internal static class AuditExtensions
                     continue;
                 }
                 var proc = Normalize(literal);
+                var pieces = literal.Trim().Replace("[", "").Replace("]", "")
+                    .Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                if (pieces.Length > 2)
+                {
+                    findings.Add(new Finding("REVIEW_REQUIRED", file, line, name, proc,
+                        "Cross-database/server stored-procedure reference needs runtime context."));
+                    continue;
+                }
                 if (!schema.Procedures.ContainsKey(proc))
                 {
-                    findings.Add(new Finding("FAIL", file, line, name, proc,
-                        "Referenced stored procedure is absent from DACPAC."));
+                    var otherSchema = pieces.Length == 1 && schema.Procedures.Keys.Any(k =>
+                        k.EndsWith("." + pieces[0], StringComparison.OrdinalIgnoreCase));
+                    findings.Add(new Finding(otherSchema ? "REVIEW_REQUIRED" : "FAIL", file, line, name, proc,
+                        otherSchema ? "Procedure exists in a non-dbo schema; verify caller default schema." :
+                            "Referenced stored procedure is absent from DACPAC."));
                     continue;
                 }
                 findings.AddRange(AnalyzeParameters(schema, proc, name,
@@ -532,7 +543,11 @@ internal static class AuditExtensions
                     continue;
                 }
                 var proc = Normalize(identifier);
-                if (!schema.Procedures.ContainsKey(proc))
+                if (identifier.Trim().Replace("[", "").Replace("]", "")
+                    .Split('.', StringSplitOptions.RemoveEmptyEntries).Length > 2)
+                    findings.Add(new Finding("REVIEW_REQUIRED", file, line, "SqlCommand", proc,
+                        "Cross-database/server stored-procedure reference needs runtime context."));
+                else if (!schema.Procedures.ContainsKey(proc))
                     findings.Add(new Finding("FAIL", file, line, "SqlCommand", proc,
                         "Stored procedure is absent from DACPAC."));
                 else
