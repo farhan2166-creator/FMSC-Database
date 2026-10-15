@@ -12,6 +12,11 @@ internal static class Regression
         schema.AddObjects("CREATE PROCEDURE dbo.P @Id int, @Optional int = NULL AS SELECT @Id AS Id;");
         schema.AddObjects("CREATE PROCEDURE dbo.UserP @UserId int AS SELECT @UserId AS Id;");
         schema.AddObjects("CREATE PROCEDURE dbo.TvpP @Rows dbo.RowT READONLY AS SELECT Id FROM @Rows;");
+        var fixture = schema.GetObjects(DacQueryScopes.UserDefined)
+            .First(p => p.ObjectType.Name == "Procedure" && p.Name.ToString().Contains("P", StringComparison.Ordinal));
+        Console.WriteLine("FIXTURE_AST: " + string.Join(", ",
+            fixture.GetAst().Batches.SelectMany(b => b.Statements).Select(x => x.GetType().FullName)));
+        Console.WriteLine("FIXTURE_SIGNATURE: " + new AuditExtensions.Schema(schema).Procedures["dbo.P"].Known);
         var root = Path.Combine(Path.GetTempPath(), "fmsc-audit-fictional-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
