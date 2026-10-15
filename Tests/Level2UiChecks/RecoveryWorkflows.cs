@@ -78,10 +78,12 @@ internal static class RecoveryWorkflows
                 ui.Screenshot("L2-UX-07-interrupted-connection");
                 interruption.Restore();
                 ui.Click("Reconnect",ControlType.Button,recovery);
+                Desktop.Wait(()=>ui.TryFind("Connection successful",ControlType.Text,recovery),"successful connection feedback",45);
+                ui.Click("Close",ControlType.Button,recovery);
                 Desktop.Wait(()=>ui.TryWindow("School Records Connection")==null?new object():null,"successful reconnect",45);
             }
             ui.Click("Load Eligible Fees",ControlType.Button);
-            Desktop.Wait(()=>ui.Find("Monthly posting preview") is {IsEnabled:true} grid?grid:null,"read retry after reconnection");
+            Desktop.Wait(()=>ui.Find("Post Selected Fees",ControlType.Button) is {IsEnabled:true} button?button:null,"eligible read preview after reconnection");
             Identity.Check(!ui.Process!.HasExited&&Identity.Count("SELECT COUNT(*) FROM dbo.FeePayments;")==payments&&
                 Identity.Count("SELECT COUNT(*) FROM dbo.BillingCharges;")==charges,"Read retry crashed or changed financial records.");
             Identity.Check(FinanceWorkflows.Paid()==paid&&FinanceWorkflows.Allocated()==allocated&&FinanceWorkflows.Charges()==charged,"Connection interruption changed financial amounts.");

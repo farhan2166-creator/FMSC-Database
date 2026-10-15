@@ -22,5 +22,23 @@ internal static partial class Program
             Check(badge.Text=="Enter a full Pakistan phone number","Elision must preserve the full accessible validation message");
         }
         form.Close();
+        // Exercise the real admission header without creating its handle or SQL loaders.
+        using var admission=new FMSC_SMS.Pages.Students.Admissions.StudentAdmissionPage();
+        var badgeField=typeof(FMSC_SMS.Pages.Students.Admissions.StudentAdmissionPage)
+            .GetField("studentStatusBadge",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!;
+        var status=(Label)badgeField.GetValue(admission)!;
+        var row=(TableLayoutPanel)status.Parent!.Parent!;
+        row.Dock=DockStyle.None; // exercise actual header at explicit available widths
+        foreach(int width in new[]{850,1500})
+        {
+            row.Width=width;row.PerformLayout();
+            foreach(string text in new[]{"New Admission","Active","Left"})
+            {
+                status.Text=text;row.PerformLayout();status.Parent.PerformLayout();
+                Check(status.Width>=TextRenderer.MeasureText(text,status.Font).Width+status.Padding.Horizontal,
+                    $"Admission header must show its complete ordinary status: {text}; badge={status.Width}, host={status.Parent.Width}, row={row.Width}, column={row.ColumnStyles[1].Width}");
+            }
+        }
+        Check(!admission.IsHandleCreated,"Header regression must never start SQL loaders");
     }
 }

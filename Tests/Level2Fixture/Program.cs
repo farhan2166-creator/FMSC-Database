@@ -7,8 +7,8 @@ Sql.ValidateTarget();
 var f=Fixture.Create();
 Sql.Key("SaveCampus",Sql.P("@UserId",f.Admin),Sql.P("@CampusCode","EMPTY"),
     Sql.P("@CampusName","Fictional Empty Campus"),Sql.P("@CampusType","School"));
-// The visible admission uses the current year. Give promotion a real following
-// year without creating the enrollment or promotion result on its behalf.
+// Admission starts in the preceding year and promotion returns in the current
+// year. A further year supplies an invalid date/year combination for validation.
 int followingYear=Sql.Key("SaveAcademicYear",Sql.P("@AcademicYearId",0),
     Sql.P("@YearName","Fictional "+(DateTime.UtcNow.Year+1)),
     Sql.P("@StartDate",new DateTime(DateTime.UtcNow.Year+1,1,1)),

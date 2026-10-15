@@ -42,8 +42,10 @@ internal static class UsabilityWorkflows
             using var proof=Identity.Open();
             main.Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Normal);
             main.Patterns.Transform.Pattern.Resize(1280,720);
+            Desktop.Wait(()=>Math.Abs(main.BoundingRectangle.Width-1280)<2&&Math.Abs(main.BoundingRectangle.Height-720)<2?main:null,"actual 1280x720 window bounds");
             ui.Find("Student Name",ControlType.Edit);ui.Screenshot("L2-UX-05-1280x720");
             main.Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Maximized);
+            Desktop.Wait(()=>main.Patterns.Window.Pattern.WindowVisualState.Value==WindowVisualState.Maximized?main:null,"maximized window state");
             ui.Find("Student Name",ControlType.Edit);ui.Screenshot("L2-UX-05-maximized");
             row.Actual="Captured admission at 1280x720 and maximized on the current display. Manual visual review of these and workflow screenshots is pending.";
             row.Evidence="L2-UX-05-1280x720.png, L2-UX-05-maximized.png";

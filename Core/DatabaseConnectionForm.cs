@@ -255,8 +255,12 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
 
     private static string ConnectionDetails(string problem)
     {
+#if FMSC_LEVEL2
+        return $"{problem}\r\n\r\nFictional Level 2 database: {Level2Target.Catalog}\r\nConnection: {Level2Target.Endpoint}\r\nPrivate data: {Path.Combine(Level2Target.Root, "database", "fixture.mdf")}";
+#else
         string endpoint = LocalDatabaseEngine.CurrentEndpoint ?? "Unavailable";
         return $"{problem}\r\n\r\nRequired database schema version: {DatabaseHelper.RequiredDatabaseSchemaVersion}\r\nSchool data: {DatabaseHelper.DatabaseFile}\r\nConnection: {endpoint}\r\nDiagnostic log: {AppExceptionHandler.LogPath}";
+#endif
     }
 
 }

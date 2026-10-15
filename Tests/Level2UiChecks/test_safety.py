@@ -8,6 +8,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).parent))
 from validate_report import validate
+from review_layout import review
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -44,6 +45,16 @@ class Level2Safety(unittest.TestCase):
         report["counts"]["Pass"] = 48
         with self.assertRaises(ValueError):
             validate(report)
+
+    def test_layout_review_requires_captures_and_observation(self):
+        images={"L2-UX-05-1280x720.png", "L2-UX-05-maximized.png"}
+        for available,notes in ((set(),"Readable labels"),(images,"")):
+            with self.assertRaises(ValueError):
+                review(self.report(),available,"Pass",notes)
+        report=self.report()
+        review(report,images,"Fail","Admission caption clipped at compact width")
+        self.assertEqual(1,report["counts"]["Fail"])
+        self.assertFalse(report["level3Ready"])
 
     @unittest.skipUnless(os.name == "nt", "Windows test binary required")
     def test_test_binary_rejects_operational_target_before_opening_sql(self):

@@ -103,10 +103,32 @@ internal sealed class Desktop : IDisposable
                 ??Automation.GetDesktop().FindAllChildren(cf=>cf.ByProcessId(Process!.Id))
                     .Select(root=>root.FindFirstDescendant(cf=>cf.ByName(text).And(cf.ByControlType(ControlType.ListItem))))
                     .FirstOrDefault(found=>found!=null&&!found.IsOffscreen),"dropdown item "+text);
-            item.Click();
+            bool selectedByKeyboard=false;
+            if(item.IsOffscreen)
+            {
+                // Native dropdown lists expose off-screen rows too. Scroll before
+                // clicking so February cannot click the visible October row.
+                var scroll=item.Patterns.ScrollItem.PatternOrDefault;
+                if(scroll!=null)scroll.ScrollIntoView();
+                else
+                {
+                    var choices=e.AsComboBox().Items;
+                    int index=Array.FindIndex(choices,x=>x.Name==text);
+                    Identity.Check(index>=0,"Dropdown choice index unavailable: "+text);
+                    Key(VirtualKeyShort.HOME);
+                    for(int i=0;i<index;i++)Key(VirtualKeyShort.DOWN);
+                    Key(VirtualKeyShort.RETURN);
+                    selectedByKeyboard=true;
+                }
+            }
+            if(!selectedByKeyboard)
+            {
+                Identity.Check(!item.IsOffscreen,"Dropdown item could not be scrolled into view: "+text);
+                item.Click();
+            }
         }
         catch {Key(VirtualKeyShort.ESCAPE);throw;}
-        Identity.Check(e.AsComboBox().Value==text,"Combo selection did not persist: "+name);
+        Wait(()=>e.AsComboBox().Value==text?e:null,"persisted selection "+name);
     }
     internal void PickStudent(string field="Student (Admission Number / Name)",string name="Fictional Example Student")
     {

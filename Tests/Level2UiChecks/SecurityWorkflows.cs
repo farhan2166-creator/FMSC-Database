@@ -20,13 +20,22 @@ internal static class SecurityWorkflows
         report.Run("L2-SEC-05",ui,()=>{
             ui.Fill("Username","level2_restricted");ui.Fill("Password",password);ui.Click("Sign In",ControlType.Button);
             ui.DashboardAfterLogin();
-            foreach(string name in new[]{"Student Admissions","Student Promotion","School Information","Class Fee Rates"})
+            foreach(var scope in new[]{
+                (Group:"Daily Work",Forbidden:new[]{"Student Admissions"}),
+                (Group:"Student Management",Forbidden:new[]{"Student Promotion"}),
+                (Group:"Fees & Billing",Forbidden:new[]{"Fee Rate Setup"}),
+                (Group:"School Setup",Forbidden:new[]{"School Profile","Academic Years","Campuses"})})
             {
-                var action=ui.TryFind(name,ControlType.Button);
-                Identity.Check(action==null||!action.IsEnabled,"Restricted action is enabled: "+name);
+                if(ui.TryFind(scope.Group,ControlType.Button) is {IsEnabled:true})ui.Click(scope.Group,ControlType.Button);
+                foreach(string name in scope.Forbidden)
+                {
+                    var action=ui.TryFind(name,ControlType.Button);
+                    Identity.Check(action==null||!action.IsEnabled,"Restricted action is enabled: "+name);
+                }
             }
-            ui.Click("Fee Collection",ControlType.Button);ui.Find("Amount Received (Rs.)",ControlType.Edit);
+            ui.Navigate("Fee Collection");ui.Find("Amount Received (Rs.)",ControlType.Edit);
             Identity.Check(Identity.Count("SELECT COUNT(*) FROM dbo.Users WHERE Username=N'level2_restricted' AND FailedLoginCount=0;")==1,"Restricted login did not persist clean authentication state.");
+            Identity.Check(Identity.Count("SELECT COUNT(*) FROM dbo.RolePermissions P JOIN dbo.Roles R ON R.RoleId=P.RoleId WHERE R.RoleName=N'Accountant';")==6,"Restricted role's six established grants changed.");
         },"Restricted login succeeds; forbidden navigation absent/disabled; permitted collection opens; account permissions unchanged.");
     }
 }

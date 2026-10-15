@@ -15,7 +15,7 @@ Requirements: Windows, an unlocked interactive desktop, .NET 8 Desktop Runtime
 and .NET SDK 8 or newer, SQL Server LocalDB 2019 or newer, `sqlcmd`, Python 3.11+,
 and NuGet access. No administrator elevation or school database files are needed.
 LocalDB must be available to the same Windows account that runs the application.
-The approved test model uses Sql150. SQLPackage is pinned by the existing Level 1
+The data-free test model uses Sql150. SQLPackage is pinned by the existing Level 1
 tool manifest to 170.5.96; no incompatible-platform override is used.
 
 In PowerShell from the repository:
@@ -24,7 +24,7 @@ In PowerShell from the repository:
 .\Tools\Run-Level2.ps1
 # If Python is installed somewhere else:
 .\Tools\Run-Level2.ps1 -PythonPath 'C:\path\to\python.exe'
-# Build and provenance checks only; scenario results are deliberately blocked:
+# Build and fixture validation only; scenario results are deliberately blocked:
 .\Tools\Run-Level2.ps1 -PreflightOnly
 ```
 
@@ -52,6 +52,17 @@ Only this evidence directory may be shared after validation:
 python Tests/Level2UiChecks/validate_report.py <exact evidence directory>
 ```
 
+After inspecting both viewport captures and the workflow images, explicitly
+record the observed visual result (use `Fail` and describe clipping if found):
+
+```powershell
+python Tests/Level2UiChecks/review_layout.py <exact evidence directory> --result Pass --notes '<specific observed findings>'
+python Tests/Level2UiChecks/validate_report.py <exact evidence directory>
+```
+
+This step requires the captured files and review notes, updates the totals and
+does not change the separate blocked resolution/DPI scenario.
+
 Private state lives in `artifacts/level2/private/FMSC_Level2_<GUID>`. Never upload
 that directory, its credentials/recovery files, raw console logs, database files,
 NuGet output or the data-bearing repository DACPAC. Git ignores generated output.
@@ -63,8 +74,7 @@ IDs and roles, excluding password values and general ValuePattern contents.
 
 Each run creates a unique LocalDB **instance and catalog**, both named
 `FMSC_Level2_<GUID>`. The harness accepts no SQL endpoint, connection string,
-existing catalog, or MDF/LDF input. It verifies the unchanged schema-only
-DACPAC/package/model/module provenance using the Level 1 verifier and publishes
+existing catalog, or MDF/LDF input. It uses the current main branch's existing data-free SQL fixture validation and publishes
 only `Tests/LifecycleSqlChecks/Baseline/schema.dacpac`.
 
 SQLPackage must preserve the `FMSC_Level2Owner` extended property using
@@ -75,11 +85,10 @@ demonstrated that the subsequent guard refuses to proceed.
 The reference fixture uses the production setup procedures and runs the unchanged
 startup schema compatibility validator. As in Level 1, DacFx's recovery-scope
 property is converted to a fresh typed uniqueidentifier only in the disposable
-fixture. Approved schema artifacts, fingerprints and migration requirements are
-not rewritten. Three fictional years support historical admission and its following-year
+fixture. Runtime compatibility and migration requirements are not rewritten. Three fictional years support historical admission and its following-year
 promotion. The driver chooses 1 April of the previous calendar year through the
 actual date-selector popup, so promotion can use 1 January of the current year
-without violating the application’s non-future-date rule. No student, collection, allocation or promotion is seeded.
+without violating the application's non-future-date rule. No student, collection, allocation or promotion is seeded.
 
 The application is built with the explicit `FmscLevel2=true` property into the
 private run folder. That compile-time symbol adds the guarded connection route,
@@ -154,7 +163,10 @@ The first visual defect found was a long inline validation message painting over
 the phone field's caption. `FormValidator.FitBadge` now reserves the measured
 caption width. A focused Windows control regression checks non-overlap, preserved
 validation state and the complete accessible message at three field widths (nine
-assertions). It also runs in the existing desktop `--post-fix` checks:
+assertions). The admission header also measures ordinary status text instead of
+clipping "New Admission" inside a fixed badge; seven additional checks cover
+compact/wide header widths without starting SQL loaders. Both run in the existing
+desktop `--post-fix` checks:
 
 ```powershell
 dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --validation-badges
@@ -193,6 +205,11 @@ rerunning with a writable temporary directory passed all eight. This was an
 environment error, not a reason to relax SQL/schema checks.
 
 ### Controlled connection interruption
+
+Monthly posting follows the application's approved current-year-only policy and
+runs after return confirmation. In January that recipe is blocked because no
+later current-year month is eligible; the March read-only recovery preview is
+also blocked before March. It does not alter the workstation clock or the policy.
 
 Only after a live ownership proof, the recovery recipe stops/deletes the unique
 LocalDB instance (its database files remain in the private directory), observes

@@ -1019,6 +1019,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         };
         foreach (float width in new[] { 30F, 12F, 32F, 26F })
             identityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
+        identityRow.ColumnStyles[1].SizeType = SizeType.Absolute;
         identityRow.Controls.Add(headingLabel, 0, 0);
         identityRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var statusHost = new Panel {
@@ -1030,14 +1031,25 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         statusHost.Controls.Add(studentStatusBadge);
         void AlignStatusBadge()
         {
-            int width = Math.Max(0, Math.Min(statusHost.ClientSize.Width - statusHost.Padding.Horizontal,
-                AppScale.Scale(120)));
+            int width = Math.Max(0, statusHost.ClientSize.Width - statusHost.Padding.Horizontal);
             int height = Math.Min(statusHost.ClientSize.Height,
                 AppMetrics.TextHeight(studentStatusBadge.Font) + UiDesignSystem.Spacing.Sm);
             studentStatusBadge.SetBounds(statusHost.Padding.Left,
                 (statusHost.ClientSize.Height - height) / 2, width, height);
         }
         statusHost.Resize += (_, _) => AlignStatusBadge();
+        void FitStatusColumn()
+        {
+            int desired = TextRenderer.MeasureText(studentStatusBadge.Text, studentStatusBadge.Font).Width
+                + studentStatusBadge.Padding.Horizontal + statusHost.Padding.Horizontal + AppScale.Scale(8);
+            int width = Math.Min(desired, Math.Max(AppScale.Scale(140), identityRow.ClientSize.Width / 3));
+            if (identityRow.ColumnStyles[1].Width != width)
+                identityRow.ColumnStyles[1].Width = width;
+            AlignStatusBadge();
+        }
+        studentStatusBadge.TextChanged += (_, _) => FitStatusColumn();
+        studentStatusBadge.FontChanged += (_, _) => FitStatusColumn();
+        identityRow.Resize += (_, _) => FitStatusColumn();
         AlignStatusBadge();
         identityRow.Controls.Add(statusHost, 1, 0);
         var registrationLabel = new Label {

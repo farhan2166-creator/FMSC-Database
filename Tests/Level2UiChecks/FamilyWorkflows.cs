@@ -35,15 +35,19 @@ internal static class FamilyWorkflows
             ui.Click("Close",ControlType.Button,dialog);ui.Click("Student Information",ControlType.Button);
         },"A second student was admitted through UI; sibling search/confirmation created exactly two members in one family with valid student links.");
         if(!report.Passed("L2-PRF-02"))return;
-        report.Run("L2-UX-08",ui,()=>{
-            ui.Fill("Father Occupation","Fictional Pending Sibling Edit");ui.Click("Find Student",ControlType.Button);
-            ui.Click("No",ControlType.Button,ui.Window("Unsaved Changes"));
-            Identity.Check(ui.Find("Student Name",ControlType.Edit).AsTextBox().Text==Sibling,"Cancelled record switch changed the selected student.");
-            Identity.Check(ui.Find("Father Occupation",ControlType.Edit).AsTextBox().Text=="Fictional Pending Sibling Edit","Cancelled record switch lost the draft.");
-            ui.Click("Find Student",ControlType.Button);ui.Click("Yes",ControlType.Button,ui.Window("Unsaved Changes"));
+        void ChoosePrimary()
+        {
+            ui.Click("Find Student",ControlType.Button);
             var search=ui.Window("Find Student");ui.Fill("Search","Fictional Example Student",search);ui.Click("Search",ControlType.Button,search);
             Desktop.Wait(()=>ui.Find("Open Student",ControlType.Button,search) is {IsEnabled:true} b?b:null,"other student search result");
             ui.Click("Open Student",ControlType.Button,search);
+        }
+        report.Run("L2-UX-08",ui,()=>{
+            ui.Fill("Father Occupation","Fictional Pending Sibling Edit");ChoosePrimary();
+            ui.Click("No",ControlType.Button,ui.Window("Unsaved Changes"));
+            Identity.Check(ui.Find("Student Name",ControlType.Edit).AsTextBox().Text==Sibling,"Cancelled record switch changed the selected student.");
+            Identity.Check(ui.Find("Father Occupation",ControlType.Edit).AsTextBox().Text=="Fictional Pending Sibling Edit","Cancelled record switch lost the draft.");
+            ChoosePrimary();ui.Click("Yes",ControlType.Button,ui.Window("Unsaved Changes"));
             Desktop.Wait(()=>ui.Find("Student Name",ControlType.Edit) is {IsEnabled:true} field?field:null,"selected record finished loading");
             Identity.Check(Convert.IsDBNull(Identity.Scalar("SELECT FatherOccupation FROM dbo.Students WHERE StudentName=N'Fictional Example Sibling';")),"Discarded sibling edit was persisted.");
         },"Cancelling record switch preserves student and draft; confirmed discard leaves the sibling's stored occupation unchanged.");
