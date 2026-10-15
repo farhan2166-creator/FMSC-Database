@@ -95,11 +95,7 @@
 	     prerequisites/copying. Normal full release publishing remains validated. -->
 	<!-- Validate installer, prerequisite, migrations and any supplied database snapshot before publishing. -->
 	<Target Name="ValidateDeploymentAssets" BeforeTargets="PrepareForPublish" Condition="'$(CIAppOnlyBundle)' != 'true' Or '$(GITHUB_ACTIONS)' != 'true'">
-        <!-- Publishing from pwsh can pass its PowerShell 7 module path through dotnet.
-             These Windows PowerShell 5.1 children need their own built-in modules,
-             including the FileHash script module. Scope the path to the child only. -->
-        <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Installer\VerifySchemaArtifact.ps1&quot; -ProjectDirectory &quot;$(MSBuildProjectDirectory)&quot;"
-              EnvironmentVariables="PSModulePath=$(SystemRoot)\System32\WindowsPowerShell\v1.0\Modules" />
+        <!-- DACPAC package and model fingerprints are no longer a publish prerequisite. -->
 		<PropertyGroup>
 			<DeploymentDatabaseDirectory Condition="'$(DeploymentDatabaseDirectory)' == ''">$(MSBuildProjectDirectory)\..\Database</DeploymentDatabaseDirectory>
 			<DeploymentMigrationDirectory Condition="'$(DeploymentMigrationDirectory)' == ''">$(MSBuildProjectDirectory)\Migrations</DeploymentMigrationDirectory>

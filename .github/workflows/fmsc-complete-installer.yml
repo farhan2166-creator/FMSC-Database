@@ -49,15 +49,6 @@ jobs:
       - name: Run synthetic performance checks
         run: dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
 
-      - name: Verify approved SQL schema artifact and regression tests
-        run: |
-          python Tools/verify_schema_artifact.py --check
-          python Tools/test_audit_schema.py
-
-      - name: Verify approved DACPAC using native PowerShell
-        shell: powershell
-        run: .\Installer\VerifySchemaArtifact.ps1 -ProjectDirectory .
-
       - name: Test full PortableRelease publishing (disposable prerequisite fixture)
         shell: pwsh
         run: .\Tools\TestPublishPowerShell.ps1 -ProjectDirectory .

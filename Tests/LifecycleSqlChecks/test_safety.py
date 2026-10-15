@@ -14,9 +14,16 @@ spec.loader.exec_module(runner)
 
 
 class SafetyTests(unittest.TestCase):
-    def test_approved_schema_only_model_and_modules(self):
+    def test_pinned_schema_only_fixture_and_modules(self):
         result = runner.verify_baseline()
         self.assertEqual(64, len(result["sourceModelSha256"]))
+
+    def test_pinned_fixture_does_not_require_current_dacpac_git_blob(self):
+        # The current repository artifact can change without weakening the
+        # integrity and model checks on the isolated, pinned SQL test fixture.
+        with patch.object(runner.subprocess, "check_output", side_effect=AssertionError(
+                "Runtime fixture preflight must not query a repository DACPAC revision.")):
+            self.assertEqual(64, len(runner.verify_baseline()["sourceModelSha256"]))
 
     def test_baseline_has_no_exported_data_or_script_relationship(self):
         with zipfile.ZipFile(runner.PROJECT / "Baseline/schema.dacpac") as package:
