@@ -89,3 +89,7 @@ These are heuristic text-secret/file-name checks, not a guarantee of finding eve
 After the reviewed configuration reaches the default `main` branch, GitHub can schedule these update PRs. If they do not appear, check the repository's Dependabot version-update status and Actions policy in Settings; no paid secret-scanning service needs to be enabled.
 
 For each update PR, read release/breaking-change notes, ensure the package still supports **.NET 8 Windows Forms**, and inspect every manifest change in a grouped update. Require the existing Windows CI and security checks to pass. For reporting/SQL-client dependencies, also perform the relevant Windows/report/disposable-database acceptance before a release. Merge manually after review or defer/close the proposal; a minor/patch label alone does not prove compatibility.
+
+## Communication module development
+
+See [COMMUNICATION_CENTER.md](COMMUNICATION_CENTER.md) before changing the optional SQL add-on, provider integration or queue. CI uses fake HTTP transports and a separately owned disposable SQL database; no live messaging or school data is permitted. Run `Tests/CommunicationChecks` and the Level 1 harness as well as Desktop CI and security checks. The nested manual add-on is deliberately outside automatic installer migrations, and the reviewed base DACPAC/version remain unchanged. Provider registration, hosting and production schema deployment require separate owner acceptance.

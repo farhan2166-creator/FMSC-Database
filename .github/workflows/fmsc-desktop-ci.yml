@@ -53,6 +53,14 @@ jobs:
       - name: Run synthetic performance and state checks
         run: dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
 
+      - name: Build optional communication worker and webhook host
+        run: |
+          dotnet build CommunicationWorker/CommunicationWorker.csproj -c Release
+          dotnet build CommunicationHost/CommunicationHost.csproj -c Release
+
+      - name: Run deterministic communication provider checks (no live delivery)
+        run: dotnet run --project Tests/CommunicationChecks/CommunicationChecks.csproj -c Release
+
       - name: Verify reviewed DACPAC and SQL-module fingerprints
         run: python Tools/verify_schema_artifact.py --check
 
