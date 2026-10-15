@@ -1,0 +1,82 @@
+name: FMSC DACPAC readable schema synchronization
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'FMSC.dacpac'
+      - 'Tools/export_dacpac_schema.py'
+      - 'Tools/test_dacpac_schema_export.py'
+      - '.github/workflows/fmsc-dacpac-schema.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'FMSC.dacpac'
+      - 'DatabaseSchema/**'
+      - 'Tools/export_dacpac_schema.py'
+      - 'Tools/test_dacpac_schema_export.py'
+      - '.github/workflows/fmsc-dacpac-schema.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fmsc-readable-schema-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Generate record-free schema and exercise regressions
+        run: |
+          python -m unittest discover -s Tools -p test_dacpac_schema_export.py -v
+          python Tools/export_dacpac_schema.py --output "$RUNNER_TEMP/generated-schema"
+
+  propose:
+    needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Generate schema-only reference
+        run: |
+          python -m unittest discover -s Tools -p test_dacpac_schema_export.py -v
+          python Tools/export_dacpac_schema.py
+      - name: Create review PR when definitions change
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -z "$(git status --porcelain -- DatabaseSchema)"; then
+            echo "DatabaseSchema already matches the DACPAC."
+            exit 0
+          fi
+          branch="automation/dacpac-schema-${GITHUB_SHA:0:12}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add -- DatabaseSchema
+          git commit -m "docs(schema): synchronize DACPAC model reference"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" --draft \
+            --title "Review generated DACPAC SQL/schema definitions" \
+            --body "Generated only from FMSC.dacpac model.xml. Full per-object model XML and SQL module bodies where available. No exported table records were read. This is NOT DACPAC approval, SQL migration or permission to deploy. Review definitions and existing DACPAC safeguards before merging. Source commit: ${GITHUB_SHA}."
