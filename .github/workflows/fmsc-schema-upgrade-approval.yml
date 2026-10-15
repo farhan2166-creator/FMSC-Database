@@ -76,6 +76,8 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - name: Report the current candidate without approving it
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           python - <<'PY'
           import os, sys
@@ -161,6 +163,7 @@ jobs:
         env:
           CANDIDATE: ${{ inputs.candidate_commit }}
           MIGRATIONS: ${{ inputs.migrations }}
+          GH_TOKEN: ${{ github.token }}
         run: >-
           python Tools/schema_upgrade.py inspect --source "$GITHUB_SHA" --candidate "$CANDIDATE"
           --migrations "$MIGRATIONS" --sql --output "$RUNNER_TEMP/upgrade-report"

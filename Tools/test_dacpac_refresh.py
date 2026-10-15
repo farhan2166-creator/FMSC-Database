@@ -304,7 +304,10 @@ class RefreshChecks(unittest.TestCase):
             if "/pulls?" in path: return []
             if path.endswith("/pulls"): return {"html_url": "https://github.com/fixture/private/pull/1"}
             return {}
-        def run(): return publisher.publish(self.root, source, source, "fixture/private", "maintainer", event, ref, api)
+        def run():
+            import schema_upgrade
+            with patch.object(schema_upgrade, "LEGACY_APPROVAL_REF", self.anchor):
+                return publisher.publish(self.root, source, source, "fixture/private", "maintainer", event, ref, api)
         return run, calls, api, source
 
     def test_publisher_creates_only_alignment_and_dispatches_checks(self):

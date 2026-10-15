@@ -48,6 +48,8 @@ def publish(project, anchor, source, repository, actor, event, ref, api):
         raise Refusal("CHECKOUT_SOURCE_DIFFERS")
     current = api("GET", base + "/git/ref/heads/" + default)["object"]["sha"]
     if current != source: raise Refusal("DEFAULT_BRANCH_MOVED_RETRY_ON_LATEST")
+    from schema_upgrade import baseline
+    baseline(project, anchor)
     report, updates = verify(project, anchor)
     if report["result"] == "REVIEW_REQUIRED": raise Refusal("REFRESH_REQUIRES_REVIEW")
     tracked = git(project, "ls-tree", source, "--", "FMSC.dacpac").decode().split()

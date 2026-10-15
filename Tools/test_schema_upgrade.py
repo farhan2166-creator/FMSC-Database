@@ -51,8 +51,12 @@ class UpgradeChecks(unittest.TestCase):
         subprocess.run(["git", "-C", str(cls.seed), "add", "."], check=True, capture_output=True)
         subprocess.run(["git", "-C", str(cls.seed), "-c", "commit.gpgsign=false", "commit", "-m", "Synthetic trusted contracts"], check=True, capture_output=True)
         cls.anchor = refresh.git(cls.seed, "rev-parse", "HEAD").decode().strip()
+        cls.original_anchor = upgrade.LEGACY_APPROVAL_REF
+        upgrade.LEGACY_APPROVAL_REF = cls.anchor
     @classmethod
-    def tearDownClass(cls): cls.store.cleanup()
+    def tearDownClass(cls):
+        upgrade.LEGACY_APPROVAL_REF = cls.original_anchor
+        cls.store.cleanup()
     def setUp(self): refresh_tests.RefreshChecks.setUp(self)
     def fixture(self, migration=True):
         raw = self.package(added_table(self.parts)); (self.root / "FMSC.dacpac").write_bytes(raw)
@@ -67,6 +71,10 @@ class UpgradeChecks(unittest.TestCase):
         report, _ = upgrade.inspect_candidate(self.root, source, source, "")
         self.assertEqual("UPGRADE_PATH_REQUIRED", report["status"])
         self.assertFalse(report["deploymentReady"]); self.assertFalse(report["upgradePathVerified"])
+    def test_unchanged_inspection_needs_no_approval_or_generated_proposal(self):
+        report,_=upgrade.inspect_candidate(self.root,self.anchor,self.anchor,'')
+        self.assertEqual('VERIFIED_UNCHANGED',report['status'])
+        self.assertFalse(report['ownerApprovalRequired']);self.assertNotIn('reviewDigest',report)
     def test_structural_review_is_not_approval(self):
         source, _ = self.fixture()
         report, _ = upgrade.inspect_candidate(self.root, source, source, "Migrations/99.sql")
@@ -109,6 +117,14 @@ class UpgradeChecks(unittest.TestCase):
         subprocess.run(["git","-C",str(self.root),"-c","commit.gpgsign=false","commit","-m","Synthetic forged approval"],check=True,capture_output=True)
         with self.assertRaisesRegex(refresh.Refusal,"OWNER_APPROVAL_RECEIPT_REQUIRED"):
             upgrade.audit_approval(self.root,self.anchor,lambda *args:None,"owner/private")
+    def test_replaced_complete_baseline_cannot_bless_itself_on_main(self):
+        _,folder,_,_,_,_=self.prepared()
+        for name in refresh.SYNC_PATHS:(self.root/name).write_bytes((folder/name).read_bytes())
+        subprocess.run(['git','-C',str(self.root),'add','.'],check=True,capture_output=True)
+        subprocess.run(['git','-C',str(self.root),'-c','commit.gpgsign=false','commit','-m','Synthetic self-declared baseline'],check=True,capture_output=True)
+        source=refresh.git(self.root,'rev-parse','HEAD').decode().strip()
+        with self.assertRaisesRegex(refresh.Refusal,'BASELINE_STRUCTURE_HAS_NO_VERIFIED_OWNER_APPROVAL'):
+            upgrade.inspect_candidate(self.root,source,source,'')
     def test_sanitized_report(self):
         source,_=self.fixture(); report,_=upgrade.inspect_candidate(self.root,source,source,"")
         folder=self.root/'report';upgrade.write_report(folder,report)
@@ -214,6 +230,8 @@ def sql_self_test():
         def git(*args):return refresh.git(root,*args)
         git('init','-b','main');git('config','user.name','Synthetic schema fixture');git('config','user.email','fixture@example.invalid')
         git('add','.');git('-c','commit.gpgsign=false','commit','-m','Synthetic data-free baseline')
+        # Only this isolated test process substitutes its fictional trust root.
+        upgrade.LEGACY_APPROVAL_REF=git('rev-parse','HEAD').decode().strip()
         candidate=refresh_tests.RefreshChecks.package(added_table(parts));(root/'FMSC.dacpac').write_bytes(candidate)
         migration=root/'Migrations/99.sql';migration.parent.mkdir(exist_ok=True);migration.write_text('CREATE TABLE dbo.FMSC_UpgradeFixture(Id int NULL);')
         git('add','.');git('-c','commit.gpgsign=false','commit','-m','Synthetic additive migration')

@@ -14,12 +14,17 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import uuid
 import xml.etree.ElementTree as ET
 import zipfile
 
 from verify_schema_artifact import inspect, verify_contract
+
+if __name__ == "__main__":
+    # Shared Refusal type when the upgrade auditor imports this CLI module.
+    sys.modules.setdefault("refresh_dacpac", sys.modules[__name__])
 
 ROOT = Path(__file__).resolve().parents[1]
 APPROVAL = "Core/ApprovedSchemaArtifact.json"
@@ -442,8 +447,17 @@ def main():
                 "differences": [], "reasons": [code], "changedApprovalFiles": [], "fixtureRegenerated": False})
             print("DACPAC refresh refused: " + code + ". For local use, supply a full reviewed --approval-ref.")
             return 1
+    from schema_upgrade import baseline
+    try:
+        baseline(args.project.resolve(), anchor)
+    except (Refusal, KeyError, OSError, ValueError, subprocess.SubprocessError) as ex:
+        code = str(ex) if isinstance(ex, Refusal) else "INVALID_APPROVAL_HISTORY"
+        write_report(args.report_dir, {"result": "REVIEW_REQUIRED", "approvalCommit": anchor,
+            "differences": [], "reasons": [code], "changedApprovalFiles": [], "fixtureRegenerated": False})
+        print("DACPAC approval history refused: " + code)
+        return 1
     report, updates = verify(args.project.resolve(), anchor)
-    if report["result"] == "REVIEW_REQUIRED" and os.environ.get("GH_TOKEN"):
+    if report["result"] == "REVIEW_REQUIRED" and os.environ.get("GH_TOKEN") and os.environ.get("GITHUB_REPOSITORY"):
         from schema_upgrade import audit_approval
         from publish_dacpac_refresh import GitHub
         try:

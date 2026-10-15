@@ -22,6 +22,8 @@ from export_dacpac_schema import prepare_model_only
 ROOT = refresh.ROOT
 RECEIPT = "Core/SchemaUpgradeApproval.json"
 WORKFLOW = ".github/workflows/fmsc-schema-upgrade-approval.yml"
+# Frozen onboarding approval records, not the unapproved DACPAC at this commit.
+LEGACY_APPROVAL_REF = "39b1548689e77c0047c3d3b5fd41a90dc39d3606"
 PATHS = (*refresh.SYNC_PATHS, RECEIPT)
 VALIDATION = ("fmsc-desktop-ci.yml", "fmsc-security.yml", "fmsc-lifecycle-sql-ci.yml")
 PROTECTED = ("Core/DatabaseMigrationRequirements.json", "Core/PermissionCatalog.json", "DatabaseHelper.cs", "Installer/core.ps1")
@@ -57,6 +59,37 @@ def baseline(project, source):
     if not any(line.split()[0] == provenance["sourceGitBlob"] for line in history):
         raise refresh.Refusal("APPROVED_BLOB_NOT_IN_TRUSTED_HISTORY")
     refresh.fixture_valid(refresh.git(project, "show", source + ":" + refresh.FIXTURE), provenance, approved)
+    # JSON edits on main cannot make the next inspection trust a self-declared
+    # baseline. Follow the last owner receipt, or the frozen onboarding records.
+    transitions = refresh.git(project, "rev-list", "--first-parent", source, "--", RECEIPT).decode().splitlines()
+    authority = transitions[0] if transitions else LEGACY_APPROVAL_REF
+    ancestor(project, authority, source)
+    def at(path): return refresh.git(project, "show", authority + ":" + path)
+    original = refresh.read_json(at(refresh.APPROVAL))
+    if transitions:
+        receipt = refresh.read_json(at(RECEIPT))
+        if not os.environ.get("GH_TOKEN") or not os.environ.get("GITHUB_REPOSITORY"):
+            raise refresh.Refusal("OWNER_APPROVAL_HISTORY_REQUIRES_AUTHENTICATED_READ")
+        verify_owner_run(receipt, GitHub(os.environ["GH_TOKEN"]), os.environ["GITHUB_REPOSITORY"])
+        for path, checksum in receipt["manifest"]["updates"].items():
+            if path not in refresh.SYNC_PATHS or refresh.sha(at(path)) != checksum:
+                raise refresh.Refusal("HISTORICAL_OWNER_APPROVAL_PAYLOAD_DIFFERS")
+    if approved["modelSha256"] != original["modelSha256"] or approved["modules"] != original["modules"]:
+        raise refresh.Refusal("BASELINE_STRUCTURE_HAS_NO_VERIFIED_OWNER_APPROVAL")
+    current_contract = refresh.read_json(refresh.git(project, "show", source + ":" + refresh.CONTRACT))
+    original_contract = refresh.read_json(at(refresh.CONTRACT))
+    current_contract.pop("schemaArtifact"); original_contract.pop("schemaArtifact")
+    if current_contract != original_contract:
+        raise refresh.Refusal("BASELINE_CONTRACT_HAS_NO_VERIFIED_OWNER_APPROVAL")
+    original_provenance = refresh.read_json(at(refresh.PROVENANCE))
+    original_parts = refresh.archive(refresh.git(project, "cat-file", "blob", original_provenance["sourceGitBlob"]), candidate=True)
+    for name in set(original_parts) | set(parts):
+        if name not in ("Origin.xml", "DacMetadata.xml", "[Content_Types].xml", "_rels/.rels") and original_parts.get(name) != parts.get(name):
+            raise refresh.Refusal("BASELINE_PAYLOAD_HAS_NO_VERIFIED_OWNER_APPROVAL")
+    for name in ("Origin.xml", "DacMetadata.xml", "[Content_Types].xml", "_rels/.rels"):
+        if name in original_parts and name in parts and refresh.canonical(refresh.xml(original_parts[name]), name == "_rels/.rels", name == "Origin.xml") != \
+            refresh.canonical(refresh.xml(parts[name]), name == "_rels/.rels", name == "Origin.xml"):
+            raise refresh.Refusal("BASELINE_METADATA_HAS_NO_VERIFIED_OWNER_APPROVAL")
     return approved, parts, provenance
 
 
@@ -99,17 +132,25 @@ def inspect_candidate(project, source, candidate, migrations):
         "requiredSchemaVersion": refresh.required_version(refresh.git(project, "show", source + ":DatabaseHelper.cs")),
         "migrations": selected, "reasons": [], "deploymentReady": False}
     if not report["structuralChangesDetected"]:
-        report["reasons"].append("USE_EXISTING_METADATA_REFRESH_WORKFLOW")
+        ordinary, _ = refresh.verify(project, source)
+        if ordinary["result"] in ("ALIGNED", "SAFE_METADATA_ONLY"):
+            report.update(status="VERIFIED_UNCHANGED" if ordinary["result"] == "ALIGNED" else "SAFE_METADATA_REFRESH",
+                compatibilityVerified=True, ownerApprovalRequired=False, upgradePathVerified=True,
+                nextAction="No approval PR needed." if ordinary["result"] == "ALIGNED" else "Use the existing metadata synchronization workflow; structural approval is not required.")
+            return report, raw
+        report["reasons"].append("PACKAGE_LAYOUT_OR_EXPORTED_PAYLOAD_REVIEW_REQUIRED")
     if set(new) - refresh.FIXTURE_ENTRIES:
         report["reasons"].append("STRUCTURAL_APPROVAL_REQUIRES_SCHEMA_ONLY_EXPORT_NO_DATA_OR_SCRIPTS")
     if hard_errors:
         # Values/SQL/XML from a candidate must never enter reports.
         report["reasons"].append("PROTECTED_APPLICATION_CONTRACT_FAILED")
         report["status"] = "COMPATIBILITY_FAILED"
-    if not selected:
+    if not selected and report["structuralChangesDetected"]:
         report["reasons"].append("REVIEWED_DATA_PRESERVING_MIGRATION_REQUIRED")
         if not hard_errors: report["status"] = "UPGRADE_PATH_REQUIRED"
     report["nextAction"] = "Select reviewed main-branch migrations and run disposable SQL verification. No baseline has been approved."
+    if not report["structuralChangesDetected"]:
+        report["nextAction"] = "Schema is unchanged but packaging/export payload is outside the metadata policy. Re-export a complete supported package; no schema migration is justified."
     if report["requiredSchemaVersion"] != "6":
         report["status"] = "COMPATIBILITY_FAILED"
         report["reasons"].append("VERSION_CHANGE_REQUIRES_REVIEWED_APPLICATION_INSTALLER_AND_FIXTURES")
@@ -273,6 +314,18 @@ def audit_approval(project, anchor, api, repository):
     anchored = refresh.read_json(refresh.git(project, "show", anchor + ":" + refresh.APPROVAL))
     if previous != anchored or previous["packageSha256"] != manifest["previousPackageSha256"]:
         raise refresh.Refusal("STALE_BASELINE_APPROVAL")
+    verify_owner_run(receipt, api, repository)
+    for name, checksum in ((m["path"], m["sha256"]) for m in manifest["migrations"]):
+        if refresh.sha(refresh.git(project, "show", manifest["sourceCommit"] + ":" + name)) != checksum:
+            raise refresh.Refusal("APPROVAL_MIGRATION_SUBSTITUTED")
+    return "STRUCTURAL_CHANGE_APPROVED"
+
+
+def verify_owner_run(receipt, api, repository):
+    manifest = receipt["manifest"]
+    digest = refresh.sha(fixed_json(manifest))
+    if receipt["reviewDigest"] != digest or receipt["status"] != "STRUCTURAL_CHANGE_APPROVED":
+        raise refresh.Refusal("INVALID_APPROVAL_RECEIPT")
     if not re.fullmatch(r"[1-9][0-9]*", receipt["runId"]) or receipt["runAttempt"] < 1:
         raise refresh.Refusal("INVALID_APPROVAL_RUN")
     base = "/repos/" + repository; info = api("GET", base)
@@ -287,10 +340,6 @@ def audit_approval(project, anchor, api, repository):
     if receipt["actor"] != run["actor"]["login"] or run["path"] != WORKFLOW or run["head_sha"] != manifest["sourceCommit"] or run["conclusion"] != "success" or \
         run["display_title"] != "Schema approve " + manifest["candidateCommit"] + " " + digest:
         raise refresh.Refusal("TRUSTED_APPROVAL_RUN_NOT_VERIFIED")
-    for name, checksum in ((m["path"], m["sha256"]) for m in manifest["migrations"]):
-        if refresh.sha(refresh.git(project, "show", manifest["sourceCommit"] + ":" + name)) != checksum:
-            raise refresh.Refusal("APPROVAL_MIGRATION_SUBSTITUTED")
-    return "STRUCTURAL_CHANGE_APPROVED"
 
 
 def main():
@@ -316,7 +365,7 @@ def main():
             print(json.dumps(publish(args.project, args.proposal, os.environ["REVIEW_DIGEST"], os.environ["CONFIRMATION"], GitHub(os.environ["GH_TOKEN"]), context)))
             return 0
         report, raw = inspect_candidate(args.project, args.source, args.candidate, args.migrations)
-        if args.sql and not report["reasons"]:
+        if args.sql and not report["reasons"] and report["ownerApprovalRequired"]:
             from verify_schema_upgrade_sql import verify_sql
             catalog = verify_sql(args.project, report, raw)
             proposal(args.project, report, raw, catalog, args.proposal)
@@ -324,7 +373,7 @@ def main():
         print(report["status"] + ": " + report["nextAction"])
         if os.environ.get("GITHUB_OUTPUT"):
             with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-                output.write("ready=" + str(report.get("upgradePathVerified", False)).lower() + "\n")
+                output.write("ready=" + str(bool(report.get("reviewDigest"))).lower() + "\n")
                 output.write("digest=" + report.get("reviewDigest", "") + "\n")
         return 0 if not report["reasons"] else 2
     except (refresh.Refusal, OSError, ValueError, KeyError, subprocess.SubprocessError, zipfile.BadZipFile) as ex:
