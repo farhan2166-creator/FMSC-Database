@@ -65,6 +65,11 @@ internal static partial class Program
                         "Account actions fit their row and remain reachable through the scrolling viewport");
                 }
             }
+            Check(SynchronizationContext.Current is WindowsFormsSynchronizationContext,
+                "Native async page checks retain the production WinForms synchronization context after nested event pumping");
+            int uiThread = Environment.CurrentManagedThreadId;
+            grid.DataBindingComplete += (_, _) => Check(Environment.CurrentManagedThreadId == uiThread,
+                "Statement result binding remains on the owning UI thread");
             picker.SetStudent(41, "Synthetic Ava · Admission 41");
             Console.WriteLine("ACCOUNT_FLOW: native sizing verified; choose synthetic student");
             ((EventHandler)typeof(StudentPicker).GetField("UserSelectionChanged", flags)!.GetValue(picker)!)
