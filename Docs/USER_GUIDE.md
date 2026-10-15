@@ -9,6 +9,12 @@
 3. Sign in using your authorized account. A first-run setup or required password-change prompt must be completed by the appropriate administrator.
 4. Open the relevant workspace from the dashboard or navigation. Ctrl+K searches all destinations your account can open, including collapsed and compact sidebar entries. Use the navigation groups below rather than editing database files manually.
 
+## Communication Center
+
+Open Communication Center if your account has access. Start with a reviewed template and saved guardian/staff contacts whose ownership and consent have been verified. A student record with a phone number is not automatically a communication contact. Empty lists explain whether to widen filters, add contacts through Contacts / Consent, review a template or ask an administrator.
+
+Compose / Bulk follows **choose template → find/select contacts → preview → create draft**. Then use Outbox / Schedule / History to review and submit; approval may be required. Draft creation and provider acceptance do not mean delivery. Each tab shows its purpose and next step. Changing filters requires a new search; New Message clears the previous recipients, text and schedule. If a save succeeds but its list refresh fails, use Refresh rather than repeating the saved action. Provider accounts, live-mode approval and a running dispatcher are still required for external delivery; see [Communication Center setup](COMMUNICATION_CENTER.md).
+
 ## Display scaling and smaller screens
 
 Use Windows display scaling for readable text. The application follows the monitor's DPI and usable desktop area. On smaller screens, dialog content may scroll; use the scrollbars or Tab to reach fields and bottom actions. Enlarging a window gives grids and flexible content more space while standard entry controls retain sensible dimensions. Printing and report zoom controls retain their existing behavior.

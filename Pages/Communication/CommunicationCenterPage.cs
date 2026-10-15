@@ -1,5 +1,6 @@
 using System.Data;
 using System.Text.Json;
+using Microsoft.Data.SqlClient;
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Security;
 using FMSC_SMS.Services.Communication;
@@ -10,6 +11,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
 {
     private readonly SqlCommunicationStore store;
     private readonly CommunicationService service;
+    private readonly Func<string,SqlParameter[],Task<DataTable>> read;
     private readonly WindowsGatewayStore gateways=new();
     private static readonly HttpClient Http=new(new HttpClientHandler{AllowAutoRedirect=false}){Timeout=TimeSpan.FromSeconds(30)};
     private readonly MessageDispatcher dispatcher;
@@ -17,7 +19,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private CancellationTokenSource? dispatchStop;
     private Task? dispatchTask;
     private bool installed;
-    private readonly Label operational=new(){Dock=DockStyle.Top,Height=AppScale.Scale(46),Text="Checking communication database readiness…",Font=AppTheme.ButtonFont,ForeColor=AppTheme.MutedText};
+    private readonly Label operational=new(){Dock=DockStyle.Top,Height=AppScale.Scale(60),AutoEllipsis=true,Text="Checking communication database readiness…",Font=AppTheme.ButtonFont,ForeColor=AppTheme.MutedText};
     private readonly TabControl tabs=new(){Dock=DockStyle.Fill};
     private readonly HashSet<Guid> included=new();
     private readonly DataGridView recipients=HumanUi.Grid(),preview=HumanUi.Grid(),history=HumanUi.Grid(),contacts=HumanUi.Grid(),templates=HumanUi.Grid(),rules=HumanUi.Grid();
@@ -37,9 +39,10 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     public bool HasUnsavedChanges=>(announcement.Text.Trim().Length>0||included.Count>0) && Signature()!=savedSignature;
     public string UnsavedChangesMessage=>"This message composition has not been saved as a campaign. Discard it?";
     public CommunicationCenterPage():this(new SqlCommunicationStore(DatabaseHelper.GetConnection,CurrentUser.UserId),true){}
-    internal CommunicationCenterPage(SqlCommunicationStore store,bool initialize):base("Communication Center","Compose and track external SMS and WhatsApp messages. Live delivery requires approved gateway setup.")
+    internal CommunicationCenterPage(SqlCommunicationStore store,bool initialize,Func<string,SqlParameter[],Task<DataTable>>? read=null):base("Communication Center","Compose and track external SMS and WhatsApp messages. Live delivery requires approved gateway setup.")
     {
         this.store=store;service=new(store);dispatcher=new(store,c=>gateways.Provider(c,Http));
+        this.read=read??((view,args)=>store.CallAsync("Read",lifetime.Token,[SqlCommunicationStore.P("@View",view),..args]));
         BuildWorkspace();
         Disposed+=(_,_)=>{lifetime.Cancel();dispatchStop?.Cancel();};
         if(initialize)Defer(InitializeAsync);
@@ -49,11 +52,12 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         await ExecuteAsync(async()=>{
             installed=await store.IsInstalledAsync(lifetime.Token);
             tabs.Enabled=installed;
-            if(!installed){operational.Text="Communication is not installed or its schema differs from the reviewed add-on. See the communication deployment guide; no database changes were made.";return;}
+            if(!installed){operational.Text="Communication setup is missing or incompatible. Run the current installer and review its Communication Center setup prompt, or ask your administrator. No database changes were made here.";SetStatus(operational.Text,PageStatusKind.Warning);return;}
             await RefreshOperational();
-            await RefreshTemplates();await RefreshRecipients();
+            await RefreshTemplates();
             foreach(var item in new[]{(campus,"Campuses","CampusId","CampusName"),(year,"Years","AcademicYearId","YearName"),(cls,"Classes","ClassId","ClassName"),(section,"Sections","SectionId","SectionName")})
-                item.Item1.Bind(await store.ReadAsync(item.Item2,token:lifetime.Token),item.Item3,item.Item4);
+                item.Item1.Bind(await ReadAsync(item.Item2),item.Item3,item.Item4,"All");
+            await LoadSelectedTab();ShowTabGuidance();
         });
     }
     private async Task ExecuteAsync(Func<Task> action)
@@ -62,10 +66,11 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         catch(OperationCanceledException) when(lifetime.IsCancellationRequested){}
         catch(Exception ex){if(!IsDisposed)SetStatus(DbMessage.UserMessage(ex),PageStatusKind.Warning);}
     }
-    private ModernButton Button(string text,Func<Task> action,string permission="Communication.View",string role="Secondary")
+    private ModernButton Button(string text,Func<Task> action,string permission="Communication.View",string role="Secondary",DataGridView? selectedGrid=null)
     {
         var b=new ModernButton{Text=text,ThemeRole=role,Height=AppMetrics.ButtonHeight,Margin=new Padding(4)};AppMetrics.FitButtonWidth(b,minWidth:100);
         b.Enabled=CurrentUser.HasPermission(permission);
+        if(selectedGrid is not null){void Update()=>b.Enabled=CurrentUser.HasPermission(permission)&&Selected(selectedGrid) is not null;selectedGrid.SelectionChanged+=(_,_)=>Update();Update();}
         b.Click+=async(_,_)=>{
             if(!CurrentUser.HasPermission(permission)||!installed){SetStatus("This action is unavailable for your account or the communication schema is not ready.",PageStatusKind.Warning);return;}
             await ExecuteAsync(action);
@@ -94,11 +99,10 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         foreach(var item in new[]{("Campus",campus),("Academic year",year),("Class",cls),("Section",section)}){filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));filters.Controls.Add(HumanUi.Field(item.Item1,item.Item2),filters.Controls.Count,0);}
         Row(filters,90);
         search.PlaceholderText="Contact or student name";search.Width=220;
-        Row(Bar(recipientFilter,search,Button("Find Contacts",async()=>{recipientPage=0;await RefreshRecipients();},"Communication.Compose"),
-            Button("Previous",async()=>{recipientPage=Math.Max(0,recipientPage-1);await RefreshRecipients();},"Communication.Compose"),
-            Button("Next",async()=>{recipientPage++;await RefreshRecipients();},"Communication.Compose"),
-            Button("Clear Selection",()=>{included.Clear();InvalidatePreview();ApplyTicks();return Task.CompletedTask;},"Communication.Compose")),100);
-        Row(selection,30);Row(recipients,220);
+        Row(Bar([recipientFilter,search,Button("Find Contacts",async()=>{recipientPage=0;await RefreshRecipients();},"Communication.Compose"),
+            ..Paging(recipients,()=>recipientPage,value=>recipientPage=value,RefreshRecipients,"Communication.Compose"),
+            Button("Clear Selection",()=>{included.Clear();InvalidatePreview();ApplyTicks();return Task.CompletedTask;},"Communication.Compose")]),100);
+        Row(selection,60);Row(recipients,220);
         recipients.ReadOnly=false;
         recipients.CurrentCellDirtyStateChanged+=(_,_)=>{if(recipients.IsCurrentCellDirty)recipients.CommitEdit(DataGridViewDataErrorContexts.Commit);};
         recipients.CellValueChanged+=(_,e)=>{if(populating||e.RowIndex<0||e.ColumnIndex<0||recipients.Columns[e.ColumnIndex].Name!="Include")return;
@@ -114,7 +118,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             });};
         Row(Bar(Button("Preview Messages",PreviewAsync,"Communication.Compose","Primary"),prepare,Button("New Message",()=>{
             if(HasUnsavedChanges&&!ModernMessageDialog.ConfirmDiscardIfDirty(FindForm(),()=>HasUnsavedChanges,UnsavedChangesMessage))return Task.CompletedTask;
-            included.Clear();announcement.Text="";requestId=Guid.NewGuid();requestDue=null;savedSignature="";preview.DataSource=null;InvalidatePreview();ApplyTicks();return Task.CompletedTask;
+            ResetComposition();return Task.CompletedTask;
         },"Communication.Compose")),60);
         Row(preview,260);compose.Controls.Add(root);
         compose.Resize+=(_,_)=>root.Width=Math.Max(AppScale.Scale(760),compose.ClientSize.Width-SystemInformation.VerticalScrollBarWidth);
@@ -124,37 +128,45 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         tabs.TabPages.Add(Tab("Compose / Bulk",compose));
         tabs.TabPages.Add(Tab("Outbox / Schedule / History",BuildHistory()));
         tabs.TabPages.Add(Tab("Contacts / Consent",BuildContacts()));
-        tabs.TabPages.Add(Tab("Templates",ListHost(templates,Bar(Button("Refresh",RefreshTemplates),Button("New Version / Review",EditTemplate,"Communication.Configure"),Button("Revoke Selected",async()=>{var row=Selected(templates)??throw new ArgumentException("Select a template first.");if(!ModernMessageDialog.Confirm(FindForm(),"Revoke this template? Unsubmitted messages will be suppressed; past messages remain in history.","Revoke Template"))return;await store.CallAsync("RevokeTemplate",lifetime.Token,SqlCommunicationStore.P("@Id",row["TemplateId"]));await RefreshTemplates();},"Communication.Configure"),Button("Previous",async()=>{templatePage=Math.Max(0,templatePage-1);await RefreshTemplates();}),Button("Next",async()=>{templatePage++;await RefreshTemplates();})))));
+        tabs.TabPages.Add(Tab("Templates",ListHost(templates,Bar([Button("Refresh",RefreshTemplates),Button("New Version / Review",EditTemplate,"Communication.Configure"),Button("Revoke Selected",async()=>{var row=Selected(templates)??throw new ArgumentException("Select a template first.");if(!ModernMessageDialog.Confirm(FindForm(),"Revoke this template? Unsubmitted messages will be suppressed; past messages remain in history.","Revoke Template"))return;await store.CallAsync("RevokeTemplate",lifetime.Token,SqlCommunicationStore.P("@Id",row["TemplateId"]));await AfterSavedAsync(RefreshTemplates,"Template revoked. Unsubmitted messages using it will be suppressed; historical messages are preserved.");},"Communication.Configure",selectedGrid:templates),..Paging(templates,()=>templatePage,value=>templatePage=value,RefreshTemplates)]))));
         tabs.TabPages.Add(Tab("Automation Rules",ListHost(rules,Bar(Button("Refresh",RefreshRules,"Communication.Configure"),Button("New / Edit Rule",EditRule,"Communication.Configure"),Button("Evaluate Committed Events",EvaluateRules,"Communication.Configure")))));
         var gateway=new Panel{Dock=DockStyle.Fill,AutoScroll=true};gateway.Controls.Add(Bar(Button("Sending Mode / Limits",EditSettings,"Communication.Configure"),Button("Secure Gateway Credentials",EditGateway,"Communication.Configure")));
         tabs.TabPages.Add(Tab("Gateway Settings",gateway));
         tabs.Enabled=false;TabStrip.Apply(tabs,AppTheme.Primary);
         var content=new Panel{Dock=DockStyle.Fill};content.Controls.Add(TabStrip.CreateHost(tabs));content.Controls.Add(operational);SetContent(content);
-        tabs.SelectedIndexChanged+=async(_,_)=>{if(!installed||IsBusy)return;if(tabs.SelectedIndex==1)await ExecuteAsync(RefreshHistory);if(tabs.SelectedIndex==2&&CurrentUser.HasPermission("Communication.Configure"))await ExecuteAsync(RefreshContacts);if(tabs.SelectedIndex==4)await ExecuteAsync(RefreshRules);};
+        if(!CurrentUser.HasPermission("Communication.Compose"))tabs.SelectedIndex=1;
+        ConfigureGuidance();
+        foreach(var input in new[]{campus,year,cls,section})input.UserSelectionChanged+=(_,_)=>RecipientFiltersChanged();
+        recipientFilter.SelectedIndexChanged+=(_,_)=>RecipientFiltersChanged();search.TextChanged+=(_,_)=>RecipientFiltersChanged();
     }
     private Guid SelectedTemplate()=>templateChoice.SelectedValue is Guid id?id:throw new ArgumentException("Choose a reviewed template.");
     private MessageChannel SelectedChannel()=>Enum.Parse<MessageChannel>(Convert.ToString(channel.SelectedItem)!);
     private string Signature()=>string.Join("|",templateChoice.SelectedValue,channel.SelectedItem,announcement.Text,string.Join(',',included.Order()),schedule.Checked,schedule.Checked?schedule.Value.ToUniversalTime().ToString("O"):"");
-    private void InvalidatePreview(){previewSignature="";prepare.Enabled=false;selection.Text=$"{included.Count} contacts selected across all result pages. Preview required before saving.";}
+    private void InvalidatePreview(){previewSignature="";prepare.Enabled=false;preview.DataSource=null;UiHelper.SetGridState(preview,UiHelper.GridDisplayState.Waiting,"Preview required. Select contacts and a reviewed template, then choose Preview Messages.");selection.Text=$"{included.Count} contacts selected across all result pages. Preview required before saving. "+TemplateHint();}
     private void ApplyTicks()
     {populating=true;try{foreach(DataGridViewRow r in recipients.Rows)if(!r.IsNewRow)r.Cells["Include"].Value=included.Contains((Guid)r.Cells["ContactId"].Value);}finally{populating=false;}}
-    private async Task RefreshRecipients()
+    private Task RefreshRecipients()
     {
-        if(!CurrentUser.HasPermission("Communication.Compose"))return;
-        var rows=await store.CallAsync("Read",lifetime.Token,SqlCommunicationStore.P("@View","Recipients"),SqlCommunicationStore.P("@Page",recipientPage),SqlCommunicationStore.P("@Search",search.Text),
-            SqlCommunicationStore.P("@Filter",recipientFilter.SelectedIndex==0?"":recipientFilter.SelectedItem),SqlCommunicationStore.P("@Campus",campus.SelectedId),SqlCommunicationStore.P("@Year",year.SelectedId),SqlCommunicationStore.P("@Class",cls.SelectedId),SqlCommunicationStore.P("@Section",section.SelectedId));
-        if(IsDisposed)return;populating=true;
-        try{rows.Columns.Add("Include",typeof(bool));recipients.DataSource=rows;foreach(DataGridViewColumn c in recipients.Columns)c.ReadOnly=c.Name!="Include";
-            recipients.Columns["Include"].DisplayIndex=0;recipients.Columns["ContactId"].Visible=false;ApplyTicks();}
-        finally{populating=false;}
-        selection.Text=$"Page {recipientPage+1} · {rows.Rows.Count} contacts shown · {included.Count} selected in total. Missing consent is explained in Preview.";
+        if(!CurrentUser.HasPermission("Communication.Compose"))return Task.CompletedTask;
+        return LoadGridAsync(recipients,()=>ReadAsync("Recipients",recipientPage,search.Text,recipientFilter.SelectedIndex==0?"":Convert.ToString(recipientFilter.SelectedItem)!,
+            SqlCommunicationStore.P("@Campus",campus.SelectedId),SqlCommunicationStore.P("@Year",year.SelectedId),SqlCommunicationStore.P("@Class",cls.SelectedId),SqlCommunicationStore.P("@Section",section.SelectedId)),rows=>{
+            populating=true;
+            try{rows.Columns.Add("Include",typeof(bool));recipients.DataSource=rows;foreach(DataGridViewColumn c in recipients.Columns)c.ReadOnly=c.Name!="Include";
+                recipients.Columns["Include"].DisplayIndex=0;recipients.Columns["ContactId"].Visible=false;ApplyTicks();}
+            finally{populating=false;}
+            selection.Text=$"Page {recipientPage+1} · {rows.Rows.Count} contacts shown · {included.Count} selected across all pages. Preview checks consent. "+TemplateHint();
+        },EmptyRecipients());
     }
     private async Task PreviewAsync()
     {
         if(savedSignature.Length>0)throw new ArgumentException("This campaign snapshot is already saved. Use New Message for another campaign; cancel the old draft in Outbox if it is no longer needed.");
         if(included.Count==0)throw new ArgumentException("Select contacts first. Add verified, consented contacts in Contacts / Consent if none are listed.");
-        string signature=Signature();var rows=await store.PreviewAsync(SelectedTemplate(),SelectedChannel(),included,announcement.Text,token:lifetime.Token);
-        if(IsDisposed||Signature()!=signature)return;preview.DataSource=rows;
+        string signature=Signature();prepare.Enabled=false;previewSignature="";
+        UiHelper.SetGridState(preview,UiHelper.GridDisplayState.Loading,"Checking recipient consent, eligibility and costs…");
+        DataTable rows;
+        try{rows=await store.PreviewAsync(SelectedTemplate(),SelectedChannel(),included,announcement.Text,token:lifetime.Token);}
+        catch{if(!IsDisposed)UiHelper.SetGridState(preview,UiHelper.GridDisplayState.Failed,"Preview could not be checked. Try Preview Messages again; no draft was created.");throw;}
+        if(IsDisposed||Signature()!=signature)return;UiHelper.ClearGridState(preview);preview.DataSource=rows;
         foreach(string name in new[]{"ContactId","AdmissionId","FamilyId","Parameters"})if(preview.Columns.Contains(name))preview.Columns[name].Visible=false;
         preview.DefaultCellStyle.WrapMode=DataGridViewTriState.True;preview.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.DisplayedCells;
         bool eligible=rows.Rows.Count==included.Count && rows.AsEnumerable().All(r=>Convert.ToString(r["Exclusion"])=="");
@@ -162,17 +174,29 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         int unknown=rows.AsEnumerable().Count(r=>r.IsNull("EstimatedCost"));
         SetStatus(eligible?$"Preview ready: {rows.Rows.Count} recipients. {(unknown>0?"Cost estimate unavailable for some recipients; live dispatch will be blocked.":"Estimated provider cost: "+rows.AsEnumerable().Sum(r=>Convert.ToDecimal(r["EstimatedCost"])).ToString("0.0000")+" "+rows.Rows[0]["Currency"])}":"Preview contains exclusions. Correct contacts, consent or template before saving.");
     }
-    private async Task RefreshTemplates()
+    private Task RefreshTemplates()=>LoadGridAsync(templates,()=>ReadAsync("Templates",templatePage),BindTemplateChoices);
+    private void BindTemplateChoices(DataTable rows)
     {
-        var rows=await store.ReadAsync("Templates",templatePage,token:lifetime.Token);if(IsDisposed)return;templates.DataSource=rows;
+        templates.DataSource=rows;
+        Guid? selected=templateChoice.SelectedValue is Guid id?id:null;
+        var old=(templateChoice.DataSource as DataTable)?.AsEnumerable().FirstOrDefault(r=>selected.HasValue&&(Guid)r["TemplateId"]==selected.Value);
         var approved=rows.Clone();foreach(DataRow row in rows.Rows)if(Convert.ToBoolean(row["Approved"]))approved.ImportRow(row);
+        // Browsing another template page must not silently replace the current
+        // composition's template. Retain only that one previous choice (bounded).
+        if(old is not null&&!rows.AsEnumerable().Any(r=>(Guid)r["TemplateId"]==selected))
+        {var kept=approved.NewRow();foreach(DataColumn c in rows.Columns)kept[c.ColumnName]=old[c.ColumnName];approved.Rows.Add(kept);}
         approved.Columns.Add("Display",typeof(string));foreach(DataRow row in approved.Rows)row["Display"]=$"{row["Code"]} · {row["Language"]} · v{row["Version"]}";
-        templateChoice.DataSource=approved;templateChoice.DisplayMember="Display";templateChoice.ValueMember="TemplateId";
-        if(approved.Rows.Count==0)SetStatus("No reviewed template is available on this page. An authorized administrator must review a template and create an approved version.",PageStatusKind.Warning);
+        templateChoice.DataSource=null;templateChoice.DisplayMember="Display";templateChoice.ValueMember="TemplateId";templateChoice.DataSource=approved;
+        if(selected.HasValue&&approved.AsEnumerable().Any(r=>(Guid)r["TemplateId"]==selected.Value))templateChoice.SelectedValue=selected.Value;else templateChoice.SelectedIndex=-1;
+        if(approved.Rows.Count==0)SetStatus("No reviewed template is available on this page. Open Templates, select a stock template and use New Version / Review, or ask an administrator to approve it.",PageStatusKind.Warning);
     }
-    private async Task RefreshOperational(){var data=await store.ReadAsync("Operational",token:lifetime.Token);if(!IsDisposed&&data.Rows.Count>0){var r=data.Rows[0];operational.Text=$"Mode: {r["Mode"]} · master pause: {r["Paused"]}. Dispatcher {(dispatchTask is {IsCompleted:false}?"running":"stopped")}. Scheduled work requires a running dispatcher; accepted does not mean delivered.";}}
-    private async Task RefreshHistory(){var rows=await store.ReadAsync(CurrentUser.HasPermission("Communication.History")?"History":"Outbox",historyPage,historySearch.Text,historyState.SelectedIndex<=0?"":Convert.ToString(historyState.SelectedItem)!,token:lifetime.Token);if(!IsDisposed){history.DataSource=rows;foreach(string name in new[]{"MessageId","CreatedBy","ApprovedBy","ProviderReference"})if(history.Columns.Contains(name))history.Columns[name].Visible=false;}}
-    private async Task RefreshContacts(){var rows=await store.ReadAsync("Contacts",contactPage,token:lifetime.Token);if(!IsDisposed)contacts.DataSource=rows;}
-    private async Task RefreshRules(){if(!CurrentUser.HasPermission("Communication.Configure"))return;var rows=await store.ReadAsync("Rules",token:lifetime.Token);if(!IsDisposed)rules.DataSource=rows;}
-    private Task EvaluateRules()=>store.CallAsync("Evaluate",lifetime.Token);
+    private string TemplateHint()=>templateChoice.Items.Count==0?"No reviewed template: open Templates or ask an administrator.":"Choose a reviewed template before previewing.";
+    private async Task RefreshOperational(){var data=await ReadAsync("Operational");if(!IsDisposed&&data.Rows.Count>0){var r=data.Rows[0];sendingSummary=$"Mode: {r["Mode"]} · master pause: {r["Paused"]}. ";operational.Text=sendingSummary+$"Dispatcher {(dispatchTask is {IsCompleted:false}?"running":"stopped")}. Scheduled work requires a running dispatcher; accepted does not mean delivered.";}}
+    private Task RefreshHistory()=>LoadGridAsync(history,()=>ReadAsync(CurrentUser.HasPermission("Communication.History")?"History":"Outbox",historyPage,historySearch.Text,historyState.SelectedIndex<=0?"":Convert.ToString(historyState.SelectedItem)!),rows=>{
+        history.DataSource=rows;foreach(string name in new[]{"MessageId","CreatedBy","ApprovedBy","ProviderReference"})if(history.Columns.Contains(name))history.Columns[name].Visible=false;
+        if(rows.Rows.Count>0)SetStatus($"Page {historyPage+1} · {rows.Rows.Count} messages shown. Select a message to review its campaign and available actions.");
+    });
+    private Task RefreshContacts()=>LoadGridAsync(contacts,()=>ReadAsync("Contacts",contactPage));
+    private Task RefreshRules()=>CurrentUser.HasPermission("Communication.Configure")?LoadGridAsync(rules,()=>ReadAsync("Rules")):Task.CompletedTask;
+    private async Task EvaluateRules(){await store.CallAsync("Evaluate",lifetime.Token);SetStatus("Committed events evaluated. Review resulting campaigns in Outbox; eligible work may need approval and a running dispatcher. This does not prove delivery.");}
 }

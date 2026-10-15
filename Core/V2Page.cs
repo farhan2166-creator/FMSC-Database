@@ -279,7 +279,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         _statusToolTip.SetToolTip(ContextLabel, context);
         return header;
     }
-    private void SetHeaderGuidance(string? guidance)
+    protected void SetHeaderGuidance(string? guidance)
     {
         _headerGuidance = guidance?.Trim() ?? string.Empty;
         if (_headerGuidanceLabel is null)
