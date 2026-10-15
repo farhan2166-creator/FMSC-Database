@@ -21,8 +21,10 @@ def package(path):
     ET.SubElement(model, "{" + NS + "}Element", Type="SqlCheckConstraint", Name="[dbo].[CK_Example]")
     xml = ET.tostring(root)
     origin = ET.Element("{" + NS + "}DacOrigin")
-    ET.SubElement(origin, "{" + NS + "}Checksum", Uri="/model.xml").text = hashlib.sha256(xml).hexdigest()
-    ET.SubElement(origin, "{" + NS + "}ContainsExportedData").text = "true"
+    properties = ET.SubElement(origin, "{" + NS + "}PackageProperties")
+    ET.SubElement(properties, "{" + NS + "}ContainsExportedData").text = "true"
+    checks = ET.SubElement(origin, "{" + NS + "}Checksums")
+    ET.SubElement(checks, "{" + NS + "}Checksum", Uri="/model.xml").text = hashlib.sha256(xml).hexdigest()
     with zipfile.ZipFile(path, "w") as z:
         z.writestr("model.xml", xml)
         z.writestr("Origin.xml", ET.tostring(origin))
