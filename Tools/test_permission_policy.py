@@ -1,4 +1,4 @@
-"""Check that the current baseline, embedded catalog and access consumers agree."""
+"""Check the pinned data-free SQL test fixture, embedded catalog and access consumers."""
 import json
 from pathlib import Path
 import re
@@ -19,7 +19,7 @@ class PermissionPolicyChecks(unittest.TestCase):
         self.assertEqual(len(self.codes), len(self.catalog))
 
     def test_catalog_covers_actual_consumers_without_dead_options(self):
-        with zipfile.ZipFile(ROOT/'FMSC.dacpac') as package:
+        with zipfile.ZipFile(ROOT/'Tests/LifecycleSqlChecks/Baseline/schema.dacpac') as package:
             root = ET.fromstring(package.read('model.xml'))
         ns = {'d': root.tag.split('}')[0][1:]}
         modules = {}

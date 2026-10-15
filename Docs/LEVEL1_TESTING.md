@@ -27,17 +27,9 @@ python Tests/LifecycleSqlChecks/run.py --cleanup \
 
 `--inject-provision-failure` intentionally fails after SQL startup to verify real cleanup. The expected outcome is **FAIL with Cleanup PASS**. Optional `--diagnostics /private/path/diagnostic.log` retains credential-redacted local diagnostics; never upload that file. CI exports only `report.json` and `summary.md`.
 
-## Approved schema, fictional data and isolation
+## Data-free SQL fixture and isolation
 
-The approved `FMSC.dacpac` contains exported data. Level 1 checkout excludes it. `Baseline/schema.dacpac` contains the unchanged approved model, package metadata and empty data relationships, with **no exported rows**. Provenance records the approved source SHA-256/Git blob identity, model hash and derived package hash; all approved SQL-module fingerprints are verified. Production artifacts/contracts remain unchanged.
-
-After a separately reviewed source baseline change, a maintainer with the approved original may regenerate the test-only copy:
-
-```bash
-python Tests/LifecycleSqlChecks/run.py --prepare-baseline
-```
-
-Review both the model and provenance changes. Do not update hashes simply to make a failed check green.
+The workflow uses only `Tests/LifecycleSqlChecks/Baseline/schema.dacpac`, a pinned data-free schema fixture, not an exported application database or owner-supplied DACPAC. The fixture ZIP is validated for allowed schema entries, no exported rows and no external payload relationships. There is no repository DACPAC provenance approval or automatic refresh. Review fixture and SQL tests together when production schema requirements change. A passing synthetic fixture test is not evidence that an owner-supplied MDF/LDF snapshot is compatible.
 
 Schema-only publication has no operational reference rows. `Fixture.cs` explicitly seeds schema version 6, the admission counter, supported role names and permission catalog. It uses the production first-administrator/setup procedures for fictional credentials, school, campus, academic program, classes, sections, years, fee types and rates. Class assignments/system-fee flags and initial role grants are reference-data fixtures. Accountant has its established six grants; Administrator has full authority.
 
@@ -65,6 +57,6 @@ Existing registration/administration suites remain unchanged. Mutation runs requ
 
 Artifacts contain commit/run identity, engine/schema, outcomes/counts, expected refusals, timings and sanitized failing assertions. They exclude student names/addresses, credentials, database files and raw logs. Cleanup cannot turn a failed business test into PASS.
 
-Classify failures as provisioning, fixture dependency, expectation, application/SQL defect or runner limitation. Check expectations against production contracts. Fix fixture/tooling errors here; propose production fixes separately. Never relax assertions, alter financial rules or edit the approved schema to hide a defect.
+Classify failures as provisioning, fixture dependency, expectation, application/SQL defect or runner limitation. Check expectations against production contracts. Fix fixture/tooling errors here; propose production fixes separately. Never relax assertions, alter financial rules or edit the pinned test schema to hide a defect.
 
 Add bounded scenarios to `Lifecycle.cs` using existing writers/TVPs or real procedures, then assert persisted state. Seed only required reference records in `Fixture.cs`. Assert exact SQL refusal codes and preserve every disposable-target guard. Physical desktop, printer and deployment acceptance remain separate.

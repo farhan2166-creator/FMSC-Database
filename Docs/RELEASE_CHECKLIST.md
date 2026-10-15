@@ -20,7 +20,7 @@
 - [ ] [Desktop CI](../.github/workflows/fmsc-desktop-ci.yml) passed **at the release candidate SHA**.
 - [ ] C# Release compilation and focused WinForms contract fixtures passed.
 - [ ] Portable regression and synthetic performance checks passed.
-- [ ] DACPAC provenance, SQL fingerprints and schema artifact tests passed.
+- [ ] Disposable SQL fixture safety, real SQL integration and installer acceptance passed (as applicable).
 - [ ] If DB code changed, the SQL integration tests passed **against a disposable copy**; record connection, fixtures and schema.
 - [ ] Confirm known runner warnings are understood; no test was disabled to make an artifact appear.
 
