@@ -75,6 +75,27 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
+      - name: Report the current candidate without approving it
+        run: |
+          python - <<'PY'
+          import os, sys
+          from pathlib import Path
+          sys.path.insert(0, 'Tools')
+          import schema_upgrade as upgrade
+          import refresh_dacpac as refresh
+          source = refresh.git(upgrade.ROOT, 'rev-parse', 'HEAD').decode().strip()
+          try:
+              report, _ = upgrade.inspect_candidate(upgrade.ROOT, source, source, '')
+          except (refresh.Refusal, ValueError, KeyError, OSError):
+              report = {'status': 'COMPATIBILITY_FAILED', 'deploymentReady': False,
+                        'reasons': ['CANDIDATE_OR_BASELINE_INVALID'],
+                        'nextAction': 'Resolve the invalid package/provenance. No approval was granted.'}
+          folder = Path(os.environ['RUNNER_TEMP']) / 'candidate-schema-report'
+          upgrade.write_report(folder, report)
+          print('Candidate status: ' + report['status'] + '; this is a diagnostic report, not approval.')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write((folder / 'summary.md').read_text())
+          PY
       - name: Test safe refresh, refusal and owner authorization
         run: |
           python Tools/test_dacpac_refresh.py
@@ -102,6 +123,16 @@ jobs:
             BASE=$(git rev-parse origin/main)
           fi
           python "$script" audit --project "$GITHUB_WORKSPACE" --anchor "$BASE"
+      - name: Upload sanitized candidate diagnostics only
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: schema-upgrade-candidate-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/candidate-schema-report/report.json
+            ${{ runner.temp }}/candidate-schema-report/summary.md
+          retention-days: 7
+          if-no-files-found: warn
 
   inspect:
     name: Verify exact candidate and reviewed data-preserving migration
