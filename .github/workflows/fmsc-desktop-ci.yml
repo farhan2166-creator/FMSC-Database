@@ -53,6 +53,10 @@ jobs:
       - name: Run synthetic performance and state checks
         run: dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
 
+      - name: Test LocalDB MSI recovery without running an installer
+        shell: pwsh
+        run: .\Tools\TestInstallerLocalDb.ps1
+
       - name: Verify reviewed DACPAC and SQL-module fingerprints
         run: python Tools/verify_schema_artifact.py --check
 
