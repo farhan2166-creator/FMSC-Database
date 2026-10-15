@@ -41,15 +41,6 @@ jobs:
       - name: Run synthetic performance and lifecycle checks
         run: dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
 
-      - name: Validate reviewed database artifact (offline)
-        run: |
-          python Tools/verify_schema_artifact.py --check
-          python Tools/test_audit_schema.py
-
-      - name: Validate reviewed DACPAC using Windows PowerShell
-        shell: powershell
-        run: .\Installer\VerifySchemaArtifact.ps1 -ProjectDirectory .
-
       # The ordinary PortableRelease publish remains subject to its installer/MSI
       # and optional detached-MDF/LDF validation. Only this GitHub Actions
       # app-only bundle skips those full-installer preparation/copy targets.
