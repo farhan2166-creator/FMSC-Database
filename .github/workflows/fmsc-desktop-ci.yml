@@ -53,6 +53,10 @@ jobs:
       - name: Run synthetic performance and state checks
         run: dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
 
+      - name: Test LocalDB MSI recovery without running an installer
+        shell: pwsh
+        run: .\Tools\TestInstallerLocalDb.ps1
+
       - name: Build optional communication worker and webhook host
         run: |
           dotnet build CommunicationWorker/CommunicationWorker.csproj -c Release

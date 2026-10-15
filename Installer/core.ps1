@@ -925,6 +925,46 @@ function Enable-StagedApplication {
     Write-Log `
         "Application activated: $AppDir"
 }
+# Keep MSI recovery independent of database updates so it can be tested with mocked msiexec.
+function Invoke-LocalDbMsiInstallation {
+    param([Parameter(Mandatory=$true)][string]$MsiPath,
+          [Parameter(Mandatory=$true)][string]$LogDirectory)
+    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $silentLog = Join-Path $LogDirectory ("SqlLocalDB-Silent-$stamp.log")
+    $wizardLog = Join-Path $LogDirectory ("SqlLocalDB-Wizard-$stamp.log")
+    Write-Log "LocalDB silent MSI diagnostic log: $silentLog"
+    $silent = Start-Process -FilePath 'msiexec.exe' -ArgumentList @(
+        '/i', "`"$MsiPath`"", '/qn', '/norestart', '/L*V', "`"$silentLog`""
+    ) -Wait -PassThru
+    if ($silent.ExitCode -in @(3010, 1641)) {
+        throw "LocalDB setup requires a Windows restart (MSI code $($silent.ExitCode)). Restart Windows and rerun FMSC. Log: $silentLog"
+    }
+    if ($silent.ExitCode -eq 0) {
+        Write-Success 'SQL Server LocalDB installed silently.'
+        return
+    }
+    $silentCode = $silent.ExitCode
+    Write-WarningMessage "Silent LocalDB installation failed (MSI code $silentCode)."
+    Write-WarningMessage "Detailed Microsoft Installer log: $silentLog"
+    Write-Host '  You can complete LocalDB setup using the official Microsoft installer wizard.' -ForegroundColor $ColorInfo
+    $choice = Read-Host 'Open Microsoft LocalDB installation wizard now? (Y/N)'
+    if ($choice -notmatch '^[Yy]$') {
+        throw "LocalDB not installed. Silent MSI code: $silentCode. Check $silentLog and rerun the installer."
+    }
+    Write-Step 'Starting the official Microsoft LocalDB installer wizard...'
+    Write-Log "LocalDB wizard MSI diagnostic log: $wizardLog"
+    $wizard = Start-Process -FilePath 'msiexec.exe' -ArgumentList @(
+        '/i', "`"$MsiPath`"", '/norestart', '/L*V', "`"$wizardLog`""
+    ) -Wait -PassThru
+    if ($wizard.ExitCode -in @(3010, 1641)) {
+        throw "LocalDB setup requires a Windows restart (MSI code $($wizard.ExitCode)). Restart Windows and rerun FMSC. Log: $wizardLog"
+    }
+    if ($wizard.ExitCode -ne 0) {
+        throw "LocalDB setup failed. Silent MSI code: $silentCode; wizard MSI code: $($wizard.ExitCode). Logs: $silentLog and $wizardLog"
+    }
+    Write-Success 'SQL Server LocalDB installed through the Microsoft setup wizard.'
+}
+
 try {
     Show-Banner
     Write-Log '================================================'
@@ -1049,6 +1089,14 @@ try {
         Get-Command `
             'sqllocaldb.exe' `
             -ErrorAction SilentlyContinue
+    # Do not reinstall an existing LocalDB just because its directory is absent from PATH.
+    if (-not $SqlLocalDb -and $env:ProgramFiles) {
+        $localExe = Join-Path $env:ProgramFiles 'Microsoft SQL Server\160\Tools\Binn\SqlLocalDB.exe'
+        if (Test-Path -LiteralPath $localExe -PathType Leaf) {
+            $env:Path += ';' + (Split-Path $localExe -Parent)
+            $SqlLocalDb = Get-Command 'sqllocaldb.exe' -ErrorAction SilentlyContinue
+        }
+    }
     if (-not $SqlLocalDb) {
         Write-WarningMessage `
             'SQL Server LocalDB was not found.'
@@ -1090,25 +1138,7 @@ try {
         }
         Write-Step `
             'Installing SQL Server LocalDB...'
-        $MsiProcess =
-            Start-Process `
-                -FilePath 'msiexec.exe' `
-                -ArgumentList @(
-                    '/i',
-                    "`"$MsiPath`"",
-                    '/qn',
-                    '/norestart'
-                ) `
-                -Wait `
-                -PassThru
-        if ($MsiProcess.ExitCode -ne 0) {
-            throw (
-                "SQL Server LocalDB installation failed. " +
-                "MSI exit code: $($MsiProcess.ExitCode)"
-            )
-        }
-        Write-Success `
-            'SQL Server LocalDB installed.'
+        Invoke-LocalDbMsiInstallation -MsiPath $MsiPath -LogDirectory $DatabaseDir
         $MachinePath =
             [Environment]::GetEnvironmentVariable(
                 'Path',
@@ -1121,6 +1151,16 @@ try {
             )
         $env:Path =
             "$MachinePath;$UserPath"
+        # The MSI can succeed before its PATH updates reach this process.
+        if (-not (Get-Command 'sqllocaldb.exe' -ErrorAction SilentlyContinue) -and $env:ProgramFiles) {
+            $localExe = Join-Path $env:ProgramFiles 'Microsoft SQL Server\160\Tools\Binn\SqlLocalDB.exe'
+            if (Test-Path -LiteralPath $localExe -PathType Leaf) {
+                $env:Path += ';' + (Split-Path $localExe -Parent)
+            }
+        }
+        if (-not (Get-Command 'sqllocaldb.exe' -ErrorAction SilentlyContinue)) {
+            throw 'LocalDB setup completed but sqllocaldb.exe was not found. Restart Windows and rerun the installer. Check the LocalDB diagnostic log if necessary.'
+        }
     }
     else {
         Write-Success `
