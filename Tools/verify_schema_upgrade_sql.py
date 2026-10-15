@@ -62,7 +62,7 @@ def verify_sql(project, report, raw):
             script.write_text(body); script.chmod(0o444)
             execute(docker + ["cp", str(script), container + ":/tmp/upgrade.sql"])
             return execute(docker + ["exec", "--env", "SQLCMDPASSWORD", container, "/opt/mssql-tools18/bin/sqlcmd",
-                "-S", "localhost", "-U", "sa", "-C", "-b", "-d", db, "-i", "/tmp/upgrade.sql"], timeout=180)
+                "-S", "localhost", "-U", "sa", "-C", "-I", "-b", "-d", db, "-i", "/tmp/upgrade.sql"], timeout=180)
         def run(db, mode):
             env["FMSC_AUDIT_CONNECTION"] = f"Server=127.0.0.1,{port};Database={db};User ID=sa;Password={secret};Encrypt=False;TrustServerCertificate=True;Connect Timeout=15"
             path = private / (db + (mode or "lifecycle") + ".json")

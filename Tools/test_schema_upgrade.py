@@ -138,7 +138,7 @@ class UpgradeChecks(unittest.TestCase):
             if path.endswith('/pulls'):return {'html_url':'https://github.com/fixture/private/pull/1'}
             if '/actions/runs/' in path:return {'actor':{'login':'fixture'},'triggering_actor':{'login':'fixture'},
                 'event':'workflow_dispatch','head_branch':'main','head_sha':source,'path':upgrade.WORKFLOW,
-                'conclusion':'success','display_title':'Schema upgrade '+source+' '+digest}
+                'conclusion':'success','display_title':'Schema approve '+source+' '+digest}
             return {}
         return source,folder,digest,context,calls,api
 
@@ -179,6 +179,12 @@ class UpgradeChecks(unittest.TestCase):
         subprocess.run(['git','-C',str(self.root),'add','.'],check=True,capture_output=True)
         subprocess.run(['git','-C',str(self.root),'-c','commit.gpgsign=false','commit','-m','Synthetic owner proposal'],check=True,capture_output=True)
         self.assertEqual('STRUCTURAL_CHANGE_APPROVED',upgrade.audit_approval(self.root,source,api,'fixture/private'))
+        def inspection_only(method,path,data=None):
+            value=api(method,path,data)
+            if '/actions/runs/' in path:value['display_title']='Schema inspect '+source+' '+digest
+            return value
+        with self.assertRaisesRegex(refresh.Refusal,'TRUSTED_APPROVAL_RUN'):
+            upgrade.audit_approval(self.root,source,inspection_only,'fixture/private')
         def forged(method,path,data=None):
             value=api(method,path,data)
             if '/actions/runs/' in path:value['actor']['login']='writer'

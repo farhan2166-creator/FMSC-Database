@@ -285,7 +285,7 @@ def audit_approval(project, anchor, api, repository):
     authorize(repository, run["actor"]["login"], run["triggering_actor"]["login"], run["event"],
         "refs/heads/" + run["head_branch"], run["head_sha"], info)
     if receipt["actor"] != run["actor"]["login"] or run["path"] != WORKFLOW or run["head_sha"] != manifest["sourceCommit"] or run["conclusion"] != "success" or \
-        run["display_title"] != "Schema upgrade " + manifest["candidateCommit"] + " " + digest:
+        run["display_title"] != "Schema approve " + manifest["candidateCommit"] + " " + digest:
         raise refresh.Refusal("TRUSTED_APPROVAL_RUN_NOT_VERIFIED")
     for name, checksum in ((m["path"], m["sha256"]) for m in manifest["migrations"]):
         if refresh.sha(refresh.git(project, "show", manifest["sourceCommit"] + ":" + name)) != checksum:

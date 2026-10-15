@@ -1,5 +1,5 @@
 name: FMSC Database Schema Upgrade Approval
-run-name: Schema upgrade ${{ inputs.candidate_commit || github.sha }} ${{ inputs.review_digest || 'inspection' }}
+run-name: Schema ${{ inputs.operation || 'validate' }} ${{ inputs.candidate_commit || github.sha }} ${{ inputs.review_digest || 'inspection' }}
 
 on:
   workflow_dispatch:
