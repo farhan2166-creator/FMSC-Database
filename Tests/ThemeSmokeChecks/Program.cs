@@ -24,8 +24,11 @@ internal static partial class Program
             CheckShortcutPermissions();
             CheckPromotionHistoryEntry();
             CheckStudentAccountFlow();
+            Console.WriteLine("ACCOUNT_FLOW: check refused regeneration");
             CheckStatementRegenerationFreshness();
+            Console.WriteLine("ACCOUNT_FLOW: check multi-student async assembly");
             CheckAsyncStatementAssembly();
+            Console.WriteLine("ACCOUNT_FLOW: existing statement safety checks completed");
             CheckClosingWholeAmounts();
             CheckPaletteDestinations();
             CheckSubmittedInputHolds();

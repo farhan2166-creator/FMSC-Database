@@ -10,6 +10,7 @@ internal static partial class Program
 {
     private static void CheckStudentAccountFlow()
     {
+        Console.WriteLine("ACCOUNT_FLOW: begin native account and family checks");
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var previous = (CurrentUser.UserId, CurrentUser.Username, CurrentUser.RoleName,
             CurrentUser.MustChangePassword, CurrentUser.GetPermissions().ToArray());
@@ -40,6 +41,7 @@ internal static partial class Program
             object? Invoke(string name) => type.GetMethod(name, flags)!.Invoke(page, null);
             using var owner = new Form { ClientSize = new Size(1200, 720), AutoScaleMode = AutoScaleMode.None };
             owner.Controls.Add(page); owner.Show(); Application.DoEvents();
+            Console.WriteLine("ACCOUNT_FLOW: SQL-free statement is visible");
             var grid = (DataGridView)typeof(V2Page).GetField("Grid", flags)!.GetValue(page)!;
             var toggle = Field<CheckBox>("groupModeToggle");
             var picker = Field<StudentPicker>("studentSearch");
@@ -64,6 +66,7 @@ internal static partial class Program
                 }
             }
             picker.SetStudent(41, "Synthetic Ava · Admission 41");
+            Console.WriteLine("ACCOUNT_FLOW: native sizing verified; choose synthetic student");
             ((EventHandler)typeof(StudentPicker).GetField("UserSelectionChanged", flags)!.GetValue(picker)!)
                 .Invoke(picker, EventArgs.Empty);
             Check(calls == 1 && readId == 41 && page.IsBusy && selected.SetEquals(new[] { 41 }),
@@ -76,6 +79,7 @@ internal static partial class Program
             data.Rows.Add("Synthetic Ava", "PAYMENT", 2L, new DateTime(2026, 10, 2), 0m, 40m);
             reply.SetResult((data, 20m));
             PumpUntil(() => !page.IsBusy, "The selected student's account finishes binding");
+            Console.WriteLine("ACCOUNT_FLOW: account read and binding completed");
             Check(grid.Rows.Count == 1 && Field<Label>("closingBalance").Text == "80" && Field<ModernButton>("exportButton").Enabled,
                 "The simplified view preserves opening balance, charges, payment totals and current-snapshot export");
             Check(Field<Label>("statementContext").Text.Contains("Synthetic Ava") && Field<ModernButton>("annualReceiptsButton").Enabled,
@@ -95,6 +99,7 @@ internal static partial class Program
                 pending.SetResult(); PumpUntil(() => task.IsCompleted, "Owned receipt preparation settles");
             }
             var from = Field<ModernDatePicker>("from"); from.Value = new DateTime(2026, 10, 1); from.Checked = true;
+            Console.WriteLine("ACCOUNT_FLOW: owned receipt guard verified");
             Check(!Field<ModernButton>("exportButton").Enabled, "Changing the period invalidates the previous financial snapshot");
             toggle.Checked = true;
             Check(Field<bool>("groupMode") && Field<DataGridView>("students").Visible && selected.Count == 0,
@@ -113,6 +118,7 @@ internal static partial class Program
                 "Direct receipt dispatch cannot bypass its existing statement permission");
             CurrentUser.SignIn(920, "Account fixture", "Administrator", false, Array.Empty<string>());
             using var profile = new StudentProfilePage((_, _, _) => throw new Exception("Family must not replace the profile"), false);
+            Console.WriteLine("ACCOUNT_FLOW: group transitions and receipt permission verified");
             var profilePicker = (StudentPicker)typeof(StudentProfilePage).GetField("student", flags)!.GetValue(profile)!;
             profilePicker.SetStudent(41, "Synthetic Ava");
             using var family = (Control)Activator.CreateInstance(typeof(StudentFamilyPage), flags, null, new object[] { 41, false }, null)!;
@@ -129,6 +135,7 @@ internal static partial class Program
             Check(profilePicker.SelectedId == 41 && profilePicker.Text == "Synthetic Ava" && !family.IsHandleCreated,
                 "Family window creation retains profile identity and this fixture never queries a school database");
             owner.Close();
+            Console.WriteLine("ACCOUNT_FLOW: all account and owned family checks completed");
         }
         finally { CurrentUser.SignIn(previous.UserId, previous.Username, previous.RoleName, previous.MustChangePassword, previous.Item5); }
     }
