@@ -13,7 +13,7 @@ Program.cs → connection / first-run / login
           → SQL Server LocalDB, stored procedures and transactions
 Services/Backup/* → verified SQL backup/restore and recovery
 Installer/core.ps1 + Migrations/*.sql → pending numbered upgrades, then database verification
-Tests/* + Tools/* → isolated regression/provenance checks
+Tests/* + Tools/* → isolated regression and disposable SQL safety checks
 ```
 
 This is a logical dependency map, not a claim that all pages directly call every layer.
@@ -22,7 +22,7 @@ This is a logical dependency map, not a claim that all pages directly call every
 
 `Program.cs` initializes WinForms and exception handling, displays a connection/startup dialog, performs first-run setup where needed, then login and the dashboard. `DatabaseHelper.cs` points at `C:\ProgramData\FMSC_Database\FMSC_DB.mdf` using the per-user LocalDB `(localdb)\MSSQLLocalDB` endpoint. It verifies the identity and calls the production `Core/DatabaseCompatibility.cs` contract; **required database schema version is 6**.
 
-The compatibility contract combines version requirements with schema structural requirements stored in embedded JSON (`Core/DatabaseCompatibilityRequirements.json`, `Core/DatabaseMigrationRequirements.json`). The reviewed schema provenance comes from `FMSC.dacpac` and `Core/ApprovedSchemaArtifact.json`; this does **not** authorize publishing a DACPAC over school database files.
+The compatibility contract combines version requirements with schema structural requirements stored in embedded JSON (`Core/DatabaseCompatibilityRequirements.json`, `Core/DatabaseMigrationRequirements.json`). The embedded compatibility manifests are enforced against the connected database at runtime; they do not authorize overwriting school database files.
 
 ## Functional modules
 
@@ -58,8 +58,8 @@ Portable sizing checks and Windows native-control fixtures cover synthetic clien
 
 ## Installer, schema and release
 
-- Optional Communication Center setup is offered separately after full base compatibility verification and before application activation. Explicit approval creates the existing verified backup, then the staged app's headless installer entry point checks packaged SQL against its embedded definition, executes it inside an outer transaction and verifies the production base/module contracts before commit. A session application lock serializes installation; an existing valid module is preserved and incompatible modules are refused. The entry point uses only an explicit Windows-authenticated LocalDB connection, never normal startup/auto-attachment or dispatch. Base version 6 and approved DACPAC provenance remain unchanged.
-- Normal full packaging uses `Properties/PublishProfiles/PortableRelease.pubxml`, `Installer/ValidateReleaseAssets.ps1`, `Installer/VerifySchemaArtifact.ps1` and `Installer/core.ps1`.
+- Optional Communication Center setup is offered separately after full base compatibility verification and before application activation. Explicit approval creates the existing verified backup, then the staged app's headless installer entry point checks packaged SQL against its embedded definition, executes it inside an outer transaction and verifies the production base/module contracts before commit. A session application lock serializes installation; an existing valid module is preserved and incompatible modules are refused. The entry point uses only an explicit Windows-authenticated LocalDB connection, never normal startup/auto-attachment or dispatch. Base schema-version 6 and runtime compatibility requirements remain enforced.
+- Normal full packaging uses `Properties/PublishProfiles/PortableRelease.pubxml`, `Installer/ValidateReleaseAssets.ps1` and `Installer/core.ps1`.
 - This release requires the current schema-6 baseline. Applied migrations 2–7 are retired. An empty or missing migrations folder skips migration execution; numbered SQL files newer than the installed base version run in numeric order within the schema version supported by that release.
 - The private complete-installer workflow obtains signed LocalDB MSI and pinned sqlcmd, bundles the application and scripts **without** school database files. The owner supplies verified detached MDF/LDF locally after download for a fresh install.
 - `CIAppOnlyBundle` is intentionally scoped to the separate app-only artifact, not the full installer validation.
@@ -72,7 +72,6 @@ Portable sizing checks and Windows native-control fixtures cover synthetic clien
 | `Tests/PerformanceChecks` | Synthetic loading, state and performance contracts |
 | `Tests/ThemeSmokeChecks` | Focused WinForms actual-page/host fixtures; not a complete interactive school-PC test |
 | `Tests/*SqlChecks` | SQL integration/migration invariants using disposable test databases only |
-| `Tools/verify_schema_artifact.py`, `Tools/test_audit_schema.py` | Reviewed DACPAC/module provenance and schema regression checks |
 | `Tools/TestPublishPowerShell.ps1` | Disposable publish validation, not a production installer acceptance |
 
 GitHub Actions builds on `windows-2022`. Passing automated tests does **not** prove SQL under a second operator Windows account, report printers/DPI, actual network loss, target database migration or installer rollback.
