@@ -4,6 +4,10 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ## [Unreleased]
 
+### Changed
+
+- [PR #15](https://github.com/farhan2166-creator/FMSC-Database/pull/15) renames Bulk Promotion to **Student Promotion** and moves Promotion History into a window opened from the promotion-details header. History starts with the selected source filters, remains independently filterable and leaves the promotion draft intact. Existing permissions, promotion processing and SQL contracts are unchanged.
+
 ### Added
 
 - [PR #18](https://github.com/farhan2166-creator/FMSC-Database/pull/18) adds conservative DACPAC refresh comparison and trusted default-branch synchronization PR automation. Exact full-model/module/data matching, sanitized refusal reports and synthetic safety regressions preserve existing approval/security/SQL-isolation rules; no automatic merge or material-change override.
