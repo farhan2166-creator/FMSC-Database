@@ -1,11 +1,11 @@
 {
   "formatVersion": 2,
-  "sourceModelSha256": "f151be03cd23e9cc4689d5261edcdfb03976f6500b7a9dc6028b94ba9946e7f6",
-  "modelObjects": 724,
-  "scriptedObjects": 709,
-  "createDefinitions": 709,
+  "sourceModelSha256": "7249252336d4a9c514c2d679b854443da791f1340969a45e080b928f6ef8828c",
+  "modelObjects": 856,
+  "scriptedObjects": 757,
+  "createDefinitions": 757,
   "bodyOnlyReferences": 0,
-  "unscriptedObjects": 15,
+  "unscriptedObjects": 99,
   "notes": "Unscriptable inline constraints/model-only objects are represented within their parent DDL and/or source DACPAC model.",
   "objects": [
     {
@@ -13,7 +13,273 @@
       "name": null,
       "script": null,
       "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
-      "modelElementSha256": "b82e1b11541417e7bcec1e82228c62c226d6267603910ef356471f1fcbe1fcf2"
+      "modelElementSha256": "d94d51981cf45ede9788fcf7f0bd30bc9cb37956b1784a05ec070a83b5686e2a"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "1ac34f9202fb7879df1324e97369c07ff6d06093d8c904bd5075f9b3078d5cc7"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "898bd9d4b0b2ec308f2fb04613a07c0135f5612566750d3921deedc012cfe3ba"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "ff488e6ff603f36667d1942f840f01087e5ab27e7385c2d7d9a5dc608b3e99c2"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "f4d8060ebaa0aa97ff361558a98e595ab1882c4dd320343012817245ddf621bf"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "477eedfc0dc1a9be6deacf600ced3a10c4aa3b2066636bab1389aa2f86469438"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "611eca07185b7c0b4316d59f502680c79b16db6c1fedf444e293277b3db33608"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "ef1cb6ccea4fce7eb7023d94d4da7946d886b1694da02dbac0b9ce020e77fbcf"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "6f2a2fb7772bab8a0ff1f08200cdcdd1e44d773e7673dbdf127f3d93e60358c5"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "a0fc052d9f1f536ec343459ab0b2e0d500f3110474951193ef520da31358af16"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "7fc847badbf7ed2164ba7812575e25075aa2faa5810cd801c57f0976d2b3667e"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "9349d97f995eb70b2b552f4061c586212930e1b0761e008f7cbe8653356b1ed1"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "f40f8c042ccaa321027713be4ce13600a21bd8df39f607040f5955c287047841"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "38f8cc5e56a30ed7449fdd28e87d1dddd34e37e6480b48d8083b168e5cf24667"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "77f0ad023ecc23fd5a37d67e557fb0d59e86ce89433a3de4a7bf5633879b59b3"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "541d3fe33499302d402a7ad9fca9199ff554f0eab73cd26237cdbe81c0710cbc"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "3624130f2544b4815d3048c4d6cc7dc7e22f952ac03344ce2eae15ae05ec9302"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "2c1e041d141a706572b96580268e0df942a97eb73bb22e1700502633d1c5e004"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "72c7d50b8e4acbfcd3c9f74f3339739c015e3b05b33d04c7ded5a6fe91d3a197"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "905e3faf355f6e59d30722d48f2459462fdf54970737e87b3204104e28207254"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "076f4d5c95d871029e94b2da12d58b9f0c9898c5bf9e5ae41fb66572ea39599b"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "ab4f45a19d7e4698a86b8f296d7407ce0da3f2e9d7e7111edc409fe5c264e4e8"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "860ffe3ffbe1e1f365ec8f4e898b11c460cc51cedca1b71e677bcb0f82da678f"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "625029c7883cb7ee1341360c62db37fca1ea1021bb8677b14589b73690667907"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "e6770f7c21dc2a022233c0d381b4547dc055f39620bbed121ffe2771ba5f69e2"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "0899bb4e077ab0c0a5e148cb7c99f77907427da80140fb79179c9b7edecba477"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "4c9c62609f30f4b45570fd1388257a38851400a732162006d198ac9f41b53c34"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "0268f81ddb41cb95ee48b48acf88707492a4375bf6d8927e0664acfc62808ea4"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "118eaaa185eed91dd75e382c24a4e41def7561c4e0b8701db161716583c075d0"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "1d02df11fd7f92ae586c7a8dab33d8bc8501649b89303523a711846f335a072f"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "0f20368efda881e8850858d90e2e17b06d53ecce19897b54bf35f3384b21cddf"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "bc3bbc3c3372c9cc429e61628fc965a9f3bf621445018c0e3ddf320cc10f80dd"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "e61814d9adddc715f977567958f886447b340ab80e83f52d451438f0811df78b"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "3eebda11c3b769efb7d3e4b463ffe2c65a652cc8da499842692cb712d9bdd5a4"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "7a4012275bb7891630134de4b00a129ae7727bdf6c5205c52b3534f392393c54"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "7d3d5bd1760575b3102b9da0e1ffc32e00c71eed78d825eab36f78e747395251"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": "[comm].[CK_CommContact_Owner]",
+      "script": "Constraints/comm_._CK_CommContact_Owner-c0c4052e8c98.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "f8e69c154814bf9a6d88bbcd37c3e32b402cd1c7193d87eee643e5b74667e72d"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": "[comm].[CK_CommContact_Phone]",
+      "script": "Constraints/comm_._CK_CommContact_Phone-5b5b1cf603bc.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "0bd3278466ada46465e0e8ddae8c0a745c1416ee47e5128df05ab61d80d6b371"
+    },
+    {
+      "type": "SqlCheckConstraint",
+      "name": "[comm].[CK_CommContact_Source]",
+      "script": "Constraints/comm_._CK_CommContact_Source-1341238e68f6.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "4ac7057da7952cba67a933919a77cbf188802095db243df15556541474f5732a"
     },
     {
       "type": "SqlCheckConstraint",
@@ -384,7 +650,105 @@
       "name": null,
       "script": null,
       "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
-      "modelElementSha256": "e0f440536598eedea0ed59704e89c72fcf34b05c1738b3255d1fc416878745a2"
+      "modelElementSha256": "40cd83122c62d41c4f22e918f6daedbb1e37a015df1397d7181d6607856ea86b"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "8d5702880f5c572c5fe0cc6fb71a7cf8be55f2b2e967c4a070e2d06bc28ac93b"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "51f058c2559fa4c54a251d9cb0e739bb116c91851816da872b3fd305f6410f0f"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "141c359224f4cb338a8a81526dec3240d8ee320fabc09aecd6df0d769c28131f"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "25805d90f7cdd7b5bc577b5958e45c98eb6ba8689484df58cccdffa41a5e0a8c"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "11e9c3c2cb29697e4e1824e70c3a22f4a16ab9b8420a0ce0cb86e793320d2c2a"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "1ebfa3bb21df990d8194a23a9f75d7563698233d0e3695aa6a490a624a1acabd"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "7c9d82d79e9b305eaf9d126f4e71fe8e7be22e0b3008e6c3e6358fa74748ca65"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "6aa6a476ca06b6ce1169ec5af1fec0fa68aabfa40af1d946d12e25375ae1fb8f"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "731f7471822c7b97d0cac7408e237dab147c408a43eb4b4ebb40ab931b06bbde"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "2374faf08b8473c68b9e943d6ec474050541f8f5a6967280d90400ff8ea56f97"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "55ed732573815aa6d6ce531f002a121c9e5bba8eff858b7f68da6ba78668c5cd"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "0cd217f2f1da0a9b9601f9524e1b0e18303e33801879a6cb7e1379f14453e223"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "1a5545c6bdbb61a80b6b5c9552c81c3ab46f9aed86d153784f14ac126a512b9d"
+    },
+    {
+      "type": "SqlDefaultConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "76f0fd120afdc6b1415d745321f76b2920db07158c5fe3b9b69f4436fcb35dcd"
     },
     {
       "type": "SqlDefaultConstraint",
@@ -1308,14 +1672,161 @@
       "name": null,
       "script": null,
       "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
-      "modelElementSha256": "f7b39b4bb1f3899b04521d4568fe3063a2b26928f8ef46aff64ab57c0bff9e17"
+      "modelElementSha256": "1ba63267ea0ac6dc7e32fdf752800764ec6f0a565a4b2ce0f2abdeee789944c7"
     },
     {
       "type": "SqlForeignKeyConstraint",
       "name": null,
       "script": null,
       "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
-      "modelElementSha256": "cadbf8d5b83c6665686fe8c0fb404dd2d52067264cf5b9cee96b6d237022fa5d"
+      "modelElementSha256": "0fea0264e019b5b880e77f59867c9be41dcab5bc645be69029fb7de54002306f"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "cfd6f35d41cacd33bffb26f1730f228cee09ef6c5cbc6e73868e187a7bdd1a12"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "8e8bbce6bf8d7ad408d5a5814b770018c7ff741cfa7716e76f1dd1a42fae3c9b"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "e62b7a73b6393ff6b7c0ac9f59c2775efb99a73666dd53b93b2b3138be6cd91f"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "e49d4b31649c0594f1aa54b3d118a51288ba4e482774c25346a9957c7857858c"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "0894760b545fcc7f27c554a25cff9711d8a1c8fa7a6d01e91fb1ad2703eaf792"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "26f7dde73c30e59aecb6fd78ab3ef8490c6c8a66f804c9332ab74a0648115be9"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "98a4acd3c5e59d104cbdc63395f5d2c247fb51d16359eee05ec85f857662c99b"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "55523666cfe657cb90d2d4568a79cc2c7aa088f85d0a1b8460f1f9bd0009a5ed"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "5cf486439b289cdaf771d2eb1909d56f47f247e5457d63e0f244bd9b8579f952"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "d8921e81924cdacab521fb6e6c774d3d8ae91d53fa63ae4d4d39a4e16364d3be"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "40767b71eeea50d57764fb1ad4ec86ad381ce258b30f96e984b8ad859ce42cb2"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "f980192a3475283be09e135455e4c2bc42e984b60634e72f83f1161cded1eaef"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "7ed24f3cbe8aefe6f0cb13887ac0b20a4e7b5e72680ca8ff54de895128365041"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "731225085199ab12d5a2bdb5418289338e786096e39982daf7c59c9f67f2d913"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "2b9a0609104e341195e23aa5791b2026ef5bc50b2e1ad227d339f6ea9a64bb56"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "91d140a9d64d073dfb1a813dc4b8ad5e29a7e4b4faf75e03d259468aa572ffb4"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "55f5851f16f8b587e213435522e26e5d12429990cef21541b2ce64cc35ee9e26"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "117761ca6515adf50479006545a9a0e0f340ece61ebc8b3469f8c91cbc05f7f7"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "ced31e3eda4ceb230b7b51f5a716645ee73ab82880f49727d738a26d3bd09b53"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "9842aaed71090f1c2c50b848b147b306f7af682529c9d2e94911253c34adb581"
+    },
+    {
+      "type": "SqlForeignKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "73c168cabaaa7433b52c38a7cea9cc7d54b8cda248b78cb2f83d326b42789ddb"
     },
     {
       "type": "SqlForeignKeyConstraint",
@@ -1844,6 +2355,48 @@
     },
     {
       "type": "SqlIndex",
+      "name": "[comm].[Attempt].[IX_CommAttempt_Budget]",
+      "script": "Indexes/comm_._Attempt_._IX_CommAttempt_Budget-fdbeaf25b777.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "25fd477242fdfd9c7f5710e3e2a37e30f5497a9af74af1d94afdddab9d33c283"
+    },
+    {
+      "type": "SqlIndex",
+      "name": "[comm].[Campaign].[IX_CommCampaign_Duplicate]",
+      "script": "Indexes/comm_._Campaign_._IX_CommCampaign_Duplicate-fbf2f1241094.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "af115a2768a3d515c708713bb8dcb6aaaf50845a07e9a4aa39d2ed061ee491a9"
+    },
+    {
+      "type": "SqlIndex",
+      "name": "[comm].[Campaign].[UX_CommCampaign_Event]",
+      "script": "Indexes/comm_._Campaign_._UX_CommCampaign_Event-d83a5fb03217.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "507b0ba06d170804a00f610b9c1cd70256fe2d5f9064b77832c4b930c4e654fd"
+    },
+    {
+      "type": "SqlIndex",
+      "name": "[comm].[Contact].[UX_CommContact_Identity]",
+      "script": "Indexes/comm_._Contact_._UX_CommContact_Identity-781e26c19ab3.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "e7663447768af9c7bafa7330efb426bd19f056816fff275203a71358f63c68be"
+    },
+    {
+      "type": "SqlIndex",
+      "name": "[comm].[Message].[IX_CommMessage_Queue]",
+      "script": "Indexes/comm_._Message_._IX_CommMessage_Queue-fbe21bd0038d.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "5594f584bb8e2d4d1e557eb332e4f22bfaf1d5087facbe0f8c073bed527947dd"
+    },
+    {
+      "type": "SqlIndex",
+      "name": "[comm].[Message].[UX_CommMessage_Provider]",
+      "script": "Indexes/comm_._Message_._UX_CommMessage_Provider-7590fe966969.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "f48cdfc0ca239bbf53da60787448fe6ddafbcc5d1e33d1a605f26f98e78ec641"
+    },
+    {
+      "type": "SqlIndex",
       "name": "[dbo].[AcademicYears].[UX_AcademicYears_Current]",
       "script": "Indexes/dbo_._AcademicYears_._UX_AcademicYears_Current-a78fbf1fadb2.sql",
       "scriptKind": "CREATE",
@@ -2334,6 +2887,13 @@
     },
     {
       "type": "SqlInlineTableValuedFunction",
+      "name": "[comm].[ValuesFor]",
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "6bbbb0f67a057e7b36017c98a23da42e6e9f2e5169f1a603082fdca7bf55b029"
+    },
+    {
+      "type": "SqlInlineTableValuedFunction",
       "name": "[dbo].[fn_ExpectedRecurringChargeMonths]",
       "script": null,
       "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
@@ -2358,42 +2918,126 @@
       "name": null,
       "script": null,
       "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
-      "modelElementSha256": "f0ddc8f79dba37f1e561a3cf0f546552afb88b5587e7be26096c207b0b99d44b"
+      "modelElementSha256": "63ecad57ad7dbcc983ae53342e5e4e63d53ec920f349405fe704537565bc0d96"
     },
     {
       "type": "SqlPrimaryKeyConstraint",
       "name": null,
       "script": null,
       "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
-      "modelElementSha256": "76b6023edf2844de0c9550468a4dc66047f6d258fd5ee14de6f78e835701db08"
+      "modelElementSha256": "e253308469e90a8fde022a305b5f53471d6212419f71c900a162c172d523d843"
     },
     {
       "type": "SqlPrimaryKeyConstraint",
       "name": null,
       "script": null,
       "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
-      "modelElementSha256": "457b9c20c0ede0931cc80ff481eccce1c9cc98c74038271d2a4c3b93cdb9cf1f"
+      "modelElementSha256": "5833fe57fe5dce1d663b7a7265bb0dbfaba2c161757d7018569121216f379098"
     },
     {
       "type": "SqlPrimaryKeyConstraint",
       "name": null,
       "script": null,
       "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
-      "modelElementSha256": "b87b1d968b287ccc0adec575abdc79b7be3189be975b5a0796863424c5388136"
+      "modelElementSha256": "158417d4a40526953d2fdc5a1f8556b737bea09980a9f8eb716b998ea3e89c50"
     },
     {
       "type": "SqlPrimaryKeyConstraint",
       "name": null,
       "script": null,
       "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
-      "modelElementSha256": "506a0091a29ef2717ba7e32363c27e9217acd293ca92cc8a7074ada29ad59157"
+      "modelElementSha256": "678adc1f625b2662be9d0ce42060c2720625e5ceecb4c19cc11614a032d4ade8"
     },
     {
       "type": "SqlPrimaryKeyConstraint",
       "name": null,
       "script": null,
       "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
-      "modelElementSha256": "73ab5d7c427ea24b637bf10800230dd7971ff1bc331b2de5a96d6d6c81d51d9f"
+      "modelElementSha256": "5ceb1a59ba076522a7e32c746e1dbc2c2918db5d590ef272619d10eadc360b5e"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "47d73fab871bd0a461c9c391b1588fc9cdc4b4ef12a17e444256ef3704cc7659"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "183ecc2e4796b72bdd5c6ca071609bfa20722366cc3a775f29a5f2e2af80ddfc"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "d5fd04ed0b22fa158543ec2e8053fde5b3eae014b43ce00e0821b4b8fcd78c12"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "e0eff284701c8ba914dabdd8a5e45af30f2c169de18df05bb29b689cc8ce9c0b"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "b40f70ade99fc3e12d8486604a04c1109274e27687d5c7f66079bf8bac3f226a"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "eb59662d96ad562157b8346e50b7e58057a1d46cd62d7c5947ccc0c5ffa5f806"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "552b205dae6d9f3ab4f7cfaa548a000a90330b60322322f219aadac00dadbcf7"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "57b7b49daaf0f3d059bec063b9ab42cc5852127d403a47b799b0c7666032dc15"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "7778719e62cee97cd52d2583c02f96aa69da32cfb9b49b889236c775d423a8a1"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "93029cb944c9b3cf440341043c8e2a8de8f4ee238b96f65f75f99d69c1200d24"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "343bbbf0407f685843e48716c14f5b50119d8efef0cd4e4c915953b97251feaa"
+    },
+    {
+      "type": "SqlPrimaryKeyConstraint",
+      "name": "[comm].[PK_CommRuleBaseline]",
+      "script": "Constraints/comm_._PK_CommRuleBaseline-e9c8742a0284.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "d6e55398d19955d533cbc70b559c07bc2900f9382aa75b7e075ee87c195b4252"
     },
     {
       "type": "SqlPrimaryKeyConstraint",
@@ -2772,6 +3416,132 @@
       "script": "Constraints/dbo_._PK_Users-1cb4f19c6bee.sql",
       "scriptKind": "CREATE",
       "modelElementSha256": "87f2b2f0511f7091f1c53dfac239151b69815bd445ffeac781c896f8497db1ec"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[CampaignSummary]",
+      "script": "StoredProcedures/comm_._CampaignSummary-6bd3639d0bff.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "b712dcc1d97d356ff3d48e585f37e7ef56982c270571b0625b8d280e597d15be"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[Claim]",
+      "script": "StoredProcedures/comm_._Claim-1f0f12a1d2ea.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "8724b86a04d921aaa3b34d97f555674c7263ab7fc3467ecd8cedcccb427540df"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[Complete]",
+      "script": "StoredProcedures/comm_._Complete-536ddfb475e5.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "b95965d4b38228f478b8f6460f49ce8207066e9389b28376e2372c866c5e7761"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[CreateCampaign]",
+      "script": "StoredProcedures/comm_._CreateCampaign-c6f4618ac9a0.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "ef6d61272ffcbee8fb9d8928968756e5b13032455b3a8ebff7100240d2839d35"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[Details]",
+      "script": "StoredProcedures/comm_._Details-7f2810c8b212.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "fed171d3076cb15d300cf5134d4dbdf7c2bcdf1a6520bd783874ac9b50066c09"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[Evaluate]",
+      "script": "StoredProcedures/comm_._Evaluate-ac0e77f4b6f8.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "6b3b763fa15817f56979e3fc34c82657de547d41f9369d14abcade350d3e4a07"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[IngestMeta]",
+      "script": "StoredProcedures/comm_._IngestMeta-b955d126a831.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "5d12e241d8cad52655707b4ed82ccb8c4a42ed006c8fda8f490fa7f2d10b94c3"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[Preview]",
+      "script": "StoredProcedures/comm_._Preview-edabfc39b6ed.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "dc76fbbf78c429d828b4c81bfbfa5a8201d436bf50382996dc2c047a9a0a818a"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[Read]",
+      "script": "StoredProcedures/comm_._Read-f93f162b1824.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "52300dff909b8143adcbf64fa0264ec2930a2b4ed900b01bfc4699bfffbe50c6"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[Retry]",
+      "script": "StoredProcedures/comm_._Retry-cd1b27cf555d.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "3d80b2ab0eb2aa49c56e1516284bf80a103b164899c10a097725ef5702390397"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[RevokeTemplate]",
+      "script": "StoredProcedures/comm_._RevokeTemplate-d501cb8114e7.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "9327dce042629b8b81da80253e5d24c2bc3850b20ea1112b1a4fc7d0926f3a7e"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[SaveContact]",
+      "script": "StoredProcedures/comm_._SaveContact-dd541f50140b.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "7060a64fe2ffd83d89b2627d5f3b1befae4b45ff3b3c1dbdb08e7dc7fe8f5442"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[SaveRolePermissions]",
+      "script": "StoredProcedures/comm_._SaveRolePermissions-940565d548de.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "c7dc62406ce6d48cff3bce6e4b6f9427df4023c33e29480989c90f2c109af8e0"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[SaveRule]",
+      "script": "StoredProcedures/comm_._SaveRule-622b95654761.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "b868dc672272080a945da37f6dd24e06fa9d88051c33823fd4f0db9e3c4fd98a"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[SaveSettings]",
+      "script": "StoredProcedures/comm_._SaveSettings-7ffa965e67fa.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "c8a24d6a19a20527c7a1b24cf8b0c1884e193c83cae7df6091bc178cc62dbf48"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[SaveTemplate]",
+      "script": "StoredProcedures/comm_._SaveTemplate-20271d0b36b9.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "9c32143c7aae1a6e1bd1bebd59806dc02d99183801bb2e120b891c9931a50da6"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[StatusUpdate]",
+      "script": "StoredProcedures/comm_._StatusUpdate-d9a0e899156b.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "883e0d2ad6be661c6c2d41baedd26294724a255f207d10da30df5c97ca3da4eb"
+    },
+    {
+      "type": "SqlProcedure",
+      "name": "[comm].[Transition]",
+      "script": "StoredProcedures/comm_._Transition-0b12697189db.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "46c0ee469e0ad8e7f730877c4f03d178c59e994c61917892f4ec9536c75130af"
     },
     {
       "type": "SqlProcedure",
@@ -4398,6 +5168,41 @@
       "modelElementSha256": "36aba524349c56760405af6b8f6406c74e13b55624030b0a521894ea4042b006"
     },
     {
+      "type": "SqlRole",
+      "name": "[FMSC_CommunicationWebhook]",
+      "script": "Security/FMSC_CommunicationWebhook-f3e5ac9fa215.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "197e363971ad131a8cb995d1722479a3e5ef0eb3ad7876e49446f6453ca2f6a1"
+    },
+    {
+      "type": "SqlRoleMembership",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "14e50df8e64f01806e8e55c0f93ee180b86258264a3df129682fa53b15f6e225"
+    },
+    {
+      "type": "SqlScalarFunction",
+      "name": "[comm].[Balance]",
+      "script": "Functions/comm_._Balance-8cbf24261fc6.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "e0da0617b8e6b621b483df0eb53194290d81a9afe5b96b912ff91832db5ed13d"
+    },
+    {
+      "type": "SqlScalarFunction",
+      "name": "[comm].[Render]",
+      "script": "Functions/comm_._Render-61b89f59cdf5.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "4619a4492d3897b34842b127f4bc8b7aa3c130dab97df30dc424794a35dad28f"
+    },
+    {
+      "type": "SqlScalarFunction",
+      "name": "[comm].[Segments]",
+      "script": "Functions/comm_._Segments-4c86d5cbb126.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "3c30ad0e9d26b2576fb9b486c1fe0673af4a4fd4a82fa10d698313e4ef9dafa1"
+    },
+    {
       "type": "SqlScalarFunction",
       "name": "[dbo].[GetFeeChargeBalance]",
       "script": "Functions/dbo_._GetFeeChargeBalance-7065e91c92b8.sql",
@@ -4424,6 +5229,97 @@
       "script": "Functions/dbo_._fn_NumberToWords-ef7fbb14d4e6.sql",
       "scriptKind": "CREATE",
       "modelElementSha256": "ea4c6e6f13afc6a5465789c28ed811e6044c0b7dd52faeede80796f3f7068428"
+    },
+    {
+      "type": "SqlSchema",
+      "name": "[comm]",
+      "script": "Schemas/comm-87206f748654.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "c68b79b8d71fbaa5c47ef4318ffbfe5694b8124723ef8c18055c0254ed638fe3"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[Attempt]",
+      "script": "Tables/comm_._Attempt-6cc97ca826ba.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "1f055b0d03910c507b8c929c605d1da0bd828a9a25bdf570f43a04095bfafc17"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[Audit]",
+      "script": "Tables/comm_._Audit-d70fb3ecb6b1.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "11266271f230ad4f9ce3fe4708361f293a5f87f63a96ca28419964d6e8c64caf"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[Campaign]",
+      "script": "Tables/comm_._Campaign-ac2aa773ceb0.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "f4bd89109c28576328fdae2b9369333e7bdc85cecc5615f6927cfeaeb825c89b"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[Contact]",
+      "script": "Tables/comm_._Contact-afb863b3cee3.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "1eaf072fc44bca03f9cfd0cbd71f7872043c141f34faabebed14cb3b27afff7e"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[Message]",
+      "script": "Tables/comm_._Message-53ae5d27bb88.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "fc00d31a95a1c0f50bacdd18784c084c94723c3d317c9d33b45e010a2e8e3e36"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[Module]",
+      "script": "Tables/comm_._Module-85c377ec133c.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "32105ea43700f7853fb32977b4c3da066a7eaef1eadfe52ea8e6e4b35a9115b4"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[PendingReceipt]",
+      "script": "Tables/comm_._PendingReceipt-0012beb0031c.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "86d64d8e7a9a8a9c46b6e3ecf414662f7685bd158ce84e9c78c20d967c1dac37"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[RuleBaseline]",
+      "script": "Tables/comm_._RuleBaseline-64893afb6817.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "537bfb7b72ce40111c4d4470efef1adaf8b6114814163732331eb8c6e0db4236"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[Rule]",
+      "script": "Tables/comm_._Rule-8abcfeacc40e.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "cdef7c3e3455fcc7620af701c328c5aaffb2c99c68de211722d6215e21d48655"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[Settings]",
+      "script": "Tables/comm_._Settings-629be33b04cc.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "7ad433190f995944af1342408f0f6008be3b6f3bbd502f572aecfef7dc5e55f6"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[Template]",
+      "script": "Tables/comm_._Template-cba592c1a2ca.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "cbf0764845bf12ccbe23d8895a80b6f1ca3f1da654c0615d603f1b8e826731fb"
+    },
+    {
+      "type": "SqlTable",
+      "name": "[comm].[WebhookInbox]",
+      "script": "Tables/comm_._WebhookInbox-e6b3b6e67417.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "09b97d611786afd6d039fe53e300448c22aa99c1b3ef37cb552bf43646f0d44e"
     },
     {
       "type": "SqlTable",
@@ -4521,14 +5417,14 @@
       "name": "[dbo].[ClearanceChecklistItems]",
       "script": "Tables/dbo_._ClearanceChecklistItems-bb5b5394cf96.sql",
       "scriptKind": "CREATE",
-      "modelElementSha256": "5aa84440555d05c2acba18d80e77b2fff3ae9b2d88a58a5687b36ff0d999890d"
+      "modelElementSha256": "8c6bb26e1d0eb6a360187f507ee5c4851c61ee815fa5ff387f62711122ca1a28"
     },
     {
       "type": "SqlTable",
       "name": "[dbo].[DailyCollectionClosings]",
       "script": "Tables/dbo_._DailyCollectionClosings-1b382d03f30f.sql",
       "scriptKind": "CREATE",
-      "modelElementSha256": "ead253e9904e528922f8b847e908807f1bd0655aab221a167947ca8a95476539"
+      "modelElementSha256": "c5be0bf91a9b0a593c13660c648f51d844d21680868ee693ed1c40a2cb791337"
     },
     {
       "type": "SqlTable",
@@ -4563,7 +5459,7 @@
       "name": "[dbo].[DuplicateStudentReviews]",
       "script": "Tables/dbo_._DuplicateStudentReviews-a525c61c0259.sql",
       "scriptKind": "CREATE",
-      "modelElementSha256": "56a2cda767802fee75ee6dd9dd0e0bcbc960ff65e61bb9a4c237bc00eabc8202"
+      "modelElementSha256": "1bb270f95dc5195b4891c301234b18360408636aefacef9e3b15c4c50e51c086"
     },
     {
       "type": "SqlTable",
@@ -4647,14 +5543,14 @@
       "name": "[dbo].[LegacyAdmissionSetup]",
       "script": "Tables/dbo_._LegacyAdmissionSetup-e7ab4edf5aee.sql",
       "scriptKind": "CREATE",
-      "modelElementSha256": "8d9ab7f0d9d3b2ddd1227f448347ef8ae1c6eadb226996182642118416a6933b"
+      "modelElementSha256": "146016351afbdedd7c7ece2e12eeeba55d9ac34bcaa6cc984e6a0c4bc062d0be"
     },
     {
       "type": "SqlTable",
       "name": "[dbo].[ManualFeePostingRequests]",
       "script": "Tables/dbo_._ManualFeePostingRequests-c34507d4b799.sql",
       "scriptKind": "CREATE",
-      "modelElementSha256": "49502e2a6d0322bd7598ca425131594d89bff54be69218d4c05ac5e91c778997"
+      "modelElementSha256": "d83878a7940042c370f0e2e0e863a69bc2ac63bbeb55e24d736a00e7dac544b4"
     },
     {
       "type": "SqlTable",
@@ -4675,7 +5571,7 @@
       "name": "[dbo].[Permissions]",
       "script": "Tables/dbo_._Permissions-8a663eaecb5d.sql",
       "scriptKind": "CREATE",
-      "modelElementSha256": "4268f1910653a2b76a3da022888732389be141fe3594646fb42eb0808f508366"
+      "modelElementSha256": "b354031e89d140cb2a2ee1cf4fece10a65efeb3229b5f4a2d96800fa572027b5"
     },
     {
       "type": "SqlTable",
@@ -4794,7 +5690,7 @@
       "name": "[dbo].[StudentClearanceRecords]",
       "script": "Tables/dbo_._StudentClearanceRecords-da9aae275301.sql",
       "scriptKind": "CREATE",
-      "modelElementSha256": "60c37d1f4acdccad05166af62c0a314fc1365e8b178d469d2917edf349737758"
+      "modelElementSha256": "4ebd6e92c933b7404bb6a71f5988de1d2c5af912d7e2205989d17954304f5d41"
     },
     {
       "type": "SqlTable",
@@ -4938,6 +5834,27 @@
     },
     {
       "type": "SqlUniqueConstraint",
+      "name": null,
+      "script": null,
+      "scriptKind": "NOT_INDEPENDENTLY_SCRIPTABLE",
+      "modelElementSha256": "2dfc275e0c7068684d9449e15ddcb7389c9d0864084cd114451b55bdb309ff7a"
+    },
+    {
+      "type": "SqlUniqueConstraint",
+      "name": "[comm].[UX_CommMessage_Recipient]",
+      "script": "Constraints/comm_._UX_CommMessage_Recipient-b174c448ef7c.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "0511d29ab406f2bf0a31c64ec49ff291083ede4c4e192e1b7cd6b98761a6987b"
+    },
+    {
+      "type": "SqlUniqueConstraint",
+      "name": "[comm].[UX_CommTemplate_Version]",
+      "script": "Constraints/comm_._UX_CommTemplate_Version-c40cdde72137.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "da37e6433a12b737ba58ed9d0aeca5fc86836879cbc63b749e4d19911610e16e"
+    },
+    {
+      "type": "SqlUniqueConstraint",
       "name": "[dbo].[UQ_AcademicYears_YearName]",
       "script": "Constraints/dbo_._UQ_AcademicYears_YearName-e3f32544281f.sql",
       "scriptKind": "CREATE",
@@ -5068,6 +5985,13 @@
       "script": "Constraints/dbo_._UQ_Users_Username-430901018a8e.sql",
       "scriptKind": "CREATE",
       "modelElementSha256": "137477e1208b203413f561e3981222fea535a6912cbf59bd12899b86f613f6a3"
+    },
+    {
+      "type": "SqlUser",
+      "name": "[FMSCCommunicationIngress]",
+      "script": "Security/FMSCCommunicationIngress-004d93742adc.sql",
+      "scriptKind": "CREATE",
+      "modelElementSha256": "02ffc4f730177cf376b804f37cbe7eb5afb0848c690f6499ec71a3674709fc82"
     },
     {
       "type": "SqlView",
