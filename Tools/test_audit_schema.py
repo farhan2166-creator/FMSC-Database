@@ -71,6 +71,34 @@ class ArtifactChecks(unittest.TestCase):
     def test_approved_model_and_modules_match(self):
         self.assertEqual(json.loads((ROOT/'Core/ApprovedSchemaArtifact.json').read_text()),self.fingerprint)
 
+    def test_installer_legacy_gate_matches_approved_schema(self):
+        # A clean database from the reviewed DACPAC must not fail a hardcoded
+        # installer check for a procedure that was never in that schema.
+        import re
+        script = (ROOT/'Installer/core.ps1').read_text(encoding='utf-8')
+        queries = re.findall(
+            r'\\$NeedsLatestUpdates\\s*=\\s*Invoke-SqlMaster\\s+-Query\\s+"([^"]+)"',
+            script)
+        self.assertEqual(1, len(queries), 'Installer schema preflight must remain present')
+        query = queries[0]
+        procedures = set(re.findall(
+            r"OBJECT_ID\\('FMSC_DB\\.dbo\\.([A-Za-z0-9_]+)','P'\\)\\s+IS NULL",
+            query))
+        columns = set(re.findall(
+            r"COL_LENGTH\\('FMSC_DB\\.dbo\\.([A-Za-z0-9_]+)','([A-Za-z0-9_]+)'\\)\\s+IS NULL",
+            query))
+        approved_procedures = {entry['name'] for entry in self.contract['objects']
+                               if entry['schema'] == 'dbo' and entry['type'].strip() == 'P'}
+        approved_columns = {(entry['objectName'], entry['name']) for entry in self.contract['columns']
+                            if entry['schema'] == 'dbo'}
+        self.assertIn('SaveStudentDetailsWithFirstEnrollment', procedures)
+        self.assertIn('AdmitHistoricalStudent', procedures)
+        self.assertIn(('Students', 'AdmissionNumber'), columns)
+        self.assertTrue(procedures.issubset(approved_procedures),
+                        f'Installer requires procedures outside approved DACPAC: {procedures - approved_procedures}')
+        self.assertTrue(columns.issubset(approved_columns),
+                        f'Installer requires columns outside approved DACPAC: {columns - approved_columns}')
+
     def test_model_checksum_corruption_detected(self):
         with tempfile.TemporaryDirectory() as directory:
             dest=Path(directory)/'bad.dacpac'
