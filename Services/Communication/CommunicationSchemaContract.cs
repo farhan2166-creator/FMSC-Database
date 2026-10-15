@@ -30,7 +30,9 @@ public static class CommunicationSchemaContract
             SELECT CASE WHEN (SELECT COUNT(*) FROM comm.Module WHERE Version=1)=1
             AND COL_LENGTH(N'comm.Message',N'ClaimToken')=16 AND COL_LENGTH(N'comm.Message',N'Simulation')=1
             AND COL_LENGTH(N'comm.Message',N'ProviderReference')=200 AND COL_LENGTH(N'comm.Contact',N'ConsentSource')=400
-            AND COL_LENGTH(N'comm.Contact',N'Revision')=8 AND COL_LENGTH(N'comm.Campaign',N'ContentHash')=32
+            AND EXISTS(SELECT 1 FROM sys.foreign_keys F JOIN sys.foreign_key_columns K ON K.constraint_object_id=F.object_id JOIN sys.columns C ON C.object_id=K.parent_object_id AND C.column_id=K.parent_column_id WHERE F.parent_object_id=OBJECT_ID(N'comm.Contact') AND C.name=N'FamilyId' AND F.delete_referential_action=2 AND F.is_disabled=0 AND F.is_not_trusted=0)
+            AND EXISTS(SELECT 1 FROM sys.indexes I JOIN sys.index_columns K ON K.object_id=I.object_id AND K.index_id=I.index_id JOIN sys.columns C ON C.object_id=K.object_id AND C.column_id=K.column_id WHERE I.object_id=OBJECT_ID(N'comm.Contact') AND I.name=N'UX_CommContact_Identity' AND I.is_unique=1 AND C.name=N'OriginalFamilyId' AND K.key_ordinal>0)
+            AND COL_LENGTH(N'comm.Contact',N'OriginalFamilyId')=4 AND COL_LENGTH(N'comm.Contact',N'Revision')=8 AND COL_LENGTH(N'comm.Campaign',N'ContentHash')=32
             AND OBJECT_ID(N'comm.PendingReceipt',N'U') IS NOT NULL AND COL_LENGTH(N'comm.Message',N'EnrollmentId')=4 AND OBJECT_ID(N'comm.RuleBaseline',N'U') IS NOT NULL
             AND COL_LENGTH(N'comm.Campaign',N'RequestHash')=32 AND COL_LENGTH(N'comm.Settings',N'NextSendUtc') IS NOT NULL
             AND (SELECT COUNT(*) FROM sys.indexes WHERE object_id=OBJECT_ID(N'comm.Message') AND is_unique=1 AND name IN(N'UX_CommMessage_Recipient',N'UX_CommMessage_Provider'))=2

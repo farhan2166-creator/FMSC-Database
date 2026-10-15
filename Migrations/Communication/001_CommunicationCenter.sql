@@ -24,7 +24,7 @@ CREATE TABLE comm.Settings(
 INSERT comm.Settings VALUES(1,'Disabled',1,100,25,60,200,10,100,NULL,NULL,'USD',20,8,300,0,SYSUTCDATETIME(),NULL,SYSUTCDATETIME());
 CREATE TABLE comm.Contact(
  ContactId uniqueidentifier NOT NULL PRIMARY KEY, OwnerKind varchar(10) NOT NULL CHECK(OwnerKind IN('Student','Family','Staff','Manual')),
- AdmissionId int NULL REFERENCES dbo.Students(AdmissionId), FamilyId int NULL REFERENCES dbo.Families(FamilyId), StaffId int NULL REFERENCES dbo.Staff(StaffId),
+ AdmissionId int NULL REFERENCES dbo.Students(AdmissionId), FamilyId int NULL REFERENCES dbo.Families(FamilyId) ON DELETE SET NULL, OriginalFamilyId int NULL, StaffId int NULL REFERENCES dbo.Staff(StaffId),
  ContactName nvarchar(150) NOT NULL, Destination varchar(16) NOT NULL, Language varchar(10) NOT NULL CHECK(Language IN('en','ur','en_US')),
  PreferredChannel varchar(10) NOT NULL CHECK(PreferredChannel IN('Sms','WhatsApp')), Verified bit NOT NULL,
  SmsConsent bit NOT NULL, WhatsAppConsent bit NOT NULL, FinancialConsent bit NOT NULL, AnnouncementConsent bit NOT NULL,
@@ -32,12 +32,12 @@ CREATE TABLE comm.Contact(
  LastDeliveryUtc datetime2 NULL, Revision rowversion NOT NULL,
  CONSTRAINT CK_CommContact_Owner CHECK(
  (OwnerKind='Student' AND AdmissionId IS NOT NULL AND FamilyId IS NULL AND StaffId IS NULL) OR
- (OwnerKind='Family' AND FamilyId IS NOT NULL AND AdmissionId IS NULL AND StaffId IS NULL) OR
+ (OwnerKind='Family' AND OriginalFamilyId IS NOT NULL AND AdmissionId IS NULL AND StaffId IS NULL) OR
  (OwnerKind='Staff' AND StaffId IS NOT NULL AND AdmissionId IS NULL AND FamilyId IS NULL) OR
  (OwnerKind='Manual' AND StaffId IS NULL AND AdmissionId IS NULL AND FamilyId IS NULL)),
  CONSTRAINT CK_CommContact_Phone CHECK(LEFT(Destination,1)='+' AND LEN(Destination) BETWEEN 9 AND 16 AND SUBSTRING(Destination,2,16) NOT LIKE '%[^0-9]%'),
  CONSTRAINT CK_CommContact_Source CHECK(LEN(LTRIM(RTRIM(ConsentSource)))>0));
-CREATE UNIQUE INDEX UX_CommContact_Identity ON comm.Contact(OwnerKind,AdmissionId,FamilyId,StaffId,Destination);
+CREATE UNIQUE INDEX UX_CommContact_Identity ON comm.Contact(OwnerKind,AdmissionId,OriginalFamilyId,StaffId,Destination);
 CREATE TABLE comm.Template(
  TemplateId uniqueidentifier NOT NULL PRIMARY KEY, Code varchar(80) NOT NULL, Version int NOT NULL CHECK(Version>0),
  Language varchar(10) NOT NULL CHECK(Language IN('en','ur','en_US')), Category varchar(20) NOT NULL CHECK(Category IN('Utility','Financial','Announcement')),
@@ -153,8 +153,8 @@ BEGIN
  comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId) Body,
  Rendered.Parameters,
  comm.Segments(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId)) Segments,
- CASE WHEN S.Mode='Simulation' THEN 0 WHEN @Channel='Sms' THEN S.SmsUnitCost*comm.Segments(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId)) ELSE S.WhatsAppUnitCost END EstimatedCost,S.Currency,
- CASE WHEN DATALENGTH(Rendered.Parameters)>8000 THEN N'Personalized provider parameters exceed the supported size; shorten the template' WHEN DATALENGTH(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId))>4000 THEN N'Personalized message exceeds 2000 characters; shorten the template' WHEN T.Approved=0 THEN N'Template requires approval' WHEN C.OwnerKind<>T.Scope THEN N'Contact context does not match template'
+ CASE WHEN S.Mode<>'Live' THEN 0 WHEN @Channel='Sms' THEN S.SmsUnitCost*comm.Segments(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId)) ELSE S.WhatsAppUnitCost END EstimatedCost,S.Currency,
+ CASE WHEN DATALENGTH(Rendered.Parameters)>8000 THEN N'Personalized provider parameters exceed the supported size; shorten the template' WHEN DATALENGTH(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId))>4000 THEN N'Personalized message exceeds 2000 characters; shorten the template' WHEN C.OwnerKind='Family' AND C.FamilyId IS NULL THEN N'Family link retired; select a current family contact' WHEN T.Approved=0 THEN N'Template requires approval' WHEN C.OwnerKind<>T.Scope THEN N'Contact context does not match template'
  WHEN C.Language<>T.Language THEN N'Template language does not match contact' WHEN C.Verified=0 THEN N'Unverified contact'
  WHEN C.OptedOut=1 THEN N'Opted out' WHEN @Channel='Sms' AND C.SmsConsent=0 THEN N'No SMS consent'
  WHEN @Channel='WhatsApp' AND C.WhatsAppConsent=0 THEN N'No WhatsApp consent'
@@ -179,6 +179,7 @@ CREATE PROCEDURE comm.SaveContact @Actor int,@Id uniqueidentifier,@Kind varchar(
  @Name nvarchar(150),@Phone varchar(16),@Language varchar(10),@Channel varchar(10),@Verified bit,@Sms bit,@WhatsApp bit,@Financial bit,@Announcements bit,@OptOut bit,@Source nvarchar(200),@ExpectedRevision binary(8)=NULL AS
 BEGIN
  SET NOCOUNT ON; SET XACT_ABORT ON; EXEC dbo.RequirePermission @Actor,N'Communication.Configure';
+ IF @Kind='Family' AND (@FamilyId IS NULL OR NOT EXISTS(SELECT 1 FROM dbo.Families WHERE FamilyId=@FamilyId)) AND NOT EXISTS(SELECT 1 FROM comm.Contact WHERE ContactId=@Id) THROW 51001,'Choose an existing family for a new family contact.',1;
  IF @Phone NOT LIKE '+%' OR LEN(@Name)=0 OR LEN(@Source)=0 THROW 51001,'A named, attributable contact and consent source are required.',1;
  BEGIN TRANSACTION;
  IF EXISTS(SELECT 1 FROM comm.Contact WITH(UPDLOCK,HOLDLOCK) WHERE ContactId=@Id)
@@ -188,8 +189,8 @@ BEGIN
   IF EXISTS(SELECT 1 FROM comm.Contact WHERE ContactId=@Id AND (Destination<>@Phone OR OptedOut=1 AND @OptOut=0) AND ConsentSource=@Source) THROW 51001,'A changed number or renewed opt-in requires fresh consent evidence.',1;
   UPDATE comm.Contact SET ContactName=@Name,Destination=@Phone,Language=@Language,PreferredChannel=@Channel,Verified=@Verified,SmsConsent=@Sms,WhatsAppConsent=@WhatsApp,FinancialConsent=@Financial,AnnouncementConsent=@Announcements,OptedOut=@OptOut,ConsentSource=@Source,ConsentUtc=SYSUTCDATETIME(),UpdatedBy=@Actor WHERE ContactId=@Id;
  END
- ELSE INSERT comm.Contact(ContactId,OwnerKind,AdmissionId,FamilyId,StaffId,ContactName,Destination,Language,PreferredChannel,Verified,SmsConsent,WhatsAppConsent,FinancialConsent,AnnouncementConsent,OptedOut,ConsentSource,ConsentUtc,UpdatedBy)
- VALUES(@Id,@Kind,@AdmissionId,@FamilyId,@StaffId,@Name,@Phone,@Language,@Channel,@Verified,@Sms,@WhatsApp,@Financial,@Announcements,@OptOut,@Source,SYSUTCDATETIME(),@Actor);
+ ELSE INSERT comm.Contact(ContactId,OwnerKind,AdmissionId,FamilyId,OriginalFamilyId,StaffId,ContactName,Destination,Language,PreferredChannel,Verified,SmsConsent,WhatsAppConsent,FinancialConsent,AnnouncementConsent,OptedOut,ConsentSource,ConsentUtc,UpdatedBy)
+ VALUES(@Id,@Kind,@AdmissionId,@FamilyId,@FamilyId,@StaffId,@Name,@Phone,@Language,@Channel,@Verified,@Sms,@WhatsApp,@Financial,@Announcements,@OptOut,@Source,SYSUTCDATETIME(),@Actor);
  INSERT comm.Audit(Actor,Operation,EntityId,Detail) VALUES(@Actor,'ContactConsentSaved',@Id,CASE WHEN @OptOut=1 THEN N'Opted out' ELSE N'Contact or consent revised; previous message destinations preserved' END);
  COMMIT;
 END;
@@ -250,7 +251,7 @@ BEGIN
  END;
  INSERT comm.Campaign VALUES(@Id,@Hash,@ContentHash,@TemplateId,@Channel,'Draft',@Actor,NULL,SYSUTCDATETIME(),@DueUtc,@Announcement,@EventKey,@PaymentId);
  INSERT comm.Message(MessageId,CampaignId,ContactId,AdmissionId,EnrollmentId,Destination,Body,Parameters,Simulation,Segments,EstimatedCost,Currency,State)
- SELECT NEWID(),@Id,ContactId,AdmissionId,EnrollmentId,Destination,Body,Parameters,CONVERT(bit,CASE WHEN (SELECT Mode FROM comm.Settings)='Simulation' THEN 1 ELSE 0 END),Segments,EstimatedCost,Currency,'Draft' FROM #P;
+ SELECT NEWID(),@Id,ContactId,AdmissionId,EnrollmentId,Destination,Body,Parameters,CONVERT(bit,CASE WHEN (SELECT Mode FROM comm.Settings)<>'Live' THEN 1 ELSE 0 END),Segments,EstimatedCost,Currency,'Draft' FROM #P;
  INSERT comm.Audit(Actor,Operation,EntityId,Detail) VALUES(@Actor,'CampaignCreated',@Id,N'Immutable recipient and message snapshots');
  COMMIT;
 END;
@@ -306,7 +307,7 @@ BEGIN
  UPDATE M SET State='Cancelled',LastCode='CONTACT_OR_BALANCE_CHANGED',UpdatedUtc=@Now
  FROM comm.Message M JOIN comm.Campaign P ON P.CampaignId=M.CampaignId JOIN comm.Contact C ON C.ContactId=M.ContactId JOIN comm.Template T ON T.TemplateId=P.TemplateId
  WHERE P.CreatedBy=@Actor AND M.State IN('Queued','Scheduled') AND (
- T.Approved=0 OR C.Verified=0 OR C.OptedOut=1 OR C.Destination<>M.Destination OR (P.Channel='Sms' AND C.SmsConsent=0) OR (P.Channel='WhatsApp' AND C.WhatsAppConsent=0) OR
+ (C.OwnerKind='Family' AND C.FamilyId IS NULL) OR T.Approved=0 OR C.Verified=0 OR C.OptedOut=1 OR C.Destination<>M.Destination OR (P.Channel='Sms' AND C.SmsConsent=0) OR (P.Channel='WhatsApp' AND C.WhatsAppConsent=0) OR
  (T.Category='Financial' AND C.FinancialConsent=0) OR (T.Category='Announcement' AND C.AnnouncementConsent=0) OR
  (T.Category='Financial' AND P.PaymentId IS NULL AND (comm.Balance(M.AdmissionId)<=0 OR comm.Render(T.Body,C.ContactId,P.Announcement,P.PaymentId)<>M.Body)) OR
  (P.PaymentId IS NOT NULL AND NOT EXISTS(SELECT 1 FROM dbo.FeePayments F WHERE F.FeePaymentId=P.PaymentId AND F.AdmissionId=M.AdmissionId AND F.Status=N'Completed' AND F.PaymentMethod NOT IN(N'Refund',N'Correction'))));
@@ -381,7 +382,7 @@ BEGIN
  IF @View='Contacts'
  BEGIN
   EXEC dbo.RequirePermission @Actor,N'Communication.Configure';
-  SELECT ContactId,OwnerKind,AdmissionId,FamilyId,StaffId,ContactName,Destination,Language,PreferredChannel,Verified,SmsConsent,WhatsAppConsent,FinancialConsent,AnnouncementConsent,OptedOut,ConsentSource,ConsentUtc,Revision FROM comm.Contact
+  SELECT ContactId,OwnerKind,AdmissionId,FamilyId,StaffId,ContactName,Destination,Language,PreferredChannel,Verified,SmsConsent,WhatsAppConsent,FinancialConsent,AnnouncementConsent,OptedOut,ConsentSource,ConsentUtc,Revision,CASE WHEN OwnerKind='Family' AND FamilyId IS NULL THEN 'Retired family' ELSE 'Current' END LinkStatus FROM comm.Contact
   WHERE ContactName LIKE N'%'+@Search+N'%' OR Destination LIKE N'%'+@Search+N'%' ORDER BY ContactName,ContactId OFFSET @Page*100 ROWS FETCH NEXT 100 ROWS ONLY;
  END
  ELSE IF @View='Recipients'
@@ -392,7 +393,7 @@ BEGIN
   SELECT C.ContactId,C.OwnerKind,C.ContactName,C.Destination,V.student Student,V.class Class,V.year AcademicYear,C.Verified,C.OptedOut,C.Language,C.SmsConsent,C.WhatsAppConsent,
    V.AdmissionId,V.FamilyId,CASE WHEN @Filter='Outstanding' AND V.AdmissionId IS NOT NULL THEN comm.Balance(V.AdmissionId) END Outstanding
   FROM comm.Contact C CROSS APPLY comm.ValuesFor(C.ContactId,N'',NULL) V
-  WHERE (@Campus=0 OR V.CampusId=@Campus) AND (@Year=0 OR V.AcademicYearId=@Year) AND (@Class=0 OR V.ClassId=@Class) AND (@Section=0 OR V.SectionId=@Section)
+  WHERE (C.OwnerKind<>'Family' OR C.FamilyId IS NOT NULL) AND (@Campus=0 OR V.CampusId=@Campus) AND (@Year=0 OR V.AcademicYearId=@Year) AND (@Class=0 OR V.ClassId=@Class) AND (@Section=0 OR V.SectionId=@Section)
    AND (C.ContactName LIKE N'%'+@Search+N'%' OR V.student LIKE N'%'+@Search+N'%')
    AND (@Filter='' AND C.OwnerKind<>'Staff' OR @Filter='Outstanding' AND comm.Balance(V.AdmissionId)>0 OR @Filter='Staff' AND C.OwnerKind='Staff' OR @Filter='Family' AND C.OwnerKind='Family' OR @Filter='Manual' AND C.OwnerKind='Manual' OR @Filter='Pending' AND V.StudentStatus=N'Pending')
   ORDER BY C.ContactName,C.ContactId OFFSET @Page*100 ROWS FETCH NEXT 100 ROWS ONLY;
