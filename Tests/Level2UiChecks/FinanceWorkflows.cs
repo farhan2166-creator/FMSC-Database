@@ -81,5 +81,6 @@ internal static class FinanceWorkflows
                 WHERE COALESCE(X.Paid,0)>B.NetAmount OR B.NetAmount<0;
                 """)==0,"Overallocated or negative charge.");
         },"Independent SQL: payment/allocation equality, ownership, enrollment links, no over-allocation or negative charges.");
+        FeeSetupWorkflows.Run(ui,report);
     }
 }

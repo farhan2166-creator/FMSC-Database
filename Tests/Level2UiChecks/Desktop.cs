@@ -70,6 +70,12 @@ internal sealed class Desktop : IDisposable
         Identity.Check(e.IsEnabled && !e.IsOffscreen,"Control is unavailable: "+name);
         if(twice)e.DoubleClick(); else e.Click();
     }
+    internal void ClickElement(AutomationElement e,bool twice=false)
+    {
+        using var c=Identity.Open();RequireInteractive();
+        Identity.Check(e.Properties.ProcessId.Value==Process!.Id&&e.IsEnabled&&!e.IsOffscreen,"Grid input must belong to this visible test application.");
+        if(twice)e.DoubleClick();else e.Click();
+    }
     internal void Fill(string name,string value,AutomationElement? scope=null)
     {
         using var c=Identity.Open(); RequireInteractive();

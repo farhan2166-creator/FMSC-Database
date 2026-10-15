@@ -37,6 +37,7 @@ internal static class Workflows
             ui.Select("Academic Year","Fictional "+(DateTime.UtcNow.Year-1));
             ui.Select("Class","Class 6 (Fictional Middle School)");
             ui.Select("Section","Section A");
+            ui.Fill("Admission Number","9001");
         },"Selected fixture class/section belongs to the displayed campus.");
         // The following scenarios are deliberately gated by actual UI admission.
         // No fixture writer creates the record used by these tests.
@@ -58,6 +59,7 @@ internal static class Workflows
                 ui.Screenshot("L2-ADM-12-date-refusal");
                 ui.Select("Academic Year","Fictional "+(DateTime.UtcNow.Year-1));
                 ui.Select("Class","Class 6 (Fictional Middle School)");ui.Select("Section","Section A");
+                ui.Fill("Admission Number","9001");
             },"Malformed phone and date/year mismatch both leave Students empty; valid context restored.");
             report.Run("L2-ADM-04",ui,()=>{
                 ui.Fill("Student Name","Fictional Example Student");
