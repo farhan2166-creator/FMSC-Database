@@ -14,16 +14,42 @@ spec.loader.exec_module(runner)
 
 
 class SafetyTests(unittest.TestCase):
-    def test_pinned_schema_only_fixture_and_modules(self):
-        result = runner.verify_baseline()
-        self.assertEqual(64, len(result["sourceModelSha256"]))
+    def test_data_free_fixture_and_provider_versions(self):
+        self.assertTrue(runner.verify_baseline())
 
-    def test_pinned_fixture_does_not_require_current_dacpac_git_blob(self):
-        # The current repository artifact can change without weakening the
-        # integrity and model checks on the isolated, pinned SQL test fixture.
+    def test_fixture_is_independent_of_exported_dacpac_and_git(self):
         with patch.object(runner.subprocess, "check_output", side_effect=AssertionError(
-                "Runtime fixture preflight must not query a repository DACPAC revision.")):
-            self.assertEqual(64, len(runner.verify_baseline()["sourceModelSha256"]))
+                "Fixture validation must not query Git or the exported DACPAC.")):
+            self.assertTrue(runner.verify_baseline())
+
+    def test_fixture_rejects_exported_rows_or_extra_zip_members(self):
+        with tempfile.TemporaryDirectory() as folder:
+            temporary = Path(folder)
+            (temporary / "Baseline").mkdir()
+            package = temporary / "Baseline/schema.dacpac"
+            package.write_bytes((runner.PROJECT / "Baseline/schema.dacpac").read_bytes())
+            with zipfile.ZipFile(package, "a") as archive:
+                archive.writestr("Data/student.bcp", b"fictional-only")
+            with patch.object(runner, "PROJECT", temporary):
+                with self.assertRaisesRegex(ValueError, "Unexpected fixture content"):
+                    runner.verify_baseline()
+
+    def test_fixture_rejects_relationship_target(self):
+        with tempfile.TemporaryDirectory() as folder:
+            temporary = Path(folder)
+            (temporary / "Baseline").mkdir()
+            package = temporary / "Baseline/schema.dacpac"
+            with zipfile.ZipFile(runner.PROJECT / "Baseline/schema.dacpac") as original:
+                with zipfile.ZipFile(package, "w") as changed:
+                    for name in original.namelist():
+                        body = original.read(name)
+                        if name == "_rels/.rels":
+                            body = (b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                                    b'<Relationship Target="Data/student.bcp" /></Relationships>')
+                        changed.writestr(name, body)
+            with patch.object(runner, "PROJECT", temporary):
+                with self.assertRaisesRegex(ValueError, "relationships"):
+                    runner.verify_baseline()
 
     def test_baseline_has_no_exported_data_or_script_relationship(self):
         with zipfile.ZipFile(runner.PROJECT / "Baseline/schema.dacpac") as package:

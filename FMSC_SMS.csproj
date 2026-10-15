@@ -10,8 +10,6 @@
     <ItemGroup>
         <!-- Portable shortcut checks build separately with simulated controls. -->
         <Compile Remove="Tests/**/*.cs" />
-        <!-- DACPAC SQL scripting utility is a separate .NET 8 console project. -->
-        <Compile Remove="Tools/DacpacSqlScripter/**/*.cs" />
         <Compile Remove="Apps/**/*.cs" />
     </ItemGroup>
 	<PropertyGroup>
@@ -103,7 +101,6 @@
 	     prerequisites/copying. Normal full release publishing remains validated. -->
 	<!-- Validate installer, prerequisite, migrations and any supplied database snapshot before publishing. -->
 	<Target Name="ValidateDeploymentAssets" BeforeTargets="PrepareForPublish" Condition="'$(CIAppOnlyBundle)' != 'true' Or '$(GITHUB_ACTIONS)' != 'true'">
-        <!-- DACPAC package and model fingerprints are no longer a publish prerequisite. -->
 		<PropertyGroup>
 			<DeploymentDatabaseDirectory Condition="'$(DeploymentDatabaseDirectory)' == ''">$(MSBuildProjectDirectory)\..\Database</DeploymentDatabaseDirectory>
 			<DeploymentMigrationDirectory Condition="'$(DeploymentMigrationDirectory)' == ''">$(MSBuildProjectDirectory)\Migrations</DeploymentMigrationDirectory>

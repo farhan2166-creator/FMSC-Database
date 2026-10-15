@@ -1,5 +1,5 @@
 # Real installation acceptance on a GitHub-hosted disposable Windows runner.
-# Runs the production installer against an approved schema-only, record-free fixture.
+# Runs the production installer against a pinned schema-only, record-free test fixture.
 param([string]$ProjectDirectory = (Split-Path $PSScriptRoot -Parent))
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
@@ -61,7 +61,7 @@ function WriteEvidence {
         limitations=@(
           'GitHub-hosted Windows 2022 is disposable but may include preinstalled LocalDB.',
           'When LocalDB was preinstalled this run does not cover a pristine MSI installation or its interactive fallback.',
-          'Only schema-only model and synthetic version marker are installed; no school data is used.',
+          'Only the data-free SQL test model and synthetic version marker are installed; no school data is used.',
           'Graphical login, printing, real production upgrades and Windows reboot scenarios remain manual.',
           'A passing run is not authorization to install on live school computers.'
         )
@@ -85,25 +85,41 @@ try {
     $ownedRoot=$true
     $checks.Add('No existing FMSC application or target database found')
 
-    Stage 'Approved schema-only fixture verification'
-    $approved=Get-Content -LiteralPath (Join-Path $project 'Core/ApprovedSchemaArtifact.json') -Raw | ConvertFrom-Json
-    $provenance=Get-Content -LiteralPath (Join-Path $project 'Tests/LifecycleSqlChecks/Baseline/provenance.json') -Raw | ConvertFrom-Json
+    Stage 'Data-free SQL test fixture safety'
     $fixture=Join-Path $project 'Tests/LifecycleSqlChecks/Baseline/schema.dacpac'
-    if ((Get-FileHash -LiteralPath $fixture -Algorithm SHA256).Hash.ToLowerInvariant() -ne $provenance.fixtureSha256 -or
-        $provenance.sourcePackageSha256 -ne $approved.packageSha256 -or
-        $provenance.sourceModelSha256 -ne $approved.modelSha256) { throw 'Approved schema fixture provenance differs.' }
+    if (-not (Test-Path -LiteralPath $fixture -PathType Leaf)) { throw 'Disposable SQL test fixture is missing.' }
     Add-Type -AssemblyName System.IO.Compression
     $zip=[IO.Compression.ZipFile]::OpenRead($fixture)
     try {
         $names=@($zip.Entries | ForEach-Object { $_.FullName } | Sort-Object)
         $allowed=@('[Content_Types].xml','_rels/.rels','DacMetadata.xml','model.xml','Origin.xml' | Sort-Object)
-        if (($names -join '|') -ne ($allowed -join '|')) { throw 'Unexpected DACPAC entries, possibly exported table data.' }
-        $stream=$zip.GetEntry('model.xml').Open()
-        try { $modelHash=(Get-FileHash -InputStream $stream -Algorithm SHA256).Hash.ToLowerInvariant() }
-        finally { $stream.Dispose() }
-        if ($modelHash -ne $approved.modelSha256) { throw 'Approved schema model changed.' }
+        if (($names -join '|') -ne ($allowed -join '|') -or $names.Count -ne 5) {
+            throw 'Unexpected SQL test fixture entries: exported data/scripts are forbidden.'
+        }
+        function Read-SqlFixtureEntry($archive, [string]$name) {
+            $entry=$archive.GetEntry($name)
+            if ($null -eq $entry) { throw "Missing SQL fixture entry: $name" }
+            $reader=[IO.StreamReader]::new($entry.Open())
+            try { return $reader.ReadToEnd() }
+            finally { $reader.Dispose() }
+        }
+        [xml]$origin=(Read-SqlFixtureEntry $zip 'Origin.xml')
+        if ($origin.SelectNodes("//*[local-name()='ExportStatistics' or local-name()='Server' or local-name()='DataPhaseTables']").Count -gt 0) {
+            throw 'SQL test fixture contains export/source metadata.'
+        }
+        foreach ($flag in $origin.SelectNodes("//*[local-name()='ContainsExportedData']")) {
+            if ($flag.InnerText.Trim().ToLowerInvariant() -ne 'false') { throw 'SQL test fixture contains exported-data marker.' }
+        }
+        [xml]$relationships=(Read-SqlFixtureEntry $zip '_rels/.rels')
+        if ($relationships.SelectNodes('//*[@Target]').Count -gt 0) {
+            throw 'SQL test fixture contains a prohibited package relationship.'
+        }
+        [xml]$model=(Read-SqlFixtureEntry $zip 'model.xml')
+        if ($model.SelectNodes("//*[local-name()='Model']/*[local-name()='Element' and @Type='SqlProcedure']").Count -eq 0) {
+            throw 'SQL test fixture has no deployable stored procedures.'
+        }
     } finally { $zip.Dispose() }
-    $checks.Add('Schema-only DACPAC hash, model and data-free entries verified')
+    $checks.Add('Data-free SQL fixture contains schema-only entries and no export relationships')
 
     Stage 'Real Microsoft SQL Server LocalDB prerequisite'
     $existing=LocalDbExe
@@ -183,7 +199,7 @@ try {
         NativeOk 'Pinned SQLPackage tool restore'
         $conn="Server=$instance;Database=FMSC_DB;Integrated Security=True;Encrypt=False;TrustServerCertificate=True"
         & dotnet tool run sqlpackage -- '/Action:Publish' "/SourceFile:$fixture" "/TargetConnectionString:$conn" '/p:CreateNewDatabase=True'
-        NativeOk 'Publish approved schema-only DACPAC'
+        NativeOk 'Publish record-free SQL test fixture'
     } finally { Pop-Location }
     $seed=@'
 SET NOCOUNT ON;
@@ -265,7 +281,7 @@ IF (SELECT COUNT(*) FROM sys.database_files WHERE physical_name IN
     Write-Host 'PASS: Disposable real Windows installer and synthetic LocalDB acceptance.'
 }
 catch {
-    if ($stage -notin @('Runner isolation','Approved schema-only fixture verification')) { $status='FAIL' }
+    if ($stage -notin @('Runner isolation','Data-free SQL test fixture safety')) { $status='FAIL' }
     Write-Host "Installation acceptance stopped at '$stage': $($_.Exception.Message)"
     throw
 }

@@ -19,8 +19,8 @@ internal static class DatabaseCompatibility
         // Historical migration-3 harnesses still validate the reviewed v2 shape.
         if(int.TryParse(DatabaseHelper.RequiredDatabaseSchemaVersion,out int required)&&required<4)return baseline;
         var definition=JsonNode.Parse(baseline)!.AsObject();
-        // Preserve the reviewed DACPAC inventory while requiring additive features
-        // installed by numbered migrations until the owner supplies a new artifact.
+        // Preserve the embedded compatibility requirements and combine them with
+        // features installed by numbered migrations.
         using var migrations=typeof(DatabaseCompatibility).Assembly.GetManifestResourceStream(
             "FMSC_SMS.Core.DatabaseMigrationRequirements.json")
             ?? throw new DatabaseCompatibilityException(new(DatabaseCompatibilityIssue.ApplicationDefinition,

@@ -41,21 +41,19 @@ dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
 dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --post-fix
 dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
 dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
-python Tools/verify_schema_artifact.py --check
-python Tools/test_audit_schema.py
 ```
 
-For Windows PowerShell provenance and disposable publish tests, see [CI workflow](../.github/workflows/fmsc-desktop-ci.yml). SQL integration must target disposable clones, not the production database.
+For Windows PowerShell and disposable publish tests, see [CI workflow](../.github/workflows/fmsc-desktop-ci.yml). SQL integration must target disposable clones, not the production database.
 
 Avoid direct merges that bypass review for sensitive changes. A Codex PR is a proposal until reviewed and merged; neither tests nor documentation automatically imply production sign-off.
 
 ## Level 1 SQL integration
 
-The separate [Level 1 lifecycle workflow](../.github/workflows/fmsc-lifecycle-sql-ci.yml) provisions an owned disposable SQL Server container and fictional school. See [LEVEL1_TESTING.md](LEVEL1_TESTING.md) for real admission-to-promotion SQL assertions, schema-only provenance, cleanup, evidence and local execution. Its passing result complements Windows CI; it does not approve interactive UI or production deployment.
+The separate [Level 1 lifecycle workflow](../.github/workflows/fmsc-lifecycle-sql-ci.yml) provisions an owned disposable SQL Server container and fictional school. See [LEVEL1_TESTING.md](LEVEL1_TESTING.md) for real admission-to-promotion SQL assertions, data-free SQL fixture validation, cleanup, evidence and local execution. Its passing result complements Windows CI; it does not approve interactive UI or production deployment.
 
 ## Security checks
 
-For a re-exported `FMSC.dacpac`, follow [verified DACPAC refresh alignment](DACPAC_REFRESH.md). The dedicated workflow compares the entire model, module fingerprints and exported data with the anchored approval. Safe metadata-only refreshes prepare a focused alignment PR and run existing Windows/security/isolated SQL checks; material changes stop for review. Do not manually accept a new hash or merge before actual checks pass.
+GitHub CI does not approve, refresh or audit DACPAC exports. Review any schema changes independently against a safe local copy. Keep the pinned record-free SQL test fixture under separate review when the tested schema changes.
 
 [FMSC Security Checks](../.github/workflows/fmsc-security.yml) is a read-only PR/`main`-push workflow, separate from the existing Windows checks. It downloads **Gitleaks CLI 8.30.1** from its official release and verifies a pinned SHA-256 before running it. The CLI is MIT-licensed and works with private repositories without a Gitleaks action license, PAT or GitHub Advanced Security subscription. Normal Actions minutes/storage limits still apply.
 
@@ -80,7 +78,7 @@ The tests create harmless synthetic fixtures in temporary repositories and delet
 4. For a genuine synthetic false positive, propose a narrow, documented value-and-path exception and retain a test proving real secrets in the same file are still caught.
 5. A scanner/configuration/download failure also fails the check. It is not a clean scan; fix the tool setup and rerun.
 
-These are heuristic text-secret/file-name checks, not a guarantee of finding every secret or personal school record. Binary DACPAC contents remain outside this text scan and are governed by the existing artifact provenance/data-handling process. Review the pinned Gitleaks version/hash periodically; Dependabot does not update the downloaded CLI. No repository visibility, paid service or branch-protection setting is changed. GitHub Actions must be allowed; maintainers may separately require the **Secrets and sensitive files** check in branch rules.
+These are heuristic text-secret/file-name checks, not a guarantee of finding every secret or personal school record. Do not commit data-bearing DACPAC exports; the record-free test schema is kept separately for isolated SQL tests. Review the pinned Gitleaks version/hash periodically; Dependabot does not update the downloaded CLI. No repository visibility, paid service or branch-protection setting is changed. GitHub Actions must be allowed; maintainers may separately require the **Secrets and sensitive files** check in branch rules.
 
 ## Reviewing Dependabot updates
 
@@ -92,4 +90,4 @@ For each update PR, read release/breaking-change notes, ensure the package still
 
 ## Communication module development
 
-See [COMMUNICATION_CENTER.md](COMMUNICATION_CENTER.md) before changing the optional SQL add-on, provider integration or queue. CI uses fake HTTP transports and a separately owned disposable SQL database; no live messaging or school data is permitted. Run `Tests/CommunicationChecks` and the Level 1 harness as well as Desktop CI and security checks. The applied communication setup is retired from deployment. Its embedded reference definition lives at `Services/Communication/Schema.sql`; only guarded disposable tests install it. The installer discovers numbered SQL files in `Migrations`, skips an empty folder or already-applied versions, backs up before pending migrations, and verifies the full database contract before activation. The required base version stays 6 and the reviewed DACPAC remains unchanged. Provider registration, hosting and production schema deployment require separate owner acceptance.
+See [COMMUNICATION_CENTER.md](COMMUNICATION_CENTER.md) before changing the optional SQL add-on, provider integration or queue. CI uses fake HTTP transports and a separately owned disposable SQL database; no live messaging or school data is permitted. Run `Tests/CommunicationChecks` and the Level 1 harness as well as Desktop CI and security checks. The applied communication setup is retired from deployment. Its embedded reference definition lives at `Services/Communication/Schema.sql`; only guarded disposable tests install it. The installer discovers numbered SQL files in `Migrations`, skips an empty folder or already-applied versions, backs up before pending migrations, and verifies the full database contract before activation. The required base version stays 6 and the runtime compatibility contract remains enforced. Provider registration, hosting and production schema deployment require separate owner acceptance.
