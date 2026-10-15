@@ -34,7 +34,7 @@ public static class CommunicationSchemaContract
             AND EXISTS(SELECT 1 FROM sys.indexes I JOIN sys.index_columns K ON K.object_id=I.object_id AND K.index_id=I.index_id JOIN sys.columns C ON C.object_id=K.object_id AND C.column_id=K.column_id WHERE I.object_id=OBJECT_ID(N'comm.Contact') AND I.name=N'UX_CommContact_Identity' AND I.is_unique=1 AND C.name=N'OriginalFamilyId' AND K.key_ordinal>0)
             AND COL_LENGTH(N'comm.Contact',N'OriginalFamilyId')=4 AND COL_LENGTH(N'comm.Contact',N'Revision')=8 AND COL_LENGTH(N'comm.Campaign',N'ContentHash')=32
             AND OBJECT_ID(N'comm.PendingReceipt',N'U') IS NOT NULL AND COL_LENGTH(N'comm.Message',N'EnrollmentId')=4 AND OBJECT_ID(N'comm.RuleBaseline',N'U') IS NOT NULL
-            AND COL_LENGTH(N'comm.Campaign',N'RequestHash')=32 AND COL_LENGTH(N'comm.Settings',N'NextSendUtc') IS NOT NULL
+            AND COL_LENGTH(N'comm.Campaign',N'DispatchActor')=4 AND COL_LENGTH(N'comm.Campaign',N'RequestHash')=32 AND COL_LENGTH(N'comm.Settings',N'NextSendUtc') IS NOT NULL
             AND (SELECT COUNT(*) FROM sys.indexes WHERE object_id=OBJECT_ID(N'comm.Message') AND is_unique=1 AND name IN(N'UX_CommMessage_Recipient',N'UX_CommMessage_Provider'))=2
             AND EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'comm.Campaign') AND name=N'UX_CommCampaign_Event' AND is_unique=1)
             AND NOT EXISTS(SELECT 1 FROM sys.foreign_keys WHERE schema_id=SCHEMA_ID(N'comm') AND (is_disabled=1 OR is_not_trusted=1))

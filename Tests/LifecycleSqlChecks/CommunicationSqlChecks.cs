@@ -201,12 +201,34 @@ internal static class CommunicationSqlChecks
             }finally{template=oldTemplate;}
         });
         await report.Stage("Communication: contact privacy and financial placeholder authorization",async()=>{
-            Sql.Query("INSERT dbo.RolePermissions(RoleId,PermissionId) SELECT U.RoleId,P.PermissionId FROM dbo.Users U CROSS JOIN dbo.Permissions P WHERE U.UserId=@Id AND P.PermissionCode IN(N'Communication.View',N'Communication.Compose');",Sql.P("@Id",f.Restricted));
+            int role=Sql.Count("SELECT RoleId FROM dbo.Users WHERE UserId=@Id",Sql.P("@Id",f.Restricted));
+            var baseline=Sql.Query("SELECT PermissionId FROM dbo.RolePermissions WHERE RoleId=@Id",Sql.P("@Id",role)).AsEnumerable().Select(r=>Convert.ToInt32(r[0])).ToArray();
+            var optional=Sql.Query("SELECT PermissionId FROM dbo.Permissions WHERE PermissionCode IN(N'Communication.View',N'Communication.Compose')").AsEnumerable().Select(r=>Convert.ToInt32(r[0])).ToArray();
+            string selected=JsonSerializer.Serialize(baseline.Concat(optional).Order());
+            Sql.Proc("comm.SaveRolePermissions",Sql.P("@UserId",f.Admin),Sql.P("@RoleId",role),Sql.P("@PermissionIdsJson",selected));
+            report.Check(Sql.Count("SELECT COUNT(*) FROM dbo.RolePermissions WHERE RoleId=@Id",Sql.P("@Id",role))==baseline.Length+2,"An explicit reviewed communication grant preserves the Accountant's exact existing base permissions.");
+            using(var connection=DatabaseHelper.GetConnection()){connection.Open();using var transaction=connection.BeginTransaction();using var save=new SqlCommand("comm.SaveRolePermissions",connection,transaction){CommandType=CommandType.StoredProcedure};save.Parameters.AddRange([Sql.P("@UserId",f.Admin),Sql.P("@RoleId",role),Sql.P("@PermissionIdsJson",selected)]);using(var result=save.ExecuteReader()){while(result.Read()){}while(result.NextResult())while(result.Read()){}}using var count=new SqlCommand("SELECT @@TRANCOUNT",connection,transaction);report.Check(Convert.ToInt32(count.ExecuteScalar())==1,"The optional permission adapter preserves the administration writer's enclosing transaction.");transaction.Rollback();}
+            await report.Refused("A restricted actor cannot grant itself communication sending",()=>Task.Run(()=>Sql.Proc("comm.SaveRolePermissions",Sql.P("@UserId",f.Restricted),Sql.P("@RoleId",role),Sql.P("@PermissionIdsJson",selected))),50003);
+            int compose=Sql.Count("SELECT PermissionId FROM dbo.Permissions WHERE PermissionCode=N'Communication.Compose'");
+            await report.Refused("Communication actions cannot be granted without viewing access",()=>Task.Run(()=>Sql.Proc("comm.SaveRolePermissions",Sql.P("@UserId",f.Admin),Sql.P("@RoleId",role),Sql.P("@PermissionIdsJson",JsonSerializer.Serialize(baseline.Append(compose))))),51001);
+            int view=Sql.Count("SELECT PermissionId FROM dbo.Permissions WHERE PermissionCode=N'Communication.View'"),send=Sql.Count("SELECT PermissionId FROM dbo.Permissions WHERE PermissionCode=N'Communication.Send'");
+            await report.Refused("Sending access cannot be granted without composition",()=>Task.Run(()=>Sql.Proc("comm.SaveRolePermissions",Sql.P("@UserId",f.Admin),Sql.P("@RoleId",role),Sql.P("@PermissionIdsJson",JsonSerializer.Serialize(baseline.Concat(new[]{view,send}))))),51001);
+            int administratorRole=Sql.Count("SELECT RoleId FROM dbo.Users WHERE UserId=@Id",Sql.P("@Id",f.Admin));
+            await report.Refused("The communication permission adapter cannot edit Administrator authority",()=>Task.Run(()=>Sql.Proc("comm.SaveRolePermissions",Sql.P("@UserId",f.Admin),Sql.P("@RoleId",administratorRole),Sql.P("@PermissionIdsJson",selected))),51001);
             var reader=new SqlCommunicationStore(DatabaseHelper.GetConnection,f.Restricted);var rows=await reader.ReadAsync("Recipients");
             report.Check(rows.AsEnumerable().All(r=>r.IsNull("Outstanding")),"A general recipient search does not disclose financial balances.");
             await report.Refused("Compose permission cannot read consent administration",()=>reader.ReadAsync("Contacts"),50003);
             await report.Refused("Student viewing does not grant staff recipient access",()=>reader.ReadAsync("Recipients",filter:"Staff"),50003);
             var previousTemplate=template;template=Guid.NewGuid();try{await report.Refused("A utility template cannot bypass financial-field permissions",()=>Template("misclassified_fixture","Utility","{{amount}}"),51001);}finally{template=previousTemplate;}
+        });
+        await report.Stage("Communication: compose-only draft and authorized sender handoff",async()=>{
+            var author=new SqlCommunicationStore(DatabaseHelper.GetConnection,f.Restricted);var id=Guid.NewGuid();
+            await author.CreateAsync(id,template,MessageChannel.Sms,[contact],"Delegated draft fixture",new DateTime(2026,1,1));
+            await report.Refused("A compose-only author cannot submit a message",()=>author.TransitionAsync(id,"Submit"),50003);
+            await store.TransitionAsync(id,"Submit");Ready();var claim=(await store.ClaimAsync(default))!;
+            report.Check(claim is not null && Sql.Count("SELECT COUNT(*) FROM comm.Campaign WHERE CampaignId=@Id AND CreatedBy=@Author AND DispatchActor=@Sender",Sql.P("@Id",id),Sql.P("@Author",f.Restricted),Sql.P("@Sender",f.Admin))==1,"An authorized sender can explicitly take responsibility for another operator's draft.");
+            await store.CompleteAsync(claim!,"Fixture",new(DeliveryState.Accepted,"handoff-"+Guid.NewGuid().ToString("N")));
+            report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Attempt WHERE MessageId=@Id AND Actor=@Sender",Sql.P("@Id",claim!.Id),Sql.P("@Sender",f.Admin))==1,"Submission audit records the actual sending actor separately from the draft author.");
         });
         await report.Stage("Communication: expired lease and schema tamper refusal",async()=>{
             await Contact(true,false);var id=Guid.NewGuid();await store.CreateAsync(id,template,MessageChannel.Sms,[contact],"Lease fixture",new DateTime(2026,1,1));await store.TransitionAsync(id,"Submit");Ready();

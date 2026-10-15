@@ -48,7 +48,7 @@ CREATE TABLE comm.Template(
 CREATE TABLE comm.Campaign(
  CampaignId uniqueidentifier NOT NULL PRIMARY KEY, RequestHash binary(32) NOT NULL, ContentHash binary(32) NOT NULL, TemplateId uniqueidentifier NOT NULL REFERENCES comm.Template(TemplateId),
  Channel varchar(10) NOT NULL CHECK(Channel IN('Sms','WhatsApp')), Status varchar(20) NOT NULL CHECK(Status IN('Draft','AwaitingApproval','Scheduled','Queued','Paused','Cancelled')),
- CreatedBy int NOT NULL REFERENCES dbo.Users(UserId), ApprovedBy int NULL REFERENCES dbo.Users(UserId),
+ CreatedBy int NOT NULL REFERENCES dbo.Users(UserId), ApprovedBy int NULL REFERENCES dbo.Users(UserId), DispatchActor int NULL REFERENCES dbo.Users(UserId),
  CreatedUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(), DueUtc datetime2 NOT NULL, Announcement nvarchar(1000) NOT NULL,
  EventKey nvarchar(150) NULL, PaymentId int NULL REFERENCES dbo.FeePayments(FeePaymentId));
 CREATE INDEX IX_CommCampaign_Duplicate ON comm.Campaign(CreatedBy,ContentHash,CreatedUtc) INCLUDE(Status);
@@ -249,7 +249,7 @@ BEGIN
  BEGIN
   ;WITH D AS(SELECT *,ROW_NUMBER() OVER(PARTITION BY Destination ORDER BY ContactId) N FROM #P) DELETE FROM D WHERE N>1;
  END;
- INSERT comm.Campaign VALUES(@Id,@Hash,@ContentHash,@TemplateId,@Channel,'Draft',@Actor,NULL,SYSUTCDATETIME(),@DueUtc,@Announcement,@EventKey,@PaymentId);
+ INSERT comm.Campaign VALUES(@Id,@Hash,@ContentHash,@TemplateId,@Channel,'Draft',@Actor,NULL,NULL,SYSUTCDATETIME(),@DueUtc,@Announcement,@EventKey,@PaymentId);
  INSERT comm.Message(MessageId,CampaignId,ContactId,AdmissionId,EnrollmentId,Destination,Body,Parameters,Simulation,Segments,EstimatedCost,Currency,State)
  SELECT NEWID(),@Id,ContactId,AdmissionId,EnrollmentId,Destination,Body,Parameters,CONVERT(bit,CASE WHEN (SELECT Mode FROM comm.Settings)<>'Live' THEN 1 ELSE 0 END),Segments,EstimatedCost,Currency,'Draft' FROM #P;
  INSERT comm.Audit(Actor,Operation,EntityId,Detail) VALUES(@Actor,'CampaignCreated',@Id,N'Immutable recipient and message snapshots');
@@ -284,7 +284,7 @@ BEGIN
  ELSE IF @Action='Resume' AND @State='Paused' SET @New=CASE WHEN @Due>SYSUTCDATETIME() THEN 'Scheduled' ELSE 'Queued' END;
  ELSE IF @Action='Cancel' AND @State IN('Draft','AwaitingApproval','Queued','Scheduled','Paused') SET @New='Cancelled';
  ELSE THROW 51001,'This campaign transition is not permitted.',1;
- UPDATE comm.Campaign SET Status=@New WHERE CampaignId=@Id;
+ UPDATE comm.Campaign SET Status=@New,DispatchActor=CASE WHEN @Action IN('Submit','Resume') THEN @Actor ELSE DispatchActor END WHERE CampaignId=@Id;
  IF @New<>'Paused' UPDATE comm.Message SET State=@New,UpdatedUtc=SYSUTCDATETIME() WHERE CampaignId=@Id AND State IN('Draft','AwaitingApproval','Queued','Scheduled');
  INSERT comm.Audit(Actor,Operation,EntityId,Detail) VALUES(@Actor,@Action,@Id,N'Only unsubmitted messages are affected');
  COMMIT;
@@ -306,7 +306,7 @@ BEGIN
  -- Revalidate mutable contact ownership/consent and paid reminders before any provider request.
  UPDATE M SET State='Cancelled',LastCode='CONTACT_OR_BALANCE_CHANGED',UpdatedUtc=@Now
  FROM comm.Message M JOIN comm.Campaign P ON P.CampaignId=M.CampaignId JOIN comm.Contact C ON C.ContactId=M.ContactId JOIN comm.Template T ON T.TemplateId=P.TemplateId
- WHERE P.CreatedBy=@Actor AND M.State IN('Queued','Scheduled') AND (
+ WHERE P.DispatchActor=@Actor AND M.State IN('Queued','Scheduled') AND (
  (C.OwnerKind='Family' AND C.FamilyId IS NULL) OR T.Approved=0 OR C.Verified=0 OR C.OptedOut=1 OR C.Destination<>M.Destination OR (P.Channel='Sms' AND C.SmsConsent=0) OR (P.Channel='WhatsApp' AND C.WhatsAppConsent=0) OR
  (T.Category='Financial' AND C.FinancialConsent=0) OR (T.Category='Announcement' AND C.AnnouncementConsent=0) OR
  (T.Category='Financial' AND P.PaymentId IS NULL AND (comm.Balance(M.AdmissionId)<=0 OR comm.Render(T.Body,C.ContactId,P.Announcement,P.PaymentId)<>M.Body)) OR
@@ -314,7 +314,7 @@ BEGIN
  DECLARE @Id uniqueidentifier,@Campaign uniqueidentifier,@Cost decimal(18,4),@Token uniqueidentifier=NEWID();
  SELECT TOP(1) @Id=M.MessageId,@Campaign=M.CampaignId,@Cost=CASE WHEN @Mode='Simulation' THEN 0 ELSE M.EstimatedCost END
  FROM comm.Message M WITH(UPDLOCK,READPAST,READCOMMITTEDLOCK) JOIN comm.Campaign P WITH(UPDLOCK) ON P.CampaignId=M.CampaignId
- WHERE M.State IN('Queued','Scheduled') AND M.NextAttemptUtc<=@Now AND P.DueUtc<=@Now AND P.Status IN('Queued','Scheduled') AND P.CreatedBy=@Actor
+ WHERE M.State IN('Queued','Scheduled') AND M.NextAttemptUtc<=@Now AND P.DueUtc<=@Now AND P.Status IN('Queued','Scheduled') AND P.DispatchActor=@Actor
  AND M.Simulation=CASE WHEN @Mode='Simulation' THEN 1 ELSE 0 END
  AND (@Mode='Simulation' OR M.Currency=(SELECT Currency FROM comm.Settings) AND CASE WHEN P.Channel='Sms' THEN (SELECT SmsUnitCost FROM comm.Settings) ELSE (SELECT WhatsAppUnitCost FROM comm.Settings) END IS NOT NULL)
  AND ((SELECT COUNT(*) FROM comm.Message X WHERE X.CampaignId=P.CampaignId)<(SELECT ApprovalThreshold FROM comm.Settings) OR P.ApprovedBy IS NOT NULL) ORDER BY P.DueUtc,M.MessageId;
@@ -388,7 +388,7 @@ BEGIN
  ELSE IF @View='Recipients'
  BEGIN
   EXEC dbo.RequirePermission @Actor,N'Communication.Compose';
-  IF @Filter='Staff' EXEC dbo.RequirePermission @Actor,N'Staff.View'; ELSE EXEC dbo.RequirePermission @Actor,N'Students.View';
+  IF @Filter='Staff' EXEC dbo.RequirePermission @Actor,N'Staff.View'; ELSE IF @Filter<>'Manual' EXEC dbo.RequirePermission @Actor,N'Students.View';
   IF @Filter='Outstanding' EXEC dbo.RequirePermission @Actor,N'Fees.View';
   SELECT C.ContactId,C.OwnerKind,C.ContactName,C.Destination,V.student Student,V.class Class,V.year AcademicYear,C.Verified,C.OptedOut,C.Language,C.SmsConsent,C.WhatsAppConsent,
    V.AdmissionId,V.FamilyId,CASE WHEN @Filter='Outstanding' AND V.AdmissionId IS NOT NULL THEN comm.Balance(V.AdmissionId) END Outstanding
@@ -465,6 +465,37 @@ BEGIN
  IF NOT EXISTS(SELECT 1 FROM comm.Message M JOIN comm.Campaign P ON P.CampaignId=M.CampaignId WHERE M.MessageId=@Id AND P.CreatedBy=@Actor) EXEC dbo.RequirePermission @Actor,N'Communication.History';
  SELECT M.MessageId,M.CampaignId,M.ContactId,M.AdmissionId,M.Body,M.Parameters,M.State,M.Simulation,M.Provider,M.ProviderReference,M.LastCode,M.Attempts,M.EstimatedCost,M.Currency,M.UpdatedUtc,
  CONCAT(LEFT(M.Destination,3),'******',RIGHT(M.Destination,3)) Destination FROM comm.Message M WHERE M.MessageId=@Id;
+END;
+GO
+CREATE PROCEDURE comm.SaveRolePermissions @UserId int,@RoleId int,@PermissionIdsJson nvarchar(max) AS
+BEGIN
+ SET NOCOUNT ON;SET XACT_ABORT ON;
+ EXEC dbo.RequireAnyPermission @UserId,N'System.Roles.Manage',N'System.Administration';
+ IF ISNULL(ISJSON(@PermissionIdsJson),0)<>1 OR LEFT(LTRIM(@PermissionIdsJson),1)<>N'[' THROW 51001,'Select a valid permission list.',1;
+ IF EXISTS(SELECT 1 FROM OPENJSON(@PermissionIdsJson) WHERE [type]<>2 OR TRY_CONVERT(int,value) IS NULL OR TRY_CONVERT(int,value)<=0) THROW 51001,'Permission IDs must be positive integers.',1;
+ DECLARE @Selected TABLE(PermissionId int NOT NULL PRIMARY KEY);
+ INSERT @Selected SELECT DISTINCT CONVERT(int,value) FROM OPENJSON(@PermissionIdsJson);
+ IF EXISTS(SELECT 1 FROM @Selected S LEFT JOIN dbo.Permissions P ON P.PermissionId=S.PermissionId WHERE P.PermissionId IS NULL) THROW 51001,'Unknown permission selection.',1;
+ DECLARE @Optional TABLE(PermissionId int NOT NULL PRIMARY KEY,Code nvarchar(100));
+ INSERT @Optional SELECT P.PermissionId,P.PermissionCode FROM @Selected S JOIN dbo.Permissions P ON P.PermissionId=S.PermissionId WHERE P.PermissionCode IN(N'Communication.View',N'Communication.Compose',N'Communication.Send',N'Communication.Bulk',N'Communication.Approve',N'Communication.Configure',N'Communication.History');
+ IF EXISTS(SELECT 1 FROM @Optional WHERE Code<>N'Communication.View') AND NOT EXISTS(SELECT 1 FROM @Optional WHERE Code=N'Communication.View') THROW 51001,'Communication actions require Communication.View.',1;
+ IF EXISTS(SELECT 1 FROM @Optional WHERE Code IN(N'Communication.Send',N'Communication.Bulk')) AND NOT EXISTS(SELECT 1 FROM @Optional WHERE Code=N'Communication.Compose') THROW 51001,'Sending and bulk composition require Communication.Compose.',1;
+ IF EXISTS(SELECT 1 FROM @Optional WHERE Code=N'Communication.Approve') AND NOT EXISTS(SELECT 1 FROM @Optional WHERE Code=N'Communication.History') THROW 51001,'Approvers need Communication.History to review campaigns.',1;
+ DECLARE @Base nvarchar(max)=N'['+ISNULL((SELECT STRING_AGG(CONVERT(nvarchar(max),S.PermissionId),N',') WITHIN GROUP(ORDER BY S.PermissionId) FROM @Selected S WHERE NOT EXISTS(SELECT 1 FROM @Optional O WHERE O.PermissionId=S.PermissionId)),N'')+N']';
+ BEGIN TRANSACTION;
+ DECLARE @RoleName nvarchar(50);SELECT @RoleName=RoleName FROM dbo.Roles WITH(UPDLOCK,HOLDLOCK) WHERE RoleId=@RoleId;
+ IF ISNULL(@RoleName,N'')<>N'Accountant' THROW 51001,'Only Accountant permissions are editable; Administrator retains full authority.',1;
+ DECLARE @Old nvarchar(max)=N'['+ISNULL((SELECT STRING_AGG(CONVERT(nvarchar(max),PermissionId),N',') WITHIN GROUP(ORDER BY PermissionId) FROM dbo.RolePermissions WHERE RoleId=@RoleId),N'')+N']';
+ -- Preserve every baseline permission validation, protected-role rule and audit.
+ DECLARE @Saved TABLE(RoleId int);INSERT @Saved EXEC dbo.SaveRolePermissions @UserId,@RoleId,@Base;
+ INSERT dbo.RolePermissions(RoleId,PermissionId) SELECT @RoleId,PermissionId FROM @Optional;
+ DECLARE @New nvarchar(max)=N'['+ISNULL((SELECT STRING_AGG(CONVERT(nvarchar(max),PermissionId),N',') WITHIN GROUP(ORDER BY PermissionId) FROM dbo.RolePermissions WHERE RoleId=@RoleId),N'')+N']',@Operation uniqueidentifier=NEWID(),@Record nvarchar(200)=CONVERT(nvarchar(200),@RoleId);
+ INSERT dbo.AuditOperations(OperationId,UserId,OperationType,CorrelationNote) VALUES(@Operation,@UserId,N'COMMUNICATION_ROLE_PERMISSIONS_SAVE',@Record);
+ EXEC dbo.WriteAuditLog @OperationId=@Operation,@UserId=@UserId,@TableName=N'RolePermissions',@RecordId=@Record,@Action=N'UPDATE',@OldValues=@Old,@NewValues=@New;
+ DELETE dbo.AuditOperations WHERE OperationId=@Operation AND NOT EXISTS(SELECT 1 FROM dbo.AuditLogs WHERE OperationId=@Operation);
+ INSERT comm.Audit(Actor,Operation,Detail) VALUES(@UserId,'CommunicationGrantsSaved',N'Explicit role edit; original base permission procedure and protected-role checks retained');
+ COMMIT;
+ SELECT @RoleId RoleId;
 END;
 GO
 CREATE PROCEDURE comm.SaveRule @Actor int,@Id uniqueidentifier,@Name nvarchar(100),@Event varchar(30),@TemplateId uniqueidentifier,@Channel varchar(10),@Enabled bit,@Approval bit=1,@Delay int=0,@Limit int=25 AS

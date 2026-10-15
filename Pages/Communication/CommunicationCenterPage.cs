@@ -80,7 +80,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private void BuildWorkspace()
     {
         channel.Items.AddRange(["Sms","WhatsApp"]);channel.SelectedIndex=0;
-        recipientFilter.Items.AddRange(["Student / family / manual","Outstanding","Family","Staff","Manual","Pending"]);recipientFilter.SelectedIndex=0;
+        recipientFilter.Items.AddRange(["Student / family / manual","Outstanding","Family","Staff","Manual","Pending"]);recipientFilter.SelectedIndex=CurrentUser.HasPermission("Students.View")?0:CurrentUser.HasPermission("Staff.View")?3:4;
         channel.Width=AppScale.Scale(120);recipientFilter.Width=AppScale.Scale(150);templateChoice.Width=AppScale.Scale(320);
         schedule.ShowCheckBox=true;schedule.Checked=false;schedule.Format=DateTimePickerFormat.Custom;schedule.CustomFormat="dd-MMM-yyyy HH:mm";
         announcement.Height=AppScale.Scale(80);announcement.MinimumSize=new Size(0,AppScale.Scale(80));
@@ -109,7 +109,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
                 if(!ModernMessageDialog.Confirm(FindForm(),$"Create a durable draft for {included.Count} selected contacts? No message is sent until Submit is confirmed.","Create Communication Draft"))return;
                 requestDue??=schedule.Checked?schedule.Value.ToUniversalTime():DateTime.UtcNow;
                 await service.PrepareAsync(requestId,SelectedTemplate(),SelectedChannel(),included,announcement.Text,requestDue.Value,lifetime.Token);
-                savedSignature=Signature();SetStatus("Draft saved: "+requestId+". Review it in Outbox, then Submit. Approval may be required.");
+                savedSignature=Signature();SetStatus("Draft saved: "+requestId+(CurrentUser.HasPermission("Communication.Send")?". Review it in Outbox, then Submit. Approval may be required.":". An authorized sender must review and submit it from History. No message was sent."));
                 prepare.Enabled=false;
             });};
         Row(Bar(Button("Preview Messages",PreviewAsync,"Communication.Compose","Primary"),prepare,Button("New Message",()=>{
