@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlDefaultConstraint" Name="[dbo].[DF_Campuses_CreatedAt]">
+			<ns0:Property Name="DefaultExpressionScript">
+				<ns0:Value>(sysdatetime())</ns0:Value>
+			</ns0:Property>
+			<ns0:Relationship Name="DefiningTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="ForColumn">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses].[CreatedAt]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

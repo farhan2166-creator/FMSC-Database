@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlDatabaseOptions" Disambiguator="1">
+			<ns0:Property Name="Collation" Value="SQL_Latin1_General_CP1_CI_AS" />
+			<ns0:Property Name="IsAnsiPaddingOn" Value="False" />
+			<ns0:Property Name="IsQuotedIdentifierOn" Value="False" />
+			<ns0:Property Name="IsCursorDefaultScopeGlobal" Value="True" />
+			<ns0:Property Name="IsTornPageProtectionOn" Value="False" />
+			<ns0:Property Name="RecoveryMode" Value="1" />
+			<ns0:Property Name="IsFullTextEnabled" Value="True" />
+			<ns0:Property Name="TargetRecoveryTimePeriod" Value="60" />
+			<ns0:Property Name="QueryStoreCaptureMode" Value="2" />
+			<ns0:Property Name="QueryStoreMaxStorageSize" Value="1000" />
+			<ns0:Property Name="TemporalHistoryRetentionEnabled" Value="False" />
+			<ns0:Relationship Name="DefaultFilegroup">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[PRIMARY]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="GenericDatabaseScopedConfigurationOptions">
+				<ns0:Entry>
+					<ns0:References Name="[IDENTITY_CACHE]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

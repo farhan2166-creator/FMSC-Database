@@ -1,0 +1,216 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[MoveAcademicProgram]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    EXEC dbo.RequirePermission @UserId, N'System.Setup';
+    IF @Direction NOT IN (-1,1) THROW 57402, 'Invalid move direction.', 1;
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        DECLARE @Lock int;
+        EXEC @Lock=sys.sp_getapplock @Resource=N'SetupOrder:AcademicPrograms',
+            @LockMode='Exclusive',@LockOwner='Transaction',@LockTimeout=10000;
+        IF @Lock&lt;0 THROW 57401, 'Unable to lock setup ordering. Please try again.', 1;
+        DECLARE @Items TABLE(Id int PRIMARY KEY, Position int);
+        INSERT @Items SELECT AcademicProgramId,
+            ROW_NUMBER() OVER(ORDER BY DisplayOrder,AcademicProgramId)
+            FROM dbo.AcademicPrograms WITH(UPDLOCK,HOLDLOCK);
+        DECLARE @Position int=(SELECT Position FROM @Items WHERE Id=@AcademicProgramId);
+        IF @Position IS NULL THROW 57403, 'The selected program was not found.', 1;
+        IF EXISTS(SELECT 1 FROM @Items WHERE Position=@Position+@Direction)
+            UPDATE @Items SET Position=CASE WHEN Id=@AcademicProgramId
+                THEN @Position+@Direction ELSE @Position END
+                WHERE Position IN(@Position,@Position+@Direction);
+        UPDATE P SET DisplayOrder=-I.Position FROM dbo.AcademicPrograms P JOIN @Items I ON I.Id=P.AcademicProgramId;
+        UPDATE dbo.AcademicPrograms SET DisplayOrder=-DisplayOrder;
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE()&lt;&gt;0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[MoveAcademicProgram].[@Items].[Position]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[MoveAcademicProgram].[@Items].[Id]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[MoveAcademicProgram].[@AcademicProgramId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[MoveAcademicProgram].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[MoveAcademicProgram].[@Direction]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutine" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@Resource]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockMode]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockOwner]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockTimeout]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms].[AcademicProgramId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms].[DisplayOrder]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[MoveAcademicProgram].[@Items].[Position]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[MoveAcademicProgram].[@Items].[Id]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[MoveAcademicProgram].[@Items].[Id]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms].[AcademicProgramId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[MoveAcademicProgram].[@Items].[Position]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DynamicObjects">
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[MoveAcademicProgram].[@Items]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[MoveAcademicProgram].[@Items].[Id]">
+									<ns0:Property Name="IsNullable" Value="False" />
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[MoveAcademicProgram].[@Items].[Position]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[MoveAcademicProgram].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[MoveAcademicProgram].[@AcademicProgramId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[MoveAcademicProgram].[@Direction]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="1" />
+				<ns0:Property Name="Length" Value="1613" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;CREATE   PROCEDURE dbo.MoveAcademicProgram&#10;    @UserId int, @AcademicProgramId int, @Direction int&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

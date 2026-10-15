@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlCheckConstraint" Name="[dbo].[CK_AuditLogs_Action]">
+			<ns0:Property Name="CheckExpressionScript">
+				<ns0:Value>[Action]=N'OTHER' OR [Action]=N'LOCK' OR [Action]=N'PUBLISH' OR [Action]=N'REJECT' OR [Action]=N'APPROVE' OR [Action]=N'REVERSAL' OR [Action]=N'REFUND' OR [Action]=N'PAYMENT' OR [Action]=N'TRANSFER_SECTION' OR [Action]=N'TRANSFER_CLASS' OR [Action]=N'TRANSFER_CAMPUS' OR [Action]=N'PROMOTE' OR [Action]=N'LEAVE' OR [Action]=N'RE-ADMIT' OR [Action]=N'DELETE' OR [Action]=N'UPDATE' OR [Action]=N'INSERT'</ns0:Value>
+			</ns0:Property>
+			<ns0:Relationship Name="CheckExpressionDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[Action]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DefiningTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

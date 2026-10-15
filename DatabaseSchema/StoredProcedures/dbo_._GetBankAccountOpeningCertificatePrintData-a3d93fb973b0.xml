@@ -1,0 +1,154 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetBankAccountOpeningCertificatePrintData]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Certificates.Print';
+
+    IF @BankAccountOpeningCertificateId &lt;= 0
+        THROW 58820, 'A valid certificate is required.', 1;
+
+    SELECT
+        BAC.BankAccountOpeningCertificateId,
+        BAC.StaffId,
+
+        BAC.CertificateNumber AS CertificateNumber,
+
+        BAC.StaffName,
+        BAC.FatherName,
+        BAC.Gender,
+        BAC.CNIC,
+        BAC.Designation,
+        BAC.BankName,
+        BAC.BranchName,
+        BAC.MonthlyIncome,
+        BAC.Purpose,
+        BAC.CertificateDate,
+        BAC.CreatedAt AS DateOfIssue,
+
+        SP.SchoolName AS InstitutionLine
+
+    FROM dbo.BankAccountOpeningCertificates AS BAC
+
+    CROSS JOIN dbo.SchoolProfile AS SP
+
+    WHERE BAC.BankAccountOpeningCertificateId = @BankAccountOpeningCertificateId
+      AND SP.SchoolProfileId = 1;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetBankAccountOpeningCertificatePrintData].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetBankAccountOpeningCertificatePrintData].[@BankAccountOpeningCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[BankAccountOpeningCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[StaffId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[CertificateNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[StaffName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[FatherName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[Gender]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[CNIC]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[Designation]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[BankName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[BranchName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[MonthlyIncome]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[Purpose]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BankAccountOpeningCertificates].[CreatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[SchoolName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[SchoolProfileId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetBankAccountOpeningCertificatePrintData].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetBankAccountOpeningCertificatePrintData].[@BankAccountOpeningCertificateId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="687" />
+				<ns0:Property Name="Length" Value="1720" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#13;&#10;/* =====================================================================&#13;&#10;   5. dbo.GetBankAccountOpeningCertificatePrintData&#13;&#10;&#13;&#10;      CertificateNumber follows the same &quot;BA-000123&quot; derived-from-&#13;&#10;      identity convention as the other certificates (&quot;RL-&quot;/&quot;RS-&quot;/&quot;CC-&quot;/&#13;&#10;      &quot;SC-&quot;/&quot;NOC-&quot;/&quot;PC-&quot;).&#13;&#10;&#13;&#10;      InstitutionLine is just SchoolProfile.SchoolName (no campus split -&#13;&#10;      staff aren't tied to a single home campus, same as&#13;&#10;      RegularLecturerCertificate), composed here so the RDLC itself&#13;&#10;      stays a plain First(Fields!InstitutionLine...) - no string-&#13;&#10;      building in RDLC expressions.&#13;&#10;   ===================================================================== */&#13;&#10;&#13;&#10;CREATE PROCEDURE dbo.GetBankAccountOpeningCertificatePrintData&#13;&#10;    @UserId INT,&#13;&#10;    @BankAccountOpeningCertificateId INT&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

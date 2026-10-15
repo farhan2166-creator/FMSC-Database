@@ -1,0 +1,25 @@
+-- Module body only. See companion XML for signatures and relationships.
+
+BEGIN
+    SET NOCOUNT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Backup.Create';
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.Users
+                   WHERE  UserId = @UserId)
+        THROW 50001, 'The specified user does not exist.', 1;
+    IF @NewFilePath IS NULL
+       OR LTRIM(RTRIM(@NewFilePath)) = N''
+        THROW 52851, 'A new file path is required.', 1;
+    IF @NewFileName IS NULL
+       OR LTRIM(RTRIM(@NewFileName)) = N''
+        THROW 52852, 'A new file name is required.', 1;
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.DatabaseBackups
+                   WHERE  BackupId = @BackupId)
+        THROW 52853, 'The specified backup history record was not found.', 1;
+    UPDATE dbo.DatabaseBackups
+    SET    FilePath = @NewFilePath,
+           FileName = @NewFileName,
+           Remarks  = LEFT(CONCAT(COALESCE (Remarks + N' ', N''), N'[Relocated to new path on ', CONVERT (NVARCHAR (19), SYSUTCDATETIME(), 120), N' UTC]'), 500)
+    WHERE  BackupId = @BackupId;
+END

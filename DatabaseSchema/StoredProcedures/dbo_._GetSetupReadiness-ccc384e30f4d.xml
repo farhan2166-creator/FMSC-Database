@@ -1,0 +1,348 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetSetupReadiness]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    DECLARE @Setup AS BIT = 0, @Fees AS BIT = 0, @Calendar AS BIT = 0;
+    BEGIN TRY
+        EXECUTE dbo.RequirePermission @UserId, N'System.Setup';
+        SET @Setup = 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() &lt;&gt; 50003
+            THROW;
+    END CATCH
+    BEGIN TRY
+        EXECUTE dbo.RequirePermission @UserId, N'Fees.Configuration.Manage';
+        SET @Fees = 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() &lt;&gt; 50003
+            THROW;
+    END CATCH
+    BEGIN TRY
+        EXECUTE dbo.RequirePermission @UserId, N'Calendar.Manage';
+        SET @Calendar = 1;
+    END TRY
+    BEGIN CATCH
+        IF ERROR_NUMBER() &lt;&gt; 50003
+            THROW;
+    END CATCH
+    IF @Setup = 0
+       AND @Fees = 0
+       AND @Calendar = 0
+        THROW 50003, 'Setup access is required.', 1;
+    DECLARE @Issues TABLE (
+        Area    NVARCHAR (50) ,
+        Issue   NVARCHAR (500),
+        PageKey NVARCHAR (40) );
+    IF @Setup = 1
+        BEGIN
+            IF NOT EXISTS (SELECT 1
+                           FROM   dbo.SchoolProfile
+                           WHERE  NULLIF (LTRIM(RTRIM(SchoolName)), N'') IS NOT NULL
+                                  AND NULLIF (LTRIM(RTRIM(AddressLine)), N'') IS NOT NULL
+                                  AND NULLIF (LTRIM(RTRIM(ContactNumber)), N'') IS NOT NULL)
+                INSERT  @Issues
+                VALUES (N'School profile', N'Complete the school name, address and contact number used on documents.', N'Profile');
+            IF NOT EXISTS (SELECT 1
+                           FROM   dbo.Campuses)
+                INSERT  @Issues
+                VALUES (N'Campuses', N'Add an campus.', N'Campuses');
+            IF NOT EXISTS (SELECT 1
+                           FROM   dbo.CampusClassSections AS CCS
+                                  INNER JOIN
+                                  dbo.Campuses AS C
+                                  ON C.CampusId = CCS.CampusId
+                                  INNER JOIN
+                                  dbo.Classes AS CL
+                                  ON CL.ClassId = CCS.ClassId
+                                  INNER JOIN
+                                  dbo.Sections AS S
+                                  ON S.SectionId = CCS.SectionId)
+                INSERT  @Issues
+                VALUES (N'Placement', N'Assign classes and sections to an campus.', N'Assignments');
+        END
+    IF @Calendar = 1
+       AND (SELECT COUNT(*)
+            FROM   dbo.AcademicYears
+            WHERE  IsCurrent = 1
+                   AND CONVERT (DATE, GETDATE()) BETWEEN StartDate AND EndDate) &lt;&gt; 1
+        INSERT  @Issues
+        VALUES (N'Academic year', N'Select one current academic year covering today.', N'Years');
+    IF @Fees = 1
+        BEGIN
+            IF NOT EXISTS (SELECT 1
+                           FROM   dbo.FeeTypes
+                           WHERE  IsMandatory = 1
+                                  AND IsTransportLinked = 0)
+                INSERT  @Issues
+                VALUES (N'Fee types', N'No mandatory non-transport fee type is configured. Confirm this is intentional.', N'Fees');
+            INSERT @Issues
+            SELECT DISTINCT N'Fee rates',
+                            CONCAT(C.CampusName, N' / ', CL.ClassName, N': configure ', FT.FeeTypeName, N' (zero is allowed for an intentionally free fee).'),
+                            N'Fees'
+            FROM   dbo.CampusClassSections AS CCS
+                   INNER JOIN
+                   dbo.Campuses AS C
+                   ON C.CampusId = CCS.CampusId
+                   INNER JOIN
+                   dbo.Classes AS CL
+                   ON CL.ClassId = CCS.ClassId
+                   INNER JOIN
+                   dbo.Sections AS S
+                   ON S.SectionId = CCS.SectionId CROSS JOIN dbo.FeeTypes AS FT
+            WHERE  FT.IsMandatory = 1
+                   AND FT.IsTransportLinked = 0
+                   AND NOT EXISTS (SELECT 1
+                                   FROM   dbo.FeeConfigurations AS FC
+                                   WHERE  FC.CampusId = CCS.CampusId
+                                          AND FC.ClassId = CCS.ClassId
+                                          AND FC.FeeTypeId = FT.FeeTypeId
+                                          AND FC.Amount &gt;= 0);
+        END
+    SELECT   Area,
+             Issue,
+             PageKey
+    FROM     @Issues
+    ORDER BY Area, Issue;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetSetupReadiness].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[SchoolName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[AddressLine]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[ContactNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections].[SectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[SectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[IsCurrent]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[StartDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[EndDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[IsMandatory]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[IsTransportLinked]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections].[SectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[SectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses].[CampusName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[IsMandatory]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[IsTransportLinked]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetSetupReadiness].[@Issues].[Area]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetSetupReadiness].[@Issues].[Issue]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetSetupReadiness].[@Issues].[PageKey]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DynamicObjects">
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[GetSetupReadiness].[@Issues]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[GetSetupReadiness].[@Issues].[Area]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Length" Value="50" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[GetSetupReadiness].[@Issues].[Issue]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Length" Value="500" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[GetSetupReadiness].[@Issues].[PageKey]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Length" Value="40" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetSetupReadiness].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="22" />
+				<ns0:Property Name="Length" Value="4607" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- GetSetupReadiness&#10;CREATE   PROCEDURE dbo.GetSetupReadiness&#13;&#10;@UserId INT&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

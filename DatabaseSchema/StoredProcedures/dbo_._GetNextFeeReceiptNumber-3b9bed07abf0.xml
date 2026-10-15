@@ -1,0 +1,141 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetNextFeeReceiptNumber]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    IF @ReceiptDate IS NULL
+        SET @ReceiptDate = CAST(GETDATE() AS DATE);
+
+    DECLARE @Year INT = YEAR(@ReceiptDate);
+    DECLARE @LastNumber INT;
+
+    SELECT
+        @LastNumber = LastNumber
+    FROM dbo.FeeReceiptNumberCounters WITH (UPDLOCK, HOLDLOCK)
+    WHERE CounterYear = @Year;
+
+    IF @LastNumber IS NULL
+    BEGIN
+        SET @LastNumber = 1;
+
+        INSERT dbo.FeeReceiptNumberCounters
+        (
+            CounterYear,
+            LastNumber
+        )
+        VALUES
+        (
+            @Year,
+            @LastNumber
+        );
+    END
+    ELSE
+    BEGIN
+        SET @LastNumber += 1;
+
+        UPDATE dbo.FeeReceiptNumberCounters
+        SET
+            LastNumber = @LastNumber
+        WHERE CounterYear = @Year;
+    END;
+
+    /* FIX 079 - pad to a minimum of four digits, widen past 9999 instead of
+       truncating. RIGHT(..., 4) alone produced '0000' at 10000 and '2345' at
+       12345, both of which duplicate a number already issued that year. */
+    DECLARE @Digits NVARCHAR(20) = CONVERT(NVARCHAR(20), @LastNumber);
+
+    SET @ReceiptNumber =
+        N'FMSC-' +
+        CONVERT(NVARCHAR(4), @Year) + N'-' +
+        RIGHT(
+            N'0000' + @Digits,
+            CASE WHEN LEN(@Digits) &gt; 4 THEN LEN(@Digits) ELSE 4 END);
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetNextFeeReceiptNumber].[@ReceiptDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeReceiptNumberCounters]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeReceiptNumberCounters].[LastNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeReceiptNumberCounters].[CounterYear]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetNextFeeReceiptNumber].[@ReceiptNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetNextFeeReceiptNumber].[@ReceiptDate]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetNextFeeReceiptNumber].[@ReceiptNumber]">
+						<ns0:Property Name="IsOutput" Value="True" />
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="40" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="232" />
+				<ns0:Property Name="Length" Value="1715" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#13;&#10;/* ---------------------------------------------------------------------------&#13;&#10;   GetNextFeeReceiptNumber - only the final number build changes.&#13;&#10;   --------------------------------------------------------------------------- */&#13;&#10;CREATE   PROCEDURE dbo.GetNextFeeReceiptNumber&#13;&#10;(&#13;&#10;    @ReceiptDate DATE,&#13;&#10;    @ReceiptNumber NVARCHAR(40) OUTPUT&#13;&#10;)&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

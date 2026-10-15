@@ -1,0 +1,97 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetSportsCertificateFieldSuggestions]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Certificates.Create';
+
+    IF @Field = N'SportName'
+        SELECT DISTINCT TOP (500) SportName AS Value
+        FROM dbo.SportsCertificates
+        WHERE SportName IS NOT NULL
+          AND LTRIM(RTRIM(SportName)) &lt;&gt; N''
+        ORDER BY SportName;
+
+    ELSE IF @Field = N'Performance'
+        SELECT DISTINCT TOP (500) Performance AS Value
+        FROM dbo.SportsCertificates
+        WHERE Performance IS NOT NULL
+          AND LTRIM(RTRIM(Performance)) &lt;&gt; N''
+        ORDER BY Performance;
+
+    ELSE
+        THROW 51601, 'Unknown suggestion field.', 1;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetSportsCertificateFieldSuggestions].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetSportsCertificateFieldSuggestions].[@Field]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates].[SportName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates].[Performance]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetSportsCertificateFieldSuggestions].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetSportsCertificateFieldSuggestions].[@Field]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="50" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="369" />
+				<ns0:Property Name="Length" Value="1118" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;/* =====================================================================&#10;   6. dbo.GetSportsCertificateFieldSuggestions&#10;&#10;      Both Sport Name and Performance recur across certificates, so&#10;      unlike Character Certificate (Remarks only) both fields get a&#10;      type-ahead suggestion list.&#10;   ===================================================================== */&#10;&#10;CREATE   PROCEDURE dbo.GetSportsCertificateFieldSuggestions&#10;    @UserId INT,&#10;    @Field NVARCHAR(50)&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

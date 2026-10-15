@@ -1,0 +1,17 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlCheckConstraint" Name="[dbo].[CK_Campuses_Type]">
+			<ns0:Property Name="CheckExpressionScript">
+				<ns0:Value>[CampusType]=N'Other' OR [CampusType]=N'Combined' OR [CampusType]=N'College' OR [CampusType]=N'School'</ns0:Value>
+			</ns0:Property>
+			<ns0:Relationship Name="CheckExpressionDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses].[CampusType]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DefiningTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

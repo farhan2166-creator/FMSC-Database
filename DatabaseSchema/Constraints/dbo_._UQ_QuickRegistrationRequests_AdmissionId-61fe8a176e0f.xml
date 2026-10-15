@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlUniqueConstraint" Name="[dbo].[UQ_QuickRegistrationRequests_AdmissionId]">
+			<ns0:Relationship Name="ColumnSpecifications">
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[QuickRegistrationRequests].[AdmissionId]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DefiningTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[QuickRegistrationRequests]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

@@ -1,0 +1,589 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[ConfirmPromotedAdmission]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Students.Administer';
+    IF @ReturnDate IS NULL
+       OR @ReturnDate &gt; CONVERT (DATE, SYSDATETIME())
+        THROW 53010, 'Enter a valid return date that is not in the future.', 1;
+    IF EXISTS (SELECT 1
+               FROM   @FeeChoices
+               WHERE  Amount &lt; 0
+                      OR DiscountAmount &lt; 0
+                      OR DiscountAmount &gt; Amount)
+        THROW 53011, 'Each fee amount and discount must be valid.', 1;
+    BEGIN TRANSACTION;
+    DECLARE @AdmissionId AS INT, @AcademicYearId AS INT, @ClassSectionId AS INT, @EnrollmentDate AS DATE, @BillingReady AS BIT, @YearEnd AS DATE, @CampusId AS INT, @ClassId AS INT;
+    SELECT @AdmissionId = E.AdmissionId,
+           @AcademicYearId = E.AcademicYearId,
+           @ClassSectionId = E.ClassSectionId,
+           @EnrollmentDate = E.EnrollmentDate,
+           @BillingReady = E.BillingReady
+    FROM   dbo.Enrollments AS E WITH (UPDLOCK, HOLDLOCK)
+    WHERE  E.EnrollmentId = @EnrollmentId
+           AND E.Status = N'Active';
+    IF @AdmissionId IS NULL
+       OR @BillingReady &lt;&gt; 0
+        THROW 53012, 'This promoted enrollment is not awaiting return confirmation.', 1;
+    SELECT @YearEnd = AY.EndDate
+    FROM   dbo.AcademicYears AS AY
+    WHERE  AY.AcademicYearId = @AcademicYearId;
+    IF @ReturnDate &lt; @EnrollmentDate
+       OR @ReturnDate &gt; @YearEnd
+        THROW 53013, 'Return date must be within the promoted academic year.', 1;
+    SELECT @CampusId = CCS.CampusId,
+           @ClassId = CCS.ClassId
+    FROM   dbo.CampusClassSections AS CCS
+    WHERE  CCS.ClassSectionId = @ClassSectionId;
+    IF EXISTS (SELECT 1
+               FROM   dbo.StudentFeeAssignments AS SFA
+                      INNER JOIN
+                      dbo.FeeTypes AS FT
+                      ON FT.FeeTypeId = SFA.FeeTypeId
+               WHERE  SFA.EnrollmentId = @EnrollmentId
+                      AND SFA.CancelledAt IS NULL
+                      AND FT.IsMandatory = 1
+                      AND NOT EXISTS (SELECT 1
+                                      FROM   @FeeChoices AS C
+                                      WHERE  C.FeeTypeId = SFA.FeeTypeId))
+       OR EXISTS (SELECT 1
+                  FROM   @FeeChoices AS C
+                  WHERE  NOT EXISTS (SELECT 1
+                                     FROM   dbo.StudentFeeAssignments AS SFA
+                                            INNER JOIN
+                                            dbo.FeeTypes AS FT
+                                            ON FT.FeeTypeId = SFA.FeeTypeId
+                                     WHERE  SFA.EnrollmentId = @EnrollmentId
+                                            AND SFA.CancelledAt IS NULL
+                                            AND FT.IsMandatory = 1
+                                            AND SFA.FeeTypeId = C.FeeTypeId))
+        THROW 53014, 'Review every mandatory class fee before confirming return.', 1;
+    UPDATE SFA
+    SET    Amount         = C.Amount,
+           DiscountAmount = C.DiscountAmount,
+           UpdatedAt      = SYSDATETIME()
+    FROM   dbo.StudentFeeAssignments AS SFA
+           INNER JOIN
+           @FeeChoices AS C
+           ON C.FeeTypeId = SFA.FeeTypeId
+    WHERE  SFA.EnrollmentId = @EnrollmentId
+           AND SFA.CancelledAt IS NULL;
+    IF @UsesTransport = 1
+        BEGIN
+            IF NOT EXISTS (SELECT 1
+                           FROM   dbo.FeeConfigurations AS FC
+                                  INNER JOIN
+                                  dbo.FeeTypes AS FT
+                                  ON FT.FeeTypeId = FC.FeeTypeId
+                           WHERE  FC.CampusId = @CampusId
+                                  AND FC.ClassId = @ClassId
+                                  AND FC.Frequency = N'Monthly'
+                                  AND FT.IsTransportLinked = 1)
+                THROW 53015, 'Transport cannot be selected without a monthly class fee.', 1;
+            INSERT dbo.StudentFeeAssignments (EnrollmentId, AdmissionId, FeeTypeId, Amount, DiscountAmount, Frequency, Remarks)
+            SELECT @EnrollmentId,
+                   @AdmissionId,
+                   FC.FeeTypeId,
+                   FC.Amount,
+                   0,
+                   FC.Frequency,
+                   N'Chosen at return admission'
+            FROM   dbo.FeeConfigurations AS FC
+                   INNER JOIN
+                   dbo.FeeTypes AS FT
+                   ON FT.FeeTypeId = FC.FeeTypeId
+            WHERE  FC.CampusId = @CampusId
+                   AND FC.ClassId = @ClassId
+                   AND FT.IsTransportLinked = 1
+                   AND NOT EXISTS (SELECT 1
+                                   FROM   dbo.StudentFeeAssignments AS SFA
+                                   WHERE  SFA.EnrollmentId = @EnrollmentId
+                                          AND SFA.FeeTypeId = FC.FeeTypeId
+                                          AND SFA.EffectiveTo IS NULL);
+        END
+    DECLARE @CutoffDay AS INT = (SELECT TOP (1) FeeProrationCutoffDay
+                                 FROM   dbo.SchoolProfile);
+    DECLARE @BillingStartDate AS DATE = CASE WHEN @CutoffDay BETWEEN 1 AND 28
+                                                  AND DAY(@ReturnDate) &gt;= @CutoffDay THEN DATEADD(month, 1, DATEFROMPARTS(YEAR(@ReturnDate), MONTH(@ReturnDate), 1)) ELSE @ReturnDate END;
+    UPDATE dbo.Enrollments
+    SET    BillingReady      = 1, PlacementConfirmedAt=COALESCE(PlacementConfirmedAt,SYSDATETIME()),
+           ReturnConfirmedAt = CONVERT (DATETIME2 (0), @ReturnDate),
+           BillingStartDate  = @BillingStartDate,
+           UsesTransport     = @UsesTransport
+    WHERE  EnrollmentId = @EnrollmentId;
+    EXECUTE dbo.PostEnrollmentOpeningCharges @EnrollmentId = @EnrollmentId;
+    INSERT  dbo.EnrollmentHistory (EnrollmentId, AdmissionId, ActionType, ActionDate, OldClassSectionId, NewClassSectionId, OldStatus, NewStatus, Remarks, UserId)
+    VALUES                       (@EnrollmentId, @AdmissionId, N'ReturnConfirmed', @ReturnDate, @ClassSectionId, @ClassSectionId, N'Active', N'Active', N'Admission confirmed after promotion', @UserId);
+    COMMIT TRANSACTION;
+    SELECT @EnrollmentId AS EnrollmentId,
+           @AdmissionId AS AdmissionId,
+           @BillingStartDate AS BillingStartDate;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[FeeProrationCutoffDay]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@ReturnDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[ClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[BillingReady]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[EndDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[ClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[CancelledAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[IsMandatory]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[CancelledAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[IsMandatory]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[CancelledAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmPromotedAdmission].[@UsesTransport]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[Frequency]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[IsTransportLinked]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Frequency]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[Frequency]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[IsTransportLinked]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EffectiveTo]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[BillingReady]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[PlacementConfirmedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[ReturnConfirmedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[datetime2]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[BillingStartDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[UsesTransport]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostEnrollmentOpeningCharges]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostEnrollmentOpeningCharges].[@EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[ActionType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[ActionDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[OldClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[NewClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[OldStatus]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[NewStatus]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[UserId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DynamicObjects">
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices]" Disambiguator="4">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices].[FeeTypeId]">
+									<ns0:Property Name="IsNullable" Value="False" />
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices].[Amount]">
+									<ns0:Property Name="IsNullable" Value="False" />
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Scale" Value="2" />
+												<ns0:Property Name="Precision" Value="12" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices].[DiscountAmount]">
+									<ns0:Property Name="IsNullable" Value="False" />
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Scale" Value="2" />
+												<ns0:Property Name="Precision" Value="12" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ConfirmPromotedAdmission].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ConfirmPromotedAdmission].[@EnrollmentId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ConfirmPromotedAdmission].[@ReturnDate]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ConfirmPromotedAdmission].[@UsesTransport]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ConfirmPromotedAdmission].[@FeeChoices]">
+						<ns0:Property Name="IsReadOnly" Value="True" />
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References Name="[dbo].[ReturnFeeChoiceType]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="29" />
+				<ns0:Property Name="Length" Value="6643" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- ConfirmPromotedAdmission&#10;CREATE   PROCEDURE dbo.ConfirmPromotedAdmission&#13;&#10;@UserId INT, @EnrollmentId INT, @ReturnDate DATE, @UsesTransport BIT, @FeeChoices dbo.ReturnFeeChoiceType READONLY&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

@@ -1,0 +1,29 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlIndex" Name="[dbo].[Families].[UX_Families_Code]">
+			<ns0:Property Name="IsUnique" Value="True" />
+			<ns0:Property Name="FilterPredicate">
+				<ns0:Value>([FamilyCode] IS NOT NULL)</ns0:Value>
+			</ns0:Property>
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Families].[FamilyCode]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="ColumnSpecifications">
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[Families].[FamilyCode]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="IndexedObject">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Families]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

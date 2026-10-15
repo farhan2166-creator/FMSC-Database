@@ -1,0 +1,167 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetDateOfBirthCertificateRecords]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Certificates.Create';
+
+    SELECT
+        DBC.CertificateRecordId,
+        DBI.DateOfBirthCertificateIssueId,
+        DBC.AdmissionId,
+
+        DBC.StudentName,
+        DBC.FatherName,
+        DBC.DateOfBirth,
+        DBC.CertificateDate,
+
+        DBI.IssuedAt,
+        DBI.IssuedByUserId,
+        U.Username AS IssuedBy,
+
+        DBI.CollectedAt,
+        DBI.CollectedBy,
+
+        CASE
+            WHEN DBI.CollectedAt IS NULL
+                THEN N'Not Collected'
+            ELSE N'Collected'
+        END AS CollectionStatus
+
+    FROM dbo.DateOfBirthCertificates AS DBC
+
+    INNER JOIN dbo.DateOfBirthCertificateIssues AS DBI
+        ON DBI.CertificateRecordId = DBC.CertificateRecordId
+
+    LEFT JOIN dbo.Users AS U
+        ON U.UserId = DBI.IssuedByUserId
+
+    WHERE
+        @AdmissionId = 0
+        OR DBC.AdmissionId = @AdmissionId
+
+    ORDER BY
+        DBC.CertificateRecordId DESC,
+        DBI.IssuedAt DESC,
+        DBI.DateOfBirthCertificateIssueId DESC;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetDateOfBirthCertificateRecords].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[CertificateRecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificates].[CertificateRecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Users]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Users].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[IssuedByUserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificates].[CertificateRecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[DateOfBirthCertificateIssueId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificates].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificates].[StudentName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificates].[FatherName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificates].[DateOfBirth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificates].[CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[IssuedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Users].[Username]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[CollectedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[CollectedBy]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetDateOfBirthCertificateRecords].[@AdmissionId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetDateOfBirthCertificateRecords].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetDateOfBirthCertificateRecords].[@AdmissionId]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">0</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="223" />
+				<ns0:Property Name="Length" Value="1429" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#13;&#10;/* =====================================================================&#13;&#10;   6. dbo.GetDateOfBirthCertificateRecords - issuance history grid&#13;&#10;   ===================================================================== */&#13;&#10;&#13;&#10;CREATE   PROCEDURE dbo.GetDateOfBirthCertificateRecords&#13;&#10;    @UserId INT,&#13;&#10;    @AdmissionId INT = 0&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

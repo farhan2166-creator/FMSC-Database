@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlForeignKeyConstraint" Name="[dbo].[FK_FamilyMembers_Family]">
+			<ns0:Property Name="OnDeleteAction" Value="1" />
+			<ns0:Relationship Name="Columns">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FamilyMembers].[FamilyId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DefiningTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FamilyMembers]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="ForeignColumns">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Families].[FamilyId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="ForeignTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Families]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

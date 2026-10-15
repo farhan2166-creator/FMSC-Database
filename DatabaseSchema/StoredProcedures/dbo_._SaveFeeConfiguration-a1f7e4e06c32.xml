@@ -1,0 +1,411 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[SaveFeeConfiguration]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Fees.Configuration.Manage';
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.Campuses
+                   WHERE  CampusId = @CampusId)
+        THROW 56310, 'Please select an campus.', 1;
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.Classes
+                   WHERE  ClassId = @ClassId)
+        THROW 56312, 'Please select an class.', 1;
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.FeeTypes
+                   WHERE  FeeTypeId = @FeeTypeId)
+        THROW 56313, 'Please select an fee type.', 1;
+    IF @Amount &lt; 0
+        THROW 56314, 'Fee amount cannot be negative.', 1;
+    DECLARE @ResultId AS INT;
+    DECLARE @OperationId AS UNIQUEIDENTIFIER = NEWID();
+    DECLARE @AuditAction AS NVARCHAR (20) = NULL;
+    DECLARE @OldValues AS NVARCHAR (MAX) = NULL;
+    DECLARE @NewValues AS NVARCHAR (MAX);
+    DECLARE @NewRemarks AS NVARCHAR (500) = NULLIF (LTRIM(RTRIM(@Remarks)), N'');
+    BEGIN TRANSACTION;
+    IF @FeeConfigurationId = 0
+        BEGIN
+            INSERT  dbo.FeeConfigurations (CampusId, ClassId, FeeTypeId, Amount, Frequency, Remarks)
+            VALUES                       (@CampusId, @ClassId, @FeeTypeId, @Amount, @Frequency, @NewRemarks);
+            SET @ResultId = CONVERT (INT, SCOPE_IDENTITY());
+            SET @AuditAction = N'INSERT';
+        END
+    ELSE
+        BEGIN
+            DECLARE @OldCampusId AS INT, @OldClassId AS INT, @OldFeeTypeId AS INT, @OldAmount AS DECIMAL (12, 2), @OldFrequency AS NVARCHAR (30), @OldRemarks AS NVARCHAR (500);
+            SELECT @OldCampusId = CampusId,
+                   @OldClassId = ClassId,
+                   @OldFeeTypeId = FeeTypeId,
+                   @OldAmount = Amount,
+                   @OldFrequency = Frequency,
+                   @OldRemarks = Remarks
+            FROM   dbo.FeeConfigurations WITH (UPDLOCK, HOLDLOCK)
+            WHERE  FeeConfigurationId = @FeeConfigurationId;
+            IF @@ROWCOUNT = 0
+                THROW 56315, 'The selected fee configuration was not found.', 1;
+            SET @ResultId = @FeeConfigurationId;
+            IF @OldCampusId = @CampusId
+               AND @OldClassId = @ClassId
+               AND @OldFeeTypeId = @FeeTypeId
+               AND @OldAmount = @Amount
+               AND ISNULL(@OldFrequency, N'') = ISNULL(@Frequency, N'')
+               AND ISNULL(@OldRemarks, N'') = ISNULL(@NewRemarks, N'')
+                BEGIN
+                    UPDATE dbo.FeeConfigurations
+                    SET    UpdatedAt = SYSDATETIME()
+                    WHERE  FeeConfigurationId = @FeeConfigurationId;
+                END
+            ELSE
+                BEGIN
+                    SET @OldValues = (SELECT @FeeConfigurationId AS FeeConfigurationId,
+                                             @OldCampusId AS CampusId,
+                                             @OldClassId AS ClassId,
+                                             @OldFeeTypeId AS FeeTypeId,
+                                             @OldAmount AS Amount,
+                                             @OldFrequency AS Frequency,
+                                             @OldRemarks AS Remarks
+                                      FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES);
+                    UPDATE dbo.FeeConfigurations
+                    SET    CampusId  = @CampusId,
+                           ClassId   = @ClassId,
+                           FeeTypeId = @FeeTypeId,
+                           Amount    = @Amount,
+                           Frequency = @Frequency,
+                           Remarks   = @NewRemarks,
+                           UpdatedAt = SYSDATETIME()
+                    WHERE  FeeConfigurationId = @FeeConfigurationId;
+                    SET @AuditAction = N'UPDATE';
+                END
+        END
+    IF @AuditAction IS NOT NULL
+        BEGIN
+            SET @NewValues = (SELECT @ResultId AS FeeConfigurationId,
+                                     @CampusId AS CampusId,
+                                     @ClassId AS ClassId,
+                                     @FeeTypeId AS FeeTypeId,
+                                     @Amount AS Amount,
+                                     @Frequency AS Frequency,
+                                     @NewRemarks AS Remarks
+                              FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES);
+            INSERT  dbo.AuditOperations (OperationId, UserId, OperationType, CorrelationNote)
+            VALUES                     (@OperationId, @UserId, N'FEE_CONFIGURATION', CONVERT (NVARCHAR (200), @ResultId));
+            DECLARE @RecordId AS NVARCHAR (200) = CONVERT (NVARCHAR (200), @ResultId);
+            EXECUTE dbo.WriteAuditLog @OperationId = @OperationId, @UserId = @UserId, @TableName = N'FeeConfigurations', @RecordId = @RecordId, @Action = @AuditAction, @OldValues = @OldValues, @NewValues = @NewValues;
+        END
+    DELETE dbo.AuditOperations WHERE OperationId=@OperationId AND NOT EXISTS(SELECT 1 FROM dbo.AuditLogs WHERE OperationId=@OperationId);
+COMMIT TRANSACTION;
+    SELECT @ResultId AS FeeConfigurationId;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[uniqueidentifier]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveFeeConfiguration].[@Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveFeeConfiguration].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveFeeConfiguration].[@CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveFeeConfiguration].[@ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveFeeConfiguration].[@FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveFeeConfiguration].[@Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveFeeConfiguration].[@FeeConfigurationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[Frequency]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveFeeConfiguration].[@Frequency]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[FeeConfigurationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[CorrelationNote]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@TableName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@RecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@Action]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OldValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@NewValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[OperationId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveFeeConfiguration].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveFeeConfiguration].[@CampusId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveFeeConfiguration].[@ClassId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveFeeConfiguration].[@FeeTypeId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveFeeConfiguration].[@Amount]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Scale" Value="2" />
+									<ns0:Property Name="Precision" Value="12" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveFeeConfiguration].[@Frequency]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="30" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveFeeConfiguration].[@FeeConfigurationId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveFeeConfiguration].[@Remarks]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="500" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="25" />
+				<ns0:Property Name="Length" Value="5511" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- SaveFeeConfiguration&#10;CREATE   PROCEDURE dbo.SaveFeeConfiguration&#13;&#10;@UserId INT, @CampusId INT, @ClassId INT, @FeeTypeId INT, @Amount DECIMAL (12, 2), @Frequency NVARCHAR (30), @FeeConfigurationId INT, @Remarks NVARCHAR (500)&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

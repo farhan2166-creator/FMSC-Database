@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlForeignKeyConstraint" Name="[dbo].[FK_RolePermissions_Permission]">
+			<ns0:Property Name="OnDeleteAction" Value="1" />
+			<ns0:Relationship Name="Columns">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RolePermissions].[PermissionId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DefiningTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RolePermissions]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="ForeignColumns">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Permissions].[PermissionId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="ForeignTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Permissions]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

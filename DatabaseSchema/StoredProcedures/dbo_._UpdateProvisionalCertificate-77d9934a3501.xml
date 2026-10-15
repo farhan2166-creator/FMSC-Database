@@ -1,0 +1,653 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[UpdateProvisionalCertificate]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Certificates.Create';
+    IF @ProvisionalCertificateId &lt;= 0
+        THROW 58820, 'A valid certificate is required.', 1;
+    IF @ExamType NOT IN (N'SSC', N'HSSC1', N'HSSC2')
+        THROW 58821, 'A valid exam type is required.', 1;
+    IF @ExamYear IS NULL
+       OR @ExamYear &lt; 1990
+       OR @ExamYear &gt; YEAR(SYSDATETIME()) + 1
+        THROW 58822, 'A valid exam year is required.', 1;
+    IF @BoardName IS NULL
+       OR LTRIM(RTRIM(@BoardName)) = N''
+        THROW 58823, 'Board name is required.', 1;
+    IF @RollNumber IS NULL
+       OR LTRIM(RTRIM(@RollNumber)) = N''
+        THROW 58824, 'Roll number is required.', 1;
+    IF @MarksObtained IS NULL
+       OR @MarksObtained &lt; 0
+        THROW 58825, 'Marks obtained is required.', 1;
+    IF @MarksOutOf IS NULL
+       OR @MarksOutOf &lt;= 0
+        THROW 58826, 'Marks out of is required.', 1;
+    IF @MarksObtained &gt; @MarksOutOf
+        THROW 58827, 'Marks obtained cannot exceed marks out of.', 1;
+    IF @CertificateDate IS NULL
+        THROW 58828, 'Certificate date is required.', 1;
+    IF @CertificateDate &gt; CONVERT (DATE, SYSDATETIME())
+        THROW 58829, 'Certificate date cannot be in the future.', 1;
+    BEGIN TRANSACTION;
+    DECLARE @AdmissionId AS INT;
+    DECLARE @OldValues AS NVARCHAR (MAX);
+    SELECT @AdmissionId = PC.AdmissionId,
+           @OldValues = (SELECT PC.ProvisionalCertificateId,
+                                PC.AdmissionId,
+                                PC.ExamType,
+                                PC.ExamYear,
+                                PC.BoardName,
+                                PC.RollNumber,
+                                PC.MarksObtained,
+                                PC.MarksOutOf,
+                                PC.Grade,
+                                PC.OtherSubjects,
+                                PC.CertificateDate,
+                                JSON_QUERY((SELECT   SubjectId,
+                                                     SubjectName,
+                                                     DisplayOrder
+                                            FROM     dbo.ProvisionalCertificateSubjects
+                                            WHERE    ProvisionalCertificateId = @ProvisionalCertificateId
+                                            ORDER BY DisplayOrder, SubjectId
+                                            FOR      JSON PATH)) AS Subjects
+                         FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES)
+    FROM   dbo.ProvisionalCertificates AS PC WITH (UPDLOCK, HOLDLOCK)
+    WHERE  PC.ProvisionalCertificateId = @ProvisionalCertificateId;
+    IF @AdmissionId IS NULL
+        THROW 58830, 'The certificate was not found.', 1;
+    UPDATE dbo.ProvisionalCertificates
+    SET    ExamType        = @ExamType,
+           ExamYear        = @ExamYear,
+           BoardName       = LTRIM(RTRIM(@BoardName)),
+           RollNumber      = LTRIM(RTRIM(@RollNumber)),
+           MarksObtained   = @MarksObtained,
+           MarksOutOf      = @MarksOutOf,
+           Grade           = NULLIF (LTRIM(RTRIM(@Grade)), N''),
+           OtherSubjects   = NULLIF (LTRIM(RTRIM(@OtherSubjects)), N''),
+           CertificateDate = @CertificateDate,
+           UpdatedByUserId = @UserId,
+           UpdatedAt       = SYSDATETIME()
+    WHERE  ProvisionalCertificateId = @ProvisionalCertificateId;
+    DECLARE @SavedSubjectOrder TABLE (
+        SubjectId    INT,
+        DisplayOrder INT);
+    INSERT @SavedSubjectOrder
+    SELECT SubjectId,
+           DisplayOrder
+    FROM   dbo.ProvisionalCertificateSubjects
+    WHERE  ProvisionalCertificateId = @ProvisionalCertificateId;
+    DELETE dbo.ProvisionalCertificateSubjects
+    WHERE  ProvisionalCertificateId = @ProvisionalCertificateId;
+    IF @SubjectIds IS NOT NULL
+       AND LTRIM(RTRIM(@SubjectIds)) &lt;&gt; N''
+        BEGIN
+            INSERT dbo.ProvisionalCertificateSubjects (ProvisionalCertificateId, SubjectId, SubjectName, DisplayOrder)
+            SELECT @ProvisionalCertificateId,
+                   SU.SubjectId,
+                   SU.SubjectName,
+                   ROW_NUMBER() OVER (ORDER BY COALESCE (SO.DisplayOrder, 2147483647), SU.SubjectName, SU.SubjectId)
+            FROM   STRING_SPLIT (@SubjectIds, N',') AS SPL
+                   INNER JOIN
+                   dbo.Subjects AS SU
+                   ON SU.SubjectId = TRY_CONVERT (INT, LTRIM(RTRIM(SPL.value)))
+                   LEFT OUTER JOIN
+                   @SavedSubjectOrder AS SO
+                   ON SO.SubjectId = SU.SubjectId
+            WHERE  TRY_CONVERT (INT, LTRIM(RTRIM(SPL.value))) IS NOT NULL;
+        END
+    DECLARE @OperationId AS UNIQUEIDENTIFIER = NEWID();
+    DECLARE @RecordId AS NVARCHAR (200) = CONVERT (NVARCHAR (200), @ProvisionalCertificateId);
+    DECLARE @NewValues AS NVARCHAR (MAX);
+    SELECT @NewValues = (SELECT ProvisionalCertificateId,
+                                AdmissionId,
+                                ExamType,
+                                ExamYear,
+                                BoardName,
+                                RollNumber,
+                                MarksObtained,
+                                MarksOutOf,
+                                Grade,
+                                OtherSubjects,
+                                CertificateDate,
+                                JSON_QUERY((SELECT   SubjectId,
+                                                     SubjectName,
+                                                     DisplayOrder
+                                            FROM     dbo.ProvisionalCertificateSubjects
+                                            WHERE    ProvisionalCertificateId = @ProvisionalCertificateId
+                                            ORDER BY DisplayOrder, SubjectId
+                                            FOR      JSON PATH)) AS Subjects
+                         FROM   dbo.ProvisionalCertificates
+                         WHERE  ProvisionalCertificateId = @ProvisionalCertificateId
+                         FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES);
+    INSERT  dbo.AuditOperations (OperationId, UserId, OperationType, CorrelationNote)
+    VALUES                     (@OperationId, @UserId, N'PROVISIONAL_CERTIFICATE', CONVERT (NVARCHAR (200), @AdmissionId));
+    EXECUTE dbo.WriteAuditLog @OperationId = @OperationId, @UserId = @UserId, @TableName = N'ProvisionalCertificates', @RecordId = @RecordId, @Action = N'UPDATE', @OldValues = @OldValues, @NewValues = @NewValues;
+    DELETE dbo.AuditOperations WHERE OperationId=@OperationId AND NOT EXISTS(SELECT 1 FROM dbo.AuditLogs WHERE OperationId=@OperationId);
+COMMIT TRANSACTION;
+    SELECT @ProvisionalCertificateId AS ProvisionalCertificateId,
+           @AdmissionId AS AdmissionId;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[uniqueidentifier]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@ExamType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@ExamYear]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@BoardName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@RollNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@MarksObtained]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@MarksOutOf]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ExamType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ExamYear]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[BoardName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[RollNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[MarksObtained]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[MarksOutOf]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[Grade]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[OtherSubjects]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[SubjectId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[SubjectName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[DisplayOrder]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ExamType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ExamYear]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[BoardName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[RollNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[MarksObtained]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[MarksOutOf]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[Grade]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@Grade]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[OtherSubjects]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@OtherSubjects]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[UpdatedByUserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[SubjectId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[DisplayOrder]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@SubjectIds]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[SubjectName]" />
+				</ns0:Entry>
+				<ns0:Entry />
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Subjects]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Subjects].[SubjectId]" />
+				</ns0:Entry>
+				<ns0:Entry />
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@SavedSubjectOrder].[SubjectId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Subjects].[SubjectId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Subjects].[SubjectName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateProvisionalCertificate].[@SavedSubjectOrder].[DisplayOrder]" />
+				</ns0:Entry>
+				<ns0:Entry />
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ExamType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ExamYear]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[BoardName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[RollNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[MarksObtained]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[MarksOutOf]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[Grade]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[OtherSubjects]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[SubjectId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[SubjectName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[DisplayOrder]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[CorrelationNote]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@TableName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@RecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@Action]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OldValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@NewValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[OperationId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DynamicObjects">
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[UpdateProvisionalCertificate].[@SavedSubjectOrder]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[UpdateProvisionalCertificate].[@SavedSubjectOrder].[SubjectId]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[UpdateProvisionalCertificate].[@SavedSubjectOrder].[DisplayOrder]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@ProvisionalCertificateId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@ExamType]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="10" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@ExamYear]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@BoardName]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="150" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@RollNumber]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="30" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@MarksObtained]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@MarksOutOf]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@Grade]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="10" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@OtherSubjects]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="300" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@CertificateDate]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateProvisionalCertificate].[@SubjectIds]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="IsMax" Value="True" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="33" />
+				<ns0:Property Name="Length" Value="7350" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- UpdateProvisionalCertificate&#10;CREATE   PROCEDURE dbo.UpdateProvisionalCertificate&#13;&#10;@UserId INT, @ProvisionalCertificateId INT, @ExamType NVARCHAR (10), @ExamYear INT, @BoardName NVARCHAR (150), @RollNumber NVARCHAR (30), @MarksObtained INT, @MarksOutOf INT, @Grade NVARCHAR (10), @OtherSubjects NVARCHAR (300), @CertificateDate DATE, @SubjectIds NVARCHAR (MAX)=NULL&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

@@ -1,0 +1,36 @@
+-- Module body only. See companion XML for signatures and relationships.
+
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Certificates.Create';
+
+    IF @CharacterCertificateIssueId <= 0
+        THROW 58200, 'A valid certificate issue is required.', 1;
+
+    IF NULLIF(LTRIM(RTRIM(@CollectedBy)), N'') IS NULL
+        THROW 58201, 'The name of the person collecting the certificate is required.', 1;
+
+    UPDATE dbo.CharacterCertificateIssues
+    SET
+        CollectedAt = SYSDATETIME(),
+        CollectedBy = LTRIM(RTRIM(@CollectedBy))
+    WHERE CharacterCertificateIssueId = @CharacterCertificateIssueId
+      AND CollectedAt IS NULL;
+
+    IF @@ROWCOUNT <> 1
+        THROW 58202, 'The certificate issue was not found or has already been collected.', 1;
+
+    SELECT
+        CharacterCertificateIssueId,
+        CertificateRecordId,
+        IssuedAt,
+        IssuedByUserId,
+        CollectedAt,
+        CollectedBy
+    FROM dbo.CharacterCertificateIssues
+    WHERE CharacterCertificateIssueId = @CharacterCertificateIssueId;
+END;

@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlForeignKeyConstraint" Name="[dbo].[FK_MutationRequests_Payments]">
+			<ns0:Relationship Name="Columns">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[MutationRequests].[FeePaymentId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DefiningTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[MutationRequests]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="ForeignColumns">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeePayments].[FeePaymentId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="ForeignTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeePayments]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

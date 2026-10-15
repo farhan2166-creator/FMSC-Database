@@ -1,0 +1,276 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlTable" Name="[dbo].[BillingCharges]">
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="Columns">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[BillingChargeId]">
+						<ns0:Property Name="IsNullable" Value="False" />
+						<ns0:Property Name="IsIdentity" Value="True" />
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[bigint]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+						<ns0:Annotation Type="OnlinePropertyAnnotation" Name="[LastValue]">
+							<ns0:Property Name="Value" Value="6" />
+						</ns0:Annotation>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[StudentFeeAssignmentId]">
+						<ns0:Property Name="IsNullable" Value="False" />
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[EnrollmentId]">
+						<ns0:Property Name="IsNullable" Value="False" />
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[AdmissionId]">
+						<ns0:Property Name="IsNullable" Value="False" />
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[FeeTypeId]">
+						<ns0:Property Name="IsNullable" Value="False" />
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[BillingMonth]">
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[ChargeDate]">
+						<ns0:Property Name="IsNullable" Value="False" />
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[DueDate]">
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[GrossAmount]">
+						<ns0:Property Name="IsNullable" Value="False" />
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Scale" Value="2" />
+									<ns0:Property Name="Precision" Value="12" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[DiscountAmount]">
+						<ns0:Property Name="IsNullable" Value="False" />
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Scale" Value="2" />
+									<ns0:Property Name="Precision" Value="12" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlComputedColumn" Name="[dbo].[BillingCharges].[NetAmount]">
+						<ns0:Property Name="ExpressionScript">
+							<ns0:Value>([GrossAmount]-[DiscountAmount])</ns0:Value>
+						</ns0:Property>
+						<ns0:Property Name="IsPersisted" Value="True" />
+						<ns0:Property Name="IsPersistedNullable" Value="True" />
+						<ns0:Relationship Name="ExpressionDependencies">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[BillingCharges].[GrossAmount]" />
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[BillingCharges].[DiscountAmount]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[Status]">
+						<ns0:Property Name="IsNullable" Value="False" />
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="20" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[Remarks]">
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="500" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[CreatedAt]">
+						<ns0:Property Name="IsNullable" Value="False" />
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[datetime2]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[ChargeKind]">
+						<ns0:Property Name="IsNullable" Value="False" />
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="20" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[BillingCharges].[ManualRequestId]">
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[uniqueidentifier]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

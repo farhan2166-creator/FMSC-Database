@@ -1,0 +1,20 @@
+-- Module body only. See companion XML for signatures and relationships.
+
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    EXEC dbo.RequirePermission @UserId, N'System.Setup';
+
+    IF NOT EXISTS (SELECT 1 FROM dbo.Campuses WHERE CampusId = @CampusId)
+        THROW 59031, 'The selected campus was not found.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.CampusClassSections WHERE CampusId = @CampusId)
+        THROW 59032, 'This campus has class/section assignments and cannot be deleted. Deactivate it instead.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.FeeConfigurations WHERE CampusId = @CampusId)
+        THROW 59033, 'This campus has fee configuration and cannot be deleted. Deactivate it instead.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.PromotionBatches WHERE SourceCampusId = @CampusId)
+        THROW 59034, 'This campus is referenced by promotion history and cannot be deleted. Deactivate it instead.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.Students WHERE AdmissionCampusId = @CampusId)
+        THROW 59036, 'This campus is assigned to students and cannot be deleted. Deactivate it instead.', 1;
+
+    DELETE FROM dbo.Campuses WHERE CampusId = @CampusId;
+END;

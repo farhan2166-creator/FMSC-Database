@@ -1,0 +1,198 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetLeaveCertificatePrintData]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Students.Leave';
+
+    IF @LeaveRecordId &lt;= 0
+        THROW 57310,
+            'A valid leave certificate is required.',
+            1;
+
+    DECLARE @CopyType NVARCHAR(20);
+
+    IF @LeaveCertificateIssueId &gt; 0
+        SELECT @CopyType = IssueType
+        FROM dbo.LeaveCertificateIssues
+        WHERE LeaveCertificateIssueId = @LeaveCertificateIssueId
+          AND LeaveRecordId = @LeaveRecordId;
+
+    IF @CopyType IS NULL
+        SELECT TOP (1)
+            @CopyType = IssueType
+        FROM dbo.LeaveCertificateIssues
+        WHERE LeaveRecordId = @LeaveRecordId
+        ORDER BY
+            IssuedAt DESC,
+            LeaveCertificateIssueId DESC;
+
+    SELECT
+        LC.LeaveRecordId,
+        LC.AdmissionId,
+
+        LC.CertificateNumber AS CertificateNumber,
+
+        LC.StudentName,
+        LC.FatherName,
+        LC.DateOfBirth,
+        LC.DateOfAdmission,
+        LC.ClassStudied,
+        LC.ClassPromotedTo,
+        LC.LeaveDate,
+        LC.AcademicRecord,
+        LC.AttendanceRecord,
+        LC.Remarks,
+        LC.CreatedAt AS DateOfIssue,
+        ISNULL(@CopyType, N'Original') AS CopyType
+
+    FROM dbo.LeaveCertificates AS LC
+    WHERE LC.LeaveRecordId = @LeaveRecordId;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetLeaveCertificatePrintData].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetLeaveCertificatePrintData].[@LeaveRecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetLeaveCertificatePrintData].[@LeaveCertificateIssueId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificateIssues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificateIssues].[IssueType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificateIssues].[LeaveCertificateIssueId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificateIssues].[LeaveRecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificateIssues].[IssuedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[LeaveRecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[CertificateNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[StudentName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[FatherName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[DateOfBirth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[DateOfAdmission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[ClassStudied]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[ClassPromotedTo]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[LeaveDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[AcademicRecord]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[AttendanceRecord]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[CreatedAt]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetLeaveCertificatePrintData].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetLeaveCertificatePrintData].[@LeaveRecordId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetLeaveCertificatePrintData].[@LeaveCertificateIssueId]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">0</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="815" />
+				<ns0:Property Name="Length" Value="2277" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#13;&#10;/* ============================================================================&#13;&#10;   PART 10 — dbo.GetLeaveCertificatePrintData: surface CopyType for the RDLC&#13;&#10;&#13;&#10;   The RDLC report definitions (LeaveCertificate.rdlc /&#13;&#10;   CollegeLeaveCertificate.rdlc) already had an unused &quot;CopyType&quot; field&#13;&#10;   wired into their dataset -- this fills it in. The report prints nothing&#13;&#10;   extra for the Original, and &quot;DUPLICATE COPY&quot; for either duplicate.&#13;&#10;&#13;&#10;   @LeaveCertificateIssueId is optional: when supplied (the UI now passes&#13;&#10;   the specific issuance row the user selected/printed), CopyType comes&#13;&#10;   from that issue. When omitted/0 (any other/older caller), it falls back&#13;&#10;   to the most recently issued copy, same as before this change.&#13;&#10;============================================================================ */&#13;&#10;&#13;&#10;CREATE PROCEDURE dbo.GetLeaveCertificatePrintData&#13;&#10;    @UserId INT,&#13;&#10;    @LeaveRecordId INT,&#13;&#10;    @LeaveCertificateIssueId INT = 0&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		
