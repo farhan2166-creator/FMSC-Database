@@ -44,9 +44,16 @@ internal static class Program
                 Identity.Check(Identity.Count("SELECT FailedLoginCount FROM dbo.Users WHERE Username=N'level2_admin';")==0,"Successful login did not reset failure count.");
             },"Administrator authenticated; failure counter reset.");
             if(!report.Passed("L2-SEC-04")) {report.Block("Administrator login failed; dependent workflows blocked.");return 1;}
-            Workflows.Run(desktop,report);
-            UsabilityWorkflows.CaptureViewports(desktop,report);
+            bool startupOnly=Environment.GetEnvironmentVariable("FMSC_LEVEL2_STARTUP_ONLY")=="1";
+            if(startupOnly)
+            {
+                UsabilityWorkflows.Initial(desktop,report);
+                UsabilityWorkflows.CaptureViewports(desktop,report);
+            }
+            else Workflows.Run(desktop,report);
             SecurityWorkflows.Run(desktop,report,args[0],password);
+            if(startupOnly)report.BlockIds("Startup/display stage only; dependent admission, finance, promotion and profile workflows were not executed in this run.",
+                report.Scenarios.Where(s=>s.Status=="Not Run"&&s.Id!="L2-UX-05").Select(s=>s.Id).ToArray());
             foreach(var row in report.Scenarios.Where(s=>s.Status=="Not Run"&&s.Actual=="Not executed."))
                 row.Actual="Not executed; remaining coverage is listed in the rerun documentation. No success is claimed.";
         }

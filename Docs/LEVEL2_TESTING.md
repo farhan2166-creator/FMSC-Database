@@ -26,6 +26,8 @@ In PowerShell from the repository:
 .\Tools\Run-Level2.ps1 -PythonPath 'C:\path\to\python.exe'
 # Build and fixture validation only; scenario results are deliberately blocked:
 .\Tools\Run-Level2.ps1 -PreflightOnly
+# Short real startup/navigation/display check; other workflows explicitly blocked:
+.\Tools\Run-Level2.ps1 -StartupOnly
 ```
 
 Python is resolved from a real `python` installation or the bundled Codex runtime
@@ -150,6 +152,11 @@ is not represented as a change to the real monitor resolution. Other actual DPI
 settings/monitor configurations are blocked when unavailable; Windows display
 settings are not changed automatically. Physical printing and receipt export are
 also outside the automated preview check.
+
+Viewport capture runs during the initial admission view, before populated native
+grids can affect UI Automation discovery. A failure now records its bounded wait
+description. Optional control-inventory failures do not erase a saved screenshot;
+all captured images for each scenario are linked in new reports.
 
 Financial scenarios independently query committed payments, allocations, charge
 totals and relationship ownership. The current fixture's opening charges are

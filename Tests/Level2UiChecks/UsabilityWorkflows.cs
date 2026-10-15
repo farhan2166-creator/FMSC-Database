@@ -37,10 +37,11 @@ internal static class UsabilityWorkflows
         var row=report.Scenarios.Single(s=>s.Id=="L2-UX-05");
         try
         {
-            ui.Navigate("Student Admissions");ui.OpenStudent();
+            ui.Navigate("Student Admissions");ui.Find("Student Name",ControlType.Edit);
             var main=ui.Window("School & College Management System");
             using var proof=Identity.Open();
             main.Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Normal);
+            Desktop.Wait(()=>main.Patterns.Window.Pattern.WindowVisualState.Value==WindowVisualState.Normal?main:null,"restored window state before resizing");
             main.Patterns.Transform.Pattern.Resize(1280,720);
             Desktop.Wait(()=>Math.Abs(main.BoundingRectangle.Width-1280)<2&&Math.Abs(main.BoundingRectangle.Height-720)<2?main:null,"actual 1280x720 window bounds");
             ui.Find("Student Name",ControlType.Edit);ui.Screenshot("L2-UX-05-1280x720");
@@ -53,7 +54,8 @@ internal static class UsabilityWorkflows
         }
         catch(Exception ex)
         {
-            row.Status="Blocked";row.Actual="Viewport capture could not complete ("+ex.GetType().Name+").";
+            row.Status="Blocked";row.Actual="Viewport capture could not complete ("+ex.GetType().Name+"): "+
+                (ex is TimeoutException or InvalidOperationException?ex.Message:"Provider failure; no layout pass claimed.");
         }
         report.BlockIds("Only the current monitor/DPI was available for this run. Other actual desktop resolutions and 125/150 percent scaling were not exercised; app-window resizing is reported separately.","L2-UX-06");
         report.Save();

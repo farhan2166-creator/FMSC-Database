@@ -38,7 +38,12 @@ internal sealed class Evidence
             s.Status="Fail";s.Actual=ex is TimeoutException or InvalidOperationException?ex.Message:"Assertion or automation failure ("+ex.GetType().Name+").";
             s.Defect="Investigate application behavior versus locator/fixture failure; not yet classified.";
         }
-        try {s.Evidence=desktop.Screenshot(id);desktop.Dump(id);} catch {s.Evidence="Capture unavailable; see outcome.";}
+        try {s.Evidence=desktop.Screenshot(id);} catch {s.Evidence="Capture unavailable; see outcome.";}
+        // A provider can fail while enumerating native grid children. Keep a
+        // successfully captured screenshot even if the optional inventory fails.
+        try {desktop.Dump(id);} catch { }
+        var captures=Directory.GetFiles(Output,id+"*.png").Select(Path.GetFileName).OrderBy(x=>x).ToArray();
+        if(captures.Length>0)s.Evidence=string.Join(", ",captures);
         Save(); Console.WriteLine(s.Status+": "+id+" "+s.ScenarioName);
     }
     internal bool Passed(string id)=>Scenarios.Single(s=>s.Id==id).Status=="Pass";

@@ -8,6 +8,7 @@ internal static class Workflows
     internal static void Run(Desktop ui,Evidence report)
     {
         UsabilityWorkflows.Initial(ui,report);
+        UsabilityWorkflows.CaptureViewports(ui,report);
         report.Run("L2-ADM-01",ui,()=>{
             ui.Click("Student Admissions",ControlType.Button);
             ui.Find("Student Name",ControlType.Edit);
