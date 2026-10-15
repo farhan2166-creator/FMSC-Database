@@ -51,6 +51,7 @@ internal static partial class Program
             CheckClosingWholeAmounts();
             CheckPaletteDestinations();
             CheckSubmittedInputHolds();
+            CheckAdmissionPostSaveBaseline();
             CheckMeaningfulCertificateContent();
             CheckSelectiveWorkspaceGuards();
             CheckLifecycleCloseGuard();

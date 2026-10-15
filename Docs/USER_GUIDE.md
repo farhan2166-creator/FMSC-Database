@@ -62,6 +62,7 @@ Promotion History is reached from this button rather than a separate navigation 
 - New sports/provisional certificate wording and result details use the existing discard guards. Opening an untouched dialog or changing only its new default date remains freely abandonable.
 - Certificate creation holds inputs through saving and refresh, refuses a second submission, and preserves the returned result message.
 - Admission and fee collection hold submitted inputs until the pending write and refresh finish. Correct invalid entries before submission; failed saves restore editing.
+- After a successful admission save and refresh, **Mark as Left** and **Correct Placement** can be opened immediately. Save any subsequent detail edits or pending photo first; an incomplete refresh still requires reopening the student as instructed on screen.
 - If a save times out, disconnects or gives uncertain feedback, **do not create a new transaction to test whether it worked**. Use the page's reconciliation action, then ask the administrator if necessary.
 - A printed report or exported CSV/PDF is a copy of selected data; verify filters and avoid sharing student or financial documents with unauthorized recipients.
 

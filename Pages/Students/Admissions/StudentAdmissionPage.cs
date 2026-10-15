@@ -296,6 +296,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private ModernButton? enrollmentActionsButton;
     /// <summary>The admission form is the largest in the application and had no unsaved-changes protection at all.</summary>
     private List<AdmissionPart>? _admissionBaseline;
+    private (int AdmissionId, int LoadVersion)? deferredAdmissionBaseline;
     /// <summary>One comparable piece of the form: what it is, for the diagnostic, and the value the operator can change.</summary>
     private readonly record struct AdmissionPart(string Where, string Value);
     /// <summary>At most one report per baseline: HasUnsavedChanges is asked several times on some paths.</summary>
@@ -383,6 +384,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private void CaptureAdmissionBaseline()
     {
+        // Saved records reload while HoldSubmittedInputs disables the page. Capturing
+        // then would treat every field as empty and invent edits when inputs reopen.
+        if (!Enabled)
+        {
+            deferredAdmissionBaseline = (currentAdmissionId, admissionLoadVersion);
+            return;
+        }
+        deferredAdmissionBaseline = null;
         try
         {
             /* captured without the pending photo on purpose: a photo that has not been stored yet must keep the form dirty, so leaving with one still prompts. */
@@ -621,6 +630,12 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         this.registrationReview = registrationReview;
         this.writePhoto = writePhoto;
         this.readPhoto = readPhoto;
+        EnabledChanged += (_, _) => {
+            if (!Enabled || deferredAdmissionBaseline is not { } pending) return;
+            deferredAdmissionBaseline = null;
+            if (pending == (currentAdmissionId, admissionLoadVersion))
+                CaptureAdmissionBaseline();
+        };
         Disposed += (_, _) => photoRead.Dispose();
         firstPlacementStatus.Items.AddRange(new object[] { "Active", "Left" });
         viewEnrollmentDate.Text=editEnrollmentDate.Text="-";
