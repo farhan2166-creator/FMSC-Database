@@ -173,9 +173,14 @@ internal static class AuditExtensions
         {
             try
             {
-                // Directly inspect the CREATE PROCEDURE AST's declaration list.
-                // A generic fragment visitor may not descend into all generated DacFx AST nodes.
-                var procedures = obj.GetAst().Batches.SelectMany(b => b.Statements)
+                // DacFx builds unscripted models with TSqlStatementSnippet ASTs.
+                // Generate DDL from model metadata and parse it with ScriptDom.
+                var ddl = obj.GetScript();
+                var parsed = new TSql160Parser(initialQuotedIdentifiers: true)
+                    .Parse(new StringReader(ddl), out var errors);
+                if (errors.Count > 0) return new ProcedureSpec(
+                    name, new Dictionary<string, ParameterSpec>(), false);
+                var procedures = ((TSqlScript)parsed).Batches.SelectMany(b => b.Statements)
                     .OfType<ProcedureStatementBody>().ToArray();
                 if (procedures.Length != 1) return new ProcedureSpec(
                     name, new Dictionary<string, ParameterSpec>(), false);
