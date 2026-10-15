@@ -32,8 +32,9 @@ internal static class Workflows
             ui.Fill("Place of Birth","Example City");
             ui.Fill("Address","Fictional Level Two Lane");
             ui.Select("Gender","Male");
+            ui.Date("First Admission",new DateTime(DateTime.UtcNow.Year-1,4,1));
             ui.Select("Campus","Fictional Main Campus");
-            ui.Select("Academic Year","Fictional "+DateTime.UtcNow.Year);
+            ui.Select("Academic Year","Fictional "+(DateTime.UtcNow.Year-1));
             ui.Select("Class","Class 6 (Fictional Middle School)");
             ui.Select("Section","Section A");
         },"Selected fixture class/section belongs to the displayed campus.");
@@ -55,7 +56,7 @@ internal static class Workflows
                 Desktop.Wait(()=>ui.Find("Save",ControlType.Button).IsEnabled?new object():null,"date validation completed");
                 Identity.Check(Identity.Count("SELECT COUNT(*) FROM dbo.Students;")==0,"Mismatched admission date/year persisted.");
                 ui.Screenshot("L2-ADM-12-date-refusal");
-                ui.Select("Academic Year","Fictional "+DateTime.UtcNow.Year);
+                ui.Select("Academic Year","Fictional "+(DateTime.UtcNow.Year-1));
                 ui.Select("Class","Class 6 (Fictional Middle School)");ui.Select("Section","Section A");
             },"Malformed phone and date/year mismatch both leave Students empty; valid context restored.");
             report.Run("L2-ADM-04",ui,()=>{
@@ -96,12 +97,12 @@ internal static class Workflows
                 Identity.Check(ui.Find("Father Occupation",ControlType.Edit).AsTextBox().Text=="Fictional Example Operator","Reopened occupation differs.");
             },"Allowed field edit committed and survives reopening.");
             report.Run("L2-ADM-11",ui,()=>{
-                ui.Fill("Father Occupation","Fictional cancelled draft");
+                ui.Fill("Father Occupation","Fictional Cancelled Draft");
                 ui.Click("Student Profile",ControlType.Button);
                 var dialog=ui.Window("Unsaved Changes");
                 ui.Screenshot("L2-ADM-11-warning");
                 ui.Click("No",ControlType.Button,dialog);
-                Identity.Check(ui.Find("Father Occupation",ControlType.Edit).AsTextBox().Text=="Fictional cancelled draft","Draft lost on cancellation.");
+                Identity.Check(ui.Find("Father Occupation",ControlType.Edit).AsTextBox().Text=="Fictional Cancelled Draft","Draft lost on cancellation.");
                 Identity.Check(Convert.ToString(Identity.Scalar("SELECT FatherOccupation FROM dbo.Students WHERE StudentName=N'Fictional Example Student';"))=="Fictional Example Operator","Unsubmitted edit persisted.");
             },"Cancelled navigation retains draft and leaves stored occupation unchanged.");
             report.Run("L2-ADM-08",ui,()=>{

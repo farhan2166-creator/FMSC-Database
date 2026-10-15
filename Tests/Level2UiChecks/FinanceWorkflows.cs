@@ -18,7 +18,7 @@ internal static class FinanceWorkflows
     internal static void Run(Desktop ui,Evidence report)
     {
         report.Run("L2-FIN-01",ui,()=>{
-            ui.Click("Fee Collection",ControlType.Button);ui.PickStudent();
+            ui.Navigate("Fee Collection");ui.PickStudent();
             Desktop.Wait(()=>ui.Find("Collect Payment",ControlType.Button).IsEnabled?new object():null,"loaded outstanding charges");
             Identity.Check(Charges()==7000&&Paid()==0,"Unexpected prepayment totals.");
             Identity.Check(Displayed(ui,"Outstanding (Rs.)")==7000,"Displayed outstanding amount differs from SQL.");
@@ -48,18 +48,27 @@ internal static class FinanceWorkflows
             Identity.Check(Identity.Count("SELECT COUNT(*) FROM dbo.FeePayments;")==2,"Settlement payment count differs.");
         },"Two committed payments total 7000; allocations 7000; remaining balance zero.");
         if(!report.Passed("L2-FIN-05"))return;
+        report.Run("L2-FIN-08",ui,()=>{
+            ui.Click("Print Receipt",ControlType.Button);
+            var receipt=ui.Window("Fee Receipt");
+            Desktop.Wait(()=>ui.Find("Export PDF",ControlType.Button,receipt) is {IsEnabled:true} button?button:null,"rendered receipt",60);
+            ui.Screenshot("L2-FIN-08-receipt");
+            Identity.Check(Paid()==7000&&Identity.Count("SELECT COUNT(*) FROM dbo.FeePayments;")==2,"Receipt preview changed payments.");
+            ui.Click("Close",ControlType.Button,receipt);
+        },"Real receipt preview rendered; no physical printing; two committed payments still total 7000.");
         report.Run("L2-FIN-09",ui,()=>{
             ui.PickStudent();
             Desktop.Wait(()=>!ui.Find("Collect Payment",ControlType.Button).IsEnabled?new object():null,"settled submission guard");
             Identity.Check(Paid()==7000&&Identity.Count("SELECT COUNT(*) FROM dbo.FeePayments;")==2,"Settled replay changed payments.");
         },"Settled collection disabled; payment count and total unchanged.");
         report.Run("L2-FIN-07",ui,()=>{
-            ui.Click("Account Statement",ControlType.Button);
-            ui.Window("Student Account Statement");
+            ui.Click("Student Fees ▾",ControlType.Button);
+            ui.Click("Account Statement",ControlType.MenuItem);
+            ui.Window("Fee Statement History");
             Identity.Check(Charges()==Allocated()&&Paid()==Allocated(),"Statement source totals differ.");
         },"Committed charges, payments and allocations reconcile to a zero balance; inspect statement screenshot.");
         // Close only the known statement dialog, then return to collection.
-        try {ui.Click("Close application",ControlType.Button,ui.Window("Student Account Statement"));} catch {return;}
+        try {ui.Click("Close",ControlType.Button,ui.Window("Fee Statement History"));} catch {return;}
         report.Run("L2-FIN-11",ui,()=>{
             Identity.Check(Paid()==Allocated(),"Payments do not reconcile to allocations.");
             Identity.Check(Identity.Count("""

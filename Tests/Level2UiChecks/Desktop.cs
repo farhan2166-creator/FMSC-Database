@@ -53,10 +53,16 @@ internal sealed class Desktop : IDisposable
     }
     internal AutomationElement Find(string name,ControlType? type=null,AutomationElement? scope=null)=>Wait(()=>
         TryFind(name,type,scope),"control "+name);
-    internal AutomationElement? TryFind(string name,ControlType? type=null,AutomationElement? scope=null)=>
-        (scope??Window()).FindAllDescendants(cf=>type.HasValue?
+    internal AutomationElement? TryFind(string name,ControlType? type=null,AutomationElement? scope=null)
+    {
+        AutomationElement? Search(AutomationElement root)=>root.FindAllDescendants(cf=>type.HasValue?
             cf.ByName(name).Or(cf.ByAutomationId("Level2Input_"+System.Text.RegularExpressions.Regex.Replace(name,@"[^A-Za-z0-9]+","_"))).And(cf.ByControlType(type.Value)):
             cf.ByName(name)).FirstOrDefault(e=>!e.IsOffscreen);
+        var match=Search(scope??Window());
+        // Date selectors and native menus are owned top-level popup surfaces.
+        return match??(scope==null?Automation.GetDesktop().FindAllChildren(cf=>cf.ByProcessId(Process!.Id))
+            .Select(Search).FirstOrDefault(found=>found!=null):null);
+    }
     internal void Click(string name,ControlType? type=null,AutomationElement? scope=null,bool twice=false)
     {
         using var c=Identity.Open(); RequireInteractive();
@@ -103,7 +109,25 @@ internal sealed class Desktop : IDisposable
         Click("Search",ControlType.Button,dialog);
         Wait(()=>TryFind("Open Student",ControlType.Button,dialog) is {IsEnabled:true} e?e:null,"student search result");
         Click("Open Student",ControlType.Button,dialog);
-        Find("Student Name",ControlType.Edit);
+        Wait(()=>Find("Student Name",ControlType.Edit) is {IsEnabled:true} e?e:null,"admission load completed");
+    }
+    internal void Navigate(string page,string group="Daily Work")
+    {
+        if(TryFind(page,ControlType.Button)==null)Click(group,ControlType.Button);
+        Click(page,ControlType.Button);
+    }
+    internal void Date(string name,DateTime date)
+    {
+        using var c=Identity.Open();RequireInteractive();
+        Find(name,ControlType.ComboBox).Focus();Key(VirtualKeyShort.F4);
+        Fill("Year",date.Year.ToString());
+        Select("Month",System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(date.Month));
+        Find("Day calendar").Focus();Key(VirtualKeyShort.HOME);
+        // The fictional workflow dates are deliberately the first of the month.
+        Identity.Check(date.Day==1,"Date helper requires an explicit first-of-month fixture date.");
+        Click("Use Date",ControlType.Button);
+        string actual=Find(name,ControlType.ComboBox).AsComboBox().Value;
+        Identity.Check(DateTime.TryParse(actual,out var chosen)&&chosen.Date==date.Date,"Calendar choice did not persist: "+name);
     }
     internal void DashboardAfterLogin()
     {

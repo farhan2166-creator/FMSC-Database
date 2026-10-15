@@ -8,7 +8,7 @@ internal static class PromotionWorkflows
         report.Run("L2-PRO-01",ui,()=>{
             ui.Click("Student Management",ControlType.Button);ui.Click("Student Promotion",ControlType.Button);
             ui.Select("Source Campus","Fictional Main Campus");
-            ui.Select("Source Academic Year","Fictional "+DateTime.UtcNow.Year);
+            ui.Select("Source Academic Year","Fictional "+(DateTime.UtcNow.Year-1));
             ui.Select("Source Class","Class 6 (Fictional Middle School)");
             ui.Click("Load Candidates",ControlType.Button);
             ui.Find("Select All",ControlType.Button);
@@ -16,7 +16,7 @@ internal static class PromotionWorkflows
         },"Candidate screen uses the UI-created student's source enrollment; count unchanged.");
         if(!report.Passed("L2-PRO-01"))return;
         report.Run("L2-PRO-02",ui,()=>{
-            ui.Select("Destination Academic Year","Fictional "+(DateTime.UtcNow.Year+1));
+            ui.Select("Destination Academic Year","Fictional "+DateTime.UtcNow.Year);
             ui.Select("Destination Class","Class 7 (Fictional Middle School)");
             ui.Select("Destination Section","Class 7 — Section A");
             ui.Click("Select All",ControlType.Button);ui.Click("Ticked: Promote",ControlType.Button);
@@ -36,7 +36,7 @@ internal static class PromotionWorkflows
                 SELECT COUNT(*) FROM dbo.Enrollments E JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId
                 JOIN dbo.CampusClassSections S ON S.ClassSectionId=E.ClassSectionId JOIN dbo.Classes C ON C.ClassId=S.ClassId
                 WHERE Y.YearName=@Year AND C.ClassName=N'Class 7' AND E.BillingReady=0;
-                """,new Microsoft.Data.SqlClient.SqlParameter("@Year","Fictional "+(DateTime.UtcNow.Year+1)))==1,"Next-year placement or billing gate differs.");
+                """,new Microsoft.Data.SqlClient.SqlParameter("@Year","Fictional "+DateTime.UtcNow.Year))==1,"Next-year placement or billing gate differs.");
         },"Two enrollments; one promotion-history row; next-year Class 7 awaits confirmed return with billing disabled.");
         report.Run("L2-PRO-04",ui,()=>{
             // A completed-processing informational dialog may still be visible.

@@ -76,8 +76,10 @@ The reference fixture uses the production setup procedures and runs the unchange
 startup schema compatibility validator. As in Level 1, DacFx's recovery-scope
 property is converted to a fresh typed uniqueidentifier only in the disposable
 fixture. Approved schema artifacts, fingerprints and migration requirements are
-not rewritten. Three fictional years support current-year admission and next-year
-promotion. No student, collection, allocation or promotion is seeded.
+not rewritten. Three fictional years support historical admission and its following-year
+promotion. The driver chooses 1 April of the previous calendar year through the
+actual date-selector popup, so promotion can use 1 January of the current year
+without violating the application’s non-future-date rule. No student, collection, allocation or promotion is seeded.
 
 The application is built with the explicit `FmscLevel2=true` property into the
 private run folder. That compile-time symbol adds the guarded connection route,
@@ -116,14 +118,14 @@ Tab focus; sign-out and fresh authentication; admission navigation/required fiel
 no-match student search; placement choices; invalid phone/date-year combinations;
 UI admission and opening-fee verification; repeated Save; search/reopen; allowed
 field edit and discard; unsaved navigation cancellation; partial/full collection;
-cancelled and settled collection safeguards; account-statement opening; independent
+cancelled and settled collection safeguards; receipt preview and account-statement opening; independent
 allocation reconciliation; promotion selection/cancellation/commit/history;
 student profile and related admission navigation. See the actual report for which
 recipes completed in any particular run; an implemented recipe can still fail.
 
 Coverage still requiring additional recipes and/or operator acceptance includes
 fee-rate configuration and monthly posting through UI, additional-charge entry,
-receipt rendering/export, deliberate duplicate-identity handling, invalid placement
+receipt export, deliberate duplicate-identity handling, invalid placement
 combinations across additional campuses, sibling linking and student status,
 confirmed next-year admission/fees, promotion replay refusals, connection-interruption
 recovery, switching records during edits, comprehensive layout/keyboard inspection,
