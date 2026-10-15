@@ -8,7 +8,7 @@ internal static partial class Program
     private static void CheckStatementRegenerationFreshness()
     {
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(StudentAccountStatementPage);
-        using var page=new StudentAccountStatementPage();
+        using var page=(StudentAccountStatementPage)Activator.CreateInstance(type,flags,null,new object?[]{false,null},null)!;
         var grid=(DataGridView)typeof(V2Page).GetField("Grid",flags)!.GetValue(page)!;
         using var old=new DataTable();old.Columns.Add("Previous statement");old.Rows.Add("Retained snapshot");page.BindingContext=new BindingContext();grid.DataSource=old;
         var export=(ModernButton)type.GetField("exportButton",flags)!.GetValue(page)!;export.Enabled=true;type.GetField("_appliedFilterSignature",flags)!.SetValue(page,"Previously current");
