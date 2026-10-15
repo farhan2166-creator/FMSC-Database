@@ -22,6 +22,18 @@ SELECT N'OWNED';
 "@
 $result=@(& sqlcmd -S "(localdb)\$catalog" -E -d $catalog -b -l 20 -t 30 -h -1 -W -Q $query 2>&1)
 if($LASTEXITCODE -ne 0 -or ($result -join '').Trim() -ne 'OWNED') {throw 'Could not establish database ownership. State retained for inspection.'}
+$processState=Join-Path $root 'app-process.json'
+if(Test-Path -LiteralPath $processState) {
+    $ownedProcess=Get-Content -LiteralPath $processState -Raw | ConvertFrom-Json
+    $expectedExecutable=Join-Path $root 'app/FMSC_SMS.exe'
+    if($ownedProcess.executable -ne $expectedExecutable) {throw 'Recorded application path differs.'}
+    $running=Get-Process -Id $ownedProcess.pid -ErrorAction SilentlyContinue
+    if($running) {
+        if($running.Path -ne $expectedExecutable) {throw 'Recorded process ID now belongs to a different program.'}
+        Stop-Process -Id $running.Id -Force
+        $running.WaitForExit(5000) | Out-Null
+    }
+}
 & SqlLocalDB stop $catalog -k
 if($LASTEXITCODE -ne 0) {throw 'Owned instance did not stop.'}
 & SqlLocalDB delete $catalog

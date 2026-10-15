@@ -32,6 +32,7 @@ internal sealed class Desktop : IDisposable
         RequireInteractive(); using var c=Identity.Open();
         var start=new ProcessStartInfo(exe) {UseShellExecute=false,WorkingDirectory=Path.GetDirectoryName(exe)!};
         Process=System.Diagnostics.Process.Start(start)??throw new InvalidOperationException("App did not start.");
+        File.WriteAllText(Path.Combine(Identity.Root,"app-process.json"),System.Text.Json.JsonSerializer.Serialize(new {pid=Process.Id,executable=Path.GetFullPath(exe)}));
     }
     internal Window? TryWindow(string? title=null)=>Automation.GetDesktop().FindAllChildren(cf=>cf.ByProcessId(Process!.Id))
         .SelectMany(root=>new[]{root}.Concat(root.FindAllDescendants(cf=>cf.ByControlType(ControlType.Window))))
@@ -94,11 +95,15 @@ internal sealed class Desktop : IDisposable
         // Click the observed dropdown item: programmatic Select and incremental
         // search are unreliable for owner-drawn WinForms lists with shared prefixes.
         e.Click();
-        var item=Wait(()=>e.FindFirstDescendant(cf=>cf.ByName(text).And(cf.ByControlType(ControlType.ListItem)))
-            ??Automation.GetDesktop().FindAllChildren(cf=>cf.ByProcessId(Process!.Id))
-                .Select(root=>root.FindFirstDescendant(cf=>cf.ByName(text).And(cf.ByControlType(ControlType.ListItem))))
-                .FirstOrDefault(found=>found!=null&&!found.IsOffscreen),"dropdown item "+text);
-        item.Click();
+        try
+        {
+            var item=Wait(()=>e.FindFirstDescendant(cf=>cf.ByName(text).And(cf.ByControlType(ControlType.ListItem)))
+                ??Automation.GetDesktop().FindAllChildren(cf=>cf.ByProcessId(Process!.Id))
+                    .Select(root=>root.FindFirstDescendant(cf=>cf.ByName(text).And(cf.ByControlType(ControlType.ListItem))))
+                    .FirstOrDefault(found=>found!=null&&!found.IsOffscreen),"dropdown item "+text);
+            item.Click();
+        }
+        catch {Key(VirtualKeyShort.ESCAPE);throw;}
         Identity.Check(e.AsComboBox().Value==text,"Combo selection did not persist: "+name);
     }
     internal void PickStudent(string field="Student (Admission Number / Name)")
@@ -134,6 +139,15 @@ internal sealed class Desktop : IDisposable
         Click("Use Date",ControlType.Button);
         string actual=Find(name,ControlType.ComboBox).AsComboBox().Value;
         Identity.Check(DateTime.TryParse(actual,out var chosen)&&chosen.Date==date.Date,"Calendar choice did not persist: "+name);
+    }
+    internal void AssertMissingChoice(string name,string prefix)
+    {
+        using var c=Identity.Open();RequireInteractive();
+        var combo=Find(name,ControlType.ComboBox);combo.Click();
+        var items=Automation.GetDesktop().FindAllChildren(cf=>cf.ByProcessId(Process!.Id))
+            .SelectMany(root=>root.FindAllDescendants(cf=>cf.ByControlType(ControlType.ListItem)));
+        Identity.Check(!items.Any(e=>(e.Properties.Name.ValueOrDefault??"").StartsWith(prefix,StringComparison.Ordinal)),"An ineligible dropdown choice remains: "+prefix);
+        Key(VirtualKeyShort.ESCAPE);
     }
     internal void DashboardAfterLogin()
     {

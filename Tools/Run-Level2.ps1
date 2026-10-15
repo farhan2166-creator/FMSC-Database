@@ -13,6 +13,8 @@ $evidence=Join-Path $repo "artifacts/level2/evidence/$catalog"
 $stage='Environment'
 $engine='Not reached'
 $created=$false
+$desktopGate=$null
+$ownsDesktopGate=$false
 $exitCode=1
 New-Item -ItemType Directory -Path $run,$evidence,(Join-Path $run 'database') | Out-Null
 $owner.ToString('D') | Set-Content -LiteralPath (Join-Path $run 'owner.txt')
@@ -74,6 +76,14 @@ function BlockedReport([string]$Reason) {
 }
 try {
     if(-not $IsWindows -and $PSVersionTable.PSEdition -ne 'Desktop') {throw 'Windows is required.'}
+    $desktopGate=[Threading.Mutex]::new($false,'Local\FMSC_SMS.Level2Desktop')
+    try {$ownsDesktopGate=$desktopGate.WaitOne(0)}
+    catch [Threading.AbandonedMutexException] {$ownsDesktopGate=$true}
+    if(-not $ownsDesktopGate) {throw 'Another Level 2 run owns this desktop.'}
+    $oldApps=@(Get-Process FMSC_SMS -ErrorAction SilentlyContinue | Where-Object {
+        $_.Path -and $_.Path.StartsWith((Join-Path $repo 'artifacts/level2/private'),[StringComparison]::OrdinalIgnoreCase)
+    })
+    if($oldApps.Count -gt 0) {throw 'An earlier fictional test application is still open; clean up that exact run first.'}
     # Generated fixture credentials and recovery files are local to this operator.
     $acl=Get-Acl -LiteralPath $run
     $acl.SetAccessRuleProtection($true,$false)
@@ -99,7 +109,7 @@ try {
     & dotnet build (Join-Path $repo 'FMSC_SMS.csproj') -c Release '-p:FmscLevel2=true' -o $appOutput -v quiet
     Native 'Test application build'
     foreach($project in @('Level2Fixture','Level2UiChecks')) {
-        & dotnet build (Join-Path $repo "Tests/$project/$project.csproj") -c Release -v quiet
+        & dotnet build (Join-Path $repo "Tests/$project/$project.csproj") -c Release -o (Join-Path $run $project) -v quiet
         Native "$project build"
     }
     & dotnet (Join-Path $appOutput 'FMSC_SMS.dll') '--verify-level2-guards'
@@ -136,11 +146,11 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
     } finally {Pop-Location}
     Stage 'Seed fictional reference data'
     VerifyTarget
-    & dotnet (Join-Path $repo 'Tests/Level2Fixture/bin/Release/net8.0/Level2Fixture.dll')
+    & dotnet (Join-Path $run 'Level2Fixture/Level2Fixture.dll')
     Native 'Reference fixture'
     VerifyTarget
     Stage 'Interactive operator workflows'
-    & dotnet (Join-Path $repo 'Tests/Level2UiChecks/bin/Release/net8.0-windows/Level2UiChecks.dll') (Join-Path $appOutput 'FMSC_SMS.exe') $evidence
+    & dotnet (Join-Path $run 'Level2UiChecks/Level2UiChecks.dll') (Join-Path $appOutput 'FMSC_SMS.exe') $evidence
     $exitCode=$LASTEXITCODE
     }
 } catch {
@@ -178,6 +188,8 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
         Add-Content -LiteralPath (Join-Path $evidence 'summary.md') -Value "`nCleanup: $cleanup"
     }
     foreach($key in $saved.Keys) {[Environment]::SetEnvironmentVariable($key,$saved[$key])}
+    if($ownsDesktopGate) {$desktopGate.ReleaseMutex()}
+    if($desktopGate) {$desktopGate.Dispose()}
     Write-Host "Level 2 evidence: $evidence"
 }
 exit $exitCode

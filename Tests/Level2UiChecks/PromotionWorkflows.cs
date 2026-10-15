@@ -17,7 +17,7 @@ internal static class PromotionWorkflows
         if(!report.Passed("L2-PRO-01"))return;
         report.Run("L2-PRO-02",ui,()=>{
             ui.Select("Destination Academic Year","Fictional "+DateTime.UtcNow.Year);
-            ui.Select("Destination Class","Class 7 (Fictional Middle School)");
+            ui.Select("Destination Class","Class 7");
             ui.Select("Destination Section","Class 7 — Section A");
             ui.Click("Select All",ControlType.Button);ui.Click("Ticked: Promote",ControlType.Button);
             ui.Click("Process Ticked",ControlType.Button);
@@ -46,5 +46,34 @@ internal static class PromotionWorkflows
             ui.Click("Close application",ControlType.Button,ui.Window("Promotion History"));
             ui.Find("Load Candidates",ControlType.Button);
         },"History opens for the committed promotion and closes back to promotion details.");
+        if(!report.Passed("L2-PRO-03"))return;
+        report.Run("L2-PRO-05",ui,()=>{
+            ui.Click("Load Candidates",ControlType.Button);
+            Desktop.Wait(()=>!ui.Find("Process Ticked",ControlType.Button).IsEnabled?new object():null,"no repeat promotion candidates");
+            Identity.Check(Identity.Count("SELECT COUNT(*) FROM dbo.Enrollments;")==2&&Identity.Count("SELECT COUNT(*) FROM dbo.PromotionBatchStudents;")==1,"Repeated promotion changed history or enrollment count.");
+        },"Promoted source student is no longer processable; two enrollments and one history row remain.");
+        report.Run("L2-PRO-06",ui,()=>{
+            decimal originalYearCharges=Identity.Money("""
+                SELECT SUM(B.NetAmount) FROM dbo.BillingCharges B JOIN dbo.Enrollments E ON E.EnrollmentId=B.EnrollmentId
+                JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId WHERE Y.YearName=@Year;
+                """,new Microsoft.Data.SqlClient.SqlParameter("@Year","Fictional "+(DateTime.UtcNow.Year-1)));
+            ui.Navigate("Student Admissions");ui.OpenStudent();ui.Click("Confirm Return",ControlType.Button);
+            var dialog=ui.Window("Confirm Return");
+            ui.Date("Billing starts from",new DateTime(DateTime.UtcNow.Year,1,1));
+            ui.Click("Confirm Return",ControlType.Button,dialog);
+            ui.Click("Yes",ControlType.Button,ui.Window("Confirm Return Admission"));
+            Desktop.Wait(()=>Identity.Count("""
+                SELECT COUNT(*) FROM dbo.Enrollments E JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId
+                WHERE Y.YearName=@Year AND E.BillingReady=1 AND E.ReturnConfirmedAt IS NOT NULL;
+                """,new Microsoft.Data.SqlClient.SqlParameter("@Year","Fictional "+DateTime.UtcNow.Year))==1?new object():null,"return confirmation commit");
+            Identity.Check(Identity.Money("""
+                SELECT SUM(B.NetAmount) FROM dbo.BillingCharges B JOIN dbo.Enrollments E ON E.EnrollmentId=B.EnrollmentId
+                JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId WHERE Y.YearName=@Year;
+                """,new Microsoft.Data.SqlClient.SqlParameter("@Year","Fictional "+DateTime.UtcNow.Year))==8000,"Next-year opening charges differ from 6000 tuition plus 2000 admission.");
+            Identity.Check(Identity.Money("""
+                SELECT SUM(B.NetAmount) FROM dbo.BillingCharges B JOIN dbo.Enrollments E ON E.EnrollmentId=B.EnrollmentId
+                JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId WHERE Y.YearName=@Year;
+                """,new Microsoft.Data.SqlClient.SqlParameter("@Year","Fictional "+(DateTime.UtcNow.Year-1)))==originalYearCharges,"Return confirmation changed original-year charges.");
+        },"UI confirmation enables next-year billing and creates exactly 8000 opening fees; original-year financial records remain unchanged.");
     }
 }
