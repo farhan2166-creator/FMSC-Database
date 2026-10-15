@@ -2,6 +2,12 @@ name: FMSC Disposable Windows Installation Acceptance
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - '.github/workflows/fmsc-disposable-windows-install.yml'
+      - 'Tools/RunDisposableWindowsInstall.ps1'
 
 permissions:
   contents: read
@@ -14,13 +20,16 @@ jobs:
   clean-install:
     name: Real Windows installer with approved synthetic LocalDB
     runs-on: windows-2022
+    if: github.event_name == 'workflow_dispatch' || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository)
     timeout-minutes: 55
     env:
       FMSC_DISPOSABLE_INSTALL: approved-synthetic-only
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
     steps:
       - name: Check out this commit (no school data or secrets)
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up .NET 8 SDK
         uses: actions/setup-dotnet@v6
@@ -54,7 +63,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-# This manual smoke test runs the actual core.ps1 and uses an isolated synthetic
+# This opt-in / focused same-repository PR test runs actual core.ps1 with synthetic
 # MDF/LDF pair. It never imports, packages, commits or uploads any school database.
 # On GitHub-hosted images LocalDB might be preinstalled; the report records the
 # missing pristine-MSI coverage instead of claiming it was tested.

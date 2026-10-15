@@ -3,7 +3,8 @@
 param([string]$ProjectDirectory = (Split-Path $PSScriptRoot -Parent))
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
-if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows' -or $env:FMSC_DISPOSABLE_INSTALL -ne 'approved-synthetic-only') {
+if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows' -or
+    $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or $env:FMSC_DISPOSABLE_INSTALL -ne 'approved-synthetic-only') {
     throw 'Refusing to run outside a designated disposable Windows GitHub Actions job.'
 }
 $identity=[Security.Principal.WindowsIdentity]::GetCurrent()
@@ -23,6 +24,12 @@ $sqlcmd=Join-Path $tools 'sqlcmd.exe'
 $instance='(localdb)\MSSQLLocalDB'
 $installed='C:\FMSC School Management'
 $live='C:\ProgramData\FMSC_Database'
+$shortcut=Join-Path ([Environment]::GetFolderPath('Desktop')) 'FMSC SMS.lnk'
+$ownedDatabase=$false
+$ownedInstallation=$false
+$ownedRoot=$false
+$fixtureFiles=@()
+$cleanupResult='NOT_REQUIRED'
 $stage='Runner isolation'
 $checks=[Collections.Generic.List[string]]::new()
 $status='BLOCKED'
@@ -32,7 +39,7 @@ New-Item -ItemType Directory -Path $evidence -Force | Out-Null
 function Stage([string]$Name) { $script:stage=$Name; Write-Host "ACCEPTANCE STAGE: $Name" }
 function NativeOk([string]$Name) { if ($LASTEXITCODE -ne 0) { throw "$Name exited with code $LASTEXITCODE" } }
 function Sql([string]$Db, [string]$Query) {
-    $result=@(& $script:sqlcmd -S $script:instance -E -d $Db -b -Q $Query 2>&1)
+    $result=@(& $script:sqlcmd -S $script:instance -E -d $Db -b -l 30 -t 60 -h -1 -W -Q $Query 2>&1)
     NativeOk "SQL verification on $Db"
     return $result
 }
@@ -49,6 +56,7 @@ function WriteEvidence {
         result=$script:status
         lastStage=$script:stage
         localDbMsiCoverage=$script:msiCoverage
+        cleanup=$script:cleanupResult
         checksPassed=@($script:checks.ToArray())
         limitations=@(
           'GitHub-hosted Windows 2022 is disposable but may include preinstalled LocalDB.',
@@ -60,7 +68,7 @@ function WriteEvidence {
     }
     $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $script:evidence 'report.json') -Encoding utf8
     $summary=@('# FMSC Disposable Windows Installation', '', "Commit: $env:GITHUB_SHA", "Result: **$script:status**",
-        "Last stage: $script:stage", "LocalDB MSI: $script:msiCoverage", '', '## Completed checks')
+        "Last stage: $script:stage", "LocalDB MSI: $script:msiCoverage", "Cleanup: $script:cleanupResult", '', '## Completed checks')
     $summary+=@($script:checks | ForEach-Object { "- $_" })
     $summary+=@('','## Coverage limits')
     $summary+=@($report.limitations | ForEach-Object { "- $_" })
@@ -69,10 +77,12 @@ function WriteEvidence {
 }
 
 try {
-    if (Test-Path -LiteralPath $installed) { throw 'Pre-existing FMSC app: not a clean FMSC installation.' }
-    if (Test-Path -LiteralPath (Join-Path $live 'FMSC_DB.mdf')) { throw 'Pre-existing database: refusing to touch it.' }
+    foreach ($path in @($installed,"$installed.staging","$installed.rollback",$live,$shortcut)) {
+        if (Test-Path -LiteralPath $path) { throw 'Pre-existing FMSC installation assets: refusing to touch them.' }
+    }
     if (Test-Path -LiteralPath $root) { throw 'Disposable test workspace already exists.' }
     New-Item -ItemType Directory -Path $root,$release,$app,$tools,$database,(Join-Path $root 'empty-source') -Force | Out-Null
+    $ownedRoot=$true
     $checks.Add('No existing FMSC application or target database found')
 
     Stage 'Approved schema-only fixture verification'
@@ -112,7 +122,7 @@ try {
         $msiCoverage='REAL_SILENT_MSI_ATTEMPTED'
         $log=Join-Path $root 'localdb-msi-private.log'
         $p=Start-Process -FilePath 'msiexec.exe' -ArgumentList @(
-            '/i', ('"' + $downloadedMsi + '"'), '/qn', '/norestart', '/L*V', ('"' + $log + '"')
+            '/i', ('"' + $downloadedMsi + '"'), '/qn', '/norestart', 'IACCEPTSQLLOCALDBLICENSETERMS=YES', '/L*V', ('"' + $log + '"')
         ) -Wait -PassThru
         if ($p.ExitCode -in @(3010,1641)) { throw 'LocalDB requires a Windows restart; acceptance is blocked until reboot.' }
         if ($p.ExitCode -ne 0) { throw "Real silent LocalDB MSI failed with code $($p.ExitCode); interactive recovery needs an operator." }
@@ -120,8 +130,18 @@ try {
     }
     $localExe=LocalDbExe
     if (-not $localExe) { throw 'LocalDB executable missing after setup.' }
+    $null=& $localExe info MSSQLLocalDB 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        & $localExe create MSSQLLocalDB 16.0
+        NativeOk 'Create isolated-runner SQL Server 2022 LocalDB instance'
+    }
     & $localExe start MSSQLLocalDB
     NativeOk 'Start LocalDB instance'
+    $info=@(& $localExe info MSSQLLocalDB 2>&1)
+    NativeOk 'Read owned-runner LocalDB endpoint'
+    $pipe=[regex]::Match(($info -join "`n"), '(?:np:)?(\\\\\.\\pipe\\LOCALDB#[A-Za-z0-9]+\\tsql\\query)')
+    if (-not $pipe.Success) { throw 'Cannot resolve the local LocalDB named pipe; no database operations permitted.' }
+    $instance='np:'+$pipe.Groups[1].Value
     $checks.Add('Actual LocalDB instance started using Microsoft-signed prerequisites')
 
     Stage 'Pinned SQL command and full installer publishing'
@@ -155,12 +175,13 @@ try {
 
     Stage 'Provision and detach synthetic version-6 LocalDB'
     $prior=@(Sql 'master' "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.databases WHERE name=N'FMSC_DB';")
-    if (($prior -join ' ') -notmatch '(?m)\b0\b') { throw 'FMSC_DB already exists; refusing to overwrite it.' }
+    if (($prior -join '').Trim() -ne '0') { throw 'FMSC_DB already exists; refusing to overwrite it.' }
+    $ownedDatabase=$true # Catalog absent on this explicitly isolated runner; covers partial publish failure too.
     Push-Location (Join-Path $project 'Tests/LifecycleSqlChecks')
     try {
         & dotnet tool restore
         NativeOk 'Pinned SQLPackage tool restore'
-        $conn='Server=(localdb)\MSSQLLocalDB;Database=FMSC_DB;Integrated Security=True;Encrypt=False;TrustServerCertificate=True'
+        $conn="Server=$instance;Database=FMSC_DB;Integrated Security=True;Encrypt=False;TrustServerCertificate=True"
         & dotnet tool run sqlpackage -- '/Action:Publish' "/SourceFile:$fixture" "/TargetConnectionString:$conn" '/p:CreateNewDatabase=True'
         NativeOk 'Publish approved schema-only DACPAC'
     } finally { Pop-Location }
@@ -179,6 +200,7 @@ EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@
     $mdf=$paths | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -match '^[A-Za-z]:\\.+\.mdf$' } | Select-Object -First 1
     $ldf=$paths | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -match '^[A-Za-z]:\\.+\.ldf$' } | Select-Object -First 1
     if (-not $mdf -or -not $ldf) { throw 'Synthetic LocalDB MDF/LDF paths unavailable.' }
+    $fixtureFiles=@($mdf,$ldf)
     Sql 'master' "ALTER DATABASE [FMSC_DB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; EXEC sys.sp_detach_db @dbname=N'FMSC_DB';" | Out-Null
     Copy-Item -LiteralPath $mdf -Destination (Join-Path $database 'FMSC_DB.mdf')
     Copy-Item -LiteralPath $ldf -Destination (Join-Path $database 'FMSC_DB_log.ldf')
@@ -192,6 +214,7 @@ EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@
     $psi.RedirectStandardInput=$true
     $psi.RedirectStandardOutput=$true
     $psi.RedirectStandardError=$true
+    $ownedInstallation=$true
     $p=[Diagnostics.Process]::Start($psi)
     if (-not $p) { throw 'Failed to start installer process.' }
     $stdout=$p.StandardOutput.ReadToEndAsync()
@@ -203,9 +226,14 @@ EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@
         try { $p.Kill($true) } catch { }
         throw 'Installer timed out; never claim success.'
     }
-    $null=$stdout.GetAwaiter().GetResult()
-    $null=$stderr.GetAwaiter().GetResult()
-    if ($p.ExitCode -ne 0) { throw "Actual installer failed with exit code $($p.ExitCode)." }
+    $installerOutput=$stdout.GetAwaiter().GetResult()
+    $installerError=$stderr.GetAwaiter().GetResult()
+    # Retain synthetic diagnostics on the disposable runner only, never as artifacts.
+    $installerOutput | Set-Content -LiteralPath (Join-Path $root 'installer-private.log')
+    if ($p.ExitCode -ne 0) {
+        $failure=Select-String -LiteralPath (Join-Path $live 'Install.log') -Pattern 'ERROR:' -ErrorAction SilentlyContinue | Select-Object -Last 1
+        throw "Actual installer failed with exit code $($p.ExitCode). $($failure.Line) $installerError"
+    }
     $installLog=Join-Path $live 'Install.log'
     if (-not (Test-Path -LiteralPath $installLog) -or
         -not (Select-String -LiteralPath $installLog -Pattern 'FMSC SMS installation completed successfully\.' -Quiet)) {
@@ -220,12 +248,19 @@ EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@
 
     Stage 'Installed app schema verification'
     $version=@(Sql 'FMSC_DB' 'SET NOCOUNT ON; SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC;')
-    if (($version -join ' ') -notmatch '(?m)\b6\b') { throw 'Wrong schema version installed.' }
+    if (($version -join '').Trim() -ne '6') { throw 'Wrong schema version installed.' }
     $exe=Join-Path $installed 'FMSC_SMS.exe'
-    $verify=Start-Process -FilePath $exe -ArgumentList @(
-        '--verify-installation','"(localdb)\MSSQLLocalDB"','"FMSC_DB"'
-    ) -Wait -PassThru
-    if ($verify.ExitCode -notin @(0,10)) { throw "Installed FMSC CLI verification failed (code $($verify.ExitCode))." }
+    $verify=Start-Process -FilePath $exe -ArgumentList @('--verify-installation',('"'+$instance+'"'),'FMSC_DB') -PassThru
+    $null=$verify.Handle
+    if (-not $verify.WaitForExit(180000)) { $verify.Kill(); throw 'Installed verification timed out.' }
+    if ($verify.ExitCode -ne 10) { throw "Installed FMSC CLI verification failed (expected base-compatible/module-absent code 10; got $($verify.ExitCode))." }
+    Sql 'FMSC_DB' @'
+IF EXISTS(SELECT 1 FROM dbo.Students) OR EXISTS(SELECT 1 FROM dbo.Users)
+    THROW 51003,'Installer unexpectedly created student/user data',1;
+IF (SELECT COUNT(*) FROM sys.database_files WHERE physical_name IN
+    (N'C:\ProgramData\FMSC_Database\FMSC_DB.mdf',N'C:\ProgramData\FMSC_Database\FMSC_DB_log.ldf'))<>2
+    THROW 51004,'Installed database does not use the expected copied file pair',1;
+'@ | Out-Null
     $checks.Add('Installed application launched in verification mode and accepted base SQL schema')
     $status='PASS'
     Write-Host 'PASS: Disposable real Windows installer and synthetic LocalDB acceptance.'
@@ -235,4 +270,25 @@ catch {
     Write-Host "Installation acceptance stopped at '$stage': $($_.Exception.Message)"
     throw
 }
-finally { WriteEvidence }
+finally {
+    try {
+        if ($ownedDatabase) {
+            Sql 'master' "IF DB_ID(N'FMSC_DB') IS NOT NULL BEGIN ALTER DATABASE [FMSC_DB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [FMSC_DB]; END;" | Out-Null
+            if (((@(Sql 'master' "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.databases WHERE name=N'FMSC_DB';")) -join '').Trim() -ne '0') {
+                throw 'Owned disposable database still exists after cleanup.'
+            }
+        }
+        foreach ($path in $fixtureFiles) {
+            if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Force }
+        }
+        if ($ownedInstallation) {
+            foreach ($path in @($installed,"$installed.staging","$installed.rollback",$live,$shortcut)) {
+                if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
+            }
+        }
+        if ($ownedRoot) { Remove-Item -LiteralPath $root -Recurse -Force }
+        $cleanupResult='PASS'
+    }
+    catch { $cleanupResult='FAIL'; $status='FAIL'; throw }
+    finally { WriteEvidence }
+}
