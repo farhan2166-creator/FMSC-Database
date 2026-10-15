@@ -1070,6 +1070,14 @@ function Invoke-LocalDbMsiInstallation {
         Get-Command `
             'sqllocaldb.exe' `
             -ErrorAction SilentlyContinue
+    # Do not reinstall an existing LocalDB just because its directory is absent from PATH.
+    if (-not $SqlLocalDb -and $env:ProgramFiles) {
+        $localExe = Join-Path $env:ProgramFiles 'Microsoft SQL Server\160\Tools\Binn\SqlLocalDB.exe'
+        if (Test-Path -LiteralPath $localExe -PathType Leaf) {
+            $env:Path += ';' + (Split-Path $localExe -Parent)
+            $SqlLocalDb = Get-Command 'sqllocaldb.exe' -ErrorAction SilentlyContinue
+        }
+    }
     if (-not $SqlLocalDb) {
         Write-WarningMessage `
             'SQL Server LocalDB was not found.'
@@ -1124,6 +1132,16 @@ function Invoke-LocalDbMsiInstallation {
             )
         $env:Path =
             "$MachinePath;$UserPath"
+        # The MSI can succeed before its PATH updates reach this process.
+        if (-not (Get-Command 'sqllocaldb.exe' -ErrorAction SilentlyContinue) -and $env:ProgramFiles) {
+            $localExe = Join-Path $env:ProgramFiles 'Microsoft SQL Server\160\Tools\Binn\SqlLocalDB.exe'
+            if (Test-Path -LiteralPath $localExe -PathType Leaf) {
+                $env:Path += ';' + (Split-Path $localExe -Parent)
+            }
+        }
+        if (-not (Get-Command 'sqllocaldb.exe' -ErrorAction SilentlyContinue)) {
+            throw 'LocalDB setup completed but sqllocaldb.exe was not found. Restart Windows and rerun the installer. Check the LocalDB diagnostic log if necessary.'
+        }
     }
     else {
         Write-Success `
