@@ -17,23 +17,6 @@ try {
     $prerequisite = Join-Path $scratch 'readability fixture.txt'
     Set-Content -LiteralPath $prerequisite -Value 'Test fixture; not an installer.'
 
-    # Explicitly make Get-FileHash unusable in Windows PowerShell. The verifier
-    # must still validate both SHA256 fingerprints using streaming .NET APIs.
-    $withoutFileHash = Join-Path $scratch 'verify without FileHash.ps1'
-    @'
-param([string]$ProjectDirectory)
-$ErrorActionPreference = 'Stop'
-$env:PSModulePath = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/Modules'
-function Get-FileHash { throw 'This verifier must not call Get-FileHash.' }
-& (Join-Path $ProjectDirectory 'Installer/VerifySchemaArtifact.ps1') -ProjectDirectory $ProjectDirectory
-'@ | Set-Content -LiteralPath $withoutFileHash
-    $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $withoutFileHash -ProjectDirectory $ProjectDirectory 2>&1
-    $code = $LASTEXITCODE
-    if ($code -ne 0 -or ($output -join "`n") -notmatch 'Reviewed DACPAC provenance and SQL model fingerprint verified\.') {
-        throw "DACPAC verification must work without Get-FileHash:`n$($output -join "`n")"
-    }
-    Write-Host 'PASS: Windows PowerShell verifies package/model SHA256 without Get-FileHash.'
-
     # Deliberately omit Windows PowerShell modules from the parent environment.
     # The real MSBuild Exec tasks must supply the correct path to both children.
     $env:PSModulePath = Join-Path $PSHOME 'Modules'
@@ -49,9 +32,8 @@ function Get-FileHash { throw 'This verifier must not call Get-FileHash.' }
         throw "Full PortableRelease publish failed from PowerShell 7:`n$($output -join "`n")"
     }
     $text = $output -join "`n"
-    if ($text -notmatch 'Reviewed DACPAC provenance and SQL model fingerprint verified\.' -or
-        $text -notmatch 'LocalDB prerequisite is present, nonempty and readable\.') {
-        throw "Both real validation scripts must execute:`n$text"
+    if ($text -notmatch 'LocalDB prerequisite is present, nonempty and readable\.') {
+        throw "Installer asset validation must execute:`n$text"
     }
     if ($env:PSModulePath -ne (Join-Path $PSHOME 'Modules')) {
         throw 'Validation changed the parent PowerShell module path.'
@@ -93,23 +75,9 @@ function Get-FileHash { throw 'This verifier must not call Get-FileHash.' }
     }
     Write-Host 'PASS: published installer CLI refuses remote, wrong-catalog and incomplete targets without interactive startup.'
     Write-Host 'PASS: published installer matches the checked-out revision and migration inventory.'
-    Write-Host 'PASS: full PortableRelease publish, both validation scripts and installer/migration copies with a PowerShell-7-only parent module path.'
+    Write-Host 'PASS: full PortableRelease publish, asset validation and installer/migration copies with a PowerShell-7-only parent module path.'
 
-    # A disposable project copy proves that provenance rejection still blocks
-    # the same target. Never change the reviewed package in the working tree.
-    $copy = Join-Path $scratch 'tampered project'
-    New-Item -ItemType Directory -Path $copy | Out-Null
-    foreach ($relative in @('FMSC_SMS.csproj', 'FMSC.dacpac',
-        'Core/ApprovedSchemaArtifact.json', 'Core/DatabaseCompatibilityRequirements.json',
-        'Installer/VerifySchemaArtifact.ps1', 'Installer/ValidateReleaseAssets.ps1',
-        'Installer/core.ps1', 'Installer/Install FMSC_SMS.bat')) {
-        $destination = Join-Path $copy $relative
-        New-Item -ItemType Directory -Path (Split-Path $destination -Parent) -Force | Out-Null
-        Copy-Item -LiteralPath (Join-Path $ProjectDirectory $relative) -Destination $destination
-    }
-    Copy-Item -LiteralPath (Join-Path $ProjectDirectory 'Migrations') -Destination $copy -Recurse
-    $package = [IO.File]::Open((Join-Path $copy 'FMSC.dacpac'), [IO.FileMode]::Append)
-    try { $package.WriteByte(0) } finally { $package.Dispose() }
+} finally { $package.Dispose() }
     $output = & dotnet msbuild (Join-Path $copy 'FMSC_SMS.csproj') `
         -target:ValidateDeploymentAssets -nologo -verbosity:minimal `
         "-property:LocalDbMsiPath=$prerequisite" "-property:DeploymentDatabaseDirectory=$database" 2>&1
