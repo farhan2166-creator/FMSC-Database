@@ -155,6 +155,17 @@ settings/monitor configurations are blocked when unavailable; Windows display
 settings are not changed automatically. Physical printing and receipt export are
 also outside the automated preview check.
 
+For the remaining real display matrix, finish/clean up the current run first.
+On a dedicated test desktop, choose each supported Windows Display configuration
+(1280x720 and 1920x1080; 100%, 125%, 150% where supported), complete any required
+sign-out, then run `-StartupOnly` in the unlocked session. Keep each run's separate
+evidence directory and record its actual monitor dimensions and observed window
+DPI. Inspect the images and exercise scrolling, focus and navigation at each
+configuration; run the full operator suite at the intended deployment settings.
+Restore the original Windows display settings afterward. A resized application
+window does not complete this matrix. Leave `L2-UX-06` blocked until the required
+configurations have actual evidence; never infer it from a hosted build.
+
 Viewport capture runs during the initial admission view and identifies the owned
 dashboard through its controls; UI Automation omits the caption's ampersand.
 A failure records its bounded wait description. Optional control-inventory
