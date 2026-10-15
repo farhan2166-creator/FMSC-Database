@@ -4,6 +4,20 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.SqlServer.Dac.Model;
 
+if (args.Length == 1 && args[0] == "--self-test")
+{
+    var code = "DatabaseHelper.Query(\"dbo.Example\"); DatabaseHelper.Query(prefix + suffix);";
+    var rootSyntax = CSharpSyntaxTree.ParseText("class Test { void Run() { " + code + " } }").GetRoot();
+    var calls = rootSyntax.DescendantNodes().OfType<InvocationExpressionSyntax>().ToList();
+    if (calls.Count != 2 || Resolve(calls[0].ArgumentList.Arguments[0].Expression) != "dbo.Example"
+        || Resolve(calls[1].ArgumentList.Arguments[0].Expression) is not null
+        || Resolve(SyntaxFactory.ParseExpression("\"dbo.\" + \"Other\"")) != "dbo.Other"
+        || Normalize("[dbo].[Example]") != "dbo.Example"
+        || Normalize("Example") != "dbo.Example")
+        throw new Exception("Roslyn caller resolution regression");
+    Console.WriteLine("PASS: fictional literal/dynamic procedure caller checks");
+    return 0;
+}
 if (args.Length != 3)
 {
     Console.Error.WriteLine("Usage: CSharpSqlAudit <schema-only.dacpac> <repository> <report-directory>");
