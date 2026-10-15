@@ -25,8 +25,6 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Fixed
 
-- Admission finalizes a successfully reloaded record's clean baseline after its submitted inputs are enabled again. Mark Left and Correct Placement no longer mistake a successful save for unsaved edits; real edits, failed reloads and pending photos remain protected.
-
 - Offer explicit Communication Center setup for a compatible schema-6 database before application activation. Approval creates a verified backup, checks packaged `7.sql` against the embedded definition, applies it transactionally and verifies base/module contracts before commit. Existing valid modules are preserved; partial or incompatible modules are refused. Normal startup, messaging defaults, base version and reviewed DACPAC remain unchanged.
 
 - Package Communication Center SQL directly as `Migrations/7.sql`, include its deployment guide, and verify that the published SQL and LocalDB recovery helper match the checked-out source. The approved base schema remains version 6; the optional add-on still requires explicit reviewed deployment. Regenerate installer ZIPs after merging fixes; rerunning an older run retains its older source revision.
@@ -46,6 +44,7 @@ The following end-user-flow corrections are proposed in [PR #8](https://github.c
 - Daily closing summaries print with intentionally blank Refund/Correction actuals, retaining recorded net totals and leaving unchecked methods blank (UFA-07).
 - Ctrl+K searches permitted destinations independently of collapsed or compact sidebar visibility and invokes navigation directly (UFA-06).
 - Admission and fee collection hold submitted inputs through awaited writes and refreshes, preventing post-submit typing from being lost. Validation remains editable before submission (UFA-05).
+- [PR #31](https://github.com/farhan2166-creator/FMSC-Database/pull/31): Admission finalizes a successfully reloaded record's clean baseline after its submitted inputs are enabled again. Mark Left and Correct Placement no longer mistake a successful save for unsaved edits; real edits, failed reloads and pending photos remain protected.
 - New sports and provisional certificate content participates in existing leave/discard guards. Date-only untouched dialogs remain freely abandonable (UFA-04).
 - Classes & Sections forwards active-save state without adding setup-draft prompts. Bulk fee-rate drafts retain their existing discard protection when embedded, with a clean baseline after a successful apply (UFA-03).
 - Admission closure and legacy go-live hold review inputs, reject obsolete previews, and prevent closing during pending operations (UFA-02).
