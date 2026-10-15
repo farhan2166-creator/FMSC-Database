@@ -88,12 +88,13 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         });
         searchStatus.SelectedIndex = 0;
         ConfigureGrid();
-        _ = LoadFiltersAsync();
         WireEvents();
         Controls.Add(BuildRoot());
         ClearSelectedDetails();
         status.Text =
             "Enter a search value or use the filters, then select a student to open.";
+        // Bind only after the inputs inherit the form's binding context, including fast reads.
+        _ = LoadFiltersAsync();
         Shown += (_, _) => searchBox.Focus();
         KeyDown += (_, e) => {
             /* UX - a drop-down that is open owns Esc/Enter (close the list / pick the item). The dialog used to close, or run a search, underneath it. */
