@@ -173,12 +173,14 @@ public static class HumanUi
             control is ModernDatePicker ||
             control is StudentPicker ||
             control is ModernTextBox { Multiline: false };
-        if (singleLineInput) control.Height = AppMetrics.InputControlHeight;
         // These fixed-purpose fields should not grow to a monitor-wide entry
         // box. The cap follows the existing font, not a resolution breakpoint.
         if (control is ModernComboBox or ModernDatePicker or ModernNumericTextBox && control.MaximumSize.Width == 0)
             control.MaximumSize = new Size(AppMetrics.TextWidth(new string('M', 24), AppTheme.NormalFont,
                 AppScale.Scale(40)), control.MaximumSize.Height);
+        // Applying a width-only MaximumSize can reset a panel's specified
+        // height to zero. Restore input height before docking and deriving its minimum.
+        if (singleLineInput) control.Height = AppMetrics.InputControlHeight;
         if (fillHeight && !singleLineInput)
         {
             control.Dock = DockStyle.Fill;
