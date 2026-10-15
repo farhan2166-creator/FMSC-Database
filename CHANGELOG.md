@@ -25,6 +25,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Fixed
 
+- Package Communication Center SQL directly as `Migrations/7.sql`, include its deployment guide, and verify that the published SQL and LocalDB recovery helper match the checked-out source. The approved base schema remains version 6; the optional add-on still requires explicit reviewed deployment. Regenerate installer ZIPs after merging fixes; rerunning an older run retains its older source revision.
+
 - Improve LocalDB installation on clean Windows computers: MSI verbose logging, explicit wizard fallback after silent failure, restart-required exit handling, executable verification and PATH discovery. No school data or database schema changes.
 
 - Fixed a fresh-install failure: the installer no longer requires `dbo.ReorderSchoolOfficials`, which is absent from the approved schema. A regression check now keeps the remaining compatibility probes aligned with the reviewed DACPAC; no SQL, migration or school-data changes.

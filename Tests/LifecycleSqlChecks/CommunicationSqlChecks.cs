@@ -16,7 +16,7 @@ internal static class CommunicationSqlChecks
             int grants=Sql.Count("SELECT COUNT(*) FROM dbo.RolePermissions;");
             using var connection=DatabaseHelper.GetConnection();connection.Open();
             new SqlCommand("EXEC sys.sp_set_session_context @key=N'FMSC_CommunicationInstall',@value=1;",connection).ExecuteNonQuery();
-            foreach(string batch in Regex.Split(File.ReadAllText("Migrations/Communication/001_CommunicationCenter.sql"),@"^\s*GO\s*$",RegexOptions.Multiline|RegexOptions.IgnoreCase))
+            foreach(string batch in Regex.Split(File.ReadAllText("Migrations/7.sql"),@"^\s*GO\s*$",RegexOptions.Multiline|RegexOptions.IgnoreCase))
                 if(!string.IsNullOrWhiteSpace(batch))
                 {
                     try { new SqlCommand(batch,connection){CommandTimeout=60}.ExecuteNonQuery(); }

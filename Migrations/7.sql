@@ -1,4 +1,5 @@
--- OPTIONAL, OWNER-REVIEWED ADD-ON. Not a numbered installer upgrade.
+-- OPTIONAL, OWNER-REVIEWED ADD-ON. Deployment sequence 7; base schema remains 6.
+-- Packaged beside 2.sql through 6.sql, but not an automatic schema-version upgrade.
 -- Back up and test a disposable copy first. Run in one connection with:
 -- EXEC sys.sp_set_session_context @key=N'FMSC_CommunicationInstall',@value=1;
 -- Base schema remains 6. Never execute automatically at application startup.
