@@ -38,6 +38,8 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Prepare data-free DACPAC metadata
         run: python Tools/export_dacpac_schema.py --prepare-model-only "$RUNNER_TEMP/schema-only.dacpac"
+      - name: Run fictional Roslyn caller regressions
+        run: dotnet run -c Release --project Tools/CSharpSqlAudit/CSharpSqlAudit.csproj -- --self-test
       - name: Analyze C# procedure references against candidate DACPAC
         id: audit
         shell: bash
