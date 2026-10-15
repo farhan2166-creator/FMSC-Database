@@ -56,10 +56,8 @@ public static class MessageTemplateService
     public static string Render(string body, IReadOnlyDictionary<string,string> values)
     {
         Validate(body);
-        foreach (string field in Fields)
-            if (body.Contains("{{"+field+"}}",StringComparison.Ordinal))
-                body = body.Replace("{{"+field+"}}", values.TryGetValue(field,out var value) ? value : throw new ArgumentException("A required template value is missing."),StringComparison.Ordinal);
-        return body;
+        return Regex.Replace(body,@"\{\{(\w+)\}\}",match=>values.TryGetValue(match.Groups[1].Value,out var value)
+            ?value:throw new ArgumentException("A required template value is missing."));
     }
 }
 public sealed record SmsEstimate(string Encoding, int Units, int Segments);

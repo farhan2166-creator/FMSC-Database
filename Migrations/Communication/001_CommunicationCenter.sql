@@ -121,9 +121,22 @@ RETURNS TABLE AS RETURN
 GO
 CREATE FUNCTION comm.Render(@Body nvarchar(max),@ContactId uniqueidentifier,@Announcement nvarchar(1000),@PaymentId int) RETURNS nvarchar(max) AS
 BEGIN
- SELECT @Body=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@Body,N'{{school}}',school),N'{{student}}',student),N'{{class}}',class),N'{{year}}',year),N'{{amount}}',ISNULL(amount,N'')),N'{{receipt}}',receipt),N'{{dueDate}}',dueDate),N'{{announcement}}',announcement)
- FROM comm.ValuesFor(@ContactId,@Announcement,@PaymentId);
- RETURN @Body;
+ -- Parse the original template once. Inserted school/person data is always literal.
+ DECLARE @school nvarchar(max),@student nvarchar(max),@class nvarchar(max),@year nvarchar(max),@amount nvarchar(max),@receipt nvarchar(max),@dueDate nvarchar(max),@announcementValue nvarchar(max);
+ SELECT @school=school,@student=student,@class=class,@year=year,@amount=amount,@receipt=receipt,@dueDate=dueDate,@announcementValue=announcement FROM comm.ValuesFor(@ContactId,@Announcement,@PaymentId);
+ DECLARE @Result nvarchar(max)=N'',@Position int=1,@Open int,@Close int,@Field nvarchar(30),@Value nvarchar(max),@Length int=DATALENGTH(@Body)/2;
+ WHILE @Position<=@Length
+ BEGIN
+  SET @Open=CHARINDEX(N'{{',@Body COLLATE Latin1_General_100_BIN2,@Position);
+  IF @Open=0 RETURN @Result+SUBSTRING(@Body COLLATE Latin1_General_100_BIN2,@Position,@Length);
+  SET @Result+=SUBSTRING(@Body COLLATE Latin1_General_100_BIN2,@Position,@Open-@Position);
+  SET @Close=CHARINDEX(N'}}',@Body COLLATE Latin1_General_100_BIN2,@Open+2);
+  IF @Close=0 RETURN @Result+SUBSTRING(@Body COLLATE Latin1_General_100_BIN2,@Open,@Length);
+  SET @Field=SUBSTRING(@Body COLLATE Latin1_General_100_BIN2,@Open+2,@Close-@Open-2);
+  SET @Value=CASE @Field WHEN N'school' THEN @school WHEN N'student' THEN @student WHEN N'class' THEN @class WHEN N'year' THEN @year WHEN N'amount' THEN @amount WHEN N'receipt' THEN @receipt WHEN N'dueDate' THEN @dueDate WHEN N'announcement' THEN @announcementValue ELSE N'' END;
+  SET @Result+=ISNULL(@Value,N'');SET @Position=@Close+2;
+ END;
+ RETURN @Result;
 END;
 GO
 CREATE PROCEDURE comm.Preview @Actor int,@TemplateId uniqueidentifier,@Channel varchar(10),@ContactIds nvarchar(max),@Announcement nvarchar(1000)=N'',@PaymentId int=NULL AS

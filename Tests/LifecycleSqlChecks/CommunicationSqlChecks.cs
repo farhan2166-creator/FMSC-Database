@@ -143,6 +143,10 @@ internal static class CommunicationSqlChecks
             template=Guid.NewGuid();await Template("oversize_fixture","Utility",string.Concat(Enumerable.Repeat("{{student}}",180)));
             var rows=await store.PreviewAsync(template,MessageChannel.Sms,[contact]);report.Check(Convert.ToString(rows.Rows[0]["Exclusion"])!.Contains("2000"),"Oversized personalization is explained instead of silently truncating a message.");
             await report.Refused("Oversized personalization cannot become a durable send",()=>store.CreateAsync(Guid.NewGuid(),template,MessageChannel.Sms,[contact],"",new DateTime(2026,1,1)),51001);
+            template=Guid.NewGuid();await Template("literal_fixture","Utility","{{student}}");
+            string original=Convert.ToString(Sql.Scalar("SELECT StudentName FROM dbo.Students WHERE AdmissionId=@Id",Sql.P("@Id",student)))!;
+            try{Sql.Query("UPDATE dbo.Students SET StudentName=N'Literal {{amount}}' WHERE AdmissionId=@Id",Sql.P("@Id",student));var literal=await store.PreviewAsync(template,MessageChannel.Sms,[contact]);report.Check(Convert.ToString(literal.Rows[0]["Body"])=="Literal {{amount}}","SQL rendering treats substituted person data literally and cannot inject a financial placeholder.");}
+            finally{Sql.Query("UPDATE dbo.Students SET StudentName=@Name WHERE AdmissionId=@Id",Sql.P("@Name",original),Sql.P("@Id",student));}
             foreach(var text in new[]{new string('ا',71),new string('^',81),string.Concat(Enumerable.Repeat("😀",36))})report.Check(Sql.Count("SELECT comm.Segments(@Text)",Sql.P("@Text",text))==SmsSegments.Estimate(text).Segments,"SQL and provider estimates agree for Urdu, extension and supplementary Unicode.");
         });
         await report.Stage("Communication: signed Meta receipts, replay isolation and inbound opt-out",async()=>{

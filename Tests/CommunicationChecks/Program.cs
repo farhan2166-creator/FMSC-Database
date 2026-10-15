@@ -21,6 +21,7 @@ Check(PermissionCatalog.IsSupportedCatalog(PermissionCatalog.All.Keys.Concat(Per
 Check(!PermissionCatalog.IsSupportedCatalog(PermissionCatalog.All.Keys.Concat(PermissionCatalog.OptionalCommunication.Take(1))),"Partially installed communication permissions are refused");
 Check(!PermissionCatalog.IsSupportedCatalog(PermissionCatalog.All.Keys.Skip(1)),"Missing existing permissions remain a hard failure");
 Check(!PermissionCatalog.IsSupportedCatalog(PermissionCatalog.All.Keys.Append("Unknown.Permission")),"Unknown authority cannot pass catalog validation");
+Check(MessageTemplateService.Render("{{student}}",new Dictionary<string,string>{{"student","Literal {{amount}}"},{"amount","private"}})=="Literal {{amount}}","Substituted values cannot inject another placeholder");
 var envelope=new MessageEnvelope(Guid.NewGuid(),Guid.NewGuid(),MessageChannel.Sms,"+923001234567","السلام علیکم","approved_notice","ur",["فرضی طالب علم"],1,false);
 string account="AC"+new string('1',32);string secret=Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
 var handler=new FixtureHandler();using var http=new HttpClient(handler);
