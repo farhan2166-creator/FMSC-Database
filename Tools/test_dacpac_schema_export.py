@@ -17,7 +17,9 @@ def package(path):
     model = ET.SubElement(root, "{" + NS + "}Model")
     table = ET.SubElement(model, "{" + NS + "}Element", Type="SqlTable", Name="[dbo].[Example]")
     ET.SubElement(table, "{" + NS + "}Relationship", Name="Columns")
-    ET.SubElement(model, "{" + NS + "}Element", Type="SqlProcedure", Name="[dbo].[ExampleProc]")
+    proc = ET.SubElement(model, "{" + NS + "}Element", Type="SqlProcedure", Name="[dbo].[ExampleProc]")
+    body = ET.SubElement(proc, "{" + NS + "}Property", Name="BodyScript")
+    ET.SubElement(body, "{" + NS + "}Value").text = "SELECT 7;"
     ET.SubElement(model, "{" + NS + "}Element", Type="SqlCheckConstraint", Name="[dbo].[CK_Example]")
     xml = ET.tostring(root)
     origin = ET.Element("{" + NS + "}DacOrigin")
@@ -85,8 +87,11 @@ class ExportChecks(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / "test.dacpac"
             package(path)
-            with self.assertRaisesRegex(ValueError, "required SQL definition"):
-                export(path, scripts()[:1])
+            with self.assertRaisesRegex(ValueError, "CREATE TABLE"):
+                export(path, scripts()[1:])
+            fallback = export(path, scripts()[:1])
+            self.assertEqual(1, json.loads(fallback["SchemaManifest.json"])["bodyOnlyReferences"])
+            self.assertIn(b"BODY ONLY:", b"".join(fallback.values()))
 
     def test_model_checksum_tamper_refused(self):
         with tempfile.TemporaryDirectory() as temp:
