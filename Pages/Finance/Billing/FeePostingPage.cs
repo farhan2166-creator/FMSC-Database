@@ -47,6 +47,9 @@ public sealed class FeePostingPage : V2Page, IBusyPage
     {
         // The grid must accept a tick. Every other column is made read-only in ConfigureGrid, so nothing but the tick column is editable.
         Grid.ReadOnly = false;
+#if FMSC_LEVEL2
+        Grid.AccessibleName = "Monthly posting preview";
+#endif
         Grid.SelectionMode = DataGridViewSelectionMode.CellSelect;
         Grid.MultiSelect = false;
         Grid.EditMode = DataGridViewEditMode.EditOnEnter;

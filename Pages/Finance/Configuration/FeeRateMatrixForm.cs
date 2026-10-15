@@ -196,6 +196,9 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         BuildLayout();
+#if FMSC_LEVEL2
+        grid.AccessibleName = "Class fee rate matrix";
+#endif
         editFeeButton.Click += (_, _) => EditSelectedFee();
         applyStudentsButton.Click += (_, _) => ApplyToStudents();
         /* D-H10 - the campus selector is wired BEFORE the list is loaded, and the grid is loaded AFTER it. */

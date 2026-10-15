@@ -126,6 +126,10 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         CancelButton = _close;
         _reconnect.Click += async (_, _) => await ConnectAsync(false);
         _restart.Click += async (_, _) => await ConnectAsync(true);
+#if FMSC_LEVEL2
+        // This fixture may reconnect, but must never launch the school installer.
+        _repair.Visible = false;
+#endif
         _repair.Click += async (_, _) => await RepairDependenciesAsync();
         _repair.Visible = false;
         _close.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
@@ -194,9 +198,19 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
 
     private void ShowFailure(string message, Exception? failure = null)
     {
-        var guidance = DatabaseConnectionGuidance.Create(message, failure, File.Exists(DatabaseHelper.DatabaseFile));
+        var guidance = DatabaseConnectionGuidance.Create(message, failure,
+#if FMSC_LEVEL2
+            File.Exists(Path.Combine(Level2Target.Root,"database","fixture.mdf")));
+#else
+            File.Exists(DatabaseHelper.DatabaseFile));
+#endif
         _canRestart = guidance.CanRestart;
-        _canRepair = guidance.CanRepair;
+        _canRepair =
+#if FMSC_LEVEL2
+            false;
+#else
+            guidance.CanRepair;
+#endif
         _repair.Visible = _canRepair;
         _status.Text = guidance.Status;
         _message.Text = guidance.Message;
@@ -241,8 +255,12 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
 
     private static string ConnectionDetails(string problem)
     {
+#if FMSC_LEVEL2
+        return $"{problem}\r\n\r\nFictional Level 2 database: {Level2Target.Catalog}\r\nConnection: {Level2Target.Endpoint}\r\nPrivate data: {Path.Combine(Level2Target.Root, "database", "fixture.mdf")}";
+#else
         string endpoint = LocalDatabaseEngine.CurrentEndpoint ?? "Unavailable";
         return $"{problem}\r\n\r\nRequired database schema version: {DatabaseHelper.RequiredDatabaseSchemaVersion}\r\nSchool data: {DatabaseHelper.DatabaseFile}\r\nConnection: {endpoint}\r\nDiagnostic log: {AppExceptionHandler.LogPath}";
+#endif
     }
 
 }

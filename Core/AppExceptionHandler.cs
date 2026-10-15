@@ -8,7 +8,11 @@ internal static class AppExceptionHandler
     {
         get
         {
+#if FMSC_LEVEL2
+            string dir = Path.Combine(FMSC_SMS.Core.Level2Target.Folder(Environment.SpecialFolder.LocalApplicationData), "FMSC", "Logs");
+#else
             string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FMSC", "Logs");
+#endif
             Directory.CreateDirectory(dir);
             return Path.Combine(dir, "FMSC_errors.log");
         }

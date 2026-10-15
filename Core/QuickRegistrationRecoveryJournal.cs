@@ -7,8 +7,17 @@ namespace FMSC_SMS.Core;
 internal sealed class QuickRegistrationRecoveryJournal : IDisposable
 {
     internal sealed record Pending(Guid Id,int UserId,string Scope,string PayloadHash,string Summary,DateTime StartedUtc);
-    private static readonly Mutex Gate=new(false,@"Local\FMSC_SMS.QuickRegistrationRecovery");
+    private static readonly Mutex Gate=new(false,
+#if FMSC_LEVEL2
+        @"Local\FMSC_SMS.Level2."+Level2Target.Owner.ToString("N")+".QuickRegistrationRecovery");
+#else
+        @"Local\FMSC_SMS.QuickRegistrationRecovery");
+#endif
+#if FMSC_LEVEL2
+    internal static string JournalPath=>Path.Combine(FMSC_SMS.Core.Level2Target.Folder(Environment.SpecialFolder.LocalApplicationData),"FMSC_SMS","PendingQuickRegistration.json");
+#else
     internal static string JournalPath=>Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"FMSC_SMS","PendingQuickRegistration.json");
+#endif
     private readonly string path;
     private FileStream? file;
     internal Pending Intent { get; }

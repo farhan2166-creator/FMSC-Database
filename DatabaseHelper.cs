@@ -8,13 +8,25 @@ public static class DatabaseHelper
     private const string DatabaseName = "FMSC_DB";
     // Version and required schema features are checked together by DatabaseCompatibility.
     public const string RequiredDatabaseSchemaVersion = "6";
+#if !FMSC_LEVEL2
     private static volatile bool _databaseAttachConfirmed;
     private static readonly object DatabaseAttachSync = new();
-    public static string DatabaseEndpoint => Core.LocalDatabaseEngine.Endpoint();
+#endif
+    public static string DatabaseEndpoint =>
+#if FMSC_LEVEL2
+        Core.Level2Target.Endpoint;
+#else
+        Core.LocalDatabaseEngine.Endpoint();
+#endif
     private static string ConnectionString => GetConnectionString("FMSC_DB");
     public static string GetConnectionString(string catalog) => new SqlConnectionStringBuilder {
         DataSource = DatabaseEndpoint,
-        InitialCatalog = catalog,
+        InitialCatalog =
+#if FMSC_LEVEL2
+            Core.Level2Target.Catalog,
+#else
+            catalog,
+#endif
         IntegratedSecurity = true,
         TrustServerCertificate = true,
         ConnectTimeout = 8,
@@ -26,6 +38,10 @@ public static class DatabaseHelper
         || ex.Number < -1000;
     private static void OpenWithStartupRetry(SqlConnection cn)
     {
+#if FMSC_LEVEL2
+        Core.Level2Target.Open(cn);
+        return;
+#else
         try { cn.Open(); }
         catch (SqlException ex) when (IsConnectionFailure(ex))
         {
@@ -39,9 +55,17 @@ public static class DatabaseHelper
             cn.ConnectionString = builder.ConnectionString;
             cn.Open();
         }
+#endif
     }
     public static void RefreshDatabaseConnection(bool restartEngine = false)
     {
+#if FMSC_LEVEL2
+        // Never restart or discover the operator's normal SQL instance.
+        SqlConnection.ClearAllPools();
+        Core.Level2Target.Validate();
+        Core.StudentSearchCache.Invalidate();
+        Core.LookupDataCache.Invalidate();
+#else
         lock (DatabaseAttachSync)
         {
             _databaseAttachConfirmed = false;
@@ -51,6 +75,7 @@ public static class DatabaseHelper
             Core.LookupDataCache.Invalidate();
             if (restartEngine) Core.LocalDatabaseEngine.Restart();
         }
+#endif
     }
     private static void EnsureDatabaseAttached()
     {
@@ -103,6 +128,10 @@ FOR ATTACH;";
 
     private static void EnsureDatabaseReady(bool verifyWhenReady = false)
     {
+#if FMSC_LEVEL2
+        Core.Level2Target.Validate();
+        return;
+#else
         if (_databaseAttachConfirmed && !verifyWhenReady)
             return;
         lock (DatabaseAttachSync)
@@ -123,6 +152,7 @@ FOR ATTACH;";
                 throw;
             }
         }
+#endif
     }
     public static SqlConnection GetConnection()
     {
@@ -131,6 +161,9 @@ FOR ATTACH;";
     }
     public static void OpenConnection(SqlConnection cn)
     {
+#if FMSC_LEVEL2
+        Core.Level2Target.Open(cn);
+#else
         try
         {
             OpenWithStartupRetry(cn);
@@ -142,6 +175,7 @@ FOR ATTACH;";
             cn.ConnectionString = GetConnectionString(new SqlConnectionStringBuilder(cn.ConnectionString).InitialCatalog);
             OpenWithStartupRetry(cn);
         }
+#endif
     }
     /// <summary>The single definition of "this connection is the FMSC database".</summary>
     private static void VerifyDatabaseIdentity()
@@ -456,6 +490,9 @@ FOR ATTACH;";
         });
     private static async Task OpenConnectionAsync(SqlConnection cn, CancellationToken cancellationToken)
     {
+#if FMSC_LEVEL2
+        await Core.Level2Target.OpenAsync(cn,cancellationToken).ConfigureAwait(false);
+#else
         try
         {
             await OpenWithStartupRetryAsync(cn, cancellationToken).ConfigureAwait(false);
@@ -468,10 +505,14 @@ FOR ATTACH;";
             cn.ConnectionString = GetConnectionString(new SqlConnectionStringBuilder(cn.ConnectionString).InitialCatalog);
             await OpenWithStartupRetryAsync(cn, cancellationToken).ConfigureAwait(false);
         }
+#endif
     }
 
     private static async Task OpenWithStartupRetryAsync(SqlConnection cn, CancellationToken cancellationToken)
     {
+#if FMSC_LEVEL2
+        await Core.Level2Target.OpenAsync(cn,cancellationToken).ConfigureAwait(false);
+#else
         try { await cn.OpenAsync(cancellationToken).ConfigureAwait(false); }
         catch (SqlException ex) when (IsConnectionFailure(ex))
         {
@@ -486,6 +527,7 @@ FOR ATTACH;";
             cn.ConnectionString = builder.ConnectionString;
             await cn.OpenAsync(cancellationToken).ConfigureAwait(false);
         }
+#endif
     }
 
     private static SqlCommand CreateUserCommand(string procedure, int timeout, SqlParameter[] parameters, SqlConnection cn)

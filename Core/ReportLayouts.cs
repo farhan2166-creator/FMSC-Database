@@ -24,7 +24,11 @@ public static class ReportLayoutStore
         if (userId <= 0)
             return null;
         return Path.Combine(
+#if FMSC_LEVEL2
+            FMSC_SMS.Core.Level2Target.Folder(Environment.SpecialFolder.ApplicationData),
+#else
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+#endif
             "FMSC_SMS",
             "ReportLayouts",
             $"user-{userId}.json");

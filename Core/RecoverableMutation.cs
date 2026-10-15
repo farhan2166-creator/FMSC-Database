@@ -42,11 +42,20 @@ internal static class MutationSaveCoordinator
 /// <summary>Small flushed intent only; never a financial draft or automatic write retry.</summary>
 internal sealed class MutationRecoveryJournal : IDisposable
 {
-    private static readonly Mutex Gate=new(false,@"Local\FMSC_SMS.MutationRecovery");
+    private static readonly Mutex Gate=new(false,
+#if FMSC_LEVEL2
+        @"Local\FMSC_SMS.Level2."+Level2Target.Owner.ToString("N")+".MutationRecovery");
+#else
+        @"Local\FMSC_SMS.MutationRecovery");
+#endif
     private FileStream? file;
     internal MutationIntent Intent{get;}
     private MutationRecoveryJournal(FileStream file,MutationIntent intent){this.file=file;Intent=intent;}
+#if FMSC_LEVEL2
+    private static string PathFor(MutationKind kind)=>Path.Combine(FMSC_SMS.Core.Level2Target.Folder(Environment.SpecialFolder.LocalApplicationData),"FMSC_SMS","Pending"+kind+".json");
+#else
     private static string PathFor(MutationKind kind)=>Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"FMSC_SMS","Pending"+kind+".json");
+#endif
     internal static void Validate(MutationIntent value)
     {
         bool Hash(string s)=>s is {Length:64}&&s.All(Uri.IsHexDigit);
