@@ -2,6 +2,8 @@
     <ItemGroup>
         <!-- Portable shortcut checks build separately with simulated controls. -->
         <Compile Remove="Tests/**/*.cs" />
+        <!-- DACPAC SQL scripting utility is a separate .NET 8 console project. -->
+        <Compile Remove="Tools/DacpacSqlScripter/**/*.cs" />
         <Compile Remove="CommunicationHost/**/*.cs;CommunicationWorker/**/*.cs" />
     </ItemGroup>
 	<PropertyGroup>

@@ -39,6 +39,23 @@ internal static partial class Program
             }
             foreach(var selected in new[]{AppThemeType.OceanBlue,AppThemeType.ProfessionalSimple})
             {AppTheme.SetTheme(selected);Application.DoEvents();Check(Field<ModernTextBox>("announcement").Text=="Fictional school notice","Theme changes preserve the communication draft");}
+            tabs.Enabled=true;
+            var tabButtons=Descendants(tabs.Parent!.Parent!).OfType<ModernButton>().Where(b=>b.ThemeRole is "TabActive" or "TabInactive").ToArray();
+            Check(tabButtons.Length==6,"Communication uses one shared navigation button per tab");
+            var first=tabButtons.Single(b=>b.Text=="Compose / Bulk");
+            foreach(var selectedTheme in AppTheme.SelectableThemes)
+            {
+                AppTheme.SetTheme(selectedTheme);Application.DoEvents();
+                for(int target=1;target<6;target++)
+                {
+                    tabs.SelectedIndex=0;Check(first.Focus(),"Compose tab can receive keyboard focus");
+                    tabs.SelectedIndex=target;first.Focus();Application.DoEvents();
+                    Check(tabs.SelectedIndex==target&&tabs.SelectedTab!.Visible&&!tabs.TabPages[0].Visible,"Selecting another tab shows only its content");
+                    Check(first.Focused&&first.ThemeRole=="TabInactive"&&tabButtons.Count(b=>b.ThemeRole=="TabActive")==1,"Retained keyboard focus never makes Compose the selected tab");
+                    first.ApplyTheme();using var image=new Bitmap(first.Width,first.Height);first.DrawToBitmap(image,first.ClientRectangle);
+                    Check(image.GetPixel(Math.Min(10,first.Width/2),first.Height/2).ToArgb()==AppTheme.SurfaceSecondary.ToArgb(),"A focused inactive Compose tab keeps its inactive fill across themes");
+                }
+            }
             page.Dispose();Check(page.IsDisposed&&connections==0,"Communication disposal performs no hidden SQL, dispatch or live network operation");
         }
         finally{AppTheme.SetTheme(theme);CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Item5);}

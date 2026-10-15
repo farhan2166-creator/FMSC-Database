@@ -9,6 +9,12 @@
 3. Sign in using your authorized account. A first-run setup or required password-change prompt must be completed by the appropriate administrator.
 4. Open the relevant workspace from the dashboard or navigation. Ctrl+K searches all destinations your account can open, including collapsed and compact sidebar entries. Use the navigation groups below rather than editing database files manually.
 
+## Communication Center
+
+Open Communication Center if your account has access. Start with a reviewed template and saved guardian/staff contacts whose ownership and consent have been verified. A student record with a phone number is not automatically a communication contact. Empty lists explain whether to widen filters, add contacts through Contacts / Consent, review a template or ask an administrator.
+
+Compose / Bulk follows **choose template → find/select contacts → preview → create draft**. Then use Outbox / Schedule / History to review and submit; approval may be required. Draft creation and provider acceptance do not mean delivery. Each tab shows its purpose and next step. Changing filters requires a new search; New Message clears the previous recipients, text and schedule. If a save succeeds but its list refresh fails, use Refresh rather than repeating the saved action. Provider accounts, live-mode approval and a running dispatcher are still required for external delivery; see [Communication Center setup](COMMUNICATION_CENTER.md).
+
 ## Display scaling and smaller screens
 
 Use Windows display scaling for readable text. The application follows the monitor's DPI and usable desktop area. On smaller screens, dialog content may scroll; use the scrollbars or Tab to reach fields and bottom actions. Enlarging a window gives grids and flexible content more space while standard entry controls retain sensible dimensions. Printing and report zoom controls retain their existing behavior.
@@ -49,6 +55,10 @@ Admission saves hold the submitted details until saving and refresh finish. For 
 
 For business-rule context see [ADMISSION_WORKFLOW.md](../ADMISSION_WORKFLOW.md). The current runtime requires schema 6 even if historical text in that file refers to older database versions.
 
+## Find Student
+
+Typing an admission number clears Campus, Academic Year, Class and Status. Changing any of those filters clears the admission number while keeping the other filters. Either change clears old results and disables **Open Student** until you click **Search** again. Student/father name searches can still be combined with filters. **Reset** clears both modes.
+
 ## Student Promotion
 
 Open **Student Promotion** (previously Bulk Promotion) to choose the source and destination placement, review candidates and process ticked students. **View Promotion History**, at the top right of Promotion Details, opens completed batches in a separate window using the selected source year, class and section. Blank source filters show all history. You can change the history filters and use **Load**, or clear them to review other batches. Closing the window keeps your promotion selections and remarks intact.
@@ -62,6 +72,7 @@ Promotion History is reached from this button rather than a separate navigation 
 - New sports/provisional certificate wording and result details use the existing discard guards. Opening an untouched dialog or changing only its new default date remains freely abandonable.
 - Certificate creation holds inputs through saving and refresh, refuses a second submission, and preserves the returned result message.
 - Admission and fee collection hold submitted inputs until the pending write and refresh finish. Correct invalid entries before submission; failed saves restore editing.
+- After a successful admission save and refresh, **Mark as Left** and **Correct Placement** can be opened immediately. Save any subsequent detail edits or pending photo first; an incomplete refresh still requires reopening the student as instructed on screen.
 - If a save times out, disconnects or gives uncertain feedback, **do not create a new transaction to test whether it worked**. Use the page's reconciliation action, then ask the administrator if necessary.
 - A printed report or exported CSV/PDF is a copy of selected data; verify filters and avoid sharing student or financial documents with unauthorized recipients.
 

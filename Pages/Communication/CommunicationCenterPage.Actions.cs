@@ -21,37 +21,39 @@ public sealed partial class CommunicationCenterPage
                 +(Convert.ToInt32(s["Simulation"])==1?"SIMULATION — no external delivery. ":"LIVE provider submission may incur charges. ")
                 +(s.IsNull("EstimatedCost")?"Estimated cost unavailable. ":$"Estimated {s["EstimatedCost"]} {s["Currency"]}. ");
             if(!ModernMessageDialog.Confirm(FindForm(),context+(action=="Submit"?"Submit this entire campaign? Eligible messages may incur provider charges when a dispatcher runs. Large or automated campaigns require approval.":action+" this campaign? Only unsent work can be paused or cancelled."),"Communication Campaign"))return;
-            await store.TransitionAsync(id,action,lifetime.Token);await RefreshHistory();
+            await store.TransitionAsync(id,action,lifetime.Token);
+            await AfterSavedAsync(RefreshHistory,action switch {"Submit"=>"Campaign submitted. Review its current state: approval, schedule, mode, master pause and dispatcher availability still govern sending. No delivery is implied.","Approve"=>"Campaign approval recorded. Review the schedule and dispatcher before sending.","Pause"=>"Campaign paused. Already submitted provider messages cannot be recalled.","Resume"=>"Campaign resumed. Eligible unsent work will follow its schedule and sending safeguards.",_=>"Campaign cancelled for unsent work. Already submitted provider messages and history are preserved."});
         }
         historySearch.PlaceholderText="Student, contact, campaign or error";historySearch.Width=220;
         historyState.Items.Add("All states");historyState.Items.AddRange(Enum.GetNames<DeliveryState>());historyState.SelectedIndex=0;
-        return ListHost(history,Bar(historySearch,historyState,Button("Search",async()=>{historyPage=0;await RefreshHistory();}),
-            Button("Refresh",RefreshHistory),Button("Previous",async()=>{historyPage=Math.Max(0,historyPage-1);await RefreshHistory();}),Button("Next",async()=>{historyPage++;await RefreshHistory();}),
-            Button("Submit",()=>Transition("Submit"),"Communication.Send","Primary"),Button("Approve",()=>Transition("Approve"),"Communication.Approve"),
-            Button("Pause",()=>Transition("Pause"),"Communication.Compose"),Button("Resume",()=>Transition("Resume"),"Communication.Send"),Button("Cancel Campaign",()=>Transition("Cancel"),"Communication.Compose"),
+        return ListHost(history,Bar([historySearch,historyState,Button("Search",async()=>{historyPage=0;await RefreshHistory();}),
+            Button("Refresh",RefreshHistory),..Paging(history,()=>historyPage,value=>historyPage=value,RefreshHistory),
+            Button("Submit",()=>Transition("Submit"),"Communication.Send","Primary",history),Button("Approve",()=>Transition("Approve"),"Communication.Approve",selectedGrid:history),
+            Button("Pause",()=>Transition("Pause"),"Communication.Compose",selectedGrid:history),Button("Resume",()=>Transition("Resume"),"Communication.Send",selectedGrid:history),Button("Cancel Campaign",()=>Transition("Cancel"),"Communication.Compose",selectedGrid:history),
             Button("Details",async()=>{
                 var row=Selected(history)??throw new ArgumentException("Select a message first.");
                 var detail=await store.CallAsync("Details",lifetime.Token,SqlCommunicationStore.P("@Id",row["MessageId"]));
                 if(IsDisposed||detail.Rows.Count==0)return;
                 using var dialog=new ApplicationWindowForm{Text="Communication Message Details",ClientSize=new Size(AppScale.Scale(850),AppScale.Scale(600)),ShowInTaskbar=false,StartPosition=FormStartPosition.CenterParent};
                 var grid=HumanUi.Grid();grid.DataSource=detail;dialog.Controls.Add(grid);dialog.ShowDialog(FindForm());
-            }),
+            },selectedGrid:history),
             Button("Safe Retry",async()=>{
                 var row=Selected(history)??throw new ArgumentException("Select a rejected message first.");
-                await store.CallAsync("Retry",lifetime.Token,SqlCommunicationStore.P("@Id",row["MessageId"]));await RefreshHistory();
-            },"Communication.Send"),
+                await store.CallAsync("Retry",lifetime.Token,SqlCommunicationStore.P("@Id",row["MessageId"]));await AfterSavedAsync(RefreshHistory,"Safe retry requested. The message must still pass current eligibility and dispatcher safeguards; no delivery is implied.");
+            },"Communication.Send",selectedGrid:history),
             Button("Check Provider Status",async()=>{
                 var row=Selected(history)??throw new ArgumentException("Select an accepted provider message first.");
                 if(row.IsNull("ProviderReference"))throw new ArgumentException("No provider reference is available. Do not resend an uncertain submission; reconcile with the provider.");
                 if(Convert.ToString(row["Provider"])!="Twilio")throw new ArgumentException("This provider needs a signed webhook or provider-console review. Simulation is never proof of delivery.");
                 var status=await gateways.Provider(MessageChannel.Sms,Http).QueryAsync(Convert.ToString(row["ProviderReference"])!,lifetime.Token);
-                await store.CallAsync("StatusUpdate",lifetime.Token,SqlCommunicationStore.P("@Id",row["MessageId"]),SqlCommunicationStore.P("@Provider","Twilio"),SqlCommunicationStore.P("@Reference",status.Reference),SqlCommunicationStore.P("@State",status.State.ToString()));await RefreshHistory();
-            },"Communication.Configure"),
-            Button("Start Dispatcher",StartDispatcher,"Communication.Send"),Button("Stop Dispatcher",()=>{dispatchStop?.Cancel();operational.Text="Stopping dispatcher. In-flight submissions are recorded before stopping.";return Task.CompletedTask;},"Communication.Send")));
+                await store.CallAsync("StatusUpdate",lifetime.Token,SqlCommunicationStore.P("@Id",row["MessageId"]),SqlCommunicationStore.P("@Provider","Twilio"),SqlCommunicationStore.P("@Reference",status.Reference),SqlCommunicationStore.P("@State",status.State.ToString()));await AfterSavedAsync(RefreshHistory,"Provider status checked: "+status.State+". Accepted is not proof of delivery.");
+            },"Communication.Configure",selectedGrid:history),
+            Button("Start Dispatcher",StartDispatcher,"Communication.Send"),Button("Stop Dispatcher",()=>{if(dispatchTask is not {IsCompleted:false}){SetStatus("Dispatcher is already stopped. Queued messages remain stored.");return Task.CompletedTask;}dispatchStop?.Cancel();operational.Text="Stopping dispatcher. In-flight submissions are recorded before stopping.";SetStatus(operational.Text);return Task.CompletedTask;},"Communication.Send")]));
     }
     private Task StartDispatcher()
     {
-        if(dispatchTask is {IsCompleted:false})return Task.CompletedTask;
+        if(dispatchTask is {IsCompleted:false}){SetStatus("Dispatcher is already running. Review message outcomes in History.");return Task.CompletedTask;}
+        dispatcherError="";SetStatus("Dispatcher started. Mode, master pause, quiet hours, schedule, consent and budgets still control eligible work. No delivery is implied.");
         dispatchStop?.Dispose();dispatchStop=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
         dispatchTask=RunDispatcher(dispatchStop.Token);return Task.CompletedTask;
     }
@@ -61,32 +63,53 @@ public sealed partial class CommunicationCenterPage
         {
             await dispatcher.RunAsync(token,text=>{
                 if(IsDisposed||!IsHandleCreated)return;
-                try{BeginInvoke((Action)(()=>{if(!IsDisposed)operational.Text=text+". Simulation is labelled separately in History; accepted does not mean delivered.";}));}
+                try{BeginInvoke((Action)(()=>{if(!IsDisposed&&dispatchStop is not null&&dispatchStop.Token==token&&dispatchTask is {IsCompleted:false}&&!token.IsCancellationRequested)operational.Text=sendingSummary+text+". Simulation is labelled separately in History; accepted does not mean delivered.";}));}
                 catch(InvalidOperationException){}
             },CurrentUser.HasPermission("Communication.Configure")&&CurrentUser.HasPermission("Communication.Approve"));
         }
         catch(OperationCanceledException) when(token.IsCancellationRequested){}
-        catch(Exception){if(!IsDisposed)operational.Text="Dispatcher stopped after an error. Review outbox outcomes before retrying.";}
-        finally{if(!IsDisposed)operational.Text="Dispatcher stopped. Queued work remains stored; it will not run while the application is closed.";}
+        catch(Exception){dispatcherError="Dispatcher stopped after an error. Review outbox outcomes before retrying. Queued work remains stored; uncertain submissions must be reconciled.";}
+        finally{if(!IsDisposed)operational.Text=sendingSummary+(dispatcherError.Length>0?dispatcherError:"Dispatcher stopped. Queued work remains stored; it will not run while the application is closed.");}
     }
-    private Control BuildContacts()=>ListHost(contacts,Bar(Button("Refresh",RefreshContacts,"Communication.Configure"),Button("Previous",async()=>{contactPage=Math.Max(0,contactPage-1);await RefreshContacts();},"Communication.Configure"),Button("Next",async()=>{contactPage++;await RefreshContacts();},"Communication.Configure"),
+    private Control BuildContacts()=>ListHost(contacts,Bar([Button("Refresh",RefreshContacts,"Communication.Configure"),..Paging(contacts,()=>contactPage,value=>contactPage=value,RefreshContacts,"Communication.Configure"),
         Button("Add From School Records",async()=>{var candidate=await PickCandidate();if(candidate is not null)await EditContact(null,candidate);},"Communication.Configure"),
-        Button("Add Manual Contact",()=>EditContact(null,null),"Communication.Configure"),Button("Edit Contact / Consent",()=>EditContact(Selected(contacts)??throw new ArgumentException("Select a contact first."),null),"Communication.Configure")));
+        Button("Add Manual Contact",()=>EditContact(null,null),"Communication.Configure"),Button("Edit Contact / Consent",()=>EditContact(Selected(contacts)??throw new ArgumentException("Select a contact first."),null),"Communication.Configure",selectedGrid:contacts)]));
     private Task<DataRow?> PickCandidate()
     {
         using var dialog=new ApplicationWindowForm{Text="Choose Student, Family or Staff Contact",ClientSize=new Size(AppScale.Scale(1050),AppScale.Scale(650)),ShowInTaskbar=false,StartPosition=FormStartPosition.CenterParent};
-        var grid=HumanUi.Grid();var term=HumanUi.TextBox(false,100);term.Width=250;term.PlaceholderText="Person or family name";int page=0;bool loading=false;DataRow? picked=null;
+        using var stop=CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
+        var grid=HumanUi.Grid();var term=HumanUi.TextBox(false,100);term.Width=250;term.PlaceholderText="Person or family name";
+        var feedback=new Label{Dock=DockStyle.Bottom,AutoSize=true,Font=AppTheme.NormalFont,ForeColor=AppTheme.MutedText,Padding=new Padding(AppMetrics.SpacingSm)};
+        feedback.MaximumSize=new Size(dialog.ClientSize.Width,0);
+        dialog.Resize+=(_,_)=>feedback.MaximumSize=new Size(Math.Max(1,dialog.ClientSize.Width),0);
+        var toolbar=Bar();int page=0;bool loading=false;DataRow? picked=null;
+        var use=new ModernButton{Text="Use Selected Record",Enabled=false};
+        var previous=new ModernButton{Text="Previous",Enabled=false};var next=new ModernButton{Text="Next",Enabled=false};
+        void UpdateSelection()=>use.Enabled=!loading&&Selected(grid) is not null&&grid.SelectedRows.Count>0;
+        grid.SelectionChanged+=(_,_)=>UpdateSelection();
         async Task Load()
         {
-            if(loading)return;loading=true;
-            try{var rows=await store.ReadAsync("Candidates",page,term.Text,token:lifetime.Token);if(!dialog.IsDisposed)grid.DataSource=rows;}
-            catch(Exception ex){if(!dialog.IsDisposed)ModernMessageDialog.ShowWarning(dialog,DbMessage.UserMessage(ex));}
-            finally{loading=false;}
+            if(loading)return;loading=true;toolbar.Enabled=false;use.Enabled=false;
+            UiHelper.SetGridState(grid,UiHelper.GridDisplayState.Loading,"Searching school records…");
+            try
+            {
+                var rows=await store.ReadAsync("Candidates",page,term.Text,token:stop.Token);if(dialog.IsDisposed)return;
+                grid.DataSource=rows;grid.Enabled=true;grid.ClearSelection();grid.CurrentCell=null;UiHelper.ClearGridState(grid);
+                string empty="No school records match this search/page. Clear the search or go to Previous. If the person is not recorded at school, close this window and use Add Manual Contact with verified consent.";
+                UiHelper.SetGridEmptyMessage(grid,empty);UiHelper.SetGridPlaceholderMessage(grid,empty);
+                feedback.Text=rows.Rows.Count==0?empty:$"Page {page+1} · {rows.Rows.Count} records. Select a row, then Use Selected Record. Verify the actual guardian/owner and consent before saving.";
+                next.Enabled=rows.Rows.Count==100&&page<100000;
+            }
+            catch(OperationCanceledException) when(stop.IsCancellationRequested){}
+            catch(Exception ex){if(!dialog.IsDisposed){grid.DataSource=null;UiHelper.SetGridState(grid,UiHelper.GridDisplayState.Failed,"School records could not be loaded. Use Search to try again.");feedback.Text=DbMessage.UserMessage(ex);next.Enabled=false;}}
+            finally{loading=false;if(!dialog.IsDisposed){toolbar.Enabled=true;previous.Enabled=page>0;UpdateSelection();}}
         }
-        var use=new ModernButton{Text="Use Selected Record"};use.Click+=(_,_)=>{picked=Selected(grid);if(picked is null)return;dialog.DialogResult=DialogResult.OK;dialog.Close();};
-        ModernButton Local(string text,Action change){var b=new ModernButton{Text=text};b.Click+=async(_,_)=>{change();await Load();};return b;}
-        dialog.Controls.Add(grid);dialog.Controls.Add(Bar(term,Local("Search",()=>page=0),Local("Previous",()=>page=Math.Max(0,page-1)),Local("Next",()=>page++),use));
-        dialog.Shown+=async(_,_)=>await Load();dialog.ShowDialog(FindForm());return Task.FromResult(picked);
+        use.Click+=(_,_)=>{if(loading)return;picked=Selected(grid);if(picked is null||grid.SelectedRows.Count==0)return;dialog.DialogResult=DialogResult.OK;dialog.Close();};
+        var find=new ModernButton{Text="Search"};find.Click+=async(_,_)=>{page=0;await Load();};
+        previous.Click+=async(_,_)=>{page=Math.Max(0,page-1);await Load();};next.Click+=async(_,_)=>{page=Math.Min(100000,page+1);await Load();};
+        term.TextChanged+=(_,_)=>{if(loading)return;page=0;grid.DataSource=null;use.Enabled=previous.Enabled=next.Enabled=false;UiHelper.SetGridState(grid,UiHelper.GridDisplayState.Waiting,"Search text changed. Select Search to load matching school records.");};
+        toolbar.Controls.AddRange([term,find,previous,next,use]);dialog.Controls.Add(grid);dialog.Controls.Add(toolbar);dialog.Controls.Add(feedback);
+        dialog.FormClosing+=(_,_)=>stop.Cancel();dialog.Shown+=async(_,_)=>await Load();dialog.ShowDialog(FindForm());return Task.FromResult(picked);
     }
     private async Task EditContact(DataRow? original,DataRow? candidate)
     {
@@ -104,7 +127,7 @@ public sealed partial class CommunicationCenterPage
         bool Flag(string name)=>original is not null&&Convert.ToBoolean(original[name]);
         editor.Flag("verified","I verified that this contact controls this number",Flag("Verified"));editor.Flag("sms","Recorded SMS consent",Flag("SmsConsent"));editor.Flag("whatsapp","Recorded WhatsApp consent",Flag("WhatsAppConsent"));editor.Flag("financial","Financial-message consent (student contacts only)",Flag("FinancialConsent"));editor.Flag("announcements","School-announcement consent",Flag("AnnouncementConsent"));editor.Flag("optout","Opted out — suppress sending",Flag("OptedOut"));editor.TextField("source","Consent source / reference / date",original is not null?CellText(original,"ConsentSource"):"");
         editor.OnChange("phone",()=>{foreach(string flag in new[]{"verified","sms","whatsapp","financial","announcements"})editor.ClearFlag(flag);});
-        if(editor.ShowDialog(FindForm())==DialogResult.OK)await RefreshContacts();
+        if(editor.ShowDialog(FindForm())==DialogResult.OK){await AfterSavedAsync(RefreshContacts,"Contact and consent saved. Return to Compose / Bulk and find contacts; no message has been sent.");}
     }
     private async Task EditTemplate()
     {
@@ -120,7 +143,7 @@ public sealed partial class CommunicationCenterPage
         editor.TextField("provider","Meta-approved template name (blank means SMS only)",original is null?"":CellText(original,"ProviderTemplate"));
         editor.TextField("order","WhatsApp body parameter order, comma-separated",original is null?"school,announcement":string.Join(',',JsonSerializer.Deserialize<string[]>(CellText(original,"ParameterOrder"))??[]));
         editor.Flag("approved","I reviewed the text, recipient scope and any provider template mapping");
-        if(editor.ShowDialog(FindForm())==DialogResult.OK)await RefreshTemplates();
+        if(editor.ShowDialog(FindForm())==DialogResult.OK){await AfterSavedAsync(RefreshTemplates,"Template version saved. Only reviewed/approved versions are offered for composing; no campaign was created or sent.");}
     }
     private async Task EditRule()
     {
@@ -136,7 +159,7 @@ public sealed partial class CommunicationCenterPage
         editor.Choice("template","Reviewed template",options.Select(Label),original is null?Label(options[0]):options.Where(r=>(Guid)r["TemplateId"]==(Guid)original["TemplateId"]).Select(Label).FirstOrDefault()??Label(options[0]));editor.Choice("channel","Channel",["Sms","WhatsApp"],original is null?"Sms":CellText(original,"Channel"));
         editor.TextField("delay","Delay in minutes",original is null?"0":CellText(original,"DelayMinutes"));editor.TextField("limit","Maximum new messages per evaluation (1–100)",original is null?"25":CellText(original,"BatchLimit"));
         editor.Flag("approval","Require campaign approval",original is null||Convert.ToBoolean(original["RequiresApproval"]));editor.Flag("enabled","Explicitly enable this rule for future events",original is not null&&Convert.ToBoolean(original["Enabled"]));
-        if(editor.ShowDialog(FindForm())==DialogResult.OK)await RefreshRules();
+        if(editor.ShowDialog(FindForm())==DialogResult.OK){await AfterSavedAsync(RefreshRules,"Automation rule saved. Its enabled state, future-event baseline, approval and sending safeguards still apply.");}
     }
     private async Task EditSettings()
     {
@@ -149,7 +172,7 @@ public sealed partial class CommunicationCenterPage
         foreach(var item in new[]{("batch","Maximum recipients per campaign","MaxBatch"),("approval","Approval threshold (recipient count)","ApprovalThreshold"),("hour","Maximum attempts per rolling hour","HourLimit"),("day","Maximum attempts per UTC day","DayLimit"),("daily","Daily estimated budget","DailyBudget"),("monthly","Monthly estimated budget","MonthlyBudget"),("sms","Estimated cost per SMS segment (blank blocks live SMS)","SmsUnitCost"),("wa","Estimated cost per WhatsApp message (blank blocks live WhatsApp)","WhatsAppUnitCost"),("currency","Budget currency; all estimates use this unit","Currency"),("start","Quiet hours start (0–23)","QuietStart"),("end","Quiet hours end (same value disables quiet hours)","QuietEnd"),("offset","Quiet-hour UTC offset in minutes (+300 for Pakistan)","UtcOffsetMinutes")})
             editor.TextField(item.Item1,item.Item2,CellText(row,item.Item3));
         editor.Flag("registered","Provider/sender registration and destination-country eligibility verified",Convert.ToBoolean(row["RegistrationConfirmed"]));
-        if(editor.ShowDialog(FindForm())==DialogResult.OK){InvalidatePreview();await RefreshOperational();}
+        if(editor.ShowDialog(FindForm())==DialogResult.OK){InvalidatePreview();await AfterSavedAsync(RefreshOperational,"Sending mode and limits saved. Review mode/master pause and dispatcher status before submitting messages.");}
     }
     private async Task EditGateway()
     {
@@ -162,7 +185,7 @@ public sealed partial class CommunicationCenterPage
             gateways.Save(c,credentials);
         });
         editor.Choice("channel","Channel",["Sms","WhatsApp"]);editor.TextField("account","Twilio Account SID or Meta business phone-number ID");editor.TextField("secret","New access token / authentication secret (never displayed back)",password:true);editor.TextField("sender","Twilio-authorized sender ID (SMS only)");editor.TextField("version","Supported Graph API version (WhatsApp only)","");
-        editor.ShowDialog(FindForm());
+        if(editor.ShowDialog(FindForm())==DialogResult.OK)SetStatus("Gateway credentials protected for this Windows user. This does not enable Live mode or prove provider connectivity.");
     }
     private static string CellText(DataRow row,string name)=>row.IsNull(name)?"":Convert.ToString(row[name],System.Globalization.CultureInfo.InvariantCulture)??"";
 }

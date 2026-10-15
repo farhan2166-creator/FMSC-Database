@@ -6,6 +6,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Changed
 
+- Replace the XML-heavy `DatabaseSchema/` reference export with real DacFx-generated SQL `CREATE` scripts in `Schema/`. The generated review PR removes the old files only after replacement scripts are produced and reports inline/unsupported model objects in a JSON manifest; no school data or database changes.
+
 - Pause routine Dependabot NuGet and GitHub Actions version-update PRs until the owner chooses to resume. Existing PRs, security-alert settings, security updates and secret scanning remain unchanged.
 
 - [PR #19](https://github.com/farhan2166-creator/FMSC-Database/pull/19) makes Student Account Statement start with one student and full-width account details; group/family selection remains a secondary mode. Annual Receipts opens for the selected student. Family / Siblings opens from Student Profile in an owned window and refreshes the profile on return. Financial calculations, SQL, permissions and installer behavior are unchanged.
@@ -15,6 +17,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 ### Added
 
 - Added an opt-in disposable Windows installation acceptance workflow: approved data-free schema fixture, real signed LocalDB prerequisite, validated complete installer, synthetic MDF/LDF, and installed-app verification. It reports pristine-MSI gaps and uploads sanitized evidence only; it does not test real school data or approve production deployment.
+
+- Added a manually dispatchable, DACPAC-triggered, schema-only reference extractor. It stores complete per-object model XML and SQL module bodies, tracks changed definitions and proposes a draft synchronization PR without importing data or approving changes.
 
 - Optional Communication Center with explicit guardian/staff consent, reviewed English/Urdu templates, draft/approval/scheduling controls, a durable SQL queue, safe simulation, Twilio SMS and official Meta template adapters. Live mode defaults disabled; the additive database module requires separate owner review/deployment. No Accountant grants, financial procedures, installer upgrades or approved DACPAC changes are included. See [setup and remaining external acceptance](Docs/COMMUNICATION_CENTER.md).
 
@@ -27,6 +31,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Fixed
 
+- Communication Center distinguishes inactive-tab keyboard focus from selection and adds per-tab instructions, actionable empty/loading/failure states, bounded paging and explicit save/next-step feedback. Changed filters block stale selections, template paging preserves the chosen template, New Message clears the previous schedule, and dispatcher errors remain visible. SQL, permissions, provider transports and installer behavior are unchanged.
+
 - Offer explicit Communication Center setup for a compatible schema-6 database before application activation. Approval creates a verified backup, checks packaged `7.sql` against the embedded definition, applies it transactionally and verifies base/module contracts before commit. Existing valid modules are preserved; partial or incompatible modules are refused. Normal startup, messaging defaults, base version and reviewed DACPAC remain unchanged.
 
 - Package Communication Center SQL directly as `Migrations/7.sql`, include its deployment guide, and verify that the published SQL and LocalDB recovery helper match the checked-out source. The approved base schema remains version 6; the optional add-on still requires explicit reviewed deployment. Regenerate installer ZIPs after merging fixes; rerunning an older run retains its older source revision.
@@ -37,6 +43,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 - [PR #16](https://github.com/farhan2166-creator/FMSC-Database/pull/16) restores date-field height after shared width limits are applied, preventing date controls from disappearing while their captions remain visible in admissions and other field layouts. Date values, optional-date handling and validation are unchanged.
 
+- [PR #30](https://github.com/farhan2166-creator/FMSC-Database/pull/30): Find Student clears placement/status filters when an admission number is typed, and clears the admission number when a filter changes. Changed criteria immediately remove old rows and their open/new-admission actions; delayed replies cannot restore stale results. Name searches retain combined filtering.
+
 - Shared DPI and responsive-layout corrections are proposed in [PR #13](https://github.com/farhan2166-creator/FMSC-Database/pull/13): explicit per-monitor awareness, logical client-area density, monitor-relative fonts and grid/tab dimensions, preserved window minima, scrollable small-screen dialogs and bounded fixed-purpose field widths. Appearance and business workflows are preserved. Physical DPI/monitor and ReportViewer acceptance remains manual.
 
 The following end-user-flow corrections are proposed in [PR #8](https://github.com/farhan2166-creator/FMSC-Database/pull/8).
@@ -46,6 +54,7 @@ The following end-user-flow corrections are proposed in [PR #8](https://github.c
 - Daily closing summaries print with intentionally blank Refund/Correction actuals, retaining recorded net totals and leaving unchecked methods blank (UFA-07).
 - Ctrl+K searches permitted destinations independently of collapsed or compact sidebar visibility and invokes navigation directly (UFA-06).
 - Admission and fee collection hold submitted inputs through awaited writes and refreshes, preventing post-submit typing from being lost. Validation remains editable before submission (UFA-05).
+- [PR #31](https://github.com/farhan2166-creator/FMSC-Database/pull/31): Admission finalizes a successfully reloaded record's clean baseline after its submitted inputs are enabled again. Mark Left and Correct Placement no longer mistake a successful save for unsaved edits; real edits, failed reloads and pending photos remain protected.
 - New sports and provisional certificate content participates in existing leave/discard guards. Date-only untouched dialogs remain freely abandonable (UFA-04).
 - Classes & Sections forwards active-save state without adding setup-draft prompts. Bulk fee-rate drafts retain their existing discard protection when embedded, with a clean baseline after a successful apply (UFA-03).
 - Admission closure and legacy go-live hold review inputs, reject obsolete previews, and prevent closing during pending operations (UFA-02).

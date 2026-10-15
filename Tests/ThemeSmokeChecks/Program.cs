@@ -37,12 +37,14 @@ internal static partial class Program
         if(args.Contains("--post-fix"))
         {
             CheckCommunicationWorkspace();
+            CheckCommunicationGuidance();
             CheckDatePickerVisibility();
             CheckPdfFileDurability();
             CheckDpiResponsiveLayouts();
             CheckShortcutPermissions();
             CheckPromotionHistoryEntry();
             CheckStudentAccountFlow();
+            CheckStudentSearchModes();
             Console.WriteLine("ACCOUNT_FLOW: check refused regeneration");
             CheckStatementRegenerationFreshness();
             Console.WriteLine("ACCOUNT_FLOW: check multi-student async assembly");
@@ -51,6 +53,7 @@ internal static partial class Program
             CheckClosingWholeAmounts();
             CheckPaletteDestinations();
             CheckSubmittedInputHolds();
+            CheckAdmissionPostSaveBaseline();
             CheckMeaningfulCertificateContent();
             CheckSelectiveWorkspaceGuards();
             CheckLifecycleCloseGuard();

@@ -398,7 +398,9 @@ namespace FMSC_SMS.Core
                     : AppTheme.ButtonDisabledText;
             // Keyboard focus needs a visible whole-button change as well as a ring.
             // Keep this separate from hover, so focus remains clear with the mouse elsewhere.
-            if (Focused && Enabled && !_isPressed)
+            // An inactive tab can retain keyboard focus after Ctrl+Tab or a busy
+            // refresh. Keep its inactive fill; the focus ring below remains visible.
+            if (Focused && Enabled && !_isPressed && _themeRole != "TabInactive")
             {
                 fillColor = _outline
                     ? AppTheme.Primary

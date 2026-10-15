@@ -68,3 +68,13 @@ python -m unittest discover -s Tests/LifecycleSqlChecks -p "test_*.py" -v
 `91ec136` changed only export identity/start, relationship IDs/order and ZIP timestamps. The whole model, **273** SQL fingerprints and all **43** exported-data entries matched the prior approval. Generated [PR #17](https://github.com/farhan2166-creator/FMSC-Database/pull/17) updates three records and reuses the fixture, preserving the intentionally refreshed DACPAC.
 
 Approval remains separate from migration/installation acceptance. This system does not run migrations, edit versions, modify original MDF/LDF or prove independently supplied detached-file compatibility. The existing DacFx recovery-scope type round-trip limitation is unchanged; Level 1 retains its test-only correction in owned disposable SQL containers. Real Windows/operator/installer acceptance remains separate.
+
+## Readable SQL schema synchronization
+
+The [DACPAC readable schema workflow](../.github/workflows/fmsc-dacpac-schema.yml) runs when `FMSC.dacpac` changes on `main` (also manually) and verifies contributions in a read-only PR job. The SQL extractor checks `model.xml` checksums, constructs a temporary **schema-only DACPAC**, and uses Microsoft's pinned **DacFx 170.5.96** library to generate SQL `CREATE` definitions. No exported BCP/table rows are read. It does **not** connect to SQL Server.
+
+Generated definitions are placed in **`Schema/`**, grouped into Tables, StoredProcedures, Views, Functions, Triggers, Indexes, Types, Security, and other supported categories. A generated `SchemaManifest.json` accounts for every model object and flags those with no separate SQL statement. For example, column definitions and inline constraints are part of table `CREATE TABLE` DDL and may not have independent scripts. The original DACPAC remains the complete source of truth; no XML extraction files need be committed.
+
+After verification, the trusted default-branch workflow opens a draft PR containing BOTH the new `Schema/` scripts and deletion of the old `DatabaseSchema/` XML export, so the old reference is never removed before a replacement is ready. On GitHub-generated PRs, CI/security/schema checks are explicitly dispatched. If any script extraction fails, the workflow fails without deleting the old folder. No automatic merges, schema approvals, SQL migrations, database writes or school data uploads occur.
+
+An existing DACPAC refresh may still fail the separate approved-schema fingerprint policy. Generating readable SQL does not approve that change; keep the provenance validation and independent review. The first SQL replacement PR is generated **after this workflow change has been reviewed and merged into main**.
