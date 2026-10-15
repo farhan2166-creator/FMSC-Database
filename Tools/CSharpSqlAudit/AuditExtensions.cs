@@ -259,8 +259,11 @@ internal static class AuditExtensions
             var qualified = Normalize(name);
             if (!schema.Tables.ContainsKey(qualified))
             {
-                results.Add(new Finding("FAIL", file, line, caller, qualified,
-                    "SQL table/view reference is absent from the DACPAC."));
+                // An unqualified identifier can resolve through a user/default schema.
+                var certain = name.Split('.').Length == 2;
+                results.Add(new Finding(certain ? "FAIL" : "REVIEW_REQUIRED", file, line, caller, qualified,
+                    certain ? "Explicit SQL table/view reference is absent from the DACPAC." :
+                        "Unqualified SQL table/view is not resolved under dbo; default schema needs review."));
                 continue;
             }
             aliases[alias] = qualified;
@@ -418,12 +421,20 @@ internal static class AuditExtensions
                 if (call.Expression is not MemberAccessExpressionSyntax member) continue;
                 var name = member.Name.Identifier.ValueText;
                 if (!Procedures.Contains(name) && !TextMethods.Contains(name)) continue;
-                if (!member.Expression.ToString().EndsWith("DatabaseHelper", StringComparison.Ordinal)) continue;
                 var resolved = semantic.GetSymbolInfo(call).Symbol as IMethodSymbol;
-                if (resolved is not null && (resolved.ContainingType.Name != "DatabaseHelper" ||
-                    resolved.ContainingType.ContainingNamespace.ToDisplayString() != "FMSC_SMS")) continue;
-                if (semantic.GetSymbolInfo(member.Expression).Symbol is ILocalSymbol or IFieldSymbol or IParameterSymbol)
-                    continue;
+                if (resolved is not null)
+                {
+                    // Semantic identity permits namespace aliases while rejecting lookalike helper classes.
+                    if (resolved.ContainingType.Name != "DatabaseHelper" ||
+                        resolved.ContainingType.ContainingNamespace.ToDisplayString() != "FMSC_SMS") continue;
+                }
+                else
+                {
+                    // No usable binding: fall back to syntax but never promote an unknown receiver to certainty.
+                    if (!member.Expression.ToString().EndsWith("DatabaseHelper", StringComparison.Ordinal)) continue;
+                    if (semantic.GetSymbolInfo(member.Expression).Symbol is ILocalSymbol or IFieldSymbol or IParameterSymbol)
+                        continue;
+                }
                 var argument = call.ArgumentList.Arguments.FirstOrDefault(a =>
                     a.NameColon?.Name.Identifier.ValueText is "procedure" or "sql")
                     ?? call.ArgumentList.Arguments.FirstOrDefault();
