@@ -18,6 +18,8 @@ internal sealed class Desktop : IDisposable
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hwnd,out uint pid);
     [DllImport("user32.dll")] private static extern bool PrintWindow(IntPtr hwnd,IntPtr hdc,uint flags);
     [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd,out RECT rect);
+    [DllImport("user32.dll")] private static extern uint GetDpiForWindow(IntPtr hwnd);
+    internal static uint ObservedDpi {get;private set;}
     [StructLayout(LayoutKind.Sequential)] private struct RECT {public int Left,Top,Right,Bottom;}
     internal static void RequireInteractive()
     {
@@ -106,20 +108,21 @@ internal sealed class Desktop : IDisposable
         catch {Key(VirtualKeyShort.ESCAPE);throw;}
         Identity.Check(e.AsComboBox().Value==text,"Combo selection did not persist: "+name);
     }
-    internal void PickStudent(string field="Student (Admission Number / Name)")
+    internal void PickStudent(string field="Student (Admission Number / Name)",string name="Fictional Example Student")
     {
-        Fill(field,"Fictional Example Student");
+        Fill(field,name);
         Wait(()=>Window().FindFirstDescendant(cf=>cf.ByControlType(ControlType.ListItem)),"student search match",10);
         Key(VirtualKeyShort.DOWN);Key(VirtualKeyShort.RETURN);
     }
-    internal void OpenStudent()
+    internal void OpenStudent(string name="Fictional Example Student")
     {
         Click("Find Student",ControlType.Button);
         var dialog=Window("Find Student");
-        Fill("Search","Fictional Example Student",dialog);
+        Fill("Search",name,dialog);
         Click("Search",ControlType.Button,dialog);
         Wait(()=>TryFind("Open Student",ControlType.Button,dialog) is {IsEnabled:true} e?e:null,"student search result");
         Click("Open Student",ControlType.Button,dialog);
+        if(TryFind("Student Name",ControlType.Edit)==null)Click("Student Information",ControlType.Button);
         Wait(()=>Find("Student Name",ControlType.Edit) is {IsEnabled:true} e?e:null,"admission load completed");
     }
     internal void Navigate(string page,string group="Daily Work")
@@ -149,6 +152,16 @@ internal sealed class Desktop : IDisposable
         Identity.Check(!items.Any(e=>(e.Properties.Name.ValueOrDefault??"").StartsWith(prefix,StringComparison.Ordinal)),"An ineligible dropdown choice remains: "+prefix);
         Key(VirtualKeyShort.ESCAPE);
     }
+    internal void ReadOnlyFaultRefresh()
+    {
+        // Sole exception to a live database guard: this fixed action only reads.
+        // The fault owner was verified before disconnection; the process and
+        // private directory are still verified, and no Save/Collect action is allowed.
+        _=Identity.Root;RequireInteractive();
+        var e=Find("Load Eligible Fees",ControlType.Button);
+        Identity.Check(e.Properties.ProcessId.Value==Process!.Id&&e.IsEnabled,"Read retry belongs to the wrong application.");
+        e.Click();
+    }
     internal void DashboardAfterLogin()
     {
         Wait(()=>{
@@ -175,6 +188,7 @@ internal sealed class Desktop : IDisposable
         if(pid!=Process!.Id)throw new InvalidOperationException("Evidence capture refused: app is not foreground.");
         string path=Path.Combine(EvidenceDirectory,id+".png");
         var handle=new IntPtr(window.Properties.NativeWindowHandle.Value);
+        ObservedDpi=GetDpiForWindow(handle);
         if(!GetWindowRect(handle,out var rect))throw new InvalidOperationException("Window bounds unavailable.");
         // Render only this HWND; screen-region capture can include unrelated windows
         // through rounded corners or occluding overlays.

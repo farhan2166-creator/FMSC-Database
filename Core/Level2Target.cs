@@ -27,27 +27,48 @@ internal static class Level2Target
     }
     internal static string Folder(Environment.SpecialFolder folder) => Path.Combine(Root, "profile", folder.ToString());
     internal static string InputId(string? name)=>"Level2Input_"+Regex.Replace(name??"Input",@"[^A-Za-z0-9]+","_");
-    internal static void Open(SqlConnection connection)
+    private static void CheckTarget(SqlConnection connection)
     {
         var target = new SqlConnectionStringBuilder(connection.ConnectionString);
         if (target.DataSource != Endpoint || target.InitialCatalog != Catalog ||
             !target.IntegratedSecurity || target.AttachDBFilename.Length != 0)
             throw new InvalidOperationException("Refusing a non-Level-2 connection.");
+    }
+    private const string IdentitySql="""
+        SELECT DB_NAME(),CONVERT(nvarchar(36),value),
+            (SELECT physical_name FROM sys.database_files WHERE file_id=1)
+        FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_Level2Owner';
+        """;
+    private static void CheckRow(SqlDataReader r,bool hasRow)
+    {
+        string prefix=Path.Combine(Root,"database")+Path.DirectorySeparatorChar;
+        if(!hasRow||r.GetString(0)!=Catalog||r.GetString(1)!=Owner.ToString("D")||
+            !Path.GetFullPath(r.GetString(2)).StartsWith(prefix,StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("Level 2 database identity mismatch.");
+    }
+    internal static void Open(SqlConnection connection)
+    {
+        CheckTarget(connection);
         connection.Open();
         try
         {
-            using var cmd = new SqlCommand("""
-                SELECT DB_NAME(),CONVERT(nvarchar(36),value),
-                    (SELECT physical_name FROM sys.database_files WHERE file_id=1)
-                FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_Level2Owner';
-                """, connection);
+            using var cmd = new SqlCommand(IdentitySql,connection){CommandTimeout=10};
             using var r = cmd.ExecuteReader();
-            string prefix = Path.Combine(Root, "database") + Path.DirectorySeparatorChar;
-            if (!r.Read() || r.GetString(0) != Catalog || r.GetString(1) != Owner.ToString("D") ||
-                !Path.GetFullPath(r.GetString(2)).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Level 2 database identity mismatch.");
+            CheckRow(r,r.Read());
         }
         catch { connection.Close(); throw; }
+    }
+    internal static async Task OpenAsync(SqlConnection connection,CancellationToken cancellationToken)
+    {
+        CheckTarget(connection);
+        await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            using var cmd=new SqlCommand(IdentitySql,connection){CommandTimeout=10};
+            using var reader=await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            CheckRow(reader,await reader.ReadAsync(cancellationToken).ConfigureAwait(false));
+        }
+        catch {connection.Close();throw;}
     }
     internal static void Validate()
     {
@@ -78,6 +99,10 @@ internal static class Level2Target
             {
                 using var c=new SqlConnection(candidate);bool rejected=false;
                 try {Open(c);} catch(InvalidOperationException ex) when(ex.Message=="Refusing a non-Level-2 connection."){rejected=true;}
+                if(!rejected)return 1;
+                rejected=false;
+                try {OpenAsync(c,CancellationToken.None).GetAwaiter().GetResult();}
+                catch(InvalidOperationException ex) when(ex.Message=="Refusing a non-Level-2 connection."){rejected=true;}
                 if(!rejected)return 1;
             }
             return 0;

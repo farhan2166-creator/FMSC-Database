@@ -7,7 +7,12 @@ namespace FMSC_SMS.Pages.Finance.Collection;
 internal sealed class CollectionRecoveryJournal : IDisposable
 {
     internal sealed record Pending(Guid Id, string Summary, DateTime StartedUtc);
-    private static readonly Mutex Gate = new(false, @"Local\FMSC_SMS.CollectionRecovery");
+    private static readonly Mutex Gate = new(false,
+#if FMSC_LEVEL2
+        @"Local\FMSC_SMS.Level2."+FMSC_SMS.Core.Level2Target.Owner.ToString("N")+".CollectionRecovery");
+#else
+        @"Local\FMSC_SMS.CollectionRecovery");
+#endif
     internal static string JournalPath => Path.Combine(
 #if FMSC_LEVEL2
         FMSC_SMS.Core.Level2Target.Folder(Environment.SpecialFolder.LocalApplicationData),

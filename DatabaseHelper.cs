@@ -8,8 +8,10 @@ public static class DatabaseHelper
     private const string DatabaseName = "FMSC_DB";
     // Version and required schema features are checked together by DatabaseCompatibility.
     public const string RequiredDatabaseSchemaVersion = "6";
+#if !FMSC_LEVEL2
     private static volatile bool _databaseAttachConfirmed;
     private static readonly object DatabaseAttachSync = new();
+#endif
     public static string DatabaseEndpoint =>
 #if FMSC_LEVEL2
         Core.Level2Target.Endpoint;
@@ -59,8 +61,8 @@ public static class DatabaseHelper
     {
 #if FMSC_LEVEL2
         // Never restart or discover the operator's normal SQL instance.
-        Core.Level2Target.Validate();
         SqlConnection.ClearAllPools();
+        Core.Level2Target.Validate();
         Core.StudentSearchCache.Invalidate();
         Core.LookupDataCache.Invalidate();
 #else
@@ -488,6 +490,9 @@ FOR ATTACH;";
         });
     private static async Task OpenConnectionAsync(SqlConnection cn, CancellationToken cancellationToken)
     {
+#if FMSC_LEVEL2
+        await Core.Level2Target.OpenAsync(cn,cancellationToken).ConfigureAwait(false);
+#else
         try
         {
             await OpenWithStartupRetryAsync(cn, cancellationToken).ConfigureAwait(false);
@@ -500,10 +505,14 @@ FOR ATTACH;";
             cn.ConnectionString = GetConnectionString(new SqlConnectionStringBuilder(cn.ConnectionString).InitialCatalog);
             await OpenWithStartupRetryAsync(cn, cancellationToken).ConfigureAwait(false);
         }
+#endif
     }
 
     private static async Task OpenWithStartupRetryAsync(SqlConnection cn, CancellationToken cancellationToken)
     {
+#if FMSC_LEVEL2
+        await Core.Level2Target.OpenAsync(cn,cancellationToken).ConfigureAwait(false);
+#else
         try { await cn.OpenAsync(cancellationToken).ConfigureAwait(false); }
         catch (SqlException ex) when (IsConnectionFailure(ex))
         {
@@ -518,6 +527,7 @@ FOR ATTACH;";
             cn.ConnectionString = builder.ConnectionString;
             await cn.OpenAsync(cancellationToken).ConfigureAwait(false);
         }
+#endif
     }
 
     private static SqlCommand CreateUserCommand(string procedure, int timeout, SqlParameter[] parameters, SqlConnection cn)

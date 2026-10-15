@@ -7,6 +7,7 @@ internal static class Workflows
 {
     internal static void Run(Desktop ui,Evidence report)
     {
+        UsabilityWorkflows.Initial(ui,report);
         report.Run("L2-ADM-01",ui,()=>{
             ui.Click("Student Admissions",ControlType.Button);
             ui.Find("Student Name",ControlType.Edit);
@@ -43,6 +44,17 @@ internal static class Workflows
         // No fixture writer creates the record used by these tests.
         if(report.Passed("L2-ADM-03"))
         {
+            report.Run("L2-ADM-13",ui,()=>{
+                ui.Select("Campus","Fictional Empty Campus");ui.Select("Academic Year","Fictional "+(DateTime.UtcNow.Year-1));
+                ui.Fill("Admission Number","9001");
+                Identity.Check(ui.Find("Section",ControlType.ComboBox).AsComboBox().Value!="Section A","Section from the previous campus leaked into the empty campus.");
+                ui.Click("Save",ControlType.Button);
+                Desktop.Wait(()=>ui.TryFind("Select a class")??ui.TryFind("Select a section"),"missing valid placement feedback");
+                Identity.Check(Identity.Count("SELECT COUNT(*) FROM dbo.Students;")==0,"Unconfigured campus placement persisted.");
+                ui.Screenshot("L2-ADM-13-empty-campus");
+                ui.Select("Campus","Fictional Main Campus");ui.Select("Academic Year","Fictional "+(DateTime.UtcNow.Year-1));
+                ui.Select("Class","Class 6 (Fictional Middle School)");ui.Select("Section","Section A");ui.Fill("Admission Number","9001");
+            },"Empty campus clears the prior section and cannot save a student; valid campus/class/section restored.");
             report.Run("L2-ADM-12",ui,()=>{
                 ui.Fill("Primary Phone (optional)","123");ui.Click("Save",ControlType.Button);
                 ui.Find("Enter a full Pakistan phone number");
@@ -116,7 +128,10 @@ internal static class Workflows
             },"Discarded occupation absent from database and reopened form.");
             FinanceWorkflows.Run(ui,report);
             PromotionWorkflows.Run(ui,report);
+            MonthlyWorkflows.Run(ui,report);
             ProfileWorkflows.Run(ui,report);
+            FamilyWorkflows.Run(ui,report);
+            RecoveryWorkflows.Run(ui,report);
         }
         else report.BlockIds("The UI-created admission prerequisite did not complete.",
             "L2-ADM-05","L2-ADM-06","L2-ADM-07","L2-ADM-08","L2-ADM-11",

@@ -5,6 +5,8 @@ using System.Text.Json;
 // created through the visible application and never by this setup utility.
 Sql.ValidateTarget();
 var f=Fixture.Create();
+Sql.Key("SaveCampus",Sql.P("@UserId",f.Admin),Sql.P("@CampusCode","EMPTY"),
+    Sql.P("@CampusName","Fictional Empty Campus"),Sql.P("@CampusType","School"));
 // The visible admission uses the current year. Give promotion a real following
 // year without creating the enrollment or promotion result on its behalf.
 int followingYear=Sql.Key("SaveAcademicYear",Sql.P("@AcademicYearId",0),

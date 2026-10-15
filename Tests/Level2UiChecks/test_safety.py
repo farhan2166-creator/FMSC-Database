@@ -47,7 +47,7 @@ class Level2Safety(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "nt", "Windows test binary required")
     def test_test_binary_rejects_operational_target_before_opening_sql(self):
-        binary = Path(os.environ.get("FMSC_LEVEL2_PROBE_BINARY", str(ROOT / "bin/Release/net8.0-windows/FMSC_SMS.dll")))
+        binary = Path(os.environ.get("FMSC_LEVEL2_PROBE_BINARY", str(ROOT / "bin/Level2/Release/net8.0-windows/FMSC_SMS.dll")))
         if not binary.exists():
             self.skipTest("Build the isolated test application in Release first")
         result = subprocess.run(["dotnet", str(binary), "--verify-level2-guards"], capture_output=True, timeout=30)

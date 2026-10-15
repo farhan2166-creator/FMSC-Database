@@ -13,6 +13,8 @@ $evidence=Join-Path $repo "artifacts/level2/evidence/$catalog"
 $stage='Environment'
 $engine='Not reached'
 $created=$false
+$instanceCreationAttempted=$false
+$binaryHash=$null
 $desktopGate=$null
 $ownsDesktopGate=$false
 $exitCode=1
@@ -25,6 +27,7 @@ foreach($key in @('FMSC_LEVEL2_OWNER','FMSC_LEVEL2_ROOT','FMSC_LEVEL2_COMMIT','F
 $env:FMSC_LEVEL2_OWNER=$owner.ToString('D')
 $env:FMSC_LEVEL2_ROOT=$run
 $env:FMSC_LEVEL2_COMMIT=(& git -C $repo rev-parse HEAD)
+$workingTreeDirty=-not [string]::IsNullOrWhiteSpace((& git -C $repo status --porcelain | Out-String))
 $env:MSBuildEnableWorkloadResolver='false'
 function Native([string]$Operation) { if($LASTEXITCODE -ne 0) {throw "$Operation failed ($LASTEXITCODE)."} }
 function Stage([string]$Name) {$script:stage=$Name;Write-Host "LEVEL 2: $Name"}
@@ -108,6 +111,7 @@ try {
     $appOutput=Join-Path $run 'app'
     & dotnet build (Join-Path $repo 'FMSC_SMS.csproj') -c Release '-p:FmscLevel2=true' -o $appOutput -v quiet
     Native 'Test application build'
+    $binaryHash=(Get-FileHash -LiteralPath (Join-Path $appOutput 'FMSC_SMS.dll') -Algorithm SHA256).Hash.ToLowerInvariant()
     foreach($project in @('Level2Fixture','Level2UiChecks')) {
         & dotnet build (Join-Path $repo "Tests/$project/$project.csproj") -c Release -o (Join-Path $run $project) -v quiet
         Native "$project build"
@@ -121,6 +125,7 @@ try {
     else {
     Stage 'Create unique private LocalDB instance'
     Owned
+    $instanceCreationAttempted=$true
     & SqlLocalDB create $catalog -s
     Native 'Create private LocalDB instance'
     $created=$true
@@ -175,14 +180,28 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
             Remove-Item -LiteralPath $resolved -Recurse -Force
         } catch {$cleanup='Fail: retained private state; inspect ownership before cleanup';$exitCode=1}
     }
+    elseif(-not $instanceCreationAttempted) {
+        try {
+            Owned
+            $expectedParent=[IO.Path]::GetFullPath((Join-Path $repo 'artifacts/level2/private'))+[IO.Path]::DirectorySeparatorChar
+            $resolved=[IO.Path]::GetFullPath($run)
+            if(-not $resolved.StartsWith($expectedParent,[StringComparison]::OrdinalIgnoreCase) -or
+                (Get-ChildItem -LiteralPath (Join-Path $run 'database') -File).Count -ne 0) {throw 'Unexpected private cleanup target.'}
+            Remove-Item -LiteralPath $resolved -Recurse -Force
+            $cleanup='Pass: no instance attempted; owned private build files removed'
+        } catch {$cleanup='Fail: private preflight state retained';$exitCode=1}
+    }
     [ordered]@{sourceCommit=$env:FMSC_LEVEL2_COMMIT;stage=$stage;cleanup=$cleanup;
         engine=$engine;schemaModel=(Get-Content -LiteralPath (Join-Path $repo 'Core/ApprovedSchemaArtifact.json') -Raw | ConvertFrom-Json).modelSha256;
-        windows=[Environment]::OSVersion.Version.ToString();utc=[DateTime]::UtcNow.ToString('o')} |
+        windows=[Environment]::OSVersion.Version.ToString();workingTreeDirty=$workingTreeDirty;applicationSha256=$binaryHash;
+        utc=[DateTime]::UtcNow.ToString('o')} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'environment.json') -Encoding utf8
     $reportPath=Join-Path $evidence 'report.json'
     if(Test-Path -LiteralPath $reportPath) {
         $report=Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json
         $report | Add-Member cleanup $cleanup -Force
+        $report | Add-Member workingTreeDirty $workingTreeDirty -Force
+        $report | Add-Member applicationSha256 $binaryHash -Force
         $report.level3Ready=($report.counts.Pass -eq $report.total -and $cleanup -like 'Pass:*')
         $report | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $reportPath -Encoding utf8
         Add-Content -LiteralPath (Join-Path $evidence 'summary.md') -Value "`nCleanup: $cleanup"

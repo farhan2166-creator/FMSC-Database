@@ -168,7 +168,7 @@
     "Id": "L2-ADM-10",
     "Module": "Admissions",
     "ScenarioName": "Duplicate identity validation",
-    "Expected": "Duplicate identity input is refused without another admission.",
+    "Expected": "Possible duplicate warns; choosing No leaves student records and charges unchanged.",
     "Actual": "Not executed.",
     "Status": "Not Run",
     "Evidence": "",

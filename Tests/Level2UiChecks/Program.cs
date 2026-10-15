@@ -45,8 +45,9 @@ internal static class Program
             },"Administrator authenticated; failure counter reset.");
             if(!report.Passed("L2-SEC-04")) {report.Block("Administrator login failed; dependent workflows blocked.");return 1;}
             Workflows.Run(desktop,report);
+            UsabilityWorkflows.CaptureViewports(desktop,report);
             SecurityWorkflows.Run(desktop,report,args[0],password);
-            foreach(var row in report.Scenarios.Where(s=>s.Status=="Not Run"))
+            foreach(var row in report.Scenarios.Where(s=>s.Status=="Not Run"&&s.Actual=="Not executed."))
                 row.Actual="Not executed; remaining coverage is listed in the rerun documentation. No success is claimed.";
         }
         catch(Exception ex)

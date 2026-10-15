@@ -42,7 +42,12 @@ internal static class MutationSaveCoordinator
 /// <summary>Small flushed intent only; never a financial draft or automatic write retry.</summary>
 internal sealed class MutationRecoveryJournal : IDisposable
 {
-    private static readonly Mutex Gate=new(false,@"Local\FMSC_SMS.MutationRecovery");
+    private static readonly Mutex Gate=new(false,
+#if FMSC_LEVEL2
+        @"Local\FMSC_SMS.Level2."+Level2Target.Owner.ToString("N")+".MutationRecovery");
+#else
+        @"Local\FMSC_SMS.MutationRecovery");
+#endif
     private FileStream? file;
     internal MutationIntent Intent{get;}
     private MutationRecoveryJournal(FileStream file,MutationIntent intent){this.file=file;Intent=intent;}

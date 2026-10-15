@@ -83,7 +83,8 @@ without violating the application’s non-future-date rule. No student, collection
 
 The application is built with the explicit `FmscLevel2=true` property into the
 private run folder. That compile-time symbol adds the guarded connection route,
-isolated local preferences/recovery/log/report-layout/communication files, stable
+isolated local preferences/recovery/log/report-layout/communication files and recovery
+mutex names, stable
 input IDs and a fictional-environment title. Normal builds do not contain that
 route and ignore test environment variables. Publishing a Level 2 binary is
 explicitly rejected. The offline guard probe checks that operational instance,
@@ -99,7 +100,10 @@ physical printer, change Windows settings or attach the school's files.
 
 The driver terminates only its own launched process. Normal completion verifies
 ownership, stops/deletes only its own LocalDB instance, and removes only its
-resolved private run directory. Evidence survives. A failed ownership check retains
+resolved private run directory. Each run builds its driver/fixture binaries into
+that private directory, so later development builds cannot replace running code.
+A session mutex refuses concurrent desktop runs. Interrupted cleanup verifies an
+exact recorded process ID and executable path before terminating a retained app. Evidence survives. A failed ownership check retains
 private state rather than deleting an uncertain target. Cleanup failure is recorded
 and returns nonzero. For an interrupted run with intact ownership:
 
@@ -123,14 +127,20 @@ allocation reconciliation; promotion selection/cancellation/commit/history;
 student profile and related admission navigation. See the actual report for which
 recipes completed in any particular run; an implemented recipe can still fail.
 
-Coverage still requiring additional recipes and/or operator acceptance includes
-fee-rate configuration and monthly posting through UI, additional-charge entry,
-receipt export, deliberate duplicate-identity handling, invalid placement
-combinations across additional campuses, sibling linking and student status,
-confirmed next-year admission/fees, promotion replay refusals, connection-interruption
-recovery, switching records during edits, comprehensive layout/keyboard inspection,
-and a real resolution/DPI matrix. The scenario inventory retains these as `Not Run`
-until executed. A single monitor or headless controls test does not prove the matrix.
+Additional recipes now cover UI rate changes/restoration, current-year monthly
+posting after confirmed return, one-off charges, sibling linking, student status,
+possible-duplicate refusal, invalid campus placement, record switching, empty
+search/reset, dialog cancellation and an owned connection interruption. These are
+implemented recipes, not assertions that any particular run passed them: consult
+that run's report.
+
+The full desktop resolution/DPI matrix remains separate. The suite captures the
+owned window at 1280x720 and maximized, records the observed window DPI, and leaves
+visual layout review pending until the screenshots are inspected. Window resizing
+is not represented as a change to the real monitor resolution. Other actual DPI
+settings/monitor configurations are blocked when unavailable; Windows display
+settings are not changed automatically. Physical printing and receipt export are
+also outside the automated preview check.
 
 Financial scenarios independently query committed payments, allocations, charge
 totals and relationship ownership. The current fixture's opening charges are
@@ -181,3 +191,16 @@ Level 1 safety tests and schema-only provenance checks passed locally. A Windows
 sandbox temporary-directory restriction initially prevented five Python tests;
 rerunning with a writable temporary directory passed all eight. This was an
 environment error, not a reason to relax SQL/schema checks.
+
+### Controlled connection interruption
+
+Only after a live ownership proof, the recovery recipe stops/deletes the unique
+LocalDB instance (its database files remain in the private directory), observes
+the real application connection dialog, recreates that exact private instance,
+and attaches only its original private MDF/LDF. It verifies the preserved owner
+marker again, clicks Reconnect and retries a read. It never copies/overwrites
+files or reconstructs school data. A finally block restores the instance even
+if a UI assertion fails. The sole action permitted without a live SQL guard is
+the fixed read-only Load Eligible Fees button during this intentional outage.
+Save/Collect actions retain their live ownership checks. Charge/payment counts
+must remain unchanged. Installer repair is unavailable in the test build.

@@ -54,6 +54,7 @@ internal sealed class Evidence
             level=2,sourceCommit=Environment.GetEnvironmentVariable("FMSC_LEVEL2_COMMIT"),runId=Identity.Owner,
             utc=DateTime.UtcNow,stage=Stage,total=Scenarios.Count,counts,scenarios=Scenarios,
             display=System.Windows.Forms.Screen.AllScreens.Select(s=>new {width=s.Bounds.Width,height=s.Bounds.Height,primary=s.Primary}).ToArray(),
+            observedWindowDpi=Desktop.ObservedDpi,
             level3Ready=counts["Fail"]==0&&counts["Blocked"]==0&&counts["Not Run"]==0,
             limitations=new[]{"Only Pass rows were executed successfully through the external desktop driver.",
                 "Reference fixture creation is not UI workflow coverage.","No genuine messages, physical printing, production records or live upgrades.",
