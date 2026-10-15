@@ -1,0 +1,72 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlScalarFunction" Name="[dbo].[fn_DateToWords]">
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[fn_DateToWords].[@TheDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[fn_NumberToWords]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="FunctionBody">
+				<ns0:Entry>
+					<ns0:Element Type="SqlScriptFunctionImplementation">
+						<ns0:Property Name="BodyScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    IF @TheDate IS NULL
+        RETURN NULL;
+
+    RETURN
+        dbo.fn_NumberToWords(DAY(@TheDate))
+        + N' ' + DATENAME(MONTH, @TheDate)
+        + N' ' + dbo.fn_NumberToWords(YEAR(@TheDate));
+END;</ns0:Value>
+						</ns0:Property>
+						<ns0:Annotation Type="SysCommentsObjectAnnotation">
+							<ns0:Property Name="CreateOffset" Value="1" />
+							<ns0:Property Name="Length" Value="294" />
+							<ns0:Property Name="StartLine" Value="1" />
+							<ns0:Property Name="StartColumn" Value="1" />
+							<ns0:Property Name="HeaderContents" Value="&#10;CREATE   FUNCTION dbo.fn_DateToWords&#10;(&#10;    @TheDate DATE&#10;)&#10;RETURNS NVARCHAR(300)&#10;AS" />
+						</ns0:Annotation>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[fn_DateToWords].[@TheDate]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Type">
+				<ns0:Entry>
+					<ns0:Element Type="SqlTypeSpecifier">
+						<ns0:Property Name="Length" Value="300" />
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

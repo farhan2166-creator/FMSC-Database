@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlUniqueConstraint" Name="[dbo].[UQ_FeeConfigurations_Context]">
+			<ns0:Relationship Name="ColumnSpecifications">
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[FeeConfigurations].[CampusId]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[FeeConfigurations].[ClassId]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[FeeConfigurations].[FeeTypeId]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DefiningTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

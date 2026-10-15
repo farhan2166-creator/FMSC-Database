@@ -1,0 +1,61 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlDmlTrigger" Name="[dbo].[GuardConfirmedAcademicYear]">
+			<ns0:Property Name="IsUpdateTrigger" Value="True" />
+			<ns0:Property Name="SqlTriggerType" Value="2" />
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+ SET NOCOUNT ON;
+ IF EXISTS(SELECT 1 FROM inserted I JOIN deleted D ON D.EnrollmentId=I.EnrollmentId JOIN dbo.Students S ON S.AdmissionId=I.AdmissionId
+  WHERE D.PlacementConfirmedAt IS NOT NULL AND S.LegacySetupPending=0
+    AND (I.AcademicYearId&lt;&gt;D.AcademicYearId OR I.PlacementConfirmedAt IS NULL))
+  THROW 59640,'Academic year is confirmed. Use Promotion for a move to another academic year.',1;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[PlacementConfirmedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[LegacySetupPending]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[PlacementConfirmedAt]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parent">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="1" />
+				<ns0:Property Name="Length" Value="494" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;CREATE   TRIGGER dbo.GuardConfirmedAcademicYear ON dbo.Enrollments AFTER UPDATE AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

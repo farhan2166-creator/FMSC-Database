@@ -1,0 +1,1118 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[ReconcileEnrollmentDates]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+ SET NOCOUNT ON; SET XACT_ABORT ON;
+ EXEC dbo.RequirePermission @UserId,N'Students.Administer';
+ EXEC dbo.RequirePermission @UserId,N'Fees.Adjust';
+ IF NULLIF(LTRIM(RTRIM(@Reason)),N'') IS NULL THROW 57400,'Enter a reason for this correction.',1;
+ IF @EnrollmentDate IS NULL OR @EnrollmentDate&gt;CONVERT(date,SYSDATETIME())
+  THROW 57401,'Enter an enrollment start that is not in the future.',1;
+ BEGIN TRY
+  BEGIN TRANSACTION;
+  DECLARE @AdmissionId int,@Ready bit,@Return datetime2,@YearStart date,@YearEnd date,@FirstAdmission date,
+   @Status nvarchar(30),@ClassSectionId int,@Locked int,@LockResult int;
+  SELECT @AdmissionId=AdmissionId FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId;
+  IF @AdmissionId IS NULL THROW 57402,'The enrollment no longer exists.',1;
+  SELECT @FirstAdmission=AdmissionDate FROM dbo.Students WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@AdmissionId;
+  SELECT @Locked=COUNT(*) FROM dbo.Enrollments WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@AdmissionId;
+  SELECT @Ready=E.BillingReady,@Return=E.ReturnConfirmedAt,@Status=E.Status,@ClassSectionId=E.ClassSectionId,
+   @YearStart=Y.StartDate,@YearEnd=Y.EndDate
+   FROM dbo.Enrollments E JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId WHERE E.EnrollmentId=@EnrollmentId;
+  IF @Status&lt;&gt;N'Active' THROW 57403,'Closed enrollments are view only.',1;
+  IF @Ready=1 AND @BillingStartDate IS NULL THROW 57404,'Billing start is required for a confirmed enrollment.',1;
+  IF @BillingStartDate&lt;@EnrollmentDate OR @BillingStartDate&gt;@YearEnd
+   THROW 57405,'Billing start must be on or after enrollment start and within the academic year.',1;
+  IF @AllowLegacyExceptions=0 AND (@EnrollmentDate&lt;@FirstAdmission OR @EnrollmentDate&lt;@YearStart OR @EnrollmentDate&gt;@YearEnd
+   OR EXISTS(SELECT 1 FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId AND EnrollmentId&lt;&gt;@EnrollmentId
+     AND ISNULL(LeavingDate,'99991231')&gt;@EnrollmentDate))
+   THROW 57406,'The start precedes admission, overlaps another enrollment, or falls outside its academic year.',1;
+  DECLARE @LockResource nvarchar(255)=N'FMSC.GenerateEnrollmentCharges.'+CONVERT(nvarchar(20),@EnrollmentId);
+  EXEC @LockResult=sys.sp_getapplock @Resource=@LockResource,@LockMode=N'Exclusive',@LockOwner=N'Transaction',@LockTimeout=0;
+  IF @LockResult&lt;0 THROW 57407,'Billing is being changed elsewhere. Reload and try again.',1;
+  SELECT @Locked=COUNT(*) FROM dbo.StudentFeeAssignments WITH(UPDLOCK,HOLDLOCK) WHERE EnrollmentId=@EnrollmentId;
+  SELECT @Locked=COUNT(*) FROM dbo.BillingCharges WITH(UPDLOCK,HOLDLOCK) WHERE EnrollmentId=@EnrollmentId;
+  SELECT @Locked=COUNT(*) FROM dbo.FeePaymentAllocations A WITH(UPDLOCK,HOLDLOCK)
+   JOIN dbo.BillingCharges B ON B.BillingChargeId=A.BillingChargeId WHERE B.EnrollmentId=@EnrollmentId;
+  DECLARE @Snapshot nvarchar(max)=(SELECT
+   JSON_QUERY((SELECT * FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId ORDER BY EnrollmentId FOR JSON PATH,INCLUDE_NULL_VALUES)) Enrollments,
+   JSON_QUERY((SELECT * FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@EnrollmentId ORDER BY StudentFeeAssignmentId FOR JSON PATH,INCLUDE_NULL_VALUES)) Assignments,
+   JSON_QUERY((SELECT * FROM dbo.BillingCharges WHERE EnrollmentId=@EnrollmentId ORDER BY BillingChargeId FOR JSON PATH,INCLUDE_NULL_VALUES)) Charges,
+   JSON_QUERY((SELECT A.* FROM dbo.FeePaymentAllocations A JOIN dbo.BillingCharges B ON B.BillingChargeId=A.BillingChargeId
+    WHERE B.EnrollmentId=@EnrollmentId ORDER BY A.FeePaymentAllocationId FOR JSON PATH,INCLUDE_NULL_VALUES)) Allocations
+   FOR JSON PATH,WITHOUT_ARRAY_WRAPPER);
+  IF @Preview=0 AND (@ExpectedSnapshot IS NULL OR @ExpectedSnapshot&lt;&gt;@Snapshot)
+   THROW 57408,'Records changed after the preview. Review the reconciliation again.',1;
+  DECLARE @Opening date=DATEFROMPARTS(YEAR(@BillingStartDate),MONTH(@BillingStartDate),1),
+   @AsOf date=CASE WHEN CONVERT(date,SYSDATETIME())&lt;@YearEnd THEN CONVERT(date,SYSDATETIME()) ELSE @YearEnd END;
+  -- Retain valid months already posted ahead of today within this academic year.
+  SELECT @AsOf=CASE WHEN MAX(BillingMonth)&gt;@AsOf THEN MAX(BillingMonth) ELSE @AsOf END
+   FROM dbo.BillingCharges WHERE EnrollmentId=@EnrollmentId AND ChargeKind=N'Monthly' AND Status&lt;&gt;N'Cancelled' AND BillingMonth&lt;=@YearEnd;
+  DECLARE @CorrectedReturn datetime2=CASE WHEN @Return IS NOT NULL AND @Return&lt;@EnrollmentDate THEN CONVERT(datetime2,@EnrollmentDate) ELSE @Return END;
+  DECLARE @Expected TABLE(StudentFeeAssignmentId int,FeeTypeId int,BillingMonth date,ChargeKind nvarchar(20),
+   ChargeDate date,GrossAmount decimal(18,2),DiscountAmount decimal(18,2));
+  IF @Ready=1
+  BEGIN
+   ;WITH Months AS (
+    SELECT @Opening BillingMonth WHERE @Opening&lt;=@AsOf
+    UNION ALL SELECT DATEADD(month,1,BillingMonth) FROM Months WHERE DATEADD(month,1,BillingMonth)&lt;=@AsOf)
+   INSERT @Expected
+   SELECT F.StudentFeeAssignmentId,F.FeeTypeId,M.BillingMonth,N'Monthly',M.BillingMonth,F.Amount,F.DiscountAmount
+    FROM Months M JOIN dbo.StudentFeeAssignments F ON F.EnrollmentId=@EnrollmentId
+    WHERE F.CancelledAt IS NULL AND F.Frequency=N'Monthly'
+     AND (F.EffectiveFrom IS NULL OR M.BillingMonth&gt;=F.EffectiveFrom)
+     AND (F.EffectiveTo IS NULL OR M.BillingMonth&lt;=F.EffectiveTo) OPTION(MAXRECURSION 1200);
+   INSERT @Expected
+   SELECT F.StudentFeeAssignmentId,F.FeeTypeId,@Opening,N'Annual',COALESCE(CONVERT(date,@CorrectedReturn),@EnrollmentDate),
+    COALESCE(B.GrossAmount,F.Amount),COALESCE(B.DiscountAmount,F.DiscountAmount)
+    FROM dbo.StudentFeeAssignments F OUTER APPLY(SELECT TOP(1) GrossAmount,DiscountAmount FROM dbo.BillingCharges
+     WHERE EnrollmentId=@EnrollmentId AND FeeTypeId=F.FeeTypeId AND ChargeKind=N'Annual' AND Status&lt;&gt;N'Cancelled' ORDER BY BillingChargeId) B
+    WHERE F.EnrollmentId=@EnrollmentId AND F.CancelledAt IS NULL AND F.Frequency=N'Yearly'
+     AND (F.EffectiveFrom IS NULL OR @Opening&gt;=F.EffectiveFrom) AND (F.EffectiveTo IS NULL OR @Opening&lt;=F.EffectiveTo);
+  END;
+  IF EXISTS(SELECT 1 FROM @Expected GROUP BY FeeTypeId,BillingMonth,ChargeKind HAVING COUNT(*)&gt;1)
+   THROW 57409,'Fee-assignment periods overlap. Correct the assignments before reconciling.',1;
+  DECLARE @Cancel TABLE(BillingChargeId bigint PRIMARY KEY);
+  INSERT @Cancel SELECT B.BillingChargeId FROM dbo.BillingCharges B
+   WHERE B.EnrollmentId=@EnrollmentId AND B.Status&lt;&gt;N'Cancelled' AND B.ChargeKind IN(N'Monthly',N'Annual')
+    AND NOT EXISTS(SELECT 1 FROM @Expected X WHERE X.FeeTypeId=B.FeeTypeId AND X.BillingMonth=B.BillingMonth AND X.ChargeKind=B.ChargeKind
+     AND (B.ChargeKind&lt;&gt;N'Annual' OR B.ChargeDate=X.ChargeDate));
+  DECLARE @Blocked int=(SELECT COUNT(*) FROM @Cancel C JOIN dbo.BillingCharges B ON B.BillingChargeId=C.BillingChargeId
+   WHERE B.Status&lt;&gt;N'Open' OR EXISTS(SELECT 1 FROM dbo.FeePaymentAllocations WHERE BillingChargeId=B.BillingChargeId));
+  DECLARE @Add TABLE(StudentFeeAssignmentId int,FeeTypeId int,BillingMonth date,ChargeKind nvarchar(20),ChargeDate date,
+   GrossAmount decimal(18,2),DiscountAmount decimal(18,2));
+  INSERT @Add SELECT X.* FROM @Expected X WHERE NOT EXISTS(SELECT 1 FROM dbo.BillingCharges B
+   WHERE B.EnrollmentId=@EnrollmentId AND B.FeeTypeId=X.FeeTypeId AND B.ChargeKind=X.ChargeKind
+    AND B.BillingMonth=X.BillingMonth AND B.Status&lt;&gt;N'Cancelled' AND NOT EXISTS(SELECT 1 FROM @Cancel C WHERE C.BillingChargeId=B.BillingChargeId));
+  DECLARE @CancelCount int=(SELECT COUNT(*) FROM @Cancel),@AddCount int=(SELECT COUNT(*) FROM @Add),
+   @CancelledAmount decimal(18,2)=COALESCE((SELECT SUM(B.NetAmount) FROM @Cancel C JOIN dbo.BillingCharges B ON B.BillingChargeId=C.BillingChargeId),0),
+   @AddedAmount decimal(18,2)=COALESCE((SELECT SUM(GrossAmount-DiscountAmount) FROM @Add),0);
+  IF @Preview=1
+  BEGIN
+   COMMIT;
+   SELECT @Snapshot Snapshot,@CancelCount CancelCount,@AddCount AddCount,@CancelledAmount CancelledAmount,@AddedAmount AddedAmount,
+    @Blocked BlockedCount,@AsOf ThroughDate,@CorrectedReturn ReturnDate;
+   RETURN;
+  END;
+  IF @Blocked&gt;0 THROW 57410,'Affected charges have payment history. Reverse or refund those payments in Student Fees before reconciling; no records were changed.',1;
+  UPDATE dbo.Enrollments SET EnrollmentDate=@EnrollmentDate,BillingStartDate=@BillingStartDate,
+   ReturnConfirmedAt=@CorrectedReturn,UpdatedAt=SYSDATETIME() WHERE EnrollmentId=@EnrollmentId;
+  UPDATE B SET Status=N'Cancelled',Remarks=LEFT(COALESCE(B.Remarks+N' | ',N'')+N'Enrollment reconciliation: '+@Reason,1000)
+   FROM dbo.BillingCharges B JOIN @Cancel C ON C.BillingChargeId=B.BillingChargeId;
+  INSERT dbo.BillingCharges(StudentFeeAssignmentId,EnrollmentId,AdmissionId,FeeTypeId,BillingMonth,ChargeDate,DueDate,GrossAmount,DiscountAmount,ChargeKind,Remarks)
+   SELECT StudentFeeAssignmentId,@EnrollmentId,@AdmissionId,FeeTypeId,BillingMonth,ChargeDate,ChargeDate,GrossAmount,DiscountAmount,ChargeKind,
+    LEFT(N'Enrollment reconciliation: '+@Reason,1000) FROM @Add;
+  INSERT dbo.EnrollmentHistory(EnrollmentId,AdmissionId,ActionType,ActionDate,OldClassSectionId,NewClassSectionId,OldStatus,NewStatus,Remarks,UserId)
+   VALUES(@EnrollmentId,@AdmissionId,N'CORRECTION',CONVERT(date,SYSDATETIME()),@ClassSectionId,@ClassSectionId,@Status,@Status,
+    LEFT(N'Dates and billing reconciled: '+@Reason,500),@UserId);
+  DECLARE @Operation uniqueidentifier=NEWID(),@After nvarchar(max)=(SELECT @EnrollmentId EnrollmentId,@EnrollmentDate EnrollmentDate,
+   @BillingStartDate BillingStartDate,@CorrectedReturn ReturnConfirmedAt,@CancelCount CancelledCharges,@AddCount AddedCharges,
+   @Reason Reason,@AllowLegacyExceptions LegacyException,
+   JSON_QUERY((SELECT * FROM dbo.BillingCharges WHERE EnrollmentId=@EnrollmentId ORDER BY BillingChargeId FOR JSON PATH)) Charges
+   FOR JSON PATH,WITHOUT_ARRAY_WRAPPER);
+  INSERT dbo.AuditOperations(OperationId,UserId,OperationType,CorrelationNote) VALUES(@Operation,@UserId,N'ENROLLMENT_RECONCILIATION',CONVERT(nvarchar(200),@EnrollmentId));
+  DECLARE @Record nvarchar(200)=CONVERT(nvarchar(200),@EnrollmentId);
+  EXEC dbo.WriteAuditLog @OperationId=@Operation,@UserId=@UserId,@TableName=N'Enrollments',@RecordId=@Record,@Action=N'CORRECTION',@OldValues=@Snapshot,@NewValues=@After;
+  COMMIT;
+  SELECT @CancelCount CancelledCharges,@AddCount AddedCharges;
+ END TRY BEGIN CATCH IF XACT_STATE()&lt;&gt;0 ROLLBACK; THROW; END CATCH;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[datetime2]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeePaymentAllocations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeePaymentAllocations].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeePaymentAllocations].[FeePaymentAllocationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@BillingStartDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[datetime2]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@EnrollmentDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[datetime2]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Cancel].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeePaymentAllocations].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[NetAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Add].[GrossAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Add].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[uniqueidentifier]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Reason]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@AllowLegacyExceptions]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[AdmissionDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[BillingReady]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[ReturnConfirmedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[ClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[StartDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[EndDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[LeavingDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutine" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@Resource]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockMode]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockOwner]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockTimeout]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeePaymentAllocations].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Preview]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@ExpectedSnapshot]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ChargeKind]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[CTE1].[Months].[BillingMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[dbo].[ReconcileEnrollmentDates].[@Opening]">
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[dbo].[StudentFeeAssignments].[M]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlColumn" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[CancelledAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Frequency]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EffectiveFrom]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EffectiveTo]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[GrossAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ChargeKind]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[GrossAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[BillingMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[ChargeKind]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ChargeKind]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[BillingMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[ChargeKind]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ChargeKind]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ChargeDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[ChargeDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ChargeKind]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[ChargeKind]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[BillingMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Cancel].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[BillingStartDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[ReturnConfirmedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Cancel].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ChargeDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[DueDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[GrossAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Add].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Add].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Add].[BillingMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Add].[ChargeDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Add].[GrossAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Add].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReconcileEnrollmentDates].[@Add].[ChargeKind]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[ActionType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[ActionDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[OldClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[NewClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[OldStatus]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[NewStatus]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[CorrelationNote]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@TableName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@RecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@Action]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OldValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@NewValues]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DynamicObjects">
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[ReconcileEnrollmentDates].[@Expected]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[StudentFeeAssignmentId]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[FeeTypeId]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[BillingMonth]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[ChargeKind]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Length" Value="20" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[ChargeDate]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[GrossAmount]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Scale" Value="2" />
+												<ns0:Property Name="Precision" Value="18" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Expected].[DiscountAmount]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Scale" Value="2" />
+												<ns0:Property Name="Precision" Value="18" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[ReconcileEnrollmentDates].[@Cancel]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Cancel].[BillingChargeId]">
+									<ns0:Property Name="IsNullable" Value="False" />
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[bigint]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[ReconcileEnrollmentDates].[@Add]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Add].[StudentFeeAssignmentId]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Add].[FeeTypeId]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Add].[BillingMonth]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Add].[ChargeKind]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Length" Value="20" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Add].[ChargeDate]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Add].[GrossAmount]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Scale" Value="2" />
+												<ns0:Property Name="Precision" Value="18" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ReconcileEnrollmentDates].[@Add].[DiscountAmount]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Scale" Value="2" />
+												<ns0:Property Name="Precision" Value="18" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[ReconcileEnrollmentDates].[CTE1].[Months]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[ReconcileEnrollmentDates].[CTE1].[Months].[BillingMonth]">
+									<ns0:Relationship Name="ExpressionDependencies">
+										<ns0:Entry />
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ReconcileEnrollmentDates].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ReconcileEnrollmentDates].[@EnrollmentId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ReconcileEnrollmentDates].[@EnrollmentDate]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ReconcileEnrollmentDates].[@BillingStartDate]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ReconcileEnrollmentDates].[@Reason]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="500" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ReconcileEnrollmentDates].[@AllowLegacyExceptions]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">0</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ReconcileEnrollmentDates].[@Preview]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">1</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ReconcileEnrollmentDates].[@ExpectedSnapshot]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="IsMax" Value="True" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="Length" Value="10501" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="CREATE   PROCEDURE dbo.ReconcileEnrollmentDates&#10; @UserId int, @EnrollmentId int, @EnrollmentDate date, @BillingStartDate date,&#10; @Reason nvarchar(500), @AllowLegacyExceptions bit=0,&#10; @Preview bit=1, @ExpectedSnapshot nvarchar(max)=NULL&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

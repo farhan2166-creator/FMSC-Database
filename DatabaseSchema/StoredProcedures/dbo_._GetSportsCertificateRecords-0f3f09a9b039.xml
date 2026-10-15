@@ -1,0 +1,125 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetSportsCertificateRecords]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Certificates.Create';
+
+    SELECT
+        SC.SportsCertificateId,
+        SC.AdmissionId,
+
+        SC.StudentName,
+        SC.FatherName,
+        SC.SportName,
+        SC.Performance,
+        SC.CertificateDate,
+
+        SC.CreatedAt,
+        SC.UpdatedAt
+
+    FROM dbo.SportsCertificates AS SC
+
+    WHERE
+        @AdmissionId = 0
+        OR SC.AdmissionId = @AdmissionId
+
+    ORDER BY
+        SC.SportsCertificateId DESC;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetSportsCertificateRecords].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates].[SportsCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates].[StudentName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates].[FatherName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates].[SportName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates].[Performance]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates].[CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates].[CreatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SportsCertificates].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetSportsCertificateRecords].[@AdmissionId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetSportsCertificateRecords].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetSportsCertificateRecords].[@AdmissionId]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">0</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="401" />
+				<ns0:Property Name="Length" Value="1009" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;/* =====================================================================&#10;   4. dbo.GetSportsCertificateRecords - grid of certificates for a&#10;      student (or, with @AdmissionId = 0, an empty result - the page&#10;      always loads this scoped to the selected student, same&#10;      convention as GetCharacterCertificateRecords).&#10;   ===================================================================== */&#10;&#10;CREATE   PROCEDURE dbo.GetSportsCertificateRecords&#10;    @UserId INT,&#10;    @AdmissionId INT = 0&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

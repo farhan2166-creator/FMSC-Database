@@ -1,0 +1,217 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[SaveSection]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        DECLARE @OrderLock int;
+        EXEC @OrderLock = sys.sp_getapplock
+            @Resource = N'SetupOrder:Sections', @LockMode = 'Exclusive',
+            @LockOwner = 'Transaction', @LockTimeout = 10000;
+        IF @OrderLock &lt; 0 THROW 57401, 'Unable to lock setup ordering. Please try again.', 1;
+        EXEC dbo.RequirePermission @UserId, N'System.Setup';
+        SET @Description = NULLIF(LTRIM(RTRIM(@Description)), N'');
+        IF @SectionId = 0
+        BEGIN
+            DECLARE @NextOrder int;
+            SELECT @NextOrder = ISNULL(MAX(DisplayOrder), 0) + 1
+            FROM dbo.Sections WITH (UPDLOCK, HOLDLOCK);
+            INSERT dbo.Sections (DisplayOrder, SectionCode, SectionName, Description)
+            VALUES (@NextOrder, @SectionCode, @SectionName, @Description);
+            SET @SectionId = CONVERT(int, SCOPE_IDENTITY());
+        END
+        ELSE
+        BEGIN
+            UPDATE dbo.Sections
+            SET SectionCode = @SectionCode, SectionName = @SectionName,
+                Description = @Description
+            WHERE SectionId = @SectionId;
+            IF @@ROWCOUNT = 0 THROW 56221, 'The selected section was not found.', 1;
+        END
+        COMMIT TRANSACTION;
+        SELECT @SectionId AS SectionId;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE() &lt;&gt; 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutine" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@Resource]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockMode]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockOwner]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockTimeout]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveSection].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveSection].[@Description]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveSection].[@SectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections].[DisplayOrder]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections].[SectionCode]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections].[SectionName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections].[Description]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveSection].[@SectionCode]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveSection].[@SectionName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections].[SectionId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveSection].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveSection].[@SectionName]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="50" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveSection].[@SectionId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveSection].[@SectionCode]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="30" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveSection].[@Description]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="250" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="1" />
+				<ns0:Property Name="Length" Value="1609" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;CREATE PROCEDURE dbo.SaveSection&#10;    @UserId int, @SectionName nvarchar(50), @SectionId int,&#10;    @SectionCode nvarchar(30), @Description nvarchar(250) = NULL&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

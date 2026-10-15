@@ -1,0 +1,151 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[UpdateDatabaseBackupPath]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Backup.Create';
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.Users
+                   WHERE  UserId = @UserId)
+        THROW 50001, 'The specified user does not exist.', 1;
+    IF @NewFilePath IS NULL
+       OR LTRIM(RTRIM(@NewFilePath)) = N''
+        THROW 52851, 'A new file path is required.', 1;
+    IF @NewFileName IS NULL
+       OR LTRIM(RTRIM(@NewFileName)) = N''
+        THROW 52852, 'A new file name is required.', 1;
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.DatabaseBackups
+                   WHERE  BackupId = @BackupId)
+        THROW 52853, 'The specified backup history record was not found.', 1;
+    UPDATE dbo.DatabaseBackups
+    SET    FilePath = @NewFilePath,
+           FileName = @NewFileName,
+           Remarks  = LEFT(CONCAT(COALESCE (Remarks + N' ', N''), N'[Relocated to new path on ', CONVERT (NVARCHAR (19), SYSUTCDATETIME(), 120), N' UTC]'), 500)
+    WHERE  BackupId = @BackupId;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateDatabaseBackupPath].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Users]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Users].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateDatabaseBackupPath].[@NewFilePath]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateDatabaseBackupPath].[@NewFileName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DatabaseBackups]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DatabaseBackups].[BackupId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateDatabaseBackupPath].[@BackupId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DatabaseBackups].[FilePath]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DatabaseBackups].[FileName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DatabaseBackups].[Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DatabaseBackups].[BackupId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateDatabaseBackupPath].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateDatabaseBackupPath].[@BackupId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[bigint]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateDatabaseBackupPath].[@NewFilePath]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="1000" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateDatabaseBackupPath].[@NewFileName]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="260" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="29" />
+				<ns0:Property Name="Length" Value="1205" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- UpdateDatabaseBackupPath&#10;CREATE   PROCEDURE dbo.UpdateDatabaseBackupPath&#13;&#10;@UserId INT, @BackupId BIGINT, @NewFilePath NVARCHAR (1000), @NewFileName NVARCHAR (260)&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

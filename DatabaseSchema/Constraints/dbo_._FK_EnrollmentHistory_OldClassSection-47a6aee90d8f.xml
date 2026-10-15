@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlForeignKeyConstraint" Name="[dbo].[FK_EnrollmentHistory_OldClassSection]">
+			<ns0:Relationship Name="Columns">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory].[OldClassSectionId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DefiningTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[EnrollmentHistory]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="ForeignColumns">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[ClassSectionId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="ForeignTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

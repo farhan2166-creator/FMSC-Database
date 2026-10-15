@@ -1,0 +1,98 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetAcademicPrograms]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    EXECUTE dbo.RequireAuthenticatedUser @UserId;
+    SELECT   AcademicProgramId,
+             ProgramCode,
+             ProgramName,
+             ProgramType,
+             DisplayOrder
+    FROM     dbo.AcademicPrograms
+    WHERE    (NULLIF (LTRIM(RTRIM(@ProgramType)), N'') IS NULL
+              OR ProgramType = @ProgramType)
+    ORDER BY DisplayOrder, AcademicProgramId;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequireAuthenticatedUser]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetAcademicPrograms].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms].[AcademicProgramId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms].[ProgramCode]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms].[ProgramName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms].[ProgramType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms].[DisplayOrder]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetAcademicPrograms].[@ProgramType]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetAcademicPrograms].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetAcademicPrograms].[@ProgramType]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="30" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="24" />
+				<ns0:Property Name="Length" Value="533" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- GetAcademicPrograms&#10;CREATE   PROCEDURE dbo.GetAcademicPrograms&#13;&#10;@UserId INT, @ProgramType NVARCHAR (30)=NULL&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

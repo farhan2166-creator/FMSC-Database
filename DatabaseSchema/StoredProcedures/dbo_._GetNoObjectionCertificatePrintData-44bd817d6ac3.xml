@@ -1,0 +1,111 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetNoObjectionCertificatePrintData]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Certificates.Print';
+
+    IF @NoObjectionCertificateId &lt;= 0
+        THROW 58620, 'A valid NOC is required.', 1;
+
+    SELECT
+        NOC.NoObjectionCertificateId,
+        NOC.AdmissionId,
+
+        NOC.CertificateNumber AS CertificateNumber,
+
+        NOC.StudentName,
+        NOC.FatherName,
+        NOC.CertificateDate,
+        NOC.CreatedAt AS DateOfIssue
+
+    FROM dbo.NoObjectionCertificates AS NOC
+    WHERE NOC.NoObjectionCertificateId = @NoObjectionCertificateId;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetNoObjectionCertificatePrintData].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetNoObjectionCertificatePrintData].[@NoObjectionCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[NoObjectionCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[NoObjectionCertificates].[NoObjectionCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[NoObjectionCertificates].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[NoObjectionCertificates].[CertificateNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[NoObjectionCertificates].[StudentName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[NoObjectionCertificates].[FatherName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[NoObjectionCertificates].[CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[NoObjectionCertificates].[CreatedAt]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetNoObjectionCertificatePrintData].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetNoObjectionCertificatePrintData].[@NoObjectionCertificateId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="319" />
+				<ns0:Property Name="Length" Value="987" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;/* =====================================================================&#10;   5. dbo.GetNoObjectionCertificatePrintData&#10;&#10;      CertificateNumber follows the same derived-from-identity&#10;      convention as the other certificates (&quot;NOC-000123&quot;).&#10;   ===================================================================== */&#10;&#10;CREATE PROCEDURE dbo.GetNoObjectionCertificatePrintData&#10;    @UserId INT,&#10;    @NoObjectionCertificateId INT&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

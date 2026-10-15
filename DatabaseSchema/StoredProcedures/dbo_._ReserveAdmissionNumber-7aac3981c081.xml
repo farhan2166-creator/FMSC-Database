@@ -1,0 +1,86 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[ReserveAdmissionNumber]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    IF @@TRANCOUNT = 0 THROW 59201, 'Admission number allocation requires an admission transaction.', 1;
+    DECLARE @Last BIGINT;
+    SELECT @Last=LastNumber FROM dbo.AdmissionNumberCounter WITH (UPDLOCK,HOLDLOCK) WHERE CounterId=1;
+    IF @Last IS NULL THROW 59202, 'The admission number counter is missing.', 1;
+    IF NULLIF(LTRIM(RTRIM(@AdmissionNumber)), '') IS NULL
+        SET @AdmissionNumber=CONVERT(VARCHAR(40), @Last+1);
+    SET @AdmissionNumber=dbo.NormalizeAdmissionNumber(@AdmissionNumber);
+    IF @AdmissionNumber IS NULL THROW 59203, 'Use a positive admission number with an optional letter suffix, such as 1 or 1a.', 1;
+    IF EXISTS (SELECT 1 FROM dbo.Students WHERE AdmissionNumber=@AdmissionNumber)
+        THROW 59204, 'This admission number is already assigned to another student. Choose a different number.', 1;
+    DECLARE @Base BIGINT = TRY_CONVERT(BIGINT, LEFT(@AdmissionNumber, PATINDEX('%[^0-9]%', @AdmissionNumber+'x')-1));
+    IF @Base&gt;@Last UPDATE dbo.AdmissionNumberCounter SET LastNumber=@Base WHERE CounterId=1;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[bigint]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[bigint]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ReserveAdmissionNumber].[@AdmissionNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AdmissionNumberCounter]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AdmissionNumberCounter].[LastNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AdmissionNumberCounter].[CounterId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[varchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[NormalizeAdmissionNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[AdmissionNumber]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ReserveAdmissionNumber].[@AdmissionNumber]">
+						<ns0:Property Name="IsOutput" Value="True" />
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="40" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[varchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="1" />
+				<ns0:Property Name="Length" Value="1184" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;CREATE   PROCEDURE dbo.ReserveAdmissionNumber&#13;&#10;    @AdmissionNumber VARCHAR(40) OUTPUT&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

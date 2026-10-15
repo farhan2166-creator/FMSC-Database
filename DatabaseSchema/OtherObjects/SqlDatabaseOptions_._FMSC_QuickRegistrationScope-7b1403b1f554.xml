@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlExtendedProperty" Name="[SqlDatabaseOptions].[FMSC_QuickRegistrationScope]">
+			<ns0:Property Name="Value">
+				<ns0:Value>'049271b4-773e-4362-a03c-bd33c0225e57'</ns0:Value>
+			</ns0:Property>
+			<ns0:Relationship Name="Host">
+				<ns0:Entry>
+					<ns0:References Disambiguator="1" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+	

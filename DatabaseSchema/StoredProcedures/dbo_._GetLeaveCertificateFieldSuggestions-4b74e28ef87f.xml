@@ -1,0 +1,107 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetLeaveCertificateFieldSuggestions]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Students.Leave';
+
+    IF @Field = N'AcademicRecord'
+        SELECT DISTINCT TOP (500) AcademicRecord AS Value
+        FROM dbo.LeaveCertificates
+        WHERE AcademicRecord IS NOT NULL
+          AND LTRIM(RTRIM(AcademicRecord)) &lt;&gt; N''
+        ORDER BY AcademicRecord;
+
+    ELSE IF @Field = N'AttendanceRecord'
+        SELECT DISTINCT TOP (500) AttendanceRecord AS Value
+        FROM dbo.LeaveCertificates
+        WHERE AttendanceRecord IS NOT NULL
+          AND LTRIM(RTRIM(AttendanceRecord)) &lt;&gt; N''
+        ORDER BY AttendanceRecord;
+
+    ELSE IF @Field = N'Remarks'
+        SELECT DISTINCT TOP (500) Remarks AS Value
+        FROM dbo.LeaveCertificates
+        WHERE Remarks IS NOT NULL
+          AND LTRIM(RTRIM(Remarks)) &lt;&gt; N''
+        ORDER BY Remarks;
+
+    ELSE
+        THROW 51500, 'Unknown suggestion field.', 1;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetLeaveCertificateFieldSuggestions].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetLeaveCertificateFieldSuggestions].[@Field]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[AcademicRecord]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[AttendanceRecord]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[LeaveCertificates].[Remarks]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetLeaveCertificateFieldSuggestions].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetLeaveCertificateFieldSuggestions].[@Field]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="50" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="911" />
+				<ns0:Property Name="Length" Value="1958" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#13;&#10;/* =====================================================================&#13;&#10;   3. dbo.GetLeaveCertificateFieldSuggestions - type-ahead for Academic&#13;&#10;      Record, Attendance Record and Remarks on the Leave Certificate&#13;&#10;      page, matching dbo.GetStudentFieldSuggestions (see&#13;&#10;      field-suggestions-support.sql). Reads from dbo.LeaveCertificates,&#13;&#10;      the only table these three free-text fields are stored in.&#13;&#10;&#13;&#10;      Uses RequirePermission @UserId, N'Students.Leave' rather than&#13;&#10;      RequireAuthenticatedUser, since every other Leave Certificate&#13;&#10;      procedure the page calls is already scoped to that permission -&#13;&#10;      unlike Father's Occupation/Previous School/Place of Birth on the&#13;&#10;      Student Admission page, this data belongs to a specific,&#13;&#10;      permissioned workflow rather than being general reference data.&#13;&#10;   ===================================================================== */&#13;&#10;CREATE   PROCEDURE dbo.GetLeaveCertificateFieldSuggestions&#13;&#10;    @UserId INT,&#13;&#10;    @Field NVARCHAR(50)&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

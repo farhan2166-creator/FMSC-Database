@@ -1,0 +1,375 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[ConfirmStudentPlacement]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+ SET NOCOUNT ON; SET XACT_ABORT ON;
+ EXEC dbo.RequireAnyPermission @UserId,N'Students.Admit',N'Students.Administer';
+ BEGIN TRY
+  BEGIN TRANSACTION;
+  DECLARE @AdmissionId int,@YearId int,@Placement int,@Start date,@BillingStart date,@End date,@Status nvarchar(30),@Confirmed datetime2(7),@Locked int;
+  SELECT @AdmissionId=AdmissionId FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId;
+  SELECT @Locked=COUNT(*) FROM dbo.Enrollments WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@AdmissionId;
+  SELECT @YearId=AcademicYearId,@Placement=ClassSectionId,@Start=EnrollmentDate,@BillingStart=COALESCE(BillingStartDate,EnrollmentDate),@End=LeavingDate,
+   @Status=Status,@Confirmed=PlacementConfirmedAt FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId;
+  IF @AdmissionId IS NULL THROW 59641,'The enrollment no longer exists.',1;
+  IF @Confirmed IS NOT NULL THROW 59642,'This placement is already confirmed. Reload Admission.',1;
+  DECLARE @YearStart date,@YearEnd date;
+  SELECT @YearStart=StartDate,@YearEnd=EndDate FROM dbo.AcademicYears WITH(HOLDLOCK) WHERE AcademicYearId=@YearId;
+  IF @Start&lt;@YearStart OR (@YearEnd IS NOT NULL AND @Start&gt;@YearEnd)
+   THROW 59643,'Correct the enrollment start or academic year before confirming placement.',1;
+  IF @BillingStart&lt;@Start OR (@YearEnd IS NOT NULL AND @BillingStart&gt;@YearEnd) OR (@End IS NOT NULL AND @BillingStart&gt;@End)
+   THROW 59644,'Correct billing start before confirming placement.',1;
+  SELECT @Locked=COUNT(*) FROM dbo.StudentFeeAssignments WITH(UPDLOCK,HOLDLOCK) WHERE EnrollmentId=@EnrollmentId;
+  SELECT @Locked=COUNT(*) FROM dbo.BillingCharges WITH(UPDLOCK,HOLDLOCK) WHERE EnrollmentId=@EnrollmentId;
+  DECLARE @Snapshot varchar(64),@Json nvarchar(max)=CONCAT(
+   (SELECT * FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId ORDER BY EnrollmentId FOR JSON PATH,INCLUDE_NULL_VALUES),
+   (SELECT * FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@EnrollmentId ORDER BY StudentFeeAssignmentId FOR JSON PATH,INCLUDE_NULL_VALUES),
+   (SELECT * FROM dbo.BillingCharges WHERE EnrollmentId=@EnrollmentId ORDER BY BillingChargeId FOR JSON PATH,INCLUDE_NULL_VALUES),
+   (SELECT * FROM dbo.AcademicYears WHERE AcademicYearId=@YearId FOR JSON PATH,INCLUDE_NULL_VALUES));
+  SET @Snapshot=CONVERT(varchar(64),HASHBYTES('SHA2_256',@Json),2);
+  IF @Preview=1
+  BEGIN
+   SELECT @Snapshot Snapshot,@Status Status,@BillingStart BillingStart,@Start EnrollmentStart,
+    (SELECT CONCAT(Y.YearName,N' · ',C.CampusName,N' · ',CL.ClassName,N' · ',S.SectionName)
+     FROM dbo.CampusClassSections CS JOIN dbo.Campuses C ON C.CampusId=CS.CampusId
+     JOIN dbo.Classes CL ON CL.ClassId=CS.ClassId JOIN dbo.Sections S ON S.SectionId=CS.SectionId
+     CROSS JOIN dbo.AcademicYears Y WHERE CS.ClassSectionId=@Placement AND Y.AcademicYearId=@YearId) PlacementName,
+    (SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@EnrollmentId AND CancelledAt IS NULL) FeeCount,
+    (SELECT COALESCE(SUM(Amount-DiscountAmount),0) FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@EnrollmentId AND CancelledAt IS NULL) FeeTotal;
+   COMMIT; RETURN;
+  END;
+  IF @ExpectedSnapshot IS NULL OR @ExpectedSnapshot&lt;&gt;@Snapshot THROW 59645,'Placement or fees changed. Review confirmation again.',1;
+  DECLARE @Operation uniqueidentifier=NEWID(),@Record nvarchar(200)=CONVERT(nvarchar(200),@EnrollmentId),@Old nvarchar(max),@New nvarchar(max);
+  SET @Old=(SELECT * FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId FOR JSON PATH,WITHOUT_ARRAY_WRAPPER,INCLUDE_NULL_VALUES);
+  UPDATE dbo.Enrollments SET PlacementConfirmedAt=SYSDATETIME(),BillingReady=CASE WHEN @Status=N'Active' THEN 1 ELSE BillingReady END,UpdatedAt=SYSDATETIME() WHERE EnrollmentId=@EnrollmentId;
+  -- Closed historical records are confirmed as history, without new billing.
+  IF @Status=N'Active' EXEC dbo.PostEnrollmentOpeningCharges @EnrollmentId;
+  SET @New=(SELECT * FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId FOR JSON PATH,WITHOUT_ARRAY_WRAPPER,INCLUDE_NULL_VALUES);
+  INSERT dbo.AuditOperations(OperationId,UserId,OperationType,CorrelationNote) VALUES(@Operation,@UserId,N'CONFIRM_PLACEMENT',@Record);
+  EXEC dbo.WriteAuditLog @Operation,@UserId,N'Enrollments',@Record,N'UPDATE',@Old,@New;
+  COMMIT;
+ END TRY
+ BEGIN CATCH
+  IF @@TRANCOUNT&gt;0 ROLLBACK;
+  THROW;
+ END CATCH;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[datetime2]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[varchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmStudentPlacement].[@EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[uniqueidentifier]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequireAnyPermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmStudentPlacement].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[ClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[BillingStartDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[LeavingDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[PlacementConfirmedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[StartDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[EndDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[varchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmStudentPlacement].[@Preview]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections].[SectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[SectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[YearName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Campuses].[CampusName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections].[SectionName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[ClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[CancelledAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ConfirmStudentPlacement].[@ExpectedSnapshot]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[BillingReady]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostEnrollmentOpeningCharges]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[CorrelationNote]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ConfirmStudentPlacement].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ConfirmStudentPlacement].[@EnrollmentId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ConfirmStudentPlacement].[@ExpectedSnapshot]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="64" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[varchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ConfirmStudentPlacement].[@Preview]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">1</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="1" />
+				<ns0:Property Name="Length" Value="4435" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;CREATE   PROCEDURE dbo.ConfirmStudentPlacement&#10; @UserId int,@EnrollmentId int,@ExpectedSnapshot varchar(64)=NULL,@Preview bit=1&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

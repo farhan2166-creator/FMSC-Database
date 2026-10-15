@@ -1,0 +1,176 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[RequirePermission]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.Users
+                   WHERE  UserId = @UserId)
+        BEGIN
+            THROW 50003, 'The specified user is not authenticated.', 1;
+        END
+    IF EXISTS (SELECT 1
+               FROM   dbo.Users AS U
+                      INNER JOIN
+                      dbo.Roles AS R
+                      ON R.RoleId = U.RoleId
+               WHERE  U.UserId = @UserId
+                      AND R.RoleName = N'Administrator')
+        RETURN;
+    IF EXISTS (SELECT 1
+               FROM   dbo.Users AS U
+                      INNER JOIN
+                      dbo.UserRoles AS UR
+                      ON UR.UserId = U.UserId
+                      INNER JOIN
+                      dbo.Roles AS R
+                      ON R.RoleId = UR.RoleId
+               WHERE  U.UserId = @UserId
+                      AND R.RoleName = N'Administrator')
+        RETURN;
+    IF EXISTS (SELECT 1
+               FROM   dbo.UserRoles AS UR
+                      INNER JOIN
+                      dbo.Roles AS R
+                      ON R.RoleId = UR.RoleId
+                      INNER JOIN
+                      dbo.RolePermissions AS RP
+                      ON RP.RoleId = R.RoleId
+                      INNER JOIN
+                      dbo.Permissions AS P
+                      ON P.PermissionId = RP.PermissionId
+               WHERE  UR.UserId = @UserId
+                      AND P.PermissionCode = @PermissionCode)
+        RETURN;
+    THROW 50003, 'You are not authorized to perform this operation.', 1;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Users]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Users].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Roles]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Roles].[RoleId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Users].[RoleId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Users].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Roles].[RoleName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UserRoles]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UserRoles].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Users].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Roles].[RoleId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UserRoles].[RoleId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Users].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Roles].[RoleName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Roles].[RoleId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UserRoles].[RoleId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RolePermissions]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RolePermissions].[RoleId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Roles].[RoleId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Permissions]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Permissions].[PermissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RolePermissions].[PermissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UserRoles].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Permissions].[PermissionCode]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission].[@PermissionCode]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[RequirePermission].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[RequirePermission].[@PermissionCode]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="100" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="22" />
+				<ns0:Property Name="Length" Value="1728" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- RequirePermission&#10;CREATE   PROCEDURE dbo.RequirePermission&#13;&#10;@UserId INT, @PermissionCode NVARCHAR (100)&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

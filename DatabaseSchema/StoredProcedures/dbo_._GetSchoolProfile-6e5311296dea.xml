@@ -1,0 +1,113 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetSchoolProfile]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequireAuthenticatedUser @UserId;
+
+    SELECT
+        SchoolProfileId,
+        SchoolName,
+        AddressLine,
+        City,
+        ContactNumber,
+        Email,
+        LogoImage,
+        LogoFileName,
+        LogoContentType,
+        FeeProrationCutoffDay,
+        CreatedAt,
+        CreatedByUserId,
+        UpdatedAt,
+        UpdatedByUserId
+    FROM dbo.SchoolProfile
+    WHERE SchoolProfileId = 1;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequireAuthenticatedUser]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetSchoolProfile].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[SchoolProfileId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[SchoolName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[AddressLine]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[City]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[ContactNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[Email]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[LogoImage]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[LogoFileName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[LogoContentType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[FeeProrationCutoffDay]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[CreatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[CreatedByUserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[UpdatedByUserId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetSchoolProfile].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="732" />
+				<ns0:Property Name="Length" Value="1264" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="/* ============================================================================&#13;&#10;   FMSC_SMS - Expose FeeProrationCutoffDay through SchoolProfile&#13;&#10;   ============================================================================&#13;&#10;   Companion to sql/AddBillingStartDateAndFeeProration.sql, which added the&#13;&#10;   dbo.SchoolProfile.FeeProrationCutoffDay column but did not touch the two&#13;&#10;   procedures the School Information screen (SchoolProfilePage.cs) actually&#13;&#10;   calls. Run this AFTER that script.&#13;&#10;&#13;&#10;   @FeeProrationCutoffDay defaults to NULL so existing callers (and the&#13;&#10;   current UI, until it's updated) keep behaving exactly as they do today.&#13;&#10;============================================================================ */&#13;&#10;&#13;&#10;CREATE PROCEDURE dbo.GetSchoolProfile&#13;&#10;    @UserId INT&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

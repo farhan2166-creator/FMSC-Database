@@ -1,0 +1,316 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[DiscontinueStudentFeeAssignment]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Fees.Adjust';
+    IF @Reason IS NULL
+       OR LTRIM(RTRIM(@Reason)) = N''
+        THROW 53130, 'A reason is required to discontinue a fee assignment.', 1;
+    IF @EffectiveTo IS NULL
+        THROW 53136, 'An effective-to date is required.', 1;
+    DECLARE @EnrollmentId AS INT, @AdmissionId AS INT, @FeeTypeId AS INT, @Amount AS DECIMAL (12, 2), @DiscountAmount AS DECIMAL (12, 2), @Frequency AS NVARCHAR (20), @ExistingEffectiveFrom AS DATE, @ExistingEffectiveTo AS DATE, @CancelledAt AS DATETIME2;
+    SELECT @EnrollmentId = EnrollmentId,
+           @AdmissionId = AdmissionId,
+           @FeeTypeId = FeeTypeId,
+           @Amount = Amount,
+           @DiscountAmount = DiscountAmount,
+           @Frequency = Frequency,
+           @ExistingEffectiveFrom = EffectiveFrom,
+           @ExistingEffectiveTo = EffectiveTo,
+           @CancelledAt = CancelledAt
+    FROM   dbo.StudentFeeAssignments
+    WHERE  StudentFeeAssignmentId = @StudentFeeAssignmentId;
+    IF @EnrollmentId IS NULL
+        THROW 53131, 'The selected student fee assignment does not exist.', 1;
+    IF @CancelledAt IS NOT NULL
+        THROW 53132, 'This fee assignment has been cancelled.', 1;
+    IF @ExistingEffectiveTo IS NOT NULL
+        THROW 53133, 'This fee assignment has already been discontinued.', 1;
+    DECLARE @NormalizedEffectiveTo AS DATE = DATEFROMPARTS(YEAR(@EffectiveTo), MONTH(@EffectiveTo), 1);
+    IF @ExistingEffectiveFrom IS NOT NULL
+       AND @NormalizedEffectiveTo &lt; @ExistingEffectiveFrom
+        THROW 53137, 'Effective-to month cannot be earlier than this version''s own starting month.', 1;
+    DECLARE @LastBilledMonth AS DATE = (SELECT MAX(BillingMonth)
+                                        FROM   dbo.BillingCharges
+                                        WHERE  StudentFeeAssignmentId = @StudentFeeAssignmentId);
+    IF @LastBilledMonth IS NOT NULL
+       AND @NormalizedEffectiveTo &lt; @LastBilledMonth
+        THROW 53134, 'Effective-to month cannot be earlier than the last month already billed for this fee.', 1;
+    BEGIN TRANSACTION;
+    UPDATE dbo.StudentFeeAssignments
+    SET    EffectiveTo = @NormalizedEffectiveTo,
+           UpdatedAt   = SYSDATETIME()
+    WHERE  StudentFeeAssignmentId = @StudentFeeAssignmentId
+           AND EffectiveTo IS NULL;
+    IF @@ROWCOUNT = 0
+        BEGIN
+            ROLLBACK;
+            THROW 53135, 'The fee assignment could not be discontinued (it may have just been changed by another operation).', 1;
+        END
+    DECLARE @OperationId AS UNIQUEIDENTIFIER = NEWID();
+    INSERT  dbo.AuditOperations (OperationId, UserId, OperationType, CorrelationNote)
+    VALUES                     (@OperationId, @UserId, N'FEE_ASSIGNMENT_DISCONTINUE', CONVERT (NVARCHAR (200), @StudentFeeAssignmentId));
+    DECLARE @OldValues AS NVARCHAR (MAX) = (SELECT @StudentFeeAssignmentId AS StudentFeeAssignmentId,
+                                                   @ExistingEffectiveFrom AS EffectiveFrom,
+                                                   CAST (NULL AS DATE) AS EffectiveTo
+                                            FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES);
+    DECLARE @NewValues AS NVARCHAR (MAX) = (SELECT @StudentFeeAssignmentId AS StudentFeeAssignmentId,
+                                                   @ExistingEffectiveFrom AS EffectiveFrom,
+                                                   @NormalizedEffectiveTo AS EffectiveTo,
+                                                   @Reason AS Reason,
+                                                   @EnrollmentId AS EnrollmentId,
+                                                   @AdmissionId AS AdmissionId,
+                                                   @FeeTypeId AS FeeTypeId
+                                            FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES);
+    EXECUTE dbo.WriteAuditLog @OperationId = @OperationId, @UserId = @UserId, @TableName = N'StudentFeeAssignments', @RecordId = @StudentFeeAssignmentId, @Action = N'UPDATE', @OldValues = @OldValues, @NewValues = @NewValues;
+    DELETE dbo.AuditOperations WHERE OperationId=@OperationId AND NOT EXISTS(SELECT 1 FROM dbo.AuditLogs WHERE OperationId=@OperationId);
+COMMIT TRANSACTION;
+    SELECT StudentFeeAssignmentId,
+           EnrollmentId,
+           AdmissionId,
+           FeeTypeId,
+           Amount,
+           DiscountAmount,
+           Frequency,
+           EffectiveFrom,
+           EffectiveTo
+    FROM   dbo.StudentFeeAssignments
+    WHERE  StudentFeeAssignmentId = @StudentFeeAssignmentId;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[datetime2]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DiscontinueStudentFeeAssignment].[@EffectiveTo]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DiscontinueStudentFeeAssignment].[@StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[uniqueidentifier]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DiscontinueStudentFeeAssignment].[@Reason]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DiscontinueStudentFeeAssignment].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Frequency]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EffectiveFrom]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EffectiveTo]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[CancelledAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[CorrelationNote]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@TableName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@RecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@Action]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OldValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@NewValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[OperationId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[DiscontinueStudentFeeAssignment].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[DiscontinueStudentFeeAssignment].[@StudentFeeAssignmentId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[DiscontinueStudentFeeAssignment].[@EffectiveTo]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[DiscontinueStudentFeeAssignment].[@Reason]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="500" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="36" />
+				<ns0:Property Name="Length" Value="4892" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- DiscontinueStudentFeeAssignment&#10;CREATE   PROCEDURE dbo.DiscontinueStudentFeeAssignment&#13;&#10;@UserId INT, @StudentFeeAssignmentId INT, @EffectiveTo DATE, @Reason NVARCHAR (500)&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

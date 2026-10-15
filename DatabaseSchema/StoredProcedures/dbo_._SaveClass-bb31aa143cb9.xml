@@ -1,0 +1,282 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[SaveClass]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="False" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'System.Setup';
+    BEGIN TRY
+    BEGIN TRANSACTION;
+    DECLARE @OrderLock int;
+    EXEC @OrderLock = sys.sp_getapplock @Resource=N'SetupOrder:Classes', @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout=10000;
+    IF @OrderLock &lt; 0 THROW 57401, 'Unable to lock setup ordering. Please try again.', 1;
+    IF NULLIF (LTRIM(RTRIM(@ClassName)), N'') IS NULL
+        THROW 56210, 'Class name is required.', 1;
+    IF @ClassId = 0
+        BEGIN
+            IF @AcademicProgramId IS NULL
+               OR @AcademicProgramId &lt;= 0
+                THROW 56211, 'Academic program is required for a new class.', 1;
+            IF NOT EXISTS (SELECT 1
+                           FROM   dbo.AcademicPrograms
+                           WHERE  AcademicProgramId = @AcademicProgramId)
+                THROW 56214, 'The selected academic program is invalid.', 1;
+            IF NULLIF (LTRIM(RTRIM(@ClassCode)), N'') IS NULL
+                THROW 56212, 'Class code is required for a new class.', 1;
+            SELECT @DisplayOrder=ISNULL(MAX(DisplayOrder),0)+1 FROM dbo.Classes WITH (UPDLOCK,HOLDLOCK) WHERE AcademicProgramId=@AcademicProgramId;
+            INSERT  dbo.Classes (AcademicProgramId, ClassCode, ClassName, DisplayOrder)
+            VALUES             (@AcademicProgramId, LTRIM(RTRIM(@ClassCode)), LTRIM(RTRIM(@ClassName)), @DisplayOrder);
+
+    COMMIT TRANSACTION;
+    SELECT CONVERT (INT, SCOPE_IDENTITY()) AS ClassId;
+            RETURN;
+        END
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.Classes
+                   WHERE  ClassId = @ClassId)
+        THROW 56215, 'The selected class was not found.', 1;
+    IF @AcademicProgramId IS NOT NULL
+       AND @AcademicProgramId &lt;&gt; ISNULL((SELECT C.AcademicProgramId
+                                         FROM   dbo.Classes AS C
+                                         WHERE  C.ClassId = @ClassId), 0)
+       AND NOT EXISTS (SELECT 1
+                       FROM   dbo.AcademicPrograms
+                       WHERE  AcademicProgramId = @AcademicProgramId)
+        THROW 56216, 'The selected academic program is invalid.', 1;
+        IF @AcademicProgramId IS NOT NULL AND @AcademicProgramId &lt;&gt; (SELECT AcademicProgramId FROM dbo.Classes WHERE ClassId=@ClassId)
+    BEGIN
+        SELECT @DisplayOrder=ISNULL(MAX(DisplayOrder),0)+1 FROM dbo.Classes WITH (UPDLOCK,HOLDLOCK) WHERE AcademicProgramId=@AcademicProgramId;
+
+    END
+    UPDATE dbo.Classes
+    SET    DisplayOrder = CASE WHEN @AcademicProgramId IS NOT NULL AND @AcademicProgramId&lt;&gt;AcademicProgramId THEN @DisplayOrder ELSE DisplayOrder END,
+           AcademicProgramId = COALESCE (@AcademicProgramId, AcademicProgramId),
+           ClassName         = LTRIM(RTRIM(@ClassName))
+    WHERE  ClassId = @ClassId;
+
+    COMMIT TRANSACTION;
+    SELECT @ClassId AS ClassId;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE() &lt;&gt; 0 ROLLBACK TRANSACTION;
+        THROW;
+    END CATCH
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Property Name="IsQuotedIdentifierOn" Value="False" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveClass].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutine" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@Resource]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockMode]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockOwner]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockTimeout]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveClass].[@ClassName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveClass].[@ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveClass].[@AcademicProgramId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicPrograms].[AcademicProgramId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveClass].[@ClassCode]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveClass].[@DisplayOrder]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[DisplayOrder]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[AcademicProgramId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassCode]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[AcademicProgramId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[AcademicProgramId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveClass].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveClass].[@ClassName]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="100" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveClass].[@ClassId]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="False" AnsiNulls="True">0</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveClass].[@AcademicProgramId]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="False" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveClass].[@ClassCode]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="False" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="30" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveClass].[@DisplayOrder]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="False" AnsiNulls="True">0</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="Length" Value="3230" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="CREATE   PROCEDURE dbo.SaveClass&#13;&#10;@UserId INT, @ClassName NVARCHAR (100), @ClassId INT=0, @AcademicProgramId INT=NULL, @ClassCode NVARCHAR (30)=NULL, @DisplayOrder INT=0&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

@@ -1,0 +1,204 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlInlineTableValuedFunction" Name="[dbo].[fn_ExpectedRecurringChargeMonths]">
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[BillingStartDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[LeavingDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[fn_ExpectedRecurringChargeMonths].[@AsOfDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[fn_ExpectedRecurringChargeMonths].[@EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[BillingReady]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[fn_ExpectedRecurringChargeMonths].[CTE1].[Months].[BillingMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[fn_ExpectedRecurringChargeMonths].[CTE1].[Months].[AnchorMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[fn_ExpectedRecurringChargeMonths].[CTE1].[Months].[EndMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[CancelledAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Frequency]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EffectiveFrom]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EffectiveTo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Columns">
+				<ns0:Entry>
+					<ns0:Element Type="SqlComputedColumn" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[StudentFeeAssignmentId]">
+						<ns0:Relationship Name="ExpressionDependencies">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[StudentFeeAssignments].[StudentFeeAssignmentId]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlComputedColumn" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[FeeTypeId]">
+						<ns0:Relationship Name="ExpressionDependencies">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlComputedColumn" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[BillingMonth]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DynamicObjects">
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[CTE1].[EnrollmentWindow]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[CTE1].[EnrollmentWindow].[StartMonth]" />
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[CTE1].[EnrollmentWindow].[EndMonth]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[CTE1].[Months]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[CTE1].[Months].[BillingMonth]" />
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[CTE1].[Months].[AnchorMonth]" />
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[CTE1].[Months].[EndMonth]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="FunctionBody">
+				<ns0:Entry>
+					<ns0:Element Type="SqlScriptFunctionImplementation">
+						<ns0:Property Name="BodyScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True"> 
+    WITH   EnrollmentWindow
+    AS     (SELECT DATEFROMPARTS(YEAR(ISNULL(E.BillingStartDate, E.EnrollmentDate)), MONTH(ISNULL(E.BillingStartDate, E.EnrollmentDate)), 1) AS StartMonth,
+                   DATEFROMPARTS(YEAR(CASE WHEN E.LeavingDate IS NULL
+                                                OR E.LeavingDate &gt; @AsOfDate THEN @AsOfDate ELSE E.LeavingDate END), MONTH(CASE WHEN E.LeavingDate IS NULL
+                                                                                                                                     OR E.LeavingDate &gt; @AsOfDate THEN @AsOfDate ELSE E.LeavingDate END), 1) AS EndMonth
+            FROM   dbo.Enrollments AS E
+            WHERE  E.EnrollmentId = @EnrollmentId
+                   AND E.Status IN (N'Active', N'Promoted', N'Completed', N'Left')
+                   AND E.BillingReady = 1),
+           Months
+    AS     (SELECT EW.StartMonth AS BillingMonth,
+                   EW.StartMonth AS AnchorMonth,
+                   EW.EndMonth
+            FROM   EnrollmentWindow AS EW
+            WHERE  EW.StartMonth &lt;= EW.EndMonth
+            UNION ALL
+            SELECT DATEADD(MONTH, 1, M.BillingMonth),
+                   M.AnchorMonth,
+                   M.EndMonth
+            FROM   Months AS M
+            WHERE  M.BillingMonth &lt; M.EndMonth)
+    SELECT SFA.StudentFeeAssignmentId,
+           SFA.FeeTypeId,
+           M.BillingMonth
+    FROM   dbo.StudentFeeAssignments AS SFA CROSS JOIN Months AS M
+    WHERE  SFA.EnrollmentId = @EnrollmentId
+           AND SFA.CancelledAt IS NULL
+           AND SFA.Frequency = N'Monthly'
+           AND (SFA.EffectiveFrom IS NULL
+                OR M.BillingMonth &gt;= SFA.EffectiveFrom)
+           AND (SFA.EffectiveTo IS NULL
+                OR M.BillingMonth &lt;= SFA.EffectiveTo)</ns0:Value>
+						</ns0:Property>
+						<ns0:Annotation Type="SysCommentsObjectAnnotation">
+							<ns0:Property Name="CreateOffset" Value="37" />
+							<ns0:Property Name="Length" Value="1964" />
+							<ns0:Property Name="StartLine" Value="1" />
+							<ns0:Property Name="StartColumn" Value="1" />
+							<ns0:Property Name="HeaderContents" Value="&#10;-- fn_ExpectedRecurringChargeMonths&#10;CREATE   FUNCTION dbo.fn_ExpectedRecurringChargeMonths&#13;&#10;(@EnrollmentId INT, @AsOfDate DATE)&#13;&#10;RETURNS TABLE &#13;&#10;AS&#13;&#10;RETURN" />
+						</ns0:Annotation>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[@EnrollmentId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[fn_ExpectedRecurringChargeMonths].[@AsOfDate]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

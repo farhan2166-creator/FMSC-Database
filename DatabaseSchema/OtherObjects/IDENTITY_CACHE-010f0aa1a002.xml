@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlGenericDatabaseScopedConfigurationOptions" Name="[IDENTITY_CACHE]">
+			<ns0:Property Name="GenericValueType" Value="2" />
+			<ns0:Property Name="GenericValue" Value="OFF" />
+		</ns0:Element>
+		

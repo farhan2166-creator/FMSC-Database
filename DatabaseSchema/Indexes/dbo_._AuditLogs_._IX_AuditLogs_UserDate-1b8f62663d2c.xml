@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlIndex" Name="[dbo].[AuditLogs].[IX_AuditLogs_UserDate]">
+			<ns0:Relationship Name="ColumnSpecifications">
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[AuditLogs].[UserId]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Property Name="IsAscending" Value="False" />
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[AuditLogs].[ActionDateTime]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="IndexedObject">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

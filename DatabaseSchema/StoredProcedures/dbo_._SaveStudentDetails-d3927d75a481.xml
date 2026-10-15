@@ -1,0 +1,888 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[SaveStudentDetails]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    IF EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@AdmissionId AND Status=N'Pending') EXEC dbo.RequireAnyPermission @UserId,N'Students.Admit',N'Students.Administer'; ELSE EXECUTE dbo.RequirePermission @UserId, N'Students.Administer';
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.Students
+                   WHERE  AdmissionId = @AdmissionId)
+        THROW 51701, 'The selected student was not found.', 1;
+    IF NULLIF (LTRIM(RTRIM(@StudentName)), N'') IS NULL
+        THROW 51702, 'Student name is required.', 1;
+    DECLARE @AdmissionDate AS DATE;
+    SELECT @AdmissionDate = AdmissionDate
+    FROM   dbo.Students
+    WHERE  AdmissionId = @AdmissionId;
+    IF @DateOfBirth IS NOT NULL
+       AND @DateOfBirth &gt; @AdmissionDate
+        THROW 51703, 'Date of birth cannot be later than the admission date.', 1;
+    IF @Disability IS NULL
+       OR @Disability NOT IN (N'Yes', N'No')
+        THROW 51704, 'Disability must be Yes or No.', 1;
+    DECLARE @OldStudentName AS NVARCHAR (500), @OldFatherName AS NVARCHAR (500), @OldDateOfBirth AS DATE, @OldGender AS NVARCHAR (20), @OldBFormNumber AS NVARCHAR (50), @OldReligion AS NVARCHAR (50), @OldBloodGroup AS NVARCHAR (10), @OldContactNumber AS NVARCHAR (30), @OldAlternateContactNumber AS NVARCHAR (30), @OldAddress AS NVARCHAR (500), @OldPreviousSchool AS NVARCHAR (500), @OldPlaceOfBirth AS NVARCHAR (500), @OldFatherOccupation AS NVARCHAR (250), @OldDisability AS NVARCHAR (3), @OldBiseEnrolmentNumber AS NVARCHAR (50), @OldCasteTribe AS NVARCHAR (100);
+    SELECT @OldStudentName = StudentName,
+           @OldFatherName = FatherName,
+           @OldDateOfBirth = DateOfBirth,
+           @OldGender = Gender,
+           @OldBFormNumber = BFormNumber,
+           @OldReligion = Religion,
+           @OldBloodGroup = BloodGroup,
+           @OldContactNumber = ContactNumber,
+           @OldAlternateContactNumber = AlternateContactNumber,
+           @OldAddress = Address,
+           @OldPreviousSchool = PreviousSchool,
+           @OldPlaceOfBirth = PlaceOfBirth,
+           @OldFatherOccupation = FatherOccupation,
+           @OldDisability = Disability,
+           @OldBiseEnrolmentNumber = BiseEnrolmentNumber,
+           @OldCasteTribe = CasteTribe
+    FROM   dbo.Students
+    WHERE  AdmissionId = @AdmissionId;
+    DECLARE @NewStudentName AS NVARCHAR (500), @NewFatherName AS NVARCHAR (500), @NewBFormNumber AS NVARCHAR (50), @NewContactNumber AS NVARCHAR (30), @NewAlternateContactNumber AS NVARCHAR (30), @NewAddress AS NVARCHAR (500), @NewPreviousSchool AS NVARCHAR (500), @NewPlaceOfBirth AS NVARCHAR (500), @NewFatherOccupation AS NVARCHAR (250), @NewBiseEnrolmentNumber AS NVARCHAR (50), @NewCasteTribe AS NVARCHAR (100);
+    SET @NewStudentName = LTRIM(RTRIM(@StudentName));
+    SET @NewFatherName = NULLIF (LTRIM(RTRIM(@FatherName)), N'');
+    SET @NewBFormNumber = NULLIF (LTRIM(RTRIM(@BFormNumber)), N'');
+    SET @NewContactNumber = NULLIF (LTRIM(RTRIM(@ContactNumber)), N'');
+    SET @NewAlternateContactNumber = NULLIF (LTRIM(RTRIM(@AlternateContactNumber)), N'');
+    SET @NewAddress = NULLIF (LTRIM(RTRIM(@Address)), N'');
+    SET @NewPreviousSchool = NULLIF (LTRIM(RTRIM(@PreviousSchool)), N'');
+    SET @NewPlaceOfBirth = NULLIF (LTRIM(RTRIM(@PlaceOfBirth)), N'');
+    SET @NewFatherOccupation = NULLIF (LTRIM(RTRIM(@FatherOccupation)), N'');
+    SET @NewBiseEnrolmentNumber = NULLIF (LTRIM(RTRIM(@BiseEnrolmentNumber)), N'');
+    SET @NewCasteTribe = NULLIF (LTRIM(RTRIM(@CasteTribe)), N'');
+    DECLARE @StudentChanged AS BIT = 0;
+    IF ISNULL(@OldStudentName, N'') &lt;&gt; ISNULL(@NewStudentName, N'')
+       OR ISNULL(@OldFatherName, N'') &lt;&gt; ISNULL(@NewFatherName, N'')
+       OR ISNULL(@OldDateOfBirth, '19000101') &lt;&gt; ISNULL(@DateOfBirth, '19000101')
+       OR ISNULL(@OldGender, N'') &lt;&gt; ISNULL(@Gender, N'')
+       OR ISNULL(@OldBFormNumber, N'') &lt;&gt; ISNULL(@NewBFormNumber, N'')
+       OR ISNULL(@OldReligion, N'') &lt;&gt; ISNULL(@Religion, N'')
+       OR ISNULL(@OldBloodGroup, N'') &lt;&gt; ISNULL(@BloodGroup, N'')
+       OR ISNULL(@OldContactNumber, N'') &lt;&gt; ISNULL(@NewContactNumber, N'')
+       OR ISNULL(@OldAlternateContactNumber, N'') &lt;&gt; ISNULL(@NewAlternateContactNumber, N'')
+       OR ISNULL(@OldAddress, N'') &lt;&gt; ISNULL(@NewAddress, N'')
+       OR ISNULL(@OldPreviousSchool, N'') &lt;&gt; ISNULL(@NewPreviousSchool, N'')
+       OR ISNULL(@OldPlaceOfBirth, N'') &lt;&gt; ISNULL(@NewPlaceOfBirth, N'')
+       OR ISNULL(@OldFatherOccupation, N'') &lt;&gt; ISNULL(@NewFatherOccupation, N'')
+       OR ISNULL(@OldDisability, N'') &lt;&gt; ISNULL(@Disability, N'')
+       OR ISNULL(@OldBiseEnrolmentNumber, N'') &lt;&gt; ISNULL(@NewBiseEnrolmentNumber, N'')
+       OR ISNULL(@OldCasteTribe, N'') &lt;&gt; ISNULL(@NewCasteTribe, N'')
+        BEGIN
+            SET @StudentChanged = 1;
+        END
+    DECLARE @EnrollmentId AS INT = NULL, @OldUsesTransport AS BIT = NULL;
+    SELECT   TOP (1) @EnrollmentId = E.EnrollmentId,
+                     @OldUsesTransport = E.UsesTransport
+    FROM     dbo.Enrollments AS E
+    WHERE    E.AdmissionId = @AdmissionId
+    ORDER BY CASE WHEN E.Status = N'Active' THEN 0 ELSE 1 END, E.EnrollmentDate DESC, E.EnrollmentId DESC;
+    DECLARE @TransportChanged AS BIT = 0;
+    IF @UsesTransport IS NOT NULL
+       AND @EnrollmentId IS NOT NULL
+       AND (@OldUsesTransport IS NULL
+            OR @OldUsesTransport &lt;&gt; @UsesTransport)
+        BEGIN
+            SET @TransportChanged = 1;
+        END
+    IF @StudentChanged = 0
+       AND @TransportChanged = 0
+        BEGIN
+            SELECT @AdmissionId AS AdmissionId;
+            RETURN;
+        END
+    BEGIN TRANSACTION;
+    IF @StudentChanged = 1
+        BEGIN
+            UPDATE dbo.Students
+            SET    StudentName            = @NewStudentName,
+                   FatherName             = @NewFatherName,
+                   DateOfBirth            = @DateOfBirth,
+                   Gender                 = @Gender,
+                   BFormNumber            = @NewBFormNumber,
+                   Religion               = @Religion,
+                   BloodGroup             = @BloodGroup,
+                   ContactNumber          = @NewContactNumber,
+                   AlternateContactNumber = @NewAlternateContactNumber,
+                   Address                = @NewAddress,
+                   PreviousSchool         = @NewPreviousSchool,
+                   PlaceOfBirth           = @NewPlaceOfBirth,
+                   FatherOccupation       = @NewFatherOccupation,
+                   Disability             = @Disability,
+                   BiseEnrolmentNumber    = @NewBiseEnrolmentNumber,
+                   CasteTribe             = @NewCasteTribe,
+                   UpdatedAt              = SYSDATETIME()
+            WHERE  AdmissionId = @AdmissionId;
+            IF @@ROWCOUNT = 0
+                THROW 51705, 'The selected student record was not found.', 1;
+        END
+    IF @TransportChanged = 1
+        BEGIN
+            UPDATE dbo.Enrollments
+            SET    UsesTransport = @UsesTransport,
+                   UpdatedAt     = SYSDATETIME()
+            WHERE  EnrollmentId = @EnrollmentId;
+            IF @@ROWCOUNT = 0
+                THROW 51707, 'The student enrollment could not be updated.', 1;
+        END
+    DECLARE @OperationId AS UNIQUEIDENTIFIER = NEWID();
+    INSERT  dbo.AuditOperations (OperationId, UserId, OperationType, CorrelationNote)
+    VALUES                     (@OperationId, @UserId, N'STUDENT_UPDATE', CONVERT (NVARCHAR (200), @AdmissionId));
+    IF @StudentChanged = 1
+        BEGIN
+            DECLARE @AuditOldValues AS NVARCHAR (MAX);
+            DECLARE @AuditNewValues AS NVARCHAR (MAX);
+            DECLARE @AuditRecordId AS NVARCHAR (200);
+            SELECT @AuditOldValues = (SELECT @OldStudentName AS StudentName,
+                                             @OldFatherName AS FatherName,
+                                             @OldDateOfBirth AS DateOfBirth,
+                                             @OldGender AS Gender,
+                                             @OldBFormNumber AS BFormNumber,
+                                             @OldReligion AS Religion,
+                                             @OldBloodGroup AS BloodGroup,
+                                             @OldContactNumber AS ContactNumber,
+                                             @OldAlternateContactNumber AS AlternateContactNumber,
+                                             @OldAddress AS Address,
+                                             @OldPreviousSchool AS PreviousSchool,
+                                             @OldPlaceOfBirth AS PlaceOfBirth,
+                                             @OldFatherOccupation AS FatherOccupation,
+                                             @OldDisability AS Disability,
+                                             @OldBiseEnrolmentNumber AS BiseEnrolmentNumber,
+                                             @OldCasteTribe AS CasteTribe
+                                      FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES);
+            SELECT @AuditNewValues = (SELECT @AdmissionId AS AdmissionId,
+                                             @NewStudentName AS StudentName,
+                                             @NewFatherName AS FatherName,
+                                             @DateOfBirth AS DateOfBirth,
+                                             @Gender AS Gender,
+                                             @NewBFormNumber AS BFormNumber,
+                                             @Religion AS Religion,
+                                             @BloodGroup AS BloodGroup,
+                                             @NewContactNumber AS ContactNumber,
+                                             @NewAlternateContactNumber AS AlternateContactNumber,
+                                             @NewAddress AS Address,
+                                             @NewPreviousSchool AS PreviousSchool,
+                                             @NewPlaceOfBirth AS PlaceOfBirth,
+                                             @NewFatherOccupation AS FatherOccupation,
+                                             @Disability AS Disability,
+                                             @NewBiseEnrolmentNumber AS BiseEnrolmentNumber,
+                                             @NewCasteTribe AS CasteTribe
+                                      FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES);
+            SET @AuditRecordId = CONVERT (NVARCHAR (200), @AdmissionId);
+            EXECUTE dbo.WriteAuditLog @OperationId = @OperationId, @UserId = @UserId, @TableName = N'Students', @RecordId = @AuditRecordId, @Action = N'UPDATE', @OldValues = @AuditOldValues, @NewValues = @AuditNewValues;
+        END
+    IF @TransportChanged = 1
+        BEGIN
+            DECLARE @TransportOldValues AS NVARCHAR (MAX), @TransportNewValues AS NVARCHAR (MAX), @TransportAuditRecordId AS NVARCHAR (200);
+            SELECT @TransportOldValues = (SELECT @EnrollmentId AS EnrollmentId,
+                                                 @AdmissionId AS AdmissionId,
+                                                 @OldUsesTransport AS UsesTransport
+                                          FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES);
+            SELECT @TransportNewValues = (SELECT @EnrollmentId AS EnrollmentId,
+                                                 @AdmissionId AS AdmissionId,
+                                                 @UsesTransport AS UsesTransport
+                                          FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES);
+            SET @TransportAuditRecordId = CONVERT (NVARCHAR (200), @EnrollmentId);
+            EXECUTE dbo.WriteAuditLog @OperationId = @OperationId, @UserId = @UserId, @TableName = N'Enrollments', @RecordId = @TransportAuditRecordId, @Action = N'UPDATE', @OldValues = @TransportOldValues, @NewValues = @TransportNewValues;
+        END
+    DELETE dbo.AuditOperations WHERE OperationId=@OperationId AND NOT EXISTS(SELECT 1 FROM dbo.AuditLogs WHERE OperationId=@OperationId);
+COMMIT TRANSACTION;
+    SELECT @AdmissionId AS AdmissionId;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[uniqueidentifier]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequireAnyPermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@StudentName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[AdmissionDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@DateOfBirth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@Disability]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[StudentName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[FatherName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[DateOfBirth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[Gender]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[BFormNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[Religion]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[BloodGroup]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[ContactNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[AlternateContactNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[Address]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[PreviousSchool]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[PlaceOfBirth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[FatherOccupation]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[Disability]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[BiseEnrolmentNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[CasteTribe]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@FatherName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@BFormNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@ContactNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@AlternateContactNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@Address]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@PreviousSchool]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@PlaceOfBirth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@FatherOccupation]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@BiseEnrolmentNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@CasteTribe]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@Gender]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@Religion]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@BloodGroup]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[UsesTransport]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SaveStudentDetails].[@UsesTransport]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[UsesTransport]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[CorrelationNote]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@TableName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@RecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@Action]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OldValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@NewValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[OperationId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@AdmissionId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@StudentName]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="500" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@FatherName]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="500" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@DateOfBirth]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@Gender]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="20" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@BFormNumber]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="50" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@Religion]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="50" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@BloodGroup]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="10" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@ContactNumber]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="30" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@AlternateContactNumber]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="30" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@Address]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="500" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@PreviousSchool]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="500" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@PlaceOfBirth]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="500" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@FatherOccupation]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="250" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@Disability]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">N'No'</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="3" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@UsesTransport]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[bit]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@BiseEnrolmentNumber]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="50" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[SaveStudentDetails].[@CasteTribe]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="100" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="23" />
+				<ns0:Property Name="Length" Value="13042" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- SaveStudentDetails&#10;CREATE   PROCEDURE dbo.SaveStudentDetails&#13;&#10;@UserId INT, @AdmissionId INT, @StudentName NVARCHAR (500), @FatherName NVARCHAR (500)=NULL, @DateOfBirth DATE=NULL, @Gender NVARCHAR (20)=NULL, @BFormNumber NVARCHAR (50)=NULL, @Religion NVARCHAR (50)=NULL, @BloodGroup NVARCHAR (10)=NULL, @ContactNumber NVARCHAR (30)=NULL, @AlternateContactNumber NVARCHAR (30)=NULL, @Address NVARCHAR (500)=NULL, @PreviousSchool NVARCHAR (500)=NULL, @PlaceOfBirth NVARCHAR (500)=NULL, @FatherOccupation NVARCHAR (250)=NULL, @Disability NVARCHAR (3)=N'No', @UsesTransport BIT=NULL, @BiseEnrolmentNumber NVARCHAR (50)=NULL, @CasteTribe NVARCHAR (100)=NULL&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

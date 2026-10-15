@@ -1,0 +1,192 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[IssueDateOfBirthCertificate]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Certificates.Create';
+
+    IF @CertificateRecordId &lt;= 0
+        THROW 58600, 'A valid date of birth certificate is required.', 1;
+
+    BEGIN TRANSACTION;
+
+    IF NOT EXISTS
+    (
+        SELECT 1
+        FROM dbo.DateOfBirthCertificates
+        WHERE CertificateRecordId = @CertificateRecordId
+    )
+        THROW 58601, 'The date of birth certificate was not found.', 1;
+
+    DECLARE
+        @LastIssueId INT,
+        @LastCollectedAt DATETIME2;
+
+    SELECT TOP (1)
+        @LastIssueId = DBI.DateOfBirthCertificateIssueId,
+        @LastCollectedAt = DBI.CollectedAt
+    FROM dbo.DateOfBirthCertificateIssues AS DBI WITH (UPDLOCK, HOLDLOCK)
+    WHERE DBI.CertificateRecordId = @CertificateRecordId
+    ORDER BY
+        DBI.IssuedAt DESC,
+        DBI.DateOfBirthCertificateIssueId DESC;
+
+    IF @LastIssueId IS NOT NULL
+       AND @LastCollectedAt IS NULL
+        THROW 58602, 'The currently issued certificate has not been collected yet.', 1;
+
+    INSERT dbo.DateOfBirthCertificateIssues
+    (
+        CertificateRecordId,
+        IssuedAt,
+        IssuedByUserId,
+        Remarks
+    )
+    VALUES
+    (
+        @CertificateRecordId,
+        SYSDATETIME(),
+        @UserId,
+        @Remarks
+    );
+
+    DECLARE @IssueId INT =
+        CONVERT(INT, SCOPE_IDENTITY());
+
+    COMMIT;
+
+    SELECT
+        @IssueId AS DateOfBirthCertificateIssueId,
+        @CertificateRecordId AS CertificateRecordId;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[datetime2]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[IssueDateOfBirthCertificate].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[IssueDateOfBirthCertificate].[@CertificateRecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificates].[CertificateRecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[DateOfBirthCertificateIssueId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[CollectedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[CertificateRecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[IssuedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[CertificateRecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[IssuedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[IssuedByUserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DateOfBirthCertificateIssues].[Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[IssueDateOfBirthCertificate].[@Remarks]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[IssueDateOfBirthCertificate].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[IssueDateOfBirthCertificate].[@CertificateRecordId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[IssueDateOfBirthCertificate].[@Remarks]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">NULL</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="1000" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="210" />
+				<ns0:Property Name="Length" Value="1920" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#13;&#10;/* =====================================================================&#13;&#10;   4. dbo.IssueDateOfBirthCertificate (&quot;Issue Again&quot;)&#13;&#10;   ===================================================================== */&#13;&#10;&#13;&#10;CREATE   PROCEDURE dbo.IssueDateOfBirthCertificate&#13;&#10;    @UserId INT,&#13;&#10;    @CertificateRecordId INT,&#13;&#10;    @Remarks NVARCHAR(1000) = NULL&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

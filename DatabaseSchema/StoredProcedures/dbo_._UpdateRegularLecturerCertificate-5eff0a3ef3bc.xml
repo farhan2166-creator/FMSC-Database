@@ -1,0 +1,278 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[UpdateRegularLecturerCertificate]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Certificates.Create';
+    IF @RegularLecturerCertificateId &lt;= 0
+        THROW 58710, 'A valid certificate is required.', 1;
+    IF @RoleTitle IS NULL
+       OR LTRIM(RTRIM(@RoleTitle)) = N''
+        THROW 58711, 'Designation (Teacher/Lecturer) is required.', 1;
+    IF @SubjectTaught IS NULL
+       OR LTRIM(RTRIM(@SubjectTaught)) = N''
+        THROW 58712, 'Subject taught is required.', 1;
+    IF @CertificateDate IS NULL
+        THROW 58713, 'Certificate date is required.', 1;
+    IF @CertificateDate &gt; CONVERT (DATE, SYSDATETIME())
+        THROW 58714, 'Certificate date cannot be in the future.', 1;
+    BEGIN TRANSACTION;
+    DECLARE @StaffId AS INT;
+    DECLARE @OldValues AS NVARCHAR (MAX);
+    SELECT @StaffId = RLC.StaffId,
+           @OldValues = (SELECT RLC.RegularLecturerCertificateId,
+                                RLC.StaffId,
+                                RLC.RoleTitle,
+                                RLC.SubjectTaught,
+                                RLC.CertificateDate
+                         FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES)
+    FROM   dbo.RegularLecturerCertificates AS RLC WITH (UPDLOCK, HOLDLOCK)
+    WHERE  RLC.RegularLecturerCertificateId = @RegularLecturerCertificateId;
+    IF @StaffId IS NULL
+        THROW 58715, 'The certificate was not found.', 1;
+    UPDATE dbo.RegularLecturerCertificates
+    SET    RoleTitle       = LTRIM(RTRIM(@RoleTitle)),
+           SubjectTaught   = LTRIM(RTRIM(@SubjectTaught)),
+           CertificateDate = @CertificateDate,
+           UpdatedByUserId = @UserId,
+           UpdatedAt       = SYSDATETIME()
+    WHERE  RegularLecturerCertificateId = @RegularLecturerCertificateId;
+    DECLARE @OperationId AS UNIQUEIDENTIFIER = NEWID();
+    DECLARE @RecordId AS NVARCHAR (200) = CONVERT (NVARCHAR (200), @RegularLecturerCertificateId);
+    DECLARE @NewValues AS NVARCHAR (MAX);
+    SELECT @NewValues = (SELECT @RegularLecturerCertificateId AS RegularLecturerCertificateId,
+                                @StaffId AS StaffId,
+                                @RoleTitle AS RoleTitle,
+                                @SubjectTaught AS SubjectTaught,
+                                @CertificateDate AS CertificateDate
+                         FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES);
+    INSERT  dbo.AuditOperations (OperationId, UserId, OperationType, CorrelationNote)
+    VALUES                     (@OperationId, @UserId, N'REGULAR_LECTURER_CERTIFICATE', CONVERT (NVARCHAR (200), @StaffId));
+    EXECUTE dbo.WriteAuditLog @OperationId = @OperationId, @UserId = @UserId, @TableName = N'RegularLecturerCertificates', @RecordId = @RecordId, @Action = N'UPDATE', @OldValues = @OldValues, @NewValues = @NewValues;
+    DELETE dbo.AuditOperations WHERE OperationId=@OperationId AND NOT EXISTS(SELECT 1 FROM dbo.AuditLogs WHERE OperationId=@OperationId);
+COMMIT TRANSACTION;
+    SELECT @RegularLecturerCertificateId AS RegularLecturerCertificateId,
+           @StaffId AS StaffId;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[uniqueidentifier]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateRegularLecturerCertificate].[@RegularLecturerCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateRegularLecturerCertificate].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateRegularLecturerCertificate].[@RoleTitle]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateRegularLecturerCertificate].[@SubjectTaught]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[UpdateRegularLecturerCertificate].[@CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[StaffId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[RegularLecturerCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[RoleTitle]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[SubjectTaught]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[RoleTitle]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[SubjectTaught]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[UpdatedByUserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[RegularLecturerCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[CorrelationNote]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@TableName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@RecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@Action]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OldValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@NewValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[OperationId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateRegularLecturerCertificate].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateRegularLecturerCertificate].[@RegularLecturerCertificateId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateRegularLecturerCertificate].[@RoleTitle]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="30" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateRegularLecturerCertificate].[@SubjectTaught]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="100" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[UpdateRegularLecturerCertificate].[@CertificateDate]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="37" />
+				<ns0:Property Name="Length" Value="3365" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- UpdateRegularLecturerCertificate&#10;CREATE   PROCEDURE dbo.UpdateRegularLecturerCertificate&#13;&#10;@UserId INT, @RegularLecturerCertificateId INT, @RoleTitle NVARCHAR (30), @SubjectTaught NVARCHAR (100), @CertificateDate DATE&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

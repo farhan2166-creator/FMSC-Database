@@ -1,0 +1,670 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[PostAdditionalFee]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Fees.Collect';
+    IF @RequestId IS NULL
+       OR NOT EXISTS (SELECT 1
+                      FROM   @Selection)
+        THROW 53020, 'Select at least one student for this charge.', 1;
+    IF @ChargeDate IS NULL
+       OR @ChargeDate &gt; CONVERT (DATE, SYSDATETIME())
+        THROW 53021, 'Enter a valid charge date that is not in the future.', 1;
+    IF @Amount IS NULL
+       OR @Amount &lt;= 0
+       OR @DiscountAmount &lt; 0
+       OR @DiscountAmount &gt; @Amount
+        THROW 53022, 'Enter a positive amount and a valid discount.', 1;
+    IF NULLIF (LTRIM(RTRIM(@Reason)), N'') IS NULL
+        THROW 53023, 'Describe what is being charged.', 1;
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.FeeTypes
+                   WHERE  FeeTypeId = @FeeTypeId)
+        THROW 53024, 'The selected fee type is unavailable.', 1;
+    BEGIN TRANSACTION;
+    DECLARE @LockResult AS INT;
+    DECLARE @LockResource AS NVARCHAR (255) = N'FMSC.AdditionalFee.' + CONVERT (NVARCHAR (36), @RequestId);
+    EXECUTE @LockResult = sys.sp_getapplock @Resource = @LockResource, @LockMode = N'Exclusive', @LockOwner = N'Transaction', @LockTimeout = 10000;
+    IF @LockResult &lt; 0
+        THROW 53019, 'This fee posting is already being processed. Try again.', 1;
+    DECLARE @BadReason AS NVARCHAR (400);
+    DECLARE @BadName AS NVARCHAR (200);
+    DECLARE @BadAdmissionId AS INT;
+    SELECT   TOP (1) @BadAdmissionId = E.AdmissionId,
+                     @BadName = ST.StudentName,
+                     @BadReason = CASE WHEN E.EnrollmentId IS NULL THEN N'a selected enrolment no longer exists.' WHEN E.Status &lt;&gt; N'Active' THEN N'their enrolment is ' + E.Status + N', not Active.' WHEN E.BillingReady &lt;&gt; 1 THEN N'their enrolment is not ready for billing yet.' WHEN @ChargeDate &lt; COALESCE (CONVERT (DATE, E.ReturnConfirmedAt), E.EnrollmentDate) THEN N'the charge date is before their enrolment start (' + CONVERT (NVARCHAR (11), COALESCE (CONVERT (DATE, E.ReturnConfirmedAt), E.EnrollmentDate), 106) + N').' ELSE N'their active enrolment is in academic year ' + AY.YearName + N', which ended on ' + CONVERT (NVARCHAR (11), AY.EndDate, 106) + N'. Promote or re-admit the student into the current academic year first.' END
+    FROM     @Selection AS S
+             LEFT OUTER JOIN
+             dbo.Enrollments AS E WITH (UPDLOCK, HOLDLOCK)
+             ON E.EnrollmentId = S.EnrollmentId
+             LEFT OUTER JOIN
+             dbo.AcademicYears AS AY
+             ON AY.AcademicYearId = E.AcademicYearId
+             LEFT OUTER JOIN
+             dbo.Students AS ST
+             ON ST.AdmissionId = E.AdmissionId
+    WHERE    E.EnrollmentId IS NULL
+             OR E.Status &lt;&gt; N'Active'
+             OR E.BillingReady &lt;&gt; 1
+             OR @ChargeDate &lt; COALESCE (CONVERT (DATE, E.ReturnConfirmedAt), E.EnrollmentDate)
+             OR @ChargeDate &gt; AY.EndDate
+    ORDER BY S.EnrollmentId;
+    IF @BadReason IS NOT NULL
+        BEGIN
+            DECLARE @Msg AS NVARCHAR (2048) = N'Cannot post this charge for ' + COALESCE (@BadName + N' (admission ' + CONVERT (NVARCHAR (20), @BadAdmissionId) + N')', N'one of the selected students') + N': ' + @BadReason;
+            THROW 53025, @Msg, 1;
+        END
+    IF EXISTS (SELECT 1
+               FROM   dbo.BillingCharges
+               WHERE  ManualRequestId = @RequestId)
+        BEGIN
+            IF NOT EXISTS (SELECT 1
+                           FROM   dbo.ManualFeePostingRequests AS R
+                           WHERE  R.RequestId = @RequestId
+                                  AND R.FeeTypeId = @FeeTypeId
+                                  AND R.ChargeDate = @ChargeDate
+                                  AND R.Amount = @Amount
+                                  AND R.DiscountAmount = @DiscountAmount
+                                  AND R.Reason = @Reason)
+                THROW 53026, 'This posting request was already used with different fee details.', 1;
+            IF EXISTS (SELECT 1
+                       FROM   @Selection AS S
+                       WHERE  NOT EXISTS (SELECT 1
+                                          FROM   dbo.BillingCharges AS BC
+                                          WHERE  BC.ManualRequestId = @RequestId
+                                                 AND BC.EnrollmentId = S.EnrollmentId
+                                                 AND BC.FeeTypeId = @FeeTypeId))
+               OR EXISTS (SELECT 1
+                          FROM   dbo.BillingCharges AS BC
+                          WHERE  BC.ManualRequestId = @RequestId
+                                 AND NOT EXISTS (SELECT 1
+                                                 FROM   @Selection AS S
+                                                 WHERE  S.EnrollmentId = BC.EnrollmentId))
+                THROW 53026, 'This posting request was already used for different students.', 1;
+            COMMIT TRANSACTION;
+            SELECT BillingChargeId,
+                   EnrollmentId,
+                   AdmissionId,
+                   GrossAmount,
+                   DiscountAmount,
+                   ChargeDate
+            FROM   dbo.BillingCharges
+            WHERE  ManualRequestId = @RequestId;
+            RETURN;
+        END
+    INSERT  dbo.ManualFeePostingRequests (RequestId, FeeTypeId, ChargeDate, Amount, DiscountAmount, Reason)
+    VALUES                              (@RequestId, @FeeTypeId, @ChargeDate, @Amount, @DiscountAmount, @Reason);
+    INSERT dbo.StudentFeeAssignments (EnrollmentId, AdmissionId, FeeTypeId, Amount, DiscountAmount, Frequency, Remarks)
+    SELECT E.EnrollmentId,
+           E.AdmissionId,
+           @FeeTypeId,
+           @Amount,
+           0,
+           N'As Needed',
+           N'Created for additional charges'
+    FROM   @Selection AS S
+           INNER JOIN
+           dbo.Enrollments AS E
+           ON E.EnrollmentId = S.EnrollmentId
+    WHERE  NOT EXISTS (SELECT 1
+                       FROM   dbo.StudentFeeAssignments AS SFA WITH (UPDLOCK, HOLDLOCK)
+                       WHERE  SFA.EnrollmentId = E.EnrollmentId
+                              AND SFA.FeeTypeId = @FeeTypeId
+                              AND SFA.EffectiveTo IS NULL);
+    DECLARE @BillingMonth AS DATE = DATEFROMPARTS(YEAR(@ChargeDate), MONTH(@ChargeDate), 1);
+    INSERT dbo.BillingCharges (StudentFeeAssignmentId, EnrollmentId, AdmissionId, FeeTypeId, BillingMonth, ChargeDate, DueDate, GrossAmount, DiscountAmount, Remarks, ChargeKind, ManualRequestId)
+    SELECT SFA.StudentFeeAssignmentId,
+           E.EnrollmentId,
+           E.AdmissionId,
+           @FeeTypeId,
+           @BillingMonth,
+           @ChargeDate,
+           @ChargeDate,
+           @Amount,
+           @DiscountAmount,
+           @Reason,
+           N'Manual',
+           @RequestId
+    FROM   @Selection AS S
+           INNER JOIN
+           dbo.Enrollments AS E
+           ON E.EnrollmentId = S.EnrollmentId
+           INNER JOIN
+           dbo.StudentFeeAssignments AS SFA
+           ON SFA.EnrollmentId = E.EnrollmentId
+              AND SFA.FeeTypeId = @FeeTypeId
+              AND SFA.EffectiveTo IS NULL;
+    IF @@ROWCOUNT &lt;&gt; (SELECT COUNT(*)
+                      FROM   @Selection)
+        THROW 53027, 'Not every selected student received the charge.', 1;
+    DECLARE @OperationId AS UNIQUEIDENTIFIER = NEWID();
+    INSERT  dbo.AuditOperations (OperationId, UserId, OperationType, CorrelationNote)
+    VALUES                     (@OperationId, @UserId, N'ADDITIONAL_FEE_POSTING', CONVERT (NVARCHAR (36), @RequestId));
+    COMMIT TRANSACTION;
+    SELECT BillingChargeId,
+           EnrollmentId,
+           AdmissionId,
+           GrossAmount,
+           DiscountAmount,
+           ChargeDate
+    FROM   dbo.BillingCharges
+    WHERE  ManualRequestId = @RequestId;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@RequestId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@ChargeDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[uniqueidentifier]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@Selection]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@Reason]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutine" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@Resource]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockMode]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockOwner]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Annotation Type="PersistedResolvableAnnotation" Name="[sys].[sp_getapplock].[@LockTimeout]">
+						<ns0:Property Name="Affinity" Value="1" />
+						<ns0:Property Name="TargetTypeStorage" Value="SqlSubroutineParameter" />
+					</ns0:Annotation>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@Selection].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[StudentName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[BillingReady]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[ReturnConfirmedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[YearName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[EndDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@Selection].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ManualRequestId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[RequestId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[ChargeDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[Reason]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ManualRequestId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@Selection].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ManualRequestId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PostAdditionalFee].[@Selection].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[GrossAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ChargeDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ManualRequestId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[RequestId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[ChargeDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ManualFeePostingRequests].[Reason]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Frequency]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EffectiveTo]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingMonth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[DueDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[Remarks]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[ChargeKind]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EffectiveTo]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[CorrelationNote]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DynamicObjects">
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[PostAdditionalFee].[@Selection]" Disambiguator="5">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[PostAdditionalFee].[@Selection].[EnrollmentId]">
+									<ns0:Property Name="IsNullable" Value="False" />
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PostAdditionalFee].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PostAdditionalFee].[@RequestId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[uniqueidentifier]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PostAdditionalFee].[@FeeTypeId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PostAdditionalFee].[@ChargeDate]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PostAdditionalFee].[@Amount]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Scale" Value="2" />
+									<ns0:Property Name="Precision" Value="12" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PostAdditionalFee].[@DiscountAmount]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Scale" Value="2" />
+									<ns0:Property Name="Precision" Value="12" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PostAdditionalFee].[@Reason]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="500" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PostAdditionalFee].[@Selection]">
+						<ns0:Property Name="IsReadOnly" Value="True" />
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References Name="[dbo].[ManualChargeSelectionType]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="22" />
+				<ns0:Property Name="Length" Value="8222" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- PostAdditionalFee&#10;CREATE   PROCEDURE dbo.PostAdditionalFee&#13;&#10;@UserId INT, @RequestId UNIQUEIDENTIFIER, @FeeTypeId INT, @ChargeDate DATE, @Amount DECIMAL (12, 2), @DiscountAmount DECIMAL (12, 2), @Reason NVARCHAR (500), @Selection dbo.ManualChargeSelectionType READONLY&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

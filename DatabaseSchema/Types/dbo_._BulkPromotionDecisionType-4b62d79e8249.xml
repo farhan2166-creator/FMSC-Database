@@ -1,0 +1,61 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlTableType" Name="[dbo].[BulkPromotionDecisionType]">
+			<ns0:Relationship Name="Columns">
+				<ns0:Entry>
+					<ns0:Element Type="SqlTableTypeSimpleColumn" Name="[dbo].[BulkPromotionDecisionType].[AdmissionId]">
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlTableTypeSimpleColumn" Name="[dbo].[BulkPromotionDecisionType].[Decision]">
+						<ns0:Relationship Name="TypeSpecifier">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="20" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Constraints">
+				<ns0:Entry>
+					<ns0:Element Type="SqlTableTypePrimaryKeyConstraint">
+						<ns0:Property Name="IsClustered" Value="True" />
+						<ns0:Relationship Name="ColumnSpecifications">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTableTypeIndexedColumnSpecification">
+									<ns0:Relationship Name="Column">
+										<ns0:Entry>
+											<ns0:References Name="[dbo].[BulkPromotionDecisionType].[AdmissionId]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+						<ns0:Annotation Type="SqlInlineConstraintAnnotation" Name="[dbo].[PK__TT_BulkP__C97EEC4222D1CDD6]" />
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

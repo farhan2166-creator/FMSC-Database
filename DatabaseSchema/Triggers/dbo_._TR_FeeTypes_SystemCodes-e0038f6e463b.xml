@@ -1,0 +1,63 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlDmlTrigger" Name="[dbo].[TR_FeeTypes_SystemCodes]">
+			<ns0:Property Name="IsUpdateTrigger" Value="True" />
+			<ns0:Property Name="IsDeleteTrigger" Value="True" />
+			<ns0:Property Name="SqlTriggerType" Value="2" />
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True"> BEGIN
+           SET NOCOUNT ON;
+           IF EXISTS (SELECT 1
+                      FROM   inserted AS I
+                             INNER JOIN
+                             deleted AS D
+                             ON D.FeeTypeId = I.FeeTypeId
+                      WHERE  D.IsSystemDefined = 1
+                             AND (I.FeeTypeCode &lt;&gt; D.FeeTypeCode))
+               BEGIN
+                   THROW 59102, 'System fee types and their stable business codes cannot be renamed or deactivated.', 1;
+               END
+           IF NOT EXISTS (SELECT 1
+                          FROM   inserted)
+              AND EXISTS (SELECT 1
+                          FROM   deleted
+                          WHERE  IsSystemDefined = 1)
+               BEGIN
+                   THROW 59103, 'System fee types cannot be deleted.', 1;
+               END
+       END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[IsSystemDefined]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeCode]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[FeeTypeCode]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes].[IsSystemDefined]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parent">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeTypes]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="28" />
+				<ns0:Property Name="Length" Value="1006" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- TR_FeeTypes_SystemCodes&#10;CREATE   TRIGGER dbo.TR_FeeTypes_SystemCodes&#13;&#10;    ON dbo.FeeTypes&#13;&#10;    AFTER UPDATE, DELETE&#13;&#10;    AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

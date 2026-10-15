@@ -1,0 +1,125 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetRegularLecturerCertificateRecords]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+
+    EXEC dbo.RequirePermission
+        @UserId,
+        N'Certificates.Create';
+
+    SELECT
+        RLC.RegularLecturerCertificateId,
+        RLC.StaffId,
+
+        RLC.StaffName,
+        RLC.FatherName,
+        RLC.RoleTitle,
+        RLC.SubjectTaught,
+        RLC.CertificateDate,
+
+        RLC.CreatedAt,
+        RLC.UpdatedAt
+
+    FROM dbo.RegularLecturerCertificates AS RLC
+
+    WHERE
+        @StaffId = 0
+        OR RLC.StaffId = @StaffId
+
+    ORDER BY
+        RLC.RegularLecturerCertificateId DESC;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetRegularLecturerCertificateRecords].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[RegularLecturerCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[StaffId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[StaffName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[FatherName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[RoleTitle]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[SubjectTaught]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[CreatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RegularLecturerCertificates].[UpdatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetRegularLecturerCertificateRecords].[@StaffId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetRegularLecturerCertificateRecords].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetRegularLecturerCertificateRecords].[@StaffId]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">0</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="376" />
+				<ns0:Property Name="Length" Value="1012" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;/* =====================================================================&#10;   4. dbo.GetRegularLecturerCertificateRecords - grid of certificates for&#10;      a staff member (page always loads this scoped to the selected&#10;      staff member, same convention as&#10;      GetRegularStudentCertificateRecords).&#10;   ===================================================================== */&#10;&#10;CREATE   PROCEDURE dbo.GetRegularLecturerCertificateRecords&#10;    @UserId INT,&#10;    @StaffId INT = 0&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

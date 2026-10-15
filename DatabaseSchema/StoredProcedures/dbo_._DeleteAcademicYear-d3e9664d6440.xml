@@ -1,0 +1,126 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[DeleteAcademicYear]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+
+
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    EXEC dbo.RequirePermission @UserId, N'Calendar.Manage';
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM dbo.AcademicYears
+        WHERE AcademicYearId = @AcademicYearId
+    )
+        THROW 59041, 'The selected academic year was not found.', 1;
+
+    IF EXISTS (
+        SELECT 1
+        FROM dbo.AcademicYears
+        WHERE AcademicYearId = @AcademicYearId
+          AND IsCurrent = 1
+    )
+        THROW 59042, 'The current academic year cannot be deleted. Select another year as current first.', 1;
+
+
+    IF EXISTS (SELECT 1 FROM dbo.Enrollments WHERE AcademicYearId = @AcademicYearId)
+        THROW 59045, 'This academic year has student enrollments and cannot be deleted. Deactivate it instead.', 1;
+
+    IF EXISTS (SELECT 1 FROM dbo.PromotionBatches WHERE SourceAcademicYearId = @AcademicYearId)
+        THROW 59047, 'This academic year is referenced by promotion history and cannot be deleted. Deactivate it instead.', 1;
+
+    IF EXISTS (SELECT 1 FROM dbo.PromotionBatches WHERE DestinationAcademicYearId = @AcademicYearId)
+        THROW 59048, 'This academic year is referenced as a promotion destination and cannot be deleted. Deactivate it instead.', 1;
+
+    DELETE FROM dbo.AcademicYears
+    WHERE AcademicYearId = @AcademicYearId;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DeleteAcademicYear].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[DeleteAcademicYear].[@AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[IsCurrent]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PromotionBatches]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PromotionBatches].[SourceAcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PromotionBatches].[DestinationAcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[AcademicYearId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[DeleteAcademicYear].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[DeleteAcademicYear].[@AcademicYearId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="220" />
+				<ns0:Property Name="Length" Value="1655" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#13;&#10;&#13;&#10;/* ----------------------------------------------------------------------------&#13;&#10;   dbo.DeleteAcademicYear - the feature removed&#13;&#10;   ---------------------------------------------------------------------------- */&#13;&#10;&#13;&#10;CREATE   PROCEDURE dbo.DeleteAcademicYear&#13;&#10;(&#13;&#10;    @UserId int,&#13;&#10;    @AcademicYearId int&#13;&#10;)&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

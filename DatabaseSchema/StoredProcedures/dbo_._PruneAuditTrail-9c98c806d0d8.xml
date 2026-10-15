@@ -1,0 +1,274 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[PruneAuditTrail]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    /* Removing or gutting audit evidence is a management action, not a viewing one:
+       the screen itself is gated on System.Audit. */
+    EXEC dbo.RequirePermission @UserId, N'System.Administration';
+
+    IF @ClearPayloadOlderThanMonths IS NULL OR @ClearPayloadOlderThanMonths &lt; 0
+        THROW 59930, 'The full-detail window cannot be negative.', 1;
+
+    IF @DeleteOlderThanMonths IS NULL OR @DeleteOlderThanMonths &lt; 0
+        THROW 59931, 'The retention window cannot be negative.', 1;
+
+    IF @MaxRows IS NULL OR @MaxRows &lt; 0
+        THROW 59932, 'The row cap cannot be negative.', 1;
+
+    DECLARE @PayloadsCleared INT = 0;
+    DECLARE @RowsDeleted INT = 0;
+    DECLARE @RowsCapped INT = 0;
+    DECLARE @OperationsRemoved INT = 0;
+    DECLARE @Cutoff DATETIME2;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        /* ---- stage 1: keep the record, drop the before/after images ---- */
+
+        IF @ClearPayloadOlderThanMonths &gt; 0
+        BEGIN
+            SET @Cutoff = DATEADD(month, -@ClearPayloadOlderThanMonths, SYSDATETIME());
+
+            UPDATE dbo.AuditLogs
+            SET OldValues = NULL,
+                NewValues = NULL
+            WHERE ActionDateTime &lt; @Cutoff
+              AND (OldValues IS NOT NULL OR NewValues IS NOT NULL);
+
+            SET @PayloadsCleared = @@ROWCOUNT;
+        END
+
+        /* ---- stage 2: the rows themselves, only when a window is asked for ---- */
+
+        IF @DeleteOlderThanMonths &gt; 0
+        BEGIN
+            SET @Cutoff = DATEADD(month, -@DeleteOlderThanMonths, SYSDATETIME());
+
+            DELETE FROM dbo.AuditLogs
+            WHERE ActionDateTime &lt; @Cutoff;
+
+            SET @RowsDeleted = @@ROWCOUNT;
+
+            /* The headers those rows belonged to. The NOT EXISTS guard is what makes
+               this safe on a second run and leaves any operation that still has a
+               line to explain it. */
+            DELETE FROM dbo.AuditOperations
+            WHERE StartedAt &lt; @Cutoff
+              AND NOT EXISTS
+                  (
+                      SELECT 1
+                      FROM dbo.AuditLogs L
+                      WHERE L.OperationId = dbo.AuditOperations.OperationId
+                  );
+
+            SET @OperationsRemoved = @@ROWCOUNT;
+        END
+
+        /* ---- stage 3: the hard cap - the newest @MaxRows lines, and no more ---- */
+
+        IF @MaxRows &gt; 0
+        BEGIN
+            /* AuditLogId is an identity, so its order IS the order things happened;
+               OFFSET without FETCH is "skip the newest N, delete the rest". */
+            DELETE FROM dbo.AuditLogs
+            WHERE AuditLogId IN
+            (
+                SELECT AuditLogId
+                FROM dbo.AuditLogs
+                ORDER BY AuditLogId DESC
+                OFFSET @MaxRows ROWS
+            );
+
+            SET @RowsCapped = @@ROWCOUNT;
+
+            /* Headers left with nothing to explain. Bounded by the oldest surviving
+               line, so a header that never had a line in the first place is not
+               touched - and when the trail is empty the comparison is NULL and
+               nothing goes. */
+            DECLARE @OldestKept DATETIME2 =
+                (SELECT MIN(ActionDateTime) FROM dbo.AuditLogs);
+
+            DELETE FROM dbo.AuditOperations
+            WHERE StartedAt &lt; @OldestKept
+              AND NOT EXISTS
+                  (
+                      SELECT 1
+                      FROM dbo.AuditLogs L
+                      WHERE L.OperationId = dbo.AuditOperations.OperationId
+                  );
+
+            SET @OperationsRemoved = @OperationsRemoved + @@ROWCOUNT;
+        END
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF XACT_STATE() &lt;&gt; 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH
+
+    SELECT
+        @PayloadsCleared      AS PayloadsCleared,
+        @RowsDeleted          AS RowsDeleted,
+        @RowsCapped           AS RowsCapped,
+        @OperationsRemoved    AS OperationsRemoved,
+        @ClearPayloadOlderThanMonths AS FullDetailMonths,
+        @DeleteOlderThanMonths       AS RetentionMonths,
+        @MaxRows                     AS MaxRows;
+END;</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[datetime2]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[datetime2]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[ActionDateTime]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PruneAuditTrail].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PruneAuditTrail].[@ClearPayloadOlderThanMonths]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PruneAuditTrail].[@DeleteOlderThanMonths]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[PruneAuditTrail].[@MaxRows]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[OldValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[NewValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[ActionDateTime]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[StartedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[AuditLogId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[AuditLogId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PruneAuditTrail].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PruneAuditTrail].[@ClearPayloadOlderThanMonths]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PruneAuditTrail].[@DeleteOlderThanMonths]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[PruneAuditTrail].[@MaxRows]">
+						<ns0:Property Name="DefaultExpressionScript">
+							<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">0</ns0:Value>
+						</ns0:Property>
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="216" />
+				<ns0:Property Name="Length" Value="4720" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#13;&#10;/* ---------------------------------------------------------------------------&#13;&#10;   1. The retention procedure, with the row cap&#13;&#10;   --------------------------------------------------------------------------- */&#13;&#10;&#13;&#10;CREATE PROCEDURE dbo.PruneAuditTrail&#13;&#10;(&#13;&#10;      @UserId                        INT&#13;&#10;    , @ClearPayloadOlderThanMonths   INT&#13;&#10;    , @DeleteOlderThanMonths         INT&#13;&#10;    , @MaxRows                       INT = 0&#13;&#10;)&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

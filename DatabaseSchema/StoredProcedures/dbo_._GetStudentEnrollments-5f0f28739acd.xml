@@ -1,0 +1,214 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetStudentEnrollments]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Fees.View';
+    IF @AdmissionId &lt;= 0
+        THROW 52001, 'A valid student is required.', 1;
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.Students
+                   WHERE  AdmissionId = @AdmissionId)
+        THROW 52002, 'The selected student was not found.', 1;
+    SELECT   E.EnrollmentId,
+             E.AdmissionId,
+             E.AcademicYearId,
+             AY.YearName,
+             E.ClassSectionId,
+             C.ClassName,
+             SEC.SectionName,
+             E.EnrollmentDate,
+             E.LeavingDate,
+             E.Status,
+             CAST (ISNULL(SUM(CASE WHEN BC.Status &lt;&gt; N'Cancelled' THEN dbo.GetFeeChargeBalance(BC.BillingChargeId) ELSE 0 END), 0) AS DECIMAL (12, 2)) AS OutstandingAmount
+    FROM     dbo.Enrollments AS E
+             INNER JOIN
+             dbo.AcademicYears AS AY
+             ON AY.AcademicYearId = E.AcademicYearId
+             INNER JOIN
+             dbo.CampusClassSections AS CCS
+             ON CCS.ClassSectionId = E.ClassSectionId
+             INNER JOIN
+             dbo.Classes AS C
+             ON C.ClassId = CCS.ClassId
+             INNER JOIN
+             dbo.Sections AS SEC
+             ON SEC.SectionId = CCS.SectionId
+             LEFT OUTER JOIN
+             dbo.BillingCharges AS BC
+             ON BC.EnrollmentId = E.EnrollmentId
+    WHERE    E.AdmissionId = @AdmissionId
+    GROUP BY E.EnrollmentId, E.AdmissionId, E.AcademicYearId, AY.YearName, E.ClassSectionId, C.ClassName, SEC.SectionName, E.EnrollmentDate, E.LeavingDate, E.Status
+    HAVING   E.Status = N'Active'
+             OR ISNULL(SUM(CASE WHEN BC.Status &lt;&gt; N'Cancelled' THEN dbo.GetFeeChargeBalance(BC.BillingChargeId) ELSE 0 END), 0) &gt; 0
+             OR EXISTS (SELECT 1
+                        FROM   dbo.StudentFeeAssignments AS SFA
+                        WHERE  SFA.EnrollmentId = E.EnrollmentId
+                               AND SFA.CancelledAt IS NULL)
+    ORDER BY CASE WHEN E.Status = N'Active' THEN 0 ELSE 1 END, CASE WHEN E.Status = N'Active' THEN E.EnrollmentId END DESC, OutstandingAmount DESC, E.EnrollmentId DESC;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetStudentEnrollments].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetStudentEnrollments].[@AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Students].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[ClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[ClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections].[SectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[CampusClassSections].[SectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[AcademicYearId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[YearName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[ClassSectionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Classes].[ClassName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Sections].[SectionName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[LeavingDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[Status]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetFeeChargeBalance]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges].[BillingChargeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[Enrollments].[EnrollmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[CancelledAt]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetStudentEnrollments].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetStudentEnrollments].[@AdmissionId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="26" />
+				<ns0:Property Name="Length" Value="2305" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- GetStudentEnrollments&#10;CREATE   PROCEDURE dbo.GetStudentEnrollments&#13;&#10;@UserId INT, @AdmissionId INT&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

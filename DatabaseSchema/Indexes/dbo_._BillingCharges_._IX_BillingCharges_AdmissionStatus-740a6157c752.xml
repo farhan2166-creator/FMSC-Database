@@ -1,0 +1,38 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlIndex" Name="[dbo].[BillingCharges].[IX_BillingCharges_AdmissionStatus]">
+			<ns0:Relationship Name="ColumnSpecifications">
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[BillingCharges].[AdmissionId]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[BillingCharges].[Status]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[BillingCharges].[BillingMonth]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="IndexedObject">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[BillingCharges]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

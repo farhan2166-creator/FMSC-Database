@@ -1,0 +1,268 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[GetProvisionalCertificatePrintData]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Certificates.Print';
+    IF @ProvisionalCertificateId &lt;= 0
+        THROW 58840, 'A valid certificate is required.', 1;
+    DECLARE @OtherSubjects AS NVARCHAR (300);
+    DECLARE @PickedCount AS INT;
+    SELECT @OtherSubjects = PC.OtherSubjects
+    FROM   dbo.ProvisionalCertificates AS PC
+    WHERE  PC.ProvisionalCertificateId = @ProvisionalCertificateId;
+    SELECT @PickedCount = COUNT(*)
+    FROM   dbo.ProvisionalCertificateSubjects
+    WHERE  ProvisionalCertificateId = @ProvisionalCertificateId;
+    DECLARE @SubjectsPassedLine AS NVARCHAR (MAX);
+    WITH   PickedSubjects
+    AS     (SELECT PCS.SubjectName,
+                   ROW_NUMBER() OVER (ORDER BY PCS.DisplayOrder, PCS.SubjectName) AS Seq
+            FROM   dbo.ProvisionalCertificateSubjects AS PCS
+            WHERE  PCS.ProvisionalCertificateId = @ProvisionalCertificateId),
+           OtherSubjectsList
+    AS     (SELECT LTRIM(RTRIM(SPL.value)) AS SubjectName,
+                   @PickedCount + ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS Seq
+            FROM   STRING_SPLIT (COALESCE (@OtherSubjects, N''), N',') AS SPL
+            WHERE  LTRIM(RTRIM(SPL.value)) &lt;&gt; N''),
+           AllSubjects
+    AS     (SELECT SubjectName,
+                   Seq
+            FROM   PickedSubjects
+            UNION ALL
+            SELECT SubjectName,
+                   Seq
+            FROM   OtherSubjectsList)
+    SELECT @SubjectsPassedLine = STRING_AGG(CONCAT(N'(', Seq, N')  ', SubjectName), N'   ') WITHIN GROUP (ORDER BY Seq)
+    FROM   AllSubjects;
+    SELECT PC.ProvisionalCertificateId,
+           PC.AdmissionId,
+           PC.CertificateNumber AS CertificateNumber,
+           PC.StudentName,
+           PC.FatherName,
+           PC.Gender,
+           PC.DateOfBirth,
+           dbo.fn_DateToWords(PC.DateOfBirth) AS DateOfBirthWords,
+           PC.ExamType,
+           CASE PC.ExamType WHEN N'SSC' THEN N'Secondary School Certificate' WHEN N'HSSC1' THEN N'Higher Secondary School Certificate Part-I' WHEN N'HSSC2' THEN N'Higher Secondary School Certificate Part-II' END AS ExamTypeLabel,
+           PC.ExamYear,
+           PC.BoardName,
+           PC.RollNumber,
+           PC.MarksObtained,
+           PC.MarksOutOf,
+           PC.Grade,
+           COALESCE (@SubjectsPassedLine, N'') AS SubjectsPassedLine,
+           PC.CertificateDate,
+           PC.CreatedAt AS DateOfIssue,
+           SP.SchoolName AS InstitutionLine
+    FROM   dbo.ProvisionalCertificates AS PC CROSS JOIN dbo.SchoolProfile AS SP
+    WHERE  PC.ProvisionalCertificateId = @ProvisionalCertificateId
+           AND SP.SchoolProfileId = 1;
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetProvisionalCertificatePrintData].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[GetProvisionalCertificatePrintData].[@ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[OtherSubjects]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[SubjectName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[DisplayOrder]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry />
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[SubjectName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ProvisionalCertificateId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[AdmissionId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[CertificateNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[StudentName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[FatherName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[Gender]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[DateOfBirth]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[fn_DateToWords]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ExamType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[ExamYear]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[BoardName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[RollNumber]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[MarksObtained]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[MarksOutOf]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[Grade]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[CertificateDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ProvisionalCertificates].[CreatedAt]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[SchoolName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[SchoolProfile].[SchoolProfileId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DynamicObjects">
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[GetProvisionalCertificatePrintData].[CTE1].[PickedSubjects]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[GetProvisionalCertificatePrintData].[CTE1].[PickedSubjects].[SubjectName]">
+									<ns0:Relationship Name="ExpressionDependencies">
+										<ns0:Entry>
+											<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[SubjectName]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[GetProvisionalCertificatePrintData].[CTE1].[PickedSubjects].[Seq]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[GetProvisionalCertificatePrintData].[CTE1].[OtherSubjectsList]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[GetProvisionalCertificatePrintData].[CTE1].[OtherSubjectsList].[SubjectName]" />
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[GetProvisionalCertificatePrintData].[CTE1].[OtherSubjectsList].[Seq]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[GetProvisionalCertificatePrintData].[CTE1].[AllSubjects]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[GetProvisionalCertificatePrintData].[CTE1].[AllSubjects].[SubjectName]">
+									<ns0:Relationship Name="ExpressionDependencies">
+										<ns0:Entry>
+											<ns0:References Name="[dbo].[ProvisionalCertificateSubjects].[SubjectName]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlComputedColumn" Name="[dbo].[GetProvisionalCertificatePrintData].[CTE1].[AllSubjects].[Seq]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetProvisionalCertificatePrintData].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[GetProvisionalCertificatePrintData].[@ProvisionalCertificateId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="39" />
+				<ns0:Property Name="Length" Value="2859" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- GetProvisionalCertificatePrintData&#10;CREATE   PROCEDURE dbo.GetProvisionalCertificatePrintData&#13;&#10;@UserId INT, @ProvisionalCertificateId INT&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		

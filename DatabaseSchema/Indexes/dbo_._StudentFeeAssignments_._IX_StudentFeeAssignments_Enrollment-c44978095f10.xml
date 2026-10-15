@@ -1,0 +1,49 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlIndex" Name="[dbo].[StudentFeeAssignments].[IX_StudentFeeAssignments_Enrollment]">
+			<ns0:Relationship Name="ColumnSpecifications">
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[StudentFeeAssignments].[EnrollmentId]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlIndexedColumnSpecification">
+						<ns0:Relationship Name="Column">
+							<ns0:Entry>
+								<ns0:References Name="[dbo].[StudentFeeAssignments].[CancelledAt]" />
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="IncludedColumns">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Amount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[DiscountAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[Frequency]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EffectiveFrom]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments].[EffectiveTo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="IndexedObject">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[StudentFeeAssignments]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

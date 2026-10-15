@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlCheckConstraint" Name="[dbo].[CK_AcademicYears_DateRange]">
+			<ns0:Property Name="CheckExpressionScript">
+				<ns0:Value>[EndDate]&gt;=[StartDate]</ns0:Value>
+			</ns0:Property>
+			<ns0:Relationship Name="CheckExpressionDependencies">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[EndDate]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears].[StartDate]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DefiningTable">
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AcademicYears]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+		</ns0:Element>
+		

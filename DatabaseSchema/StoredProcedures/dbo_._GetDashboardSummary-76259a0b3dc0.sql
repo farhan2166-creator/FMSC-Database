@@ -1,0 +1,37 @@
+-- Module body only. See companion XML for signatures and relationships.
+
+BEGIN
+    SET NOCOUNT ON;
+    EXECUTE dbo.RequirePermission @UserId, N'Reports.View';
+    DECLARE @Today AS DATE = CAST (GETDATE() AS DATE);
+    DECLARE @MonthStart AS DATE = DATEFROMPARTS(YEAR(@Today), MONTH(@Today), 1);
+    SELECT (SELECT COUNT(*)
+            FROM   dbo.Students) AS TotalStudents,
+           (SELECT COUNT(*)
+            FROM   dbo.Students
+            WHERE  Status = N'Active') AS ActiveStudents,
+           (SELECT COUNT(*)
+            FROM   dbo.Classes) AS TotalClasses,
+           (SELECT COUNT(*)
+            FROM   dbo.Staff
+            WHERE  Status = N'Active') AS ActiveStaff,
+           (SELECT COUNT(*)
+            FROM   dbo.Campuses) AS ActiveCampuses,
+           (SELECT COUNT(*)
+            FROM   dbo.Students
+            WHERE  AdmissionDate >= @MonthStart
+                   AND AdmissionDate <= @Today) AS NewAdmissionsThisMonth,
+           (SELECT ISNULL(SUM(FP.TotalAmount), 0)
+            FROM   dbo.FeePayments AS FP
+            WHERE  FP.Status = N'Completed'
+                   AND FP.PaymentDate >= @MonthStart
+                   AND FP.PaymentDate <= @Today) AS FeeCollectedThisMonth,
+           (SELECT ISNULL(SUM(FP.TotalAmount), 0)
+            FROM   dbo.FeePayments AS FP
+            WHERE  FP.Status = N'Completed'
+                   AND FP.PaymentDate = @Today) AS FeeCollectedToday,
+           (SELECT ISNULL(SUM(dbo.GetFeeChargeBalance(BC.BillingChargeId)), 0)
+            FROM   dbo.BillingCharges AS BC
+            WHERE  BC.Status <> N'Cancelled'
+                   AND dbo.GetFeeChargeBalance(BC.BillingChargeId) > 0) AS FeeOutstanding;
+END

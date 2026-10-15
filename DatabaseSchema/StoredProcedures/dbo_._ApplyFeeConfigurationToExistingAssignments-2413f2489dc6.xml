@@ -1,0 +1,449 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ns0:Element xmlns:ns0="http://schemas.microsoft.com/sqlserver/dac/Serialization/2012/02" Type="SqlProcedure" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments]">
+			<ns0:Property Name="BodyScript">
+				<ns0:Value QuotedIdentifiers="True" AnsiNulls="True">
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT OFF;
+    EXECUTE dbo.RequirePermission @UserId, N'Fees.Configuration.Manage';
+    IF @Reason IS NULL
+       OR LTRIM(RTRIM(@Reason)) = N''
+        THROW 53151, 'A reason is required to apply a fee configuration change to existing students.', 1;
+    IF @EffectiveFrom IS NULL
+        THROW 53152, 'An effective-from date is required.', 1;
+    IF NOT EXISTS (SELECT 1
+                   FROM   dbo.FeeConfigurations
+                   WHERE  CampusId = @CampusId
+                          AND ClassId = @ClassId
+                          AND FeeTypeId = @FeeTypeId)
+        THROW 53153, 'No fee configuration exists for the selected campus, class and fee type.', 1;
+    DECLARE @NormalizedEffectiveFrom AS DATE = DATEFROMPARTS(YEAR(@EffectiveFrom), MONTH(@EffectiveFrom), 1);
+    DECLARE @Candidates TABLE (
+        RowNum                 INT             IDENTITY (1, 1),
+        StudentFeeAssignmentId INT            ,
+        NewAmount              DECIMAL (12, 2));
+    INSERT INTO @Candidates (StudentFeeAssignmentId, NewAmount)
+    SELECT StudentFeeAssignmentId,
+           NewAmount
+    FROM   dbo.fn_StaleFeeAssignmentsForConfiguration(@CampusId, @ClassId, @FeeTypeId);
+    DECLARE @Total AS INT = (SELECT COUNT(*)
+                             FROM   @Candidates);
+    DECLARE @Succeeded AS INT = 0;
+    DECLARE @Failed AS INT = 0;
+    DECLARE @i AS INT = 1;
+    DECLARE @CurrentAssignmentId AS INT, @CurrentNewAmount AS DECIMAL (12, 2);
+    DECLARE @Failures TABLE (
+        StudentFeeAssignmentId INT            ,
+        ErrorMessage           NVARCHAR (2000));
+    WHILE @i &lt;= @Total
+        BEGIN
+            SELECT @CurrentAssignmentId = StudentFeeAssignmentId,
+                   @CurrentNewAmount = NewAmount
+            FROM   @Candidates
+            WHERE  RowNum = @i;
+            BEGIN TRY
+                EXECUTE dbo.ChangeStudentFeeAssignmentAmount_Internal @UserId = @UserId, @StudentFeeAssignmentId = @CurrentAssignmentId, @NewAmount = @CurrentNewAmount, @EffectiveFrom = @NormalizedEffectiveFrom, @Reason = @Reason;
+                SET @Succeeded = @Succeeded + 1;
+            END TRY
+            BEGIN CATCH
+                SET @Failed = @Failed + 1;
+                INSERT  INTO @Failures (StudentFeeAssignmentId, ErrorMessage)
+                VALUES                (@CurrentAssignmentId, ERROR_MESSAGE());
+            END CATCH
+            SET @i = @i + 1;
+        END
+    DECLARE @OperationId AS UNIQUEIDENTIFIER = NEWID();
+    INSERT  dbo.AuditOperations (OperationId, UserId, OperationType, CorrelationNote)
+    VALUES                     (@OperationId, @UserId, N'FEE_APPLY_CONFIG_TO_EXISTING', N'CampusId=' + CONVERT (NVARCHAR (20), @CampusId) + N' ClassId=' + CONVERT (NVARCHAR (20), @ClassId) + N' FeeTypeId=' + CONVERT (NVARCHAR (20), @FeeTypeId) + N' EffectiveFrom=' + CONVERT (NVARCHAR (20), @NormalizedEffectiveFrom) + N' Total=' + CONVERT (NVARCHAR (20), @Total) + N' Succeeded=' + CONVERT (NVARCHAR (20), @Succeeded) + N' Failed=' + CONVERT (NVARCHAR (20), @Failed) + N' Reason=' + @Reason);
+    DECLARE @NewValues AS NVARCHAR (MAX) = (SELECT @CampusId AS CampusId,
+                                                   @ClassId AS ClassId,
+                                                   @FeeTypeId AS FeeTypeId,
+                                                   @NormalizedEffectiveFrom AS EffectiveFrom,
+                                                   @Reason AS Reason,
+                                                   @Total AS TotalAssignments,
+                                                   @Succeeded AS Succeeded,
+                                                   @Failed AS Failed
+                                            FOR    JSON PATH, WITHOUT_ARRAY_WRAPPER, INCLUDE_NULL_VALUES);
+    EXECUTE dbo.WriteAuditLog @OperationId = @OperationId, @UserId = @UserId, @TableName = N'StudentFeeAssignments', @RecordId = 0, @Action = N'UPDATE', @OldValues = NULL, @NewValues = @NewValues;
+    SELECT @Total AS TotalAssignments,
+           @Succeeded AS Succeeded,
+           @Failed AS Failed,
+           @NormalizedEffectiveFrom AS EffectiveFrom;
+    SELECT StudentFeeAssignmentId,
+           ErrorMessage
+    FROM   @Failures;
+DELETE dbo.AuditOperations WHERE OperationId=@OperationId AND NOT EXISTS(SELECT 1 FROM dbo.AuditLogs WHERE OperationId=@OperationId);
+END</ns0:Value>
+			</ns0:Property>
+			<ns0:Property Name="IsAnsiNullsOn" Value="True" />
+			<ns0:Relationship Name="BodyDependencies">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@EffectiveFrom]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[uniqueidentifier]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Reason]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[RequirePermission]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[CampusId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[ClassId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[FeeConfigurations].[FeeTypeId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Candidates].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Candidates].[NewAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[fn_StaleFeeAssignmentsForConfiguration]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[fn_StaleFeeAssignmentsForConfiguration].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[fn_StaleFeeAssignmentsForConfiguration].[NewAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Candidates].[RowNum]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ChangeStudentFeeAssignmentAmount_Internal]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ChangeStudentFeeAssignmentAmount_Internal].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ChangeStudentFeeAssignmentAmount_Internal].[@StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ChangeStudentFeeAssignmentAmount_Internal].[@NewAmount]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ChangeStudentFeeAssignmentAmount_Internal].[@EffectiveFrom]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ChangeStudentFeeAssignmentAmount_Internal].[@Reason]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Failures].[StudentFeeAssignmentId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Failures].[ErrorMessage]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[OperationType]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditOperations].[CorrelationNote]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OperationId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@UserId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@TableName]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@RecordId]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@Action]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@OldValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[WriteAuditLog].[@NewValues]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs]" />
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:References Name="[dbo].[AuditLogs].[OperationId]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="DynamicObjects">
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Candidates]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Candidates].[RowNum]">
+									<ns0:Property Name="IsNullable" Value="False" />
+									<ns0:Property Name="IsIdentity" Value="True" />
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Candidates].[StudentFeeAssignmentId]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Candidates].[NewAmount]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Scale" Value="2" />
+												<ns0:Property Name="Precision" Value="12" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[decimal]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlDynamicColumnSource" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Failures]">
+						<ns0:Relationship Name="Columns">
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Failures].[StudentFeeAssignmentId]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+							<ns0:Entry>
+								<ns0:Element Type="SqlSimpleColumn" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Failures].[ErrorMessage]">
+									<ns0:Relationship Name="TypeSpecifier">
+										<ns0:Entry>
+											<ns0:Element Type="SqlTypeSpecifier">
+												<ns0:Property Name="Length" Value="2000" />
+												<ns0:Relationship Name="Type">
+													<ns0:Entry>
+														<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+													</ns0:Entry>
+												</ns0:Relationship>
+											</ns0:Element>
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Parameters">
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@UserId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@CampusId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@ClassId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@FeeTypeId]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[int]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@EffectiveFrom]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[date]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+				<ns0:Entry>
+					<ns0:Element Type="SqlSubroutineParameter" Name="[dbo].[ApplyFeeConfigurationToExistingAssignments].[@Reason]">
+						<ns0:Relationship Name="Type">
+							<ns0:Entry>
+								<ns0:Element Type="SqlTypeSpecifier">
+									<ns0:Property Name="Length" Value="500" />
+									<ns0:Relationship Name="Type">
+										<ns0:Entry>
+											<ns0:References ExternalSource="BuiltIns" Name="[nvarchar]" />
+										</ns0:Entry>
+									</ns0:Relationship>
+								</ns0:Element>
+							</ns0:Entry>
+						</ns0:Relationship>
+					</ns0:Element>
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Relationship Name="Schema">
+				<ns0:Entry>
+					<ns0:References ExternalSource="BuiltIns" Name="[dbo]" />
+				</ns0:Entry>
+			</ns0:Relationship>
+			<ns0:Annotation Type="SysCommentsObjectAnnotation">
+				<ns0:Property Name="CreateOffset" Value="47" />
+				<ns0:Property Name="Length" Value="4657" />
+				<ns0:Property Name="StartLine" Value="1" />
+				<ns0:Property Name="StartColumn" Value="1" />
+				<ns0:Property Name="HeaderContents" Value="&#10;-- ApplyFeeConfigurationToExistingAssignments&#10;CREATE   PROCEDURE dbo.ApplyFeeConfigurationToExistingAssignments&#13;&#10;@UserId INT, @CampusId INT, @ClassId INT, @FeeTypeId INT, @EffectiveFrom DATE, @Reason NVARCHAR (500)&#13;&#10;AS" />
+			</ns0:Annotation>
+		</ns0:Element>
+		
