@@ -5,7 +5,9 @@ on:
     branches: [main]
     paths:
       - 'FMSC.dacpac'
+      - 'Schema/**'
       - 'Tools/export_dacpac_schema.py'
+      - 'Tools/DacpacSqlScripter/**'
       - 'Tools/test_dacpac_schema_export.py'
       - '.github/workflows/fmsc-dacpac-schema.yml'
   pull_request:
@@ -13,7 +15,9 @@ on:
     paths:
       - 'FMSC.dacpac'
       - 'DatabaseSchema/**'
+      - 'Schema/**'
       - 'Tools/export_dacpac_schema.py'
+      - 'Tools/DacpacSqlScripter/**'
       - 'Tools/test_dacpac_schema_export.py'
       - '.github/workflows/fmsc-dacpac-schema.yml'
   workflow_dispatch:
@@ -36,10 +40,20 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - name: Generate record-free schema and exercise regressions
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify synthetic tests and generate DacFx SQL CREATE scripts
+        shell: bash
         run: |
+          set -euo pipefail
           python -m unittest discover -s Tools -p test_dacpac_schema_export.py -v
-          python Tools/export_dacpac_schema.py --output "$RUNNER_TEMP/generated-schema"
+          python Tools/export_dacpac_schema.py --prepare-model-only "$RUNNER_TEMP/schema-only.dacpac"
+          dotnet run --project Tools/DacpacSqlScripter/DacpacSqlScripter.csproj -c Release -- \
+            "$RUNNER_TEMP/schema-only.dacpac" "$RUNNER_TEMP/dacfx-scripts.json"
+          python Tools/export_dacpac_schema.py --scripts-json "$RUNNER_TEMP/dacfx-scripts.json" \
+            --output "$RUNNER_TEMP/Schema"
+          test "$(find "$RUNNER_TEMP/Schema" -name '*.sql' | wc -l)" -gt 100
 
   propose:
     needs: verify
@@ -49,6 +63,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -56,27 +71,47 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
-      - name: Generate schema-only reference
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Generate SQL in Schema and retire the old XML export
+        shell: bash
         run: |
+          set -euo pipefail
           python -m unittest discover -s Tools -p test_dacpac_schema_export.py -v
-          python Tools/export_dacpac_schema.py
+          python Tools/export_dacpac_schema.py --prepare-model-only "$RUNNER_TEMP/schema-only.dacpac"
+          dotnet run --project Tools/DacpacSqlScripter/DacpacSqlScripter.csproj -c Release -- \
+            "$RUNNER_TEMP/schema-only.dacpac" "$RUNNER_TEMP/dacfx-scripts.json"
+          python Tools/export_dacpac_schema.py --scripts-json "$RUNNER_TEMP/dacfx-scripts.json" --output Schema
+          test "$(find Schema -name '*.sql' | wc -l)" -gt 100
+          git rm -qr --ignore-unmatch -- DatabaseSchema
       - name: Create review PR when definitions change
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          if test -z "$(git status --porcelain -- DatabaseSchema)"; then
-            echo "DatabaseSchema already matches the DACPAC."
+          if test -z "$(git status --porcelain -- DatabaseSchema Schema)"; then
+            echo "Schema SQL already matches the DACPAC."
             exit 0
           fi
           branch="automation/dacpac-schema-${GITHUB_SHA:0:12}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$branch"
-          git add -- DatabaseSchema
-          git commit -m "docs(schema): synchronize DACPAC model reference"
+          # git rm already staged DatabaseSchema deletions; stage new SQL only.
+          git add -A -- Schema
+          git commit -m "docs(schema): replace XML export with DacFx CREATE SQL in Schema"
           git push origin "$branch"
           gh pr create --base main --head "$branch" --draft \
-            --title "Review generated DACPAC SQL/schema definitions" \
-            --body "Generated only from FMSC.dacpac model.xml. Full per-object model XML and SQL module bodies where available. No exported table records were read. This is NOT DACPAC approval, SQL migration or permission to deploy. Review definitions and existing DACPAC safeguards before merging. Source commit: ${GITHUB_SHA}."
+            --title "Review SQL schema re-extraction into Schema folder" \
+            --body "Generated from a **data-free DACPAC model** using Microsoft DacFx CREATE scripting. Replaces old DatabaseSchema XML export with Schema/*.sql and a JSON coverage manifest. No exported table records were read; no database migrations or application SQL were executed. Inline constraints may be contained in parent table CREATE statements rather than separate scripts. This is NOT schema approval or authorization to deploy. Review changes and run CI before merging. Source commit: ${GITHUB_SHA}."
+          # GITHUB_TOKEN-created PRs suppress default PR events. Explicitly
+          # dispatch read-only checks on the exact generated branch.
+          gh workflow run fmsc-desktop-ci.yml --ref "$branch"
+          gh workflow run fmsc-security.yml --ref "$branch"
+          gh workflow run fmsc-dacpac-schema.yml --ref "$branch"
+
+# DacFx scripting runs on a data-free temporary package; only a reviewed default-
+# branch workflow can create the generated PR. The old DatabaseSchema folder is
+# deleted in that SAME PR as Schema creation, never independently.
