@@ -36,6 +36,14 @@ internal static partial class Program
                 parent.ClientSize=size;Application.DoEvents();
                 Check(tabs.Width>0&&tabs.Height>0,"Communication tabs retain a usable client area");
                 Check(tabs.TabPages[0].Controls.OfType<Panel>().Single().AutoScroll,"Compose retains scrolling when its content exceeds the available client area");
+                foreach(string field in new[]{"channel","templateChoice","schedule"})
+                {
+                    var input=Field<Control>(field);
+                    Check(input.Visible&&input.Width>=AppScale.Scale(100)&&input.Height>0,"Compose message settings have visible, usable bounds");
+                    Check(input.Parent!.Parent is TableLayoutPanel layout&&layout.GetRow(input.Parent)==0,"Compose message settings share the first layout row");
+                }
+                var clear=Descendants(tabs.TabPages[0]).OfType<ModernButton>().Single(b=>b.Text=="Clear Selection");
+                Check(clear.Bottom<=clear.Parent!.ClientSize.Height,"Compose toolbar grows to fit wrapped actions at smaller window sizes");
             }
             foreach(var selected in new[]{AppThemeType.OceanBlue,AppThemeType.ProfessionalSimple})
             {AppTheme.SetTheme(selected);Application.DoEvents();Check(Field<ModernTextBox>("announcement").Text=="Fictional school notice","Theme changes preserve the communication draft");}
@@ -49,7 +57,9 @@ internal static partial class Program
                 for(int target=1;target<6;target++)
                 {
                     tabs.SelectedIndex=0;Check(first.Focus(),"Compose tab can receive keyboard focus");
-                    tabs.SelectedIndex=target;first.Focus();Application.DoEvents();
+                    tabs.SelectedIndex=target;Application.DoEvents();
+                    Check(tabButtons.Single(b=>b.ThemeRole=="TabActive").Focused,"Switching tabs moves retained navigation focus to the selected tab");
+                    first.Focus();Application.DoEvents();
                     Check(tabs.SelectedIndex==target&&tabs.SelectedTab!.Visible&&!tabs.TabPages[0].Visible,"Selecting another tab shows only its content");
                     Check(first.Focused&&first.ThemeRole=="TabInactive"&&tabButtons.Count(b=>b.ThemeRole=="TabActive")==1,"Retained keyboard focus never makes Compose the selected tab");
                     first.ApplyTheme();using var image=new Bitmap(first.Width,first.Height);first.DrawToBitmap(image,first.ClientRectangle);

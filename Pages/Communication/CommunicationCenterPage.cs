@@ -92,17 +92,26 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         var compose=new Panel{Dock=DockStyle.Fill,AutoScroll=true};
         var root=new TableLayoutPanel{Dock=DockStyle.Top,AutoSize=true,ColumnCount=1,RowCount=0,Margin=Padding.Empty};
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        void Row(Control c,int h){c.Dock=DockStyle.Fill;root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppScale.Scale(h)));root.Controls.Add(c,0,root.RowCount++);}
-        Row(Bar(HumanUi.Field("Channel",channel),HumanUi.Field("Reviewed template",templateChoice),HumanUi.Field("Send after (local time, optional)",schedule)),100);
+        void Row(Control c,int h){c.Dock=DockStyle.Fill;root.RowStyles.Add(h==0?new RowStyle(SizeType.AutoSize):new RowStyle(SizeType.Absolute,AppScale.Scale(h)));root.Controls.Add(c,0,root.RowCount++);}
+        // Field containers dock to fill; a flow panel cannot give them usable bounds.
+        var messageFields=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1,Margin=Padding.Empty};
+        messageFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,20));
+        messageFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,45));
+        messageFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,35));
+        messageFields.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        messageFields.Controls.Add(HumanUi.Field("Channel",channel),0,0);
+        messageFields.Controls.Add(HumanUi.Field("Reviewed template",templateChoice),1,0);
+        messageFields.Controls.Add(HumanUi.Field("Send after (local time, optional)",schedule),2,0);
+        Row(messageFields,80);
         Row(HumanUi.Field("Announcement text (only the approved announcement field can be customized)",announcement),120);
         var filters=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1};
         foreach(var item in new[]{("Campus",campus),("Academic year",year),("Class",cls),("Section",section)}){filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));filters.Controls.Add(HumanUi.Field(item.Item1,item.Item2),filters.Controls.Count,0);}
-        Row(filters,90);
+        Row(filters,78);
         search.PlaceholderText="Contact or student name";search.Width=220;
         Row(Bar([recipientFilter,search,Button("Find Contacts",async()=>{recipientPage=0;await RefreshRecipients();},"Communication.Compose"),
             ..Paging(recipients,()=>recipientPage,value=>recipientPage=value,RefreshRecipients,"Communication.Compose"),
-            Button("Clear Selection",()=>{included.Clear();InvalidatePreview();ApplyTicks();return Task.CompletedTask;},"Communication.Compose")]),100);
-        Row(selection,60);Row(recipients,220);
+            Button("Clear Selection",()=>{included.Clear();InvalidatePreview();ApplyTicks();return Task.CompletedTask;},"Communication.Compose")]),0);
+        Row(selection,44);Row(recipients,220);
         recipients.ReadOnly=false;
         recipients.CurrentCellDirtyStateChanged+=(_,_)=>{if(recipients.IsCurrentCellDirty)recipients.CommitEdit(DataGridViewDataErrorContexts.Commit);};
         recipients.CellValueChanged+=(_,e)=>{if(populating||e.RowIndex<0||e.ColumnIndex<0||recipients.Columns[e.ColumnIndex].Name!="Include")return;

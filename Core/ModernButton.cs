@@ -431,7 +431,8 @@ namespace FMSC_SMS.Core
             shape.Draw(e.Graphics, pen);
             // Paint focus AFTER the fill and border, otherwise the fill erases it.
             // Always show the focused action, including focus moved here by Enter.
-            if (Focused && Enabled && rect.Width > 12 && rect.Height > 12)
+            if (Focused && Enabled && rect.Width > 12 && rect.Height > 12 &&
+                (_themeRole is not ("TabActive" or "TabInactive") || ShowFocusCues))
             {
                 int inset = Math.Max(3, (int)Math.Round(3f * DeviceDpi / 96f));
                 using var focusPen = new Pen(GetButtonTextColor(fillColor), Math.Max(2f, 2f * DeviceDpi / 96f));

@@ -35,6 +35,7 @@ public static class TabStrip
         private readonly ToolTip hints = new();
         private readonly List<(TabPage Page, ModernButton Button)> entries = new();
         private bool arranging;
+        private bool navigationFocusPending;
         private int columns;
 
         public TabHost(TabControl tabs)
@@ -53,6 +54,7 @@ public static class TabStrip
             tabs.Dock = DockStyle.None;
             viewport.Controls.Add(tabs);
             tabs.SelectedIndexChanged += SelectionChanged;
+            tabs.Deselecting += CaptureNavigationFocus;
             tabs.ControlAdded += PagesChanged;
             tabs.ControlRemoved += PagesChanged;
             tabs.HandleCreated += TabHandleCreated;
@@ -74,6 +76,12 @@ public static class TabStrip
             foreach (TabPage page in tabs.TabPages)
             {
                 var button = new ModernButton { Text = page.Text, Dock = DockStyle.Fill };
+                button.LostFocus += (_, _) => {
+                    // Native selection may move focus before Deselecting is raised.
+                    navigationFocusPending = true;
+                    if (IsHandleCreated)
+                        BeginInvoke(new Action(() => navigationFocusPending = false));
+                };
                 button.Click += (_, _) => {
                     if (page.Enabled) tabs.SelectedTab = page;
                     // Selecting handlers may veto the change while a save is running.
@@ -157,7 +165,21 @@ public static class TabStrip
             ArrangeButtons();
             FitTabContent();
         }
-        private void SelectionChanged(object? sender, EventArgs e) => RefreshAppearance();
+        private void SelectionChanged(object? sender, EventArgs e)
+        {
+            bool navigationFocused = navigationFocusPending || entries.Any(entry => entry.Button.Focused);
+            navigationFocusPending = false;
+            RefreshAppearance();
+            var selected = tabs.SelectedTab;
+            if (navigationFocused && IsHandleCreated)
+                BeginInvoke(new Action(() => {
+                    // Native tab selection finishes restoring focus after its events.
+                    if (!IsDisposed && tabs.SelectedTab == selected)
+                        entries.FirstOrDefault(entry => entry.Page == selected).Button?.Focus();
+                }));
+        }
+        private void CaptureNavigationFocus(object? sender, TabControlCancelEventArgs e) =>
+            navigationFocusPending |= entries.Any(entry => entry.Button.Focused);
         private void PagesChanged(object? sender, ControlEventArgs e)
         {
             // TabPages removal completes after ControlRemoved is raised.
@@ -177,6 +199,7 @@ public static class TabStrip
             if (disposing)
             {
                 tabs.SelectedIndexChanged -= SelectionChanged;
+                tabs.Deselecting -= CaptureNavigationFocus;
                 tabs.ControlAdded -= PagesChanged;
                 tabs.ControlRemoved -= PagesChanged;
                 tabs.HandleCreated -= TabHandleCreated;

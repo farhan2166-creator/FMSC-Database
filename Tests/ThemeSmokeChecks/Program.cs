@@ -34,6 +34,13 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--communication-layout"))
+        {
+            CheckCommunicationWorkspace();
+            CheckCommunicationGuidance();
+            Console.WriteLine($"PASS: {checks} communication layout, focus and workflow checks.");
+            return;
+        }
         if(args.Contains("--post-fix"))
         {
             CheckCommunicationWorkspace();
