@@ -58,6 +58,7 @@ Portable sizing checks and Windows native-control fixtures cover synthetic clien
 
 ## Installer, schema and release
 
+- Optional Communication Center setup is offered separately after full base compatibility verification and before application activation. Explicit approval creates the existing verified backup, then the staged app's headless installer entry point checks packaged SQL against its embedded definition, executes it inside an outer transaction and verifies the production base/module contracts before commit. A session application lock serializes installation; an existing valid module is preserved and incompatible modules are refused. The entry point uses only an explicit Windows-authenticated LocalDB connection, never normal startup/auto-attachment or dispatch. Base version 6 and approved DACPAC provenance remain unchanged.
 - Normal full packaging uses `Properties/PublishProfiles/PortableRelease.pubxml`, `Installer/ValidateReleaseAssets.ps1`, `Installer/VerifySchemaArtifact.ps1` and `Installer/core.ps1`.
 - Numbered migrations `Migrations/2.sql` through `6.sql` are for controlled upgrades; do not apply indiscriminately to live data.
 - The private complete-installer workflow obtains signed LocalDB MSI and pinned sqlcmd, bundles the application and scripts **without** school database files. The owner supplies verified detached MDF/LDF locally after download for a fresh install.

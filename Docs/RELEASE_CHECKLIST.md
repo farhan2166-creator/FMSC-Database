@@ -28,7 +28,7 @@
 
 - [ ] [Complete installer workflow](../.github/workflows/fmsc-complete-installer.yml) finished **successfully** at the same SHA.
 - [ ] Downloaded private Actions artifact and recorded URL, run ID and checksum.
-- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, `Migrations/2.sql`–`7.sql`, required app resources, readme and communication deployment guide. `7.sql` is a manual optional add-on, not an automatic schema-7 upgrade.
+- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, `Migrations/2.sql`–`7.sql`, required app resources, readme and communication deployment guide. `7.sql` uses a separate optional setup prompt with verified backup and transactional validation, not a schema-7 version bump.
 - [ ] Copied LocalDB recovery helper and `Migrations/7.sql` match the source commit; copied-helper tests passed. Start a new workflow run for new source rather than rerunning an older run.
 - [ ] Microsoft LocalDB MSI signature and pinned sqlcmd digest were verified by the workflow; double-check source of prerequisites if changed.
 - [ ] DB snapshot is **not** included in Actions. The owner locally supplies matching **detached** `FMSC_DB.mdf` and `FMSC_DB_log.ldf` only for fresh-install validation.
@@ -41,6 +41,7 @@
 - [ ] Existing schema version upgraded with correct migration order using a restored **disposable clone**; original data and recovery scope preserved.
 - [ ] Verified pre-migration backup and rollback/recovery scenario tested.
 - [ ] App startup and full schema compatibility check pass after install/upgrade.
+- [ ] Communication setup: decline skips SQL; approval creates a verified backup, applies and verifies the module before activation; repeat install preserves contacts/history/settings; partial/incompatible modules and failed backup/SQL refuse activation. Live messaging stays disabled on new installation.
 - [ ] Deliberately invalid, newer, missing and mismatched database/prerequisite scenarios refuse unsafe installation.
 
 ## 5. School workflow acceptance
