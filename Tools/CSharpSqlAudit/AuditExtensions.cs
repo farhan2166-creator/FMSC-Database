@@ -250,10 +250,27 @@ internal static class AuditExtensions
         var visitor = new SqlReferences();
         fragment.Accept(visitor);
         var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // One SQL string may include multiple scopes, subqueries, and CTEs.
+        // Do not attach a column to the wrong underlying table when an alias is reused.
+        var ambiguousAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void Register(string alias, string table)
+        {
+            if (aliases.TryGetValue(alias, out var existing) &&
+                !string.Equals(existing, table, StringComparison.OrdinalIgnoreCase))
+                ambiguousAliases.Add(alias);
+            else aliases[alias] = table;
+        }
         foreach (var (name, alias) in visitor.Tables)
         {
             var plainName = name.Split('.').Last();
-            if (visitor.Ctes.Contains(plainName) || plainName.StartsWith('#') || plainName.StartsWith('@') ||
+            if (visitor.Ctes.Contains(plainName))
+            {
+                // A CTE alias is not a physical table alias; its derived columns
+                // must not be checked against a similarly named alias in another scope.
+                ambiguousAliases.Add(alias);
+                continue;
+            }
+            if (plainName.StartsWith('#') || plainName.StartsWith('@') ||
                 name.StartsWith("sys.", StringComparison.OrdinalIgnoreCase) ||
                 name.StartsWith("INFORMATION_SCHEMA.", StringComparison.OrdinalIgnoreCase))
                 continue;
@@ -266,22 +283,22 @@ internal static class AuditExtensions
             var qualified = Normalize(name);
             if (!schema.Tables.ContainsKey(qualified))
             {
-                // An unqualified identifier can resolve through a user/default schema.
                 var certain = name.Split('.').Length == 2;
                 results.Add(new Finding(certain ? "FAIL" : "REVIEW_REQUIRED", file, line, caller, qualified,
                     certain ? "Explicit SQL table/view reference is absent from the DACPAC." :
                         "Unqualified SQL table/view is not resolved under dbo; default schema needs review."));
                 continue;
             }
-            aliases[alias] = qualified;
-            aliases[plainName] = qualified;
+            Register(alias, qualified);
+            Register(plainName, qualified);
         }
         foreach (var (prefix, column) in visitor.Columns.Distinct())
         {
             string? table = null;
-            if (prefix is not null)
+            if (prefix is not null && !ambiguousAliases.Contains(prefix))
                 aliases.TryGetValue(prefix, out table);
-            else if (aliases.Values.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1)
+            else if (prefix is null && visitor.Ctes.Count == 0 &&
+                     aliases.Values.Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1)
                 table = aliases.Values.First();
             if (table is null || !schema.Tables.TryGetValue(table, out var tableSpec)) continue;
             if (!tableSpec.Columns.Contains(column))
