@@ -4,6 +4,7 @@
         <Compile Remove="Tests/**/*.cs" />
         <!-- DACPAC SQL scripting utility is a separate .NET 8 console project. -->
         <Compile Remove="Tools/DacpacSqlScripter/**/*.cs" />
+        <Compile Remove="Tools/CSharpSqlAudit/**/*.cs" />
         <Compile Remove="Apps/**/*.cs" />
     </ItemGroup>
 	<PropertyGroup>
