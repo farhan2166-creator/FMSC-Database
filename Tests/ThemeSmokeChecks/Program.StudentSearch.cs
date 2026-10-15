@@ -74,8 +74,8 @@ internal static partial class Program
             foreach (string filter in new[] { "searchCampus", "searchYear", "searchClass", "searchStatus" })
             {
                 text.Text = "9100"; Finish(Search());
-                Field<ComboBox>(filter).SelectedIndex = 1;
-                Check(text.Text.Length == 0 && Field<ComboBox>(filter).SelectedIndex == 1,
+                Field<ModernComboBox>(filter).SelectedIndex = 1;
+                Check(text.Text.Length == 0 && Field<ModernComboBox>(filter).SelectedIndex == 1,
                     "Each filter clears admission text while retaining the newly chosen filter");
                 Empty("Each changed filter clears old rows and disables Open Student");
                 Finish(Search());
