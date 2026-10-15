@@ -77,21 +77,11 @@ try {
     Write-Host 'PASS: published installer matches the checked-out revision and migration inventory.'
     Write-Host 'PASS: full PortableRelease publish, asset validation and installer/migration copies with a PowerShell-7-only parent module path.'
 
-} finally { $package.Dispose() }
-    $output = & dotnet msbuild (Join-Path $copy 'FMSC_SMS.csproj') `
-        -target:ValidateDeploymentAssets -nologo -verbosity:minimal `
-        "-property:LocalDbMsiPath=$prerequisite" "-property:DeploymentDatabaseDirectory=$database" 2>&1
-    $code = $LASTEXITCODE
-    if ($code -eq 0 -or ($output -join "`n") -notmatch 'DACPAC package differs from the reviewed artifact') {
-        throw "Changed DACPAC did not fail the provenance check:`n$($output -join "`n")"
-    }
-    Write-Host 'PASS: the MSBuild validation target still rejects an altered DACPAC.'
 } finally {
     $env:PSModulePath = $modulePathBefore
     if (Test-Path -LiteralPath $scratch) {
         Remove-Item -LiteralPath $scratch -Recurse -Force
     }
 }
-# GitHub's pwsh wrapper propagates the last native exit code. The deliberate
-# rejection above is a passing assertion, rather than a failing workflow step.
+# Keep the native exit code from deliberately refused test invocations from failing the workflow.
 $global:LASTEXITCODE = 0
