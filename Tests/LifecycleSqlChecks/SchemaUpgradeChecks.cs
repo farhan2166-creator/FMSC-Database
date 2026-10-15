@@ -8,7 +8,13 @@ internal static class SchemaUpgradeChecks
     internal static int Export(bool snapshot)
     {
         Sql.ValidateTarget();
-        using (var connection = DatabaseHelper.GetConnection()) { connection.Open(); DatabaseCompatibility.Validate(connection); }
+        using (var connection = DatabaseHelper.GetConnection())
+        {
+            connection.Open(); DatabaseCompatibility.Validate(connection);
+            if (Sql.Count("SELECT CASE WHEN OBJECT_ID(N'comm.Module',N'U') IS NULL THEN 0 ELSE 1 END;") == 1 &&
+                !FMSC_SMS.Services.Communication.CommunicationSchemaContract.VerifyAsync(connection).GetAwaiter().GetResult())
+                throw new InvalidOperationException("Communication schema or required module initialization is incompatible. Review the synthetic setup/upgrade path.");
+        }
         string path = Environment.GetEnvironmentVariable("FMSC_SCHEMA_UPGRADE_PRIVATE_OUTPUT")
             ?? throw new InvalidOperationException("Private metadata output is required.");
         string root = Path.GetFullPath(Environment.GetEnvironmentVariable("FMSC_TEST_PRIVATE_ROOT")!);
