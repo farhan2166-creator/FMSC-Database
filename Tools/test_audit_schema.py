@@ -77,15 +77,15 @@ class ArtifactChecks(unittest.TestCase):
         import re
         script = (ROOT/'Installer/core.ps1').read_text(encoding='utf-8')
         queries = re.findall(
-            r'\\$NeedsLatestUpdates\\s*=\\s*Invoke-SqlMaster\\s+-Query\\s+"([^"]+)"',
+            r'\$NeedsLatestUpdates\s*=\s*Invoke-SqlMaster\s+-Query\s+"([^"]+)"',
             script)
         self.assertEqual(1, len(queries), 'Installer schema preflight must remain present')
         query = queries[0]
         procedures = set(re.findall(
-            r"OBJECT_ID\\('FMSC_DB\\.dbo\\.([A-Za-z0-9_]+)','P'\\)\\s+IS NULL",
+            r"OBJECT_ID\('FMSC_DB\.dbo\.([A-Za-z0-9_]+)','P'\)\s+IS NULL",
             query))
         columns = set(re.findall(
-            r"COL_LENGTH\\('FMSC_DB\\.dbo\\.([A-Za-z0-9_]+)','([A-Za-z0-9_]+)'\\)\\s+IS NULL",
+            r"COL_LENGTH\('FMSC_DB\.dbo\.([A-Za-z0-9_]+)','([A-Za-z0-9_]+)'\)\s+IS NULL",
             query))
         approved_procedures = {entry['name'] for entry in self.contract['objects']
                                if entry['schema'] == 'dbo' and entry['type'].strip() == 'P'}
