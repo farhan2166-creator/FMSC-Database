@@ -24,7 +24,7 @@ def validate(report):
                 not row["Actual"] or row["Actual"].startswith("Not executed") or
                 row["DatabaseVerification"] == "Not executed." or not row["Evidence"]):
             raise ValueError("Pass requires observed outcome, persistence result and evidence")
-        if row["Evidence"] and (".." in row["Evidence"] or ":" in row["Evidence"] or "\\" in row["Evidence"]):
+        if row["Evidence"] and (".." in row["Evidence"] or ":" in row["Evidence"] or "\\" in row["Evidence"] or "/" in row["Evidence"]):
             raise ValueError("Evidence references must stay inside the public evidence directory")
     text = json.dumps(report).lower()
     if any(token in text for token in ("password=", "passwordhash", "passwordsalt", "credentials.json", "connectionstring")):
@@ -34,7 +34,11 @@ def validate(report):
 if __name__ == "__main__":
     import sys
     root = Path(sys.argv[1])
-    validate(json.loads((root / "report.json").read_text(encoding="utf-8-sig")))
+    report = json.loads((root / "report.json").read_text(encoding="utf-8-sig"))
+    validate(report)
+    for row in report["scenarios"]:
+        if row["Status"] == "Pass" and any(not (root / ref.strip()).is_file() for ref in row["Evidence"].split(",")):
+            raise ValueError("Pass refers to missing evidence")
     for path in root.iterdir():
         if path.name not in {"report.json", "summary.md", "environment.json"} and not (
                 path.name.startswith(("L2-", "startup-")) and path.suffix in {".png", ".txt"}):

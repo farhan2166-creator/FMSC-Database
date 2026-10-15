@@ -153,9 +153,10 @@ settings/monitor configurations are blocked when unavailable; Windows display
 settings are not changed automatically. Physical printing and receipt export are
 also outside the automated preview check.
 
-Viewport capture runs during the initial admission view, before populated native
-grids can affect UI Automation discovery. A failure now records its bounded wait
-description. Optional control-inventory failures do not erase a saved screenshot;
+Viewport capture runs during the initial admission view and identifies the owned
+dashboard through its controls; UI Automation omits the caption's ampersand.
+A failure records its bounded wait description. Optional control-inventory
+failures do not erase a saved screenshot;
 all captured images for each scenario are linked in new reports.
 
 Financial scenarios independently query committed payments, allocations, charge

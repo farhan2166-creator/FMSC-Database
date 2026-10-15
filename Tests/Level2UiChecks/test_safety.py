@@ -34,7 +34,7 @@ class Level2Safety(unittest.TestCase):
             validate(report)
 
     def test_artifact_path_escape_and_credential_disclosure_refused(self):
-        for change in ({"Evidence": "../private/owner.txt"}, {"Actual": "Password=unpublishable"}):
+        for change in ({"Evidence": "../private/owner.txt"}, {"Evidence": "/private/owner.txt"}, {"Actual": "Password=unpublishable"}):
             report = self.report()
             report["scenarios"][0].update(change)
             with self.assertRaises(ValueError):

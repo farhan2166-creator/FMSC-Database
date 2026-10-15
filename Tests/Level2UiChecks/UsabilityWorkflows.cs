@@ -38,7 +38,10 @@ internal static class UsabilityWorkflows
         try
         {
             ui.Navigate("Student Admissions");ui.Find("Student Name",ControlType.Edit);
-            var main=ui.Window("School & College Management System");
+            // WinForms UIA removes caption mnemonic ampersands. Identify the
+            // owned dashboard by its controls rather than its rendered title.
+            var main=ui.Window();
+            Identity.Check(ui.TryFind("Daily Work",ControlType.Button,main)!=null,"Viewport target must be the owned dashboard.");
             using var proof=Identity.Open();
             main.Patterns.Window.Pattern.SetWindowVisualState(WindowVisualState.Normal);
             Desktop.Wait(()=>main.Patterns.Window.Pattern.WindowVisualState.Value==WindowVisualState.Normal?main:null,"restored window state before resizing");
