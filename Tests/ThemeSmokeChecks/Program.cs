@@ -37,6 +37,7 @@ internal static partial class Program
         if(args.Contains("--post-fix"))
         {
             CheckCommunicationWorkspace();
+            CheckCommunicationGuidance();
             CheckDatePickerVisibility();
             CheckPdfFileDurability();
             CheckDpiResponsiveLayouts();
