@@ -217,10 +217,23 @@ def sql_self_test():
     # reviewed data-free fixture, then add one wholly fictional table/migration.
     with tempfile.TemporaryDirectory(prefix="fmsc-upgrade-integration-") as folder:
         root = Path(folder) / "repo"
-        shutil.copytree(refresh.ROOT, root, ignore=shutil.ignore_patterns('.git','FMSC.dacpac','bin','obj','__pycache__',
-            'Schema','Audit','Reports','Resources','out','*.mdf','*.ldf','*.bak','*.zip'))
+        root.mkdir()
+        # Only tracked source/contract files enter the synthetic repository.
+        # Untracked settings, images, exports and database files are never copied.
+        allowed = {'.cs','.csproj','.sln','.json','.props','.targets','.sql','.py','.config','.toml'}
+        for name in refresh.git(refresh.ROOT,'ls-files','-z').decode().split('\0'):
+            if not name: continue
+            relative=Path(name); source=refresh.ROOT/relative
+            if relative.parts[0] in ('Schema','Audit','Reports','Resources') or relative.suffix.lower() not in allowed:
+                continue
+            if source.is_symlink(): raise AssertionError('Test source symlink is unsupported')
+            destination=root/relative;destination.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(source,destination)
         raw = (refresh.ROOT / refresh.FIXTURE).read_bytes()
         parts = refresh.archive(raw); actual=refresh.fingerprint(parts,raw)[3]
+        approved=refresh.read_json((refresh.ROOT/refresh.APPROVAL).read_bytes())
+        recorded=refresh.read_json((refresh.ROOT/refresh.PROVENANCE).read_bytes())
+        refresh.fixture_valid(raw,recorded,approved)
+        (root/refresh.FIXTURE).write_bytes(raw)
         (root/'FMSC.dacpac').write_bytes(raw)
         (root/refresh.APPROVAL).write_text(json.dumps(actual))
         contract=refresh.read_json((root/refresh.CONTRACT).read_bytes());contract['schemaArtifact']['sha256']=actual['packageSha256']
