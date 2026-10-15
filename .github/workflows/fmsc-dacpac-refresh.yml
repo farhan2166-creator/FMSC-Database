@@ -44,13 +44,13 @@ jobs:
       result: ${{ steps.compare.outputs.result }}
     steps:
       - name: Check out candidate with history; do not persist credentials
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Check out trusted approval and verification code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.base.sha || github.sha }}
           path: trusted
@@ -134,7 +134,7 @@ jobs:
       actions: write
     steps:
       - name: Check out only the trusted default-branch source snapshot
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
