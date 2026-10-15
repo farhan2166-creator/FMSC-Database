@@ -14,7 +14,7 @@ The backup manager generates names like `FMSC_DB_Backup_YYYY-MM-DD_HHmm.bak`. A 
 
 ## Before you consider a restore
 
-Communication Center installation uses the existing verified pre-migration backup helper before applying optional `Migrations/7.sql`. Its backup filename includes `v6_to_v6_Communication1`; this identifies the separate module setup, not a base schema-version change. The installer records the path in `Install.log` and `Backups/LastPreMigrationBackup.txt`. A failed backup prevents SQL installation; a failed or uncertain module installation prevents application activation. Do not blindly rerun SQL after a timeout or lost acknowledgement: rerun the installer to verify whether the module committed, preserving any existing communication history.
+The installer creates a checksum-verified recovery backup before applying any pending numbered SQL files from `Migrations`. Empty folders and already-applied scripts do not trigger a migration backup. The installer records the path in `Install.log` and `Backups/LastPreMigrationBackup.txt`. A failed backup prevents migrations; failed SQL, an incorrect version, or failed compatibility checks prevents application activation. The already-applied Communication Center setup has been retired. Preserve its records and settings during upgrades.
 
 - **Restoring replaces current school data. Newer records may be lost.** Confirm restore point, time, operator approval and expected data-loss window.
 - Close other app sessions; plan a maintenance window. Confirm SQL LocalDB user/instance and file permissions.

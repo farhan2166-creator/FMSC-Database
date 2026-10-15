@@ -4,8 +4,8 @@ updates:
     directories:
       - "/"
       - "/Tests/*"
-      - "/CommunicationHost"
-      - "/CommunicationWorker"
+      - "/Apps/Host"
+      - "/Apps/Worker"
     schedule:
       interval: weekly
       day: monday

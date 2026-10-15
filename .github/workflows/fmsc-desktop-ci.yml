@@ -57,14 +57,14 @@ jobs:
         shell: pwsh
         run: .\Tools\TestInstallerLocalDb.ps1
 
-      - name: Test explicit communication setup and backup ordering
+      - name: Test migration discovery, versions and backup ordering
         shell: powershell
-        run: .\Tools\TestCommunicationSetup.ps1
+        run: .\Tools\TestInstallerMigrations.ps1
 
       - name: Build optional communication worker and webhook host
         run: |
-          dotnet build CommunicationWorker/CommunicationWorker.csproj -c Release
-          dotnet build CommunicationHost/CommunicationHost.csproj -c Release
+          dotnet build Apps/Worker/Worker.csproj -c Release
+          dotnet build Apps/Host/Host.csproj -c Release
 
       - name: Run deterministic communication provider checks (no live delivery)
         run: dotnet run --project Tests/CommunicationChecks/CommunicationChecks.csproj -c Release

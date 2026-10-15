@@ -41,7 +41,7 @@ class SecurityChecks(unittest.TestCase):
                      "secrets.json", "credentials.json", "appsettings.Production.json", "profile.pubxml.user", "key.pfx", ".aws/credentials"):
             self.assertTrue(forbidden_file(name), name)
         for name in ("FMSC.dacpac", "Properties/PublishProfiles/PortableRelease.pubxml", "Core/PermissionCatalog.json",
-                     "Migrations/6.sql", "DatabaseHelper.cs", ".env.example", ".env.sample", ".env.template"):
+                     "Services/Communication/Schema.sql", "DatabaseHelper.cs", ".env.example", ".env.sample", ".env.template"):
             self.assertFalse(forbidden_file(name), name)
 
     def test_exact_existing_fixture_is_allowed(self):

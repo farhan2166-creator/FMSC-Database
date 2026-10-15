@@ -58,25 +58,27 @@ function Get-FileHash { throw 'This verifier must not call Get-FileHash.' }
     }
     foreach ($relative in @('FMSC_SMS/FMSC_SMS.exe', 'FMSC_SMS/FMSC_SMS.dll',
         'FMSC_SMS/FMSC_SMS.deps.json', 'FMSC_SMS/FMSC_SMS.runtimeconfig.json',
-        'core.ps1', 'Install FMSC_SMS.bat', 'Tools/SqlLocalDB.msi',
-        'Migrations/2.sql', 'Migrations/3.sql', 'Migrations/4.sql', 'Migrations/5.sql', 'Migrations/6.sql', 'Migrations/7.sql')) {
+        'core.ps1', 'Install FMSC_SMS.bat', 'Tools/SqlLocalDB.msi')) {
         $file = Join-Path $release $relative
         if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0) {
             throw "Full publish did not copy its required output: $relative"
         }
     }
     foreach ($pair in @(
-        @('Installer/core.ps1', 'core.ps1'),
-        @('Migrations/7.sql', 'Migrations/7.sql')
+        ,@('Installer/core.ps1', 'core.ps1')
     )) {
         $expected = (Get-FileHash -LiteralPath (Join-Path $ProjectDirectory $pair[0]) -Algorithm SHA256).Hash
         $actual = (Get-FileHash -LiteralPath (Join-Path $release $pair[1]) -Algorithm SHA256).Hash
         if ($actual -ne $expected) { throw "Published installer asset differs from checked-out source: $($pair[1])" }
     }
+    if (-not (Test-Path -LiteralPath (Join-Path $release 'Migrations') -PathType Container)) { throw 'Package must include its migrations folder even when empty.' }
+    $sourceSql = @(Get-ChildItem -LiteralPath (Join-Path $ProjectDirectory 'Migrations') -Filter '*.sql' -File)
+    $copiedSql = @(Get-ChildItem -LiteralPath (Join-Path $release 'Migrations') -Filter '*.sql' -File)
+    if ($sourceSql.Count -ne $copiedSql.Count) { throw 'Packaged migration inventory differs from source.' }
     # Exercise the actual copied helper, not merely its source-tree counterpart.
     # Use a child scope so the test's mocked process/console commands stay local.
     & (Join-Path $ProjectDirectory 'Tools/TestInstallerLocalDb.ps1') -InstallerPath (Join-Path $release 'core.ps1')
-    & (Join-Path $ProjectDirectory 'Tools/TestCommunicationSetup.ps1') -InstallerPath (Join-Path $release 'core.ps1')
+    & (Join-Path $ProjectDirectory 'Tools/TestInstallerMigrations.ps1') -InstallerPath (Join-Path $release 'core.ps1')
     # Exercise the real published WinExe's headless path. These targets must be
     # refused before any network/SQL connection or interactive startup occurs.
     foreach ($arguments in @(
@@ -90,7 +92,7 @@ function Get-FileHash { throw 'This verifier must not call Get-FileHash.' }
         if ($process.ExitCode -ne 23) { throw "Installer verification did not refuse an unsafe target: $($process.ExitCode)" }
     }
     Write-Host 'PASS: published installer CLI refuses remote, wrong-catalog and incomplete targets without interactive startup.'
-    Write-Host 'PASS: published LocalDB recovery and top-level communication SQL match the checked-out revision.'
+    Write-Host 'PASS: published installer matches the checked-out revision and migration inventory.'
     Write-Host 'PASS: full PortableRelease publish, both validation scripts and installer/migration copies with a PowerShell-7-only parent module path.'
 
     # A disposable project copy proves that provenance rejection still blocks

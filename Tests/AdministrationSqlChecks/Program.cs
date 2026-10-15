@@ -9,8 +9,6 @@ var builder=new SqlConnectionStringBuilder(connectionText);
 bool loopback=!builder.IntegratedSecurity&&builder.DataSource.StartsWith("127.0.0.1,",StringComparison.Ordinal)&&builder.UserID=="sa";
 if(!builder.InitialCatalog.StartsWith("FMSC_AuditChecks_",StringComparison.Ordinal)||(!builder.IntegratedSecurity&&!loopback))
     throw new Exception("Use a disposable FMSC_AuditChecks_<suffix> catalog with integrated security or isolated loopback test SQL authentication.");
-if(Environment.GetEnvironmentVariable("FMSC_MIGRATION_FILE") is { Length:>0 } migrationPath)
-    Console.WriteLine($"PASS: {MigrationChecks.Run(connectionText,migrationPath)} migration durability checks.");
 DatabaseHelper.ConnectionString=connectionText;
 int checks=0;
 void Check(bool valid,string message){if(!valid)throw new Exception(message);checks++;Console.WriteLine("PASS: "+message);}

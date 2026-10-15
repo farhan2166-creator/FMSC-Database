@@ -12,7 +12,7 @@ Program.cs → connection / first-run / login
           → DatabaseHelper.cs (FMSC_DB and SQL connection setup)
           → SQL Server LocalDB, stored procedures and transactions
 Services/Backup/* → verified SQL backup/restore and recovery
-Installer/core.ps1 + Migrations/2..6.sql → installer and ordered upgrades
+Installer/core.ps1 + Migrations/*.sql → pending numbered upgrades, then database verification
 Tests/* + Tools/* → isolated regression/provenance checks
 ```
 
@@ -60,7 +60,7 @@ Portable sizing checks and Windows native-control fixtures cover synthetic clien
 
 - Optional Communication Center setup is offered separately after full base compatibility verification and before application activation. Explicit approval creates the existing verified backup, then the staged app's headless installer entry point checks packaged SQL against its embedded definition, executes it inside an outer transaction and verifies the production base/module contracts before commit. A session application lock serializes installation; an existing valid module is preserved and incompatible modules are refused. The entry point uses only an explicit Windows-authenticated LocalDB connection, never normal startup/auto-attachment or dispatch. Base version 6 and approved DACPAC provenance remain unchanged.
 - Normal full packaging uses `Properties/PublishProfiles/PortableRelease.pubxml`, `Installer/ValidateReleaseAssets.ps1`, `Installer/VerifySchemaArtifact.ps1` and `Installer/core.ps1`.
-- Numbered migrations `Migrations/2.sql` through `6.sql` are for controlled upgrades; do not apply indiscriminately to live data.
+- This release requires the current schema-6 baseline. Applied migrations 2–7 are retired. An empty or missing migrations folder skips migration execution; numbered SQL files newer than the installed base version run in numeric order within the schema version supported by that release.
 - The private complete-installer workflow obtains signed LocalDB MSI and pinned sqlcmd, bundles the application and scripts **without** school database files. The owner supplies verified detached MDF/LDF locally after download for a fresh install.
 - `CIAppOnlyBundle` is intentionally scoped to the separate app-only artifact, not the full installer validation.
 

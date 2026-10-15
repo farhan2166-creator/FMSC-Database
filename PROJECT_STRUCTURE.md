@@ -40,6 +40,8 @@ Permissions remain attached to each existing action. User/role administration re
 | `Pages/Security` | Login and account/security screens |
 | `Services/Backup` | Backup execution and settings; these are services, not pages |
 | `Core` | Shared controls, navigation, validation, printing and design helpers |
+| `Apps/Worker` | Optional communication dispatcher — `Worker.csproj` |
+| `Apps/Host` | Optional WhatsApp callback gateway — `Host.csproj` |
 
 ## Clearer names
 

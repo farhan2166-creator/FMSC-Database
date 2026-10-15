@@ -23,5 +23,5 @@
     <Using Include="System.Data" /><Using Include="FMSC_SMS" /><Using Include="FMSC_SMS.Core" />
     <Using Include="FMSC_SMS.Pages.Security" /><Using Include="FMSC_SMS.Pages.Finance.Collection" />
   </ItemGroup>
-<ItemGroup><EmbeddedResource Include="../../Migrations/7.sql" LogicalName="FMSC_SMS.Communication.Schema.sql" /></ItemGroup>
+<ItemGroup><EmbeddedResource Include="../../Services/Communication/Schema.sql" LogicalName="FMSC_SMS.Communication.Schema.sql" /></ItemGroup>
 </Project>

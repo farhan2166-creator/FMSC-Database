@@ -31,9 +31,7 @@ try{
  $taskLogPath=(Join-Path $taskDir 'checks_log.ldf').Replace("'","''")
  [void](Query "RESTORE DATABASE [$taskName] FROM DISK=@Path WITH MOVE N'$taskDataName' TO N'$taskDataPath',MOVE N'$taskLogName' TO N'$taskLogPath'" @{Path=$taskBackup})
  $taskCreated=$true;$script:taskConnection.Dispose();$script:taskConnection=Connect $taskName
- # Apply the approved version-2 whole-rupee change to the disposable clone only.
- [void](Query (Get-Content -Raw (Join-Path $taskRoot 'Migrations/2.sql')))
- # Validate the rest of the current supplied admission workflow.
+ [void](Query "IF (SELECT MAX(TRY_CONVERT(int,VersionNumber)) FROM dbo.DatabaseVersion)<>6 THROW 59990,'Use the current schema-6 database snapshot.',1;")
  [void](Query "IF COL_LENGTH(N'dbo.Enrollments',N'PlacementConfirmedAt') IS NULL OR OBJECT_ID(N'dbo.CompleteQuickAdmission',N'P') IS NULL THROW 59990,'Use the current database snapshot with the admission workflow already installed.',1;")
  $taskContext=Query "SELECT TOP(1) Y.AcademicYearId,CS.ClassSectionId,CS.CampusId FROM dbo.AcademicYears Y CROSS JOIN dbo.CampusClassSections CS WHERE CONVERT(date,GETDATE()) BETWEEN Y.StartDate AND Y.EndDate ORDER BY CS.ClassSectionId;"
  $taskYear=[int]$taskContext.Rows[0].AcademicYearId;$taskPlacement=[int]$taskContext.Rows[0].ClassSectionId;$taskCampus=[int]$taskContext.Rows[0].CampusId

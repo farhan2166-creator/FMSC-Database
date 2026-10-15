@@ -1,9 +1,14 @@
--- OPTIONAL, OWNER-REVIEWED ADD-ON. Deployment sequence 7; base schema remains 6.
--- Packaged beside 2.sql through 6.sql, but not an automatic schema-version upgrade.
--- Back up and test a disposable copy first. Run in one connection with:
--- EXEC sys.sp_set_session_context @key=N'FMSC_CommunicationInstall',@value=1;
--- Base schema remains 6. Never execute automatically at application startup.
+-- Communication module reference definition for runtime verification and disposable SQL fixtures.
+-- Already installed on the current database; not a pending deployment migration.
 SET XACT_ABORT ON;
+-- Required for filtered indexes, including when run through sqlcmd/SSMS.
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET ARITHABORT ON;
+SET NUMERIC_ROUNDABORT OFF;
 IF TRY_CONVERT(int,SESSION_CONTEXT(N'FMSC_CommunicationInstall'))<>1 OR SESSION_CONTEXT(N'FMSC_CommunicationInstall') IS NULL
  THROW 51000,'Explicit communication installation context is required.',1;
 IF (SELECT MAX(TRY_CONVERT(int,VersionNumber)) FROM dbo.DatabaseVersion)<>6

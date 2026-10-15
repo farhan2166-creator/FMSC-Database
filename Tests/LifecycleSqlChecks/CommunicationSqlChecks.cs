@@ -15,30 +15,30 @@ internal static class CommunicationSqlChecks
         bool installed=await report.Stage("Communication: additive schema, explicit consent and permission isolation",async()=>{
             int grants=Sql.Count("SELECT COUNT(*) FROM dbo.RolePermissions;");
             using var connection=DatabaseHelper.GetConnection();connection.Open();
-            string script=File.ReadAllText("Migrations/7.sql");
+            string script=File.ReadAllText("Services/Communication/Schema.sql");
             foreach(int version in new[]{5,7})
             {
                 Sql.Query("UPDATE dbo.DatabaseVersion SET VersionNumber=@Version WHERE VersionId=(SELECT MAX(VersionId) FROM dbo.DatabaseVersion);",Sql.P("@Version",version));
-                try { report.Check(await CommunicationInstallation.InstallAsync(connection,script)==CommunicationInstallation.BaseIncompatible && Sql.Count("SELECT COUNT(*) FROM sys.schemas WHERE name=N'comm';")==0,"Installer refuses base version "+version+" without creating communication objects."); }
+                try { report.Check(await CommunicationFixture.InstallAsync(connection,script)==CommunicationInstallation.BaseIncompatible && Sql.Count("SELECT COUNT(*) FROM sys.schemas WHERE name=N'comm';")==0,"Installer refuses base version "+version+" without creating communication objects."); }
                 finally { Sql.Query("UPDATE dbo.DatabaseVersion SET VersionNumber=6 WHERE VersionId=(SELECT MAX(VersionId) FROM dbo.DatabaseVersion);"); }
             }
             report.Check(await CommunicationInstallation.CheckAsync(connection)==CommunicationInstallation.Missing,"Installer distinguishes a compatible base database from missing optional communication support.");
-            report.Check(await CommunicationInstallation.InstallAsync(connection,script+"\n-- changed fixture\n")==CommunicationInstallation.ScriptMismatch,"Installer refuses SQL differing from the application's embedded reviewed definition.");
+            report.Check(await CommunicationFixture.InstallAsync(connection,script+"\n-- changed fixture\n")==CommunicationInstallation.ScriptMismatch,"Installer refuses SQL differing from the application's embedded reviewed definition.");
             // Real SQL failure after earlier DDL succeeded: the installer's outer
             // transaction must remove every partial object and optional grant.
             Sql.Query("CREATE TRIGGER FMSC_AuditChecks_RefuseCommunication ON DATABASE FOR CREATE_TABLE AS BEGIN IF EVENTDATA().value('(/EVENT_INSTANCE/SchemaName)[1]','sysname')=N'comm' AND EVENTDATA().value('(/EVENT_INSTANCE/ObjectName)[1]','sysname')=N'Template' THROW 51044,'Synthetic communication DDL refusal.',1; END;");
-            try { await report.Refused("Installer rolls back a mid-script SQL failure",async()=>{await CommunicationInstallation.InstallAsync(connection,script);},51044); }
+            try { await report.Refused("Installer rolls back a mid-script SQL failure",async()=>{await CommunicationFixture.InstallAsync(connection,script);},51044); }
             finally { Sql.Query("DROP TRIGGER FMSC_AuditChecks_RefuseCommunication ON DATABASE;"); }
             report.Check(await CommunicationInstallation.CheckAsync(connection)==CommunicationInstallation.Missing && Sql.Count("SELECT COUNT(*) FROM sys.schemas WHERE name=N'comm';")==0 && Sql.Count("SELECT COUNT(*) FROM dbo.RolePermissions;")==grants,"Interrupted setup leaves no partial module or changed role grants.");
             report.Check(Convert.ToInt32(await new SqlCommand("SELECT @@TRANCOUNT;",connection).ExecuteScalarAsync())==0,"Failed setup closes its transaction before a retry.");
-            report.Check(await CommunicationInstallation.InstallAsync(connection,script)==CommunicationInstallation.Ready,"Production installer path applies and verifies migration 7 before committing.");
-            report.Check(await CommunicationInstallation.InstallAsync(connection,script)==CommunicationInstallation.Ready,"A verified existing module is preserved without reapplying migration 7.");
+            report.Check(await CommunicationFixture.InstallAsync(connection,script)==CommunicationInstallation.Ready,"Disposable fixture applies and verifies the communication baseline before committing.");
+            report.Check(await CommunicationFixture.InstallAsync(connection,script)==CommunicationInstallation.Ready,"A verified existing module is preserved without reapplying the communication baseline.");
             report.Check(await store.IsInstalledAsync(),"Optional communication schema is present without modifying the approved DACPAC.");
             report.Check(Sql.Count("SELECT COUNT(*) FROM dbo.RolePermissions;")==grants,"Installing communication grants no Accountant authority.");
             report.Check(Sql.Count("SELECT MAX(TRY_CONVERT(int,VersionNumber)) FROM dbo.DatabaseVersion;")==6,"Communication does not change base schema version 6.");
             var saved=Sql.Proc("AdmitStudent",f.AdmissionArgs("Communication Example"));student=Convert.ToInt32(saved.Rows[0]["AdmissionId"]);enrollment=Convert.ToInt32(saved.Rows[0]["EnrollmentId"]);
             await Contact(true,false);
-            report.Check(await CommunicationInstallation.InstallAsync(connection,script)==CommunicationInstallation.Ready && Sql.Count("SELECT COUNT(*) FROM comm.Contact;")==1,"Reinstallation verification preserves existing communication contacts.");
+            report.Check(await CommunicationFixture.InstallAsync(connection,script)==CommunicationInstallation.Ready && Sql.Count("SELECT COUNT(*) FROM comm.Contact;")==1,"Reinstallation verification preserves existing communication contacts.");
             await Template("notice","Utility","{{school}}: {{student}} {{announcement}}");
             var rows=await store.PreviewAsync(template,MessageChannel.Sms,[contact],"Synthetic message");
             report.Check(rows.Rows.Count==1 && Convert.ToString(rows.Rows[0]["Exclusion"])=="","Explicit verified SMS consent permits a scoped student message.");
@@ -249,7 +249,7 @@ internal static class CommunicationSqlChecks
             Sql.Query("ALTER PROCEDURE comm.RevokeTemplate @Actor int,@Id uniqueidentifier AS SELECT 1;");
             report.Check(!await store.IsInstalledAsync(),"Changed add-on SQL definitions cannot pass the reviewed module contract.");
             using var check=DatabaseHelper.GetConnection();check.Open();
-            report.Check(await CommunicationInstallation.InstallAsync(check,File.ReadAllText("Migrations/7.sql"))==CommunicationInstallation.ModuleIncompatible,"Installer refuses to overwrite an altered existing communication module.");
+            report.Check(await CommunicationFixture.InstallAsync(check,File.ReadAllText("Services/Communication/Schema.sql"))==CommunicationInstallation.ModuleIncompatible,"Installer refuses to overwrite an altered existing communication module.");
         });
         string State(Guid id)=>Convert.ToString(Sql.Scalar("SELECT State FROM comm.Message WHERE MessageId=@Id",Sql.P("@Id",id)))!;
         void Ready()=>Sql.Query("UPDATE comm.Settings SET NextSendUtc=DATEADD(SECOND,-1,SYSUTCDATETIME());");

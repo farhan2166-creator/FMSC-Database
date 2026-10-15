@@ -149,13 +149,7 @@ jobs:
             'Install FMSC_SMS.bat',
             'core.ps1',
             'Tools/SqlLocalDB.msi',
-            'Tools/sqlcmd.exe',
-            'Migrations/2.sql',
-            'Migrations/3.sql',
-            'Migrations/4.sql',
-            'Migrations/5.sql',
-            'Migrations/6.sql',
-            'Migrations/7.sql'
+            'Tools/sqlcmd.exe'
           )
           foreach ($item in $required) {
             $file = Join-Path $root $item
@@ -164,15 +158,14 @@ jobs:
             }
           }
           foreach ($pair in @(
-            @('Installer/core.ps1', 'core.ps1'),
-            @('Migrations/7.sql', 'Migrations/7.sql')
+            ,@('Installer/core.ps1', 'core.ps1')
           )) {
             $expected = (Get-FileHash -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $pair[0]) -Algorithm SHA256).Hash
             $actual = (Get-FileHash -LiteralPath (Join-Path $root $pair[1]) -Algorithm SHA256).Hash
             if ($actual -ne $expected) { throw "Packaged installer asset differs from checked-out source: $($pair[1])" }
           }
           & (Join-Path $env:GITHUB_WORKSPACE 'Tools/TestInstallerLocalDb.ps1') -InstallerPath (Join-Path $root 'core.ps1')
-          & (Join-Path $env:GITHUB_WORKSPACE 'Tools/TestCommunicationSetup.ps1') -InstallerPath (Join-Path $root 'core.ps1')
+          & (Join-Path $env:GITHUB_WORKSPACE 'Tools/TestInstallerMigrations.ps1') -InstallerPath (Join-Path $root 'core.ps1')
           $excluded = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.Extension.ToLowerInvariant() -in @('.mdf','.ldf','.bak') })
           if ($excluded.Count -gt 0) { throw 'Unexpected school database or backup file in the GitHub artifact.' }
 
@@ -202,15 +195,16 @@ jobs:
             ''
             'APPLICATION UPDATE WITHOUT REPLACING A SCHOOL DATABASE'
             'Do not put a new MDF/LDF over an existing installed school database.'
-            'The existing installer detects and migrates an existing database safely.'
+            'The installer verifies an existing schema-6 database before activating the app.'
+            'Applied scripts 2-7 are retired; future upgrades use numbered SQL files with the matching application release.'
             ''
             'Includes the current self-contained .NET 8 app, SQL LocalDB 2022 MSI,'
-            'pinned Microsoft sqlcmd tool, current installer core.ps1 and Migrations 2-7.'
-            'The installer offers optional Communication Center setup (Migrations\7.sql)'
-            'before application activation. Choose Y to create a verified backup and'
-            'apply/verify it transactionally. Enter or N skips this optional step.'
-            'Existing valid modules are preserved. The approved base version stays 6.'
-            'Review the included COMMUNICATION_CENTER.md before applying it.'
+            'pinned Microsoft sqlcmd tool and current installer core.ps1.'
+            'The migrations folder may be empty. Numbered SQL files newer than the'
+            'installed database version run in numeric order, with a verified backup'
+            'first. Already-applied files are skipped; failed SQL or compatibility'
+            'verification stops application activation. Retired setup 7 is not rerun.'
+            'Communication Center is preserved from the supplied/installed database.'
             'If silent LocalDB setup fails, this installer offers the official Microsoft'
             'wizard and reports verbose MSI log paths. An immediate old-style 1603 error'
             'without that offer indicates an older core.ps1: check the source commit below.'

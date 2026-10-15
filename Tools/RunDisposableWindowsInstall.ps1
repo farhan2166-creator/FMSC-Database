@@ -166,7 +166,7 @@ try {
     & dotnet @arguments
     NativeOk 'Full PortableRelease publish'
     foreach ($file in @('FMSC_SMS/FMSC_SMS.exe','core.ps1','Install FMSC_SMS.bat',
-        'Tools/SqlLocalDB.msi','Tools/sqlcmd.exe','Migrations/6.sql','Migrations/7.sql')) {
+        'Tools/SqlLocalDB.msi','Tools/sqlcmd.exe')) {
         if (-not (Test-Path -LiteralPath (Join-Path $release $file) -PathType Leaf)) {
             throw "Real installer asset missing: $file"
         }
@@ -219,7 +219,6 @@ EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@
     if (-not $p) { throw 'Failed to start installer process.' }
     $stdout=$p.StandardOutput.ReadToEndAsync()
     $stderr=$p.StandardError.ReadToEndAsync()
-    $p.StandardInput.WriteLine('N')  # Do not apply optional Communication Center migration.
     $p.StandardInput.WriteLine('N')  # Do not start interactive WinForms UI.
     $p.StandardInput.Close()
     if (-not $p.WaitForExit(720000)) {

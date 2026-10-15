@@ -1,4 +1,4 @@
-"""Check that migration 3, the embedded catalog and actual access consumers agree."""
+"""Check that the current baseline, embedded catalog and access consumers agree."""
 import json
 from pathlib import Path
 import re
@@ -11,14 +11,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class PermissionPolicyChecks(unittest.TestCase):
     def setUp(self):
-        self.catalog = json.loads((ROOT/'Core/PermissionCatalog.json').read_text())
-        self.migration = (ROOT/'Migrations/3.sql').read_text()
+        self.catalog = json.loads((ROOT/'Core/PermissionCatalog.json').read_text(encoding='utf-8'))
         self.codes = {entry['Code'] for entry in self.catalog}
 
-    def test_same_catalog_in_sql_and_csharp(self):
-        match = re.search(r"DECLARE @Catalog nvarchar\(max\)=N'((?:[^']|'')*)';", self.migration)
-        self.assertIsNotNone(match)
-        self.assertEqual(self.catalog, json.loads(match.group(1).replace("''", "'")))
+    def test_unique_base_catalog(self):
         self.assertEqual(28, len(self.codes))
         self.assertEqual(len(self.codes), len(self.catalog))
 
@@ -32,12 +28,6 @@ class PermissionPolicyChecks(unittest.TestCase):
                 continue
             body = element.find("d:Property[@Name='BodyScript']/d:Value", ns)
             modules[element.get('Name')] = body.text or ''
-        updates = re.findall(r"EXEC sys.sp_executesql N'((?:[^']|'')*)';", self.migration)
-        self.assertEqual(7, len(updates))
-        for update in updates:
-            update = update.replace("''", "'")
-            name = re.search(r'ALTER PROCEDURE dbo\.(\w+)', update, re.I).group(1)
-            modules[f'[dbo].[{name}]'] = update
         sql_codes = set()
         for body in modules.values():
             for statement in re.findall(r'EXEC(?:UTE)?\s+dbo\.Require(?:Any)?Permission\b[^;]*;', body, re.I):
@@ -47,22 +37,21 @@ class PermissionPolicyChecks(unittest.TestCase):
                        'System.Roles.Deactivate', 'Students.Siblings'} | self.codes
         cs_codes = set()
         for path in ROOT.rglob('*.cs'):
-            if any(part in ('Tests', 'bin', 'obj', '.git') for part in path.relative_to(ROOT).parts):
+            if any(part in ('Tests', 'bin', 'obj', '.git', 'RecoveryBackups') for part in path.relative_to(ROOT).parts):
                 continue
-            cs_codes.update(set(re.findall(r'"([A-Za-z]+\.[A-Za-z.]+)"', path.read_text())) & old_catalog)
+            cs_codes.update(set(re.findall(r'"([A-Za-z]+\.[A-Za-z.]+)"', path.read_text(encoding='utf-8'))) & old_catalog)
         self.assertLessEqual(cs_codes, self.codes)
         self.assertEqual(self.codes, sql_codes | cs_codes)
 
-    def test_application_and_installer_require_migration_version(self):
+    def test_application_and_installer_require_current_baseline(self):
         application = re.search(r'RequiredDatabaseSchemaVersion = "(\d+)"', (ROOT/'DatabaseHelper.cs').read_text())
         installer = re.search(r"\$DatabaseVersion = '(\d+)'", (ROOT/'Installer/core.ps1').read_text())
         self.assertIsNotNone(application)
         self.assertIsNotNone(installer)
         required = int(application.group(1))
-        self.assertGreaterEqual(required, 3)
+        self.assertEqual(required, 6)
         self.assertEqual(int(installer.group(1)), required)
-        self.assertEqual(max(int(path.stem) for path in (ROOT/'Migrations').glob('*.sql') if path.stem.isdigit()), required)
-        self.assertIn("VALUES(N'3',SYSDATETIME()", self.migration)
+        self.assertEqual(set(), {path.name for path in (ROOT/'Migrations').glob('*.sql')})
 
     def test_metadata_fits_sql_columns(self):
         for entry in self.catalog:

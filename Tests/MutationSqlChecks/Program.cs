@@ -2,28 +2,19 @@ using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Security;
 using Microsoft.Data.SqlClient;
 
+if(args.Any(arg=>arg is not ("--compatibility" or "--additional-fee" or "--bank" or "--adjustment-types")))
+    throw new ArgumentException("Use a disposable schema-6 baseline; legacy upgrade modes have been retired.");
 string connectionText=Environment.GetEnvironmentVariable("FMSC_AUDIT_CONNECTION")??throw new Exception("Set the disposable audit connection.");
 var builder=new SqlConnectionStringBuilder(connectionText);
 if(!builder.InitialCatalog.StartsWith("FMSC_AuditChecks_",StringComparison.Ordinal)||!builder.DataSource.StartsWith("127.0.0.1,",StringComparison.Ordinal)||builder.UserID!="sa")throw new Exception("Only a disposable loopback audit clone is accepted.");
 DatabaseHelper.ConnectionString=connectionText;
 DataTable Query(string sql,params SqlParameter[] parameters){using var c=DatabaseHelper.GetConnection();c.Open();using var q=new SqlCommand(sql,c){CommandTimeout=120};q.Parameters.AddRange(parameters);var table=new DataTable();using var a=new SqlDataAdapter(q);a.Fill(table);return table;}
 int checks=0;void Check(bool ok,string label){if(!ok)throw new Exception(label);checks++;Console.WriteLine("PASS: "+label);}
-string Resource(string name){using var input=typeof(MutationKind).Assembly.GetManifestResourceStream(name)!;using var reader=new StreamReader(input);return reader.ReadToEnd();}
-if(args.Contains("--compatibility")){using var c=DatabaseHelper.GetConnection();c.Open();DatabaseCompatibility.Validate(c);Console.WriteLine("PASS: uploaded schema 6 meets production startup and restore compatibility requirements.");return;}
-if(args.Contains("--upgrade-from-4"))
-{
-    using var c=DatabaseHelper.GetConnection();c.Open();c.InfoMessage+=(_,e)=>Console.WriteLine(e.Message);
-    foreach(int version in new[]{5,6})
-    {
-        using var q=new SqlCommand(Resource($"Migration{version}Checks.sql"),c){CommandTimeout=120};q.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource($"Migration{version}.sql")});q.ExecuteNonQuery();
-    }
-    DatabaseCompatibility.Validate(c);Console.WriteLine("PASS: prior user-supplied schema-4 data survives ordered 5/6 upgrades, injected rollback, rerun and current startup validation.");return;
+using(var compatible=DatabaseHelper.GetConnection()){
+    compatible.Open();DatabaseCompatibility.Validate(compatible);
+    Check(true,"current schema 6 meets production startup and restore compatibility requirements");
 }
-if(args.Contains("--migration")){
-    using var c=DatabaseHelper.GetConnection();c.Open();c.InfoMessage+=(_,e)=>Console.WriteLine(e.Message);
-    using var q=new SqlCommand(Resource("Migration6Checks.sql"),c){CommandTimeout=120};q.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource("Migration6.sql")});q.ExecuteNonQuery();
-    DatabaseCompatibility.Validate(c);Check(true,"startup validates request table, typed columns, result foreign keys, uniqueness and safeguards");
-}
+if(args.Contains("--compatibility")) return;
 CurrentUser.UserId=Convert.ToInt32(Query("SELECT TOP(1) U.UserId FROM dbo.Users U JOIN dbo.Roles R ON R.RoleId=U.RoleId WHERE R.RoleName=N'Administrator'").Rows[0][0]);
 int admin=CurrentUser.UserId;
 if(args.Contains("--additional-fee")){await AdditionalFeeChecks.RunAsync(admin);return;}

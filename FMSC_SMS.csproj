@@ -4,7 +4,7 @@
         <Compile Remove="Tests/**/*.cs" />
         <!-- DACPAC SQL scripting utility is a separate .NET 8 console project. -->
         <Compile Remove="Tools/DacpacSqlScripter/**/*.cs" />
-        <Compile Remove="CommunicationHost/**/*.cs;CommunicationWorker/**/*.cs" />
+        <Compile Remove="Apps/**/*.cs" />
     </ItemGroup>
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
@@ -106,28 +106,21 @@
 			<LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == '' AND Exists('$(MSBuildProjectDirectory)\..\Tools\SqlLocalDB.msi')">$(MSBuildProjectDirectory)\..\Tools\SqlLocalDB.msi</LocalDbMsiPath>
 			<LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == '' AND Exists('$(MSBuildProjectDirectory)\..\LocalDB\SqlLocalDB.msi')">$(MSBuildProjectDirectory)\..\LocalDB\SqlLocalDB.msi</LocalDbMsiPath>
 			<LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == ''">$(MSBuildProjectDirectory)\..\Tools\SqlLocalDB.msi</LocalDbMsiPath>
-			<!-- Baseline schema version a fresh install already has. -->
-			<!-- The current complete schema and school data form the version-1 release baseline. -->
-			<BaselineDatabaseVersion>1</BaselineDatabaseVersion>
 			<_InstallerScript>$(MSBuildProjectDirectory)\Installer\core.ps1</_InstallerScript>
 			<_InstallerText>$([System.IO.File]::ReadAllText('$(_InstallerScript)'))</_InstallerText>
 			<!-- [$] escapes the PowerShell variable marker from MSBuild property expansion. -->
 			<_RequiredSchemaVersion>$([System.Text.RegularExpressions.Regex]::Match('$(_InstallerText)', '[$]DatabaseVersion = [^0-9]*([0-9]+)').Groups[1].Value)</_RequiredSchemaVersion>
-			<_RequiredSchemaVersionNumber>$([System.Convert]::ToInt32('$(_RequiredSchemaVersion)'))</_RequiredSchemaVersionNumber>
 		</PropertyGroup>
-		<Error Condition="'$(_RequiredSchemaVersion)' == ''" Text="FIX 36: could not read the required schema version from Installer\core.ps1, so the migration requirement cannot be determined. Expected a line like: `$DatabaseVersion = '2'" />
+		<Error Condition="'$(_RequiredSchemaVersion)' == ''" Text="Could not read the required schema version from Installer\core.ps1. Expected a line like: `$DatabaseVersion = '6'" />
 		<ItemGroup>
 			<_RequiredDeploymentFile Include="$(MSBuildProjectDirectory)\Installer\core.ps1" />
 			<_RequiredDeploymentFile Include="$(MSBuildProjectDirectory)\Installer\Install FMSC_SMS.bat" />
-			<_RequiredSqlMigration Include="$(DeploymentMigrationDirectory)\*.sql" />
 		</ItemGroup>
 		<Error Condition="'@(_RequiredDeploymentFile)' != '' AND !Exists('%(FullPath)')" Text="Required release asset is missing: %(FullPath). Publishing has been stopped." />
 		<!-- LocalDB must be bundled; sqlcmd can be resolved by the installer. The self-contained publish includes the .NET Desktop Runtime. -->
 		<Error Condition="!Exists('$(LocalDbMsiPath)')" Text="Required LocalDB prerequisite is missing: $(LocalDbMsiPath). Supply LocalDbMsiPath or place SqlLocalDB.msi in ..\Tools or ..\LocalDB." />
 		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Installer\ValidateReleaseAssets.ps1&quot; -DatabaseDirectory &quot;$(DeploymentDatabaseDirectory)&quot; -LocalDbMsiPath &quot;$(LocalDbMsiPath)&quot;"
               EnvironmentVariables="PSModulePath=$(SystemRoot)\System32\WindowsPowerShell\v1.0\Modules" />
-		<Error Condition="'@(_RequiredSqlMigration)' == '' AND '$(_RequiredSchemaVersionNumber)' &gt; '$(BaselineDatabaseVersion)'" Text="FIX 36: the release requires database schema version $(_RequiredSchemaVersion) but no SQL migration files were found under $(DeploymentMigrationDirectory). A release artifact cannot reach that version without its migration chain." />
-		<Message Condition="'@(_RequiredSqlMigration)' == '' AND '$(_RequiredSchemaVersionNumber)' &lt;= '$(BaselineDatabaseVersion)'" Importance="high" Text="FIX 36: release requires schema version $(_RequiredSchemaVersion), which a fresh install already has, so no migration is needed and ..\Migrations may be empty." />
 	</Target>
 	<Target Name="CopyDeploymentFiles" AfterTargets="Publish" DependsOnTargets="ValidateDeploymentAssets" Condition="'$(CIAppOnlyBundle)' != 'true' Or '$(GITHUB_ACTIONS)' != 'true'">
 		<PropertyGroup>
@@ -144,7 +137,7 @@
 		<Copy SourceFiles="$(LocalDbMsiPath)" DestinationFiles="$(ReleaseRoot)Tools\SqlLocalDB.msi" SkipUnchangedFiles="true" />
 		<MakeDir Directories="$(ReleaseRoot)Migrations" />
 		<ItemGroup>
-			<MigrationFiles Include="$(DeploymentMigrationDirectory)\**\*.sql" />
+			<MigrationFiles Include="$(DeploymentMigrationDirectory)\*.sql" />
 		</ItemGroup>
 		<Copy SourceFiles="@(MigrationFiles)" DestinationFiles="@(MigrationFiles->'$(ReleaseRoot)Migrations\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\core.ps1" DestinationFiles="$(ReleaseRoot)core.ps1" SkipUnchangedFiles="true" />
@@ -156,5 +149,5 @@
 	<ItemGroup>
 	  <None Include=".editorconfig" />
 	</ItemGroup>
-<ItemGroup><EmbeddedResource Include="Migrations/7.sql" LogicalName="FMSC_SMS.Communication.Schema.sql" /></ItemGroup>
+<ItemGroup><EmbeddedResource Include="Services/Communication/Schema.sql" LogicalName="FMSC_SMS.Communication.Schema.sql" /></ItemGroup>
 </Project>

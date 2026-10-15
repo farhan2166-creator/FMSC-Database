@@ -4,6 +4,7 @@ using FMSC_SMS.Pages.Students.Maintenance;
 using Microsoft.Data.SqlClient;
 
 // The name guard prevents running writes against the school database accidentally.
+if(args.Length!=0) throw new ArgumentException("Use a disposable schema-6 baseline; legacy upgrade modes have been retired.");
 string connectionText=Environment.GetEnvironmentVariable("FMSC_AUDIT_CONNECTION")??throw new Exception("Set FMSC_AUDIT_CONNECTION to an explicitly disposable restored database.");
 var builder=new SqlConnectionStringBuilder(connectionText);
 bool localSqlAuth=!builder.IntegratedSecurity && builder.DataSource.StartsWith("127.0.0.1,",StringComparison.Ordinal) && builder.UserID=="sa";
@@ -14,20 +15,6 @@ DataTable Query(string sql,params SqlParameter[] parameters)
 {
     using var c=DatabaseHelper.GetConnection();c.Open();using var q=new SqlCommand(sql,c){CommandTimeout=120};q.Parameters.AddRange(parameters);
     var t=new DataTable();using var a=new SqlDataAdapter(q);a.Fill(t);return t;
-}
-if(args.Contains("--migration-4"))
-{
-    string Resource(string name){using var input=typeof(QuickRegistrationSaveCoordinator).Assembly.GetManifestResourceStream(name)!;using var reader=new StreamReader(input);return reader.ReadToEnd();}
-    using var connection=DatabaseHelper.GetConnection();connection.Open();
-    connection.InfoMessage+=(_,message)=>Console.WriteLine(message.Message);
-    using var command=new SqlCommand(Resource("Migration4Checks.sql"),connection){CommandTimeout=120};
-    command.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource("Migration4.sql")});command.ExecuteNonQuery();
-    using(var upgrade=new SqlCommand(Resource("Migration5Checks.sql"),connection){CommandTimeout=120}){upgrade.Parameters.Add(new SqlParameter("@Migration",SqlDbType.NVarChar,-1){Value=Resource("Migration5.sql")});upgrade.ExecuteNonQuery();}
-    using(var latest=new SqlCommand(Resource("Migration6.sql"),connection){CommandTimeout=120})latest.ExecuteNonQuery();
-    DatabaseCompatibility.Validate(connection);
-    Console.WriteLine("PASS: application startup contract validates migration 4's additive table, columns, uniqueness and foreign keys");
-    Console.WriteLine("PASS: 9 migration-4 checks plus 4 migration-5 rollback, rerun and preservation checks, upgraded to schema 6 on a disposable version-3 database.");
-    return;
 }
 int checks=0;
 void Assert(bool ok,string label){if(!ok)throw new Exception(label);Console.WriteLine("PASS: "+label);checks++;}

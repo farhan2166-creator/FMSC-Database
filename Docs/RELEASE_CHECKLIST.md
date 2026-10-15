@@ -28,8 +28,8 @@
 
 - [ ] [Complete installer workflow](../.github/workflows/fmsc-complete-installer.yml) finished **successfully** at the same SHA.
 - [ ] Downloaded private Actions artifact and recorded URL, run ID and checksum.
-- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, `Migrations/2.sql`–`7.sql`, required app resources, readme and communication deployment guide. `7.sql` uses a separate optional setup prompt with verified backup and transactional validation, not a schema-7 version bump.
-- [ ] Copied LocalDB recovery helper and `Migrations/7.sql` match the source commit; copied-helper tests passed. Start a new workflow run for new source rather than rerunning an older run.
+- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, a `Migrations/` folder (empty when there are no pending scripts), required app resources, readme and communication deployment guide. Applied scripts 2–7 are retired. Future numbered scripts must record their versions and match the application release; the installer backs up before applying them.
+- [ ] Copied installer and any pending numbered SQL files match the source commit; copied-helper migration discovery/version tests passed. Start a new workflow run for new source rather than rerunning an older run.
 - [ ] Microsoft LocalDB MSI signature and pinned sqlcmd digest were verified by the workflow; double-check source of prerequisites if changed.
 - [ ] DB snapshot is **not** included in Actions. The owner locally supplies matching **detached** `FMSC_DB.mdf` and `FMSC_DB_log.ldf` only for fresh-install validation.
 - [ ] Confirm expected `FMSC_DB` schema and database version against supplied snapshot; **do not replace existing school data or publish DACPAC over MDF/LDF**.

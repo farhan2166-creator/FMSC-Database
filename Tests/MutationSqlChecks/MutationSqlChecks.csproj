@@ -10,10 +10,6 @@
     <Compile Include="../../Core/DatabaseCompatibilityFailure.cs" Link="DatabaseCompatibilityFailure.cs" />
     <EmbeddedResource Include="../../Core/DatabaseCompatibilityRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseCompatibilityRequirements.json" />
     <EmbeddedResource Include="../../Core/DatabaseMigrationRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseMigrationRequirements.json" />
-    <EmbeddedResource Include="../../Migrations/5.sql" LogicalName="Migration5.sql" />
-    <EmbeddedResource Include="../QuickRegistrationSqlChecks/Migration5Checks.sql" LogicalName="Migration5Checks.sql" />
-    <EmbeddedResource Include="../../Migrations/6.sql" LogicalName="Migration6.sql" />
-    <EmbeddedResource Include="Migration6Checks.sql" LogicalName="Migration6Checks.sql" />
     <Using Include="System.Data" /><Using Include="FMSC_SMS" />
   </ItemGroup>
 </Project>

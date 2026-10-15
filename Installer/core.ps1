@@ -183,61 +183,6 @@ function Invoke-SqlDatabase {
     }
     return $Output
 }
-function Invoke-SqlFile {
-    param(
-        [string]$FilePath
-    )
-    if (-not (Test-Path -LiteralPath $FilePath)) {
-        throw `
-            "SQL migration file was not found: $FilePath"
-    }
-    Write-Log `
-        "Executing migration against database: $DatabaseName"
-    Write-Log `
-        "Migration file: $FilePath"
-    $Output =
-        & $script:SqlCmdPath `
-            -S $SqlInstance `
-            -E `
-            -d $DatabaseName `
-            -b `
-            -i $FilePath `
-            2>&1
-    if ($Output) {
-        foreach ($Line in $Output) {
-            Write-Log $Line.ToString()
-        }
-    }
-    if ($LASTEXITCODE -ne 0) {
-        throw `
-            "SQL migration failed: $FilePath"
-    }
-    Write-Log `
-        "Migration completed successfully: $FilePath"
-}
-<#
-FIX 38 - transactional / recovery semantics for a migration step.
-Invoke-SqlFile alone cannot give a migration atomicity: sqlcmd sends the file
-batch by batch (split on GO), and each batch that succeeds commits before the
-next is attempted. A failure half way through therefore leaves the database
-partially migrated while dbo.DatabaseVersion still reports the OLD version -
-the version is not falsely advanced, but the schema has moved, and re-running
-the migration will typically fail on objects the first run already created.
-What this wrapper adds:
-  * the version BEFORE the run is captured, so a failure reports the exact state
-    ("still at N, expected M") instead of a bare "SQL migration failed";
-  * after a successful run the recorded version is ASSERTED to equal the
-    migration's own version. A migration that completes without recording its
-    version, or records a different one, is reported as the defect it is rather
-    than passed silently to the next migration;
-  * a failure message that names the recovery position, so the database is left
-    in a state an operator can act on.
-This is a checkpoint, not a magic transaction. A migration needing true
-atomicity must itself use SET XACT_ABORT ON with BEGIN TRANSACTION / COMMIT
-around its DDL and record its version inside that transaction; a migration
-spanning multiple GO batches cannot be atomic and should be written to be
-idempotent instead.
-#>
 function New-PreMigrationBackup {
     param(
         [string]$FromVersion,
@@ -362,65 +307,6 @@ function New-PreMigrationBackup {
         "Recovery backup record: $RecordPath"
     Pause-Long
     return $BackupPath
-}
-function Invoke-SqlMigration {
-    param(
-        [string]$FilePath,
-        [int]$ExpectedVersion,
-        [string]$RecoveryBackupPath
-    )
-    $VersionBefore =
-        Get-DatabaseVersion
-    Write-Log `
-        "Applying migration $ExpectedVersion (database is at $VersionBefore before the run)"
-    try {
-        Invoke-SqlFile `
-            -FilePath $FilePath
-    }
-    catch {
-        $VersionAfterFailure =
-            Get-DatabaseVersion
-        # The parameter is optional so the wrapper stays callable on its own, but the migration loop always passes the path it created and verified.
-        if ([string]::IsNullOrWhiteSpace($RecoveryBackupPath)) {
-            $RecoveryBackupDescription =
-                '(no pre-migration backup was recorded for this run)'
-        }
-        else {
-            $RecoveryBackupDescription =
-                $RecoveryBackupPath
-        }
-        throw (
-            "Migration $ExpectedVersion failed.`r`n`r`n" +
-            "Database version before the run : $VersionBefore`r`n" +
-            "Database version now            : $VersionAfterFailure`r`n`r`n" +
-            "If the two differ, the migration's version update DID commit and only " +
-            "a later step failed. If they are the same, the schema may still have " +
-            "been partially changed by batches that committed before the failure.`r`n`r`n" +
-            "Recovery: inspect the objects the migration was meant to create. " +
-            "If the schema is inconsistent, restore this verified backup, taken " +
-            "automatically immediately before the migration chain started:`r`n`r`n" +
-            "    $RecoveryBackupDescription`r`n`r`n" +
-            "then re-run the installer.`r`n`r`n" +
-            "Underlying error: $($_.Exception.Message)"
-        )
-    }
-    $VersionAfter =
-        Get-DatabaseVersion
-    $VersionAfterObject =
-        Convert-ToDbVersion $VersionAfter
-    if ($VersionAfterObject -ne $ExpectedVersion) {
-        throw (
-            "Migration $ExpectedVersion ran without error, but the database " +
-            "recorded version $VersionAfter instead of $ExpectedVersion.`r`n`r`n" +
-            "Refusing to continue: every later migration assumes this one's version " +
-            "is current, and dbo.DatabaseVersion must never report a version the " +
-            "schema has not actually reached.`r`n`r`n" +
-            "Check that the migration file updates dbo.DatabaseVersion to its own " +
-            "version, then re-run the installer."
-        )
-    }
-    Write-Log `
-        "Migration $ExpectedVersion applied and recorded (database is now at $VersionAfter)"
 }
 function Get-InstalledApplicationVersion {
     $InstalledExe =
@@ -914,7 +800,7 @@ function Enable-StagedApplication {
             "Staged             : $Staging`r`n" +
             "Application folder : $AppDir`r`n`r`n" +
             $Recovery + "`r`n`r`n" +
-            "The database has not been migrated.`r`n`r`n" +
+            "Any completed database migrations remain applied; keep the recorded recovery backup.`r`n`r`n" +
             "Underlying error: $ActivationError"
         )
     }
@@ -927,46 +813,101 @@ function Enable-StagedApplication {
 }
 # Keep MSI recovery independent of database updates so it can be tested with mocked msiexec.
 function Invoke-InstallationDatabaseCheck {
-    param([string]$Application, [string]$Mode, [string]$MigrationFile)
-    $arguments = @($Mode, ('"' + $SqlInstance + '"'), ('"' + $DatabaseName + '"'))
-    if ($Mode -eq '--install-communication') { $arguments += ('"' + $MigrationFile + '"') }
-    $process = Start-Process -FilePath $Application -ArgumentList $arguments -PassThru
-    $null = $process.Handle # Retain the exit-code handle even if the helper exits immediately.
+    param([string]$Application)
+    $arguments = @('--verify-installation', ('"' + $SqlInstance + '"'), ('"' + $DatabaseName + '"'))
+    $process = Start-Process -FilePath $Application -ArgumentList $arguments -PassThru -WindowStyle Hidden
+    $null = $process.Handle
     if (-not $process.WaitForExit(180000)) {
         try { $process.Kill() } catch { }
-        throw 'Database verification/setup timed out. Do not assume setup failed or retry SQL manually. Keep the verified backup and rerun the installer to inspect the module state.'
+        throw 'Database verification timed out. The staged application was not activated.'
     }
     return $process.ExitCode
 }
-function Invoke-CommunicationSetup {
-    param([string]$Application, [string]$MigrationFile)
-    $state = Invoke-InstallationDatabaseCheck -Application $Application -Mode '--verify-installation'
-    if ($state -eq 0) {
-        Write-Log 'Communication Center is already installed and verified; no SQL was reapplied.'
-        return
+function Invoke-SqlMigration {
+    param([string]$FilePath, [int]$VersionBefore, [int]$ExpectedVersion)
+    $fullPath = [IO.Path]::GetFullPath($FilePath)
+    $wrapperPath = Join-Path ([IO.Path]::GetTempPath()) ('FMSC_migration_' + [Guid]::NewGuid().ToString('N') + '.sql')
+    # One sqlcmd connection owns the lock and transaction across every GO batch.
+    # Scripts may use a balanced nested transaction and must record their filename version.
+    $wrapper = @"
+:on error exit
+SET XACT_ABORT ON;
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_NULLS ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET ARITHABORT ON;
+SET NUMERIC_ROUNDABORT OFF;
+DECLARE @Lock int;
+EXEC @Lock=sys.sp_getapplock @Resource=N'FMSC_SchemaMigration',@LockMode=N'Exclusive',@LockOwner=N'Session',@LockTimeout=0;
+IF @Lock<0 THROW 51000,'Another database migration is running.',1;
+DECLARE @Before int=(SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC);
+IF @Before IS NULL OR @Before<>$VersionBefore THROW 51000,'Database version changed since migration planning; rerun the installer.',1;
+BEGIN TRANSACTION;
+GO
+:r "$fullPath"
+GO
+IF @@TRANCOUNT<>1 THROW 51000,'Migration did not preserve the installer transaction.',1;
+DECLARE @After int=(SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC);
+IF @After IS NULL OR @After<>$ExpectedVersion THROW 51000,'Migration did not record its expected database version.',1;
+COMMIT TRANSACTION;
+"@
+    try {
+        [IO.File]::WriteAllText($wrapperPath, $wrapper, [Text.UTF8Encoding]::new($false))
+        $output = & $script:SqlCmdPath -S $SqlInstance -E -d $DatabaseName -C -b -f 65001 -i $wrapperPath 2>&1
+        foreach ($line in $output) { Write-Log $line.ToString() }
+        if ($LASTEXITCODE -ne 0) {
+            throw "Migration $ExpectedVersion failed. The staged application was not activated. Keep the verified recovery backup and inspect the database before retrying."
+        }
+    } finally {
+        if (Test-Path -LiteralPath $wrapperPath) { Remove-Item -LiteralPath $wrapperPath -Force }
     }
-    if ($state -ne 10) {
-        throw "Database verification refused setup (code $state). Codes: 20=base schema incompatible; 21=existing communication schema incompatible; 23=connection/verification failure. No communication SQL was applied and the staged application was not activated."
-    }
-    Write-WarningMessage 'Communication Center database setup (Migrations\7.sql) has not been applied.'
-    Write-Host '  You may install it now. A verified backup is created first.' -ForegroundColor $ColorInfo
-    Write-Host '  Messaging remains disabled and paused; existing role grants are preserved.' -ForegroundColor $ColorInfo
-    $choice = Read-Host 'Install Communication Center database support now? (Y/N; Enter = No)'
-    if ($choice -notmatch '^[Yy]$') {
-        Write-Log 'Communication Center setup skipped by operator; the base application can still be updated.'
-        return
-    }
-    if (-not (Test-Path -LiteralPath $MigrationFile -PathType Leaf)) {
-        throw "Communication migration file is missing: $MigrationFile. No communication SQL was applied."
-    }
-    Write-Log 'Preparing Communication Center setup; base schema stays 6.'
-    $script:RecoveryBackupPath = New-PreMigrationBackup -FromVersion '6' -ToVersion '6_Communication1'
-    $result = Invoke-InstallationDatabaseCheck -Application $Application -Mode '--install-communication' -MigrationFile $MigrationFile
-    if ($result -ne 0) {
-        throw "Communication Center setup did not complete (code $result; 22=script differs from the application). The staged application was not activated. Keep the verified backup: $script:RecoveryBackupPath. A lost acknowledgement may mean COMMIT succeeded: rerun the installer for verification; do not rerun individual SQL batches."
-    }
-    Write-Log 'Communication Center setup verified. New installations are committed transactionally with messaging disabled and paused; existing settings are preserved. Base schema remains 6.'
 }
+function Invoke-PendingMigrations {
+    param([string]$Directory, [int]$RequiredVersion)
+    if (-not (Test-Path -LiteralPath $Directory -PathType Container)) {
+        Write-Log 'No migrations folder; skipping database migrations.'
+        return
+    }
+    $files = @(Get-ChildItem -LiteralPath $Directory -Filter '*.sql' -File)
+    if ($files.Count -eq 0) {
+        Write-Log 'Migrations folder has no SQL files; skipping database migrations.'
+        return
+    }
+    $versions = @{}
+    $migrations = @(foreach ($file in $files) {
+        if ($file.BaseName -notmatch '^[1-9][0-9]*$') {
+            throw "Invalid migration filename: $($file.Name). Use a positive integer such as 8.sql. No migrations were run."
+        }
+        $version = Convert-ToDbVersion $file.BaseName
+        if ($versions.ContainsKey($version)) { throw "Duplicate migration version $version. No migrations were run." }
+        $versions[$version] = $true
+        [pscustomobject]@{ FilePath = $file.FullName; Version = $version }
+    })
+    $current = Convert-ToDbVersion (Get-DatabaseVersion)
+    $pending = @($migrations | Where-Object Version -gt $current | Sort-Object Version)
+    if ($pending.Count -eq 0) {
+        Write-Log "No migrations newer than database version $current; skipping database migrations."
+        return
+    }
+    if ($current -gt $RequiredVersion -or ($pending | Where-Object Version -gt $RequiredVersion)) {
+        throw "Pending SQL exceeds this release's supported schema version $RequiredVersion. No migrations were run. Use the matching application release."
+    }
+    $target = $pending[-1].Version
+    if ($target -ne $RequiredVersion) {
+        throw "Available migrations stop at $target, but this release requires $RequiredVersion. No migrations were run."
+    }
+    $script:RecoveryBackupPath = New-PreMigrationBackup -FromVersion "$current" -ToVersion "$target"
+    foreach ($migration in $pending) {
+        Write-Step "Applying database migration $($migration.Version)..."
+        Invoke-SqlMigration -FilePath $migration.FilePath -VersionBefore $current -ExpectedVersion $migration.Version
+        $actual = Convert-ToDbVersion (Get-DatabaseVersion)
+        if ($actual -ne $migration.Version) { throw "Migration $($migration.Version) did not leave the expected database version. Application activation stopped." }
+        $current = $actual
+    }
+}
+
 function Invoke-LocalDbMsiInstallation {
     param([Parameter(Mandatory=$true)][string]$MsiPath,
           [Parameter(Mandatory=$true)][string]$LogDirectory)
@@ -1042,10 +983,6 @@ try {
     if (-not (Test-Path -LiteralPath $AppSource)) {
         throw `
             "Published application folder was not found: $AppSource"
-    }
-    if (-not (Test-Path -LiteralPath $MigrationsDir)) {
-        throw `
-            "Migrations folder was not found: $MigrationsDir"
     }
     $SourceExe =
         Join-Path $AppSource 'FMSC_SMS.exe'
@@ -1414,15 +1351,15 @@ try {
     Pause-Long
     Write-Section `
         'STEP 6 OF 8  -  APPLICATION STAGING'
-    # The new application is copied and verified here, before the database is touched at all, and is activated only in STEP 7.
+    # Stage and verify application files before pending migrations; activate only after full database verification.
     Write-Host `
         '  The new application is copied and verified first.' `
         -ForegroundColor $ColorInfo
     Write-Host `
-        '  It is activated only after a verified database backup' `
+        '  It is activated only after pending database updates' `
         -ForegroundColor $ColorInfo
     Write-Host `
-        '  exists, and before any migration runs.' `
+        '  and database compatibility checks have succeeded.' `
         -ForegroundColor $ColorInfo
     Write-Host ''
     $InstalledExe =
@@ -1460,273 +1397,12 @@ try {
     Pause-Long
     Write-Section `
         'STEP 7 OF 8  -  APPLICATION ACTIVATION AND DATABASE UPDATE'
-    $CurrentDatabaseVersion =
-        Get-DatabaseVersion
-    $CurrentVersionObject =
-        Convert-ToDbVersion $CurrentDatabaseVersion
-    $RequiredVersionObject =
-        Convert-ToDbVersion $DatabaseVersion
-    Write-Host ''
-    Write-Host `
-        '  DATABASE COMPATIBILITY' `
-        -ForegroundColor $ColorAccent
-    Write-Host ''
-    Write-Host `
-        "  Current database : $CurrentDatabaseVersion" `
-        -ForegroundColor $ColorInfo
-    Write-Host `
-        "  Required by app  : $DatabaseVersion" `
-        -ForegroundColor $ColorInfo
-    Write-Host ''
-    if ($CurrentVersionObject -gt $RequiredVersionObject) {
-        Write-Failure `
-            'Database is newer than this release supports.'
-        throw (
-            "The installed database is newer than this application release.`r`n`r`n" +
-            "Installed database: $CurrentDatabaseVersion`r`n" +
-            "Required by release: $DatabaseVersion`r`n`r`n" +
-            "The installer will NOT downgrade the database."
-        )
+    Invoke-PendingMigrations -Directory $MigrationsDir -RequiredVersion (Convert-ToDbVersion $DatabaseVersion)
+    $verification = Invoke-InstallationDatabaseCheck -Application (Join-Path $AppStagingDir 'FMSC_SMS.exe')
+    if ($verification -notin @(0,10)) {
+        throw "Database compatibility verification failed (code $verification). The staged application was not activated."
     }
-    if ($CurrentVersionObject -eq $RequiredVersionObject) {
-        Write-Success `
-            'Database schema is already up to date.'
-        Write-Success `
-            'No database migration is required.'
-        # Verify the complete base contract and offer the separately versioned
-        # optional communication module BEFORE activating the staged application.
-        Invoke-CommunicationSetup -Application (Join-Path $AppStagingDir 'FMSC_SMS.exe') -MigrationFile (Join-Path $MigrationsDir '7.sql')
-        Write-Step `
-            'Activating the staged application...'
-        Enable-StagedApplication `
-            -Staging $AppStagingDir `
-            -AppDir $AppDir `
-            -RollbackDir $AppRollbackDir
-        Write-Success `
-            'Application activated.'
-    }
-    else {
-        Write-WarningMessage `
-            'Database migration is required.'
-        Write-Host ''
-        Write-Host `
-            "  Current database : $CurrentDatabaseVersion" `
-            -ForegroundColor $ColorInfo
-        Write-Host `
-            "  Required database: $DatabaseVersion" `
-            -ForegroundColor $ColorInfo
-        Write-Host ''
-        Write-Step `
-            'Checking available migration files...'
-        $MigrationFiles =
-            Get-ChildItem `
-                -Path $MigrationsDir `
-                -Filter '*.sql' `
-                -File |
-            Sort-Object Name
-        if (-not $MigrationFiles) {
-            throw (
-                "Database migration is required, but no SQL migration " +
-                "files were found.`r`n`r`n" +
-                "Current database: $CurrentDatabaseVersion`r`n" +
-                "Required database: $DatabaseVersion`r`n" +
-                "Migrations directory: $MigrationsDir"
-            )
-        }
-        $ApplicableMigrations = @()
-        foreach ($MigrationFile in $MigrationFiles) {
-            $BaseName =
-                [System.IO.Path]::GetFileNameWithoutExtension(
-                    $MigrationFile.Name
-                )
-            if ($BaseName -notmatch '^\d+$') {
-                Write-Log `
-                    "Ignoring invalid migration filename: $($MigrationFile.Name) (expected a plain integer database schema version, e.g. 2.sql)"
-                continue
-            }
-            $MigrationVersion =
-                Convert-ToDbVersion $BaseName
-            if (
-                ($MigrationVersion -gt $CurrentVersionObject) -and
-                ($MigrationVersion -le $RequiredVersionObject)
-            ) {
-                $ApplicableMigrations +=
-                    [PSCustomObject]@{
-                        File = $MigrationFile
-                        Version = $MigrationVersion
-                        VersionText = $BaseName
-                    }
-            }
-        }
-        if ($ApplicableMigrations.Count -eq 0) {
-            throw (
-                "No applicable database migration was found.`r`n`r`n" +
-                "Current database: $CurrentDatabaseVersion`r`n" +
-                "Required database: $DatabaseVersion"
-            )
-        }
-        # The chain must be contiguous BEFORE anything runs. Merge/rebase dropped files and hand-numbered releases both produce exactly that gap.
-        $MissingMigrationVersions = @()
-        for (
-            $ExpectedVersion = $CurrentVersionObject + 1
-            $ExpectedVersion -le $RequiredVersionObject
-            $ExpectedVersion++
-        ) {
-            if (
-                -not ($ApplicableMigrations |
-                    Where-Object { $_.Version -eq $ExpectedVersion })
-            ) {
-                $MissingMigrationVersions +=
-                    "$ExpectedVersion.sql"
-            }
-        }
-        if ($MissingMigrationVersions.Count -gt 0) {
-            throw (
-                "The database migration chain is incomplete.`r`n`r`n" +
-                "Current database: $CurrentDatabaseVersion`r`n" +
-                "Required by app : $DatabaseVersion`r`n`r`n" +
-                "Missing migration file(s): " +
-                ($MissingMigrationVersions -join ', ') + "`r`n`r`n" +
-                "Migrations directory: $MigrationsDir`r`n`r`n" +
-                "Refusing to migrate: applying only the migrations that happen " +
-                "to be present would leave the database partially advanced."
-            )
-        }
-        Write-Success `
-            "Migration chain verified: $CurrentDatabaseVersion -> $DatabaseVersion has no gaps."
-        Write-Success `
-            "$($ApplicableMigrations.Count) database migration(s) available."
-        Write-Host ''
-        foreach (
-            $Migration in
-            ($ApplicableMigrations | Sort-Object Version)
-        ) {
-            Write-Host `
-                "    - $($Migration.VersionText)" `
-                -ForegroundColor $ColorDim
-        }
-        Write-Host ''
-        Write-Host `
-            '  ============================================================' `
-            -ForegroundColor $ColorWarning
-        Write-Host `
-            '                 DATABASE UPDATE REQUIRED' `
-            -ForegroundColor $ColorWarning
-        Write-Host `
-            '  ============================================================' `
-            -ForegroundColor $ColorWarning
-        Write-Host ''
-        Write-Host `
-            '  The application requires a newer database schema.' `
-            -ForegroundColor $ColorInfo
-        Write-Host `
-            '  The new application is already staged and verified, but it' `
-            -ForegroundColor $ColorInfo
-        Write-Host `
-            '  has NOT been activated. A verified database backup is taken' `
-            -ForegroundColor $ColorInfo
-        Write-Host `
-            '  first, then migrations run, then the application is activated.' `
-            -ForegroundColor $ColorInfo
-        Write-Host ''
-        Write-Host `
-            '  If you choose NO, the application will NOT be updated.' `
-            -ForegroundColor $ColorWarning
-        Write-Host ''
-        $MigrationApproval =
-            Read-Host `
-                '  Update the database now? (Y/N)'
-        if ($MigrationApproval -notmatch '^[Yy]$') {
-            Write-Host ''
-            Write-Failure `
-                'Database migration was declined.'
-            Write-Host ''
-            Write-Host `
-                '  The new application was staged but NOT activated.' `
-                -ForegroundColor $ColorWarning
-            Write-Host `
-                '  The installed application and the database are unchanged.' `
-                -ForegroundColor $ColorWarning
-            Write-Host ''
-            Write-Host `
-                '  Installation cancelled.' `
-                -ForegroundColor $ColorWarning
-            Write-Host ''
-            exit 0
-        }
-        Write-Host ''
-        Write-Success `
-            'Database migration approved.'
-        Pause-Long
-        # One recovery point for the whole upgrade, taken after the operator approves the migration and before the first migration runs.
-        $RecoveryBackupPath =
-            New-PreMigrationBackup `
-                -FromVersion $CurrentDatabaseVersion `
-                -ToVersion $DatabaseVersion
-        # Keep the currently installed application active until the entire
-        # migration chain and final schema-version check have succeeded.
-        foreach (
-            $Migration in
-            ($ApplicableMigrations | Sort-Object Version)
-        ) {
-            $MigrationFile =
-                $Migration.File
-            $MigrationVersion =
-                $Migration.VersionText
-            Write-Host ''
-            Write-Host `
-                '  ------------------------------------------------------------' `
-                -ForegroundColor $ColorTitle
-            Write-Host `
-                "  DATABASE MIGRATION $MigrationVersion" `
-                -ForegroundColor $ColorTitle
-            Write-Host `
-                '  ------------------------------------------------------------' `
-                -ForegroundColor $ColorTitle
-            Write-Log `
-                "Applying migration: $MigrationVersion"
-            Write-Log `
-                "File: $($MigrationFile.FullName)"
-            Write-Step `
-                "Applying database migration $MigrationVersion..."
-            # run through the migration wrapper, which captures the version before the run, reports a failure with the exact before/after state, and asserts the migration recorded exactly its own version.
-            Invoke-SqlMigration `
-                -FilePath $MigrationFile.FullName `
-                -ExpectedVersion $Migration.Version `
-                -RecoveryBackupPath $RecoveryBackupPath
-            $CurrentDatabaseVersion =
-                Get-DatabaseVersion
-            Write-Success `
-                "Database schema is now version $CurrentDatabaseVersion."
-            Write-Log `
-                "Database is now version $CurrentDatabaseVersion"
-            Pause-Long
-        }
-        # compare as numbers. This was a string comparison, so '10' and '9' would compare as unequal even when both are version 10, and a leading zero ('05') would fail against '5'.
-        $FinalRecordedVersionObject =
-            Convert-ToDbVersion $CurrentDatabaseVersion
-        if ($FinalRecordedVersionObject -ne $RequiredVersionObject) {
-            throw (
-                "Database migration did not reach the required version.`r`n`r`n" +
-                "Current: $CurrentDatabaseVersion`r`n" +
-                "Required: $DatabaseVersion"
-            )
-        }
-        Write-Success `
-            'All required database migrations completed successfully.'
-        Invoke-CommunicationSetup -Application (Join-Path $AppStagingDir 'FMSC_SMS.exe') -MigrationFile (Join-Path $MigrationsDir '7.sql')
-        Write-Step `
-            'Activating the staged application...'
-        Enable-StagedApplication `
-            -Staging $AppStagingDir `
-            -AppDir $AppDir `
-            -RollbackDir $AppRollbackDir
-        Write-Success `
-            'Application activated.'
-        Write-Log `
-            "Previous application kept for rollback: $AppRollbackDir"
-        Pause-Long
-    }
+    $RequiredVersionObject = Convert-ToDbVersion $DatabaseVersion
     # Reject databases lacking reviewed baseline features; do not require procedures absent from the approved schema.
     $NeedsLatestUpdates = Invoke-SqlMaster -Query "SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH('FMSC_DB.dbo.Students','AdmissionNumber') IS NULL OR OBJECT_ID('FMSC_DB.dbo.SaveStudentDetailsWithFirstEnrollment','P') IS NULL OR OBJECT_ID('FMSC_DB.dbo.AdmitHistoricalStudent','P') IS NULL THEN 1 ELSE 0 END;"
     if (($NeedsLatestUpdates -join "`n") -match '(?m)^\s*1\s*$') {
@@ -1752,6 +1428,8 @@ try {
             "Required: $DatabaseVersion"
         )
     }
+    Write-Step 'Activating the staged application...'
+    Enable-StagedApplication -Staging $AppStagingDir -AppDir $AppDir -RollbackDir $AppRollbackDir
     Write-Success `
         "Final database schema version: $FinalDatabaseVersion"
     Write-Host ''

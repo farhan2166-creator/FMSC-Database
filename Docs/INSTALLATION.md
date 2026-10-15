@@ -10,7 +10,7 @@ The private [Complete Windows Installer ZIP](../.github/workflows/fmsc-complete-
 FMSC_SMS/                 Published self-contained app and resources
 Database/                 You provide FMSC_DB.mdf and FMSC_DB_log.ldf for a fresh install
 Tools/                    Signed Microsoft SqlLocalDB.msi and verified sqlcmd.exe
-Migrations/               2.sql through 6.sql; optional Communication Center add-on 7.sql
+Migrations/               Pending numbered SQL migrations; currently empty
 Install FMSC_SMS.bat
 core.ps1
 READ_ME_FIRST.txt         Packaging instructions
@@ -20,9 +20,11 @@ SHA256SUMS.txt            Package content hashes
 
 **Important:** The GitHub build deliberately excludes school MDF/LDF files. The source repository alone is **not** a ready-to-install fresh database. A complete-installer workflow must first run successfully and upload its artifact; do not assume an installer exists from a passing ordinary CI build.
 
-After fixes are merged, start a **new** Complete Windows Installer ZIP run with **Run workflow → main**. Rerunning an older run rebuilds its original source commit. Check the source commit in the run summary and extracted `READ_ME_FIRST.txt`; do not mix an older `core.ps1` with newer application files. Packaging verifies the copied installer recovery helper and communication SQL against that checked-out revision.
+After fixes are merged, start a **new** Complete Windows Installer ZIP run with **Run workflow → main**. Rerunning an older run rebuilds its original source commit. Check the source commit in the run summary and extracted `READ_ME_FIRST.txt`; do not mix an older `core.ps1` with newer application files. Packaging verifies the copied installer against that checked-out revision and checks the migration folder inventory.
 
-`Migrations/7.sql` is optional Communication Center support. It does not advance the approved base version from 6. After base compatibility verification, the installer asks **Install Communication Center database support now?** Choose **Y** to create a verified backup and install/verify it transactionally before application activation. Enter or N skips it; a valid existing module is preserved and an incompatible module is refused. Follow [Communication Center deployment](COMMUNICATION_CENTER.md#deployment-gate) on a disposable copy first. No provider is enabled and no existing role gains access automatically.
+The installer no longer offers the already-applied Communication Center setup. Its runtime definition remains embedded for verification; fresh installs that need the module must use a snapshot containing it.
+
+The installer checks `Migrations` for top-level `*.sql` files. An empty or missing folder skips migration execution. Filenames must be positive integer versions (for example `8.sql`); the installer reads `dbo.DatabaseVersion`, ignores files at or below that version, and applies pending files in numeric order. It creates one checksum-verified recovery backup before the first pending file. Each file must use a balanced transaction, preserve the installer's outer transaction, and record its filename version in `dbo.DatabaseVersion`. A SQL failure or incorrect recorded version stops installation before app activation. Pending versions must match the schema supported by the application release; update the application's and installer's required version together when shipping a future schema change.
 
 ## Before a fresh install
 
@@ -49,7 +51,7 @@ If silent LocalDB installation fails (for example, MSI code 1603), the current i
 
 - Take and **verify** a recoverable backup first and note its storage path.
 - Do **not** copy a replacement MDF/LDF over an installed school's existing pair.
-- Run the same verified installer with the app closed. Its database version gates and ordered migration chain must be allowed to operate; a newer schema must not be downgraded.
+- Run the same verified installer with the app closed. This release requires the current schema-6 baseline. Applied scripts 2–7 are retired; future upgrades are supplied as numbered SQL files. Older databases still require a reviewed upgrade path to the release baseline. A newer schema must not be downgraded.
 - Record the automatic pre-migration safety backup, installer status, original/current version, and post-upgrade application compatibility. Recovery requires a tested restore path.
 - If anything fails, **do not manually rerun SQL migrations on the live school database**. Follow [recovery](BACKUP_RECOVERY.md), and use a verified disposable clone for diagnosis.
 
