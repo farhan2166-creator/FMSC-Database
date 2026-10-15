@@ -9,7 +9,9 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 3
+    # Owner-requested pause: restore to 3 to resume routine version-update PRs.
+    # This does not disable Dependabot security updates or alerts.
+    open-pull-requests-limit: 0
     groups:
       nuget-minor-and-patch:
         patterns: ["*"]
@@ -20,7 +22,8 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 3
+    # Keep routine GitHub Actions version-update PRs paused as well.
+    open-pull-requests-limit: 0
     groups:
       actions-minor-and-patch:
         patterns: ["*"]
