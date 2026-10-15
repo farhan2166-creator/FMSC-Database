@@ -6,8 +6,8 @@ on:
     paths:
       - 'FMSC.dacpac'
       - 'Schema/**'
-      - 'Schema/**'
       - 'Tools/export_dacpac_schema.py'
+      - 'Tools/DacpacSqlScripter/**'
       - 'Tools/test_dacpac_schema_export.py'
       - '.github/workflows/fmsc-dacpac-schema.yml'
   pull_request:
@@ -15,7 +15,9 @@ on:
     paths:
       - 'FMSC.dacpac'
       - 'DatabaseSchema/**'
+      - 'Schema/**'
       - 'Tools/export_dacpac_schema.py'
+      - 'Tools/DacpacSqlScripter/**'
       - 'Tools/test_dacpac_schema_export.py'
       - '.github/workflows/fmsc-dacpac-schema.yml'
   workflow_dispatch:
@@ -103,6 +105,11 @@ jobs:
           gh pr create --base main --head "$branch" --draft \
             --title "Review SQL schema re-extraction into Schema folder" \
             --body "Generated from a **data-free DACPAC model** using Microsoft DacFx CREATE scripting. Replaces old DatabaseSchema XML export with Schema/*.sql and a JSON coverage manifest. No exported table records were read; no database migrations or application SQL were executed. Inline constraints may be contained in parent table CREATE statements rather than separate scripts. This is NOT schema approval or authorization to deploy. Review changes and run CI before merging. Source commit: ${GITHUB_SHA}."
+          # GITHUB_TOKEN-created PRs suppress default PR events. Explicitly
+          # dispatch read-only checks on the exact generated branch.
+          gh workflow run fmsc-desktop-ci.yml --ref "$branch"
+          gh workflow run fmsc-security.yml --ref "$branch"
+          gh workflow run fmsc-dacpac-schema.yml --ref "$branch"
 
 # DacFx scripting runs on a data-free temporary package; only a reviewed default-
 # branch workflow can create the generated PR. The old DatabaseSchema folder is
