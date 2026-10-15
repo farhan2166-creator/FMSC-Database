@@ -25,7 +25,11 @@ internal static partial class Program
         Check(buttons.Count>0&&buttons.All(button=>!button.Enabled),"Record-specific profile shortcuts start unavailable with no selected student");
         foreach(var button in buttons)button.PerformClick();Check(opens==0,"Disabled blank-profile shortcuts cannot dispatch an accidental default record page");
         var picker=(StudentPicker)typeof(StudentProfilePage).GetField("student",flags)!.GetValue(page)!;picker.SetStudent(41,"Student");typeof(StudentProfilePage).GetMethod("UpdateStudentShortcuts",flags)!.Invoke(page,null);
-        Check(buttons.All(button=>button.Enabled),"A committed profile student makes record-specific shortcuts available");buttons[0].PerformClick();Check(opens==1,"A deliberate selected-student shortcut still navigates normally");
+        Check(buttons.All(button=>button.Enabled),"A committed profile student makes record-specific shortcuts available");
+        // Family now intentionally opens an owned window. Exercise a named
+        // navigation shortcut rather than assuming the first button navigates.
+        buttons.Single(button=>button.Text=="Open "+PageTitles.StudentRecordChecks).PerformClick();
+        Check(opens==1,"A deliberate selected-student review shortcut still navigates normally");
         picker.SetStudent(0,"");typeof(StudentProfilePage).GetMethod("UpdateStudentShortcuts",flags)!.Invoke(page,null);Check(buttons.All(button=>!button.Enabled),"Clearing the committed profile identity removes shortcut targets");
         Check(!page.IsHandleCreated,"Profile shortcut fixture starts no SQL or destination form");
     }

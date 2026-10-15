@@ -65,6 +65,18 @@ Promotion History is reached from this button rather than a separate navigation 
 - If a save times out, disconnects or gives uncertain feedback, **do not create a new transaction to test whether it worked**. Use the page's reconciliation action, then ask the administrator if necessary.
 - A printed report or exported CSV/PDF is a copy of selected data; verify filters and avoid sharing student or financial documents with unauthorized recipients.
 
+## Student Account Statement and annual receipts
+
+Open **Reports > Student Account Statement**, then choose a student by admission number or name. Their account loads without an Include checkbox. The full-width details show fee charges, allocated payments and remaining amounts; the summary shows opening balance, charges, payments and closing balance. Leave the optional dates unchecked for the complete account, or choose a period and click **View Statement**. Changing a student or period makes the old export unavailable until the statement is refreshed.
+
+Choose **Annual Receipts** to open the existing yearly receipt sheet for that student. Select the academic year inside that window; this is a receipt printout, while the statement explains charges and balances. The separate Reports tile has been consolidated into the statement action; the Student Profile receipt shortcut remains available. Existing statement permission is required. When exactly one student is selected in group mode, its explicit academic-year filter is carried into the receipts window; an unavailable year must be chosen again.
+
+For several students, switch on **Group / family statements**, use the placement filters and **Find Students**, then tick **Include** or **Include Family** and click **View Statement**. Existing group selection, due printing and exports remain available. Switching modes clears every selected student and family, including selections outside the visible results, while retaining the chosen date period.
+
+## Family / Siblings from Student Profile
+
+Select a student in **Student Profile**, then choose **Open Family / Siblings**. The existing family workspace opens in an owned window for that student. Close it to return to the same profile; the profile refreshes to show changed family links. The window cannot close during a pending link/unlink operation. Family viewing and student-administration permissions still govern viewing and changes separately. Normal sidebar navigation uses Student Profile; the direct family route is retained for an account with family access but no profile-viewing permission.
+
 ## Daily Collection Closing
 
 Enter whole-rupee actual amounts. Leave Refund/Correction actuals blank and explain their impact in Notes; blank ordinary methods remain unchecked. Printed totals include recorded adjustments without inventing counted amounts. Historical stored fractions remain visible at their original precision and are not silently rounded when printing.
