@@ -159,5 +159,9 @@ Review captured images explicitly with `review_layout.py`, validate the public
 evidence with `validate_report.py`, and retain each run's actual source metadata.
 The suite returns nonzero while a required scenario remains blocked or unreviewed.
 Detailed prerequisites, safety boundaries, cleanup and dedicated-runner setup are
-in [LEVEL2_TESTING.md](LEVEL2_TESTING.md). Implementation and fixes remain in
-[draft PR #42](https://github.com/farhan2166-creator/FMSC-Database/pull/42), unmerged.
+in [LEVEL2_TESTING.md](LEVEL2_TESTING.md). Implementation, fixes, results and
+fictional evidence were published to `main` through
+[PR #42](https://github.com/farhan2166-creator/FMSC-Database/pull/42)
+(merge commit `2c22a53`) with the owner's authorization. Historical source commits
+in the evidence identify the actual tested revisions; publication does not add
+test coverage or change the recorded outcomes.
