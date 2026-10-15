@@ -12,25 +12,30 @@ internal static class Regression
         schema.AddObjects("CREATE PROCEDURE dbo.P @Id int, @Optional int = NULL AS SELECT @Id AS Id;");
         schema.AddObjects("CREATE PROCEDURE dbo.UserP @UserId int AS SELECT @UserId AS Id;");
         schema.AddObjects("CREATE PROCEDURE dbo.TvpP @Rows dbo.RowT READONLY AS SELECT Id FROM @Rows;");
-        var fixture = schema.GetObjects(DacQueryScopes.UserDefined)
-            .First(p => p.ObjectType.Name == "Procedure" && p.Name.ToString().Contains("P", StringComparison.Ordinal));
-        Console.WriteLine("FIXTURE_AST: " + string.Join(", ",
-            fixture.GetAst().Batches.SelectMany(b => b.Statements).Select(x => x.GetType().FullName)));
-        Console.WriteLine("FIXTURE_SIGNATURE: " + new AuditExtensions.Schema(schema).Procedures["dbo.P"].Known);
+        Require(new AuditExtensions.Schema(schema).Procedures["dbo.P"].Known,
+            "DacFx-generated procedure DDL must supply parameters.");
         var root = Path.Combine(Path.GetTempPath(), "fmsc-audit-fictional-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
             // Synthetic only. No live FMSC database or application files are modified.
             var code = """
+                using DB = FMSC_SMS.DatabaseHelper;
                 namespace FMSC_SMS {
                     public static class DatabaseHelper {
                         public static object Query(string procedure, params object[] parameters) => new();
                         public static object QueryUserAsync(string procedure, params object[] parameters) => new();
+                        public static object QueryUser(string procedure, params object[] parameters) => new();
+                        public static object QueryUserSet(string procedure, params object[] parameters) => new();
+                        public static object ExecuteUser(string procedure, params object[] parameters) => new();
+                        public static object ExecuteUserAsync(string procedure, params object[] parameters) => new();
+                        public static object ScalarUser(string procedure, params object[] parameters) => new();
+                        public static object ScalarUserAsync(string procedure, params object[] parameters) => new();
                         public static object QueryUserSetAsync(string procedure, params object[] parameters) => new();
                         public static object Execute(string procedure, params object[] parameters) => new();
                         public static object Scalar(string procedure, params object[] parameters) => new();
                         public static object QuerySql(string sql, params object[] parameters) => new();
+                        public static object QuerySqlAsync(string sql, params object[] parameters) => new();
                         public static object Int(string name, int? number) => new();
                         public static object Bit(string name, bool value) => new();
                     }
@@ -54,6 +59,21 @@ internal static class Regression
                             DatabaseHelper.Query("dbo.P", DatabaseHelper.Int("@Bad", 1)); // PARAM_MISSING
                             DatabaseHelper.Query("dbo.P", DatabaseHelper.Bit("@Id", true)); // PARAM_TYPE
                             DatabaseHelper.Query("dbo.P", DatabaseHelper.Int("@Id", 1)); // OPTIONAL_GOOD
+                            DatabaseHelper.Query(procedure: "dbo.P", parameters: new[] { DatabaseHelper.Int("@Id", 1) }); // NAMED_GOOD
+                            DB.Query("dbo.P", DatabaseHelper.Int("@Id", 1)); // ALIAS_GOOD
+                            const string stable = "dbo.P";
+                            DatabaseHelper.Query(stable, DatabaseHelper.Int("@Id", 1)); // LOCAL_CONST
+                            DatabaseHelper.QueryUser("dbo.UserP"); // USER_SYNC
+                            DatabaseHelper.QueryUserSet("dbo.UserP"); // USER_SET_SYNC
+                            DatabaseHelper.Execute("dbo.P", DatabaseHelper.Int("@Id", 1)); // EXEC_GOOD
+                            DatabaseHelper.ExecuteUser("dbo.UserP"); // EXEC_USER
+                            DatabaseHelper.ExecuteUserAsync("dbo.UserP"); // EXEC_USER_ASYNC
+                            DatabaseHelper.Scalar("dbo.P", DatabaseHelper.Int("@Id", 1)); // SCALAR_GOOD
+                            DatabaseHelper.ScalarUser("dbo.UserP"); // SCALAR_USER
+                            DatabaseHelper.ScalarUserAsync("dbo.UserP"); // SCALAR_USER_ASYNC
+                            DatabaseHelper.QuerySqlAsync("SELECT Id FROM dbo.Existing"); // RAW_ASYNC
+                            DatabaseHelper.QuerySql("SELECT Id FROM dbo.Missing"); // RAW_UNQUALIFIED_CASE
+                            DatabaseHelper.QuerySql("SELECT Id FROM Missing"); // RAW_MISSING_REVIEW
                             DatabaseHelper.QueryUserAsync("dbo.UserP"); // USER_INJECT
                             DatabaseHelper.QueryUserSetAsync("dbo.UserP"); // USER_SET
                             var p = new[] { DatabaseHelper.Int("@Id", 1) };
@@ -89,7 +109,7 @@ internal static class Regression
             File.WriteAllText(path, code);
             var findings = new List<Finding>();
             var audited = AuditExtensions.Scan(schema, root, new[] { path }, findings);
-            Require(audited == 19, $"Caller count expected 19, got {audited}.");
+            Require(audited == 33, $"Caller count expected 33, got {audited}.");
             int Line(string marker)
             {
                 var offset = code.IndexOf("// " + marker, StringComparison.Ordinal);
@@ -112,7 +132,9 @@ internal static class Regression
                     string.Join("; ", findings.Where(f => f.Line == Line(marker))));
             }
             foreach (var marker in new[] { "CONST_GOOD", "CONCAT_GOOD", "OPTIONAL_GOOD",
-                "USER_INJECT", "USER_SET", "ARRAY_GOOD", "SQL_GOOD", "TVP_GOOD", "CMD_TEXT", "DECOY" })
+                "USER_INJECT", "USER_SET", "ARRAY_GOOD", "SQL_GOOD", "TVP_GOOD", "CMD_TEXT", "DECOY",
+                "NAMED_GOOD", "ALIAS_GOOD", "LOCAL_CONST", "USER_SYNC", "USER_SET_SYNC", "EXEC_GOOD",
+                "EXEC_USER", "EXEC_USER_ASYNC", "SCALAR_GOOD", "SCALAR_USER", "SCALAR_USER_ASYNC", "RAW_ASYNC" })
                 Clean(marker);
             Expect("PROC_MISSING", "FAIL", "dbo.Gone");
             Expect("PARAM_MISSING", "FAIL", "@Bad");
@@ -120,6 +142,8 @@ internal static class Regression
             Expect("DYNAMIC_REVIEW", "REVIEW_REQUIRED", "Dynamic");
             Expect("MUTABLE_REVIEW", "REVIEW_REQUIRED", "Dynamic");
             Expect("TABLE_MISSING", "FAIL", "dbo.Absent");
+            Expect("RAW_UNQUALIFIED_CASE", "FAIL", "dbo.Missing");
+            Expect("RAW_MISSING_REVIEW", "REVIEW_REQUIRED", "dbo.Missing");
             Expect("COLUMN_REVIEW", "REVIEW_REQUIRED", "NoSuch");
             Expect("DYNAMIC_SQL", "REVIEW_REQUIRED", "Dynamic");
             Expect("TVP_MISSING", "FAIL", "TVP type differs");
@@ -130,7 +154,7 @@ internal static class Regression
             Require(AuditExtensions.Constant(expression, null) == "dbo.P", "Literal concatenation.");
             Require(AuditExtensions.Normalize("[dbo].[P]") == "dbo.P", "Qualified identifiers.");
             Require(AuditExtensions.Normalize("P") == "dbo.P", "Default dbo schema.");
-            Console.WriteLine("PASS: fictional Roslyn/DacFx/ScriptDom regressions (19 caller cases; positives, negatives, parameters, TVPs, SQL, locations).");
+            Console.WriteLine("PASS: fictional Roslyn/DacFx/ScriptDom regressions (33 caller cases; positives, negatives, parameters, TVPs, SQL, locations).");
         }
         finally { Directory.Delete(root, recursive: true); }
     }
