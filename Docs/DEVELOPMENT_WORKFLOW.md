@@ -84,9 +84,9 @@ These are heuristic text-secret/file-name checks, not a guarantee of finding eve
 
 ## Reviewing Dependabot updates
 
-[.github/dependabot.yml](../.github/dependabot.yml) checks NuGet at the project root and `Tests/*`, and GitHub Actions weekly on Monday. It groups minor/patch updates and caps regular version-update PRs at three per ecosystem. Major updates remain separate review proposals. There is no auto-merge configuration; no current dependency or target-framework version is changed by adding it. GitHub's separate security-update PRs, if already enabled, have their own limits.
+[.github/dependabot.yml](../.github/dependabot.yml) currently pauses routine NuGet and GitHub Actions version-update PRs with `open-pull-requests-limit: 0` in both ecosystem entries. This leaves existing dependency PRs open and does not change GitHub security-alert settings, separate security-update PRs (if enabled) or secret scanning. No dependency versions or target frameworks are changed.
 
-After the reviewed configuration reaches the default `main` branch, GitHub can schedule these update PRs. If they do not appear, check the repository's Dependabot version-update status and Actions policy in Settings; no paid secret-scanning service needs to be enabled.
+To resume, restore both limits to `3` and merge that configuration change into `main`. The retained schedule checks NuGet at the project root, `Tests/*`, `CommunicationHost` and `CommunicationWorker`, and GitHub Actions weekly on Monday, grouping minor/patch updates. Major updates remain separate proposals. The pause has no automatic expiry, and there is no auto-merge configuration.
 
 For each update PR, read release/breaking-change notes, ensure the package still supports **.NET 8 Windows Forms**, and inspect every manifest change in a grouped update. Require the existing Windows CI and security checks to pass. For reporting/SQL-client dependencies, also perform the relevant Windows/report/disposable-database acceptance before a release. Merge manually after review or defer/close the proposal; a minor/patch label alone does not prove compatibility.
 
