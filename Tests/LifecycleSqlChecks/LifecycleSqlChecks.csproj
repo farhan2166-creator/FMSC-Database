@@ -5,6 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+    <Compile Include="../../Services/Communication/*.cs" Exclude="../../Services/Communication/WindowsGatewayStore.cs" Link="Communication/%(Filename)%(Extension)" />
     <Compile Include="../QuickRegistrationSqlChecks/DatabaseContext.cs" Link="DatabaseContext.cs" />
     <Compile Include="../../Core/DatabaseCompatibility.cs" Link="DatabaseCompatibility.cs" />
     <Compile Include="../../Core/DatabaseCompatibilityFailure.cs" Link="DatabaseCompatibilityFailure.cs" />
@@ -21,4 +22,5 @@
     <Using Include="System.Data" /><Using Include="FMSC_SMS" /><Using Include="FMSC_SMS.Core" />
     <Using Include="FMSC_SMS.Pages.Security" /><Using Include="FMSC_SMS.Pages.Finance.Collection" />
   </ItemGroup>
+<ItemGroup><EmbeddedResource Include="../../Migrations/Communication/001_CommunicationCenter.sql" LogicalName="FMSC_SMS.Communication.Schema.sql" /></ItemGroup>
 </Project>

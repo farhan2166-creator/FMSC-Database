@@ -19,7 +19,8 @@ internal static class Program
         });
         if (ready)
         {
-            if (args.Contains("--mutation-fixture")) await SeedLegacyMutation(fixture!);
+            if (args.Contains("--communication")) await CommunicationSqlChecks.Run(fixture!,Evidence);
+            else if (args.Contains("--mutation-fixture")) await SeedLegacyMutation(fixture!);
             else if (!args.Contains("--fixture-only")) await new Lifecycle(fixture!, Evidence).Run();
         }
         Evidence.Save(path);
