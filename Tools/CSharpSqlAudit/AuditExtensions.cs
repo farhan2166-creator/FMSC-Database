@@ -505,6 +505,15 @@ internal static class AuditExtensions
                         "Dynamic SqlCommand procedure name."));
                     continue;
                 }
+                if (!explicitInitializer)
+                {
+                    // The property was assigned later, possibly after execution or on a conditional path.
+                    // Without flow-sensitive verification this is not a definite stored-procedure invocation.
+                    findings.Add(new Finding("REVIEW_REQUIRED", file, line, "SqlCommand",
+                        Normalize(identifier),
+                        "CommandType.StoredProcedure is assigned after construction; verify execution order and branches."));
+                    continue;
+                }
                 var proc = Normalize(identifier);
                 if (!schema.Procedures.ContainsKey(proc))
                     findings.Add(new Finding("FAIL", file, line, "SqlCommand", proc,
