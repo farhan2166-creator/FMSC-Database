@@ -1,0 +1,75 @@
+name: FMSC C# and DACPAC compatibility audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'FMSC.dacpac'
+      - '**/*.cs'
+      - 'Tools/CSharpSqlAudit/**'
+      - 'Tools/export_dacpac_schema.py'
+      - '.github/workflows/fmsc-csharp-sql-audit.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'FMSC.dacpac'
+      - '**/*.cs'
+      - 'Tools/CSharpSqlAudit/**'
+      - 'Tools/export_dacpac_schema.py'
+      - '.github/workflows/fmsc-csharp-sql-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Prepare data-free DACPAC metadata
+        run: python Tools/export_dacpac_schema.py --prepare-model-only "$RUNNER_TEMP/schema-only.dacpac"
+      - name: Analyze C# procedure references against candidate DACPAC
+        id: audit
+        shell: bash
+        run: |
+          set +e
+          dotnet run -c Release --project Tools/CSharpSqlAudit/CSharpSqlAudit.csproj -- \
+            "$RUNNER_TEMP/schema-only.dacpac" "$GITHUB_WORKSPACE" "$RUNNER_TEMP/compatibility"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Summarize audit findings
+        if: always()
+        shell: bash
+        run: |
+          if test -s "$RUNNER_TEMP/compatibility/CompatibilityReport.md"; then
+            cat "$RUNNER_TEMP/compatibility/CompatibilityReport.md" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Analysis incomplete. No compatibility conclusion can be claimed." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: csharp-dacpac-audit-${{ github.run_id }}
+          path: ${{ runner.temp }}/compatibility/
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Enforce definite incompatibilities or incomplete analysis
+        env:
+          CODE: ${{ steps.audit.outputs.exit_code }}
+        shell: bash
+        run: |
+          if test "$CODE" != '0'; then
+            echo "Audit did not pass (exit $CODE). See report or step output." >&2
+            exit 1
+          fi
