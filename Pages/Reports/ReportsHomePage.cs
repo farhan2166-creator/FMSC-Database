@@ -105,14 +105,8 @@ public sealed class ReportsHomePage : V2Page
                         PageTitles.StudentAccountStatement,
                         "A student's charges, payments and balance.",
                         "Finance",
-                        () => new StudentAccountStatementPage()),
-                    new(
-                        PageTitles.AnnualFeeReceipts,
-                        "Print a student's yearly payment receipts in a compact two-column sheet.",
-                        "Finance",
-                        () => new AnnualFeeReceiptsPage())
-                }.Where(report => CurrentUser.HasPermission("Fees.Statement.View") ||
-                    report.Title != PageTitles.AnnualFeeReceipts).ToArray());
+                        () => new StudentAccountStatementPage())
+                });
             hasReports = true;
         }
         if (!hasReports)

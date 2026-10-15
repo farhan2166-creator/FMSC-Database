@@ -47,6 +47,15 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             ForeColor = AppTheme.MutedText,
             Text = "No students included"
         };
+    private bool groupMode;
+    private Action? arrangeStatement;
+    private readonly CheckBox groupModeToggle = new() { Text = "Group / family statements", AutoSize = true };
+    private readonly Label statementContext = new() {
+        Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft,
+        Font = AppTheme.ButtonFont, ForeColor = AppTheme.Text,
+        Text = "Select a student to view their account."
+    };
+    private ModernButton? annualReceiptsButton;
     private bool suppressFilterEvents;
     private bool suppressStudentEvents;
     private int studentSearchVersion;
@@ -67,7 +76,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     public string BusyMessage=>"A financial statement or report is being prepared. Wait for the result before leaving.";
     public StudentAccountStatementPage() : this(true,null) { }
     internal StudentAccountStatementPage(bool initialize,Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>>? readStatement)
-        : base(PageTitles.StudentAccountStatement, "Select students to review or print their charges, payments and balances.")
+        : base(PageTitles.StudentAccountStatement, "See what a student was charged, what was paid and what remains due.")
     {
         this.readStatement=readStatement??LoadStatementDataAsync;
         Disposed+=(_,_)=>statementReads.Dispose();
@@ -86,8 +95,15 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             StudentPicker.SearchPlaceholder;
         studentSearch.SearchFailed += ex => Fail(ex);
         studentSearch.UserSelectionChanged += async (_, _) => {
-            OnFiltersChanged();
-            await SearchStudents();
+            if (groupMode) { OnFiltersChanged(); await SearchStudents(); }
+            else
+            {
+                SelectSingleStudent();
+                await LoadStatement();
+            }
+        };
+        studentSearch.SelectionCleared += (_, _) => {
+            if (!groupMode) ClearSingleStudent();
         };
         studentSearch.KeyDown +=
             async (_, e) => {
@@ -96,7 +112,8 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
                 e.SuppressKeyPress = true;
                 e.Handled = true;
                 /* SearchStudents returns Task, so it must be awaited. */
-                await SearchStudents();
+                if (groupMode) await SearchStudents();
+                else if (studentSearch.SelectedId > 0) { SelectSingleStudent(); await LoadStatement(); }
             };
         campus.SelectedIndexChanged +=
             async (_, _) => {
@@ -140,249 +157,224 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             (_, _) => OnFiltersChanged();
         if(initialize)Defer(BindContextLookups);
         ConfigureStudentGrid();
-        var filters =
-            HumanUi.Card("1. Find Students", "Use any combination of filters. Admission Number or name is usually the quickest search.");
-        var filterGrid =
-            new TableLayoutPanel {
-                Dock = DockStyle.Fill,
-                ColumnCount = 4,
-                RowCount = 2,
-                Padding = new Padding(2),
-                Margin = new Padding(0)
-            };
-        for (int i = 0; i < 4; i++)
-        {
-            filterGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
-        }
-        // Field panels also need room for the input's own margins and their bottom padding.
-        int fieldRowHeight = Math.Max(AppMetrics.FieldRowHeight,
+        BuildStatementLayout();
+        ClearForm();
+    }
+    private void BuildStatementLayout()
+    {
+        var filters = HumanUi.Card("Student account", "Choose a student. Dates are optional; leave them unchecked for the complete account.");
+        var filterGrid = new TableLayoutPanel {
+            Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Margin = Padding.Empty
+        };
+        foreach (float width in new[] { 30f, 30f, 20f, 20f })
+            filterGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
+        int fieldHeight = Math.Max(AppMetrics.FieldRowHeight,
             AppMetrics.TextHeight(AppTheme.FieldCaptionFont) + AppMetrics.InputControlHeight
             + AppMetrics.SpacingSm + Math.Max(studentSearch.Margin.Vertical, from.Margin.Vertical));
-        filterGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, fieldRowHeight));
-        filterGrid.RowStyles.Add(new RowStyle(SizeType.Absolute, fieldRowHeight));
-        filterGrid.Controls.Add(HumanUi.Field("Campus", campus), 0, 0);
-        filterGrid.Controls.Add(HumanUi.Field("Academic Year", year), 1, 0);
-        filterGrid.Controls.Add(HumanUi.Field("Class", cls), 2, 0);
-        filterGrid.Controls.Add(HumanUi.Field("Section", section), 3, 0);
-        filterGrid.Controls.Add(HumanUi.Field("Student Name or Admission Number", studentSearch), 0, 1);
+        filterGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        filterGrid.Controls.Add(HumanUi.Field("Student", studentSearch), 0, 0);
         filterGrid.SetColumnSpan(studentSearch.Parent!, 2);
-        filterGrid.Controls.Add(HumanUi.Field("Statement From (optional)", from), 2, 1);
-        filterGrid.Controls.Add(HumanUi.Field("Statement To (optional)", to), 3, 1);
-        // Field's default auto-sized column retains the native date picker's
-        // preferred width. Let every field follow its allocated filter column.
+        filterGrid.Controls.Add(HumanUi.Field("From (optional)", from), 2, 0);
+        filterGrid.Controls.Add(HumanUi.Field("To (optional)", to), 3, 0);
         foreach (TableLayoutPanel field in filterGrid.Controls.OfType<TableLayoutPanel>())
-            field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        var searchButton =
-            CreateFilterButton("Find Students", AppTheme.Primary);
-        var viewButton =
-            CreateFilterButton("Generate Statement", AppTheme.Success);
-        var dueReportButton =
-            CreateFilterButton("Print Amounts Due", AppTheme.Primary);
-        generateStatementButton = viewButton;
-        printAmountsDueButton = dueReportButton;
-        UpdateSelectionActions();
-        var clearButton =
-            CreateFilterButton("Start Over", AppTheme.MutedText);
-        /* this is also the one place that takes off ticks the current list does not show, so the button says so rather than leaving the operator to hunt for them. */
-        SetToolTip(
-            clearButton,
-            "Clears the filters, the search and the statement, and unticks every student - "
-            + "including students ticked in an earlier search that this list does not show.");
-        /* SearchStudents returns Task; await it so a failure surfaces through this handler rather than as an unobserved task exception. */
-        searchButton.Click += async (_, _) => await SearchStudents();
-        viewButton.Click += async (_, _) => await LoadStatement();
-        dueReportButton.Click += async (_, _) => await PrintDueReport();
-        clearButton.Click += (_, _) => {
-            ClearForm();
-            /* The section list was narrowed to the previous campus/class; with both cleared it must offer every section again. */
-            _ = ReloadSections();
+            field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        var groupFilters = new TableLayoutPanel {
+            Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Margin = Padding.Empty, Visible = false
         };
-        var buttonPanel =
-            new TableLayoutPanel {
-                Dock = DockStyle.Fill,
-                ColumnCount = 4,
-                RowCount = 1,
-                Padding = new Padding(2, 4, 2, 0),
-                Margin = new Padding(0)
-            };
-        for (int i = 0; i < 4; i++)
-            buttonPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
-        buttonPanel.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-        foreach (ModernButton button in new[]
-                 {
-                     searchButton,
-                     viewButton,
-                     dueReportButton,
-                     clearButton
-                 })
+        foreach (var item in new[] { ("Campus", campus), ("Academic Year", year), ("Class", cls), ("Section", section) })
         {
-            button.Dock = DockStyle.Fill;
-            button.Margin = new Padding(4, 2, 4, 2);
-            button.MinimumSize = new Size(0, AppMetrics.ButtonHeight);
+            groupFilters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+            groupFilters.Controls.Add(HumanUi.Field(item.Item1, item.Item2), groupFilters.Controls.Count, 0);
         }
-        buttonPanel.Controls.Add(searchButton, 0, 0);
-        buttonPanel.Controls.Add(viewButton, 1, 0);
-        buttonPanel.Controls.Add(dueReportButton, 2, 0);
-        buttonPanel.Controls.Add(clearButton, 3, 0);
-        var filterBody =
-            new TableLayoutPanel {
-                Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 2,
-                Padding = new Padding(0),
-                Margin = new Padding(0)
-            };
-        filterBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        filterBody.RowStyles.Add(new RowStyle(SizeType.Absolute, fieldRowHeight * 2 + filterGrid.Padding.Vertical));
-        filterBody.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 8));
+        var find = CreateFilterButton("Find Students", AppTheme.Primary);
+        find.Click += async (_, _) => await SearchStudents();
+        generateStatementButton = CreateFilterButton("View Statement", AppTheme.Primary);
+        generateStatementButton.Click += async (_, _) => await LoadStatement();
+        printAmountsDueButton = CreateFilterButton("Print Amounts Due", AppTheme.MutedText);
+        printAmountsDueButton.Click += async (_, _) => await PrintDueReport();
+        annualReceiptsButton = CreateFilterButton("Annual Receipts", AppTheme.MutedText);
+        annualReceiptsButton.Click += (_, _) => OpenAnnualReceipts();
+        var clear = CreateFilterButton("Clear", AppTheme.MutedText);
+        clear.Click += (_, _) => { ClearForm(); _ = ReloadSections(); };
+        SetToolTip(clear, "Clears all students, family selections, dates and the displayed statement.");
+        var actions = new FlowLayoutPanel {
+            Dock = DockStyle.Fill, WrapContents = true, Margin = Padding.Empty, Padding = Padding.Empty
+        };
+        foreach (var button in new[] { generateStatementButton, printAmountsDueButton, annualReceiptsButton, clear })
+        {
+            AppMetrics.FitButtonWidth(button, minWidth: 110);
+            actions.Controls.Add(button);
+        }
+        groupModeToggle.Font = AppTheme.NormalFont;
+        groupModeToggle.ForeColor = AppTheme.Text;
+        var modeBar = new FlowLayoutPanel {
+            Dock = DockStyle.Fill, WrapContents = false, Margin = Padding.Empty, Padding = Padding.Empty
+        };
+        modeBar.Controls.Add(groupModeToggle);
+        modeBar.Controls.Add(find);
+        find.Visible = false;
+        groupModeToggle.CheckedChanged += (_, _) => {
+            if (IsBusy) { groupModeToggle.Checked = groupMode; return; }
+            if (groupMode == groupModeToggle.Checked) return;
+            groupMode = groupModeToggle.Checked;
+            // A mode change never carries hidden students into a single-student account.
+            var start = from.Value; var end = to.Value;
+            bool hasStart = from.Checked, hasEnd = to.Checked;
+            ClearForm();
+            from.Value = start; to.Value = end; from.Checked = hasStart; to.Checked = hasEnd;
+            groupFilters.Visible = groupMode;
+            find.Visible = groupMode;
+            arrangeStatement?.Invoke();
+        };
+        var filterBody = new TableLayoutPanel {
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty
+        };
+        filterBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        filterBody.RowStyles.Add(new RowStyle(SizeType.Absolute, fieldHeight));
+        var groupFilterRow = new RowStyle(SizeType.Absolute, 0);
+        filterBody.RowStyles.Add(groupFilterRow);
+        filterBody.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
+        var actionsRow = new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight);
+        filterBody.RowStyles.Add(actionsRow);
         filterBody.Controls.Add(filterGrid, 0, 0);
-        filterBody.Controls.Add(buttonPanel, 0, 1);
+        filterBody.Controls.Add(groupFilters, 0, 1);
+        filterBody.Controls.Add(modeBar, 0, 2);
+        filterBody.Controls.Add(actions, 0, 3);
         filters.Content.Controls.Add(filterBody);
-        var studentCard =
-            HumanUi.Card("2. Choose Students", "Tick Include, or Include Family for linked students.");
-        var selectAllButton = CreateFilterButton("Select All Results", AppTheme.MutedText);
-        var clearSelectionButton = CreateFilterButton("Clear Selection", AppTheme.MutedText);
-        selectAllButton.Click += (_, _) => SelectAllStudents();
-        clearSelectionButton.Click += (_, _) => ClearStudentSelection();
-        var selectionBar = new TableLayoutPanel {
-            Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 1,
-            Padding = new Padding(0),
-            Margin = new Padding(0)
-        };
-        selectionBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
-        selectionBar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
-        selectAllButton.Dock = DockStyle.Fill;
-        clearSelectionButton.Dock = DockStyle.Fill;
-        selectionBar.Controls.Add(selectAllButton, 0, 0);
-        selectionBar.Controls.Add(clearSelectionButton, 1, 0);
-        selectionSummary.AutoSize = false;
-        selectionSummary.Margin = new Padding(4, 0, 4, 0);
-        /* Use explicit rows rather than Dock.Top plus Dock.Fill. The latter depends on WinForms z-order and allowed the toolbar to consume/overlap nearly all of the student grid at shorter window heights. */
+
+        var studentCard = HumanUi.Card("Choose students / families", "Tick students or Include Family. Selections can span searches.");
+        var selectAll = CreateFilterButton("Select All Results", AppTheme.MutedText);
+        var deselect = CreateFilterButton("Clear Selection", AppTheme.MutedText);
+        selectAll.Click += (_, _) => { SelectAllStudents(); OnFiltersChanged(); };
+        deselect.Click += (_, _) => { ClearStudentSelection(); OnFiltersChanged(); };
         var selectionBody = new TableLayoutPanel {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 3,
-            Padding = new Padding(0),
-            Margin = new Padding(0)
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty
         };
-        selectionBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        int selectionSummaryHeight = AppMetrics.TextHeight(AppTheme.NormalFont) + 6;
-        selectionBody.RowStyles.Add(new RowStyle(SizeType.Absolute, selectionSummaryHeight));
-        selectionBody.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 10));
-        selectionBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+        selectionBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        selectionBody.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.NormalFont) + 8));
+        selectionBody.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
+        selectionBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         selectionBody.Controls.Add(selectionSummary, 0, 0);
-        selectionBody.Controls.Add(selectionBar, 0, 1);
+        selectionBody.Controls.Add(HumanUi.ButtonRow(selectAll, deselect), 0, 1);
         selectionBody.Controls.Add(students, 0, 2);
         studentCard.Content.Controls.Add(selectionBody);
-        var statement =
-            HumanUi.Card("3. Review Statement", "Charges and allocated payments.", accessory: export);
-        // Dock the accessory before the two header labels consume vertical space.
-        statement.Header.Controls.SetChildIndex(export, statement.Header.Controls.Count - 1);
+        var statement = HumanUi.Card("Account details", "Fee charges with allocated payments and remaining amounts.", accessory: exportButton);
+        statement.Header.Controls.SetChildIndex(exportButton, statement.Header.Controls.Count - 1);
         statement.Content.Controls.Add(Grid);
-        var work =
-            new TableLayoutPanel {
-                Dock = DockStyle.Fill,
-                ColumnCount = 2,
-                RowCount = 1,
-                Padding = new Padding(0, 6, 0, 0),
-                Margin = new Padding(0)
-            };
-        work.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
-        work.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50f));
-        work.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-        work.Controls.Add(studentCard, 0, 0);
-        work.Controls.Add(statement, 1, 0);
         var summary = BuildSummary();
-        var root =
-            new TableLayoutPanel {
-                Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 4,
-                Padding = new Padding(0),
-                Margin = new Padding(0)
-            };
-        int filterHeight = filters.Padding.Vertical + filters.Header.Height + filters.Content.Padding.Vertical
-            + fieldRowHeight * 2 + filterGrid.Padding.Vertical + AppMetrics.ButtonHeight + 8;
-        int summaryHeight = SummaryCardRowHeight();
-        int statusHeight = AppMetrics.TextHeight(AppTheme.NormalFont) + 8;
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, filterHeight));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, summaryHeight));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, statusHeight));
+        var root = new TableLayoutPanel {
+            ColumnCount = 1, RowCount = 6, Margin = Padding.Empty, Padding = Padding.Empty
+        };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        var filterRow = new RowStyle(SizeType.Absolute);
+        var selectionRow = new RowStyle(SizeType.Absolute, 0);
+        root.RowStyles.Add(filterRow);
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.ButtonFont) + 12));
+        root.RowStyles.Add(selectionRow);
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, SummaryCardRowHeight()));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.NormalFont) * 2 + 8));
         root.Controls.Add(filters, 0, 0);
-        root.Controls.Add(work, 0, 1);
-        root.Controls.Add(summary, 0, 2);
-        StatusLabel.TextAlign = ContentAlignment.MiddleLeft;
-        root.Controls.Add(StatusLabel, 0, 3);
-
-        // A fill-docked table alone shrinks its percent row to zero. Keep a usable
-        // grid height inside a scrolling viewport when the dialog is shorter.
-        var viewport = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Margin = new Padding(0) };
-        root.Dock = DockStyle.None;
+        root.Controls.Add(statementContext, 0, 1);
+        root.Controls.Add(studentCard, 0, 2);
+        root.Controls.Add(summary, 0, 3);
+        root.Controls.Add(statement, 0, 4);
+        root.Controls.Add(StatusLabel, 0, 5);
+        var viewport = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Margin = Padding.Empty };
         viewport.Controls.Add(root);
         bool arranging = false;
-        Size arrangedViewportSize = Size.Empty;
-        void ArrangeStatement()
-        {
-            if (arranging || viewport.ClientSize == arrangedViewportSize)
-                return;
+        arrangeStatement = () => {
+            if (arranging) return;
             arranging = true;
-            arrangedViewportSize = viewport.ClientSize;
             try
             {
-                int availableWidth = viewport.ClientSize.Width;
-                int studentWidth = students.Columns.Cast<DataGridViewColumn>()
-                    .Where(column => column.Visible).Sum(column => column.MinimumWidth)
-                    + studentCard.Padding.Horizontal + SystemInformation.VerticalScrollBarWidth + 8;
-                bool stacked = availableWidth < studentWidth + AppScale.Scale(420) + AppMetrics.SpacingSm;
-                int gridHeight = students.ColumnHeadersHeight + AppMetrics.GridRowHeight * 4
-                    + SystemInformation.HorizontalScrollBarHeight + 4;
-                int studentHeight = studentCard.Padding.Vertical + studentCard.Header.Height
-                    + studentCard.Content.Padding.Vertical + selectionSummaryHeight
-                    + AppMetrics.ButtonHeight + 10 + gridHeight;
-                int statementHeight = statement.Padding.Vertical + statement.Header.Height
-                    + statement.Content.Padding.Vertical + gridHeight;
-                work.SuspendLayout();
-                work.SetCellPosition(statement, new TableLayoutPanelCellPosition(stacked ? 0 : 1, stacked ? 1 : 0));
-                work.ColumnCount = stacked ? 1 : 2;
-                work.RowCount = stacked ? 2 : 1;
-                work.ColumnStyles.Clear();
-                work.RowStyles.Clear();
-                work.ColumnStyles.Add(stacked
-                    ? new ColumnStyle(SizeType.Percent, 100f)
-                    : new ColumnStyle(SizeType.Absolute, Math.Max(studentWidth + AppMetrics.SpacingSm, availableWidth * 0.48f)));
-                if (stacked)
+                root.SuspendLayout();
+                groupFilterRow.Height = groupMode ? fieldHeight : 0;
+                studentCard.Visible = groupMode;
+                int width = Math.Max(AppScale.Scale(720), viewport.ClientSize.Width - SystemInformation.VerticalScrollBarWidth);
+                int actionWidth = width - filters.Padding.Horizontal - filters.Content.Padding.Horizontal;
+                int rows = 1, usedWidth = 0;
+                foreach (Control button in actions.Controls)
                 {
-                    work.RowStyles.Add(new RowStyle(SizeType.Absolute, studentHeight + AppMetrics.SpacingSm));
-                    work.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+                    int required = button.Width + button.Margin.Horizontal;
+                    if (usedWidth > 0 && usedWidth + required > actionWidth) { rows++; usedWidth = 0; }
+                    usedWidth += required;
                 }
-                else
-                {
-                    work.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-                    work.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
-                }
-                studentCard.Margin = stacked
-                    ? new Padding(0, 0, 0, AppMetrics.SpacingSm)
-                    : new Padding(0, 0, AppMetrics.SpacingSm, 0);
-                int workHeight = work.Padding.Vertical + studentHeight
-                    + (stacked ? statementHeight + AppMetrics.SpacingSm : 0);
-                root.Size = new Size(Math.Max(availableWidth, AppScale.Scale(720)),
-                    Math.Max(viewport.ClientSize.Height, filterHeight + workHeight + summaryHeight + statusHeight));
-                work.ResumeLayout(true);
+                actionsRow.Height = AppMetrics.ButtonRowHeight * rows;
+                filterRow.Height = filters.Padding.Vertical + filters.Header.Height + filters.Content.Padding.Vertical
+                    + fieldHeight * (groupMode ? 2 : 1) + AppMetrics.ButtonRowHeight + actionsRow.Height;
+                selectionRow.Height = groupMode ? studentCard.Padding.Vertical + studentCard.Header.Height
+                    + studentCard.Content.Padding.Vertical + AppMetrics.TextHeight(AppTheme.NormalFont) + 8
+                    + AppMetrics.ButtonRowHeight + students.ColumnHeadersHeight + AppMetrics.GridRowHeight * 4 : 0;
+                int fixedHeight = root.RowStyles.Cast<RowStyle>().Where(r => r.SizeType == SizeType.Absolute).Sum(r => (int)r.Height);
+                int statementHeight = statement.Padding.Vertical + statement.Header.Height + statement.Content.Padding.Vertical
+                    + Grid.ColumnHeadersHeight + AppMetrics.GridRowHeight * 5 + SystemInformation.HorizontalScrollBarHeight;
+                root.Size = new Size(width,
+                    Math.Max(viewport.ClientSize.Height, fixedHeight + statementHeight));
+                root.ResumeLayout(true);
             }
-            finally
-            {
-                arranging = false;
-            }
-        }
-        viewport.SizeChanged += (_, _) => ArrangeStatement();
-        viewport.Layout += (_, _) => ArrangeStatement();
+            finally { arranging = false; }
+        };
+        viewport.SizeChanged += (_, _) => arrangeStatement();
         SetContent(viewport);
-        ArrangeStatement();
-        ClearForm();
+        arrangeStatement();
+    }
+    private void SelectSingleStudent()
+    {
+        statementReads.Cancel();
+        Grid.DataSource = null;
+        openingBalance.Text = chargesTotal.Text = paymentsTotal.Text = closingBalance.Text = "0";
+        _appliedFilterSignature = string.Empty;
+        SetReportActionsEnabled(false);
+        manuallySelectedAdmissionIds.Clear();
+        familySelections.Clear();
+        students.Rows.Clear();
+        int id = studentSearch.SelectedId;
+        if (id > 0)
+        {
+            manuallySelectedAdmissionIds.Add(id);
+            students.Rows.Add(true, false, id, studentSearch.Text, "", "");
+        }
+        statementContext.Text = id > 0 ? studentSearch.Text : "Select a student to view their account.";
+        OnFiltersChanged();
+    }
+    private void ClearSingleStudent()
+    {
+        SelectSingleStudent();
+        SetStatus("Select a student to view their charges, payments and balance.");
+    }
+    private void OpenAnnualReceipts()
+    {
+        if (IsBusy || IsDisposed) return;
+        if (!CurrentUser.HasPermission("Fees.Statement.View"))
+        {
+            SetStatus("Annual receipts require statement access.", PageStatusKind.Warning); return;
+        }
+        var ids = GetSelectedAdmissionIds();
+        if (ids.Count != 1) { SetStatus("Select exactly one student to open annual receipts.", PageStatusKind.Warning); return; }
+        try
+        {
+            using var dialog = CreateAnnualReceiptsDialog(ids[0]);
+            dialog.ShowDialog(FindForm());
+        }
+        catch (Exception ex) { Fail(ex); }
+    }
+    private ApplicationWindowForm CreateAnnualReceiptsDialog(int admissionId)
+    {
+        var dialog = new ApplicationWindowForm {
+            Text = PageTitles.AnnualFeeReceipts, StartPosition = FormStartPosition.CenterParent,
+            ClientSize = new Size(AppScale.Scale(1100), AppScale.Scale(680)),
+            MinimumSize = new Size(AppScale.Scale(800), AppScale.Scale(480)), ShowInTaskbar = false,
+            BackColor = AppTheme.PageBackground
+        };
+        try
+        {
+            var page = new AnnualFeeReceiptsPage(admissionId, groupMode ? year.SelectedId : 0) { Dock = DockStyle.Fill };
+            dialog.Controls.Add(page);
+            ModalPageCloseGuard.Attach(dialog, page);
+            return dialog;
+        }
+        catch { dialog.Dispose(); throw; }
     }
     // This is additive only - the free-text search, campus/year/class/section filters, and multi-student/family statement logic below are completely unchanged.
     public StudentAccountStatementPage(int preloadAdmissionId)
@@ -402,6 +394,15 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             await SearchStudents();
             if (IsDisposed)
                 return;
+            var selected = students.Rows.Cast<DataGridViewRow>().FirstOrDefault(row => GetRowAdmissionId(row) == admissionId);
+            if (selected is null)
+            {
+                ClearSingleStudent();
+                SetStatus("This student could not be found. Choose a student before viewing their account.", PageStatusKind.Warning);
+                return;
+            }
+            studentSearch.SetStudent(admissionId, Convert.ToString(selected.Cells["StudentName"].Value) ?? AdmissionNumbers.ForId(admissionId));
+            statementContext.Text = studentSearch.Text;
             await LoadStatement();
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
@@ -697,7 +698,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         if (current)
             SetStatus("Statement matches the current filters and student selection.");
         else
-            SetStatus("Filters or student changed. Use Generate Statement again before exporting.", true);
+            SetStatus("Filters or student changed. Use View Statement again before exporting.", true);
     }
     private async Task BindContextLookups()
     {
@@ -940,7 +941,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         manuallySelectedAdmissionIds.Clear();
         familySelections.Clear();
         studentSearchVersion++;
-        SetStatus("Filter changed. Click Search Students to load students.");
+        SetStatus("Filter changed. Use Find Students to load students.");
     }
     private void SelectFamilyForStudent(int admissionId)
     {
@@ -1099,7 +1100,10 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     {
         bool hasStudents = GetSelectedAdmissionIds().Count > 0;
         if (generateStatementButton is not null) generateStatementButton.Enabled = hasStudents&&!BusyOperationRunning;
-        if (printAmountsDueButton is not null) printAmountsDueButton.Enabled = hasStudents && !printingDueReport;
+        if (printAmountsDueButton is not null) printAmountsDueButton.Enabled = hasStudents && !IsBusy;
+        if (annualReceiptsButton is not null) annualReceiptsButton.Enabled = GetSelectedAdmissionIds().Count == 1
+            && !IsBusy && CurrentUser.HasPermission("Fees.Statement.View");
+        if (groupMode) statementContext.Text = $"Group statement · {GetSelectedAdmissionIds().Count:N0} student(s) included";
     }
     private List<int> GetSelectedAdmissionIds()
     {
@@ -1151,13 +1155,13 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
                 new ColumnStyle(SizeType.Percent, 25f));
         }
         table.Controls.Add(
-            SummaryCard("Balance Before Period", openingBalance), 0, 0);
+            SummaryCard("Opening Balance", openingBalance), 0, 0);
         table.Controls.Add(
             SummaryCard("Charges in Period", chargesTotal), 1, 0);
         table.Controls.Add(
             SummaryCard("Payments in Period", paymentsTotal), 2, 0);
         table.Controls.Add(
-            SummaryCard("Balance at To Date", closingBalance), 3, 0);
+            SummaryCard("Closing Balance", closingBalance), 3, 0);
         return table;
     }
     private static Control SummaryCard(string title, Label value)
@@ -2032,8 +2036,8 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             string.Empty;
         SetReportActionsEnabled(false);
         UpdateSelectionActions();
-        SetStatus(
-            "Form cleared - every ticked student, including ticks carried over from earlier searches, "
-            + "has been cleared. Click Search Students for all students, or use filters to narrow the results.");
+        statementContext.Text = groupMode ? "Find students, then tick those to include." : "Select a student to view their account.";
+        SetStatus(groupMode ? "All selections cleared. Use Find Students, then tick students or Include Family."
+            : "Select a student above. The complete account is shown unless you choose dates.");
     }
 }

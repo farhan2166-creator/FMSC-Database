@@ -14,6 +14,9 @@ internal static partial class Program
     private static void Main(string[] args)
     {
         // Run on a disposable Windows test profile; no SQL/database is used.
+        // Unattended control failures must terminate with their exception rather
+        // than wait indefinitely in Windows Forms' interactive error dialog.
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         if(args.Contains("--post-fix"))
@@ -23,6 +26,12 @@ internal static partial class Program
             CheckDpiResponsiveLayouts();
             CheckShortcutPermissions();
             CheckPromotionHistoryEntry();
+            CheckStudentAccountFlow();
+            Console.WriteLine("ACCOUNT_FLOW: check refused regeneration");
+            CheckStatementRegenerationFreshness();
+            Console.WriteLine("ACCOUNT_FLOW: check multi-student async assembly");
+            CheckAsyncStatementAssembly();
+            Console.WriteLine("ACCOUNT_FLOW: existing statement safety checks completed");
             CheckClosingWholeAmounts();
             CheckPaletteDestinations();
             CheckSubmittedInputHolds();

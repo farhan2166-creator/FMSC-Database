@@ -649,7 +649,9 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Students",
                 PageTitles.StudentRecordChecks,
                 "Students.View"),
-            });
+            // Normal family work opens from Student Profile. Retain the existing
+            // route for an account granted family access without profile access.
+            }.Where(item => item.Title != "Family / Siblings" || !CurrentUser.HasPermission("Students.View")).ToArray());
         AddModule(
             flow,
             "finance.png",
