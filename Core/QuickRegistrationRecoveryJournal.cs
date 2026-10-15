@@ -8,7 +8,11 @@ internal sealed class QuickRegistrationRecoveryJournal : IDisposable
 {
     internal sealed record Pending(Guid Id,int UserId,string Scope,string PayloadHash,string Summary,DateTime StartedUtc);
     private static readonly Mutex Gate=new(false,@"Local\FMSC_SMS.QuickRegistrationRecovery");
+#if FMSC_LEVEL2
+    internal static string JournalPath=>Path.Combine(FMSC_SMS.Core.Level2Target.Folder(Environment.SpecialFolder.LocalApplicationData),"FMSC_SMS","PendingQuickRegistration.json");
+#else
     internal static string JournalPath=>Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"FMSC_SMS","PendingQuickRegistration.json");
+#endif
     private readonly string path;
     private FileStream? file;
     internal Pending Intent { get; }

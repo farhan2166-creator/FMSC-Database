@@ -153,6 +153,9 @@ public class ApplicationWindowForm : Form
     }
     protected override void OnShown(EventArgs e)
     {
+#if FMSC_LEVEL2
+        Text += " [Fictional Level 2]";
+#endif
         base.OnShown(e);
         FitWorkingArea();
         if (this is not FMSC_SMS.MainDashboardForm)

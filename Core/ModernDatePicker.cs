@@ -234,6 +234,9 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
     /// <summary>The native date picker inside is what a screen reader lands on.</summary>
     public void ApplyAccessibleInfo(string? name, string? description)
     {
+#if FMSC_LEVEL2
+        _inner.Name = Level2Target.InputId(name);
+#endif
         _inner.AccessibleName = name;
         _inner.AccessibleDescription = description;
     }

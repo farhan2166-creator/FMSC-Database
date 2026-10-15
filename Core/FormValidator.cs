@@ -466,8 +466,12 @@ public sealed class FormValidator : IDisposable
         if (caption.IsDisposed || badge.IsDisposed)
             return;
         int wanted = TextRenderer.MeasureText(badge.Text, badge.Font).Width + 10;
-        int widest = Math.Max(AppScale.Scale(56), (int)(caption.Width * 0.62));
-        int width = Math.Clamp(wanted, AppScale.Scale(40), widest);
+        // The caption still draws its own text beneath this child label. A fixed
+        // percentage can cover a long caption (for example Primary Phone), so
+        // reserve its measured text width before allocating space to the badge.
+        int captionWidth = TextRenderer.MeasureText(caption.Text, caption.Font).Width;
+        int available = Math.Max(0, caption.ClientSize.Width - caption.Padding.Horizontal - captionWidth - AppScale.Scale(8));
+        int width = Math.Min(wanted, available);
         if (badge.Width != width)
             badge.Width = width;
     }

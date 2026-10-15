@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--validation-badges"))
+        {
+            CheckValidationBadges();
+            Console.WriteLine($"PASS: {checks} validation-caption layout checks.");
+            return;
+        }
         if(args.Contains("--communication-layout"))
         {
             CheckCommunicationWorkspace();
@@ -43,6 +49,7 @@ internal static partial class Program
         }
         if(args.Contains("--post-fix"))
         {
+            CheckValidationBadges();
             CheckCommunicationWorkspace();
             CheckCommunicationGuidance();
             CheckDatePickerVisibility();

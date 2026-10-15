@@ -46,7 +46,11 @@ internal sealed class MutationRecoveryJournal : IDisposable
     private FileStream? file;
     internal MutationIntent Intent{get;}
     private MutationRecoveryJournal(FileStream file,MutationIntent intent){this.file=file;Intent=intent;}
+#if FMSC_LEVEL2
+    private static string PathFor(MutationKind kind)=>Path.Combine(FMSC_SMS.Core.Level2Target.Folder(Environment.SpecialFolder.LocalApplicationData),"FMSC_SMS","Pending"+kind+".json");
+#else
     private static string PathFor(MutationKind kind)=>Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"FMSC_SMS","Pending"+kind+".json");
+#endif
     internal static void Validate(MutationIntent value)
     {
         bool Hash(string s)=>s is {Length:64}&&s.All(Uri.IsHexDigit);

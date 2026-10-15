@@ -5,6 +5,25 @@ internal static class Program
     [STAThread]
     static void Main(string[] args)
     {
+#if FMSC_LEVEL2
+        if (args.SequenceEqual(new[]{"--verify-level2-guards"}))
+        {
+            Environment.ExitCode = Level2Target.VerifyRejections();
+            return;
+        }
+        // Fail before any UI or operational file/engine access. Normal startup,
+        // first-run checks, authentication and operator forms remain unchanged.
+        Level2Target.ValidateSchema();
+        if (args.Length != 0) throw new InvalidOperationException("Installation commands are disabled in Level 2.");
+#else
+        // A normal binary must reject the test-only probe before normal startup
+        // can access its operational database. This also detects a wrong build.
+        if (args.SequenceEqual(new[]{"--verify-level2-guards"}))
+        {
+            Environment.ExitCode = 2;
+            return;
+        }
+#endif
         if (args.Length > 0 && args[0] is "--verify-installation" or "--install-communication")
         {
             Environment.ExitCode = CommunicationInstallation.Run(args);

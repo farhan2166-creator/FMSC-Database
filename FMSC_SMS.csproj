@@ -1,4 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <!-- Opt-in test binary; normal builds contain no disposable-target override. -->
+    <PropertyGroup Condition="'$(FmscLevel2)' == 'true'">
+        <DefineConstants>$(DefineConstants);FMSC_LEVEL2</DefineConstants>
+    </PropertyGroup>
+    <Target Name="RejectLevel2Publish" BeforeTargets="PrepareForPublish" Condition="'$(FmscLevel2)' == 'true'">
+        <Error Text="The isolated Level 2 test binary must never be published as a school application." />
+    </Target>
     <ItemGroup>
         <!-- Portable shortcut checks build separately with simulated controls. -->
         <Compile Remove="Tests/**/*.cs" />

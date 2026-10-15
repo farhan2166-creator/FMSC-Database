@@ -14,7 +14,11 @@ namespace FMSC_SMS.Core
             GetThemeName(_currentTheme);
         private static readonly string ThemeFilePath =
             Path.Combine(
+#if FMSC_LEVEL2
+                FMSC_SMS.Core.Level2Target.Folder(Environment.SpecialFolder.ApplicationData), "FMSC_SMS", "theme.txt");
+#else
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FMSC_SMS", "theme.txt");
+#endif
         private static AppThemeType _currentTheme =
             LoadSavedTheme();
         public static event EventHandler? ThemeChanged;

@@ -307,6 +307,9 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
     /// <summary>The text box inside is what a screen reader lands on.</summary>
     public void ApplyAccessibleInfo(string? name, string? description)
     {
+#if FMSC_LEVEL2
+        _text.Name = Level2Target.InputId(name);
+#endif
         _text.AccessibleName = name;
         _text.AccessibleDescription = description;
     }

@@ -9,7 +9,11 @@ internal sealed class CollectionRecoveryJournal : IDisposable
     internal sealed record Pending(Guid Id, string Summary, DateTime StartedUtc);
     private static readonly Mutex Gate = new(false, @"Local\FMSC_SMS.CollectionRecovery");
     internal static string JournalPath => Path.Combine(
+#if FMSC_LEVEL2
+        FMSC_SMS.Core.Level2Target.Folder(Environment.SpecialFolder.LocalApplicationData),
+#else
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+#endif
         "FMSC_SMS", "PendingCollection.json");
     private readonly string path;
     private FileStream? stream;

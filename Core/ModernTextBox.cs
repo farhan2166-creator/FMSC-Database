@@ -202,6 +202,9 @@ namespace FMSC_SMS.Core
         /// <summary>The native text box inside is what a screen reader lands on, so the name and description given to this wrapper have to reach it.</summary>
         public void ApplyAccessibleInfo(string? name, string? description)
         {
+#if FMSC_LEVEL2
+            _inner.Name = Level2Target.InputId(name);
+#endif
             _inner.AccessibleName = name;
             _inner.AccessibleDescription = description;
         }
