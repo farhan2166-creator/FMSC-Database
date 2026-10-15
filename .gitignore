@@ -362,3 +362,9 @@ Database/*.bak
 /Tests/LifecycleSqlChecks/Baseline/*
 !/Tests/LifecycleSqlChecks/Baseline/schema.dacpac
 !/Tests/LifecycleSqlChecks/Baseline/provenance.json
+
+# External communication regression sources only.
+!/Tests/CommunicationChecks/
+/Tests/CommunicationChecks/*
+!/Tests/CommunicationChecks/*.cs
+!/Tests/CommunicationChecks/*.csproj

@@ -73,7 +73,7 @@ internal sealed class AdministrationStore(AccessEditorKind kind) : IAdministrati
         var roles = data.Tables[0].AsEnumerable().Select(row => new AccessRole(Number(row,"RoleId"), Text(row,"RoleName"),
             Text(row,"Description"), mappings.Where(map => map.Role == Number(row,"RoleId")).Select(map => map.Permission).Distinct().Order().ToArray())).ToArray();
         if (roles.Length != 2 || !roles.Any(role => AdministrativeAccess.IsAccountant(role.Name)) ||
-            permissions.Length != PermissionCatalog.All.Count || permissions.Any(permission => !PermissionCatalog.Contains(permission.Code)))
+            !PermissionCatalog.IsSupportedCatalog(permissions.Select(permission => permission.Code)))
             throw new InvalidDataException("The database needs migration 3: Administrator, Accountant and the supported permission catalog.");
         if (roles.Count(role => role.Protected) != 1 || roles.Any(role => string.IsNullOrWhiteSpace(role.Name)) ||
             roles.Select(role => role.Id).Distinct().Count() != roles.Length ||
@@ -218,7 +218,9 @@ internal sealed class AdministrationStore(AccessEditorKind kind) : IAdministrati
                 using var role = Procedure(transaction,"dbo.SaveRole",actor,DatabaseHelper.P("@RoleName",draft.Name),
                     DatabaseHelper.P("@Description",draft.Description),DatabaseHelper.Int("@RoleId",draft.Id));
                 int id = SavedId(role,"RoleId");
-                using var permissions = Procedure(transaction,"dbo.SaveRolePermissions",actor,DatabaseHelper.Int("@RoleId",id),
+                var optionalIds=catalog.Permissions.Where(p=>PermissionCatalog.OptionalCommunication.Contains(p.Code,StringComparer.OrdinalIgnoreCase)).Select(p=>p.Id).ToHashSet();
+                bool optionalRole=draft.Choices.Any(optionalIds.Contains)||catalog.Roles.Any(r=>r.Id==id&&r.Permissions.Any(optionalIds.Contains));
+                using var permissions = Procedure(transaction,optionalRole?"comm.SaveRolePermissions":"dbo.SaveRolePermissions",actor,DatabaseHelper.Int("@RoleId",id),
                     DatabaseHelper.P("@PermissionIdsJson",JsonSerializer.Serialize(draft.Choices)));
                 if (SavedId(permissions,"RoleId") != id) throw new InvalidDataException("The permission save returned a different role.");
                 return id;
