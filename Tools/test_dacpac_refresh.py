@@ -114,6 +114,33 @@ class RefreshChecks(unittest.TestCase):
         next(e for e in origin.iter() if e.get("Uri") == "/model.xml").text = refresh.sha(parts["model.xml"])
         parts["Origin.xml"] = ET.tostring(origin); self.candidate(parts)
 
+    def test_missing_optional_relationships_part_reports_model_drift(self):
+        # A real extracted DACPAC may omit the optional relationships part.
+        # That should not conceal changed objects or qualify for auto-approval.
+        parts = self.parts.copy()
+        parts.pop("_rels/.rels")
+        model = ET.fromstring(parts["model.xml"])
+        ns = {"d": model.tag.split("}")[0][1:]}
+        node = next(e for e in model.findall("d:Model/d:Element", ns) if e.get("Type") == "SqlTable")
+        prop = node.find(".//d:Property[@Name='IsNullable']", ns)
+        self.assertIsNotNone(prop)
+        prop.set("Value", "False" if prop.get("Value") == "True" else "True")
+        parts["model.xml"] = ET.tostring(model)
+        origin = ET.fromstring(parts["Origin.xml"])
+        next(e for e in origin.iter() if e.get("Uri") == "/model.xml").text = refresh.sha(parts["model.xml"])
+        parts["Origin.xml"] = ET.tostring(origin)
+        self.candidate(parts)
+        report = self.refuse("CANDIDATE_RELATIONSHIPS_PART_ABSENT_REVIEW_REQUIRED")
+        self.assertIn("FULL_SCHEMA_MODEL_CHANGED", report["reasons"])
+        self.assertTrue(report["modelObjects"])
+
+    def test_missing_relationships_with_unchanged_model_never_auto_approves(self):
+        parts = self.parts.copy()
+        parts.pop("_rels/.rels")
+        self.candidate(parts)
+        report = self.refuse("CANDIDATE_RELATIONSHIPS_PART_ABSENT_REVIEW_REQUIRED")
+        self.assertNotIn("FULL_SCHEMA_MODEL_CHANGED", report["reasons"])
+
     def test_metadata_refresh_sync_and_idempotence(self):
         self.candidate(); report, updates = self.check()
         self.assertEqual("SAFE_METADATA_ONLY", report["result"])
