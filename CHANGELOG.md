@@ -41,6 +41,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 - [PR #16](https://github.com/farhan2166-creator/FMSC-Database/pull/16) restores date-field height after shared width limits are applied, preventing date controls from disappearing while their captions remain visible in admissions and other field layouts. Date values, optional-date handling and validation are unchanged.
 
+- [PR #30](https://github.com/farhan2166-creator/FMSC-Database/pull/30): Find Student clears placement/status filters when an admission number is typed, and clears the admission number when a filter changes. Changed criteria immediately remove old rows and their open/new-admission actions; delayed replies cannot restore stale results. Name searches retain combined filtering.
+
 - Shared DPI and responsive-layout corrections are proposed in [PR #13](https://github.com/farhan2166-creator/FMSC-Database/pull/13): explicit per-monitor awareness, logical client-area density, monitor-relative fonts and grid/tab dimensions, preserved window minima, scrollable small-screen dialogs and bounded fixed-purpose field widths. Appearance and business workflows are preserved. Physical DPI/monitor and ReportViewer acceptance remains manual.
 
 The following end-user-flow corrections are proposed in [PR #8](https://github.com/farhan2166-creator/FMSC-Database/pull/8).
