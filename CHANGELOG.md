@@ -16,6 +16,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Added
 
+- Added an opt-in disposable Windows installation acceptance workflow: approved data-free schema fixture, real signed LocalDB prerequisite, validated complete installer, synthetic MDF/LDF, and installed-app verification. It reports pristine-MSI gaps and uploads sanitized evidence only; it does not test real school data or approve production deployment.
+
 - Added a manually dispatchable, DACPAC-triggered, schema-only reference extractor. It stores complete per-object model XML and SQL module bodies, tracks changed definitions and proposes a draft synchronization PR without importing data or approving changes.
 
 - Optional Communication Center with explicit guardian/staff consent, reviewed English/Urdu templates, draft/approval/scheduling controls, a durable SQL queue, safe simulation, Twilio SMS and official Meta template adapters. Live mode defaults disabled; the additive database module requires separate owner review/deployment. No Accountant grants, financial procedures, installer upgrades or approved DACPAC changes are included. See [setup and remaining external acceptance](Docs/COMMUNICATION_CENTER.md).
