@@ -154,5 +154,5 @@
 	<ItemGroup>
 	  <None Include=".editorconfig" />
 	</ItemGroup>
-<ItemGroup><EmbeddedResource Include="Migrations/Communication/001_CommunicationCenter.sql" LogicalName="FMSC_SMS.Communication.Schema.sql" /></ItemGroup>
+<ItemGroup><EmbeddedResource Include="Migrations/7.sql" LogicalName="FMSC_SMS.Communication.Schema.sql" /></ItemGroup>
 </Project>

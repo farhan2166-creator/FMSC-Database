@@ -1,6 +1,7 @@
 # Run on Windows pwsh. Does not launch msiexec or touch school databases.
+param([string]$InstallerPath = (Join-Path $PSScriptRoot '../Installer/core.ps1'))
 $ErrorActionPreference = 'Stop'
-$source = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../Installer/core.ps1') -Raw
+$source = Get-Content -LiteralPath $InstallerPath -Raw
 $tokens = $null
 $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseInput($source, [ref]$tokens, [ref]$parseErrors)

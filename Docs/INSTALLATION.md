@@ -10,14 +10,19 @@ The private [Complete Windows Installer ZIP](../.github/workflows/fmsc-complete-
 FMSC_SMS/                 Published self-contained app and resources
 Database/                 You provide FMSC_DB.mdf and FMSC_DB_log.ldf for a fresh install
 Tools/                    Signed Microsoft SqlLocalDB.msi and verified sqlcmd.exe
-Migrations/               2.sql through 6.sql
+Migrations/               2.sql through 6.sql; optional Communication Center add-on 7.sql
 Install FMSC_SMS.bat
 core.ps1
 READ_ME_FIRST.txt         Packaging instructions
+COMMUNICATION_CENTER.md  Optional add-on review, consent and deployment instructions
 SHA256SUMS.txt            Package content hashes
 ```
 
 **Important:** The GitHub build deliberately excludes school MDF/LDF files. The source repository alone is **not** a ready-to-install fresh database. A complete-installer workflow must first run successfully and upload its artifact; do not assume an installer exists from a passing ordinary CI build.
+
+After fixes are merged, start a **new** Complete Windows Installer ZIP run with **Run workflow → main**. Rerunning an older run rebuilds its original source commit. Check the source commit in the run summary and extracted `READ_ME_FIRST.txt`; do not mix an older `core.ps1` with newer application files. Packaging verifies the copied installer recovery helper and communication SQL against that checked-out revision.
+
+`Migrations/7.sql` is an optional, manually reviewed communication deployment. It does not advance the approved base version from 6 and is not executed automatically by the installer. Follow [Communication Center deployment](COMMUNICATION_CENTER.md#deployment-gate) on a disposable copy first.
 
 ## Before a fresh install
 
@@ -37,6 +42,8 @@ SHA256SUMS.txt            Package content hashes
 5. After successful installation, launch the application under the intended operator account; verify connection, login, schema compatibility, a read-only student search, a report preview, and permitted user actions.
 
 The app expects `FMSC_DB` under `C:\ProgramData\FMSC_Database` and uses `(localdb)\MSSQLLocalDB` by default. Current required **database schema version: 6**; application assembly version is tracked separately in `FMSC_SMS.csproj`.
+
+If silent LocalDB installation fails (for example, MSI code 1603), the current installer reports a verbose log under `C:\ProgramData\FMSC_Database` and asks whether to open the official Microsoft installer wizard. A failed/cancelled wizard or restart-required result stops installation safely. Code 1603 alone does not identify the underlying MSI problem; retain the verbose log for diagnosis. An immediate `SQL Server LocalDB installation failed. MSI exit code: 1603` message without this fallback belongs to the older installer: verify the artifact's source commit before retrying.
 
 ## Updating an existing installation
 

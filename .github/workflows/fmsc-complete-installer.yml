@@ -154,7 +154,8 @@ jobs:
             'Migrations/3.sql',
             'Migrations/4.sql',
             'Migrations/5.sql',
-            'Migrations/6.sql'
+            'Migrations/6.sql',
+            'Migrations/7.sql'
           )
           foreach ($item in $required) {
             $file = Join-Path $root $item
@@ -162,6 +163,15 @@ jobs:
               throw "Required full-installer file missing or empty: $item"
             }
           }
+          foreach ($pair in @(
+            @('Installer/core.ps1', 'core.ps1'),
+            @('Migrations/7.sql', 'Migrations/7.sql')
+          )) {
+            $expected = (Get-FileHash -LiteralPath (Join-Path $env:GITHUB_WORKSPACE $pair[0]) -Algorithm SHA256).Hash
+            $actual = (Get-FileHash -LiteralPath (Join-Path $root $pair[1]) -Algorithm SHA256).Hash
+            if ($actual -ne $expected) { throw "Packaged installer asset differs from checked-out source: $($pair[1])" }
+          }
+          & (Join-Path $env:GITHUB_WORKSPACE 'Tools/TestInstallerLocalDb.ps1') -InstallerPath (Join-Path $root 'core.ps1')
           $excluded = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.Extension.ToLowerInvariant() -in @('.mdf','.ldf','.bak') })
           if ($excluded.Count -gt 0) { throw 'Unexpected school database or backup file in the GitHub artifact.' }
 
@@ -194,7 +204,14 @@ jobs:
             'The existing installer detects and migrates an existing database safely.'
             ''
             'Includes the current self-contained .NET 8 app, SQL LocalDB 2022 MSI,'
-            'pinned Microsoft sqlcmd tool, installer core.ps1 and Migrations 2-6.'
+            'pinned Microsoft sqlcmd tool, current installer core.ps1 and Migrations 2-7.'
+            'Migrations\7.sql is the optional Communication Center add-on. It requires'
+            'owner review and explicit installation consent in the same SQL connection;'
+            'it is not run automatically and does not change the approved base version 6.'
+            'Review the included COMMUNICATION_CENTER.md before applying it.'
+            'If silent LocalDB setup fails, this installer offers the official Microsoft'
+            'wizard and reports verbose MSI log paths. An immediate old-style 1603 error'
+            'without that offer indicates an older core.ps1: check the source commit below.'
             'SQL integration, interactive GUI, printers, live school data and installation'
             'still require separate acceptance checks on a disposable/test Windows PC.'
             ''
@@ -202,6 +219,7 @@ jobs:
             "GitHub Actions run: $env:GITHUB_RUN_NUMBER"
             'This ZIP is a PRIVATE workflow artifact, not a public GitHub Release.'
           ) | Set-Content -LiteralPath (Join-Path $root 'READ_ME_FIRST.txt') -Encoding UTF8
+          Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'Docs/COMMUNICATION_CENTER.md') -Destination (Join-Path $root 'COMMUNICATION_CENTER.md')
 
           $checksumLines = @(Get-ChildItem -LiteralPath $root -Recurse -File | Sort-Object FullName | ForEach-Object {
             $relative = [System.IO.Path]::GetRelativePath($root, $_.FullName).Replace('\', '/')
