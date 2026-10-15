@@ -198,11 +198,15 @@ Validated fictional evidence is uploaded as a short-lived Actions artifact.
 
 Keep the existing Level 1 SQL and desktop control suites independent. At the
 inspected main commit `bf37dfec784ac48f76960afc136d37a3794722bc`, GitHub Level 1
-reported 45 passing scenarios; Security and Desktop CI also succeeded. The eight
-Level 1 safety tests and schema-only provenance checks passed locally. A Windows
-sandbox temporary-directory restriction initially prevented five Python tests;
-rerunning with a writable temporary directory passed all eight. This was an
-environment error, not a reason to relax SQL/schema checks.
+reported 45 passing scenarios; Security and Desktop CI also succeeded. Main later
+advanced to `76227d2` through the owner's PR #43, removing exported-DACPAC provenance
+tooling. This branch incorporates that decision and uses its existing Level 1
+data-free fixture validator. All ten current Level 1 safety tests passed locally.
+The fixture bytes are unchanged from the earlier inspected baseline; its observed
+package/model hashes are recorded in `environment.json` for traceability, without
+creating a replacement approval policy. Runtime schema compatibility still runs
+before application startup. No Level 1 test or compatibility requirement was
+weakened by the Level 2 implementation.
 
 ### Controlled connection interruption
 

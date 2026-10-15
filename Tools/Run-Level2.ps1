@@ -15,6 +15,8 @@ $engine='Not reached'
 $created=$false
 $instanceCreationAttempted=$false
 $binaryHash=$null
+$schemaModel=$null
+$fixtureHash=$null
 $desktopGate=$null
 $ownsDesktopGate=$false
 $exitCode=1
@@ -101,11 +103,13 @@ try {
         else {$PythonPath=Join-Path $env:USERPROFILE '.cache/codex-runtimes/codex-primary-runtime/dependencies/python/python.exe'}
     }
     foreach($tool in @('dotnet','SqlLocalDB','sqlcmd',$PythonPath)) {Get-Command $tool -ErrorAction Stop | Out-Null}
-    Stage 'Approved schema-only fixture provenance'
+    Stage 'Data-free SQL fixture validation'
     Push-Location $repo
     try {
-        & $PythonPath -c "import runpy; m=runpy.run_path('Tests/LifecycleSqlChecks/run.py'); m['verify_baseline'](); print('PASS: unchanged approved schema-only fixture and module fingerprints.')"
-        Native 'Schema-only provenance'
+        $schemaModel=& $PythonPath -c "import runpy, hashlib, zipfile; m=runpy.run_path('Tests/LifecycleSqlChecks/run.py'); m['verify_baseline'](); print(hashlib.sha256(zipfile.ZipFile('Tests/LifecycleSqlChecks/Baseline/schema.dacpac').read('model.xml')).hexdigest())"
+        Native 'Data-free SQL fixture validation'
+        $fixtureHash=(Get-FileHash -LiteralPath (Join-Path $repo 'Tests/LifecycleSqlChecks/Baseline/schema.dacpac') -Algorithm SHA256).Hash.ToLowerInvariant()
+        Write-Host 'PASS: existing Level 1 data-free fixture validation; observed hashes recorded as evidence, not approval fingerprints.'
     } finally {Pop-Location}
     Stage 'Build application and external UI driver'
     $appOutput=Join-Path $run 'app'
@@ -138,7 +142,7 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
 "@ | Out-Null
     Sql $catalog "EXEC sys.sp_addextendedproperty @name=N'FMSC_Level2Owner',@value=N'$owner';" | Out-Null
     VerifyTarget
-    Stage 'Publish approved record-free schema'
+    Stage 'Publish verified record-free test schema'
     Push-Location (Join-Path $repo 'Tests/LifecycleSqlChecks')
     try {
         & dotnet tool restore
@@ -192,7 +196,7 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
         } catch {$cleanup='Fail: private preflight state retained';$exitCode=1}
     }
     [ordered]@{sourceCommit=$env:FMSC_LEVEL2_COMMIT;stage=$stage;cleanup=$cleanup;
-        engine=$engine;schemaModel=(Get-Content -LiteralPath (Join-Path $repo 'Core/ApprovedSchemaArtifact.json') -Raw | ConvertFrom-Json).modelSha256;
+        engine=$engine;schemaModel=$schemaModel;fixtureSha256=$fixtureHash;
         windows=[Environment]::OSVersion.Version.ToString();workingTreeDirty=$workingTreeDirty;applicationSha256=$binaryHash;
         utc=[DateTime]::UtcNow.ToString('o')} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'environment.json') -Encoding utf8
