@@ -40,5 +40,13 @@ internal static partial class Program
             }
         }
         Check(!admission.IsHandleCreated,"Header regression must never start SQL loaders");
+        foreach(string actionField in new[]{"findButton","newAdmissionButton","collectPaymentButton"})
+        {
+            var action=(Button)typeof(FMSC_SMS.Pages.Students.Admissions.StudentAdmissionPage)
+                .GetField(actionField,System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.GetValue(admission)!;
+            Check(action.AutoSize&&action.GetPreferredSize(Size.Empty).Width>=
+                TextRenderer.MeasureText(action.Text,action.Font).Width+action.Padding.Horizontal,
+                "Admission toolbar preferred width must fit the full caption and padding: "+action.Text);
+        }
     }
 }

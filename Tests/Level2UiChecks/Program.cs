@@ -52,7 +52,7 @@ internal static class Program
             }
             else Workflows.Run(desktop,report);
             SecurityWorkflows.Run(desktop,report,args[0],password);
-            if(startupOnly)report.BlockIds("Startup/display stage only; dependent admission, finance, promotion and profile workflows were not executed in this run.",
+            if(startupOnly||Environment.GetEnvironmentVariable("FMSC_LEVEL2_ADMISSIONS_ONLY")=="1")report.BlockIds("Scoped startup/admission stage only; remaining workflows were not executed in this run.",
                 report.Scenarios.Where(s=>s.Status=="Not Run"&&s.Id!="L2-UX-05").Select(s=>s.Id).ToArray());
             foreach(var row in report.Scenarios.Where(s=>s.Status=="Not Run"&&s.Actual=="Not executed."))
                 row.Actual="Not executed; remaining coverage is listed in the rerun documentation. No success is claimed.";

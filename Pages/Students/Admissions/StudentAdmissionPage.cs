@@ -8,7 +8,7 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Admissions;
 public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPage
 {
-    protected override int ActionStatusWidth => 120;
+    protected override int ActionStatusWidth => 240;
     private ToolStripItem? confirmPlacementAction;
     private int pendingPlacementId;
     private static readonly Padding AdmissionDetailsCardPadding =
@@ -944,6 +944,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         SetActionButtonImage("Save", "✓");
         SetActionButtonImage("Print ▾", "▣");
         SetActionButtonImage("Collect Payment", "Rs");
+        // Native preferred sizing includes the real font, caption and padding
+        // after the dashboard changes scale. Let the toolbar wrap whole buttons.
+        foreach (var action in Actions.Controls.OfType<ModernButton>())
+        {
+            action.AutoSize = true;
+            action.AutoSizeMode = AutoSizeMode.GrowOnly;
+        }
         LoadCampuses();
         Campus.SelectedIndexChanged +=
     (_, _) => Defer(LoadFeeStructure);

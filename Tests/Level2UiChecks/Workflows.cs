@@ -127,6 +127,7 @@ internal static class Workflows
                 Identity.Check(ui.Find("Father Occupation",ControlType.Edit).AsTextBox().Text=="Fictional Example Operator","Discarded edit returned.");
                 Identity.Check(Convert.ToString(Identity.Scalar("SELECT FatherOccupation FROM dbo.Students WHERE StudentName=N'Fictional Example Student';"))=="Fictional Example Operator","Discard changed stored occupation.");
             },"Discarded occupation absent from database and reopened form.");
+            if(Environment.GetEnvironmentVariable("FMSC_LEVEL2_ADMISSIONS_ONLY")=="1")return;
             FinanceWorkflows.Run(ui,report);
             PromotionWorkflows.Run(ui,report);
             MonthlyWorkflows.Run(ui,report);

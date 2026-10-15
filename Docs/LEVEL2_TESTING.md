@@ -28,6 +28,8 @@ In PowerShell from the repository:
 .\Tools\Run-Level2.ps1 -PreflightOnly
 # Short real startup/navigation/display check; other workflows explicitly blocked:
 .\Tools\Run-Level2.ps1 -StartupOnly
+# Repeat admission creation/edit/discard with startup/display checks:
+.\Tools\Run-Level2.ps1 -AdmissionsOnly
 ```
 
 Python is resolved from a real `python` installation or the bundled Codex runtime
@@ -179,6 +181,13 @@ desktop `--post-fix` checks:
 ```powershell
 dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --validation-badges
 ```
+
+Three more assertions cover native preferred widths for Find Student, Clear/New
+and Collect Payment. These admission toolbar buttons can grow to fit their
+captions after adaptive scaling; the status area reserves 240 logical pixels
+instead of squeezing messages into a narrow column. The focused suite totals
+19 assertions. Other workflows are explicitly blocked in scoped reruns rather
+than counted as successful.
 
 `Tests/Level2UiChecks/Desktop.cs` owns process-scoped discovery, bounded retries,
 input, known startup dialogs and screenshots. Inputs use semantic accessible names

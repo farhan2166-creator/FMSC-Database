@@ -3,7 +3,8 @@
 param(
     [string]$PythonPath,
     [switch]$PreflightOnly,
-    [switch]$StartupOnly
+    [switch]$StartupOnly,
+    [switch]$AdmissionsOnly
 )
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
@@ -24,13 +25,14 @@ $exitCode=1
 New-Item -ItemType Directory -Path $run,$evidence,(Join-Path $run 'database') | Out-Null
 $owner.ToString('D') | Set-Content -LiteralPath (Join-Path $run 'owner.txt')
 $saved=@{}
-foreach($key in @('FMSC_LEVEL2_OWNER','FMSC_LEVEL2_ROOT','FMSC_LEVEL2_COMMIT','FMSC_LEVEL2_PROBE_BINARY','FMSC_LEVEL2_STARTUP_ONLY','MSBuildEnableWorkloadResolver')) {
+foreach($key in @('FMSC_LEVEL2_OWNER','FMSC_LEVEL2_ROOT','FMSC_LEVEL2_COMMIT','FMSC_LEVEL2_PROBE_BINARY','FMSC_LEVEL2_STARTUP_ONLY','FMSC_LEVEL2_ADMISSIONS_ONLY','MSBuildEnableWorkloadResolver')) {
     $saved[$key]=[Environment]::GetEnvironmentVariable($key)
 }
 $env:FMSC_LEVEL2_OWNER=$owner.ToString('D')
 $env:FMSC_LEVEL2_ROOT=$run
 $env:FMSC_LEVEL2_COMMIT=(& git -C $repo rev-parse HEAD)
 $env:FMSC_LEVEL2_STARTUP_ONLY=if($StartupOnly){'1'}else{'0'}
+$env:FMSC_LEVEL2_ADMISSIONS_ONLY=if($AdmissionsOnly){'1'}else{'0'}
 $workingTreeDirty=-not [string]::IsNullOrWhiteSpace((& git -C $repo status --porcelain | Out-String))
 $env:MSBuildEnableWorkloadResolver='false'
 function Native([string]$Operation) { if($LASTEXITCODE -ne 0) {throw "$Operation failed ($LASTEXITCODE)."} }
@@ -82,7 +84,7 @@ function BlockedReport([string]$Reason) {
     $summary | Set-Content -LiteralPath (Join-Path $script:evidence 'summary.md') -Encoding utf8
 }
 try {
-    if($PreflightOnly -and $StartupOnly) {throw 'Choose either preflight-only or startup-only.'}
+    if([int][bool]$PreflightOnly+[int][bool]$StartupOnly+[int][bool]$AdmissionsOnly -gt 1) {throw 'Choose only one scoped mode.'}
     if(-not $IsWindows -and $PSVersionTable.PSEdition -ne 'Desktop') {throw 'Windows is required.'}
     $desktopGate=[Threading.Mutex]::new($false,'Local\FMSC_SMS.Level2Desktop')
     try {$ownsDesktopGate=$desktopGate.WaitOne(0)}
