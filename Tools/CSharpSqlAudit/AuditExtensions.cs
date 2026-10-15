@@ -364,11 +364,11 @@ internal static class AuditExtensions
                 if (supplied.Type is not null && supplied.Type != "Structured")
                     findings.Add(new Finding("FAIL", file, line, method, procedure,
                         name + " expects a table-valued parameter (Structured)."));
-                else if (supplied.TypeName is not null && !string.Equals(
-                    Normalize(supplied.TypeName), expected.TableType, StringComparison.OrdinalIgnoreCase))
+                else if (supplied.TableType is not null && !string.Equals(
+                    Normalize(supplied.TableType), expected.TableType, StringComparison.OrdinalIgnoreCase))
                     findings.Add(new Finding("FAIL", file, line, method, procedure,
                         name + " TVP type differs: expected " + expected.TableType + "."));
-                else if (supplied.TypeName is null)
+                else if (supplied.TableType is null)
                     findings.Add(new Finding("REVIEW_REQUIRED", file, line, method, procedure,
                         name + " TVP TypeName cannot be verified."));
             }
