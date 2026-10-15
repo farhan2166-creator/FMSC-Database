@@ -7,6 +7,8 @@ on:
     paths:
       - 'Tests/**'
       - 'Core/**'
+      - 'Services/Communication/**'
+      - 'Pages/Communication/**'
       - 'Pages/Students/**'
       - 'Pages/Finance/**'
       - 'Pages/Administration/**'
@@ -21,6 +23,8 @@ on:
     paths:
       - 'Tests/**'
       - 'Core/**'
+      - 'Services/Communication/**'
+      - 'Pages/Communication/**'
       - 'Pages/Students/**'
       - 'Pages/Finance/**'
       - 'Pages/Administration/**'

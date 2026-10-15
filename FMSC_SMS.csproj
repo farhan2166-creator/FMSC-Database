@@ -2,6 +2,7 @@
     <ItemGroup>
         <!-- Portable shortcut checks build separately with simulated controls. -->
         <Compile Remove="Tests/**/*.cs" />
+        <Compile Remove="CommunicationHost/**/*.cs;CommunicationWorker/**/*.cs" />
     </ItemGroup>
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
@@ -153,4 +154,5 @@
 	<ItemGroup>
 	  <None Include=".editorconfig" />
 	</ItemGroup>
+<ItemGroup><EmbeddedResource Include="Migrations/Communication/001_CommunicationCenter.sql" LogicalName="FMSC_SMS.Communication.Schema.sql" /></ItemGroup>
 </Project>

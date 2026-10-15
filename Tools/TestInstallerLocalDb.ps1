@@ -11,6 +11,17 @@ $fn = @($ast.FindAll({
         $node.Name -eq 'Invoke-LocalDbMsiInstallation'
 }, $true))
 if ($fn.Count -ne 1) { throw 'Expected exactly one LocalDB MSI helper.' }
+$calls = @($ast.FindAll({
+    param($node)
+    $node -is [System.Management.Automation.Language.CommandAst] -and
+        $node.GetCommandName() -eq 'Invoke-LocalDbMsiInstallation'
+}, $true))
+if ($calls.Count -ne 1) { throw 'Expected exactly one LocalDB MSI call in the installation path.' }
+for ($parent = $calls[0].Parent; $null -ne $parent; $parent = $parent.Parent) {
+    if ($parent -is [System.Management.Automation.Language.FunctionDefinitionAst]) {
+        throw 'The LocalDB MSI call must be in the installer flow, not accidentally nested in a helper.'
+    }
+}
 Invoke-Expression $fn[0].Extent.Text
 
 function Write-Log { param([string]$Message) }
@@ -60,5 +71,7 @@ Try-Scenario @(1603) N '1603' 1
 Try-Scenario @(3010) Y 'restart' 1
 Try-Scenario @(1641) Y 'restart' 1
 Try-Scenario @(1603, 3010) Y 'restart' 2
+Try-Scenario @(1603, 1641) Y 'restart' 2
+Try-Scenario @(1603, 1602) Y 'wizard MSI code: 1602' 2
 Try-Scenario @(1603, 1603) Y 'wizard MSI code: 1603' 2
 Write-Output 'PASS: LocalDB silent setup, interactive retry, refusal, verbose logging and restart guards.'

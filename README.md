@@ -14,6 +14,7 @@ FMSC_SMS is a Windows desktop school-management application built with **C#**, *
 | Developer / Codex | [Architecture](Docs/ARCHITECTURE.md) and [development / PR workflow](Docs/DEVELOPMENT_WORKFLOW.md) |
 | Release owner | [Release acceptance checklist](Docs/RELEASE_CHECKLIST.md) |
 | Owner refreshing the DACPAC | [Automated verification and approval alignment](Docs/DACPAC_REFRESH.md) |
+| Communication administrator | [Communication Center setup, consent and live-delivery prerequisites](Docs/COMMUNICATION_CENTER.md) |
 | Everyone tracking changes | [Changelog](CHANGELOG.md) |
 | Audit findings | [Current master audit](Audit/FMSC_MASTER_AUDIT.md) and [historical evidence](Audit/FMSC_HISTORICAL_AUDITS.md) |
 

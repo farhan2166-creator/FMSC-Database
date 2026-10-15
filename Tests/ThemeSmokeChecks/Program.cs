@@ -19,8 +19,24 @@ internal static partial class Program
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
+        Control.CheckForIllegalCrossThreadCalls = true;
+        // Match production's persistent UI loop. Standalone DoEvents calls can
+        // uninstall the WinForms context and resume awaited page code on a worker.
+        using var context = new ApplicationContext();
+        using var dispatcher = new Control();
+        _ = dispatcher.Handle;
+        dispatcher.BeginInvoke((Action)(() => {
+            try { RunChecks(args); }
+            finally { context.ExitThread(); }
+        }));
+        Application.Run(context);
+    }
+
+    private static void RunChecks(string[] args)
+    {
         if(args.Contains("--post-fix"))
         {
+            CheckCommunicationWorkspace();
             CheckDatePickerVisibility();
             CheckPdfFileDurability();
             CheckDpiResponsiveLayouts();

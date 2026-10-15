@@ -12,6 +12,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Added
 
+- Optional Communication Center with explicit guardian/staff consent, reviewed English/Urdu templates, draft/approval/scheduling controls, a durable SQL queue, safe simulation, Twilio SMS and official Meta template adapters. Live mode defaults disabled; the additive database module requires separate owner review/deployment. No Accountant grants, financial procedures, installer upgrades or approved DACPAC changes are included. See [setup and remaining external acceptance](Docs/COMMUNICATION_CENTER.md).
+
 - [PR #18](https://github.com/farhan2166-creator/FMSC-Database/pull/18) adds conservative DACPAC refresh comparison and trusted default-branch synchronization PR automation. Exact full-model/module/data matching, sanitized refusal reports and synthetic safety regressions preserve existing approval/security/SQL-isolation rules; no automatic merge or material-change override.
 - Generated [PR #17](https://github.com/farhan2166-creator/FMSC-Database/pull/17) aligns the verified metadata-only `91ec136` refresh across three approval/provenance records, preserving the refreshed DACPAC and reusing the schema-only fixture.
 
@@ -22,6 +24,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 ### Fixed
 
 - Improve LocalDB installation on clean Windows computers: MSI verbose logging, explicit wizard fallback after silent failure, restart-required exit handling, executable verification and PATH discovery. No school data or database schema changes.
+
+- Fixed a fresh-install failure: the installer no longer requires `dbo.ReorderSchoolOfficials`, which is absent from the approved schema. A regression check now keeps the remaining compatibility probes aligned with the reviewed DACPAC; no SQL, migration or school-data changes.
 
 - [PR #16](https://github.com/farhan2166-creator/FMSC-Database/pull/16) restores date-field height after shared width limits are applied, preventing date controls from disappearing while their captions remain visible in admissions and other field layouts. Date values, optional-date handling and validation are unchanged.
 
