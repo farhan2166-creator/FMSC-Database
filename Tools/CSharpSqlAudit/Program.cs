@@ -86,7 +86,7 @@ try
         "**Scope:** " + counts.limitation, "",
         "| Result | C# location | Procedure | Reason |", "|---|---|---|---|" };
     foreach (var f in found.OrderBy(x => x.File).ThenBy(x => x.Line))
-    var parts = name.Replace("[", "").Replace("]", "").Trim().Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        lines.Add($"| {f.Status} | `{f.File}:{f.Line}` | `{f.Object}` | {f.Message} |");
     File.WriteAllText(Path.Combine(output, "CompatibilityReport.md"), string.Join("\n", lines) + "\n");
     Console.WriteLine($"Audited {audited} calls, {counts.failures} failures, {counts.reviews} requiring review.");
     return counts.failures > 0 ? 1 : 0;
