@@ -173,40 +173,42 @@ internal static class AuditExtensions
         {
             try
             {
-                var visitor = new ParameterVisitor();
-                obj.GetAst().Accept(visitor);
-                return new ProcedureSpec(name, visitor.Parameters
-                    .ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase), true);
+                // Directly inspect the CREATE PROCEDURE AST's declaration list.
+                // A generic fragment visitor may not descend into all generated DacFx AST nodes.
+                var procedures = obj.GetAst().Batches.SelectMany(b => b.Statements)
+                    .OfType<ProcedureStatementBody>().ToArray();
+                if (procedures.Length != 1) return new ProcedureSpec(
+                    name, new Dictionary<string, ParameterSpec>(), false);
+                var parameters = procedures[0].Parameters
+                    .Select(ReadParameter)
+                    .ToDictionary(p => p.Name, StringComparer.OrdinalIgnoreCase);
+                return new ProcedureSpec(name, parameters, true);
             }
             catch (Exception)
             {
-                // An unreadable model definition must not be treated as an empty signature.
+                // An unreadable model definition must never become an empty valid signature.
                 return new ProcedureSpec(name, new Dictionary<string, ParameterSpec>(), false);
             }
         }
     }
 
-    private sealed class ParameterVisitor : TSqlFragmentVisitor
+    private static ParameterSpec ReadParameter(ProcedureParameter node)
     {
-        internal readonly List<ParameterSpec> Parameters = new();
-        public override void ExplicitVisit(ProcedureParameter node)
+        string type;
+        string? tableType = null;
+        if (node.DataType is SqlDataTypeReference builtin)
+            type = builtin.SqlDataTypeOption.ToString();
+        else if (node.DataType is UserDataTypeReference custom)
         {
-            string type;
-            string? tableType = null;
-            if (node.DataType is SqlDataTypeReference builtin)
-                type = builtin.SqlDataTypeOption.ToString();
-            else if (node.DataType is UserDataTypeReference custom)
-            {
-                type = "Structured";
-                tableType = Normalize(string.Join(".", custom.Name.Identifiers.Select(x => x.Value)));
-            }
-            else type = "Unknown";
-            Parameters.Add(new ParameterSpec(node.VariableName.Value, type, tableType,
-                node.Value is not null, node.Modifier == ParameterModifier.Output));
+            type = "Structured";
+            tableType = Normalize(string.Join(".", custom.Name.Identifiers.Select(x => x.Value)));
         }
+        else type = "Unknown";
+        return new ParameterSpec(node.VariableName.Value, type, tableType,
+            node.Value is not null, node.Modifier == ParameterModifier.Output);
     }
 
-    private sealed class SqlReferences : TSqlFragmentVisitor
+        private sealed class SqlReferences : TSqlFragmentVisitor
     {
         internal readonly List<(string Name, string Alias)> Tables = new();
         internal readonly List<(string? Prefix, string Column)> Columns = new();
