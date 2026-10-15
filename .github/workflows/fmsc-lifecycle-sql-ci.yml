@@ -14,7 +14,6 @@ on:
       - 'Pages/Administration/**'
       - 'DatabaseHelper.cs'
       - 'FMSC_SMS.csproj'
-      - 'FMSC.dacpac'
       - 'Migrations/**'
       - 'Tools/**'
       - '.github/workflows/fmsc-lifecycle-sql-ci.yml'
@@ -31,7 +30,6 @@ on:
       - 'DatabaseHelper.cs'
       - 'FMSC_SMS.csproj'
       - 'Tools/**'
-      - 'FMSC.dacpac'
       - 'Migrations/**'
       - '.github/workflows/fmsc-lifecycle-sql-ci.yml'
 
@@ -64,13 +62,8 @@ jobs:
           (folder / 'summary.md').write_text('# FMSC Level 1: BLOCKED\n\nCommit: ' + os.environ['GITHUB_SHA'] + '\n\nInspect the failed checkout/tooling step. No SQL execution is claimed.\n')
           PY
 
-      - name: Check out test source without exported school rows
+      - name: Check out test source and data-free SQL fixture
         uses: actions/checkout@v7
-        with:
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /*
-            !/FMSC.dacpac
 
       - name: Install .NET 8
         uses: actions/setup-dotnet@v6
@@ -82,7 +75,7 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Verify test safety and schema-only provenance
+      - name: Verify disposable SQL fixture safety
         run: |
           test ! -f FMSC.dacpac
           python -m unittest discover -s Tests/LifecycleSqlChecks -p 'test_*.py' -v

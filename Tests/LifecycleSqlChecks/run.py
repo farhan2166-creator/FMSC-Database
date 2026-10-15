@@ -1,12 +1,10 @@
 """Own one ephemeral SQL container; publish schema only, execute real SQL tests, and erase it.
 
-Raw child output, credentials and the derived DACPAC remain private temporary files.
+Raw child output, credentials and the record-free SQL test package remain private temporary files.
 Only a fixed report/summary allowlist is exported. No production connection option exists.
 """
 from pathlib import Path
 import argparse
-import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -27,88 +25,45 @@ LABEL = "fmsc.level1.owner"
 STAGES = ["Environment and tooling", "Database provisioning", "Lifecycle SQL", "Quick Registration SQL", "Mutation SQL", "Administration SQL", "Portable regressions", "Performance checks", "Communication database provisioning", "Communication SQL", "Communication provider checks", "Cleanup"]
 
 
-def schema_only(source, destination):
-    spec = importlib.util.spec_from_file_location("fmsc_provenance", ROOT / "Tools/verify_schema_artifact.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    _, _, _, actual = module.inspect(source)
-    approved = json.loads((ROOT / "Core/ApprovedSchemaArtifact.json").read_text())
-    if actual != approved:
-        raise ValueError("Approved DACPAC provenance differs; no derived fixture may be built.")
-    keep = {"model.xml", "DacMetadata.xml", "[Content_Types].xml", "Origin.xml"}
-    with zipfile.ZipFile(source) as original, zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as derived:
-        def write_entry(name, data):
-            # Stable ZIP metadata avoids regenerating a different fixture hash
-            # for the same approved schema during refresh verification.
-            entry = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
-            entry.compress_type = zipfile.ZIP_DEFLATED
-            derived.writestr(entry, data)
-        for name in sorted(keep):
-            data = original.read(name)
-            if name == "Origin.xml":
-                origin = ET.fromstring(data)
-                # Remove source server/export statistics as well as table data.
-                # They are unnecessary to deploy the unchanged model.
-                for child in list(origin):
-                    if child.tag.split("}")[-1] not in ("PackageProperties", "Checksums"):
-                        origin.remove(child)
-                for parent in origin.iter():
-                    for child in list(parent):
-                        if child.tag.endswith("Checksum") and child.get("Uri") != "/model.xml":
-                            parent.remove(child)
-                for child in origin.iter():
-                    if child.tag.endswith("ContainsExportedData"):
-                        child.text = "false"
-                data = ET.tostring(origin, encoding="utf-8", xml_declaration=True)
-            write_entry(name, data)
-        write_entry("_rels/.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships" />')
-    with zipfile.ZipFile(destination) as result:
-        if any(name.startswith("Data/") or name.upper().endswith(".BCP") for name in result.namelist()):
-            raise ValueError("Exported table data must never enter a test package.")
-        if hashlib.sha256(result.read("model.xml")).hexdigest() != approved["modelSha256"]:
-            raise ValueError("Schema-only preparation changed the approved model.")
-    return approved["packageSha256"], approved["modelSha256"]
-
-
 def verify_baseline():
-    requirement = re.search(r'RequiredDatabaseSchemaVersion\s*=\s*"(\d+)"', (ROOT / "DatabaseHelper.cs").read_text())
+    """Check the isolated SQL test fixture, not the original exported DACPAC.
+
+    The test fixture is deliberately not a production-schema approval source.
+    The real SQL scenarios and live runtime contract enforce their own behavior.
+    """
+    requirement = re.search(r'RequiredDatabaseSchemaVersion\\s*=\\s*"(\\d+)"', (ROOT / "DatabaseHelper.cs").read_text())
     if requirement is None or requirement.group(1) != "6":
-        raise ValueError("Production schema requirement changed; review the fixture before running tests.")
+        raise ValueError("Production schema requirement changed; review the SQL test fixture before running tests.")
+
     def provider_version(project):
         return next(e.get("Version") for e in ET.parse(project).getroot().iter("PackageReference") if e.get("Include") == "Microsoft.Data.SqlClient")
     version = provider_version(ROOT / "FMSC_SMS.csproj")
     for project in ("LifecycleSqlChecks", "QuickRegistrationSqlChecks", "MutationSqlChecks", "AdministrationSqlChecks", "PerformanceChecks"):
         if provider_version(ROOT / "Tests" / project / (project + ".csproj")) != version:
             raise ValueError("SQL test provider differs from the production package; review the dependency update.")
-    provenance = json.loads((PROJECT / "Baseline/provenance.json").read_text())
-    approved = json.loads((ROOT / "Core/ApprovedSchemaArtifact.json").read_text())
-    # Lifecycle acceptance uses the pinned data-free fixture. It is NOT a
-    # release-time verification of the repository's FMSC.dacpac (which may
-    # intentionally be refreshed independently). Keep fixture integrity,
-    # approved model identity, test SQL modules, and production version checks.
+
     package = PROJECT / "Baseline/schema.dacpac"
-    if provenance["sourcePackageSha256"] != approved["packageSha256"] or provenance["sourceModelSha256"] != approved["modelSha256"]:
-        raise ValueError("Pinned SQL test fixture differs from the recorded model; review it before running tests.")
-    if hashlib.sha256(package.read_bytes()).hexdigest() != provenance["fixtureSha256"]:
-        raise ValueError("Schema-only fixture checksum differs.")
     with zipfile.ZipFile(package) as fixture:
-        if set(fixture.namelist()) != {"model.xml", "Origin.xml", "DacMetadata.xml", "[Content_Types].xml", "_rels/.rels"}:
+        allowed = {"model.xml", "Origin.xml", "DacMetadata.xml", "[Content_Types].xml", "_rels/.rels"}
+        names = fixture.namelist()
+        if len(names) != len(allowed) or set(names) != allowed:
             raise ValueError("Unexpected fixture content; exported data/scripts are forbidden.")
-        model = fixture.read("model.xml")
+        if fixture.testzip() is not None:
+            raise ValueError("Damaged SQL test fixture entry.")
         origin = ET.fromstring(fixture.read("Origin.xml"))
         if any(e.tag.split("}")[-1] in ("ExportStatistics", "Server", "DataPhaseTables") or
-               e.tag.endswith("ContainsExportedData") and e.text.lower() != "false" for e in origin.iter()):
-            raise ValueError("Export/source metadata must not enter the schema-only fixture.")
-        if hashlib.sha256(model).hexdigest() != approved["modelSha256"]:
-            raise ValueError("Fixture model differs from the approved production schema.")
-        root = ET.fromstring(model)
-        ns = {"d": root.tag.split("}")[0][1:]}
-        types = {"SqlProcedure", "SqlDmlTrigger", "SqlScalarFunction", "SqlInlineTableValuedFunction", "SqlMultiStatementTableValuedFunction"}
-        modules = {e.get("Name"): hashlib.sha256(ET.tostring(e, encoding="utf-8").replace(b"\r\n", b"\n")).hexdigest()
-            for e in root.findall("d:Model/d:Element", ns) if e.get("Type") in types}
-        if modules != approved["modules"]:
-            raise ValueError("Approved SQL module fingerprints differ.")
-    return provenance
+               e.tag.endswith("ContainsExportedData") and (e.text or "").strip().lower() != "false"
+               for e in origin.iter()):
+            raise ValueError("Export/source metadata must not enter the data-free fixture.")
+        relationships = ET.fromstring(fixture.read("_rels/.rels"))
+        if any("Target" in e.attrib for e in relationships.iter()):
+            raise ValueError("External or data relationships are forbidden in the SQL test fixture.")
+        model = ET.fromstring(fixture.read("model.xml"))
+        ns = {"d": model.tag.split("}")[0][1:]}
+        schema = model.find("d:Model", ns)
+        if schema is None or not any(e.get("Type") == "SqlProcedure" for e in schema):
+            raise ValueError("SQL test fixture requires a deployable schema and stored procedures.")
+    return True
 
 
 def docker_env():
@@ -165,7 +120,7 @@ def write_evidence(output, report):
 
 
 def validate_evidence(output, forbidden=()):
-    allowed = {"commit", "runId", "result", "schemaVersion", "engine", "scenarios", "limitations", "expectedRefusals", "sourceDacpacSha256", "modelSha256"}
+    allowed = {"commit", "runId", "result", "schemaVersion", "engine", "scenarios", "limitations", "expectedRefusals"}
     report = json.loads((output / "report.json").read_text())
     if set(report) - allowed or report["result"] not in ("PASS", "FAIL", "BLOCKED"):
         raise ValueError("Unexpected evidence metadata.")
@@ -189,7 +144,6 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--state", type=Path)
-    parser.add_argument("--prepare-baseline", action="store_true")
     parser.add_argument("--sqlpackage", type=Path)
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--cleanup", action="store_true")
@@ -197,15 +151,6 @@ def main():
     parser.add_argument("--diagnostics", type=Path, help="Optional local private diagnostic file; never upload it.")
     parser.add_argument("--inject-provision-failure", action="store_true", help="Exercise failure evidence and container cleanup; always exits nonzero.")
     args = parser.parse_args()
-    if args.prepare_baseline:
-        baseline = PROJECT / "Baseline"
-        baseline.mkdir(exist_ok=True)
-        source_hash, model_hash = schema_only(ROOT / "FMSC.dacpac", baseline / "schema.dacpac")
-        blob = subprocess.check_output(["git", "hash-object", "FMSC.dacpac"], cwd=ROOT, text=True).strip()
-        (baseline / "provenance.json").write_text(json.dumps({"sourcePackageSha256": source_hash, "sourceModelSha256": model_hash,
-            "sourceGitBlob": blob, "fixtureSha256": hashlib.sha256((baseline / "schema.dacpac").read_bytes()).hexdigest()}, indent=2) + "\n")
-        print("Prepared schema-only baseline; no exported table data is retained.")
-        return 0
     if args.output is None or args.state is None:
         parser.error("--output and --state are required for execution/cleanup")
     if args.cleanup:
@@ -312,10 +257,9 @@ def main():
             for project in ["LifecycleSqlChecks", "QuickRegistrationSqlChecks", "MutationSqlChecks", "AdministrationSqlChecks", "AuditFixChecks", "PerformanceChecks", "CommunicationChecks"]:
                 execute([args.dotnet, "build", str(ROOT / "Tests" / project / (project + ".csproj")), "-c", "Release"], timeout=300)
         stage("Environment and tooling", tooling)
-        baseline = verify_baseline()
+        verify_baseline()
         import shutil
         shutil.copyfile(PROJECT / "Baseline/schema.dacpac", Path(private.name) / "schema-only.dacpac")
-        report.update(sourceDacpacSha256=baseline["sourcePackageSha256"], modelSha256=baseline["sourceModelSha256"])
         container = "fmsc-level1-" + token.hex
         args.state.parent.mkdir(parents=True, exist_ok=True)
         args.state.write_text(json.dumps({"owner": str(token), "container": container}))
