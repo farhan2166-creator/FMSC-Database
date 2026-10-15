@@ -27,7 +27,7 @@ Enable **Settings → Actions → General → Workflow permissions → Allow Git
 - Previous and candidate approval/provenance records must be valid. Arbitrary edited hashes/contracts are refused instead of silently repaired. The approved blob must be reachable in trusted artifact history.
 - Allowed differences are ZIP timestamps/compression/order, export operation identity/start, relationship IDs/order and semantically identical package-metadata XML formatting. Unknown metadata, deployment identity/version changes and model reserialization require review.
 
-This conservative policy does not normalize SQL or infer equivalence from similar object names. Even potentially harmless **model** serialization changes require review. There is no material-change override. Differences identify changed approved schema objects and hashed payload entries without exposing SQL bodies or row values.
+This conservative metadata policy does not normalize SQL or infer equivalence from similar object names. Even potentially harmless **model** serialization changes require review. Structural changes use the separate owner-confirmed path below; they never become metadata refreshes. Differences identify changed approved schema objects and hashed payload entries without exposing SQL bodies or row values.
 
 ## Synchronized files
 
@@ -62,6 +62,38 @@ python -m unittest discover -s Tests/LifecycleSqlChecks -p "test_*.py" -v
 ```
 
 `--sync` writes only proved alignment, refuses unrelated changes and checks the result. Failed writes/post-checks restore original records. Tests use temporary repositories, the schema-only model and fictional payload bytes; they never copy school rows into fixtures. Windows/security/disposable SQL checks remain mandatory on the reviewed revision.
+
+## Deliberate structural upgrade approval
+
+**FMSC Database Schema Upgrade Approval** distinguishes inspection, explicit owner authorization and deployment acceptance. A readable candidate without the optional OPC relationships part still produces object differences; it never silently becomes a metadata refresh. Inspection changes no approval records.
+
+| Status | Meaning / next action |
+|---|---|
+| `VERIFIED_UNCHANGED` | Already matches; no new approval PR |
+| `SAFE_METADATA_REFRESH` | Model/modules/exported bytes unchanged; existing metadata synchronization applies |
+| `STRUCTURAL_CHANGE_REVIEW_REQUIRED` | Review material changes and test a migration path |
+| `COMPATIBILITY_FAILED` | Required contract or disposable acceptance failed; resolve before approval |
+| `UPGRADE_PATH_REQUIRED` | No reviewed migration selection; deployment readiness remains blocked |
+| `STRUCTURAL_CHANGE_APPROVED` | Exact owner decision is backed by a successful trusted Actions attempt; review the draft PR and all CI before merging |
+
+1. Use a **schema-only** export for a structural upgrade. New/modified data entries, deployment scripts and unknown payloads are refused. Removing old exported data is reported and never deletes installed records. Metadata refreshes still require all existing exported bytes to remain identical.
+2. Review the separate `Schema/` extraction PR. Extraction is not approval. Add/review any necessary data-preserving SQL at flat numbered `Migrations/<number>.sql` paths on main. An empty folder, matching version or already upgraded personal database is not migration evidence. Do not manufacture SQL/version changes to make a check green.
+3. After this implementation is reviewed and merged, dispatch **inspect** on default `main`, supplying the full candidate commit and explicitly selected migration paths in ascending order (comma-separated). The candidate must be in main's history and still be main's current artifact. Inspection verifies the previous approved Git blob and compatibility contracts, runs real production lifecycle writers against old and fresh candidate schema-only fixtures, migrates the populated old fixture, and checks original records, recovery identity and full target catalog/module/permission equivalence. Owned SQL databases use loopback-only endpoints and are removed on success/failure.
+4. Only successful inspection produces a `reviewDigest`. Review its artifact/model/migration fingerprints and test results. Dispatch **approve** on the same main revision with the same candidate/migrations, that digest, and exact `APPROVE:<reviewDigest>` confirmation. Verification runs again. Changed main, candidate, scripts or protected contracts require a new inspection and confirmation.
+5. Only the **personal repository owner**, as both original and rerun actor, may publish. Trusted default-branch code rechecks live main and the complete proposal, then prepares a **draft PR** containing the four baseline files and `Core/SchemaUpgradeApproval.json`. The receipt binds the exact candidate, protected contracts, migration hashes, generated-file hashes and Actions run/attempt. No automatic merge occurs. Desktop, Security, Level 1 and approval checks are dispatched on that generated branch.
+6. Changed baseline records are audited against the trusted owner-run identity and review digest. Merely editing hashes, forging a receipt or merging an unrelated PR cannot satisfy approval. Existing exact artifact/schema checks stay red until legitimate alignment; never disable them to hide an intermediate mismatch.
+
+The implemented safeguard is owner-only default-branch dispatch plus exact digest confirmation. **No protected environment or branch protection is claimed to be active.** It requires no paid environment feature. Keep repository administration and workflow editing trusted. For optional additional protection, use **Settings → Environments**, choose the owner as required reviewer, restrict deployments to `main`, then separately review adding that environment to the publisher job. Availability depends on GitHub plan; it is not silently configured. Organization-owned repositories are refused until an explicit reviewer policy is implemented.
+
+If needed, enable **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests**. This workflow creates drafts only. Its short publisher needs contents/PR writes and Actions writes for the four allowlisted validation workflows. PR jobs have read credentials; no `pull_request_target`, PAT, or candidate script/SQL execution with write credentials is used.
+
+Fresh acceptance and existing-database acceptance are separate: the latter requires a reviewed, tested migration reaching the candidate structure while retaining records. The production installer is unchanged. Actions never upgrades a school database, attaches original MDF/LDF, resets data or replaces an existing database. Operator backups, independently supplied database-pair checks and interactive installation remain manual acceptance.
+
+The current application/fixture requirement remains **6**. The system never increments it or regenerates recovery/permission contracts automatically. Version changes, incompatible signatures, removed safeguards or intended transformations of existing cell values require separately reviewed application/installer/test changes. Strict preservation permits new columns/reference rows but rejects changed/deleted original values and recovery identity. Missing evidence blocks readiness rather than creating a false green.
+
+Seven-day report artifacts contain only sanitized `report.json`/`summary.md`; new identifiers are hashed and SQL/row values are omitted. The one-day internal proposal artifact contains only the four baseline files, including a **data-free** test DACPAC, and a hashed manifest. Synthetic row snapshots/private diagnostics are deleted and never uploaded. Existing `Schema/` automation remains separate and unchanged.
+
+Local tests: `python Tools/test_dacpac_refresh.py`, `python Tools/test_schema_upgrade.py`, and `python Tools/test_schema_upgrade.py --sql`. SQL testing needs Docker and .NET 8, uses the existing Level 1 fictional fixtures/writers and ownership guards, and demonstrates a synthetic additive upgrade without approving the uploaded database. Optional `FMSC_UPGRADE_DOTNET`/`FMSC_UPGRADE_SQLPACKAGE` select installed tools. `FMSC_UPGRADE_DIAGNOSTICS` is a local private failure log; never upload it.
 
 ## Current correction and limits
 

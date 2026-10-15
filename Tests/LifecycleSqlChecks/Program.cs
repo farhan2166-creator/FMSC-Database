@@ -5,6 +5,8 @@ internal static class Program
     private static readonly Report Evidence = new();
     internal static async Task<int> Main(string[] args)
     {
+        if (args.Contains("--upgrade-catalog")) return SchemaUpgradeChecks.Export(false);
+        if (args.Contains("--upgrade-snapshot")) return SchemaUpgradeChecks.Export(true);
         string path = Environment.GetEnvironmentVariable("FMSC_TEST_REPORT_PATH") ?? throw new InvalidOperationException("A test evidence path is required.");
         Fixture? fixture = null;
         bool ready = await Evidence.Stage("Fixture: isolated target and synthetic school", () => {

@@ -25,7 +25,7 @@ class GitHub:
             with urllib.request.urlopen(request, timeout=60) as response:
                 body = response.read(); return json.loads(body) if body else {}
         except urllib.error.HTTPError as ex:
-            if ex.code == 404 and method == "GET" and "/git/ref/heads/automation/dacpac-refresh-" in path: return None
+            if ex.code == 404 and method == "GET" and any(prefix in path for prefix in ("/git/ref/heads/automation/dacpac-refresh-", "/git/ref/heads/automation/schema-upgrade-")): return None
             # Never print response bodies, credentials, payloads or private source.
             raise Refusal("GITHUB_HTTP_" + str(ex.code)) from None
 
@@ -56,6 +56,19 @@ def publish(project, anchor, source, repository, actor, event, ref, api):
     if not updates: return {"result": "ALIGNED", "pullRequest": None}
     if not set(updates).issubset(SYNC_PATHS): raise Refusal("UNEXPECTED_PR_PATH")
     branch = "automation/dacpac-refresh-" + source[:12]
+    pr = create_review_pr(api, repository, source, branch, updates, "Synchronize verified DACPAC metadata refresh",
+        "Verified metadata-only refresh. Exact model/module/exported payload matching passed; review the dispatched Desktop, Security and isolated SQL checks before merging. No automatic merge. Source: `" + source + "`.")
+    # Explicit dispatch is essential for GITHUB_TOKEN-created PRs. It is limited
+    # to the existing reviewed workflows and this generated alignment branch.
+    for workflow in WORKFLOWS:
+        api("POST", base + "/actions/workflows/" + workflow + "/dispatches", {"ref": branch})
+    return {"result": "PR_PREPARED", "pullRequest": pr["html_url"], "branch": branch, "dispatchedWorkflows": list(WORKFLOWS)}
+
+
+def create_review_pr(api, repository, source, branch, updates, title, body, draft=False):
+    """Publish a single exact-content proposal; never overwrite an existing branch."""
+    base = "/repos/" + repository
+    default = api("GET", base)["default_branch"]
     existing = api("GET", base + "/git/ref/heads/" + branch)
     if existing is not None:
         commit_sha = existing["object"]["sha"]
@@ -72,28 +85,13 @@ def publish(project, anchor, source, repository, actor, event, ref, api):
             blob = api("POST", base + "/git/blobs", {"encoding": "base64", "content": base64.b64encode(payload).decode()})
             entries.append({"path": name, "mode": "100644", "type": "blob", "sha": blob["sha"]})
         tree = api("POST", base + "/git/trees", {"base_tree": commit["tree"]["sha"], "tree": entries})
-        new = api("POST", base + "/git/commits", {"message": "Synchronize verified metadata-only DACPAC refresh", "parents": [source], "tree": tree["sha"]})
+        new = api("POST", base + "/git/commits", {"message": title, "parents": [source], "tree": tree["sha"]})
         api("POST", base + "/git/refs", {"ref": "refs/heads/" + branch, "sha": new["sha"]})
     if api("GET", base + "/git/ref/heads/" + default)["object"]["sha"] != source:
         raise Refusal("DEFAULT_BRANCH_MOVED_BEFORE_PR")
     owner = repository.split("/")[0]
     matches = api("GET", base + "/pulls?state=open&base=" + default + "&head=" + owner + ":" + branch)
-    if matches:
-        pr = matches[0]
-    else:
-        body = ("Verified metadata-only DACPAC refresh. Exact full model, all " + str(report["moduleCount"]) +
-                " SQL fingerprints, exported data, structural/whole-rupee/recovery contracts and required schema version are unchanged. "
-                "Only approved artifact/provenance records and, when necessary, the data-free schema fixture are synchronized.\n\n"
-                "Source commit: `" + source + "`\nPrevious package: `" + report["previousPackageSha256"] + "`\nCandidate package: `" + report["candidatePackageSha256"] +
-                "`\nSchema-only fixture regenerated: " + str(report["fixtureRegenerated"]) +
-                "\n\nDesktop, security and isolated Level 1 workflows are dispatched on this branch because GITHUB_TOKEN-created PRs do not trigger ordinary PR workflows. "
-                "Review the completed runs before merging. No automatic merge, schema/data update or installer change is authorized.")
-        pr = api("POST", base + "/pulls", {"base": default, "head": branch, "title": "Synchronize verified DACPAC metadata refresh", "body": body})
-    # Explicit dispatch is essential for GITHUB_TOKEN-created PRs. It is limited
-    # to the existing reviewed workflows and this generated alignment branch.
-    for workflow in WORKFLOWS:
-        api("POST", base + "/actions/workflows/" + workflow + "/dispatches", {"ref": branch})
-    return {"result": "PR_PREPARED", "pullRequest": pr["html_url"], "branch": branch, "dispatchedWorkflows": list(WORKFLOWS)}
+    return matches[0] if matches else api("POST", base + "/pulls", {"base": default, "head": branch, "title": title, "body": body, "draft": draft})
 
 
 def main():

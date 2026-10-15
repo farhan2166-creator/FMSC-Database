@@ -6,6 +6,7 @@ on:
     paths:
       - 'FMSC.dacpac'
       - 'Core/ApprovedSchemaArtifact.json'
+      - 'Core/SchemaUpgradeApproval.json'
       - 'Core/DatabaseCompatibilityRequirements.json'
       - 'Tests/LifecycleSqlChecks/Baseline/**'
       - 'Tools/*dacpac_refresh.py'
@@ -16,6 +17,7 @@ on:
     paths:
       - 'FMSC.dacpac'
       - 'Core/ApprovedSchemaArtifact.json'
+      - 'Core/SchemaUpgradeApproval.json'
       - 'Core/DatabaseCompatibilityRequirements.json'
       - 'Tests/LifecycleSqlChecks/Baseline/**'
       - 'Tools/*dacpac_refresh.py'
@@ -30,6 +32,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: fmsc-dacpac-refresh-${{ github.ref }}
@@ -71,6 +74,7 @@ jobs:
           APPROVAL_REF: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
           GITHUB_EVENT_BEFORE: ${{ github.event.before || '' }}
           EVENT_NAME: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           verifier=trusted/Tools/refresh_dacpac.py

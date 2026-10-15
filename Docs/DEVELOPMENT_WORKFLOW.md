@@ -55,6 +55,8 @@ The separate [Level 1 lifecycle workflow](../.github/workflows/fmsc-lifecycle-sq
 
 ## Security checks
 
+Intentional schema upgrades use [owner-bound approval](DACPAC_REFRESH.md#deliberate-structural-upgrade-approval): exact candidate inspection, reviewed migrations, disposable fresh/migrated lifecycle and record-preservation tests, then owner digest confirmation and a draft baseline PR. Missing migration evidence blocks readiness. SQL extraction, JSON edits and an ordinary workflow dispatch never constitute structural approval. Production installer/database behavior remains unchanged.
+
 For a re-exported `FMSC.dacpac`, follow [verified DACPAC refresh alignment](DACPAC_REFRESH.md). The dedicated workflow compares the entire model, module fingerprints and exported data with the anchored approval. Safe metadata-only refreshes prepare a focused alignment PR and run existing Windows/security/isolated SQL checks; material changes stop for review. Do not manually accept a new hash or merge before actual checks pass.
 
 [FMSC Security Checks](../.github/workflows/fmsc-security.yml) is a read-only PR/`main`-push workflow, separate from the existing Windows checks. It downloads **Gitleaks CLI 8.30.1** from its official release and verifies a pinned SHA-256 before running it. The CLI is MIT-licensed and works with private repositories without a Gitleaks action license, PAT or GitHub Advanced Security subscription. Normal Actions minutes/storage limits still apply.

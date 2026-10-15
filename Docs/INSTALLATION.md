@@ -1,5 +1,7 @@
 # Installation and Upgrade Guide — Windows x64
 
+For changed database structures, follow [schema upgrade approval](DACPAC_REFRESH.md#deliberate-structural-upgrade-approval). Fresh schema acceptance does not prove an existing school database can be upgraded safely: require the reviewed migration, backup/operator path and disposable preservation evidence. If missing, deployment readiness is blocked. This approval system does not change installer behavior or execute migrations on school data.
+
 This describes the **existing FMSC_SMS installer**; it does not replace it. Use a tested Windows machine and approved, verified data. For backup/restore see [BACKUP_RECOVERY.md](BACKUP_RECOVERY.md).
 
 ## What is delivered

@@ -16,6 +16,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Added
 
+- Owner-controlled structural DACPAC review and draft baseline proposals with exact artifact/plan confirmation, audited approval receipts, protected compatibility contracts and disposable lifecycle/migration preservation checks. Existing metadata refresh and separate `Schema/` extraction remain; no live database, installer behavior or required schema version is changed.
+
 - Added an opt-in disposable Windows installation acceptance workflow: approved data-free schema fixture, real signed LocalDB prerequisite, validated complete installer, synthetic MDF/LDF, and installed-app verification. It reports pristine-MSI gaps and uploads sanitized evidence only; it does not test real school data or approve production deployment.
 
 - Added a manually dispatchable, DACPAC-triggered, schema-only reference extractor. It stores complete per-object model XML and SQL module bodies, tracks changed definitions and proposes a draft synchronization PR without importing data or approving changes.

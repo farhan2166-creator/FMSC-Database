@@ -101,7 +101,7 @@ def canonical(node, relationship_ids=False, volatile_origin=False, path=""):
     return (node.tag, tuple(sorted(attrs.items())), text, tuple(children))
 
 
-def archive(data):
+def archive(data, *, candidate=False):
     if len(data) > 128 * 1024 * 1024:
         raise Refusal("PACKAGE_SIZE_LIMIT")
     with zipfile.ZipFile(io.BytesIO(data)) as z:
@@ -121,7 +121,12 @@ def archive(data):
                 raise Refusal("UNSAFE_ZIP_ENTRY")
             if e.file_size > 128 * 1024 * 1024 or e.file_size > max(1, e.compress_size) * 2000:
                 raise Refusal("ZIP_EXPANSION_LIMIT")
-        if not FIXTURE_ENTRIES.issubset(names):
+        # Some genuine DacFx exports omit the optional OPC relationships part.
+        # Approved baseline and synthetic fixture still require the complete
+        # reviewed layout. Only a candidate may omit the optional part, and
+        # this never qualifies as an automatically safe metadata refresh.
+        required = FIXTURE_ENTRIES - ({"_rels/.rels"} if candidate else set())
+        if not required.issubset(names):
             raise Refusal("MISSING_PACKAGE_METADATA")
         # Reading every entry checks CRC, including exported data. Keep it private.
         contents = {name: z.read(name) for name in names}
@@ -140,14 +145,15 @@ def archive(data):
         if name not in contents or (e.text or "").lower() != sha(contents[name]):
             raise Refusal("INTERNAL_CHECKSUM_MISMATCH")
     xml(contents["model.xml"])
-    relationships = xml(contents["_rels/.rels"])
-    ids = [e.get("Id") for e in relationships]
-    if len(ids) != len(set(ids)) or any(not value for value in ids):
-        raise Refusal("INVALID_RELATIONSHIP_ID")
-    for e in relationships:
-        target = (e.get("Target") or "").lstrip("/")
-        if e.get("TargetMode", "Internal") != "Internal" or target not in contents:
-            raise Refusal("EXTERNAL_OR_MISSING_RELATIONSHIP_TARGET")
+    if "_rels/.rels" in contents:
+        relationships = xml(contents["_rels/.rels"])
+        ids = [e.get("Id") for e in relationships]
+        if len(ids) != len(set(ids)) or any(not value for value in ids):
+            raise Refusal("INVALID_RELATIONSHIP_ID")
+        for e in relationships:
+            target = (e.get("Target") or "").lstrip("/")
+            if e.get("TargetMode", "Internal") != "Internal" or target not in contents:
+                raise Refusal("EXTERNAL_OR_MISSING_RELATIONSHIP_TARGET")
     xml(contents["DacMetadata.xml"])
     xml(contents["[Content_Types].xml"])
     return contents
@@ -177,14 +183,18 @@ def object_inventory(contents):
     for i, node in enumerate(nodes):
         kind = node.get("Type", "Unknown")
         name = node.get("Name")
+        if not name:
+            annotation = node.find("d:Annotation[@Type='SqlInlineConstraintAnnotation']", ns)
+            name = annotation.get("Name") if annotation is not None else None
+        if not name and kind == "SqlDatabaseOptions": name = "database-options"
         # Anonymous definitions are still checked; the full model is byte-strict.
         key = (kind, name or "anonymous:" + str(i))
         facets = {}
         for child in node:
             field = child.get("Name")
             if field:
-                facets[field] = sha(ET.tostring(child, encoding="utf-8"))
-        result[key] = {"sha256": sha(ET.tostring(node, encoding="utf-8")), "facets": facets}
+                facets[field] = sha(json.dumps(canonical(child), separators=(",", ":")).encode())
+        result[key] = {"sha256": sha(json.dumps(canonical(node), separators=(",", ":")).encode()), "facets": facets}
     return result
 
 
@@ -247,7 +257,14 @@ def verify(project, anchor):
         if not any(line.split()[0] == provenance["sourceGitBlob"] for line in reachable):
             raise Refusal("APPROVED_BLOB_NOT_IN_TRUSTED_HISTORY")
         previous = git(project, "cat-file", "blob", provenance["sourceGitBlob"])
-        old = archive(previous)
+        reviewed_layout = False
+        try:
+            receipt = read_json(at("Core/SchemaUpgradeApproval.json"))
+            reviewed_layout = (receipt["status"] == "STRUCTURAL_CHANGE_APPROVED" and
+                receipt["manifest"]["candidateModelSha256"] == approved["modelSha256"])
+        except (subprocess.SubprocessError, KeyError):
+            pass
+        old = archive(previous, candidate=reviewed_layout)
         old_root, old_ns, old_elements, old_print = fingerprint(old, previous)
         if old_print != approved or provenance["sourcePackageSha256"] != approved["packageSha256"] or provenance["sourceModelSha256"] != approved["modelSha256"]:
             raise Refusal("INCORRECT_BASELINE_PROVENANCE")
@@ -259,9 +276,12 @@ def verify(project, anchor):
         if current_path.is_symlink():
             raise Refusal("SYMLINK_CANDIDATE_REFUSED")
         candidate = current_path.read_bytes()
-        new = archive(candidate)
+        new = archive(candidate, candidate=True)
         root, ns, elements, actual = fingerprint(new, candidate)
+        if "_rels/.rels" not in new and "_rels/.rels" in old:
+            report["reasons"].append("CANDIDATE_RELATIONSHIPS_PART_ABSENT_REVIEW_REQUIRED")
         report.update(previousPackageSha256=approved["packageSha256"], candidatePackageSha256=actual["packageSha256"],
+                      previousModelSha256=approved["modelSha256"],
                       sourceGitBlob=git_blob(candidate), modelSha256=actual["modelSha256"], moduleCount=len(actual["modules"]),
                       requiredSchemaVersion=required_version(at("DatabaseHelper.cs")), exportedEntryCount=sum(n.startswith("Data/") for n in old))
         if report["requiredSchemaVersion"] != required_version((project / "DatabaseHelper.cs").read_bytes()):
@@ -285,12 +305,18 @@ def verify(project, anchor):
         if report["differences"]:
             report["reasons"].append("PAYLOAD_CHANGED")
         for name in ("Origin.xml", "DacMetadata.xml", "[Content_Types].xml", "_rels/.rels"):
+            if name not in new or name not in old:
+                # A missing relationships part is reported above and cannot
+                # silently compare equal to the baseline's empty relationships.
+                continue
             a, b = xml(old[name]), xml(new[name])
             if canonical(a, name == "_rels/.rels", name == "Origin.xml") != canonical(b, name == "_rels/.rels", name == "Origin.xml"):
                 report["reasons"].append("UNREVIEWED_METADATA_CHANGE:" + name)
         current_contract = copy.deepcopy(contract)
         current_contract["schemaArtifact"]["sha256"] = actual["packageSha256"]
-        if verify_contract(root, ns, elements, current_contract, actual):
+        compatibility_errors = verify_contract(root, ns, elements, current_contract, actual)
+        report["compatibilityVerified"] = not compatibility_errors
+        if compatibility_errors:
             report["reasons"].append("PRODUCTION_COMPATIBILITY_CONTRACT_FAILED")
         if report["reasons"]:
             return report, {}
@@ -360,12 +386,13 @@ def synchronize(project, updates):
 
 
 def write_report(folder, report):
+    enrich_report(report)
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-    lines = ["# FMSC DACPAC refresh verification", "", "Result: **" + report["result"] + "**", "",
+    lines = ["# FMSC DACPAC refresh verification", "", "Status: **" + report["status"] + "**", "", "Result: **" + report["result"] + "**", "",
         "Policy: exact full model, all SQL module fingerprints and all exported payload bytes must match the anchored approval.",
         "No SQL bodies, row values, database archives or connection metadata are included.", ""]
-    for key in ("approvalCommit", "previousPackageSha256", "candidatePackageSha256", "modelSha256", "requiredSchemaVersion", "moduleCount", "exportedEntryCount"):
+    for key in ("approvalCommit", "previousPackageSha256", "previousModelSha256", "candidatePackageSha256", "modelSha256", "requiredSchemaVersion", "moduleCount", "exportedEntryCount", "objectChanges", "compatibilityVerified", "ownerApprovalRequired", "upgradePathVerified", "nextAction"):
         if key in report: lines.append(f"- {key}: `{report[key]}`")
     lines += ["", "Reasons: " + (", ".join(report["reasons"]) or "none"), "",
               "Synchronization files: " + (", ".join(report["changedApprovalFiles"]) or "none"),
@@ -375,6 +402,27 @@ def write_report(folder, report):
         lines.append(f"| {row.get('category',row.get('kind'))} | {row.get('entry',row.get('object'))} | {row['change']} | {', '.join(row.get('changedFields',[]))} |")
     lines += ["", "Exact-MDF/LDF compatibility and live data outcomes remain outside this offline check. Existing isolated SQL/Windows/security checks must pass on the proposed revision."]
     (folder / "summary.md").write_text("\n".join(lines) + "\n")
+
+
+def enrich_report(report):
+    """User-facing status without changing the strict legacy publisher contract."""
+    changes = report.get("modelObjects", [])
+    report["objectChanges"] = {kind: sum(row["change"] == kind for row in changes)
+                               for kind in ("added", "modified", "removed")}
+    report["structuralChangesDetected"] = "FULL_SCHEMA_MODEL_CHANGED" in report["reasons"]
+    report["status"] = {"ALIGNED": "VERIFIED_UNCHANGED", "SAFE_METADATA_ONLY": "SAFE_METADATA_REFRESH"}.get(
+        report["result"], "STRUCTURAL_CHANGE_REVIEW_REQUIRED")
+    if "PRODUCTION_COMPATIBILITY_CONTRACT_FAILED" in report["reasons"]:
+        report["status"] = "COMPATIBILITY_FAILED"
+    report["ownerApprovalRequired"] = report["result"] == "REVIEW_REQUIRED"
+    report["upgradePathVerified"] = report["result"] != "REVIEW_REQUIRED"
+    report["nextAction"] = ("No action or approval PR needed." if report["result"] == "ALIGNED" else
+        "Review the metadata synchronization PR; no structural approval needed." if report["result"] == "SAFE_METADATA_ONLY" else
+        "Use FMSC Database Schema Upgrade Approval to inspect the exact candidate and test reviewed migrations. No baseline was changed.")
+    if report.get("ownerApprovalVerified"):
+        report.update(status="STRUCTURAL_CHANGE_APPROVED", ownerApprovalRequired=False,
+                      upgradePathVerified=True, nextAction="Review the draft baseline PR and all mandatory CI results; production database acceptance remains separate.")
+    return report
 
 
 def main():
@@ -395,6 +443,18 @@ def main():
             print("DACPAC refresh refused: " + code + ". For local use, supply a full reviewed --approval-ref.")
             return 1
     report, updates = verify(args.project.resolve(), anchor)
+    if report["result"] == "REVIEW_REQUIRED" and os.environ.get("GH_TOKEN"):
+        from schema_upgrade import audit_approval
+        from publish_dacpac_refresh import GitHub
+        try:
+            if audit_approval(args.project.resolve(), anchor, GitHub(os.environ["GH_TOKEN"]), os.environ["GITHUB_REPOSITORY"]) == "STRUCTURAL_CHANGE_APPROVED":
+                current = git(args.project, "rev-parse", "HEAD").decode().strip()
+                approved_report, _ = verify(args.project.resolve(), current)
+                if approved_report["result"] == "ALIGNED":
+                    report, updates = approved_report, {}
+                    report["ownerApprovalVerified"] = True
+        except (Refusal, KeyError, OSError, ValueError, subprocess.SubprocessError):
+            report["reasons"].append("STRUCTURAL_OWNER_APPROVAL_NOT_VERIFIED")
     if args.sync and report["result"] != "REVIEW_REQUIRED":
         original = {name: (args.project / name).read_bytes() for name in updates}
         try:

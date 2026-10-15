@@ -1,0 +1,209 @@
+name: FMSC Database Schema Upgrade Approval
+run-name: Schema upgrade ${{ inputs.candidate_commit || github.sha }} ${{ inputs.review_digest || 'inspection' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [inspect, approve, validate]
+        default: inspect
+        description: Inspect first; approve only the exact tested review digest
+      candidate_commit:
+        description: Full 40-character candidate commit already in main history
+        type: string
+        default: ''
+      migrations:
+        description: Reviewed main files in order, e.g. Migrations/7.sql,Migrations/8.sql
+        type: string
+        default: ''
+      review_digest:
+        description: Exact reviewDigest from a successful inspection
+        type: string
+        default: ''
+      confirmation:
+        description: For approve only, type APPROVE followed by colon and the exact reviewDigest
+        type: string
+        default: ''
+  pull_request:
+    branches: [main]
+    paths:
+      - 'FMSC.dacpac'
+      - 'Core/ApprovedSchemaArtifact.json'
+      - 'Core/DatabaseCompatibilityRequirements.json'
+      - 'Core/DatabaseMigrationRequirements.json'
+      - 'Core/SchemaUpgradeApproval.json'
+      - 'Tests/LifecycleSqlChecks/**'
+      - 'Tools/*schema_upgrade*.py'
+      - 'Tools/*dacpac*.py'
+      - '.github/workflows/fmsc-schema-upgrade-approval.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'Core/ApprovedSchemaArtifact.json'
+      - 'Core/DatabaseCompatibilityRequirements.json'
+      - 'Core/SchemaUpgradeApproval.json'
+      - 'Tests/LifecycleSqlChecks/Baseline/**'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: schema-upgrade-${{ github.ref }}-${{ inputs.operation || github.event_name }}
+  cancel-in-progress: false
+
+jobs:
+  regressions:
+    name: Approval safety and disposable migration regressions
+    if: github.event_name != 'workflow_dispatch' || inputs.operation == 'validate'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+          path: trusted
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Test safe refresh, refusal and owner authorization
+        run: |
+          python Tools/test_dacpac_refresh.py
+          python Tools/test_schema_upgrade.py
+      - name: Execute real synthetic migration and lifecycle acceptance
+        run: python Tools/test_schema_upgrade.py --sql
+      - name: Retry owned cleanup after interruption or failure
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/fmsc-schema-upgrade-owner.json"; then
+            python Tests/LifecycleSqlChecks/run.py --cleanup --state "$RUNNER_TEMP/fmsc-schema-upgrade-owner.json" --output "$RUNNER_TEMP/unused-cleanup-evidence"
+          fi
+      - name: Validate changed approval records with trusted code
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
+        run: |
+          set -euo pipefail
+          script=trusted/Tools/schema_upgrade.py
+          if ! test -f "$script"; then
+            echo 'Bootstrap implementation under review: only read credentials, no structural approval is authorized.'
+            script=Tools/schema_upgrade.py
+          fi
+          if test -z "$BASE"; then
+            BASE=$(git rev-parse origin/main)
+          fi
+          python "$script" audit --project "$GITHUB_WORKSPACE" --anchor "$BASE"
+
+  inspect:
+    name: Verify exact candidate and reviewed data-preserving migration
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.operation != 'validate' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      ready: ${{ steps.verify.outputs.ready }}
+      digest: ${{ steps.verify.outputs.digest }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify candidate and produce an unapproved proposal
+        id: verify
+        env:
+          CANDIDATE: ${{ inputs.candidate_commit }}
+          MIGRATIONS: ${{ inputs.migrations }}
+        run: >-
+          python Tools/schema_upgrade.py inspect --source "$GITHUB_SHA" --candidate "$CANDIDATE"
+          --migrations "$MIGRATIONS" --sql --output "$RUNNER_TEMP/upgrade-report"
+          --proposal "$RUNNER_TEMP/upgrade-proposal"
+      - name: Publish sanitized review summary
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/upgrade-report/summary.md"; then
+            cat "$RUNNER_TEMP/upgrade-report/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Retry owned SQL cleanup after interruption or failure
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/fmsc-schema-upgrade-owner.json"; then
+            python Tests/LifecycleSqlChecks/run.py --cleanup --state "$RUNNER_TEMP/fmsc-schema-upgrade-owner.json" --output "$RUNNER_TEMP/unused-cleanup-evidence"
+          fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: schema-upgrade-report
+          path: |
+            ${{ runner.temp }}/upgrade-report/report.json
+            ${{ runner.temp }}/upgrade-report/summary.md
+          retention-days: 7
+      - name: Retain only the verified data-free proposal for the trusted publisher
+        if: steps.verify.outputs.ready == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: verified-schema-proposal
+          path: |
+            ${{ runner.temp }}/upgrade-proposal/manifest.json
+            ${{ runner.temp }}/upgrade-proposal/Core/ApprovedSchemaArtifact.json
+            ${{ runner.temp }}/upgrade-proposal/Core/DatabaseCompatibilityRequirements.json
+            ${{ runner.temp }}/upgrade-proposal/Tests/LifecycleSqlChecks/Baseline/provenance.json
+            ${{ runner.temp }}/upgrade-proposal/Tests/LifecycleSqlChecks/Baseline/schema.dacpac
+          retention-days: 1
+          if-no-files-found: error
+
+  approve:
+    name: Owner-confirmed draft baseline PR
+    needs: inspect
+    if: >-
+      inputs.operation == 'approve' && needs.inspect.outputs.ready == 'true' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      github.actor == github.repository_owner && github.triggering_actor == github.repository_owner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - name: Check out trusted default-branch code only
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: verified-schema-proposal
+          path: ${{ runner.temp }}/verified-proposal
+      - name: Recheck owner, artifact identity, digest and baseline; prepare draft PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEW_DIGEST: ${{ inputs.review_digest }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          VERIFIED_DIGEST: ${{ needs.inspect.outputs.digest }}
+          GITHUB_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          test "$REVIEW_DIGEST" = "$VERIFIED_DIGEST"
+          python Tools/schema_upgrade.py publish --proposal "$RUNNER_TEMP/verified-proposal"
+
+# Owner-only default-branch dispatch + exact artifact/plan digest is the approval
+# mechanism. No protected environment is claimed or silently configured. Candidate
+# code and SQL never execute with the publisher's write credentials. No auto-merge.
