@@ -90,6 +90,9 @@ internal static class Regression
                             DatabaseHelper.Query("dbo.TvpP", new SqlParameter("@Rows", SqlDbType.Structured) { TypeName = "dbo.RowT" }); // TVP_GOOD
                             DatabaseHelper.Query("dbo.TvpP", new SqlParameter("@Rows", SqlDbType.Structured) { TypeName = "dbo.Wrong" }); // TVP_MISSING
                             var procedure = new SqlCommand("dbo.P") { CommandType = CommandType.StoredProcedure }; // CMD_PROC
+                            var absent = new SqlCommand("dbo.Gone") { CommandType = CommandType.StoredProcedure }; // CMD_ABSENT
+                            var dynamicCommand = new SqlCommand(Choose()) { CommandType = CommandType.StoredProcedure }; // CMD_DYNAMIC
+                            var defaultText = new SqlCommand("dbo.Gone"); // CMD_DEFAULT_TEXT
                             var text = new SqlCommand("dbo.Gone") { CommandType = CommandType.Text }; // CMD_TEXT
                             var later = new SqlCommand("dbo.Gone"); // CMD_LATER
                             later.CommandType = CommandType.StoredProcedure;
@@ -109,7 +112,7 @@ internal static class Regression
             File.WriteAllText(path, code);
             var findings = new List<Finding>();
             var audited = AuditExtensions.Scan(schema, root, new[] { path }, findings);
-            Require(audited == 33, $"Caller count expected 33, got {audited}.");
+            Require(audited == 35, $"Caller count expected 35, got {audited}.");
             int Line(string marker)
             {
                 var offset = code.IndexOf("// " + marker, StringComparison.Ordinal);
@@ -132,7 +135,7 @@ internal static class Regression
                     string.Join("; ", findings.Where(f => f.Line == Line(marker))));
             }
             foreach (var marker in new[] { "CONST_GOOD", "CONCAT_GOOD", "OPTIONAL_GOOD",
-                "USER_INJECT", "USER_SET", "ARRAY_GOOD", "SQL_GOOD", "TVP_GOOD", "CMD_TEXT", "DECOY",
+                "USER_INJECT", "USER_SET", "ARRAY_GOOD", "SQL_GOOD", "TVP_GOOD", "CMD_TEXT", "CMD_DEFAULT_TEXT", "DECOY",
                 "NAMED_GOOD", "ALIAS_GOOD", "LOCAL_CONST", "USER_SYNC", "USER_SET_SYNC", "EXEC_GOOD",
                 "EXEC_USER", "EXEC_USER_ASYNC", "SCALAR_GOOD", "SCALAR_USER", "SCALAR_USER_ASYNC", "RAW_ASYNC" })
                 Clean(marker);
@@ -148,13 +151,15 @@ internal static class Regression
             Expect("DYNAMIC_SQL", "REVIEW_REQUIRED", "Dynamic");
             Expect("TVP_MISSING", "FAIL", "TVP type differs");
             Expect("CMD_PROC", "REVIEW_REQUIRED", "SqlCommand.Parameters");
-            Expect("CMD_LATER", "FAIL", "dbo.Gone");
+            Expect("CMD_LATER", "REVIEW_REQUIRED", "after construction");
+            Expect("CMD_ABSENT", "FAIL", "dbo.Gone");
+            Expect("CMD_DYNAMIC", "REVIEW_REQUIRED", "Dynamic");
             Require(findings.All(f => f.File == "Cases.cs" && f.Line > 0), "Invalid reported file/line.");
             var expression = SyntaxFactory.ParseExpression("(@\"dbo.\" + \"P\")");
             Require(AuditExtensions.Constant(expression, null) == "dbo.P", "Literal concatenation.");
             Require(AuditExtensions.Normalize("[dbo].[P]") == "dbo.P", "Qualified identifiers.");
             Require(AuditExtensions.Normalize("P") == "dbo.P", "Default dbo schema.");
-            Console.WriteLine("PASS: fictional Roslyn/DacFx/ScriptDom regressions (33 caller cases; positives, negatives, parameters, TVPs, SQL, locations).");
+            Console.WriteLine("PASS: fictional Roslyn/DacFx/ScriptDom regressions (35 caller cases; positives, negatives, parameters, TVPs, SQL, locations).");
         }
         finally { Directory.Delete(root, recursive: true); }
     }
