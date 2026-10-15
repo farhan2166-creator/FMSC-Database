@@ -81,10 +81,8 @@ public static class DeliveryStatusService
     {
         if (current == next) return false;
         if (current is DeliveryState.Delivered or DeliveryState.Read) return current == DeliveryState.Delivered && next == DeliveryState.Read;
-        if (next is DeliveryState.Draft or DeliveryState.Queued or DeliveryState.Submitting or DeliveryState.Cancelled) return false;
-        if (next is DeliveryState.Failed or DeliveryState.Rejected) return current is DeliveryState.Accepted or DeliveryState.Sent or DeliveryState.DeliveryUnknown;
-        int Rank(DeliveryState s) => s switch { DeliveryState.Accepted => 1, DeliveryState.Sent => 2, DeliveryState.Delivered => 3, DeliveryState.Read => 4, _ => 0 };
-        return Rank(next)>Rank(current);
+        return current is DeliveryState.Accepted or DeliveryState.Sent or DeliveryState.DeliveryUnknown
+            && next is DeliveryState.Sent or DeliveryState.Delivered or DeliveryState.Read or DeliveryState.Failed or DeliveryState.Rejected;
     }
     public static bool VerifyMetaSignature(byte[] body, string signature, string appSecret)
     {

@@ -69,6 +69,7 @@ CREATE TABLE comm.Attempt(
  AttemptId bigint IDENTITY PRIMARY KEY, MessageId uniqueidentifier NOT NULL REFERENCES comm.Message(MessageId), ClaimToken uniqueidentifier NOT NULL UNIQUE,
  Actor int NOT NULL REFERENCES dbo.Users(UserId), CreatedUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME(), ReservedCost decimal(18,4) NOT NULL CHECK(ReservedCost>=0));
 CREATE INDEX IX_CommAttempt_Budget ON comm.Attempt(CreatedUtc) INCLUDE(ReservedCost);
+CREATE TABLE comm.PendingReceipt(ProviderReference varchar(200) NOT NULL PRIMARY KEY,State varchar(20) NOT NULL CHECK(State IN('Sent','Delivered','Read','Failed')),ReceivedUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME());
 CREATE TABLE comm.WebhookInbox(PayloadHash binary(32) NOT NULL PRIMARY KEY,ReceivedUtc datetime2 NOT NULL DEFAULT SYSUTCDATETIME());
 CREATE TABLE comm.Audit(
  AuditId bigint IDENTITY PRIMARY KEY, Actor int NOT NULL REFERENCES dbo.Users(UserId), Operation varchar(40) NOT NULL,
@@ -118,7 +119,7 @@ RETURNS TABLE AS RETURN
  LEFT JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId
  WHERE C.ContactId=@ContactId;
 GO
-CREATE FUNCTION comm.Render(@Body nvarchar(2000),@ContactId uniqueidentifier,@Announcement nvarchar(1000),@PaymentId int) RETURNS nvarchar(2000) AS
+CREATE FUNCTION comm.Render(@Body nvarchar(max),@ContactId uniqueidentifier,@Announcement nvarchar(1000),@PaymentId int) RETURNS nvarchar(max) AS
 BEGIN
  SELECT @Body=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@Body,N'{{school}}',school),N'{{student}}',student),N'{{class}}',class),N'{{year}}',year),N'{{amount}}',ISNULL(amount,N'')),N'{{receipt}}',receipt),N'{{dueDate}}',dueDate),N'{{announcement}}',announcement)
  FROM comm.ValuesFor(@ContactId,@Announcement,@PaymentId);
@@ -137,10 +138,10 @@ BEGIN
  IF @Category='Financial' EXEC dbo.RequirePermission @Actor,N'Fees.View';
  SELECT C.ContactId,C.ContactName,C.Destination,C.AdmissionId,V.EnrollmentId,C.FamilyId,
  comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId) Body,
- ISNULL((SELECT comm.Render(N'{{'+CONVERT(nvarchar(30),J.value)+N'}}',C.ContactId,@Announcement,@PaymentId) text FROM OPENJSON(T.ParameterOrder) J ORDER BY TRY_CONVERT(int,J.[key]) FOR JSON PATH),N'[]') Parameters,
+ Rendered.Parameters,
  comm.Segments(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId)) Segments,
  CASE WHEN S.Mode='Simulation' THEN 0 WHEN @Channel='Sms' THEN S.SmsUnitCost*comm.Segments(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId)) ELSE S.WhatsAppUnitCost END EstimatedCost,S.Currency,
- CASE WHEN T.Approved=0 THEN N'Template requires approval' WHEN C.OwnerKind<>T.Scope THEN N'Contact context does not match template'
+ CASE WHEN DATALENGTH(Rendered.Parameters)>8000 THEN N'Personalized provider parameters exceed the supported size; shorten the template' WHEN DATALENGTH(comm.Render(T.Body,C.ContactId,@Announcement,@PaymentId))>4000 THEN N'Personalized message exceeds 2000 characters; shorten the template' WHEN T.Approved=0 THEN N'Template requires approval' WHEN C.OwnerKind<>T.Scope THEN N'Contact context does not match template'
  WHEN C.Language<>T.Language THEN N'Template language does not match contact' WHEN C.Verified=0 THEN N'Unverified contact'
  WHEN C.OptedOut=1 THEN N'Opted out' WHEN @Channel='Sms' AND C.SmsConsent=0 THEN N'No SMS consent'
  WHEN @Channel='WhatsApp' AND C.WhatsAppConsent=0 THEN N'No WhatsApp consent'
@@ -157,7 +158,8 @@ BEGIN
  ELSE N'' END Exclusion
  FROM (SELECT DISTINCT TRY_CONVERT(uniqueidentifier,value) Id FROM OPENJSON(@ContactIds)) I JOIN comm.Contact C ON C.ContactId=I.Id
  CROSS APPLY comm.ValuesFor(C.ContactId,@Announcement,@PaymentId) V
- CROSS JOIN comm.Template T CROSS JOIN comm.Settings S WHERE T.TemplateId=@TemplateId AND S.Id=1 ORDER BY C.ContactName,C.ContactId;
+ CROSS JOIN comm.Template T CROSS JOIN comm.Settings S
+ CROSS APPLY(SELECT ISNULL((SELECT comm.Render(N'{{'+CONVERT(nvarchar(30),J.value)+N'}}',C.ContactId,@Announcement,@PaymentId) text FROM OPENJSON(T.ParameterOrder) J ORDER BY TRY_CONVERT(int,J.[key]) FOR JSON PATH),N'[]') Parameters) Rendered WHERE T.TemplateId=@TemplateId AND S.Id=1 ORDER BY C.ContactName,C.ContactId;
 END;
 GO
 CREATE PROCEDURE comm.SaveContact @Actor int,@Id uniqueidentifier,@Kind varchar(10),@AdmissionId int=NULL,@FamilyId int=NULL,@StaffId int=NULL,
@@ -184,9 +186,10 @@ BEGIN
  SET NOCOUNT ON; SET XACT_ABORT ON; EXEC dbo.RequirePermission @Actor,N'Communication.Configure';
  DECLARE @R nvarchar(2000)=@Body;
  SELECT @R=REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(@R,N'{{school}}',N''),N'{{student}}',N''),N'{{class}}',N''),N'{{year}}',N''),N'{{amount}}',N''),N'{{receipt}}',N''),N'{{dueDate}}',N''),N'{{announcement}}',N'');
- IF LEN(@Body)=0 OR @R LIKE N'%{{%' OR @R LIKE N'%}}%' OR ISJSON(@Order)<>1 THROW 51001,'Invalid template text or parameter order.',1;
+ IF LEN(@Body)=0 OR @R LIKE N'%{{%' OR @R LIKE N'%}}%' OR ISJSON(@Order)<>1 OR LEFT(LTRIM(@Order),1)<>'[' THROW 51001,'Invalid template text or parameter order.',1;
  IF EXISTS(SELECT 1 FROM OPENJSON(@Order) WHERE [type]<>1 OR value NOT IN('school','student','class','year','amount','receipt','dueDate','announcement')) THROW 51001,'Unknown template parameter.',1;
  IF @Scope IN('Family','Manual') AND (EXISTS(SELECT 1 FROM OPENJSON(@Order) WHERE value IN('student','amount','receipt','class','year','dueDate')) OR @Body LIKE N'%{{student}}%' OR @Body LIKE N'%{{amount}}%' OR @Body LIKE N'%{{receipt}}%' OR @Body LIKE N'%{{class}}%' OR @Body LIKE N'%{{year}}%' OR @Body LIKE N'%{{dueDate}}%') THROW 51001,'Personal student fields cannot be used in a family or manual template.',1;
+ IF @Category<>'Financial' AND (@Body LIKE N'%{{amount}}%' OR @Body LIKE N'%{{receipt}}%' OR @Body LIKE N'%{{dueDate}}%' OR EXISTS(SELECT 1 FROM OPENJSON(@Order) WHERE value IN('amount','receipt','dueDate'))) THROW 51001,'Financial placeholders require the Financial category and Fees.View authority.',1;
  IF @Category='Financial' AND @Scope<>'Student' THROW 51001,'Financial templates require an explicitly linked student contact.',1;
  BEGIN TRANSACTION;
  IF EXISTS(SELECT 1 FROM comm.Template WITH(UPDLOCK,HOLDLOCK) WHERE TemplateId=@Id)
@@ -222,7 +225,7 @@ BEGIN
  END;
  DECLARE @ContentHash binary(32)=HASHBYTES('SHA2_256',CONCAT(CONVERT(nvarchar(36),@TemplateId),N'|',@Channel,N'|',@ContactIds,N'|',@Announcement,N'|',CONVERT(nvarchar(10),@DueUtc,23),N'|',@EventKey,N'|',@PaymentId));
  IF EXISTS(SELECT 1 FROM comm.Campaign WITH(UPDLOCK,HOLDLOCK) WHERE CreatedBy=@Actor AND ContentHash=@ContentHash AND Status<>'Cancelled' AND CreatedUtc>=DATEADD(MINUTE,-15,SYSUTCDATETIME())) THROW 51002,'A matching recent campaign already exists. Review Outbox before preparing it again.',1;
- CREATE TABLE #P(ContactId uniqueidentifier,ContactName nvarchar(150),Destination varchar(16),AdmissionId int,EnrollmentId int,FamilyId int,Body nvarchar(2000),Parameters nvarchar(4000),Segments int,EstimatedCost decimal(18,4),Currency char(3),Exclusion nvarchar(200));
+ CREATE TABLE #P(ContactId uniqueidentifier,ContactName nvarchar(150),Destination varchar(16),AdmissionId int,EnrollmentId int,FamilyId int,Body nvarchar(max),Parameters nvarchar(max),Segments int,EstimatedCost decimal(18,4),Currency char(3),Exclusion nvarchar(200));
  INSERT #P EXEC comm.Preview @Actor,@TemplateId,@Channel,@ContactIds,@Announcement,@PaymentId;
  IF EXISTS(SELECT 1 FROM #P WHERE LEN(Exclusion)>0) OR (SELECT COUNT(*) FROM #P)<>(SELECT COUNT(DISTINCT value) FROM OPENJSON(@ContactIds)) THROW 51001,'Review exclusions or missing contacts before creating the campaign.',1;
  IF (SELECT COUNT(*) FROM #P)>1 EXEC dbo.RequirePermission @Actor,N'Communication.Bulk';
@@ -326,6 +329,16 @@ BEGIN
  Provider=@Provider,ProviderReference=@Reference,SafeToRetry=CASE WHEN @State='Rejected' THEN @RetrySafe ELSE 0 END,LastCode=@Code,
  NextAttemptUtc=DATEADD(SECOND,CASE WHEN @RetryDelay>CASE WHEN Attempts=1 THEN 30 ELSE 120 END THEN @RetryDelay WHEN Attempts=1 THEN 30 ELSE 120 END,SYSUTCDATETIME()),UpdatedUtc=SYSUTCDATETIME()
  WHERE MessageId=@Id AND ClaimToken=@Token AND State IN('Submitting','DeliveryUnknown');
+ -- A signed receipt can arrive before the submitting HTTP request returns.
+ IF @Provider='MetaCloud' AND @Reference IS NOT NULL
+ BEGIN
+  UPDATE M SET State=R.State,UpdatedUtc=SYSUTCDATETIME()
+  FROM comm.Message M JOIN comm.PendingReceipt R ON R.ProviderReference=M.ProviderReference
+  WHERE M.MessageId=@Id AND M.ClaimToken=@Token AND M.State IN('Accepted','Sent','DeliveryUnknown');
+  IF @@ROWCOUNT>0 INSERT comm.Audit(Actor,Operation,EntityId,Detail) VALUES(@Actor,'EarlyReceiptReconciled',@Id,N'Previously signed provider receipt matched after acknowledgement');
+  UPDATE C SET LastDeliveryUtc=SYSUTCDATETIME() FROM comm.Contact C JOIN comm.Message M ON M.ContactId=C.ContactId WHERE M.MessageId=@Id AND M.State IN('Delivered','Read');
+  DELETE FROM comm.PendingReceipt WHERE ProviderReference=@Reference AND EXISTS(SELECT 1 FROM comm.Message WHERE MessageId=@Id AND ProviderReference=@Reference);
+ END;
  INSERT comm.Audit(Actor,Operation,EntityId,Detail) VALUES(@Actor,'SubmissionResult',@Id,@State+N': '+@Code);
  COMMIT;
 END;
@@ -353,19 +366,22 @@ BEGIN
  SET NOCOUNT ON; EXEC dbo.RequirePermission @Actor,N'Communication.View';
  IF @Page NOT BETWEEN 0 AND 100000 THROW 51001,'Invalid result page.',1;
  IF @View='Contacts'
+ BEGIN
+  EXEC dbo.RequirePermission @Actor,N'Communication.Configure';
   SELECT ContactId,OwnerKind,AdmissionId,FamilyId,StaffId,ContactName,Destination,Language,PreferredChannel,Verified,SmsConsent,WhatsAppConsent,FinancialConsent,AnnouncementConsent,OptedOut,ConsentSource,ConsentUtc,Revision FROM comm.Contact
   WHERE ContactName LIKE N'%'+@Search+N'%' OR Destination LIKE N'%'+@Search+N'%' ORDER BY ContactName,ContactId OFFSET @Page*100 ROWS FETCH NEXT 100 ROWS ONLY;
+ END
  ELSE IF @View='Recipients'
  BEGIN
   EXEC dbo.RequirePermission @Actor,N'Communication.Compose';
   IF @Filter='Staff' EXEC dbo.RequirePermission @Actor,N'Staff.View'; ELSE EXEC dbo.RequirePermission @Actor,N'Students.View';
   IF @Filter='Outstanding' EXEC dbo.RequirePermission @Actor,N'Fees.View';
   SELECT C.ContactId,C.OwnerKind,C.ContactName,C.Destination,V.student Student,V.class Class,V.year AcademicYear,C.Verified,C.OptedOut,C.Language,C.SmsConsent,C.WhatsAppConsent,
-   V.AdmissionId,V.FamilyId,CASE WHEN V.AdmissionId IS NOT NULL THEN comm.Balance(V.AdmissionId) END Outstanding
+   V.AdmissionId,V.FamilyId,CASE WHEN @Filter='Outstanding' AND V.AdmissionId IS NOT NULL THEN comm.Balance(V.AdmissionId) END Outstanding
   FROM comm.Contact C CROSS APPLY comm.ValuesFor(C.ContactId,N'',NULL) V
   WHERE (@Campus=0 OR V.CampusId=@Campus) AND (@Year=0 OR V.AcademicYearId=@Year) AND (@Class=0 OR V.ClassId=@Class) AND (@Section=0 OR V.SectionId=@Section)
    AND (C.ContactName LIKE N'%'+@Search+N'%' OR V.student LIKE N'%'+@Search+N'%')
-   AND (@Filter='' OR @Filter='Outstanding' AND comm.Balance(V.AdmissionId)>0 OR @Filter='Staff' AND C.OwnerKind='Staff' OR @Filter='Family' AND C.OwnerKind='Family' OR @Filter='Manual' AND C.OwnerKind='Manual' OR @Filter='Pending' AND V.StudentStatus=N'Pending')
+   AND (@Filter='' AND C.OwnerKind<>'Staff' OR @Filter='Outstanding' AND comm.Balance(V.AdmissionId)>0 OR @Filter='Staff' AND C.OwnerKind='Staff' OR @Filter='Family' AND C.OwnerKind='Family' OR @Filter='Manual' AND C.OwnerKind='Manual' OR @Filter='Pending' AND V.StudentStatus=N'Pending')
   ORDER BY C.ContactName,C.ContactId OFFSET @Page*100 ROWS FETCH NEXT 100 ROWS ONLY;
  END
  ELSE IF @View='Operational' SELECT Mode,Paused,Currency,MaxBatch,HourLimit,DayLimit FROM comm.Settings;
@@ -377,9 +393,9 @@ BEGIN
  ELSE IF @View IN('History','Outbox')
  BEGIN
   IF @View='History' EXEC dbo.RequirePermission @Actor,N'Communication.History';
-  SELECT M.MessageId,M.CampaignId,P.CreatedBy,P.ApprovedBy,P.DueUtc,P.Status CampaignStatus,M.State,M.Simulation,M.Provider,M.ProviderReference,M.Attempts,M.LastCode,
+  SELECT M.MessageId,M.CampaignId,S.StudentName Student,C.ContactName Recipient,T.Code Template,T.Language,P.CreatedBy,P.ApprovedBy,P.DueUtc,P.Status CampaignStatus,M.State,M.Simulation,M.Provider,M.ProviderReference,M.Attempts,M.LastCode,
    CONCAT(LEFT(M.Destination,3),'******',RIGHT(M.Destination,3)) Destination,M.EstimatedCost,M.Currency,M.UpdatedUtc
-  FROM comm.Message M JOIN comm.Campaign P ON P.CampaignId=M.CampaignId WHERE (@View='History' OR P.CreatedBy=@Actor) AND (@Filter='' OR M.State=@Filter) AND (CONVERT(nvarchar(36),M.CampaignId) LIKE N'%'+@Search+N'%' OR M.LastCode LIKE N'%'+@Search+N'%')
+  FROM comm.Message M JOIN comm.Campaign P ON P.CampaignId=M.CampaignId JOIN comm.Contact C ON C.ContactId=M.ContactId JOIN comm.Template T ON T.TemplateId=P.TemplateId LEFT JOIN dbo.Students S ON S.AdmissionId=M.AdmissionId WHERE (@View='History' OR P.CreatedBy=@Actor) AND (@Filter='' OR M.State=@Filter) AND (CONVERT(nvarchar(36),M.CampaignId) LIKE N'%'+@Search+N'%' OR M.LastCode LIKE N'%'+@Search+N'%' OR S.StudentName LIKE N'%'+@Search+N'%' OR C.ContactName LIKE N'%'+@Search+N'%')
   ORDER BY M.UpdatedUtc DESC,M.MessageId OFFSET @Page*100 ROWS FETCH NEXT 100 ROWS ONLY;
  END
  ELSE IF @View='Settings' BEGIN EXEC dbo.RequirePermission @Actor,N'Communication.Configure'; SELECT * FROM comm.Settings; END
@@ -402,6 +418,8 @@ BEGIN
  SET NOCOUNT ON; SET XACT_ABORT ON; EXEC dbo.RequirePermission @Actor,N'Communication.Configure';
  IF @Mode='Live' AND (@RegistrationConfirmed=0 OR (@SmsCost IS NULL AND @WhatsAppCost IS NULL)) THROW 51001,'Live sending requires provider registration confirmation and an explicit cost estimate.',1;
  BEGIN TRANSACTION;
+ DECLARE @Gate int;SELECT @Gate=Id FROM comm.Settings WITH(UPDLOCK,HOLDLOCK) WHERE Id=1;
+ IF @Currency<>(SELECT Currency FROM comm.Settings) AND EXISTS(SELECT 1 FROM comm.Attempt WHERE CreatedUtc>=DATEFROMPARTS(YEAR(SYSUTCDATETIME()),MONTH(SYSUTCDATETIME()),1) AND ReservedCost>0) THROW 51001,'Currency cannot change while this month has reserved provider costs.',1;
  UPDATE comm.Settings SET Mode=@Mode,Paused=@Paused,MaxBatch=@MaxBatch,ApprovalThreshold=@ApprovalThreshold,HourLimit=@HourLimit,DayLimit=@DayLimit,DailyBudget=@DailyBudget,MonthlyBudget=@MonthlyBudget,SmsUnitCost=@SmsCost,WhatsAppUnitCost=@WhatsAppCost,Currency=@Currency,QuietStart=@QuietStart,QuietEnd=@QuietEnd,UtcOffsetMinutes=@Offset,RegistrationConfirmed=@RegistrationConfirmed,UpdatedBy=@Actor,UpdatedUtc=SYSUTCDATETIME() WHERE Id=1;
  INSERT comm.Audit(Actor,Operation,Detail) VALUES(@Actor,'SettingsSaved',N'Sending mode and limits revised; no credentials stored in SQL');
  COMMIT;
@@ -478,7 +496,7 @@ BEGIN
   IF @Event='PaymentCompleted' INSERT @Candidates SELECT C.ContactId,P.FeePaymentId,P.FeePaymentId FROM dbo.FeePayments P JOIN comm.Contact C ON C.AdmissionId=P.AdmissionId WHERE P.FeePaymentId>@Start AND P.Status=N'Completed' AND P.PaymentMethod NOT IN(N'Refund',N'Correction');
   IF @Event='AdmissionCompleted' INSERT @Candidates SELECT C.ContactId,S.AdmissionId,NULL FROM dbo.Students S JOIN comm.Contact C ON C.AdmissionId=S.AdmissionId WHERE S.Status=N'Active' AND S.AdmissionNumber IS NOT NULL AND NOT EXISTS(SELECT 1 FROM comm.RuleBaseline B WHERE B.RuleId=@Rule AND B.EventId=S.AdmissionId);
   IF @Event='PromotionCompleted' INSERT @Candidates SELECT C.ContactId,P.PromotionBatchStudentId,NULL FROM dbo.PromotionBatchStudents P JOIN comm.Contact C ON C.AdmissionId=P.AdmissionId WHERE P.PromotionBatchStudentId>@Start AND P.Decision=N'PROMOTE' AND P.NewEnrollmentId=(SELECT TOP(1) EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=P.AdmissionId ORDER BY EnrollmentDate DESC,EnrollmentId DESC);
-  IF @Event='ReturnConfirmed' INSERT @Candidates SELECT C.ContactId,E.EnrollmentId,NULL FROM dbo.Enrollments E JOIN comm.Contact C ON C.AdmissionId=E.AdmissionId WHERE E.ReturnConfirmedAt IS NOT NULL AND NOT EXISTS(SELECT 1 FROM comm.RuleBaseline B WHERE B.RuleId=@Rule AND B.EventId=E.EnrollmentId);
+  IF @Event='ReturnConfirmed' INSERT @Candidates SELECT C.ContactId,E.EnrollmentId,NULL FROM dbo.Enrollments E JOIN comm.Contact C ON C.AdmissionId=E.AdmissionId WHERE E.ReturnConfirmedAt IS NOT NULL AND E.EnrollmentId=(SELECT TOP(1) EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=E.AdmissionId ORDER BY EnrollmentDate DESC,EnrollmentId DESC) AND NOT EXISTS(SELECT 1 FROM comm.RuleBaseline B WHERE B.RuleId=@Rule AND B.EventId=E.EnrollmentId);
   IF @Event='MonthlyOutstanding' INSERT @Candidates SELECT C.ContactId,CONVERT(bigint,FORMAT(SYSUTCDATETIME(),'yyyyMM')),NULL FROM comm.Contact C WHERE C.AdmissionId IS NOT NULL AND comm.Balance(C.AdmissionId)>0;
   DECLARE @Contact uniqueidentifier,@EventId bigint,@Payment int,@Key nvarchar(150),@Campaign uniqueidentifier,@Ids nvarchar(100),@Due datetime2;
   DECLARE E CURSOR LOCAL FAST_FORWARD FOR SELECT TOP(@Limit) X.ContactId,X.EventId,X.PaymentId FROM @Candidates X JOIN comm.Contact C ON C.ContactId=X.ContactId JOIN comm.Template T ON T.TemplateId=@Template
@@ -522,6 +540,7 @@ BEGIN
  BEGIN TRANSACTION;
  IF EXISTS(SELECT 1 FROM comm.WebhookInbox WITH(UPDLOCK,HOLDLOCK) WHERE PayloadHash=@Hash) BEGIN COMMIT;RETURN;END;
  INSERT comm.WebhookInbox(PayloadHash) VALUES(@Hash);
+ DELETE FROM comm.PendingReceipt WHERE ReceivedUtc<DATEADD(DAY,-7,SYSUTCDATETIME());
  DECLARE @Reference varchar(200),@State varchar(20),@Id uniqueidentifier;
  DECLARE S CURSOR LOCAL FAST_FORWARD FOR
   SELECT JSON_VALUE(S.value,'$.id'),CASE JSON_VALUE(S.value,'$.status') WHEN 'sent' THEN 'Sent' WHEN 'delivered' THEN 'Delivered' WHEN 'read' THEN 'Read' WHEN 'failed' THEN 'Failed' END
@@ -530,7 +549,12 @@ BEGIN
  WHILE @@FETCH_STATUS=0
  BEGIN
   SET @Id=NULL;SELECT @Id=MessageId FROM comm.Message WHERE Provider='MetaCloud' AND ProviderReference=@Reference;
-  IF @Id IS NOT NULL AND @State IS NOT NULL EXEC comm.StatusUpdate @Actor,@Id,'MetaCloud',@Reference,@State;
+  IF @State IS NOT NULL AND LEN(@Reference)>0
+  BEGIN
+   IF @Id IS NOT NULL EXEC comm.StatusUpdate @Actor,@Id,'MetaCloud',@Reference,@State;
+   ELSE IF NOT EXISTS(SELECT 1 FROM comm.PendingReceipt WITH(UPDLOCK,HOLDLOCK) WHERE ProviderReference=@Reference) INSERT comm.PendingReceipt(ProviderReference,State) VALUES(@Reference,@State);
+   ELSE UPDATE comm.PendingReceipt SET State=@State WHERE ProviderReference=@Reference AND (State='Sent' AND @State IN('Delivered','Read','Failed') OR State='Delivered' AND @State='Read');
+  END;
   FETCH NEXT FROM S INTO @Reference,@State;
  END;
  CLOSE S;DEALLOCATE S;

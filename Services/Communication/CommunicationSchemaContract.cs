@@ -31,7 +31,7 @@ public static class CommunicationSchemaContract
             AND COL_LENGTH(N'comm.Message',N'ClaimToken')=16 AND COL_LENGTH(N'comm.Message',N'Simulation')=1
             AND COL_LENGTH(N'comm.Message',N'ProviderReference')=200 AND COL_LENGTH(N'comm.Contact',N'ConsentSource')=400
             AND COL_LENGTH(N'comm.Contact',N'Revision')=8 AND COL_LENGTH(N'comm.Campaign',N'ContentHash')=32
-            AND COL_LENGTH(N'comm.Message',N'EnrollmentId')=4 AND OBJECT_ID(N'comm.RuleBaseline',N'U') IS NOT NULL
+            AND OBJECT_ID(N'comm.PendingReceipt',N'U') IS NOT NULL AND COL_LENGTH(N'comm.Message',N'EnrollmentId')=4 AND OBJECT_ID(N'comm.RuleBaseline',N'U') IS NOT NULL
             AND COL_LENGTH(N'comm.Campaign',N'RequestHash')=32 AND COL_LENGTH(N'comm.Settings',N'NextSendUtc') IS NOT NULL
             AND (SELECT COUNT(*) FROM sys.indexes WHERE object_id=OBJECT_ID(N'comm.Message') AND is_unique=1 AND name IN(N'UX_CommMessage_Recipient',N'UX_CommMessage_Provider'))=2
             AND EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'comm.Campaign') AND name=N'UX_CommCampaign_Event' AND is_unique=1)

@@ -121,16 +121,42 @@ internal static class CommunicationSqlChecks
             await Settings();Sql.Query("UPDATE comm.Settings SET HourLimit=1;");var capped=Guid.NewGuid();await store.CreateAsync(capped,template,MessageChannel.Sms,[contact],"Hourly cap fixture",new DateTime(2026,1,1));await store.TransitionAsync(capped,"Submit");Ready();
             report.Check(await store.ClaimAsync(default) is null,"The hourly attempt cap is enforced across previous campaigns.");await store.TransitionAsync(capped,"Cancel");await Settings();
         });
+        await report.Stage("Communication: committed promotion, return and payment event context",async()=>{
+            async Task<Guid> Rule(string eventName,Guid ruleTemplate){var id=Guid.NewGuid();await store.CallAsync("SaveRule",default,SqlCommunicationStore.P("@Id",id),SqlCommunicationStore.P("@Name","Fictional "+eventName),SqlCommunicationStore.P("@Event",eventName),SqlCommunicationStore.P("@TemplateId",ruleTemplate),SqlCommunicationStore.P("@Channel","Sms"),SqlCommunicationStore.P("@Enabled",true));return id;}
+            DataTable Campaigns(Guid rule)=>Sql.Query("SELECT CampaignId FROM comm.Campaign WHERE EventKey LIKE @Key",Sql.P("@Key",rule+":%"));
+            template=Guid.NewGuid();await Template("promotion_completed","Utility","{{student}}: {{class}} {{year}}");var promotionRule=await Rule("PromotionCompleted",template);
+            var decisions=new DataTable();decisions.Columns.Add("AdmissionId",typeof(int));decisions.Columns.Add("Decision",typeof(string));decisions.Rows.Add(student,"PROMOTE");
+            Sql.Proc("BulkPromoteStudents",Sql.P("@UserId",f.Admin),Sql.P("@SourceAcademicYearId",f.SourceYear),Sql.P("@DestinationAcademicYearId",f.NextYear),Sql.P("@SourceCampusId",f.Campus),Sql.P("@SourceClassId",f.Class6),Sql.P("@SourceSectionId",f.Section),Sql.P("@DestinationClassSectionId",f.Placement7),Sql.P("@EffectiveDate",f.PromotionDate),Sql.P("@Remarks","Fictional communication promotion"),Sql.TvpParameter("@Decisions","BulkPromotionDecisionType",decisions));
+            int destination=Sql.Count("SELECT EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=@Id AND AcademicYearId=@Year",Sql.P("@Id",student),Sql.P("@Year",f.NextYear));
+            await store.CallAsync("Evaluate");var promotions=Campaigns(promotionRule);report.Check(promotions.Rows.Count==1,"An actual committed bulk promotion produces one communication event.");await store.TransitionAsync((Guid)promotions.Rows[0][0],"Cancel");
+            template=Guid.NewGuid();await Template("return_confirmed","Utility","{{student}}: {{class}} {{year}}");var returnRule=await Rule("ReturnConfirmed",template);await store.CallAsync("Evaluate");
+            report.Check(Campaigns(returnRule).Rows.Count==0,"An existing unconfirmed destination enrollment does not produce a return message.");
+            Sql.Proc("ConfirmPromotedAdmission",Sql.P("@UserId",f.Admin),Sql.P("@EnrollmentId",destination),Sql.P("@ReturnDate",f.PromotionDate),Sql.P("@UsesTransport",false),Sql.TvpParameter("@FeeChoices","ReturnFeeChoiceType",Tvp.ReturnFeeChoices(new[]{(f.Tuition,6000m,0m),(f.AdmissionFee,2000m,0m)})));
+            await store.CallAsync("Evaluate");await store.CallAsync("Evaluate");var returns=Campaigns(returnRule);report.Check(returns.Rows.Count==1 && Sql.Count("SELECT COUNT(*) FROM comm.Message WHERE CampaignId=@Id AND EnrollmentId=@Enrollment",Sql.P("@Id",returns.Rows[0][0]),Sql.P("@Enrollment",destination))==1,"A confirmed return on a pre-existing enrollment is detected once with its correct year context.");await store.TransitionAsync((Guid)returns.Rows[0][0],"Cancel");
+            template=Guid.NewGuid();await Template("payment_received","Financial","{{student}}: received {{amount}}; receipt {{receipt}}; {{class}} {{year}}");var paymentRule=await Rule("PaymentCompleted",template);
+            long charge=Convert.ToInt64(Sql.Scalar("SELECT TOP(1) BillingChargeId FROM dbo.BillingCharges WHERE EnrollmentId=@Id AND dbo.GetFeeChargeBalance(BillingChargeId)>=1000 ORDER BY BillingChargeId",Sql.P("@Id",destination)));
+            await CollectionDiscountWriter.CollectAsync("ProcessFeeTransaction",Array.Empty<CollectionDiscountWriter.Edit>(),"Synthetic communication fixture",Lifecycle.CollectionArgs(student,destination,f.NextMonthlyDate,1000,[(charge,1000m)],"Fictional committed event collection"));
+            await store.CallAsync("Evaluate");await store.CallAsync("Evaluate");var payments=Campaigns(paymentRule);report.Check(payments.Rows.Count==1,"A genuine committed payment produces one receipt campaign after repeated evaluation.");
+            report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Message M JOIN comm.Campaign C ON C.CampaignId=M.CampaignId JOIN dbo.FeePayments P ON P.FeePaymentId=C.PaymentId WHERE C.CampaignId=@Id AND M.EnrollmentId=P.EnrollmentId AND M.EnrollmentId=@Enrollment AND CHARINDEX(P.ReceiptNumber,M.Body)>0",Sql.P("@Id",payments.Rows[0][0]),Sql.P("@Enrollment",destination))==1,"The receipt snapshot uses the actual payment identity and destination enrollment.");await store.TransitionAsync((Guid)payments.Rows[0][0],"Cancel");
+        });
+        await report.Stage("Communication: rendered text limits and Urdu segment parity",async()=>{
+            template=Guid.NewGuid();await Template("oversize_fixture","Utility",string.Concat(Enumerable.Repeat("{{student}}",180)));
+            var rows=await store.PreviewAsync(template,MessageChannel.Sms,[contact]);report.Check(Convert.ToString(rows.Rows[0]["Exclusion"])!.Contains("2000"),"Oversized personalization is explained instead of silently truncating a message.");
+            await report.Refused("Oversized personalization cannot become a durable send",()=>store.CreateAsync(Guid.NewGuid(),template,MessageChannel.Sms,[contact],"",new DateTime(2026,1,1)),51001,2628,8152);
+            foreach(var text in new[]{new string('ا',71),new string('^',81),string.Concat(Enumerable.Repeat("😀",36))})report.Check(Sql.Count("SELECT comm.Segments(@Text)",Sql.P("@Text",text))==SmsSegments.Estimate(text).Segments,"SQL and provider estimates agree for Urdu, extension and supplementary Unicode.");
+        });
         await report.Stage("Communication: signed Meta receipts, replay isolation and inbound opt-out",async()=>{
             template=Guid.NewGuid();await Template("meta_fixture","Utility","{{student}}: {{announcement}}","approved_fixture");await Contact(true,false,true);
             var id=Guid.NewGuid();await store.CreateAsync(id,template,MessageChannel.WhatsApp,[contact],"Meta fixture",new DateTime(2026,1,1));await store.TransitionAsync(id,"Submit");Ready();
-            var claim=(await store.ClaimAsync(default))!;string reference="wamid."+Guid.NewGuid().ToString("N");await store.CompleteAsync(claim,"MetaCloud",new(DeliveryState.Accepted,reference));
+            var claim=(await store.ClaimAsync(default))!;string reference="wamid."+Guid.NewGuid().ToString("N");
             string secret=Convert.ToHexString(RandomNumberGenerator.GetBytes(32));var receiver=new MetaWebhookStore(DatabaseHelper.GetConnection,f.Admin,secret,"fixture_account","fixture_phone");
             var staleRevision=(byte[])Sql.Scalar("SELECT Revision FROM comm.Contact WHERE ContactId=@Id",Sql.P("@Id",contact))!;
             var now=DateTimeOffset.UtcNow;
             byte[] Payload(bool stop)=>JsonSerializer.SerializeToUtf8Bytes(new{ @object="whatsapp_business_account",entry=new[]{new{id="fixture_account",changes=new[]{new{value=new{metadata=new{phone_number_id="fixture_phone"},statuses=new[]{new{id=reference,status="delivered",timestamp=now.ToUnixTimeSeconds().ToString()}},messages=stop?new[]{new{from="923001234567",timestamp=now.ToUnixTimeSeconds().ToString(),type="text",text=new{body="STOP"}}}:Array.Empty<object>()}}}}}});
             string Signature(byte[] body)=>"sha256="+Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret),body));
-            var body=Payload(false);report.Check(await receiver.ReceiveAsync(body,Signature(body),now,default) && State(claim.Id)=="Delivered","Signed account-scoped Meta receipt updates the exact provider message.");
+            var body=Payload(false);report.Check(await receiver.ReceiveAsync(body,Signature(body),now,default) && State(claim.Id)=="Submitting","An early signed receipt is held while HTTP acknowledgement is still pending.");
+            await store.CompleteAsync(claim,"MetaCloud",new(DeliveryState.Accepted,reference));
+            report.Check(State(claim.Id)=="Delivered" && Sql.Count("SELECT COUNT(*) FROM comm.PendingReceipt WHERE ProviderReference=@Ref",Sql.P("@Ref",reference))==0,"Acknowledgement reconciles the early signed receipt with the exact message without losing delivery evidence.");
             int audits=Sql.Count("SELECT COUNT(*) FROM comm.Audit;");await receiver.ReceiveAsync(body,Signature(body),now,default);
             report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Audit;")==audits,"Replayed signed callback is durably deduplicated.");
             report.Check(!await receiver.ReceiveAsync(body,"sha256=invalid",now,default),"Unsigned input never reaches SQL ingestion.");
@@ -138,6 +164,27 @@ internal static class CommunicationSqlChecks
             await report.Refused("A stale contact editor cannot undo a newer opt-out",()=>Contact(true,false,true,staleRevision),51004);
             report.Check(Convert.ToString(Sql.Scalar("SELECT USER_NAME()"))=="dbo","Restricted callback impersonation is reverted before returning a pooled connection.");
             await report.Refused("Raw webhook ingestion cannot be invoked through the ordinary SQL user",()=>Task.Run(()=>Sql.Proc("comm.IngestMeta",Sql.P("@Actor",f.Admin),Sql.P("@Payload",Encoding.UTF8.GetString(body)))),51003);
+        });
+        await report.Stage("Communication: interrupted bulk campaign and readable history",async()=>{
+            await Contact(true,false);template=Guid.NewGuid();await Template("bulk_fixture","Utility","{{student}}: {{announcement}}");
+            var contacts=Sql.Query("SELECT ContactId,AdmissionId FROM comm.Contact WHERE OwnerKind='Student'");
+            var savedContact=contact;var savedStudent=student;
+            try{foreach(DataRow row in contacts.Rows){contact=(Guid)row["ContactId"];student=Convert.ToInt32(row["AdmissionId"]);await Contact(true,false);}}finally{contact=savedContact;student=savedStudent;}
+            var ids=contacts.AsEnumerable().Select(r=>(Guid)r["ContactId"]).ToArray();report.Check(ids.Length==2,"The bulk fixture has two independently scoped fictional student contacts with fresh consent after the shared-phone opt-out test.");
+            var eligible=await store.PreviewAsync(template,MessageChannel.Sms,ids,"Bulk fixture");report.Check(eligible.AsEnumerable().All(r=>Convert.ToString(r["Exclusion"])==""),"Both synthetic bulk recipients meet the real consent and template rules.");
+            var id=Guid.NewGuid();await store.CreateAsync(id,template,MessageChannel.Sms,ids,"Bulk fixture",new DateTime(2026,1,1));await store.TransitionAsync(id,"Submit");Ready();
+            var claim=(await store.ClaimAsync(default))!;await store.CompleteAsync(claim,"Fixture",new(DeliveryState.Accepted,"bulk-"+Guid.NewGuid().ToString("N")));await store.TransitionAsync(id,"Pause");Ready();
+            report.Check(await store.ClaimAsync(default) is null,"Pausing an interrupted bulk campaign prevents the next provider claim.");await store.TransitionAsync(id,"Cancel");
+            report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Message WHERE CampaignId=@Id AND State='Accepted'",Sql.P("@Id",id))==1 && Sql.Count("SELECT COUNT(*) FROM comm.Message WHERE CampaignId=@Id AND State='Cancelled'",Sql.P("@Id",id))==1,"Cancellation preserves the submitted message and cancels only the remaining unsent recipient.");
+            var rows=await store.ReadAsync("History",search:"Second Communication Example");report.Check(rows.Rows.Count>0 && rows.Columns.Contains("Recipient") && rows.Columns.Contains("Template"),"History supports student search and identifies the contact and template without exposing message bodies in the list.");
+        });
+        await report.Stage("Communication: contact privacy and financial placeholder authorization",async()=>{
+            Sql.Query("INSERT dbo.RolePermissions(RoleId,PermissionId) SELECT U.RoleId,P.PermissionId FROM dbo.Users U CROSS JOIN dbo.Permissions P WHERE U.UserId=@Id AND P.PermissionCode IN(N'Communication.View',N'Communication.Compose');",Sql.P("@Id",f.Restricted));
+            var reader=new SqlCommunicationStore(DatabaseHelper.GetConnection,f.Restricted);var rows=await reader.ReadAsync("Recipients");
+            report.Check(rows.AsEnumerable().All(r=>r.IsNull("Outstanding")),"A general recipient search does not disclose financial balances.");
+            await report.Refused("Compose permission cannot read consent administration",()=>reader.ReadAsync("Contacts"),50003);
+            await report.Refused("Student viewing does not grant staff recipient access",()=>reader.ReadAsync("Recipients",filter:"Staff"),50003);
+            var previousTemplate=template;template=Guid.NewGuid();try{await report.Refused("A utility template cannot bypass financial-field permissions",()=>Template("misclassified_fixture","Utility","{{amount}}"),51001);}finally{template=previousTemplate;}
         });
         await report.Stage("Communication: expired lease and schema tamper refusal",async()=>{
             await Contact(true,false);var id=Guid.NewGuid();await store.CreateAsync(id,template,MessageChannel.Sms,[contact],"Lease fixture",new DateTime(2026,1,1));await store.TransitionAsync(id,"Submit");Ready();

@@ -80,7 +80,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     private void BuildWorkspace()
     {
         channel.Items.AddRange(["Sms","WhatsApp"]);channel.SelectedIndex=0;
-        recipientFilter.Items.AddRange(["All contacts","Outstanding","Family","Staff","Manual","Pending"]);recipientFilter.SelectedIndex=0;
+        recipientFilter.Items.AddRange(["Student / family / manual","Outstanding","Family","Staff","Manual","Pending"]);recipientFilter.SelectedIndex=0;
         channel.Width=AppScale.Scale(120);recipientFilter.Width=AppScale.Scale(150);templateChoice.Width=AppScale.Scale(320);
         schedule.ShowCheckBox=true;schedule.Checked=false;schedule.Format=DateTimePickerFormat.Custom;schedule.CustomFormat="dd-MMM-yyyy HH:mm";
         announcement.Height=AppScale.Scale(80);announcement.MinimumSize=new Size(0,AppScale.Scale(80));
@@ -130,7 +130,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         tabs.TabPages.Add(Tab("Gateway Settings",gateway));
         tabs.Enabled=false;TabStrip.Apply(tabs,AppTheme.Primary);
         var content=new Panel{Dock=DockStyle.Fill};content.Controls.Add(TabStrip.CreateHost(tabs));content.Controls.Add(operational);SetContent(content);
-        tabs.SelectedIndexChanged+=async(_,_)=>{if(!installed||IsBusy)return;if(tabs.SelectedIndex==1)await ExecuteAsync(RefreshHistory);if(tabs.SelectedIndex==2)await ExecuteAsync(RefreshContacts);if(tabs.SelectedIndex==4)await ExecuteAsync(RefreshRules);};
+        tabs.SelectedIndexChanged+=async(_,_)=>{if(!installed||IsBusy)return;if(tabs.SelectedIndex==1)await ExecuteAsync(RefreshHistory);if(tabs.SelectedIndex==2&&CurrentUser.HasPermission("Communication.Configure"))await ExecuteAsync(RefreshContacts);if(tabs.SelectedIndex==4)await ExecuteAsync(RefreshRules);};
     }
     private Guid SelectedTemplate()=>templateChoice.SelectedValue is Guid id?id:throw new ArgumentException("Choose a reviewed template.");
     private MessageChannel SelectedChannel()=>Enum.Parse<MessageChannel>(Convert.ToString(channel.SelectedItem)!);
@@ -171,7 +171,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         if(approved.Rows.Count==0)SetStatus("No reviewed template is available on this page. An authorized administrator must review a template and create an approved version.",PageStatusKind.Warning);
     }
     private async Task RefreshOperational(){var data=await store.ReadAsync("Operational",token:lifetime.Token);if(!IsDisposed&&data.Rows.Count>0){var r=data.Rows[0];operational.Text=$"Mode: {r["Mode"]} · master pause: {r["Paused"]}. Dispatcher {(dispatchTask is {IsCompleted:false}?"running":"stopped")}. Scheduled work requires a running dispatcher; accepted does not mean delivered.";}}
-    private async Task RefreshHistory(){var rows=await store.ReadAsync(CurrentUser.HasPermission("Communication.History")?"History":"Outbox",historyPage,historySearch.Text,historyState.SelectedIndex<=0?"":Convert.ToString(historyState.SelectedItem)!,token:lifetime.Token);if(!IsDisposed)history.DataSource=rows;}
+    private async Task RefreshHistory(){var rows=await store.ReadAsync(CurrentUser.HasPermission("Communication.History")?"History":"Outbox",historyPage,historySearch.Text,historyState.SelectedIndex<=0?"":Convert.ToString(historyState.SelectedItem)!,token:lifetime.Token);if(!IsDisposed){history.DataSource=rows;foreach(string name in new[]{"MessageId","CreatedBy","ApprovedBy","ProviderReference"})if(history.Columns.Contains(name))history.Columns[name].Visible=false;}}
     private async Task RefreshContacts(){var rows=await store.ReadAsync("Contacts",contactPage,token:lifetime.Token);if(!IsDisposed)contacts.DataSource=rows;}
     private async Task RefreshRules(){if(!CurrentUser.HasPermission("Communication.Configure"))return;var rows=await store.ReadAsync("Rules",token:lifetime.Token);if(!IsDisposed)rules.DataSource=rows;}
     private Task EvaluateRules()=>store.CallAsync("Evaluate",lifetime.Token);

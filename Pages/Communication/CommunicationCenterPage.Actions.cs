@@ -23,7 +23,7 @@ public sealed partial class CommunicationCenterPage
             if(!ModernMessageDialog.Confirm(FindForm(),context+(action=="Submit"?"Submit this entire campaign? Eligible messages may incur provider charges when a dispatcher runs. Large or automated campaigns require approval.":action+" this campaign? Only unsent work can be paused or cancelled."),"Communication Campaign"))return;
             await store.TransitionAsync(id,action,lifetime.Token);await RefreshHistory();
         }
-        historySearch.PlaceholderText="Campaign ID or error code";historySearch.Width=220;
+        historySearch.PlaceholderText="Student, contact, campaign or error";historySearch.Width=220;
         historyState.Items.Add("All states");historyState.Items.AddRange(Enum.GetNames<DeliveryState>());historyState.SelectedIndex=0;
         return ListHost(history,Bar(historySearch,historyState,Button("Search",async()=>{historyPage=0;await RefreshHistory();}),
             Button("Refresh",RefreshHistory),Button("Previous",async()=>{historyPage=Math.Max(0,historyPage-1);await RefreshHistory();}),Button("Next",async()=>{historyPage++;await RefreshHistory();}),
@@ -69,7 +69,7 @@ public sealed partial class CommunicationCenterPage
         catch(Exception){if(!IsDisposed)operational.Text="Dispatcher stopped after an error. Review outbox outcomes before retrying.";}
         finally{if(!IsDisposed)operational.Text="Dispatcher stopped. Queued work remains stored; it will not run while the application is closed.";}
     }
-    private Control BuildContacts()=>ListHost(contacts,Bar(Button("Refresh",RefreshContacts),Button("Previous",async()=>{contactPage=Math.Max(0,contactPage-1);await RefreshContacts();}),Button("Next",async()=>{contactPage++;await RefreshContacts();}),
+    private Control BuildContacts()=>ListHost(contacts,Bar(Button("Refresh",RefreshContacts,"Communication.Configure"),Button("Previous",async()=>{contactPage=Math.Max(0,contactPage-1);await RefreshContacts();},"Communication.Configure"),Button("Next",async()=>{contactPage++;await RefreshContacts();},"Communication.Configure"),
         Button("Add From School Records",async()=>{var candidate=await PickCandidate();if(candidate is not null)await EditContact(null,candidate);},"Communication.Configure"),
         Button("Add Manual Contact",()=>EditContact(null,null),"Communication.Configure"),Button("Edit Contact / Consent",()=>EditContact(Selected(contacts)??throw new ArgumentException("Select a contact first."),null),"Communication.Configure")));
     private Task<DataRow?> PickCandidate()
@@ -155,10 +155,11 @@ public sealed partial class CommunicationCenterPage
     {
         // SQL permission is rechecked before writing OS-protected credentials.
         await store.ReadAsync("Settings",token:lifetime.Token);
-        using var editor=new CommunicationEditor("Secure Gateway Credentials — This Windows User",e=>{
+        using var editor=new CommunicationEditor("Secure Gateway Credentials — This Windows User",async e=>{
+            await store.ReadAsync("Settings",token:lifetime.Token);
             var c=Enum.Parse<MessageChannel>(e.Value("channel"));var credentials=new GatewayCredentials(e.Value("account"),e.Value("secret"),e.Value("sender"),e.Value("version"));
             _=c==MessageChannel.Sms?(IMessageProvider)new TwilioSmsProvider(Http,credentials.AccountOrPhoneId,credentials.Secret,credentials.Sender):new WhatsAppCloudProvider(Http,credentials.AccountOrPhoneId,credentials.Secret,credentials.GraphVersion);
-            gateways.Save(c,credentials);return Task.CompletedTask;
+            gateways.Save(c,credentials);
         });
         editor.Choice("channel","Channel",["Sms","WhatsApp"]);editor.TextField("account","Twilio Account SID or Meta business phone-number ID");editor.TextField("secret","New access token / authentication secret (never displayed back)",password:true);editor.TextField("sender","Twilio-authorized sender ID (SMS only)");editor.TextField("version","Supported Graph API version (WhatsApp only)","");
         editor.ShowDialog(FindForm());
