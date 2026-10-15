@@ -101,7 +101,7 @@ def canonical(node, relationship_ids=False, volatile_origin=False, path=""):
     return (node.tag, tuple(sorted(attrs.items())), text, tuple(children))
 
 
-def archive(data):
+def archive(data, *, candidate=False):
     if len(data) > 128 * 1024 * 1024:
         raise Refusal("PACKAGE_SIZE_LIMIT")
     with zipfile.ZipFile(io.BytesIO(data)) as z:
@@ -121,7 +121,12 @@ def archive(data):
                 raise Refusal("UNSAFE_ZIP_ENTRY")
             if e.file_size > 128 * 1024 * 1024 or e.file_size > max(1, e.compress_size) * 2000:
                 raise Refusal("ZIP_EXPANSION_LIMIT")
-        if not FIXTURE_ENTRIES.issubset(names):
+        # Some genuine DacFx exports omit the optional OPC relationships part.
+        # Approved baseline and synthetic fixture still require the complete
+        # reviewed layout. Only a candidate may omit the optional part, and
+        # this never qualifies as an automatically safe metadata refresh.
+        required = FIXTURE_ENTRIES - ({"_rels/.rels"} if candidate else set())
+        if not required.issubset(names):
             raise Refusal("MISSING_PACKAGE_METADATA")
         # Reading every entry checks CRC, including exported data. Keep it private.
         contents = {name: z.read(name) for name in names}
@@ -140,14 +145,15 @@ def archive(data):
         if name not in contents or (e.text or "").lower() != sha(contents[name]):
             raise Refusal("INTERNAL_CHECKSUM_MISMATCH")
     xml(contents["model.xml"])
-    relationships = xml(contents["_rels/.rels"])
-    ids = [e.get("Id") for e in relationships]
-    if len(ids) != len(set(ids)) or any(not value for value in ids):
-        raise Refusal("INVALID_RELATIONSHIP_ID")
-    for e in relationships:
-        target = (e.get("Target") or "").lstrip("/")
-        if e.get("TargetMode", "Internal") != "Internal" or target not in contents:
-            raise Refusal("EXTERNAL_OR_MISSING_RELATIONSHIP_TARGET")
+    if "_rels/.rels" in contents:
+        relationships = xml(contents["_rels/.rels"])
+        ids = [e.get("Id") for e in relationships]
+        if len(ids) != len(set(ids)) or any(not value for value in ids):
+            raise Refusal("INVALID_RELATIONSHIP_ID")
+        for e in relationships:
+            target = (e.get("Target") or "").lstrip("/")
+            if e.get("TargetMode", "Internal") != "Internal" or target not in contents:
+                raise Refusal("EXTERNAL_OR_MISSING_RELATIONSHIP_TARGET")
     xml(contents["DacMetadata.xml"])
     xml(contents["[Content_Types].xml"])
     return contents
@@ -259,8 +265,10 @@ def verify(project, anchor):
         if current_path.is_symlink():
             raise Refusal("SYMLINK_CANDIDATE_REFUSED")
         candidate = current_path.read_bytes()
-        new = archive(candidate)
+        new = archive(candidate, candidate=True)
         root, ns, elements, actual = fingerprint(new, candidate)
+        if "_rels/.rels" not in new:
+            report["reasons"].append("CANDIDATE_RELATIONSHIPS_PART_ABSENT_REVIEW_REQUIRED")
         report.update(previousPackageSha256=approved["packageSha256"], candidatePackageSha256=actual["packageSha256"],
                       sourceGitBlob=git_blob(candidate), modelSha256=actual["modelSha256"], moduleCount=len(actual["modules"]),
                       requiredSchemaVersion=required_version(at("DatabaseHelper.cs")), exportedEntryCount=sum(n.startswith("Data/") for n in old))
@@ -285,6 +293,10 @@ def verify(project, anchor):
         if report["differences"]:
             report["reasons"].append("PAYLOAD_CHANGED")
         for name in ("Origin.xml", "DacMetadata.xml", "[Content_Types].xml", "_rels/.rels"):
+            if name not in new:
+                # A missing relationships part is reported above and cannot
+                # silently compare equal to the baseline's empty relationships.
+                continue
             a, b = xml(old[name]), xml(new[name])
             if canonical(a, name == "_rels/.rels", name == "Origin.xml") != canonical(b, name == "_rels/.rels", name == "Origin.xml"):
                 report["reasons"].append("UNREVIEWED_METADATA_CHANGE:" + name)
