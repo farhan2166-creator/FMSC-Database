@@ -49,6 +49,10 @@ Admission saves hold the submitted details until saving and refresh finish. For 
 
 For business-rule context see [ADMISSION_WORKFLOW.md](../ADMISSION_WORKFLOW.md). The current runtime requires schema 6 even if historical text in that file refers to older database versions.
 
+## Find Student
+
+Typing an admission number clears Campus, Academic Year, Class and Status. Changing any of those filters clears the admission number while keeping the other filters. Either change clears old results and disables **Open Student** until you click **Search** again. Student/father name searches can still be combined with filters. **Reset** clears both modes.
+
 ## Student Promotion
 
 Open **Student Promotion** (previously Bulk Promotion) to choose the source and destination placement, review candidates and process ticked students. **View Promotion History**, at the top right of Promotion Details, opens completed batches in a separate window using the selected source year, class and section. Blank source filters show all history. You can change the history filters and use **Load**, or clear them to review other batches. Closing the window keeps your promotion selections and remarks intact.

@@ -1,4 +1,5 @@
 using FMSC_SMS.Core;
+using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Dialogs;
 public sealed class StudentSearchDialog : ApplicationWindowForm
 {
@@ -41,12 +42,20 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         Margin = new Padding(0)
     };
     private int searchVersion;
+    private bool updatingCriteria;
+    private readonly Func<string, SqlParameter[], Task<DataTable>> query;
     private readonly bool officialAdmissionsOnly;
     public int SelectedAdmissionId { get; private set; }
     public string? NewAdmissionNumber { get; private set; }
     private string? missingAdmissionNumber;
     public StudentSearchDialog(IWin32Window? owner = null, bool officialAdmissionsOnly = false)
+        : this(owner, officialAdmissionsOnly, DatabaseHelper.QueryUserAsync)
     {
+    }
+    internal StudentSearchDialog(IWin32Window? owner, bool officialAdmissionsOnly,
+        Func<string, SqlParameter[], Task<DataTable>> query)
+    {
+        this.query = query;
         this.officialAdmissionsOnly = officialAdmissionsOnly;
         Text = "Find Student";
         StartPosition = FormStartPosition.CenterParent;
@@ -230,11 +239,11 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         searchButton.Click += (_, _) => Search();
         resetButton.Click += (_, _) => ResetFilters();
         /* changing any criterion invalidates a search that is already running, so its result can never land under filters it was not run for. */
-        searchBox.TextChanged += (_, _) => searchVersion++;
-        searchCampus.SelectedIndexChanged += (_, _) => searchVersion++;
-        searchYear.SelectedIndexChanged += (_, _) => searchVersion++;
-        searchClass.SelectedIndexChanged += (_, _) => searchVersion++;
-        searchStatus.SelectedIndexChanged += (_, _) => searchVersion++;
+        searchBox.TextChanged += (_, _) => CriteriaChanged(fromSearchText: true);
+        searchCampus.SelectedIndexChanged += (_, _) => CriteriaChanged(fromSearchText: false);
+        searchYear.SelectedIndexChanged += (_, _) => CriteriaChanged(fromSearchText: false);
+        searchClass.SelectedIndexChanged += (_, _) => CriteriaChanged(fromSearchText: false);
+        searchStatus.SelectedIndexChanged += (_, _) => CriteriaChanged(fromSearchText: false);
         openButton.Click += (_, _) => OpenSelectedStudent();
         closeButton.Click += (_, _) => {
             DialogResult = DialogResult.Cancel;
@@ -251,16 +260,22 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         try
         {
             var results = await Task.WhenAll(
-                DatabaseHelper.QueryUserAsync("GetCampuses"),
-                DatabaseHelper.QueryUserAsync("GetAcademicYears"),
-                DatabaseHelper.QueryUserAsync("GetClasses"));
+                query("GetCampuses", Array.Empty<SqlParameter>()),
+                query("GetAcademicYears", Array.Empty<SqlParameter>()),
+                query("GetClasses", Array.Empty<SqlParameter>()));
             if (IsDisposed) return;
-            searchCampus.Bind(results[0], "CampusId", "CampusName");
-            searchYear.Bind(results[1], "AcademicYearId", "YearName");
-            searchClass.Bind(results[2], "ClassId", "ClassName");
-            if (searchCampus.Items.Count > 0) searchCampus.SelectedIndex = 0;
-            if (searchYear.Items.Count > 0) searchYear.SelectedIndex = 0;
-            if (searchClass.Items.Count > 0) searchClass.SelectedIndex = 0;
+            // Binding selects intermediate rows. It must not clear text typed while lookups loaded.
+            updatingCriteria = true;
+            try
+            {
+                searchCampus.Bind(results[0], "CampusId", "CampusName");
+                searchYear.Bind(results[1], "AcademicYearId", "YearName");
+                searchClass.Bind(results[2], "ClassId", "ClassName");
+                if (searchCampus.Items.Count > 0) searchCampus.SelectedIndex = 0;
+                if (searchYear.Items.Count > 0) searchYear.SelectedIndex = 0;
+                if (searchClass.Items.Count > 0) searchClass.SelectedIndex = 0;
+            }
+            finally { updatingCriteria = false; }
         }
         catch (Exception ex)
         {
@@ -270,7 +285,20 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
     }
     private void ResetFilters()
     {
-        searchBox.Clear();
+        updatingCriteria = true;
+        try
+        {
+            searchBox.Clear();
+            ClearFilterChoices();
+        }
+        finally { updatingCriteria = false; }
+        InvalidateResults();
+        status.Text =
+            "Filters reset. Enter a search value or choose filters, then Search.";
+        searchBox.Focus();
+    }
+    private void ClearFilterChoices()
+    {
         if (searchCampus.Items.Count > 0)
             searchCampus.SelectedIndex = 0;
         if (searchYear.Items.Count > 0)
@@ -278,11 +306,32 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         if (searchClass.Items.Count > 0)
             searchClass.SelectedIndex = 0;
         searchStatus.SelectedIndex = 0;
+    }
+    private void CriteriaChanged(bool fromSearchText)
+    {
+        if (updatingCriteria) return;
+        updatingCriteria = true;
+        try
+        {
+            // Numeric admission lookup and placement/status filters are separate modes.
+            // Names retain their existing combined-filter search behavior.
+            if (AdmissionNumbers.TryNormalize(searchBox.Text.Trim(), out _))
+            {
+                if (fromSearchText) ClearFilterChoices();
+                else searchBox.Clear();
+            }
+        }
+        finally { updatingCriteria = false; }
+        InvalidateResults();
+        status.Text = "Search criteria changed. Choose Search to load matching students.";
+    }
+    private void InvalidateResults()
+    {
+        searchVersion++;
         resultsGrid.DataSource = null;
+        SelectedAdmissionId = 0;
+        NewAdmissionNumber = null;
         ClearSelectedDetails();
-        status.Text =
-            "Filters reset. Enter a search value or choose filters, then Search.";
-        searchBox.Focus();
     }
     /// <summary>every criterion the search request is built from, in one comparable string, read from the live controls.</summary>
     private string FilterSignature()
@@ -304,6 +353,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
     private async Task SearchAsync()
     {
         int version = ++searchVersion;
+        resultsGrid.DataSource = null;
         ClearSelectedDetails();
         bool counted = false;
         try
@@ -312,16 +362,12 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
             string filterSignature = FilterSignature();
             string searchText = searchBox.Text.Trim();
             bool isAdmissionIdSearch = AdmissionNumbers.TryNormalize(searchText, out string admissionNumber);
-            /* The filters the operator has set on screen (before an Admission Number search sets them aside), only so the status line can say they were not applied. */
-            bool filtersSetOnScreen =
-                searchCampus.SelectedId > 0 || searchYear.SelectedId > 0 ||
-                searchClass.SelectedId > 0 || searchStatus.SelectedIndex != 0;
             /* Admission Number is an independent filter (): a number in the Search box finds that student whatever Campus / Academic Year / Class / Status say. */
             int campusId = isAdmissionIdSearch ? 0 : searchCampus.SelectedId;
             int academicYearId = isAdmissionIdSearch ? 0 : searchYear.SelectedId;
             int classId = isAdmissionIdSearch ? 0 : searchClass.SelectedId;
             int statusIndex = isAdmissionIdSearch ? 0 : searchStatus.SelectedIndex;
-            bool hasFilter = campusId > 0 || academicYearId > 0 || classId > 0 || !string.IsNullOrWhiteSpace(searchText);
+            bool hasFilter = campusId > 0 || academicYearId > 0 || classId > 0 || statusIndex != 0 || !string.IsNullOrWhiteSpace(searchText);
             if (!hasFilter)
             {
                 resultsGrid.DataSource = null;
@@ -335,14 +381,15 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
             searchButton.Enabled = false;
             resetButton.Enabled = false;
             /* made a numeric search obey the filters on screen, so a campus + an admission number from another campus returned nothing. */
-            DataTable raw = await DatabaseHelper.QueryUserAsync(
+            DataTable raw = await query(
                 "GetStudents",
+                new[] {
                 DatabaseHelper.Int("@CampusId", campusId),
                 DatabaseHelper.Int("@AcademicYearId", academicYearId),
                 DatabaseHelper.Int("@ClassId", classId),
                 DatabaseHelper.Int("@ClassSectionId", 0),
                 DatabaseHelper.P("@Search", null),
-                DatabaseHelper.Bit("@IncludeFormerStudents", statusIndex == 0));
+                DatabaseHelper.Bit("@IncludeFormerStudents", statusIndex == 0) });
             if (IsDisposed || version != searchVersion || !string.Equals(filterSignature, FilterSignature(), StringComparison.Ordinal)) return;
             IEnumerable<DataRow> candidates = HumanUi.FindStudentMatches(raw, searchText);
             var filtered = new List<DataRow>();
@@ -387,7 +434,6 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
             status.Text = filtered.Count == 1
                 ? (isAdmissionIdSearch
                     ? $"1 student found with an Admission Number starting with {admissionNumber}. Press Enter to open it."
-                        + (filtersSetOnScreen ? " Campus, Year, Class and Status are not applied to an Admission Number search." : string.Empty)
                     : "1 student found. Press Enter to open the record.")
                 : $"{filtered.Count:N0} student(s) found. The first one is selected - "
                   + "press Down to choose another, then Enter to open.";
@@ -473,8 +519,9 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         }
         DataGridViewRow row = resultsGrid.CurrentRow!;
         string studentName = Convert.ToString(row.Cells["StudentName"].Value) ?? "-";
+        string admissionNumber = Convert.ToString(row.Cells["AdmissionNumber"].Value) ?? "-";
         status.Text =
-            $"Selected: {studentName} (Admission Number {AdmissionNumbers.ForId(id)}). Double-click or choose Open Student.";
+            $"Selected: {studentName} (Admission Number {admissionNumber}). Double-click or choose Open Student.";
     }
     private int GetSelectedAdmissionId()
     {
