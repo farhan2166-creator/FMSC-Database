@@ -56,6 +56,7 @@ internal static class Regression
                             DatabaseHelper.Query(Procedure, DatabaseHelper.Int("@Id", 1)); // CONST_GOOD
                             DatabaseHelper.Query("dbo." + "P", DatabaseHelper.Int("@Id", 1)); // CONCAT_GOOD
                             DatabaseHelper.Query("dbo.Gone", DatabaseHelper.Int("@Id", 1)); // PROC_MISSING
+                            DatabaseHelper.Query("OtherDb.dbo.P", DatabaseHelper.Int("@Id", 1)); // CROSS_DB_REVIEW
                             DatabaseHelper.Query("dbo.P", DatabaseHelper.Int("@Bad", 1)); // PARAM_MISSING
                             DatabaseHelper.Query("dbo.P", DatabaseHelper.Bit("@Id", true)); // PARAM_TYPE
                             DatabaseHelper.Query("dbo.P", DatabaseHelper.Int("@Id", 1)); // OPTIONAL_GOOD
@@ -113,7 +114,7 @@ internal static class Regression
             File.WriteAllText(path, code);
             var findings = new List<Finding>();
             var audited = AuditExtensions.Scan(schema, root, new[] { path }, findings);
-            Require(audited == 36, $"Caller count expected 36, got {audited}.");
+            Require(audited == 37, $"Caller count expected 37, got {audited}.");
             int Line(string marker)
             {
                 var offset = code.IndexOf("// " + marker, StringComparison.Ordinal);
@@ -141,6 +142,7 @@ internal static class Regression
                 "EXEC_USER", "EXEC_USER_ASYNC", "SCALAR_GOOD", "SCALAR_USER", "SCALAR_USER_ASYNC", "RAW_ASYNC", "CTE_ALIAS_GOOD" })
                 Clean(marker);
             Expect("PROC_MISSING", "FAIL", "dbo.Gone");
+            Expect("CROSS_DB_REVIEW", "REVIEW_REQUIRED", "Cross-database");
             Expect("PARAM_MISSING", "FAIL", "@Bad");
             Expect("PARAM_TYPE", "REVIEW_REQUIRED", "SQL type differs");
             Expect("DYNAMIC_REVIEW", "REVIEW_REQUIRED", "Dynamic");
@@ -160,7 +162,7 @@ internal static class Regression
             Require(AuditExtensions.Constant(expression, null) == "dbo.P", "Literal concatenation.");
             Require(AuditExtensions.Normalize("[dbo].[P]") == "dbo.P", "Qualified identifiers.");
             Require(AuditExtensions.Normalize("P") == "dbo.P", "Default dbo schema.");
-            Console.WriteLine("PASS: fictional Roslyn/DacFx/ScriptDom regressions (36 caller cases; positives, negatives, parameters, TVPs, SQL, locations).");
+            Console.WriteLine("PASS: fictional Roslyn/DacFx/ScriptDom regressions (37 caller cases; positives, negatives, parameters, TVPs, SQL, locations).");
         }
         finally { Directory.Delete(root, recursive: true); }
     }
