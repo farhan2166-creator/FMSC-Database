@@ -44,9 +44,6 @@ public sealed class HelpCenterPage : UserControl
         category.Items.Add("All topics");
         foreach (var item in HelpCatalog.Entries.Select(e => e.Category).Distinct().OrderBy(c => c)) category.Items.Add(item);
         category.SelectedIndex = 0;
-        split.Panel1MinSize = 180;
-        split.Panel2MinSize = 220;
-        split.SplitterDistance = 320;
         split.Panel1.Controls.Add(results);
         var detail = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Padding = new Padding(16, 4, 8, 0) };
         detail.RowStyles.Add(new RowStyle(SizeType.Absolute, 82));
@@ -69,7 +66,7 @@ public sealed class HelpCenterPage : UserControl
         category.SelectedIndexChanged += (_, _) => Filter();
         results.SelectedIndexChanged += (_, _) => ShowAnswer();
         results.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter && matching.Length > 0) { answer.Focus(); e.Handled = true; } };
-        Resize += (_, _) => FitSplit();
+        split.SizeChanged += (_, _) => FitSplit();
         AppTheme.ThemeChanged += ThemeChanged;
         Disposed += (_, _) => AppTheme.ThemeChanged -= ThemeChanged;
         ApplyTheme();
@@ -77,8 +74,8 @@ public sealed class HelpCenterPage : UserControl
     }
     private void FitSplit()
     {
-        if (split.Width > split.Panel1MinSize + split.Panel2MinSize + split.SplitterWidth)
-            split.SplitterDistance = Math.Max(split.Panel1MinSize, Math.Min(split.Width / 3, split.Width - split.Panel2MinSize - split.SplitterWidth));
+        if (split.Width > 440)
+            split.SplitterDistance = Math.Max(180, Math.Min(split.Width / 3, split.Width - 220 - split.SplitterWidth));
     }
     private void Filter()
     {
