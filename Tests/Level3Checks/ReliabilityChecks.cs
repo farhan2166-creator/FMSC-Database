@@ -29,6 +29,7 @@ internal sealed class ReliabilityChecks(Fixture f, Report r)
         await r.Stage("L3-REC-05 | killed process retains collection journal across restart", JournalRestart, ready);
         await r.Stage("L3-REC-06 | cancelled SQL command rolls back staged collection", Cancel, ready);
         await r.Stage("L3-FIN-07 | concurrent production posting and competing collections", Concurrent, ready);
+        await r.Stage("L3-FIN-05 | exact correction and reversal ledger persistence", Adjustments, ready);
         await r.Stage("L3-SEC-04 | SQL permissions rechecked after role removal", StalePermission, ready);
         bool saved = await r.Stage("L3-DB-01 | checksum backup and VERIFYONLY", Backup, ready);
         bool loaded = await r.Stage("L3-DB-02 | restore to absent owned catalog and new files", Restore, saved);
@@ -157,6 +158,33 @@ internal sealed class ReliabilityChecks(Fixture f, Report r)
             r.Check(committed.Sum() == 1 && Payments() == before + 1 && Balance() == due - 5000, "Competing full-balance allocations permit one payment and refuse the stale duplicate.");
             r.Check(Sql.Money("SELECT SUM(Amount) FROM dbo.FeePaymentAllocations WHERE BillingChargeId=@C;", Sql.P("@C", charge)) == 5000, "Independent allocation query proves the charge was collected once.");
         } finally { charge = original; }
+    }
+    private Task Adjustments()
+    {
+        Sql.ValidateTarget();
+        var admitted = Sql.Proc("AdmitStudent", f.AdmissionArgs("Adjustment Example")).Rows[0];
+        int id = Convert.ToInt32(admitted["AdmissionId"]), year = Convert.ToInt32(admitted["EnrollmentId"]);
+        long bill = Convert.ToInt64(Sql.Scalar("SELECT MIN(BillingChargeId) FROM dbo.BillingCharges WHERE EnrollmentId=@E;", Sql.P("@E", year)));
+        decimal Due() => Sql.Money("SELECT SUM(dbo.GetFeeChargeBalance(BillingChargeId)) FROM dbo.BillingCharges WHERE EnrollmentId=@E;", Sql.P("@E", year));
+        SqlParameter[] Collect(decimal amount) => Lifecycle.CollectionArgs(id, year, f.MonthlyDate, amount, new[] { (bill, amount) }).Concat(new[] { Sql.P("@UserId", f.Admin) }).ToArray();
+        SqlParameter[] Change(string type, int payment, decimal amount) => new[] {
+            Sql.P("@UserId", f.Admin), Sql.P("@AdmissionId", id), Sql.P("@EnrollmentId", year), Sql.P("@TransactionType", type), Sql.P("@Amount", amount),
+            Sql.P("@TransactionDate", f.MonthlyDate), Sql.P("@PaymentMethod", null), Sql.P("@ReferenceNumber", null), Sql.P("@Remarks", "Fictional adjustment integrity"),
+            Sql.P("@FeePaymentId", payment), new SqlParameter("@BillingChargeId", SqlDbType.BigInt) { Value = DBNull.Value },
+            Sql.TvpParameter("@Allocations", "FeePaymentAllocationType", Tvp.FeeAllocations(Array.Empty<(long, decimal)>())) };
+        int first = Convert.ToInt32(Sql.Proc("ProcessFeeTransaction", Collect(100)).Rows[0]["FeePaymentId"]);
+        Sql.Proc("ProcessFeeTransaction", Change("Correction", first, 80));
+        r.Check(Due() == 6920 && Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments WHERE RelatedFeePaymentId=@P AND Status=N'Completed';", Sql.P("@P", first)) == -20,
+            "Correcting 100 to 80 persists a negative 20 adjustment and leaves exactly 6920 due.");
+        int second = Convert.ToInt32(Sql.Proc("ProcessFeeTransaction", Collect(200)).Rows[0]["FeePaymentId"]);
+        r.Check(Due() == 6720, "A distinct additional 200 collection reduces dues before reversal.");
+        Sql.Proc("ProcessFeeTransaction", Change("Reversal", second, 200));
+        r.Check(Due() == 6920 && Convert.ToString(Sql.Scalar("SELECT Status FROM dbo.FeePayments WHERE FeePaymentId=@P;", Sql.P("@P", second))) == "Reversed",
+            "Reversal preserves its original payment identity/history and reopens exactly 200.");
+        r.Check(Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments WHERE EnrollmentId=@E AND Status=N'Completed';", Sql.P("@E", year)) == 80 &&
+            Sql.Money("SELECT SUM(A.Amount) FROM dbo.FeePaymentAllocations A JOIN dbo.FeePayments P ON P.FeePaymentId=A.FeePaymentId WHERE P.EnrollmentId=@E AND P.Status=N'Completed';", Sql.P("@E", year)) == 80,
+            "Separate SQL reads reconcile completed net collections and allocations to exactly 80 after correction/reversal.");
+        return Task.CompletedTask;
     }
     private async Task StalePermission()
     {

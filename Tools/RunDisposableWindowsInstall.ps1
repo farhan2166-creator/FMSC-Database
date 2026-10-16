@@ -334,44 +334,19 @@ VALUES(1,N'Fictional Level 3 Install School',SYSUTCDATETIME(),SYSUTCDATETIME(),@
         $checks.Add('L3-INS-04 cloud subset | Missing application prerequisite refused without replacing live app/data; MSI refusal is separately unit tested')
         Stage 'L3-INS-05 simulated partial activation failure and actual filesystem rollback'
         Assert-Level3Database
-        & {
-            param($projectPath,$testRoot)
-            $tokens=$null; $parseErrors=$null
-            $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $projectPath 'Installer/core.ps1'),[ref]$tokens,[ref]$parseErrors)
-            if ($parseErrors.Count) { throw 'Production installer does not parse.' }
-            $definition=@($ast.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Enable-StagedApplication'},$true))
-            if ($definition.Count -ne 1) { throw 'Expected one production activation function.' }
-            Invoke-Expression $definition[0].Extent.Text
-            function Write-Log { param($Message) }
-            $fixture=Join-Path $testRoot ('activation-'+[guid]::NewGuid().ToString('N'))
-            $fixtureApp=Join-Path $fixture 'live'
-            $fixtureStage=Join-Path $fixture 'stage'
-            $fixtureRollback=Join-Path $fixture 'rollback'
-            New-Item -ItemType Directory -Path $fixtureApp,$fixtureStage -Force | Out-Null
-            'old executable sentinel' | Set-Content -LiteralPath (Join-Path $fixtureApp 'FMSC_SMS.exe')
-            'new executable sentinel' | Set-Content -LiteralPath (Join-Path $fixtureStage 'FMSC_SMS.exe')
-            $oldHash=(Get-FileHash -LiteralPath (Join-Path $fixtureApp 'FMSC_SMS.exe')).Hash
-            function Move-Item {
-                [CmdletBinding()] param([string]$LiteralPath,[string]$Destination,[switch]$Force)
-                if ($LiteralPath -eq $fixtureStage -and $Destination -eq $fixtureApp) {
-                    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
-                    'partial activation' | Set-Content -LiteralPath (Join-Path $Destination 'partial.txt')
-                    throw [IO.IOException]::new('Controlled test-only activation interruption')
-                }
-                Microsoft.PowerShell.Management\Move-Item @PSBoundParameters
-            }
-            $refused=$false
-            try { Enable-StagedApplication -Staging $fixtureStage -AppDir $fixtureApp -RollbackDir $fixtureRollback }
-            catch { if ($_.Exception.Message -notmatch 'Controlled test-only activation interruption') { throw }; $refused=$true }
-            if (-not $refused -or (Get-FileHash -LiteralPath (Join-Path $fixtureApp 'FMSC_SMS.exe')).Hash -ne $oldHash -or
-                (Test-Path -LiteralPath (Join-Path $fixtureApp 'partial.txt')) -or (Test-Path -LiteralPath $fixtureRollback)) {
-                throw 'Partial activation did not restore the exact previous application and remove unsafe partial output.'
-            }
-            Remove-Item -LiteralPath $fixture -Recurse -Force
-        } $project $root
+        & (Join-Path $project 'Tests/Level3Checks/TestActivation.ps1') -ProjectDirectory $project -ScratchRoot $root
         if ((Install-Snapshot) -ne $before) { throw 'Activation fault test changed the installed SQL snapshot.' }
         $checks.Add('L3-INS-05 | Test-only injected partial directory move exercises production rollback; exact previous bytes restored and partial output removed; not a power-loss test')
         Stage 'Level 3 complete installer ZIP integrity, no database files'
+        # Reuse real package assembly; redirect only its output root to the owned fixture.
+        $workflow=Get-Content -LiteralPath (Join-Path $project '.github/workflows/fmsc-complete-installer.yml') -Raw
+        $assembly=[regex]::Match($workflow,'(?ms)^      - name: Validate complete installer layout and create database instructions\r?\n        shell: pwsh\r?\n        run: \|\r?\n(?<body>.*?)(?=\r?\n      - name:|\z)')
+        if (-not $assembly.Success) { throw 'Cannot locate the reviewed complete-installer assembly step.' }
+        $body=[regex]::Replace($assembly.Groups['body'].Value,'(?m)^          ','')
+        $originalRoot='$root = Join-Path $env:GITHUB_WORKSPACE ''out/complete-installer'''
+        if (-not $body.Contains($originalRoot)) { throw 'Installer assembly root changed; review the acceptance adapter.' }
+        $body=$body.Replace($originalRoot,('$root = '''+$release.Replace("'","''")+''''))
+        & ([scriptblock]::Create($body))
         $zipPath=Join-Path $root 'installer-synthetic.zip'
         Compress-Archive -Path (Join-Path $release '*') -DestinationPath $zipPath
         $archive=[IO.Compression.ZipFile]::OpenRead($zipPath)
@@ -381,10 +356,20 @@ VALUES(1,N'Fictional Level 3 Install School',SYSUTCDATETIME(),SYSUTCDATETIME(),@
                 if ($required -notin $entries) { throw "ZIP is missing $required" }
             }
             if (@($entries | Where-Object { $_ -match '(?i)\.(mdf|ldf|ndf|bak)$' }).Count) { throw 'Database file entered the installer ZIP.' }
+            $manifest=@{}
+            foreach ($line in Get-Content -LiteralPath (Join-Path $release 'SHA256SUMS.txt')) {
+                if ($line -notmatch '^([0-9a-fA-F]{64})  (.+)$') { throw 'Invalid installer checksum manifest row.' }
+                $manifest[$Matches[2]]=$Matches[1].ToUpperInvariant()
+            }
             foreach ($entry in $archive.Entries) {
-                if ($entry.Length -eq 0) { continue }
-                $stream=$entry.Open()
-                try { $stream.CopyTo([IO.Stream]::Null) } finally { $stream.Dispose() }
+                if ($entry.FullName.EndsWith('/') -or $entry.FullName.EndsWith('\')) { continue }
+                $name=$entry.FullName.Replace('\','/')
+                if ($name -eq 'SHA256SUMS.txt') { continue }
+                if (-not $manifest.ContainsKey($name)) { throw 'ZIP asset is missing from checksum manifest.' }
+                $stream=$entry.Open(); $sha=[Security.Cryptography.SHA256]::Create()
+                try {
+                    if ([Convert]::ToHexString($sha.ComputeHash($stream)) -ne $manifest[$name]) { throw 'ZIP asset checksum differs from the assembled installer.' }
+                } finally { $stream.Dispose(); $sha.Dispose() }
             }
         } finally { $archive.Dispose() }
         $checks.Add('L3 ZIP | All required non-database assets present and readable; no MDF/LDF/NDF/BAK files; ZIP remains private and is deleted')

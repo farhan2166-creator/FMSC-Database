@@ -57,14 +57,14 @@ def build(sql=None, install=None, windows=None, desktop=None, security=None):
             stage_failed = attempted and install.get("lastStage", "").startswith(test_id) and install.get("result") == "FAIL"
             components.append({"name": "Owned disposable Windows installer" if kind == "INSTALL" else "Missing source executable refusal; MSI mocks are supplementary",
                                "status": "PASS" if passed else "FAIL" if stage_failed else "BLOCKED" if attempted else "NOT RUN",
-                               "assertions": len(matched), "seconds": 0, "evidence": "install/report.json" if attempted else "", "execution": "Actual installer / simulated activation fault" if attempted else "Not executed"})
+                               "assertions": len(matched), "seconds": 0, "evidence": "install/report.json" if attempted else "", "execution": "Actual installer / simulated activation fault" if matched or stage_failed else "Not executed: runner or prerequisite blocked"})
         if kind in LOCAL:
             if desktop and desktop.get("status") == "completed":
                 components.append({"name": "Fresh Windows control contracts (supplementary)", "status": "PASS" if desktop.get("conclusion") == "success" else "BLOCKED", "assertions": 0, "seconds": 0, "evidence": desktop["html_url"], "execution": "Noninteractive; not visual acceptance"})
             if kind in {"RESOURCE", "REPORT"} and windows:
                 components.append({"name": "Bounded production dialog/export components", "status": windows["result"], "assertions": 0, "seconds": windows.get("measurements", {}).get("DialogCycleSeconds", 0), "evidence": "windows/report.json", "execution": "Actual Windows controls/PDF/CSV, no operator desktop"})
         if test_id == "L3-SEC-05" and security:
-            components.append({"name": "Fresh security workflow", "status": "PASS" if security.get("conclusion") == "success" else "FAIL", "assertions": 0, "seconds": 0, "evidence": security["html_url"], "execution": "Gitleaks and sensitive-file checks"})
+            components.append({"name": "Fresh security workflow", "status": "BLOCKED" if security.get("noRunnerSteps") else "PASS" if security.get("conclusion") == "success" else "FAIL", "assertions": 0, "seconds": 0, "evidence": security["html_url"], "execution": "Gitleaks and sensitive-file checks"})
         outcomes = {c["status"] for c in components}
         status = "FAIL" if "FAIL" in outcomes else "LOCAL REQUIRED" if kind in LOCAL else "BLOCKED" if "BLOCKED" in outcomes or (names and cleanup != "PASS") else "NOT RUN" if not components or "NOT RUN" in outcomes else "PASS"
         actual = "; ".join(c["name"] + ": " + c["status"] for c in components) or "Cloud portion not executed."

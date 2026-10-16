@@ -110,7 +110,7 @@ def write_evidence(output, report):
                f"Engine: SQL Server 2022 ({report.get('engine') or 'unverified'}); required schema: 6", "",
                f"PASS: {sum(s['result']=='PASS' for s in rows)} · FAIL: {sum(s['result']=='FAIL' for s in rows)} · BLOCKED: {sum(s['result']=='BLOCKED' for s in rows)}",
                "", "| Scenario | Result | Assertions | Seconds |", "|---|---|---:|---:|"]
-    summary += [f"| {s['name']} | {s['result']} | {s.get('assertions',0)} | {s.get('seconds',0):.2f} |" for s in rows]
+    summary += [f"| {s['name'].replace('|','/')} | {s['result']} | {s.get('assertions',0)} | {s.get('seconds',0):.2f} |" for s in rows]
     for row in rows:
         if row.get("assertion"):
             summary += ["", f"**{row['name']}**: {row['assertion']}", f"Category: {row.get('category','Prerequisite failure')}"]

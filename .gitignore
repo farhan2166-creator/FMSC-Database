@@ -385,3 +385,4 @@ Database/*.bak
 !/Tests/Level3Checks/*.cs
 !/Tests/Level3Checks/*.py
 !/Tests/Level3Checks/catalog.json
+!/Tests/Level3Checks/*.ps1
