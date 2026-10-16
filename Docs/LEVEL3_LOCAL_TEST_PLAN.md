@@ -44,3 +44,111 @@ For each item retain the exact commit, environment, scenario ID, expected/actual
 Use Windows 10/11 or Windows Server 2022 x64 VM with a clean snapshot and no school data/installed FMSC. Generate only synthetic schema-6 data from `Tests/LifecycleSqlChecks/Baseline/schema.dacpac`; set reference rows/type using the existing fixture setup, then independently validate the runtime contract. Do not use `fmsc.dacpac` exports as a data source. The existing GitHub Windows acceptance script documents the exact synthetic provisioning/attachment sequence, but intentionally refuses arbitrary local execution. Do not set fake GitHub environment variables to bypass that guard. A future local VM adapter must retain equivalent ownership and pristine-machine checks; until then these VM-only destructive file/MSI cases stay LOCAL REQUIRED.
 
 A real power cut, disk failure and reboot-interrupted installation are not proven by the injected cloud activation exception. If later tested, use snapshots on this disposable VM only, inspect old application availability and database integrity before retry, and retain a verified synthetic backup. Never perform those experiments on the operator PC or a school database.
+
+## Windows checks deferred because the GitHub limit is exhausted
+
+The owner confirmed the Actions limit is exhausted. Four additional scenarios remain **BLOCKED**, rather than being added to the 17 LOCAL REQUIRED count: **L3-INS-01, L3-INS-02, L3-INS-03, L3-INS-05**. They were implemented for a pristine GitHub-hosted Windows machine but never executed there. No automatic retry is needed until capacity is available. The Windows Desktop CI, component checks and printing-related checks also await actual Windows execution.
+
+On a **disposable Windows profile/VM**, these SQL-free regression commands reproduce the noninteractive Windows layer (normal user; no real school application/database):
+
+```powershell
+dotnet restore FMSC_SMS.sln
+dotnet build FMSC_SMS.sln -c Release --no-restore
+dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
+dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --post-fix
+dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --level3
+dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
+dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
+dotnet run --project Tests/CommunicationChecks/CommunicationChecks.csproj -c Release
+powershell -NoProfile -File Tools/TestInstallerMigrations.ps1
+pwsh -NoProfile -File Tools/TestInstallerLocalDb.ps1
+pwsh -NoProfile -File Tests/Level3Checks/TestActivation.ps1
+python -m unittest discover -s Tests/Level3Checks -p 'test_*.py' -v
+python Tools/test_security.py --gitleaks C:\Tools\gitleaks.exe
+python Tools/check_security.py --gitleaks C:\Tools\gitleaks.exe
+```
+
+Use the official checksum-pinned Gitleaks 8.30.1 CLI documented in DEVELOPMENT_WORKFLOW.md. Do not set `FMSC_LEVEL3_WINDOWS_EVIDENCE` on a normal PC: automated component evidence export intentionally accepts only the designated runner temporary root. Record sanitized console totals manually and keep native/visual results separate.
+
+| Blocked ID | VM/operator continuation | Expected | Evidence and cleanup |
+|---|---|---|---|
+| L3-INS-01 | In a fresh, snapshot-backed VM with no school installation, publish the reviewed PortableRelease with Microsoft-signed LocalDB and pinned sqlcmd; add a generated **synthetic** detached schema-6 pair, then run `Install FMSC_SMS.bat` as administrator. Use the safe synthetic preparation sequence below. | Installer activates correct app, attaches only the synthetic pair, and installed schema verification succeeds. | Record source/hash, MSI state, application verification exit and SQL owner marker. Destroy/revert VM after test; no database uploads. |
+| L3-INS-02 | Preserve a synthetic school/setup row and theme file. Record database GUID plus hashes/counts and theme bytes; remove packaged database templates; run the same installer as an app-only update. | Existing database GUID, records and settings unchanged; app updated; no database template required. | Before/after SQL checks from separate connections, theme/app hashes; revert VM snapshot. |
+| L3-INS-03 | Repeat installer against the same synthetic compatible installation and settings. | Reinstallation preserves all previous records/identity/settings. | Before/after SQL and settings checks; delete no operational path outside VM. |
+| L3-INS-05 | Run `pwsh -NoProfile -File Tests/Level3Checks/TestActivation.ps1` inside the VM, then examine the real installer update/rollback folder behavior using only synthetic VM assets. Any process-kill/reboot extension requires a snapshot and verified synthetic backup first. | Injected partial move fails, exact old executable bytes restored, partial output removed, SQL unchanged. Physical interruption must be recorded separately. | Script output/cleanup, old/new hashes, independent SQL snapshot. No real power-loss claim from the injected exception. |
+
+Do not run `RunDisposableWindowsInstall.ps1` directly on the PC or bypass its hosted-runner guards. It is not a local VM adapter. The manual VM installation steps above are separate acceptance, requiring an explicitly prepared disposable machine and administrator rights.
+
+### Synthetic detached-pair preparation for the disposable installation VM
+
+Run **only inside the empty snapshot-backed VM**, after installing .NET 8 SDK, LocalDB 2022 and sqlcmd and checking out the reviewed revision. This produces synthetic files; it does not install or upgrade any school database. Keep the PowerShell session open so its generated ownership values remain available. Stop on any error.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$vm = Get-CimInstance Win32_ComputerSystem
+if ($vm.Model -notmatch 'Virtual Machine|VMware|VirtualBox|KVM|HVM|QEMU') {
+    throw 'Use an identifiable disposable VM; this is not an operator-PC preparation script.'
+}
+if ((Test-Path 'C:\FMSC School Management') -or (Test-Path 'C:\ProgramData\FMSC_Database')) {
+    throw 'Existing FMSC assets found: revert to a clean VM snapshot.'
+}
+$repo = (Get-Location).Path
+$owner = [guid]::NewGuid()
+$instance = 'FMSC_AuditChecks_L3VM_' + $owner.ToString('N')
+$catalog = $instance
+$root = Join-Path $env:TEMP ('FMSC_Level3Vm_' + $owner.ToString('N'))
+if (Test-Path -LiteralPath $root) { throw 'Test directory already exists.' }
+New-Item -ItemType Directory -Path $root | Out-Null
+$owner.ToString() | Set-Content (Join-Path $root 'owner.txt')
+& sqllocaldb create $instance 16.0
+if ($LASTEXITCODE) { throw 'Unique LocalDB creation failed; do not substitute MSSQLLocalDB.' }
+& sqllocaldb start $instance
+if ($LASTEXITCODE) { throw 'Unique LocalDB start failed.' }
+$server = '(localdb)\' + $instance
+$conn = "Server=$server;Database=$catalog;Integrated Security=True;Encrypt=False;TrustServerCertificate=True"
+Push-Location (Join-Path $repo 'Tests/LifecycleSqlChecks')
+try {
+    & dotnet tool restore
+    if ($LASTEXITCODE) { throw 'Pinned SqlPackage restore failed.' }
+    & dotnet tool run sqlpackage -- '/Action:Publish' "/SourceFile:$repo/Tests/LifecycleSqlChecks/Baseline/schema.dacpac" "/TargetConnectionString:$conn" '/p:CreateNewDatabase=True'
+    if ($LASTEXITCODE) { throw 'Synthetic schema publication failed.' }
+} finally { Pop-Location }
+$seed = @"
+SET NOCOUNT ON;
+IF EXISTS(SELECT 1 FROM dbo.Students) OR EXISTS(SELECT 1 FROM dbo.Users)
+ OR EXISTS(SELECT 1 FROM dbo.DatabaseVersion) THROW 51000,'Nonempty synthetic target refused',1;
+INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');
+INSERT dbo.AdmissionNumberCounter(CounterId,LastNumber) VALUES(1,1000);
+DECLARE @Owner uniqueidentifier='$owner', @Scope uniqueidentifier=NEWID();
+EXEC sys.sp_addextendedproperty @name=N'FMSC_Level3VmOwner',@value=@Owner;
+EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@Scope;
+"@
+& sqlcmd -S $server -E -C -d $catalog -b -Q $seed
+if ($LASTEXITCODE) { throw 'Synthetic reference/owner setup failed.' }
+$guard = "SET NOCOUNT ON; IF DB_NAME()<>N'$catalog' OR NOT EXISTS(SELECT 1 FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_Level3VmOwner' AND TRY_CONVERT(uniqueidentifier,value)=CONVERT(uniqueidentifier,'$owner')) THROW 51001,'Wrong test identity',1;"
+& sqlcmd -S $server -E -C -d $catalog -b -Q $guard
+if ($LASTEXITCODE) { throw 'Ownership verification failed; do not detach/drop anything.' }
+$mdf = ((& sqlcmd -S $server -E -C -d $catalog -b -h -1 -W -Q 'SET NOCOUNT ON; SELECT physical_name FROM sys.database_files WHERE type=0;') -join '').Trim()
+if ($LASTEXITCODE) { throw 'Synthetic data file lookup failed.' }
+$ldf = ((& sqlcmd -S $server -E -C -d $catalog -b -h -1 -W -Q 'SET NOCOUNT ON; SELECT physical_name FROM sys.database_files WHERE type=1;') -join '').Trim()
+if ($LASTEXITCODE) { throw 'Synthetic log file lookup failed.' }
+foreach ($file in @($mdf,$ldf)) {
+    if (-not [IO.Path]::GetFileName($file).StartsWith($catalog,[StringComparison]::OrdinalIgnoreCase)) {
+        throw 'Unexpected fixture file identity; detach/copy refused.'
+    }
+}
+# Detach only this freshly created, owner-verified catalog; no real database name is used.
+& sqlcmd -S $server -E -C -d $catalog -b -Q ($guard + " USE master; EXEC master.sys.sp_detach_db @dbname=N'$catalog';")
+if ($LASTEXITCODE) { throw 'Synthetic detach failed.' }
+$pair = Join-Path $root 'Database'
+New-Item -ItemType Directory -Path $pair | Out-Null
+Copy-Item -LiteralPath $mdf -Destination (Join-Path $pair 'FMSC_DB.mdf')
+Copy-Item -LiteralPath $ldf -Destination (Join-Path $pair 'FMSC_DB_log.ldf')
+Get-FileHash (Join-Path $pair '*') -Algorithm SHA256
+```
+
+Copy **only that generated pair** into the reviewed full installer's `Database` folder **inside this VM**. Prepare/publish non-database assets using the existing complete-installer workflow/INSTALLATION instructions: genuine Microsoft-signed LocalDB MSI, pinned sqlcmd and reviewed application, never inert prerequisites from unit tests. This preparation sequence is documented for future local use and **has not been executed on Windows in this Level 3 run**. If DacFx produces different file names, stop and review the owned metadata rather than removing the file-identity check.
+
+After fresh installation, independently query the new VM-only `(localdb)\MSSQLLocalDB`, `FMSC_DB` and verify the preserved `FMSC_Level3VmOwner` equals this session's `$owner`, schema 6 and expected physical paths before any further mutation. Use the fictional role/user/profile setup from `Tools/RunDisposableWindowsInstall.ps1` for update preservation assertions; do not copy school records. Record database GUID, row hashes/counts and theme bytes before/after each update/reinstall. Inspect installation logs and installed app `--verify-installation` exit (base-compatible/module-absent code 10 is expected for this data-free fixture). Never manually raise a version on an existing database.
+
+On completion, close all test apps, stop/delete **only the recorded unique test instance**, and revert/destroy the entire disposable VM snapshot to erase both source and installed synthetic files. Do not transfer the MDF/LDF, logs containing private setup, or any backup off the VM. If ownership cannot be re-established, stop individual cleanup and destroy the disposable VM rather than guessing at database/file names.

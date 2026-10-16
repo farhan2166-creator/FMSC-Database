@@ -52,6 +52,8 @@ python Tests/Level3Checks/report.py --sql sql/report.json \
   --output combined
 ```
 
+For PR runs, the artifact checkout commit may be a synthetic merge commit rather than the API run’s `head_sha`. Preserve `head_sha`, and supply `commit` in normalized run metadata only when the actual artifact/run association verifies that checkout revision. Never relabel an unrelated artifact to bypass revision matching.
+
 Mixed revisions, missing rows, dishonest counts, forged local passes and nonnumeric measurement payloads are rejected. The reporter preserves failed assertions and failed cleanup; it never turns local requirements into passes. Shared source stages support multiple acceptance rows, so per-row assertion counts are not additive unique totals. Reports are evidence, not schema approval or deployment authorization.
 
 See [results](LEVEL3_RESULTS.md) and the [local checklist](LEVEL3_LOCAL_TEST_PLAN.md). Keep the PR unmerged until owner review.
