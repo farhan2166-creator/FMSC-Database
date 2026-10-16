@@ -58,6 +58,7 @@ internal static partial class Program
             CheckShortcutPermissions();
             CheckPromotionHistoryEntry();
             CheckCompactStatusLayout();
+            CheckMessageDialogs();
             CheckStudentAccountFlow();
             CheckStudentSearchModes();
             Console.WriteLine("ACCOUNT_FLOW: check refused regeneration");

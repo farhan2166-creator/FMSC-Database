@@ -1122,11 +1122,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if (plan is null) return;
             string problem = plan.Review(admissionIdValue.Text) ?? "Review this admission number.";
             if (plan.Suggested is not { } suggestion) {
-                MessageBox.Show(this, problem + "\n\nNo safe number can be suggested. Review the surrounding admission records; you can leave this number unchanged.",
+                ModernMessageDialog.Show(this, problem + "\n\nNo safe number can be suggested. Review the surrounding admission records; you can leave this number unchanged.",
                     "Admission Number Review", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-            if (MessageBox.Show(this, problem + $"\n\nUse suggested admission number {suggestion}? Save the student to apply the correction.",
+            if (ModernMessageDialog.Show(this, problem + $"\n\nUse suggested admission number {suggestion}? Save the student to apply the correction.",
                 "Admission Number Review", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 admissionIdValue.Text = suggestion;
         };
@@ -4321,9 +4321,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 return;
             if (!dob.Checked &&
                 !Confirm(
-                    "No date of birth has been entered, so none will be stored.\n\n" +
-                    "Certificates that need it (Date of Birth, Regular Student) cannot be issued " +
-                    "until it is added on the student's record.\n\nSave the admission without a date of birth?",
+                    "Save without a date of birth?\n\nNo birth date will be stored. Date of Birth and Regular Student certificates cannot be issued until you add it.",
                     "Date of Birth Not Entered"))
             {
                 dob.Focus();
@@ -4757,45 +4755,26 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if (matches.Count == 0)
                 return true;
             // Show matched records beside the proposed admission for duplicate review.
-            string DescribeMatch(DataRow row)
+            using var matchTable = new DataTable();
+            foreach (string caption in new[] { "Admission No.", "Date of birth", "Class / Section", "Status" })
+                matchTable.Columns.Add(caption);
+            foreach (DataRow row in matches)
             {
-                // Missing or DBNull columns return null.
-                string? Col(string name) =>
-                    row.Table.Columns.Contains(name) && row[name] != DBNull.Value
-                        ? Convert.ToString(row[name])
-                        : null;
-                var admissionNumber = Col("AdmissionNumber") ?? "?";
-                var registrationNumber = Col("RegistrationNumber");
-                var dob = row.Table.Columns.Contains("DateOfBirth") && row["DateOfBirth"] != DBNull.Value
-                    ? Convert.ToDateTime(row["DateOfBirth"]).ToString("dd-MMM-yyyy")
-                    : null;
-                var className = Col("ClassName");
-                var sectionName = Col("SectionName");
-                var status = Col("Status") ?? Col("EnrollmentStatus");
-                var parts = new List<string> { $"Admission Number {admissionNumber}" };
-                _ = registrationNumber; // kept for the data read; the registration number is not shown in this warning
-                if (!string.IsNullOrWhiteSpace(dob)) parts.Add($"DOB {dob}");
-                if (!string.IsNullOrWhiteSpace(className))
-                    parts.Add(string.IsNullOrWhiteSpace(sectionName) ? className : $"{className} / {sectionName}");
-                if (!string.IsNullOrWhiteSpace(status)) parts.Add(status);
-                return "  • " + string.Join("  |  ", parts);
+                string? Col(string column) => row.Table.Columns.Contains(column) && row[column] != DBNull.Value
+                    ? Convert.ToString(row[column]) : null;
+                string birth = row.Table.Columns.Contains("DateOfBirth") && row["DateOfBirth"] != DBNull.Value
+                    ? Convert.ToDateTime(row["DateOfBirth"]).ToString("dd-MMM-yyyy") : "Not recorded";
+                matchTable.Rows.Add(Col("AdmissionNumber") ?? "?", birth,
+                    string.Join(" / ", new[] { Col("ClassName"), Col("SectionName") }.Where(value => !string.IsNullOrWhiteSpace(value))),
+                    Col("Status") ?? Col("EnrollmentStatus"));
             }
-            var matchList = string.Join("\n", matches.Select(DescribeMatch));
-            var message =
-                $"A student named \"{studentName}\"" +
-                (string.IsNullOrWhiteSpace(fatherNameText) ? "" : $" (father: \"{fatherNameText}\")") +
-                " already exists in the system:\n\n" +
-                matchList +
-                "\n\nCompare the details above with what you're entering now.\n" +
-                "If this is the SAME child, do not create a new record -- use \"Find Possible Sibling\" " +
-                "only for an actual sibling, or open the existing record instead.\n\n" +
-                "Are you certain this is a DIFFERENT student and should be admitted as new?";
-            return ModernMessageDialog.Show(
-                FindForm(),
-                message,
-                "Possible Duplicate Student",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning,
+            return ModernMessageDialog.Show(FindForm(),
+                new MessageDialogContent("Is this a different student?",
+                    "Matching student records were found. Compare them before creating another record.",
+                    Facts: new (string, string)[] { ("Student", studentName), ("Father", fatherNameText) },
+                    Records: matchTable,
+                    Notice: "If this is the same child, open the existing record instead. Link as a sibling only for a different child."),
+                "Possible Duplicate Student", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                 MessageBoxDefaultButton.Button2) == DialogResult.Yes;
         }
         catch (Exception nonFatalException56)

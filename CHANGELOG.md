@@ -35,6 +35,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Fixed
 
+- Center message-dialog buttons with a readable gap. Show clear decision headings, prominent consequences, aligned fields and read-only record tables for payment, promotion, backup and duplicate-student confirmations. Preserve confirmation defaults, keyboard choices, exact values and recovery payloads; long details scroll while buttons remain visible.
+
 - Shorten promotion, admission, registration, transfer and collection feedback. Shared status areas stay within two readable lines, with full hover/accessibility text; unknown promotion outcomes remain visible after refresh. Counts, receipt references, recovery guidance and database rules are preserved.
 
 - Communication Center distinguishes inactive-tab keyboard focus from selection and adds per-tab instructions, actionable empty/loading/failure states, bounded paging and explicit save/next-step feedback. Changed filters block stale selections, template paging preserves the chosen template, New Message clears the previous schedule, and dispatcher errors remain visible. SQL, permissions, provider transports and installer behavior are unchanged.

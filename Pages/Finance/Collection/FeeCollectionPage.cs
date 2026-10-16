@@ -2898,12 +2898,23 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             /* The payment date is stamped on the receipt and the ledger. */
             description +=
                 $"\r\nPayment date: {paymentDate.Value:dd-MMM-yyyy hh:mm tt}   Method: {method.Text}.";
+            var confirmationFacts = new List<(string, string)> {
+                ("Student", student.Text.Trim()),
+                ("Payment", $"Rs. {amount:#,##0.##}"),
+                ("Discount", $"Rs. {discount:#,##0.##}"),
+                ("Payment date", paymentDate.Value.ToString("dd-MMM-yyyy hh:mm tt")),
+                ("Method", method.Text)
+            };
             foreach (DataGridViewRow row in charges.Rows)
             {
                 if (row.Cells["GrossAmount"].Tag is decimal oldDiscount &&
                     oldDiscount != GetDecimal(row.Cells["AppliedDiscount"].Value))
+                {
                     description += $"\r\n{GetText(row.Cells["FeeTypeName"].Value)} ({GetText(row.Cells["BillingMonth"].Value)}): " +
                         $"bill discount Rs. {oldDiscount:0.##} to Rs. {GetDecimal(row.Cells["AppliedDiscount"].Value):0.##}.";
+                    confirmationFacts.Add(($"{GetText(row.Cells["FeeTypeName"].Value)} · {GetText(row.Cells["BillingMonth"].Value)}",
+                        $"Bill discount: Rs. {oldDiscount:0.##} → Rs. {GetDecimal(row.Cells["AppliedDiscount"].Value):0.##}"));
+                }
             }
             /* When siblings are included, say so up front, and say it in the terms the system now uses: ONE family collection under ONE receipt number. */
             /* Every student with an allocation row goes to the database, DISCOUNTS INCLUDED. */
@@ -2937,6 +2948,11 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     "row and choose Reverse Charge.");
                 return;
             }
+            using var confirmationRows = new DataTable();
+            confirmationRows.Columns.Add("Admission No.");
+            confirmationRows.Columns.Add("Student");
+            confirmationRows.Columns.Add("Payment (Rs.)", typeof(decimal));
+            confirmationRows.Columns.Add("Discount (Rs.)", typeof(decimal));
             if (allocationLines.Count > 1)
             {
                 description +=
@@ -2952,6 +2968,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                         .Where(r => r.amount < 0m)
                         .Sum(r => r.amount);
                     string who = WhoIs(group.Key);
+                    confirmationRows.Rows.Add(AdmissionNumbers.ForId(group.Key), who, studentTotal, studentDiscount);
                     /* What is left is each child's own payment, with the discount that goes with it so the figures on the receipt are recognisable. */
                     description += studentDiscount > 0m
                         ? $"\r\n    - {who}: Rs. {studentTotal:0.##} (discount Rs. {studentDiscount:0.##})"
@@ -2965,10 +2982,12 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 MarkCollectionField(paymentAmount, "Each student's collected amount must be a whole number. Adjust the family payment allocation.");
                 return;
             }
-            string confirmMessage =
-                description +
-                "\r\n\r\n" +
-                "This operation will be completed immediately and is final.";
+            var confirmMessage = new MessageDialogContent(
+                allocationLines.Count > 1 ? $"Record payment for {allocationLines.Count} students?" : "Record this payment?",
+                Explanation: allocationLines.Count > 1 ? "One family receipt covers this payment. Each child's fees stay under their own record." : null,
+                Facts: confirmationFacts,
+                Records: allocationLines.Count > 1 ? confirmationRows : null,
+                Notice: "This records the payment immediately and is final. Check every amount before choosing Yes.");
             if (ModernMessageDialog.Show(
                     FindForm(),
                     confirmMessage,

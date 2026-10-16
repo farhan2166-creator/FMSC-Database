@@ -303,12 +303,9 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
             {
                 var confirmation = ModernMessageDialog.Show(
                     FindForm(),
-                    "Change backup folder?\n\n" +
-                    $"Folder: {newFolder}\n\n" +
-                    $"Existing backup records found: {relinkable}\n\n" +
-                    "Those records will be relinked to this folder. This changes where the " +
-                    "application expects those backup files to be located.\n\n" +
-                    "Do you want to change the backup folder?",
+                    new MessageDialogContent("Change the backup folder?",
+                        Facts: new (string, string)[] { ("New folder", newFolder), ("Records to relink", relinkable.ToString("N0")) },
+                        Notice: "Existing backup records will point to this folder. FMSC will look here for those files."),
                     "Confirm Backup Folder Change",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning,
@@ -567,52 +564,19 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                 : "This backup is not compatible with FMSC. Choose an FMSC school data backup.");
             return;
         }
-        var detailLines = new List<string> {
-            "Restoring this backup will replace your current school records with the " +
-                "selected backup.",
-            "",
-            "Records added after this backup will be replaced. Review the backup date before continuing."
-        };
-        if (info is null)
-        {
-            detailLines.Add("");
-            detailLines.Add(
-                "The backup could not be checked, so its source and date are unknown. " +
-                "Ask the administrator to check the file before restoring it.");
-        }
-        else
-        {
-            detailLines.Add("");
-            detailLines.Add($"Backup source: {info.DatabaseName}");
-            detailLines.Add($"Backup taken: {FormatBackupAge(info)}");
-            if (!info.IsForFmscDatabase)
-            {
-                detailLines.Add("");
-                detailLines.Add(
-                    "This backup is not compatible with FMSC. Nothing will be changed. Choose an FMSC backup file.");
-            }
-            else if (info.IsStale)
-            {
-                detailLines.Add("");
-                detailLines.Add(
-                    $"WARNING: This backup is {(int)info.Age.TotalDays} day(s) old. " +
-                    "Everything recorded in FMSC since then - admissions, fee payments, " +
-                    "and so on - will be lost if you continue.");
-            }
-        }
-        detailLines.Add("");
-        detailLines.Add(
-            "A safety copy of your current school data will be saved automatically " +
-            "before restoring. Restore that safety copy if you need to recover your current records.");
-        detailLines.Add("");
-        detailLines.Add(UiText.Dialogs.Continue);
         var confirmation = ModernMessageDialog.Show(
             FindForm(),
-            string.Join("\n", detailLines),
-            "Confirm Data Restore",
-            MessageBoxButtons.YesNo,
-            MessageBoxIcon.Warning,
-            MessageBoxDefaultButton.Button2);
+            new MessageDialogContent("Restore this backup?",
+                "This replaces your current school records with the selected backup. Check the backup date first.",
+                Facts: new (string, string)[] {
+                    ("Backup file", backupPath),
+                    ("Database", info?.DatabaseName ?? "Unknown"),
+                    ("Backup date", info is null ? "Unknown" : FormatBackupAge(info))
+                },
+                Notice: (info?.IsStale == true ? $"This backup is {(int)info.Age.TotalDays} days old. " : "") +
+                    "Records added after the backup, including admissions and payments, will be lost. " +
+                    "A safety copy of the current data is saved before restoring; use it to recover your current records if needed."),
+            "Confirm Data Restore", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
         if (confirmation != DialogResult.Yes)
             return;
         isBusy = true;
