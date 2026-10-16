@@ -10,6 +10,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Changed
 
+- Clarified payment-adjustment and placement confirmations with aligned details, and shortened Communication Center guidance while preserving warnings and confirmation defaults.
+
 - Replace the XML-heavy `DatabaseSchema/` reference export with real DacFx-generated SQL `CREATE` scripts in `Schema/`. The generated review PR removes the old files only after replacement scripts are produced and reports inline/unsupported model objects in a JSON manifest; no school data or database changes.
 
 - Pause routine Dependabot NuGet and GitHub Actions version-update PRs until the owner chooses to resume. Existing PRs, security-alert settings, security updates and secret scanning remain unchanged.

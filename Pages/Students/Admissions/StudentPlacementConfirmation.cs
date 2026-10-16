@@ -7,11 +7,24 @@ internal static class StudentPlacementConfirmation
     {
         var review = await DatabaseHelper.QueryUserAsync("ConfirmStudentPlacement", DatabaseHelper.Int("@EnrollmentId", enrollment));
         var plan = review.Rows[0];
-        string billing = Convert.ToString(plan["Status"]) == "Active"
-            ? $"Assigned fee lines: {plan["FeeCount"]}. Opening billing starts {Convert.ToDateTime(plan["BillingStart"]):dd MMM yyyy}.\nReview the fee amounts in Admission before confirming."
-            : "This confirms historical placement only. No bills will be posted.";
-        if (ModernMessageDialog.Show(owner,
-            $"{placement}\n{plan["PlacementName"]}\nEnrollment start: {Convert.ToDateTime(plan["EnrollmentStart"]):dd MMM yyyy}\n\nConfirm this placement?\n\n{billing}\n\nAfter confirmation, use Promotion, Transfer or Re-admission for movement. Academic year will be locked.",
+        bool active = Convert.ToString(plan["Status"]) == "Active";
+        var facts = new List<(string, string)> {
+            ("Record", placement),
+            ("Placement", Convert.ToString(plan["PlacementName"]) ?? ""),
+            ("Enrollment start", Convert.ToDateTime(plan["EnrollmentStart"]).ToString("dd MMM yyyy"))
+        };
+        if (active) {
+            facts.Add(("Assigned fee lines", Convert.ToString(plan["FeeCount"]) ?? ""));
+            facts.Add(("Billing starts", Convert.ToDateTime(plan["BillingStart"]).ToString("dd MMM yyyy")));
+        }
+        var confirmation = new MessageDialogContent(
+            "Confirm this placement?",
+            Explanation: active
+                ? "Review the fee amounts in Admission before confirming."
+                : "Historical placement only. No bills will be posted.",
+            Facts: facts,
+            Notice: "The academic year will be locked. For later movement, use Promotion, Transfer or Re-admission.");
+        if (ModernMessageDialog.Show(owner, confirmation,
             "Confirm Placement", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return false;
         await DatabaseHelper.ExecuteUserAsync("ConfirmStudentPlacement", DatabaseHelper.Int("@EnrollmentId", enrollment),
             DatabaseHelper.Bit("@Preview", false), DatabaseHelper.P("@ExpectedSnapshot", Convert.ToString(plan["Snapshot"])));

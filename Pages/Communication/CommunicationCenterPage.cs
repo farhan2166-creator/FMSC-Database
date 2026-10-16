@@ -52,7 +52,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         await ExecuteAsync(async()=>{
             installed=await store.IsInstalledAsync(lifetime.Token);
             tabs.Enabled=installed;
-            if(!installed){operational.Text="Communication setup is missing or incompatible. Run the current installer and review its Communication Center setup prompt, or ask your administrator. No database changes were made here.";SetStatus(operational.Text,PageStatusKind.Warning);return;}
+            if(!installed){operational.Text="Communication setup is missing or incompatible. Ask your administrator to review setup in the current installer. No database changes were made.";SetStatus(operational.Text,PageStatusKind.Warning);return;}
             await RefreshOperational();
             await RefreshTemplates();
             foreach(var item in new[]{(campus,"Campuses","CampusId","CampusName"),(year,"Years","AcademicYearId","YearName"),(cls,"Classes","ClassId","ClassName"),(section,"Sections","SectionId","SectionName")})
@@ -72,7 +72,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         b.Enabled=CurrentUser.HasPermission(permission);
         if(selectedGrid is not null){void Update()=>b.Enabled=CurrentUser.HasPermission(permission)&&Selected(selectedGrid) is not null;selectedGrid.SelectionChanged+=(_,_)=>Update();Update();}
         b.Click+=async(_,_)=>{
-            if(!CurrentUser.HasPermission(permission)||!installed){SetStatus("This action is unavailable for your account or the communication schema is not ready.",PageStatusKind.Warning);return;}
+            if(!CurrentUser.HasPermission(permission)||!installed){SetStatus("This action needs permission and completed communication setup. Ask your administrator.",PageStatusKind.Warning);return;}
             await ExecuteAsync(action);
         };return b;
     }
@@ -119,10 +119,10 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
             if(Convert.ToBoolean(row.Cells["Include"].Value??false))included.Add(id);else included.Remove(id);InvalidatePreview();};
         prepare.Click+=async(_,_)=>{if(!CurrentUser.HasPermission("Communication.Compose")||previewSignature!=Signature()||!installed)return;
             await ExecuteAsync(async()=>{
-                if(!ModernMessageDialog.Confirm(FindForm(),$"Create a durable draft for {included.Count} selected contacts? No message is sent until Submit is confirmed.","Create Communication Draft"))return;
+                if(!ModernMessageDialog.Confirm(FindForm(),$"Save a draft for {included.Count} selected contacts? Nothing is sent until Submit is confirmed.","Create Communication Draft"))return;
                 requestDue??=schedule.Checked?schedule.Value.ToUniversalTime():DateTime.UtcNow;
                 await service.PrepareAsync(requestId,SelectedTemplate(),SelectedChannel(),included,announcement.Text,requestDue.Value,lifetime.Token);
-                savedSignature=Signature();SetStatus("Draft saved: "+requestId+(CurrentUser.HasPermission("Communication.Send")?". Review it in Outbox, then Submit. Approval may be required.":". An authorized sender must review and submit it from History. No message was sent."));
+                savedSignature=Signature();SetStatus("Draft saved. Nothing has been sent. "+(CurrentUser.HasPermission("Communication.Send")?"Open Outbox to review and submit. Approval may be required.":"Ask an authorized sender to review and submit it from Outbox / Schedule / History."));
                 prepare.Enabled=false;
             });};
         Row(Bar(Button("Preview Messages",PreviewAsync,"Communication.Compose","Primary"),prepare,Button("New Message",()=>{
@@ -137,7 +137,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         tabs.TabPages.Add(Tab("Compose / Bulk",compose));
         tabs.TabPages.Add(Tab("Outbox / Schedule / History",BuildHistory()));
         tabs.TabPages.Add(Tab("Contacts / Consent",BuildContacts()));
-        tabs.TabPages.Add(Tab("Templates",ListHost(templates,Bar([Button("Refresh",RefreshTemplates),Button("New Version / Review",EditTemplate,"Communication.Configure"),Button("Revoke Selected",async()=>{var row=Selected(templates)??throw new ArgumentException("Select a template first.");if(!ModernMessageDialog.Confirm(FindForm(),"Revoke this template? Unsubmitted messages will be suppressed; past messages remain in history.","Revoke Template"))return;await store.CallAsync("RevokeTemplate",lifetime.Token,SqlCommunicationStore.P("@Id",row["TemplateId"]));await AfterSavedAsync(RefreshTemplates,"Template revoked. Unsubmitted messages using it will be suppressed; historical messages are preserved.");},"Communication.Configure",selectedGrid:templates),..Paging(templates,()=>templatePage,value=>templatePage=value,RefreshTemplates)]))));
+        tabs.TabPages.Add(Tab("Templates",ListHost(templates,Bar([Button("Refresh",RefreshTemplates),Button("New Version / Review",EditTemplate,"Communication.Configure"),Button("Revoke Selected",async()=>{var row=Selected(templates)??throw new ArgumentException("Select a template first.");if(!ModernMessageDialog.Confirm(FindForm(),"Revoke this template? Unsubmitted messages will be suppressed; past messages remain in history.","Revoke Template"))return;await store.CallAsync("RevokeTemplate",lifetime.Token,SqlCommunicationStore.P("@Id",row["TemplateId"]));await AfterSavedAsync(RefreshTemplates,"Template revoked. Unsubmitted messages using it are blocked; past messages stay in History.");},"Communication.Configure",selectedGrid:templates),..Paging(templates,()=>templatePage,value=>templatePage=value,RefreshTemplates)]))));
         tabs.TabPages.Add(Tab("Automation Rules",ListHost(rules,Bar(Button("Refresh",RefreshRules,"Communication.Configure"),Button("New / Edit Rule",EditRule,"Communication.Configure"),Button("Evaluate Committed Events",EvaluateRules,"Communication.Configure")))));
         var gateway=new Panel{Dock=DockStyle.Fill,AutoScroll=true};gateway.Controls.Add(Bar(Button("Sending Mode / Limits",EditSettings,"Communication.Configure"),Button("Secure Gateway Credentials",EditGateway,"Communication.Configure")));
         tabs.TabPages.Add(Tab("Gateway Settings",gateway));
@@ -197,7 +197,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         approved.Columns.Add("Display",typeof(string));foreach(DataRow row in approved.Rows)row["Display"]=$"{row["Code"]} · {row["Language"]} · v{row["Version"]}";
         templateChoice.DataSource=null;templateChoice.DisplayMember="Display";templateChoice.ValueMember="TemplateId";templateChoice.DataSource=approved;
         if(selected.HasValue&&approved.AsEnumerable().Any(r=>(Guid)r["TemplateId"]==selected.Value))templateChoice.SelectedValue=selected.Value;else templateChoice.SelectedIndex=-1;
-        if(approved.Rows.Count==0)SetStatus("No reviewed template is available on this page. Open Templates, select a stock template and use New Version / Review, or ask an administrator to approve it.",PageStatusKind.Warning);
+        if(approved.Rows.Count==0)SetStatus("No reviewed template on this page. In Templates, choose a stock template and select New Version / Review, or ask your administrator.",PageStatusKind.Warning);
     }
     private string TemplateHint()=>templateChoice.Items.Count==0?"No reviewed template: open Templates or ask an administrator.":"Choose a reviewed template before previewing.";
     private async Task RefreshOperational(){var data=await ReadAsync("Operational");if(!IsDisposed&&data.Rows.Count>0){var r=data.Rows[0];sendingSummary=$"Mode: {r["Mode"]} · master pause: {r["Paused"]}. ";operational.Text=sendingSummary+$"Dispatcher {(dispatchTask is {IsCompleted:false}?"running":"stopped")}. Scheduled work requires a running dispatcher; accepted does not mean delivered.";}}
@@ -207,5 +207,5 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
     });
     private Task RefreshContacts()=>LoadGridAsync(contacts,()=>ReadAsync("Contacts",contactPage));
     private Task RefreshRules()=>CurrentUser.HasPermission("Communication.Configure")?LoadGridAsync(rules,()=>ReadAsync("Rules")):Task.CompletedTask;
-    private async Task EvaluateRules(){await store.CallAsync("Evaluate",lifetime.Token);SetStatus("Committed events evaluated. Review resulting campaigns in Outbox; eligible work may need approval and a running dispatcher. This does not prove delivery.");}
+    private async Task EvaluateRules(){await store.CallAsync("Evaluate",lifetime.Token);SetStatus("Events checked. Review campaigns in Outbox. Sending may need approval and a running dispatcher; delivery is not confirmed.");}
 }
