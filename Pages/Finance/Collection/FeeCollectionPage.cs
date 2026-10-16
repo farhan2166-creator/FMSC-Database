@@ -11,17 +11,17 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     private readonly LookupBox enrollment = new();
     private readonly DataGridView charges =
         HumanUi.Grid(true);
-    /* Reverse is the one verb that belongs to a single charge - the fee-level operations act on the assignment and live in Fee Assignments. */
+    /* Reverse acts on one charge; assignment changes belong in Fee Assignments. */
     private readonly ContextMenuStrip chargeMenu = new StyledContextMenu();
     private readonly ContextMenuStrip studentFeesMenu = new StyledContextMenu();
     private readonly DataGridView recentPayments =
         HumanUi.Grid();
-    /* One row per child with open charges, shown only when more than one child is being paid for. */
+    /* Show one proposal row per child only for family collections. */
     private readonly DataGridView familyProposal =
         HumanUi.Grid(true);
     private bool suppressProposalEvents;
     private RowStyle? proposalRow;
-    /* This page collects for whoever is actually paying, so a parent paying for two or three children does not need a separate screen or an up-front decision about whether this… */
+    /* Collect selected siblings' fees in one workflow without a separate family screen. */
     private readonly CheckedListBox siblings = new() {
         Dock = DockStyle.Fill,
         CheckOnClick = true,
@@ -33,14 +33,14 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     private readonly Label primaryPayer = new() { Dock=DockStyle.Fill, Font=AppTheme.NormalFont, TextAlign=ContentAlignment.MiddleLeft };
     private ModernButton selectAllSiblings = null!;
     private Action? updateSiblingLayout;
-    /// <summary>Set while the sibling list is being rebuilt, because ItemCheck fires for programmatic SetItemChecked too and would otherwise load charges for siblings nobody ticked.</summary>
+    /// <summary>Ignore programmatic sibling ticks while rebuilding the list.</summary>
     private bool suppressSiblingEvents;
-    /// <summary>True while a tick is still loading that sibling's charges from the database, so a second tick cannot interleave with it at the await point.</summary>
+    /// <summary>Prevent overlapping sibling charge loads.</summary>
     private bool siblingBusy;
     private bool focusAmountAfterSiblingLoad;
-    /// <summary>Set when a collection produced more than one receipt, so the note can be shown after the post-transaction reloads have finished overwriting the status line.</summary>
+    /// <summary>Report multiple receipts after refreshes finish updating status.</summary>
     private string? multiStudentReceiptNote;
-    /// <summary>Set when the collection just completed covered a family, so the one receipt number shared by every child can be reprinted as a single document.</summary>
+    /// <summary>Retain the shared family receipt number for reprinting.</summary>
     private string? lastGroupReceiptNumber;
     private readonly Label siblingHint = new() {
         Dock = DockStyle.Bottom,
@@ -49,13 +49,13 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         ForeColor = AppTheme.MutedText,
         TextAlign = ContentAlignment.MiddleLeft
     };
-    /// <summary>admissionId -> (enrollmentId, display name) for every sibling ticked, so their charges can be loaded and their charges attributed on posting.</summary>
+    /// <summary>Map selected siblings to their enrollment and display name for allocation.</summary>
     private readonly Dictionary<int, (int EnrollmentId, string Name)> payingFor = new();
     private readonly ModernComboBox method =
         HumanUi.Combo();
     private readonly ModernTextBox discountAmount =
         HumanUi.TextBox(false, 100);
-    /* This is the input the screen is driven from - the grid shows how it settles each charge, in the settlement order (tuition, one-time, yearly, then the rest). */
+    /* Allocate the entered payment across charges in settlement order. */
     private readonly ModernTextBox paymentAmount =
         HumanUi.TextBox(false, 100);
     private readonly ModernTextBox reference =
@@ -69,14 +69,14 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             ShowUpDown = true,
             Value = DateTime.Now
         };
-    /* True once the OPERATOR has moved the payment date for the student now on screen. */
+    /* Preserve a payment date explicitly chosen by the operator. */
     private bool paymentDateEdited;
     private bool suppressPaymentDateEvents;
     private readonly Label totalDue =
         new();
     private readonly Label balance =
         new();
-    /* The figure the operator acts on: what is owed after the discount and before any money. Read-only - it is derived, not entered. */
+    /* Derived payable amount after discount, before collection. */
     private readonly Label amountToPay =
         new();
     private int admissionId;
@@ -85,7 +85,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     private bool suppressSearch;
     private bool suppressDiscountEvents;
     private bool suppressPaymentEvents;
-    /// <summary>The payable figure the summary last displayed (= Total Due less the discount as spread).</summary>
+    /// <summary>Last displayed payable amount after discount allocation.</summary>
     private decimal lastPayableShown;
     private int loadVersion;
     private ModernButton? executeButton;
@@ -103,12 +103,12 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     private ModernButton? historyButton;
     private ModernButton? paymentHistoryButton;
     private ModernButton? studentFeesMenuButton;
-    /// <summary>The Payment History dialog's Reprint Receipt button. See ReprintReceiptAsync for why a receipt can now be reprinted at all.</summary>
+    /// <summary>Payment History receipt-reprint action.</summary>
     private ModernButton? reprintReceiptButton;
     /// <summary>Off-screen parent for the payment list.</summary>
     private Panel? paymentHistoryHost;
     private bool transactionBusy;
-    // Snapshot of the most recently completed Collection transaction, kept only in memory so "Print Receipt" can reprint it with the real (post-discount) figures.
+    // Retain the last committed receipt with its actual post-discount amounts.
     private sealed class LastCollectionReceipt
     {
         public required string StudentName;
@@ -195,7 +195,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     {
         ConfigureDecimalInput(discountAmount);
         paymentAmount.KeyPress += WholeAmountKeyPress;
-        /* The Operation dropdown is gone: this page is collection-only. See the Operation label in the layout for why. */
+        /* This workspace records collections only. */
         method.Items.AddRange(
             new object[]
             {
@@ -206,7 +206,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 "Other"
             });
         method.SelectedIndex = 0;
-        /* It is an async void handler underneath, so it had no protection against a second click while the first posting was in flight. */
+        /* Guard the async collection handler against duplicate submissions. */
         executeButton =
             AddBusyAction(
                 "Collect Payment",
@@ -234,7 +234,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 (lastCollectionReceipt is null && lastGroupReceiptNumber is null)))
                 printReceiptButton.Enabled = false;
         };
-        // (Fee Assignments UI): contextual entry point, ("Add the Fee Assignments panel to the existing FeeCollectionPage as a first visible increment - no retirement, no navigation change").
+        // Open fee assignments for the selected enrollment.
         feeAssignmentsButton =
             AddAction(
                 "Fee Assignments",
@@ -244,7 +244,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         addChargeButton = AddAction(
             "Add Charge", (_, _) => OpenAdditionalFee(), "Secondary");
         addChargeButton.Enabled = false;
-        // (Fee Operations, scoped down): rather than build a whole new consolidated screen, Future Fees ('s GetStudentFeeProjection) and History (the existing, unmodified StudentAccountStatementPage) are added here as two more…
+        // Reuse existing projection and statement views for Future Fees and History.
         futureFeesButton =
             AddAction(
                 "Future Fees",
@@ -257,7 +257,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 (_, _) => OpenHistory(),
                 "Secondary");
         historyButton.Enabled = false;
-        /* The payment list is no longer a permanent column on this page, so it opens from here instead, the same way History and Fee Assignments do. */
+        /* Open payment history on demand. */
         paymentHistoryButton =
             AddAction(
                 "Payment History",
@@ -272,7 +272,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     paymentHistoryButton.Enabled = historyButton.Enabled;
                 }
             };
-        /* Keep the collection workflow visually dominant. The existing buttons stay as the single source of enable-state and behaviour; this compact menu simply invokes them. */
+        /* Delegate menu actions to the existing buttons so permissions and enabled states remain authoritative. */
         studentFeesMenuButton = new ModernButton {
             Text = "Student Fees ▾",
             ThemeRole = "Secondary",
@@ -309,7 +309,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             clear);
         /* Start reading the student list now so the first keystroke filters at once. */
         StudentSearchCache.Warm();
-        /* The operator edited the box away from the student this page holds. The typed text is left exactly as typed. */
+        /* Clear the previous student's data without changing the search text. */
         student.SelectionCleared += (_, _) => {
             if (suppressStudentEvents ||
                 suppressSearch)
@@ -320,7 +320,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 ClearPayment(false);
         };
         TrackStudentSearchStatus(student);
-        /* A student was chosen: clicked, highlighted and Enter, or an exact admission number typed and Enter. */
+        /* Load only a committed student selection. */
         student.UserSelectionChanged += async (_, _) => {
             if (suppressStudentEvents ||
                 suppressSearch)
@@ -357,7 +357,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 futureFeesButton.Enabled = admissionId > 0 && enrollmentId > 0;
             if (historyButton is not null)
                 historyButton.Enabled = admissionId > 0 && enrollmentId > 0;
-            /* The rows above were just cleared, and with them every sibling's charges, the discount and the Paid figure belonged to the previous enrollment. */
+            /* Clear sibling charges, discounts and payment amounts when enrollment changes. */
             suppressSiblingEvents = true;
             try
             {
@@ -393,19 +393,19 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         discountAmount.TextChanged += (_, _) => {
             if (suppressDiscountEvents)
                 return;
-            /* The discount changes what each charge can take, so the allocation is recomputed from the payment rather than merely capped - otherwise the Payment field and the grid disagree. */
+            /* Reallocate payment after discount changes so the grid and payment field agree. */
             if (PaidIsUntouchedDefault())
                 RefreshEnteredPaymentAllocation();
             else
                 ApplyPaymentAcrossCharges();
         };
-        /* entering the amount received settles the charges. The grid is the result of that allocation, not the input to it. */
+        /* The payment field drives allocation; the grid displays the result. */
         paymentAmount.TextChanged += (_, _) => {
             if (suppressPaymentEvents)
                 return;
             ApplyPaymentAcrossCharges();
         };
-        /* The operator setting the date himself is the one thing that stops this page refreshing it; a date this page wrote is not that. */
+        /* Only an operator-selected date suppresses automatic date refresh. */
         paymentDate.ValueChanged += (_, _) => {
             if (suppressPaymentDateEvents)
                 return;
@@ -417,7 +417,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             HumanUi.Card(
                 "Student & Collection Date",
                 "Choose the student once; the current academic placement and outstanding charges load automatically.");
-        /* Keep the transaction header compact. Payment details belong beside the amount being collected, not beside the student identity, so method / reference / remarks live in the checkout card below. */
+        /* Keep method, reference and remarks beside the amount being collected. */
         var contextGrid =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -504,7 +504,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         chargeCard.Header.Controls.SetChildIndex(chargeActions, chargeCard.Header.Controls.Count - 1);
         chargeCard.Content.Controls.Add(
             charges);
-        /* It now opens from the Payment History button, so both of those keep the width. */
+        /* Payment history opens separately; preserve space for collection. */
         paymentHistoryHost =
             new Panel {
                 Dock = DockStyle.Fill,
@@ -516,7 +516,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             recentPayments);
         Controls.Add(
             paymentHistoryHost);
-        /* Paying for a sibling. Ticking one loads that child's outstanding charges into the same grid on the left, so one payment can cover several children without leaving this screen. */
+        /* Ticking a sibling adds their outstanding charges to this collection. */
         var siblingsCard =
             HumanUi.Card(
                 "Paying For",
@@ -575,12 +575,12 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 e.Handled=true; e.SuppressKeyPress=true;
             }
         };
-        /* Added to the panel HERE, after the button exists. */
+        /* Attach the panel after its button exists. */
         siblingPanel.Controls.Add(
             selectAllSiblings,
             0,
             3);
-        /* The per-child proposal, collapsed to nothing until a family payment is actually in progress - see ProposeFamilyAllocation. */
+        /* Show the per-child proposal only during family allocation. */
         proposalRow =
             new RowStyle(
                 SizeType.Absolute,
@@ -720,9 +720,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
             Padding = new Padding(0, 8, 0, 0), Margin = new Padding(0)
         };
-        // Owner-reviewed layout (12 October 2026): Fee Collection is accepted as
-        // displayed. Keep its 78/22 split; do not widen/rearrange it based only
-        // on a speculative clipping concern without a demonstrated problem.
+        // Owner-approved layout: retain the 78/22 split unless a reproduced usability issue justifies change.
         workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 78));
         workspace.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 22));
         workspace.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -891,7 +889,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 Visible = false,
                 ReadOnly = true
             });
-        /* The rows are added positionally against the columns above, so inserting a column in the middle would silently shift every value. */
+        /* Keep positional row values aligned with the column order. */
         charges.Columns.Add(
             new DataGridViewTextBoxColumn {
                 Name = "AdmissionId",
@@ -925,7 +923,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             charges.Columns[columnName].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             charges.Columns[columnName].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
         }
-        /* Column fitting is no longer wired here. It now lives in UiHelper.FitColumnsToWidth and HumanUi.Grid routes every grid to it. */
+        /* Shared grid helpers own column fitting. */
         charges.CellClick += (_, e) => {
             if (e.RowIndex < 0 ||
                 e.ColumnIndex < 0)
@@ -1032,7 +1030,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         foreach (DataGridViewColumn chargeColumn in charges.Columns)
             chargeColumn.SortMode = DataGridViewColumnSortMode.NotSortable;
         charges.ContextMenuStrip = chargeMenu;
-        /* Both gestures land here: a right-click over a row, and the keyboard's Menu key / Shift+F10 on the current row. */
+        /* Use the same row menu for mouse and keyboard gestures. */
         chargeMenu.Opening += (_, e) => {
             Point pointer = charges.PointToClient(Cursor.Position);
             var hit = charges.HitTest(pointer.X, pointer.Y);
@@ -1071,7 +1069,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         var reverse =
             chargeMenu.Items.Add(
                 "Reverse this charge...");
-        /* A collection in flight owns the whole charger list - the allocation it is about to post was built from these rows. */
+        /* Hold all charge inputs while their allocation is being submitted. */
         reverse.Enabled = !transactionBusy;
         reverse.Click += async (_, _) => await ReverseChargeAsync(rowIndex);
         return true;
@@ -1224,7 +1222,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         }
         await PrintGroupReceiptAsync(institution, receiptNumber);
     }
-    /// <summary>Puts the page into its one and only mode: Collection. Keeping the method (rather than deleting its call sites) keeps the collection state explicit and in one place.</summary>
+    /// <summary>Keep collection mode explicit.</summary>
     private void UpdateOperationMode()
     {
         charges.Columns["Pay"].Visible = manualAllocation;
@@ -1242,7 +1240,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         reference.Enabled = true;
         discountAmount.Enabled = true;
         paymentAmount.Enabled = true;
-        // Payment history is read-only context here. Selecting a payment to act on is done on Fee Adjustments, not on this page.
+        // Payment history is read-only; modify payments through Fee Adjustments.
         recentPayments.Enabled = false;
         recentPayments.ClearSelection();
         UpdateCollectionTotals();
@@ -1331,7 +1329,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         {
             suppressPaymentEvents = false;
         }
-        /* A new student is a new collection, so the date is today's again unless this student's own date is set deliberately afterwards. */
+        /* Reset to today for a new student unless the operator chooses another date. */
         ResetPaymentDateToNow(true);
         enrollment.Enabled = false;
         if (feeAssignmentsButton is not null)
@@ -1347,7 +1345,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             UpdateCollectionTotals();
             return;
         }
-        /* The reset above (enrollment.ClearLookup) raises the enrollment change handler at 476, which runs LoadCharges/LoadRecentPayments and advances loadVersion on the way. */
+        /* Clearing enrollment triggers loads that advance loadVersion. */
         version = loadVersion;
         try
         {
@@ -1364,7 +1362,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             var raw = await enrollmentsTask;
             var placements = (await placementTask).AsEnumerable()
                 .ToDictionary(row => GetInt(row,"ClassSectionId"),row => GetText(row,"CampusName"));
-            /* this reply re-binds the Enrollment dropdown and writes enrollmentId, the pair every money action then uses, and it had no post-await check at all. */
+            /* Recheck the student before binding enrollment and enabling money actions. */
             if (IsDisposed ||
                 version != loadVersion ||
                 student.SelectedId != selectedAdmissionId)
@@ -1458,7 +1456,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             }
             enrollment.Enabled =
                 dt.Rows.Count > 1;
-            /* A promoted student who has not returned yet has a new Active enrollment with no charges (BillingReady = 0) beside last year's enrollment, which may still owe money. */
+            /* Awaiting-return enrollments are unbillable; earlier enrollments may still have outstanding fees. */
             int owingEnrollmentId = 0;
             foreach (DataRow owingRow in dt.Rows)
             {
@@ -1531,8 +1529,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 Fail(ex);
         }
     }
-    /// <summary>Appends one student's outstanding charges to the charges grid WITHOUT clearing it.</summary>
-    /// <summary>Monthly charges first, with tuition then transport within each frequency group.</summary>
+    /// <summary>Append outstanding charges without clearing; rank monthly fees first, then tuition and transport.</summary>
     private static int SettlementRank(
         DataRow row,
         Dictionary<int, string> frequencyByAssignment)
@@ -1556,7 +1553,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             name.Contains("transport", StringComparison.OrdinalIgnoreCase) ? 1 : 2;
         return (monthly ? 0 : 10) + feeRank;
     }
-    /// <summary>StudentFeeAssignmentId -> Frequency for one enrollment, so a charge can be ranked by what it was billed under rather than by a guess from its fee type.</summary>
+    /// <summary>Resolve settlement priority from assignment frequency rather than guessing from fee type.</summary>
     private static async Task<Dictionary<int, string>> LoadAssignmentFrequenciesAsync(
         int forEnrollmentId)
     {
@@ -1609,13 +1606,13 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             await frequenciesTask;
         var feeOrderRows = await feeOrderTask;
         var feeOrder=feeOrderRows.AsEnumerable().ToDictionary(row=>GetInt(row,"FeeTypeId"),row=>GetInt(row,"DisplayOrder"));
-        /* Callers that pass no version (-1) are the explicit tick paths, which append on demand rather than on a load. */
+        /* Version -1 identifies explicit sibling ticks that append charges on demand. */
         if (version >= 0 &&
             (IsDisposed || version != loadVersion))
         {
             return 0;
         }
-        /* Those callers pass the student they started for; if the page has moved on, append nothing. */
+        /* Do not append charges after the selected student changes. */
         if (IsDisposed ||
             (expectedPrimaryAdmissionId > 0 &&
              (admissionId != expectedPrimaryAdmissionId ||
@@ -1641,7 +1638,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             long chargeId = GetLong(row, "BillingChargeId");
             if (chargeId <= 0)
                 continue;
-            // Never list the same charge twice - ticking a sibling, unticking and re-ticking would otherwise duplicate every one of their rows.
+            // Deduplicate charges when siblings are removed and reselected.
             if (!listedCharges.Add(chargeId))
                 continue;
             decimal outstanding = GetDecimal(row, "Balance");
@@ -1714,7 +1711,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     }
     private static DateTime ChargePeriod(DataGridViewRow row) =>
         row.Cells["BillingMonth"].Tag is DateTime date ? date : DateTime.MinValue;
-    /* UX - a refusal that belongs to one field is marked on that field (border + a few words on its caption) and focused, with the same words in the… */
+    /* Show field-specific refusals inline and focus the invalid input. */
     private FormValidator? collectionValidator;
     private void MarkCollectionField(Control field, string message)
     {
@@ -1728,7 +1725,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         .OrderBy(row => row.Cells["BillingChargeId"].Tag is int rank ? rank : 12)
         .ThenBy(ChargePeriod)
         .ThenBy(row => Convert.ToInt64(row.Cells["BillingChargeId"].Value));
-    /// <summary>Spreads an amount across EVERY open charge, in the desk's settlement order, and writes the result into the grid.</summary>
+    /// <summary>Allocate across open charges in settlement order.</summary>
     private decimal FillFromReceivedAmount(decimal received)
     {
         if (received <= 0m)
@@ -1838,7 +1835,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         Math.Abs(
             GetAmount(paymentAmount) -
             lastPayableShown) <= 0.005m;
-    /// <summary>Reads the amount received, applies it in the grid's settlement order, and reports the result. An amount larger than the debt is reported by UpdateCollectionTotals, which already knows the payable figure.</summary>
+    /// <summary>Allocate the received amount in settlement order; totals report any excess.</summary>
     private void ApplyPaymentAcrossCharges()
     {
         decimal typed = GetAmount(paymentAmount);
@@ -3416,7 +3413,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         using var dialog = new FeeHistoryDialog(admissionId);
         dialog.ShowDialog(FindForm());
     }
-    /// <summary>Reverses exactly one charge, through dbo.ReverseBillingCharge (FMSC_FIX_082), then reloads what the reversal invalidated. The procedure itself decides whether the reversal is allowed - this method never guesses.</summary>
+    /// <summary>Reverse one charge through dbo.ReverseBillingCharge; SQL decides eligibility, then dependent views reload.</summary>
     private async Task ReverseChargeAsync(int rowIndex)
     {
         if (transactionBusy) return;

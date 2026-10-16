@@ -2,7 +2,8 @@ namespace FMSC_SMS.Core;
 
 internal static class StudentPhotoInput
 {
-    // Input files may be larger; only the prepared JPEG is stored in the database.
+    // Owner policy: new photos fit within 80 KB, preserving proportions without upscaling.
+    // This C# limit does not rewrite existing photos or impose a new SQL constraint.
     internal const int MaximumBytes = 25_000_000;
     internal const int MaximumStoredBytes = 80 * 1024;
     internal const int MaximumDimension = 600;

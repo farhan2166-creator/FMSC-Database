@@ -15,7 +15,7 @@ public static class CurrentUser
         UserId = userId;
         Username = username;
         RoleName = roleName;
-        /* The SQL bypass (dbo.RequirePermission) now recognises Administrator role MEMBERSHIP, not just the primary role. */
+        // Owner policy: any Administrator membership has full authority, matching dbo.RequirePermission.
         IsAdministrator = roleName
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Any(role => role.Equals("Administrator", StringComparison.OrdinalIgnoreCase));

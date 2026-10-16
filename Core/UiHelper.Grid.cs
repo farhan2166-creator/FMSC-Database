@@ -43,8 +43,7 @@ namespace FMSC_SMS.Core
             ApplyGridColumnPresentation(grid);
             ScheduleColumnFit(grid);
         }
-        /// <summary>Use the shared row spacing for existing, bound and manually added rows.
-        /// Wrapped content may grow beyond this height, but short text must not collapse it.</summary>
+        /// <summary>Apply shared minimum row spacing; allow wrapped content to grow.</summary>
         private static void ApplyGridRowMetrics(DataGridView grid, int startIndex = 0, int? rowCount = null)
         {
             int height = Math.Max(UiDpi.Metric(grid, AppMetrics.GridRowHeight),
@@ -77,7 +76,7 @@ namespace FMSC_SMS.Core
                 ? look.Accent
                 : AppTheme.Primary;
         internal static Color SharedGridAccent(DataGridView grid) => GridAccent(grid);
-        /// <summary>Light header: a pale tint of the accent, bold dark text, and a 2px accent line underneath (drawn in <see cref="GridCellPainting"/>).</summary>
+        /// <summary>Use a tinted header, bold text and an accent underline.</summary>
         internal static void ApplyGridHeaderStyle(DataGridView grid, Color accent)
         {
             GridLook look = GridLooks.GetOrCreateValue(grid);
@@ -141,7 +140,7 @@ namespace FMSC_SMS.Core
         }
         private static Color BadgeColor(string text)
         {
-            /* A fixed palette, picked from the text with a stable sum so the same value always gets the same colour (string.GetHashCode differs between runs). */
+            /* Use a stable character sum for colors; string.GetHashCode varies between runs. */
             int sum = 0;
             foreach (char c in text.Trim().ToLowerInvariant())
                 sum = unchecked(sum * 31 + c);
@@ -319,7 +318,7 @@ namespace FMSC_SMS.Core
             GridPlaceholders.Add(grid, message);
             grid.Invalidate();
         }
-        /// <summary>UX - what an EMPTY grid is saying, so the operator can tell "nothing asked for yet" from "working on it" from "it did not load" from.</summary>
+        /// <summary>Distinguish initial, loading, empty and failed grid states.</summary>
         public enum GridDisplayState
         {
             /// <summary>Nothing has been asked for yet (no student selected, no search run).</summary>
@@ -683,7 +682,7 @@ namespace FMSC_SMS.Core
                 }
                 if (!column.Visible)
                     return;
-                /* The EFFECTIVE auto-size mode, not the column's own property. Measured, not assumed - see FitColumnsToWidth for how it is used and compensated for. */
+                /* Use the effective auto-size mode, including inherited settings. */
                 if (column.InheritedAutoSizeMode !=
                     DataGridViewAutoSizeColumnMode.None)
                 {
@@ -795,7 +794,7 @@ namespace FMSC_SMS.Core
                 return 0;
             }
         }
-        /// <summary>Columns that are a row AFFORDANCE rather than data - the reorder arrows, the delete cross, checkboxes, and button columns such as Fee Collection's "+/−".</summary>
+        /// <summary>Identify action columns such as arrows, delete, checkboxes and buttons.</summary>
         private static bool IsWidthPinnedColumn(DataGridViewColumn column)
         {
             string name = column.Name ?? string.Empty;
@@ -888,14 +887,14 @@ namespace FMSC_SMS.Core
                         each + (i < remainder ? 1 : 0);
                 }
             }
-            /* The widths are pinned AFTER the share-out. Leaving the columns in an auto-size mode would let the next content or layout change take the shared padding straight back off. */
+            /* Pin widths after distributing space so auto-sizing cannot undo the result. */
             foreach (DataGridViewColumn column in flexible)
             {
                 column.AutoSizeMode =
                     DataGridViewAutoSizeColumnMode.None;
             }
         }
-        /// <summary>A grid filled row by row raises RowsAdded once per row, and a window resize raises SizeChanged per pixel; both would otherwise re-measure every column dozens of times for one visible change.</summary>
+        /// <summary>Coalesce row-addition and resize events before measuring columns.</summary>
         private static readonly HashSet<DataGridView> ColumnFitPending = new();
         private static void ScheduleColumnFit(DataGridView grid)
         {
@@ -995,7 +994,7 @@ namespace FMSC_SMS.Core
             {
                 e.CellStyle.BackColor = AppTheme.Tint(GridAccent(grid), 0.94f);
             }
-            /* UX - in a grid that is typed into, the cells that take input stay plain white and the calculated / read-only ones take the faint secondary surface. */
+            /* Keep editable cells white and calculated cells on the secondary surface. */
             if (!selected &&
                 e.CellStyle is not null &&
                 !(GridLooks.TryGetValue(grid, out GridLook? hoverLook) && hoverLook.HoverRow == e.RowIndex) &&
