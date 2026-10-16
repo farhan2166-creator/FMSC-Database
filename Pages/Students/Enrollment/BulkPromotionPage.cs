@@ -998,24 +998,20 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                 mappingSummary=mappingDialog.Summary+"\n";
             }
             /* Show the user-reviewed destinations before any enrollment is changed. */
-            string from =
-                $"From: {sourceCampus.Text} · {sourceClass.Text} · " +
-                (sourceSection.SelectedId > 0 ? sourceSection.Text : "all sections") +
-                $" · {sourceYear.Text}\n";
-            string to = promoteCount > 0
-                ? $"To: {destinationClass.Text} · {destinationSection.Text} · {destinationYear.Text}\n"
-                : $"To: {destinationYear.Text} (held-back students stay in their current class)\n";
-            var confirm =
-                ModernMessageDialog.Show(
-                    $"Process {selected.Count:N0} student(s)?\n\n" +
-                    from + to + mappingSummary +
-                    $"Effective date: {effective:dd-MMM-yyyy}\n\n" +
-                    $"Promote: {promoteCount:N0}\n" +
-                    $"Hold Back: {holdCount:N0}\n\n" +
-                    "A new placement will be created in the destination academic year for each processed student.",
-                    "Confirm Student Promotion",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question);
+            var confirmation = new MessageDialogContent(
+                $"Process {selected.Count:N0} students?",
+                Facts: new (string, string)[] {
+                    ("Campus", sourceCampus.Text),
+                    ("From", $"{sourceClass.Text} · {(sourceSection.SelectedId > 0 ? sourceSection.Text : "All sections")} · {sourceYear.Text}"),
+                    ("To", promoteCount > 0 ? $"{destinationClass.Text} · {destinationSection.Text} · {destinationYear.Text}" : destinationYear.Text),
+                    ("Effective date", effective.ToString("dd-MMM-yyyy")),
+                    ("Promote", promoteCount.ToString("N0")),
+                    ("Hold back", holdCount.ToString("N0")),
+                    ("Section mapping", string.IsNullOrWhiteSpace(mappingSummary) ? "As selected above" : mappingSummary.Trim())
+                },
+                Notice: "Each student gets a new placement in the destination year. Held-back students keep their class. Confirm return admission before billing.");
+            var confirm = ModernMessageDialog.Show(FindForm(), confirmation,
+                "Confirm Student Promotion", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (confirm !=
                 DialogResult.Yes)
             {

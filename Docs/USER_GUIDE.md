@@ -21,6 +21,8 @@ Use Windows display scaling for readable text. The application follows the monit
 
 Result messages stay within two font-scaled lines so feedback cannot displace the workspace. Hover over the status text for full details. A warning or unknown save outcome still requires its stated recovery checks before retrying.
 
+Confirmation dialogs show the question first, then important consequences and the details to review. Yes/No buttons are centered. Family payments and matching student records use read-only tables; scroll through long details before confirming. The payment counter keeps its approved Yes default, while restore and duplicate-student confirmations default to No. Enter uses the selected default; Escape declines a Yes/No question.
+
 ## Common workspaces
 
 | Work | Where to start | Operational caution |

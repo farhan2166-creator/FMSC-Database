@@ -251,7 +251,7 @@ internal static class RdlcReportPreview
             catch (Exception ex)
             {
                 AppExceptionHandler.LogNonFatal(ex, $"Report {action}");
-                MessageBox.Show(form, $"Unable to {action} the report.\n\n{ex.GetBaseException().Message}",
+                ModernMessageDialog.Show(form, $"Unable to {action} the report.\n\n{ex.GetBaseException().Message}",
                     form.Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -400,7 +400,7 @@ internal static class RdlcReportPreview
                     {
                         page.Text = "Preview failed";
                         AppExceptionHandler.LogNonFatal(e.Exception, "Report preview rendering");
-                        MessageBox.Show(form, $"Unable to preview the report.\n\n{e.Exception.GetBaseException().Message}",
+                        ModernMessageDialog.Show(form, $"Unable to preview the report.\n\n{e.Exception.GetBaseException().Message}",
                             form.Text, MessageBoxButtons.OK, MessageBoxIcon.Error);
                         return;
                     }
