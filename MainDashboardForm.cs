@@ -2,6 +2,7 @@ using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Administration;
 using FMSC_SMS.Pages.Dashboard;
 using FMSC_SMS.Pages.Finance.Billing;
+using FMSC_SMS.Pages.Help;
 using FMSC_SMS.Pages.Finance.Collection;
 using FMSC_SMS.Pages.Finance.Configuration;
 using FMSC_SMS.Pages.Finance.StudentAccounts;
@@ -728,6 +729,8 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             "Reports.View");
         AddMainNav(flow, "reports.png", "Communication Center", AppTheme.Primary,
             () => new FMSC_SMS.Pages.Communication.CommunicationCenterPage(), "Communication", "Communication Center", "Communication.View");
+        AddMainNav(flow, "dashboard.png", "Help & FAQ", AppTheme.Primary,
+            () => new HelpCenterPage(), "Help", "Help & FAQ");
         // User and role administration lives in the permission-controlled Account menu.
         AddModule(
             flow,
