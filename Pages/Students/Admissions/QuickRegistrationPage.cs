@@ -71,10 +71,8 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     internal bool IsBusy=>busy||loadingFees||loadingFamily;
     private string savedStatus="";
     private string savedSnapshot="",expectedQuote="";
-    // Owner-approved (2026-10-13): date/year-only changes on an otherwise blank
-    // new registration are selection context, not a student draft. Allow leaving
-    // without a discard prompt; entered student details or placement still warn.
-    // Existing pending records retain their normal edit tracking.
+    // Owner policy (FR-06): date/year alone on a blank new registration do not prompt.
+    // Student details, placement and existing-record edits retain normal discard warnings.
     public bool HasUnsavedChanges=>recoveryBlocked||HasPendingChanges||(savedStudent==0&&(name.Text.Trim().Length>0||parent.Text.Trim().Length>0||contact.Text.Trim().Length>0||address.Text.Trim().Length>0||placement.SelectedId>0));
     public string UnsavedChangesMessage=>recoveryBlocked?"A registration save still needs verification. Its recovery record will be retained when you leave. Check Save Outcome when you return; do not register this child again until its outcome is clear.":"Discard the unsaved registration changes?";
     private string familyReference="";

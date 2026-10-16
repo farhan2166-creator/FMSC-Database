@@ -2,10 +2,8 @@ using System.Text.Json;
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Students.Certificates;
 /// <summary>Optional clearance checklist helper; currently not invoked by the Leave Certificate flow.</summary>
-// Business rule (V20 audit F-02): clearance is optional, confirmed by the owner.
-// A missing checklist is not a reason to block leaving or issuing a Leave Certificate.
-// Do not wire this helper as a mandatory UI/DB gate without a new policy decision.
-// See Docs/AUDIT_DECISIONS.md; this helper's balance/checklist rules apply only when used.
+// Owner policy: clearance is optional and cannot gate withdrawal or Leave Certificate issuance.
+// These checklist rules apply only when this helper is explicitly used.
 internal static class ClearanceUi
 {
     public static async Task<bool> ShowClearanceChecklistAsync(IWin32Window owner, int admissionId, string studentDisplayName)

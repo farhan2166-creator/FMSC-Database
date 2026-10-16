@@ -1,5 +1,6 @@
 namespace FMSC_SMS.Core;
 
+// Owner policy (F-01): reject fractional rupees; never round inputs or rewrite historical amounts.
 internal static class WholeRupees
 {
     internal static bool IsWhole(decimal value) => value == decimal.Truncate(value);

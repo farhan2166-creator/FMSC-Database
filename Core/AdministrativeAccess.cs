@@ -45,6 +45,8 @@ internal enum AccessCheckOutcome { Saved, NotApplied, Changed }
 internal sealed record AccessCheckResult(AccessCheckOutcome Outcome, AccessCatalog Catalog, AccessRecord? Record);
 internal sealed class AdministrativeStaleStateException(string message) : InvalidOperationException(message);
 
+// Owner policy: retain Administrator and Accountant; Administrator is protected and unrestricted.
+// Preserve Accountant access unless explicitly edited; never grant new module permissions by default.
 internal static class AdministrativeAccess
 {
     internal static bool IsAdministrator(string name) => string.Equals(name.Trim(), "Administrator", StringComparison.OrdinalIgnoreCase);

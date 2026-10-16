@@ -92,12 +92,12 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
     };
     private readonly ModernButton historyButton;
     private DataTable? candidateData;
-    /* Appears after a promotion: the promoted students cannot be billed until their return is confirmed, so it offers Confirm Return Admission (on the student, when just one was promoted). */
+    /* Promoted enrollments remain unbillable until return admission is confirmed. */
     private readonly NextStepBar nextSteps;
     /* Start date of every academic year, read once. */
     private readonly Dictionary<int, DateTime> yearStarts = new();
     private DataTable? yearTable;
-    /* All classes, read once. The destination class list is derived from it (same program, later class than the source), see BuildDestinationClasses. */
+    /* Derive destination classes from the cached same-program class list. */
     private DataTable? classTable;
     /* > 0 while a load or a promotion runs; ApplyState locks the whole page meanwhile. */
     private int busyCount;
@@ -133,7 +133,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         ConfigureTables();
         ConfigureGrid();
         ConfigureButtons();
-        /* CASCADE RULE: what the operator picks in a parent combo resets everything beneath it. source campus -> source section, destination section source year -> destination year… */
+        /* Parent selections reset dependent source and destination choices. */
         sourceCampus.UserSelectionChanged += async (_, _) => await OnSourceCampusChanged();
         sourceYear.UserSelectionChanged += (_, _) => OnSourceYearChanged();
         sourceClass.UserSelectionChanged += async (_, _) => await OnSourceClassChanged();
@@ -492,7 +492,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         }
         catch (Exception ex) { Fail(ex); }
     }
-    /// <summary>A source year is a year some later year exists for: the server refuses a destination that does not start after the source (52514).</summary>
+    /// <summary>A source year requires a later destination year (SQL 52514).</summary>
     private void BindSourceYears()
     {
         var dt = new DataTable();
@@ -523,7 +523,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         }
         catch (Exception ex) { Fail(ex); }
     }
-    /// <summary>Rebuilds the destination year list from the source year: only years that start AFTER it, earliest first, with the next one preselected (the effective date follows).</summary>
+    /// <summary>Offer later years, preselecting the earliest and its start date.</summary>
     private void BuildDestinationYears()
     {
         destinationYear.ClearLookup();
@@ -551,7 +551,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             ApplyDefaultEffectiveDate();
         }
     }
-    /// <summary>Rebuilds the destination class list from the source class with the rule the Leave Certificate promotion list already uses (GetLeaveCertificatePromotionClasses).</summary>
+    /// <summary>Use GetLeaveCertificatePromotionClasses rules for destination classes.</summary>
     private void BuildDestinationClasses()
     {
         destinationClass.ClearLookup();
@@ -719,7 +719,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         if (!IsDisposed)
             ApplyState();
     }
-    /// <summary>The single source of truth for what the operator can touch, worked out from the page as it is now and called after every change.</summary>
+    /// <summary>Recompute input and action availability from the current page state.</summary>
     private void ApplyState()
     {
         if (IsDisposed)
@@ -794,7 +794,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             return "Choose the destination section for the students being promoted.";
         return null;
     }
-    /// <summary>The candidate set is defined by the source context, so a change to any part of it must drop that set rather than leave rows the operator can still tick and process.</summary>
+    /// <summary>Discard candidates whenever their source context changes.</summary>
     private void InvalidateCandidates()
     {
         if (candidateData is null &&
@@ -811,14 +811,14 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
     {
         if (!ValidateRequiredInputs(sourceTable))
             return;
-        /* Held for the whole load: the setup card and every button are locked, so the context cannot change under the query (the guards below stay as a backstop). */
+        /* Hold setup and actions during candidate loading; keep post-await guards. */
         BeginBusy();
         try
         {
             if (sourceCampus.SelectedId <= 0 || sourceYear.SelectedId <= 0 || sourceClass.SelectedId <= 0)
             { Warn("Select source campus, source academic year and source class."); return; }
             var campusId = sourceCampus.SelectedId; var yearId = sourceYear.SelectedId; var classId = sourceClass.SelectedId; var sectionId = sourceSection.SelectedId;
-            /* Every control value the background work needs is read HERE, on the UI thread. Nothing inside a Task.Run lambda in this page may read a control. */
+            /* Capture control values on the UI thread before starting background work. */
             var destClassId = destinationClass.SelectedId;
             SetStatus("Loading promotion candidates...");
             var data = await Task.Run(() => DatabaseHelper.QueryUser("GetBulkPromotionCandidates", DatabaseHelper.Int("@SourceAcademicYearId", yearId), DatabaseHelper.Int("@SourceCampusId", campusId), DatabaseHelper.Int("@SourceClassId", classId), DatabaseHelper.Int("@SourceSectionId", sectionId)));
@@ -1082,7 +1082,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                 result.Columns.Contains("HeldBackCount");
             if (!serverCountsRead)
             {
-                /* The procedure ran, but this build could not read its result row. Say exactly that: the outcome is unknown, so nothing here may be worded as a completed promotion. */
+                /* An unreadable result leaves promotion outcome unknown; do not claim success. */
                 string unknown = $"Outcome unknown. Check History and placements before retrying ({attempted:N0} selected).";
                 Warn(unknown);
                 await LoadCandidates();
@@ -1121,7 +1121,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                 reportOutcome = () => Info(complete);
             }
             reportOutcome();
-            /* Read now: the reload below replaces the candidate table. A single promoted student is carried to the next screen; a batch opens it on the pending list. */
+            /* Capture promoted IDs before reload replaces candidates; carry a single student into return confirmation. */
             int promotedAdmissionId = promoted == 1
                 ? selected
                     .Where(r => string.Equals(Convert.ToString(r["Decision"]), "PROMOTE", StringComparison.OrdinalIgnoreCase))

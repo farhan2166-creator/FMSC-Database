@@ -4,6 +4,10 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ## [Unreleased]
 
+### Documentation
+
+- Shorten C# comments and record accepted business policies beside their implementations. Historical audits, executable code, SQL, database artifacts and installer behavior are unchanged.
+
 ### Changed
 
 - Replace the XML-heavy `DatabaseSchema/` reference export with real DacFx-generated SQL `CREATE` scripts in `Schema/`. The generated review PR removes the old files only after replacement scripts are produced and reports inline/unsupported model objects in a JSON manifest; no school data or database changes.

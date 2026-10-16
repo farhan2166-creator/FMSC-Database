@@ -123,10 +123,10 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
     private string loadedSnapshot = "";
     /* Set only once the changes have been applied, so that path closes without the unsaved-changes prompt. */
     private bool savedSuccessfully;
-    /* One confirmation per close gesture. Assigning DialogResult on a modal form raises FormClosing too, so a single Close click would otherwise ask twice. */
+    /* Confirm once: setting DialogResult also raises FormClosing. */
     private bool discardConfirmed;
     public bool Applied { get; private set; }
-    /// <summary>how many configurations the atomic call applied. See the copy dialog above: all-or-nothing, so on success this is the plan size.</summary>
+    /// <summary>Atomic application succeeds for the entire plan or none of it.</summary>
     public int AppliedCount { get; private set; }
     public BulkFeeRateChangesForm(int currentCampusId = 0, int currentClassId = 0)
         : this(currentCampusId, currentClassId, true) { }
@@ -148,7 +148,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         campusScope.SelectedIndexChanged += (_, _) => ReloadClassScope();
         previewButton.Click += (_, _) => RunPreview();
         applyButton.Click += (_, _) => Apply();
-        /* One invalidation point for every control that decides what a preview would contain. campusScope's handler above only rebuilds the class list. */
+        /* Invalidate the preview when any scope or adjustment input changes. */
         campusScope.SelectedIndexChanged += (_, _) => InvalidateBulkPreview();
         classScope.SelectedIndexChanged += (_, _) => InvalidateBulkPreview();
         feeTypeScope.SelectedIndexChanged += (_, _) => InvalidateBulkPreview();
@@ -183,7 +183,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         form.PrepareForEmbedding();
         return form;
     }
-    /// <summary>See FeeRateMatrixForm.PrepareForEmbedding: Close would dispose a form that is not running under ShowDialog, so it is hidden and the close guard is bypassed.</summary>
+    /// <summary>Hide Close and bypass modal close handling when embedded in a workspace.</summary>
     public void PrepareForEmbedding()
     {
         embedded = true;
@@ -209,7 +209,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         var help = FeeToolLayout.Help(
             "Choose the fees and adjustment amount, then preview the changes before applying them.",
             tip);
-        /* Increase and Decrease share one control, as do the two ways of stating the amount, so a change reads as one sentence: Increase, 10, percent. */
+        /* Present direction, amount and unit as one adjustment. */
         typePercentage.Text = "Percent (%)";
         typeFlatAmount.Text = "Flat (Rs.)";
         var directionPanel = ChoicePanel(directionIncrease, directionDecrease);
@@ -249,7 +249,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         selectNoneButton.Click += (_, _) => SelectPreviewRows(false);
         selectAllButton.Enabled = selectNoneButton.Enabled = false;
         HumanUi.ApplyGridStyle(preview, AppTheme.Warning);
-        /* The guard runs here rather than from the button's own DialogResult, because a button that assigns DialogResult dismisses the modal form before the confirmation can keep it open. */
+        /* Confirm before assigning DialogResult so Cancel can keep the dialog open. */
         closeButton.Click += (_, _) => {
             if (embedded)
                 return;
@@ -399,7 +399,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         applyButton.Enabled = selectAllButton.Enabled = selectNoneButton.Enabled = false;
         plan = new List<PlanRow>();
         preview.Rows.Clear();
-        /* counted afresh for this preview, and cleared here rather than beside the loop so the early returns below cannot leave the previous preview's count standing. */
+        /* Reset the preview count before any early return. */
         previewUnreadableClasses = 0;
         try
         {
@@ -460,7 +460,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
                     catch (Exception nonFatalException31)
                     {
                         FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException31, "BulkFeeRateChangesForm: RunPreview fallback");
-                        /* this class's fees are simply absent from the plan; counting it is what lets the preview and Apply say so instead of quietly adjusting a smaller school. */
+                        /* Count classes omitted from the plan because they have no configurations. */
                         previewUnreadableClasses++;
                         continue;
                     }
@@ -513,7 +513,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
                     row.ClassName,
                     row.FeeTypeName,
                     row.Frequency,
-                    /* N2, because this is the amount that will be stored: "No rounding" leaves 1,582.50, which N0 previewed as "Rs. 1,583" - a figure the operator never agreed to. */
+                    /* Show decimals in preview so fractional candidates are not displayed as rounded amounts. */
                     $"Rs. {row.OldAmount:N2}",
                     $"Rs. {row.NewAmount:N2}",
                     $"{row.NewAmount - row.OldAmount:+0.00;-0.00;0.00}");
@@ -576,10 +576,10 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
             applyButton.Enabled = false;
         }
     }
-    /* Takes Control, not ComboBox: the scope pickers are ModernComboBox, which is a Panel wrapper with a Text property rather than a ComboBox subclass. */
+    /* Accept Control because ModernComboBox wraps its native input. */
     private static string SelectedComboText(Control combo, string fallback) =>
         string.IsNullOrWhiteSpace(combo.Text) ? fallback : combo.Text.Trim();
-    /// <summary>The scope and adjustment choices as one comparable snapshot. The preview grid is deliberately not part of it: it is derived from these choices and is never typed into directly.</summary>
+    /// <summary>Snapshot scope and adjustment inputs, excluding the derived preview grid.</summary>
     private string EditorState() =>
         string.Join("\u001f",
             campusScope.SelectedValue?.ToString() ?? "",
@@ -601,7 +601,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
     {
         return ModernMessageDialog.ConfirmDiscardOnce(this, IsDirty, ref discardConfirmed);
     }
-    /// <summary>The previewed plan no longer describes the controls on screen, so it is dropped rather than left to be applied under them.</summary>
+    /// <summary>Discard a preview when its inputs change.</summary>
     private void InvalidateBulkPreview()
     {
         if (plan.Count == 0 &&

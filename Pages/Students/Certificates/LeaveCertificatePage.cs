@@ -3,10 +3,8 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
 {
-    // Business rule (V20 audit F-02): withdrawal clearance is optional.
-    // The authorized Leave flow deliberately proceeds without a clearance checklist.
-    // Preserve existing Students.Leave authorization and leaving-state validations.
-    // See Docs/AUDIT_DECISIONS.md before introducing a clearance precondition.
+    // Owner policy: clearance is optional; preserve Students.Leave and leaving-state validation.
+    // A missing clearance checklist must not block withdrawal or certificate issuance.
     private const string CertificateTypeName = "School";
     private const int MaxDuplicateIssues = 2;
     private readonly StudentPicker student = new();
