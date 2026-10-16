@@ -24,6 +24,10 @@ For UI changes, include the before/after operator sequence, dirty-state/busy-sta
 
 For installer changes, distinguish a passing publish regression from a successful private installer ZIP, and a successful ZIP from real-school installation approval.
 
+## Source comments
+
+Keep comments brief and explain intent, safety constraints or business policy. Record accepted owner decisions beside the relevant C# implementation, with the audit ID where useful; preserve the historical audit evidence. Distinguish accepted policy from proposals and unverified findings. Avoid obsolete fix narratives or comments that repeat the code.
+
 ## Changelog conventions
 
 Use headings `Added`, `Changed`, `Fixed`, `Security`, and `Documentation` as appropriate under `## [Unreleased]`. Link changes to PRs or commits. When tagging a version, move release entries into `## [x.y.z] - YYYY-MM-DD` only after release acceptance; avoid claiming historical release dates or production readiness from CI alone.

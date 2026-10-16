@@ -10,31 +10,31 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
     ModernButton? restoreButton;
     ModernButton? locateFileButton;
     bool isBusy;
-    /* what the shell says when the operator tries to leave, sign out or close during a backup or a restore. Set beside isBusy so the two cannot drift apart. */
+    /* Block navigation, sign-out and closing while backup or restore is running. */
     string busyMessage = string.Empty;
-    /// <summary>leaving this page disposes it, and signing out or closing ends the process.</summary>
+    /// <summary>Leaving disposes the page; sign-out or closing ends the process.</summary>
     public bool IsBusy => isBusy;
     public string BusyMessage =>
         string.IsNullOrEmpty(busyMessage)
             ? "Work is running on this page. Please wait until it finishes."
             : busyMessage;
-    /* Refresh History is a plain action, so it stayed clickable while a backup or a restore was running. It is held with the other busy-state actions now. */
+    /* Hold Refresh History during backup and restore. */
     ModernButton? refreshHistoryButton;
-    /* history reads had no version, so two overlapping ones (the operator's Refresh and the reload the busy path runs at the end) bound their tables in whichever order the database… */
+    /* Only the latest history read may bind results. */
     int historyLoadVersion;
     bool historyLoadedLatest;
-    /* The backup history (and, for Locate Missing File, the row picked out of it) is what Restore and Locate Missing File depend on, and LoadHistoryAsync reads it asynchronously. */
+    /* Restore and Locate Missing File require a successfully loaded history. */
     int historyLoadDepth;
     bool historyLoadFailed;
     bool historyLoading;
     DatabaseBackupManager.BackupInfo? selectedRestoreBackupInfo;
-    /* The restore card's dedicated backup-status area. It is built only for an operator who may restore, so every use below is guarded. */
+    /* This status area exists only for users with restore permission. */
     Panel? restoreStatusPanel;
     Label? restoreStatusHeadline;
     Label? restoreStatusDetail;
-    /* whether the selected file may reach the final confirmation at all. The final confirmation stays mandatory for everything else. */
+    /* Only eligible files may reach the mandatory restore confirmation. */
     bool restoreAllowed = true;
-    /// <summary>The four states this page can already tell apart from the header the manager reads.</summary>
+    /// <summary>Backup eligibility states derived from the existing header metadata.</summary>
     private enum RestoreFileState
     {
         None,
@@ -59,10 +59,10 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         {
             chooseRestoreButton =
                 AddAction("Choose Backup File…", (_, _) => ChooseRestoreFile());
-            /* restoring replaces the whole database, so it must never be able to start twice from a double click. */
+            /* Prevent duplicate restore submissions. */
             restoreButton =
                 AddBusyAction("Restore Data", RestoreNowAsync, "Danger");
-            /* AddBusyAction re-enables its button in a finally block after every attempt, which would undo a disabled state. */
+            /* Preserve disabled states when the busy scope restores actions. */
             restoreButton.EnabledChanged += (_, _) => {
                 if ((!restoreAllowed || !HistoryDependentActionsUsable) &&
                     restoreButton is { Enabled: true })
@@ -136,7 +136,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
             };
             restoreFields.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
-            /* The backup-status area sits between the file field and the buttons, so the operator reads what the file IS before reaching the actions. */
+            /* Show backup eligibility before the restore actions. */
             int restoreStatusHeight =
                 AppMetrics.TextHeight(AppTheme.FontSmallBold) +
                 AppMetrics.TextHeight(AppTheme.NormalFont) +
@@ -170,7 +170,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                     AppMetrics.SpacingXs),
                 BackColor = AppTheme.Tint(AppTheme.MutedText, 0.90f)
             };
-            /* Dock order: the Fill detail is added first, so the Top headline takes the top edge and the detail fills what is left below it. */
+            /* Add Fill before Top so the headline retains its space. */
             restoreStatusPanel.Controls.Add(restoreStatusDetail);
             restoreStatusPanel.Controls.Add(restoreStatusHeadline);
             restoreFields.Controls.Add(
@@ -193,7 +193,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                     AppMetrics.ButtonRowHeight +
                     restoreStatusHeight));
             root.Controls.Add(restoreCard, 0, 1);
-            /* no file is selected yet, so the area starts in its neutral state rather than looking like a verified backup. */
+            /* No selected file means unverified, not valid. */
             ShowRestoreFileStatus(RestoreFileState.None, null);
         }
         var historyCard = HumanUi.Card(
@@ -204,7 +204,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         root.Controls.Add(historyCard, 0, canRestore ? 2 : 1);
         SetContent(root);
         LoadBackupFolder();
-        /* LoadHistoryAsync opens the gate for the deferred load; this closes it first so no frame is painted in which Restore or Locate Missing File looks usable before the history has… */
+        /* Keep history-dependent actions disabled until loading succeeds. */
         CloseHistoryDependentActions();
         Defer(LoadHistoryAsync);
     }
@@ -230,7 +230,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         }
         return row;
     }
-    /// <summary>True only while the actions that read the backup history may be used at all.</summary>
+    /// <summary>Whether history-dependent actions are currently available.</summary>
     bool HistoryDependentActionsUsable =>
         !isBusy &&
         !historyLoading &&
@@ -248,7 +248,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         historyLoading = true;
         CloseHistoryDependentActions();
     }
-    /// <summary>re-open the gate only after a fully successful read.</summary>
+    /// <summary>Reopen the gate only after a successful read.</summary>
     void EndHistoryLoad()
     {
         if (historyLoadDepth > 0)
@@ -261,7 +261,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
             return;
         ApplyHistoryDependentEnablement();
     }
-    /// <summary>The page's own rules for the two history-dependent actions, in one place so the gate and the busy guard cannot contradict each other.</summary>
+    /// <summary>Shared eligibility rules for Restore and Locate Missing File.</summary>
     void ApplyHistoryDependentEnablement()
     {
         bool usable = HistoryDependentActionsUsable;
@@ -296,7 +296,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         SetBusyState(true);
         try
         {
-            /* setting the backup folder also relinks existing backup records to it, which is a real state change rather than a preference. */
+            /* Changing the folder also relinks stored backup records. */
             int relinkable = await Task.Run(
                 () => DatabaseBackupManager.CountAutoRelinkableBackups(newFolder));
             if (relinkable > 0)
@@ -362,7 +362,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
             await LoadHistoryAsync();
             if (result.Success)
             {
-                /* A dialog ON PURPOSE, and the only one of its kind on this page. */
+                /* Restoring replaces the database and requires explicit confirmation. */
                 ModernMessageDialog.ShowInfo(
                     FindForm(),
                     $"{result.Message}\n\n{backupPath}");
@@ -414,7 +414,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                 break;
             case RestoreFileState.WrongDatabase:
                 SetStatus("This backup is not compatible with FMSC. Choose another file.", true);
-                /* this is now refused, not merely advised. The wording says so, because the restore itself will reject the file. */
+                /* Reject ineligible files before confirmation. */
                 Warn("This backup is not compatible with FMSC. Choose an FMSC school data backup.");
                 break;
             case RestoreFileState.Stale:
@@ -427,13 +427,13 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                 break;
         }
     }
-    /// <summary>classify the metadata the manager already read. Nothing here re-reads the file or re-implements a validation rule; it only names the outcome GetBackupInfo / BackupInfo already express.</summary>
+    /// <summary>Classify existing backup metadata without rereading or revalidating the file.</summary>
     static RestoreFileState ClassifyRestoreFile(DatabaseBackupManager.BackupInfo? info)
     {
-        /* A null BackupInfo is the manager's "RESTORE HEADERONLY could not be read" result - the unreadable/corrupt case. */
+        /* A missing header means unreadable or corrupt. */
         if (info is null)
             return RestoreFileState.Unverified;
-        /* "(unknown)" is DatabaseBackupManager's own placeholder for a header that reported no DatabaseName. */
+        /* The manager uses "(unknown)" when the header omits DatabaseName. */
         if (string.IsNullOrWhiteSpace(info.DatabaseName) ||
             string.Equals(info.DatabaseName, "(unknown)", StringComparison.Ordinal))
         {
@@ -445,7 +445,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
             ? RestoreFileState.Stale
             : RestoreFileState.Valid;
     }
-    /// <summary>write the state into the restore card's status area.</summary>
+    /// <summary>Display backup eligibility in the restore card.</summary>
     void ShowRestoreFileStatus(RestoreFileState state, DatabaseBackupManager.BackupInfo? info)
     {
         if (restoreStatusPanel is null ||
@@ -497,7 +497,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         restoreStatusDetail.ForeColor =
             state == RestoreFileState.None ? AppTheme.MutedText : AppTheme.Text;
         restoreStatusPanel.BackColor = AppTheme.Tint(accent, 0.90f);
-        /* Valid and stale backups keep the final confirmation; wrong-database and unverifiable files cannot be restored at all. */
+        /* Valid and stale backups require confirmation; unverifiable or foreign backups are rejected. */
         SetRestoreAllowed(
             state is RestoreFileState.Valid or RestoreFileState.Stale or RestoreFileState.None);
     }
@@ -506,7 +506,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         restoreAllowed = allowed;
         if (restoreButton is null)
             return;
-        /* refuses the file; / additionally refuse to re-open the button over an unfinished or failed history read. */
+        /* Require both eligible metadata and a completed history read. */
         restoreButton.Enabled =
             allowed &&
             HistoryDependentActionsUsable;
@@ -557,7 +557,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         }
         restoreFile.Tag = backupPath;
         var info = selectedRestoreBackupInfo;
-        /* The header is re-read above whenever the selected path changed, so the status area is refreshed here and a file whose metadata is not verifiable (or is from another database)… */
+        /* Recheck changed file paths before allowing restore confirmation. */
         RestoreFileState state = ClassifyRestoreFile(info);
         ShowRestoreFileStatus(state, info);
         if (state is RestoreFileState.Unverified or RestoreFileState.WrongDatabase)
@@ -637,7 +637,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                 RestartApplication(FindForm());
                 return;
             }
-            /* same ordering rule as the backup path above: reload, then report, so the outcome is the last thing written to the status. */
+            /* Reload before reporting success so refresh feedback cannot replace the outcome. */
             await LoadHistoryAsync();
             Warn(result.Message);
         }
@@ -650,12 +650,12 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
         {
             isBusy = false;
             busyMessage = string.Empty;
-            /* After a successful restore the window has been closed above, so this page may already be disposed. */
+            /* Successful restore may already have disposed this page. */
             if (!IsDisposed)
                 SetBusyState(false);
         }
     }
-    /// <summary>Restarts the application after a completed restore, leaving exactly one instance running. If the close is refused, nothing is launched and the operator is told to reopen the application.</summary>
+    /// <summary>Restart once after restore; if closing is refused, launch nothing and request a manual restart.</summary>
     static void RestartApplication(Form? shell)
     {
         var exePath = Environment.ProcessPath;
@@ -702,7 +702,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                 "Restore Complete");
         }
     }
-    /// <summary>The history and the two actions that read it are gated for the duration of this read.</summary>
+    /// <summary>Gate history-dependent actions for the entire read.</summary>
     async Task LoadHistoryAsync()
     {
         int version = ++historyLoadVersion;
@@ -714,12 +714,12 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                 await Task.Run(DatabaseBackupManager.PruneHistory);
             DataTable history = await Task.Run(DatabaseBackupManager.GetHistory);
             if (IsDisposed) return;
-            /* A read that has been superseded must not bind its table over the newer one, and must not claim the outcome the gate is about to apply. */
+            /* Superseded history reads must not bind results or update eligibility. */
             if (version == historyLoadVersion)
             {
                 Bind(history);
                 historyLoadedLatest = true;
-                /* After Bind, because the rebind writes its own record count over the status line - the same ordering the backup and restore paths use. */
+                /* Report after binding, which overwrites the status with its row count. */
                 if (pruned.removed > 0)
                 {
                     SetStatus(
@@ -730,7 +730,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                 }
                 if (pruned.failed > 0)
                 {
-                    /* Told, not swallowed: the usual cause is a database that has not had FMSC_FIX_083 applied, and then the old entries simply keep returning. */
+                    /* Report cleanup failure; missing FMSC_FIX_083 can leave obsolete entries. */
                     SetStatus(
                         $"{pruned.failed} history entr" +
                         (pruned.failed == 1 ? "y could" : "ies could") +
@@ -791,7 +791,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
     void SetBusyState(bool busy)
     {
         backupNowButton.Enabled = !busy;
-        /* Refresh History is the retry path for a failed READ, which is why it is left open by BeginHistoryLoad. */
+        /* Keep Refresh History available for retrying a failed read. */
         if (refreshHistoryButton is not null)
             refreshHistoryButton.Enabled = !busy;
         if (busy)
@@ -802,7 +802,7 @@ public sealed class BackupRestorePage : V2Page, IBusyPage
                 locateFileButton.Enabled = false;
             return;
         }
-        /* The page's own rule rather than forcing Enabled = true. */
+        /* Restore the page-specific enabled state. */
         ApplyHistoryDependentEnablement();
     }
 }

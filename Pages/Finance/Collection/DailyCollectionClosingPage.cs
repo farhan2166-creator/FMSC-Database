@@ -5,6 +5,8 @@ using FMSC_SMS.Pages.Reports;
 namespace FMSC_SMS.Pages.Finance.Collection;
 
 /// <summary>Reconciliation records are separate from student payments.</summary>
+// Owner policy (BL-08): closing is a revisable snapshot, not a lock on backdated transactions.
+// Later payment changes require review and reapproval; retain previous revisions.
 public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyPage
 {
     private readonly ModernDatePicker day = HumanUi.Date();
@@ -212,6 +214,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
                 !Equals(current["ClosingStatus"], state["ClosingStatus"])) { Warn("This day changed. Load it again before printing."); return; }
             string school = await InstitutionProfile.GetNameAsync();
             if (string.IsNullOrWhiteSpace(school)) { Warn("Complete School Profile before printing."); return; }
+            // UFA-07/08: blank actuals stay unchecked; print preserves historical decimal precision.
             var printable = DailyClosingSummary.CreatePrintable(amounts);
             GridPrintJob.ShowPreview(FindForm(), school, "Daily Collection Closing",
                 $"{loadedDay:dd-MMM-yyyy} · {state["ClosingStatus"]} · Revision {state["Revision"]}\n" +

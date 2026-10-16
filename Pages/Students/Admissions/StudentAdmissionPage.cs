@@ -423,13 +423,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             new System.Text.StringBuilder();
         foreach (Control control in ControlsRecursive(this))
         {
-            /* The quick-find box is a search, not part of the admission: what is typed in it is not the student's data. */
+            /* Exclude quick-find text from the admission draft. */
             if (IsWithinQuickFind(control) || IsWithinFeePreviewMonth(control))
                 continue;
             // This is an entry preference, not part of the student's record.
             if (ReferenceEquals(control, keepPlacement))
                 continue;
-            /* A field the operator cannot reach cannot hold their work, so its value is recorded as that field type's EMPTY value rather than as what the application has put in… */
+            /* Treat inaccessible fields as empty when comparing drafts. */
             bool editable =
                 IsOperatorEditable(control);
             int segmentStart =
@@ -444,13 +444,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 case TextBox text:
                     signature.Append(text.Text);
                     break;
-                /* A LookupBox is matched before ModernComboBox on purpose. SelectedId is 0 in both of those states and non-zero only once the operator actually picks something. */
+                /* Match LookupBox first: only a nonzero SelectedId represents a selection. */
                 case LookupBox lookup:
                     signature.Append(lookup.SelectedId);
                     break;
                 case ComboBox combo:
                     signature.Append(combo.Text);
-                    /* The index only counts when the control actually shows a choice; a list that has just been bound sits on its blank first row, which is not an operator action. */
+                    /* Ignore the initial blank combo row when comparing drafts. */
                     if (!string.IsNullOrWhiteSpace(combo.Text))
                     {
                         signature
@@ -460,7 +460,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     break;
                 case DateTimePicker date:
                     signature.Append(date.Value.Ticks);
-                    /* The date of birth is optional, and the tick is what says whether it is entered at all. */
+                    /* DOB is entered only when its checkbox is checked. */
                     signature
                         .Append('~')
                         .Append(date.Checked);
@@ -487,7 +487,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     continue;
             }
             signature.Append('|');
-            /* The switch above is untouched on purpose: each counted control still appends exactly what it always appended. */
+            /* Preserve each control type's existing signature format. */
             string value =
                 signature
                     .ToString(
@@ -506,7 +506,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     DescribeControl(control),
                     value));
         }
-        /* The fee grid: its rows live in _selectedFees, not in the control tree, and the discount cells are edited in place on those same row objects. */
+        /* Include fee rows and edited discounts; they are outside the control tree. */
         foreach (FeeSelectionRow fee in _selectedFees.Where(_ => _editEnrollmentId <= 0))
         {
             parts.Add(
@@ -525,7 +525,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 pendingPhoto ? "photo" : "no-photo"));
         return parts;
     }
-    /// <summary>True when the operator can actually change this control.</summary>
+    /// <summary>Whether this control belongs to the student finder.</summary>
     private bool IsWithinQuickFind(Control control)
     {
         for (Control? current = control; current is not null; current = current.Parent)
@@ -558,7 +558,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             _ => true
         };
     }
-    /// <summary>The value a field of this kind reports when nothing has been chosen.</summary>
+    /// <summary>The unselected value for this control type.</summary>
     private static string UnchosenValue(Control control) =>
         control switch {
             LookupBox => "0",
@@ -567,7 +567,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             ModernDatePicker => string.Empty,
             _ => string.Empty
         };
-    /// <summary>A short name for a field, for the diagnostic in <see cref="ReportFirstDifference"/> and nothing else.</summary>
+    /// <summary>Field name used only by draft-difference diagnostics.</summary>
     private static string DescribeControl(Control control)
     {
         if (!string.IsNullOrWhiteSpace(control.Name))
@@ -594,7 +594,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         return control.GetType().Name;
     }
-    /// <summary>True when it is safe to replace what is on screen. Uses the same confirmation as the navigation guard, so leaving the page and switching student within it behave identically.</summary>
+    /// <summary>Confirm before replacing unsaved work, using the shared navigation prompt.</summary>
     private bool ConfirmDiscardAdmission()
     {
         if (!HasUnsavedChanges)
@@ -649,6 +649,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         NationalIdentityInput.Attach(bform);
         firstEnrollmentDate.ShowCheckBox = true;
         firstEnrollmentDate.Checked = false;
+        // Owner policy (BL-05): unknown historical withdrawal dates stay blank; never invent a date.
         firstWithdrawalDate.ShowCheckBox = true;
         firstWithdrawalDate.Checked = false;
         assignFirstPlacement.CheckedChanged += (_, _) => {
@@ -674,7 +675,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         foreach (Button button in new[] { tab1Button, tab2Button, choosePhotoButton, savePhotoButton, removePhotoButton })
             UiHelper.DisposeOwnedButtonImageOnDispose(button);
         _navigate = navigate;
-        // This constructor builds by far the largest, most field-dense control tree in the app (student/guardian/address/placement fields, the fee grid, the siblings grid, both tabs).
+        // Defer expensive layout while building the admission controls.
         SuspendLayout();
         try
         {
@@ -787,7 +788,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         registrationNo.Enabled = false;
         registrationNo.BackColor = AppTheme.SurfaceSecondary;
         registrationNo.PlaceholderText = "Assigned after admission";
-        /* The number is produced by the save, so the field is never typeable and never needs focus: keeping it out of the tab order leaves the keyboard path as ... */
+        /* Generated registration numbers are read-only and excluded from tab order. */
         registrationNo.TabStop = false;
         enrolmentNo.PlaceholderText =
             "Optional reference number";
@@ -838,7 +839,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         transport.Items.AddRange(new object[] { "No", "Yes" });
         transport.SelectedIndex = 0;
         ConfigureFieldSuggestions();
-        /* Finding a student is a toolbar job, not a panel: the quick-find box and the full finder come first, then the admission actions, then collecting and printing. */
+        /* Keep student search and admission actions together in the toolbar. */
         quickStudent.Dock = DockStyle.None;
         quickStudent.Width = AppScale.Scale(320);
         // Keep the finder width independent of status text and action visibility.
@@ -864,7 +865,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             }, "Secondary");
         UiAccessibility.Describe(newAdmissionButton, "Clear and start a new admission",
             "Discard current student entries and start a new admission. Placement is retained when Keep placement is selected.");
-        /* Save writes the student record (and can create it), so it is guarded against a double submit. Clear is local; the print actions only read. */
+        /* Guard Save against duplicate submissions; Clear is local and printing is read-only. */
         // These actions own their enabled state; a generic busy action must not
         // re-enable Save after an unconfirmed admission reply.
         saveButton = AddAction(UiText.Actions.Save, async (_, _) => await Save(), "Success");
@@ -918,8 +919,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             "Collect Payment",
             (_, _) => CollectPaymentNow(),
             "Success");
-        /* ONE bill, and it shows the real amounts. The parameter stays, so showActualAmount: false brings the parent copy back in one edit. */
-        /* UX - Print Bill and Print Form share one "Print" button (1366 x 768 has no room for both), each still one click away in its menu. */
+        /* Print one bill using actual amounts; showActualAmount controls the copy format. */
+        /* Share one Print menu to keep both documents accessible on smaller screens. */
         var printBillItem = printMenu.Items.Add("Print Bill");
         printBillItem.Click += async (_, _) =>
             await RunBusyAsync(
@@ -934,7 +935,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             "Print ▾",
             (_, _) => printMenu.Show(admissionPrintButton!, new Point(0, admissionPrintButton!.Height)),
             "Secondary");
-        /* this page is reached with Students.Admit. New Admission and Clear are local and stay. */
+        /* Students.Admit opens this page; New and Clear are local actions. */
         GateActionAny(saveButton, "Students.Admit", "Students.Administer");
         GateAction(saveAndNewButton, "Students.Admit");
         GateAction(collectPaymentButton, "Fees.Collect");
@@ -984,7 +985,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 await OpenSelectedSiblingAsync();
             };
         quickStudent.PlaceholderText = StudentPicker.SearchPlaceholder;
-        // The full student list is useful for quick find, but it is not required to paint
+        // Defer student lookup loading so the admission page can paint first.
         // the admission form. Starting it through the UI queue lets the page appear first.
         Defer(StudentSearchCache.Warm);
         quickStudent.SearchFailed += ex => Fail(ex);
@@ -1147,7 +1148,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             new ColumnStyle(
                 SizeType.Absolute,
                 AppScale.Scale(210)));
-        /* Three visual groups share this card: Student Details and Parent / Contact on the left (each under a small heading rule) and Photo on the right. */
+        /* Group student and parent details beside the photo. */
         int groupHeadingHeight = Math.Max(16, AppMetrics.TextHeight(UiDesignSystem.Typography.Caption)) + 6;
         int groupGap = UiDesignSystem.Spacing.Sm;
         var informationPanel = new TableLayoutPanel {
@@ -1193,7 +1194,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     SizeType.Percent,
                     25F));
         }
-        /* Controls are added in the order the operator moves through them (a TableLayoutPanel's tab order is its add order). */
+        /* Add fields in keyboard-entry order. */
         for (int row = 0; row < 2; row++)
         {
             guardianGrid.RowStyles.Add(
@@ -1248,7 +1249,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             AdmissionFieldRowHeight * 3;
         int guardianInfoHeight =
             AdmissionFieldRowHeight * 2;
-        /* Heading, student rows, heading (with a little air above it), parent rows. */
+        /* Separate student and parent fields with headings. */
         int informationHeight =
             studentInfoHeight +
             groupHeadingHeight + groupGap +
@@ -1496,7 +1497,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             tab1Root);
         tab1Panel.Controls.Add(
             tab1Scroll);
-        // Fees & Siblings is the secondary step. Its cards and grids are built on the
+        // Build Fees & Siblings on first use to reduce initial layout work.
         // first visit to that tab so the primary admission form can paint sooner.
         var tabBar = new TableLayoutPanel {
             Dock = DockStyle.Fill,
@@ -1708,7 +1709,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 "Remove",
                 34,
                 false));
-        /* The admission sends typed discounts with its fee selections so its opening charges are posted at the discounted amount. */
+        /* Submit admission discounts with fee selections so opening charges use the net amount. */
         feeGrid.CellValidating +=
             FeeGrid_CellValidating;
         feeGrid.CellValueChanged +=
@@ -1737,7 +1738,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         bool isLocked = isMandatory ||
             hasPayments ||
             (isTransportLinked && UsesTransport);
-        /* Every other fee on this list is governed by Fee Configuration - it is added, changed or withdrawn there. */
+        /* Manage other fee types through Fee Configuration. */
         bool canRemove = isTransportLinked && !isLocked;
         var cell = (DataGridViewButtonCell)row.Cells["Remove"];
         if (canRemove)
@@ -1775,17 +1776,17 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             row.HasPayments ||
             (row.IsTransportLinked && UsesTransport))
         {
-            /* !row.IsTransportLinked is the rule, not a safety net: only the transport fee offers a ✕. */
+            /* Only transport-linked fees can be removed here. */
             return;
         }
-        /* RemoveFeeRow is now async Task. */
+        /* Await removal before refreshing fee state. */
         _ = RemoveFeeRow(row);
     }
     private async Task RemoveFeeRow(FeeSelectionRow row)
     {
         if (row.StudentFeeAssignmentId > 0)
         {
-            /* The ✕ removes a SAVED fee assignment from the student's record, and that cannot be undone, so it names the fee and asks first. */
+            /* Confirm removal of a saved fee assignment. */
             if (!Confirm(
                     $"Delete the saved fee assignment \"{row.FeeTypeName}\" " +
                     $"(Rs. {row.NetAmount:N0}) from this student?\r\n\r\n" +
@@ -2110,7 +2111,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 0)
         });
     }
-    /// <summary>Shows the student's status in the Student &amp; Family Information header: "New Admission" until a student is loaded, then the stored status, coloured by what it says…</summary>
+    /// <summary>Display New Admission or the loaded student's stored status.</summary>
     private void UpdateStudentWorkspace()
     {
         UpdatePhotoActions();
@@ -2183,7 +2184,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             {
                 return;
             }
-            /* loading another student replaces everything on the form. Asked here rather than before the dialog opens, so merely looking at the search results never prompts. */
+            /* Prompt only after a search result is chosen, before replacing the current record. */
             if (!ConfirmDiscardAdmission())
                 return;
             if (!string.IsNullOrWhiteSpace(dialog.NewAdmissionNumber))
@@ -2201,7 +2202,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             Fail(ex);
         }
     }
-    /// <summary>Quick find: loads the student picked in the toolbar box. Like the full finder, the operator is asked about unsaved work only once a student has been chosen.</summary>
+    /// <summary>Load the toolbar selection after confirming any unsaved work.</summary>
     private async Task LoadQuickStudentAsync()
     {
         try
@@ -2609,7 +2610,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             Fail(ex);
         }
     }
-    /// <summary>The fee-discount lines this save will send, validated but not yet written. They travel as one table-valued parameter into dbo.SaveStudentDetailsWithFirstEnrollment, which saves details and discounts atomically and can also create a verified first enrollment.</summary>
+    /// <summary>Validate discount rows before atomically saving details, discounts and optional first placement.</summary>
     private bool TryBuildFeeDiscountPlan(
         out List<(int assignmentId, decimal discount)> feeDiscounts)
     {
@@ -2664,13 +2665,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             return false;
         }
     }
-    /* Item 6 - the religion the loaded student has stored when it is not one of the values this list offers. */
+    /* Preserve stored religion values absent from the current choices. */
     private string? _loadedReligionNotInList;
     private string? ReligionToSave() =>
         religion.SelectedIndex >= 0
             ? religion.Text.Trim()
             : _loadedReligionNotInList;
-    /// <summary>The discounts typed on a NEW admission, keyed by fee type: at that moment no fee assignment exists yet, so the rows carry no StudentFeeAssignmentId to key on.</summary>
+    /// <summary>Key new-admission discounts by fee type; assignment IDs do not exist yet.</summary>
     private bool TryBuildTypedDiscountsByFeeType(
         out List<(int feeTypeId, decimal discount)> typedDiscounts)
     {
@@ -2724,7 +2725,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             return false;
         }
     }
-    /// <summary>UX - the admission's own rules, checked all at once and shown on the fields themselves (danger-coloured border plus a few words on the caption).</summary>
+    /// <summary>Validate all admission fields inline and focus the first error.</summary>
     private bool ValidateAdmissionInline(bool isNew, bool confirmingRegistration = false)
     {
         FormValidator v = admissionValidator ??= CreateValidator();
@@ -2784,7 +2785,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             "Enter 13 digits, with or without dashes", () => IsValidOptionalBFormOrCnic(bform.Text));
         if (!isNew)
         {
-            /* The load leaves this combo unselected when the stored value is not Yes or No, and SaveStudentDetails refuses anything else. */
+            /* Require an explicit Yes/No when the stored value is unsupported. */
             v.Required(disability, "Choose Yes or No");
         }
         RecordTextPolicy.ValidateInputs(v, this);
@@ -2843,15 +2844,15 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         if (confirmReturnButton is not null) confirmReturnButton.Visible = false;
         int version = ++admissionLoadVersion;
         photoRead.Cancel();
-        /* Item 11 - a photo chosen but not yet saved belongs to the record this load is replacing. */
+        /* Clear an unsaved photo when switching to another student. */
         if (admissionId != currentAdmissionId)
         {
             /* Re-loading the same student keeps a prepared photo available for Save Photo or retry. */
             photoDraft.Discard();
         }
-        /* Item 6 - and the stored-religion carry-over belongs to the previous student too. */
+        /* Clear the previous student's stored religion fallback. */
         _loadedReligionNotInList = null;
-        /* Item 3 - only a load that actually finished, on the student it was started for, may replace the placement pickers with the read-only summary. */
+        /* Show read-only placement only after the current student loads successfully. */
         bool loadedThisStudent = false;
         try
         {
@@ -2912,7 +2913,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     : Convert.ToString(
                         row["FatherOccupation"])
                       ?? string.Empty;
-            /* Each combo is reset first, and a stored value the list does not offer is named in the status line for the operator to decide. */
+            /* Reset combos and report stored values absent from their choices. */
             var valuesNotInList = new List<string>();
             string disabilityValue =
                 row["Disability"] == DBNull.Value
@@ -2985,7 +2986,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 }
                 else
                 {
-                    /* Kept so the save can send it back unchanged rather than blanking a value this list cannot show. */
+                    /* Round-trip unsupported stored values without blanking them. */
                     _loadedReligionNotInList = religionValue.Trim();
                     valuesNotInList.Add(
                         $"religion \"{religionValue.Trim()}\"");
@@ -3013,7 +3014,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     blood.SelectedIndex = 0;
                 }
             }
-            /* Item 6 - set from THIS student every time: a student with no admission date used to keep the previous student's date on the form and in the summary. */
+            /* Reset admission date for each record; never retain the previous student's date. */
             bool hasAdmissionDate =
                 row["AdmissionDate"] != DBNull.Value;
             admissionDate.Value =
@@ -3021,7 +3022,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     ? Convert.ToDateTime(
                         row["AdmissionDate"])
                     : DateTime.Today;
-            /* Set from THIS student every time: a student with no date of birth used to leave the previous student's date in the picker, and Save then wrote it. */
+            /* Reset DOB and its checkbox for each record to avoid saving another student's date. */
             if (row["DateOfBirth"] != DBNull.Value)
             {
                 dob.Value =
@@ -3184,7 +3185,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 feeStatus.Text =
                     "This student has no current placement.";
             }
-            /* Item 4 - every await in this tail can finish after the operator has moved to another student (or cleared the form). */
+            /* Recheck student identity after each awaited read. */
             if (IsDisposed ||
                 version != admissionLoadVersion ||
                 currentAdmissionId != admissionId)
@@ -3216,7 +3217,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         finally
         {
-            /* Item 3 - a load that threw, or that a newer one has overtaken, must NOT hide the placement pickers behind the summary. */
+            /* Failed or superseded loads must leave placement pickers available. */
             if (!IsDisposed &&
                 loadedThisStudent &&
                 version == admissionLoadVersion)
@@ -3224,24 +3225,24 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 ShowPlacementSummary(true);
             }
         }
-        /* and again before the header and the clean baseline. */
+        /* Recheck the load before updating the header and clean baseline. */
         if (IsDisposed ||
             version != admissionLoadVersion)
         {
             return false;
         }
-        /* and this is the point at which the page knows WHICH record it is showing, so the header says so rather than looking like a blank form. */
+        /* Update the header only for the record actually displayed. */
         string loadedStudent = name.Text.Trim();
         SetPageHeaderText(
             registrationReview ? "Review Registration" : "Edit Student",
             registrationReview ? $"{loadedStudent} · {AdmissionNumbers.ForId(admissionId)} · Save details, then confirm official admission."
                 : $"Student: {loadedStudent} (Admission Number {AdmissionNumbers.ForId(admissionId)}) - saving updates this student.");
-        /* this is the point at which the form has settled on a record. */
+        /* Capture the clean baseline after the record has settled. */
         CaptureAdmissionBaseline();
         Defer(() => RefreshConfirmReturnAvailabilityAsync(admissionId, version));
         return true;
     }
-    /* The load generation for the new-admission fee structure. Its loader is now awaited, so a second Campus/Year/Class change can overtake this run and this one must not write after it. */
+    /* Version fee-structure reads so older context changes cannot overwrite newer results. */
     private int feeStructureLoadVersion;
     private async Task LoadFeeStructure()
     {
@@ -3251,7 +3252,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         int campusId = Campus.SelectedId;
         int yearId = Year.SelectedId;
         int classId = Class.SelectedId;
-        /* two guards before anything is cleared. */
+        /* Check the load and context before clearing fees. */
         if (_selectedFees.Count > 0 &&
             campusId == _feeScopeCampusId &&
             yearId == _feeScopeYearId &&
@@ -3271,7 +3272,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         try
         {
-            /* this was fire-and-forget, and the callee's FIRST statement replaces _availableFeeOptions with an empty list before its first await. */
+            /* Await the loader, which clears available options before its first await. */
             await LoadAvailableFeeOptionsAsync(campusId, yearId, classId);
             if (IsDisposed ||
                 version != feeStructureLoadVersion || HistoricalAdmission ||
@@ -3297,7 +3298,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 });
             }
             feeGrid.DataSource = _selectedFees;
-            /* The rows now on screen were built for this scope, so this is the scope a later change is measured against. */
+            /* Remember the scope that produced these fee rows. */
             _feeScopeCampusId = campusId;
             _feeScopeYearId = yearId;
             _feeScopeClassId = classId;
@@ -3357,7 +3358,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private async Task LoadCurrentSiblingsAsync()
     {
-        /* Item 4 - the student this list is being built for. */
+        /* Capture the student identity for this sibling read. */
         int admissionId = currentAdmissionId;
         try
         {
@@ -3444,7 +3445,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             siblingsGrid.DataSource = display;
             if (siblingsGrid.Columns.Contains("FamilyMemberId"))
                 siblingsGrid.Columns["FamilyMemberId"].Visible = false;
-            /* Students are identified by Admission Number, so it leads the row. The registration number (a reporting label) stays in the table but is not shown to the operator. */
+            /* Lead with Admission Number; keep registration only in the backing table. */
             if (siblingsGrid.Columns.Contains(UiText.Fields.RegistrationNumber))
                 siblingsGrid.Columns[UiText.Fields.RegistrationNumber].Visible = false;
             if (siblingsGrid.Columns.Contains("AdmissionId"))
@@ -3530,7 +3531,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 Warn("No placement was found for this student.");
                 return;
             }
-            /* A print action writing to the ledger is wrong on its own terms: the operator was looking at a document, not posting fees. */
+            /* Printing must not post fees or modify the ledger. */
             var raw =
                 await DatabaseHelper.QueryUserAsync(
                     "GetOutstandingCharges",
@@ -3999,7 +4000,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         try
         {
             var dt = await readPhoto(admissionId, request.Token);
-            /* Item 4 - a photo that arrives after the operator has moved to another student must not be shown on them. */
+            /* Discard photos returned for a student no longer selected. */
             if (IsDisposed ||
                 !photoRead.IsCurrent(request) || admissionLoadVersion != version || currentAdmissionId != admissionId)
             {
@@ -4085,7 +4086,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             }
             if (selectedAdmissionId > 0)
             {
-                /* this deletes the stored photo and cannot be undone, so it is confirmed first. */
+                /* Confirm deletion of the stored photo. */
                 if (!Confirm(
                         "Remove this student's profile photo?\r\n\r\n" +
                         "The existing photo will be deleted from the student record.",
@@ -4270,7 +4271,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         savedAdmissionReadyForNext = false;
         if (saveButton is not null)
             saveButton.Enabled = false;
-        /* UX - while the save runs, the actions that would wipe or replace the form under it (Find, New Admission, Clear, quick find) are held. */
+        /* Hold actions that could replace the admission while Save is running. */
         BusyScope holdInterfering =
             BeginBusy(string.Empty, findButton, newAdmissionButton, quickStudent, saveAndNewButton, keepPlacement);
         try
@@ -4311,7 +4312,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         {
             using (HoldSubmittedInputs())
                 admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId,HistoricalAdmission);
-            /* UX - every problem is marked on its own field at once (border + a few words on the caption), the first one takes focus. */
+            /* Show all field errors and focus the first invalid input. */
             if (!ValidateAdmissionInline(isNew: true))
                 return;
             string studentName =
@@ -4331,7 +4332,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             using (HoldSubmittedInputs())
                 if (!await ConfirmNotDuplicateAsync(studentName, fatherName.Text.Trim()))
                     return;
-            /* Read before anything is written: an unreadable discount stops the save here, where nothing has happened yet, rather than after the student is admitted. */
+            /* Validate discounts before writing any admission data. */
             var typedDiscounts = new List<(int feeTypeId, decimal discount)>();
             if (!HistoricalAdmission && !TryBuildTypedDiscountsByFeeType(out typedDiscounts))
                 return;
@@ -4415,7 +4416,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 DatabaseHelper.Bit(
                     "@UsesTransport",
                     UsesTransport),
-                /* Every fee row the operator has on this grid travels to the database, mandatory fees excepted - AdmitStudent always assigns those straight from Fee Configurations. */
+                /* Submit selected fees; AdmitStudent assigns mandatory fees from Fee Configurations. */
                 new SqlParameter(
                     "@SelectedFeeTypeIds",
                     System.Data.SqlDbType.Structured) {
@@ -4540,7 +4541,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         SetStatus(message, photoSaved && reloaded ? PageStatusKind.Success : PageStatusKind.Warning);
         savedAdmissionReadyForNext = photoSaved && reloaded;
     }
-    /// <summary>The edit path uses dbo.SaveStudentDetailsWithFirstEnrollment to save student details, fee discounts and an optional verified first enrollment in one transaction.</summary>
+    /// <summary>Save details, discounts and optional first enrollment in one SQL transaction.</summary>
     private async Task SaveDetailsAndDiscountsAsync(
         int admissionId,
         string studentName,
@@ -4615,7 +4616,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             DatabaseHelper.P(
                 "@CasteTribe",
                 casteTribe.Text.Trim()),
-            /* both halves of this Save now travel to one procedure that commits them together. See Migrations\FMSC_FIX_076_AtomicStudentDetailsAndDiscounts.sql. */
+            /* Save details and discounts atomically through the same procedure. */
             new Microsoft.Data.SqlClient.SqlParameter(
                 "@Discounts",
                 System.Data.SqlDbType.Structured) {
@@ -4641,7 +4642,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 else SetStatus("No changes to save.");
                 return;
             }
-            /* UX - see SaveNewAdmissionAsync: all problems shown at once, inline. */
+            /* Use the same inline validation as new admission. */
             if (!ValidateAdmissionInline(isNew: false))
                 return;
             string studentName =
@@ -4652,7 +4653,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 blood.SelectedIndex > 0
                     ? blood.Text.Trim()
                     : null;
-            /* The discount lines are built and validated FIRST: an unparseable discount must abort before the database is touched. */
+            /* Validate discount rows before touching the database. */
             if (!TryBuildFeeDiscountPlan(out var feeDiscounts))
                 return;
             if (IsDisposed || currentAdmissionId != savedStudent || admissionLoadVersion != savedVersion) return;
@@ -4674,7 +4675,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if (IsDisposed || currentAdmissionId != savedStudent || admissionLoadVersion != savedVersion) return;
             string success = AssigningFirstPlacement ? "Student details and verified first placement saved. No fees were generated."
                 : "Student details and fee discounts updated successfully.";
-            /* The details transaction is committed by now, so a reload that fails is only a stale screen. */
+            /* The details are committed; reload failure means stale display, not failed Save. */
             try
             {
                 bool refreshed = await LoadStudentForEditAsync(savedStudent);
@@ -4755,10 +4756,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 .ToList();
             if (matches.Count == 0)
                 return true;
-            // Strengthened: show the actual matched record(s) side-by-side with what's being entered now.
+            // Show matched records beside the proposed admission for duplicate review.
             string DescribeMatch(DataRow row)
             {
-                // Returns null for a column that is absent or DBNull; every caller below already handles that.
+                // Missing or DBNull columns return null.
                 string? Col(string name) =>
                     row.Table.Columns.Contains(name) && row[name] != DBNull.Value
                         ? Convert.ToString(row[name])
@@ -4800,14 +4801,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         catch (Exception nonFatalException56)
         {
             FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException56, "StudentAdmissionPage: ConfirmNotDuplicateAsync fallback");
-            // Best-effort only: if the duplicate check itself fails (e.g. no network/DB hiccup), don't block the actual admission on it.
+            // Duplicate-name lookup is advisory; its failure must not block admission.
             return true;
         }
     }
     private void ClearAll(
     bool clearGenerated = true, bool retainPlacement = false)
     {
-        /* any student load still in flight belongs to the form this clear is replacing, so it must not land on the cleared page. */
+        /* Invalidate student reads before clearing the form. */
         admissionLoadVersion++;
         unconfirmedAdmission = null;
         photoRead.Cancel();
@@ -4817,7 +4818,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         feeStructureLoadVersion++;
         admissionValidator?.ClearAll();
         currentAdmissionId = 0;
-        /* The quick-find box names the student that was on the form, which this clear is replacing. */
+        /* Clear the previous record's quick-find text. */
         quickStudent.Clear();
         UpdateAdmissionIdDisplay();
         _editEnrollmentId = 0;
@@ -4898,11 +4899,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         SwitchTab(0);
         UpdateAdmissionEntryFlow();
         name.Focus();
-        /* back to "new admission" mode, so the header never keeps claiming the last record after the form has been emptied. */
+        /* Restore the New Admission header after clearing. */
         SetPageHeaderText(
             PageTitles.Admissions,
             AdmissionContextSubtitle);
-        /* An empty form is clean, so the baseline is captured here too. */
+        /* Capture the empty form as clean. */
         CaptureAdmissionBaseline();
         if (retainPlacement && Campus.SelectedId > 0 && Year.SelectedId > 0 && Class.SelectedId > 0)
         {

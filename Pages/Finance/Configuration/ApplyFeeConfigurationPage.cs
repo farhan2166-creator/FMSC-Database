@@ -26,7 +26,7 @@ public sealed class ApplyFeeConfigurationPage : V2Page
     private DateTime earliestMonth = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private int monthRequest;
     internal bool IsApplying => applying;
-    /// <summary>every control that defines which students a preview is for, in one comparable string. The ids come from TryGetScope so the signature cannot drift from the query.</summary>
+    /// <summary>Snapshot preview scope using the same IDs as TryGetScope.</summary>
     private string ScopeSignature()
     {
         TryGetScope(out int campusId, out int classId, out int feeTypeId);
@@ -461,7 +461,9 @@ public sealed class ApplyFeeConfigurationPage : V2Page
         Grid.Columns[columnName].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
         Grid.Columns[columnName].Width = width;
     }
-    // ApplyAsync writes via ApplyFeeConfigurationToExistingAssignments and is only ever meant to be enabled by a fresh Preview (Step 3's own state machine).
+    // Enable Apply only after a fresh preview.
+    // Owner policy (BL-07): apply from the chosen month without repricing issued bills.
+    // Eligible rows may succeed while others fail; retain successes and report each outcome.
     private async Task ApplyAsync()
     {
         if (applying || !ValidateRequiredInputs())
@@ -489,7 +491,7 @@ public sealed class ApplyFeeConfigurationPage : V2Page
                     return;
                 }
                 int affectedCount = previewRows.Rows.Count;
-                // block outright only when the chosen month is guaranteed to fail for every previewed student (the database would reject each one individually via Step 1's guard).
+                // Block the month only when SQL would reject it for every previewed student.
                 int conflictingCount = CountConflictingRows(EffectiveMonth);
                 if (conflictingCount > 0 && conflictingCount == affectedCount)
                 {
@@ -498,7 +500,7 @@ public sealed class ApplyFeeConfigurationPage : V2Page
                         "Choose a later start month and review the changes again. Existing bills and payments will not be changed.");
                     return;
                 }
-                /* One unmistakable statement of the financial scope before the write: what it applies to, when it takes effect, who it affects, how many are expected to succeed and how many… */
+                /* Confirm financial scope, effective month and expected per-student outcomes before applying. */
                 string previewMessage =
                     "Update the student fees listed in your review?\r\n\r\n" +
                     $"Campus: {campus.Text}\r\n" +

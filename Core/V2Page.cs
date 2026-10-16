@@ -60,7 +60,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     private bool _reportStale;
     /// <summary>True once the last <see cref="BindReportAsync(Func{DataTable})"/> call actually bound a table.</summary>
     private bool _reportLanded;
-    /// <summary>every Export action this page created, so the shared report machinery can close them itself when a report lands under filters that are no longer on screen.</summary>
+    /// <summary>Track export actions so stale reports cannot be exported.</summary>
     private readonly List<ModernButton> _exportButtons = new();
     private RoundedPanel? _pageHeader;
     private TableLayoutPanel? _shellRoot;
@@ -155,10 +155,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         AppTheme.ThemeChanged += OnThemeChanged;
         Disposed += (_, _) => {
             AppTheme.ThemeChanged -= OnThemeChanged;
-            /* A database query already running on a worker cannot be force-cancelled, but it
-             * must not keep the last (potentially large) report attached to this page while
-             * that worker winds down. Detach both references as soon as navigation disposes
-             * the page. */
+            /* Detach report data on disposal while any uncancellable worker read finishes. */
             _reportSource = null;
             if (!Grid.IsDisposed)
                 Grid.DataSource = null;
@@ -167,7 +164,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 validator.Dispose();
             _reportLoads.Dispose();
         };
-        // The page gets its final width only after it is docked into the main window. Measure guidance after that first layout, and again whenever the available width changes.
+        // Measure guidance after docking and when the available width changes.
         HandleCreated += (_, _) => ScheduleHeaderFit();
         VisibleChanged += (_, _) => ScheduleHeaderFit();
         SizeChanged += (_, _) => ScheduleHeaderFit();
@@ -286,7 +283,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             return;
         _headerGuidanceLabel.AccessibleName = _headerGuidance;
         _statusToolTip.SetToolTip(_headerGuidanceLabel, _headerGuidance);
-        /* UI fix - ScheduleHeaderFit defers the row-height recalculation to a BeginInvoke so it always runs after the page's first, still-settling layout. */
+        /* Defer header sizing until the initial layout settles. */
         if (IsHandleCreated && Visible &&
             _headerTextLayout is { IsDisposed: false, ClientSize.Width: > 0 })
         {
@@ -737,7 +734,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 bool buttonHadFocus = button.Focused;
                 button.Enabled = false;
                 Control? focusAfterDisable = owningForm?.ActiveControl;
-                /* A page's own finally can deliberately leave this action disabled: nothing left to apply, stale filters, a refused permission. Same convention MasterPage uses for lookup binding. */
+                /* Preserve disabled states set by page validation or permissions during the operation. */
                 bool pageChangedEnabled = false;
                 void NoteEnabledChange(object? sender, EventArgs e) =>
                     pageChangedEnabled = true;
@@ -774,7 +771,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     private bool _busyOperationRunning;
     protected bool BusyOperationRunning=>_busyOperationRunning;
     protected string BusyOperationMessage { get; private set; }="";
-    /// <summary>Shows <paramref name="message"/> in the status line and disables only <paramref name="controlsToDisable"/> (the ones that would interfere or double-submit); navigation and every other control stay usable.</summary>
+    /// <summary>Show status and hold only controls that could interfere or double-submit.</summary>
     protected BusyScope BeginBusy(string message, params Control?[] controlsToDisable) =>
         new BusyScope(
             message,
@@ -788,7 +785,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             FindForm());
     /// <summary>UX - the loading variant: a message only, nothing disabled ("Loading students…", "Loading history…").</summary>
     protected BusyScope BeginLoading(string message) => BeginBusy(message);
-    /// <summary>UX - runs <paramref name="operation"/> inside a busy scope, and refuses to start a second one while the first is still running (a double-click on Save, Collect or Confirm).</summary>
+    /// <summary>Run inside a busy scope and reject concurrent submissions.</summary>
     protected async Task<bool> RunBusyAsync(
         string message,
         Func<Task> operation,
@@ -842,8 +839,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         return validator;
     }
     private readonly List<FormValidator> _validators = new();
-    /* Shared page shortcuts are deliberately resolved against visible action buttons. This keeps
-     * permissions, disabled states and page-specific behavior in charge of what can run. */
+    /* Resolve shortcuts through visible action buttons, preserving permissions and enabled states. */
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
         if (AppHotKeys.TrySwitchTab(this, keyData))
@@ -943,7 +939,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         _exportButtons.Add(button);
         return button;
     }
-    /* Report column layout - the operator chooses which columns a report shows and in what order. A page that does not override the catalogue behaves exactly as before. */
+    /* Pages may opt into operator-selected report columns and order. */
     private readonly Dictionary<string, List<string>?> _reportLayoutCache = new(StringComparer.Ordinal);
     private bool _reportLayoutHooked;
     /// <summary>Which saved layout applies. A page with several shapes of report returns one key per shape.</summary>
@@ -1044,7 +1040,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         }
         ApplyReportColumnLayout();
     }
-    /// <summary>Stores the columns for a layout without touching the grid - for a page that is about to switch to that layout (a saved view being applied) and wants the choice in…</summary>
+    /// <summary>Store column choices before switching to a saved view, without changing the grid.</summary>
     protected void RememberReportColumns(string layoutKey, IReadOnlyList<string>? keys)
     {
         if (keys is null || keys.Count == 0)
@@ -1289,7 +1285,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         catch (Exception) when (ticket.Token.IsCancellationRequested) { }
         catch (Exception) when (MarkReportGridFailed(ticket.Cancellation))
         {
-            /* Never reached: the filter above only records the failed state and returns false, so the exception still travels to the page's own handler exactly as before. */
+            /* The filter records failure and returns false; the page handler still receives the exception. */
             throw;
         }
         finally
@@ -1340,7 +1336,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     protected virtual void OnReportPageBound()
     {
     }
-    /// <summary>A report page that tracks its filters overrides this with the signature of the filters currently on screen (one line: <c>=> FilterSignature;</c>).</summary>
+    /// <summary>Override with the current filter signature to track report freshness.</summary>
     protected virtual string ReportFilterSignature() => string.Empty;
     /// <summary>True when the rows that just landed answer the filters now on screen.</summary>
     protected bool ReportMatchesCurrentFilters(string requestedSignature) =>
@@ -1405,7 +1401,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         SetReportExportEnabled(false);
         SetStatus(UiText.Reports.FiltersChanged, true);
     }
-    /// <summary>Marks the displayed report as no longer matching the filters on screen **without** clearing it, for pages that deliberately keep the previous report visible behind a warning (see CurrentStudentsReportPage's rule).</summary>
+    /// <summary>Mark the retained report stale when filters change; keep its warning visible.</summary>
     protected void MarkReportStale()
     {
         if (_reportSource is null)
@@ -1413,7 +1409,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         _reportStale = true;
         SetReportPagerEnabled(false);
     }
-    /// <summary>The filters match the displayed report again (the operator moved them back), so the report is current once more and its pager is rebuilt.</summary>
+    /// <summary>Restore freshness and paging when filters again match the displayed report.</summary>
     protected void RestoreReportStale()
     {
         if (!_reportStale)
@@ -1455,7 +1451,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         string filePrefix = "FMSC_Report")
     {
         DataTable? source = _reportSource ?? Grid.DataSource as DataTable;
-        /* A report whose filters moved is not exportable: the file would otherwise carry the previous filter context's figures while its title and subtitle describe the set now on screen. */
+        /* Disable export while displayed rows belong to different filters. */
         if (_reportStale)
         {
             Warn("These results are no longer current - the filters changed, or the last run did not complete - so exporting them could put one selection's figures in a file labelled with another's. Run the report again, then export.");
@@ -1558,7 +1554,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         Actions.Controls
             .Cast<Control>()
             .Concat(_relocatedActionButtons);
-    /// <summary>disables every action button and returns each one's previous state, so restoring cannot override a decision the page made while the work ran.</summary>
+    /// <summary>Hold action buttons and preserve page-specific enabled states on restoration.</summary>
     private List<(Control Control, bool WasEnabled)> SuspendActionButtons()
     {
         var captured = new List<(Control Control, bool WasEnabled)>();
@@ -1617,7 +1613,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     {
         _statusToolTip.SetToolTip(control, _shortcutController.DecorateToolTip(control, text));
     }
-    /// <summary>Something the operator asked for was ATTEMPTED and did NOT happen. The status line is set too, so the outcome stays on screen after the dialog is dismissed.</summary>
+    /// <summary>Report an attempted operation that failed; retain the outcome after dismissing the dialog.</summary>
     protected void Alert(
         string message)
     {
@@ -1655,7 +1651,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         column.DefaultCellStyle.SelectionBackColor = AppTheme.PrimaryLight;
         return column;
     }
-    /// <summary>Leave it null for the wording-based default (questions about discarding, deleting, removing, reversing or overwriting default to No).</summary>
+    /// <summary>Null uses the wording-based default; destructive/discard confirmations default to No.</summary>
     protected bool Confirm(
         string message,
         string title = "Confirm",
@@ -1699,7 +1695,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         SetStatus(
             message,
             actionable ? PageStatusKind.Warning : PageStatusKind.Error);
-        /* A failure the operator can act on (a business rule one of our procedures raised, a duplicate, a missing field, a retryable deadlock) keeps the warning presentation. */
+        /* Present actionable SQL refusals as warnings. */
         if (actionable)
         {
             ModernMessageDialog.ShowWarning(FindForm(), message);

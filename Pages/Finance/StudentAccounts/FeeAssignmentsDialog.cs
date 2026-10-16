@@ -219,7 +219,7 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
             addButton.Enabled = false;
         }
     }
-    /* UX - the write is synchronous, so a second click/Enter that was already queued while it ran would fire on the closing dialog and post the assignment twice. */
+    /* Drain queued gestures while the synchronous write is held to prevent duplicate assignment. */
     private bool submitting;
     private void Add()
     {
@@ -284,7 +284,7 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
     private readonly string initialReason;
     /* Set only once the discontinue has been written, so that path closes without the unsaved-changes prompt. */
     private bool savedSuccessfully;
-    /* One confirmation per close gesture. Assigning DialogResult on a modal form raises FormClosing too, so a single Cancel click would otherwise ask twice. */
+    /* Confirm once: setting DialogResult also raises FormClosing. */
     private bool discardConfirmed;
     public DiscontinueFeeAssignmentForm(int studentFeeAssignmentId, string feeTypeName, DateTime? effectiveFrom)
     {
@@ -354,7 +354,7 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary"
         };
-        /* The guard runs here rather than from the button's own DialogResult, because a button that assigns DialogResult dismisses the modal form before the confirmation can keep it open. */
+        /* Confirm before assigning DialogResult so Cancel can keep the dialog open. */
         cancel.Click += (_, _) => {
             if (!ConfirmDiscard())
                 return;
@@ -436,7 +436,7 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
             submitting = false;
         }
     }
-    /// <summary>The two values this form edits, compared with the ones it was loaded with: the last active month and the reason. A form whose save is already under way is never dirty.</summary>
+    /// <summary>Compare last active month and reason with the loaded values; saving is not dirty.</summary>
     private bool IsDirty() =>
         !savedSuccessfully &&
         DialogResult != DialogResult.OK &&
@@ -485,13 +485,13 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Success"
     };
-    /* The amount, effective month and reason this form was loaded with, so Cancel on an untouched form closes without asking about changes that are not there. */
+    /* Retain loaded amount, effective month and reason for draft comparison. */
     private readonly string initialNewAmountText;
     private readonly DateTime initialEffectiveFrom;
     private readonly string initialReason;
     /* Set only once the change has been written, so that path closes without the unsaved-changes prompt. */
     private bool savedSuccessfully;
-    /* One confirmation per close gesture. Assigning DialogResult on a modal form raises FormClosing too, so a single Cancel click would otherwise ask twice. */
+    /* Confirm once: setting DialogResult also raises FormClosing. */
     private bool discardConfirmed;
     public ChangeFeeAssignmentAmountForm(
         int studentFeeAssignmentId,
@@ -515,7 +515,7 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         newAmount.Text = currentAmount.ToString("0.##");
-        // The database (dbo.ChangeStudentFeeAssignmentAmount, Step 1) rejects an EffectiveFrom on or before this fee's last already-billed month - that guard remains the authoritative check.
+        // SQL rejects effective months on or before the last billed month.
         DateTime minEffectiveFrom = FirstOfMonth(DateTime.Today.AddMonths(1));
         if (startingMonth.HasValue && FirstOfMonth(startingMonth.Value).AddMonths(1)>minEffectiveFrom)
             minEffectiveFrom=FirstOfMonth(startingMonth.Value).AddMonths(1);
@@ -525,7 +525,7 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
             if (billedFloor > minEffectiveFrom)
                 minEffectiveFrom = billedFloor;
         }
-        // Value must be moved up to the new floor before MinDate is raised, otherwise WinForms rejects a MinDate greater than the control's current Value.
+        // Raise Value before MinDate to avoid invalid DateTimePicker bounds.
         effectiveFrom.Value = minEffectiveFrom;
         effectiveFrom.MinDate = minEffectiveFrom;
         BuildLayout(feeTypeName, currentAmount, currentDiscount);
@@ -557,7 +557,7 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary"
         };
-        /* The guard runs here rather than from the button's own DialogResult, because a button that assigns DialogResult dismisses the modal form before the confirmation can keep it open. */
+        /* Confirm before assigning DialogResult so Cancel can keep the dialog open. */
         cancel.Click += (_, _) => {
             if (!ConfirmDiscard())
                 return;
@@ -619,7 +619,7 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
             validator.Fail(newAmount, "Enter 0 or more, e.g. 1500");
         else if (amount < currentDiscount)
         {
-            /* The discount is carried into the new version unchanged, so an amount below it produces a row CK_StudentFeeAssignments_Discount refuses. dbo.ChangeStudentFeeAssignmentAmount_Internal rejects it with Msg 53149 and remains the authoritative check. */
+            /* Keep the carried-forward discount within the new amount; SQL remains authoritative (53149). */
             validator.Fail(newAmount, $"Not below the discount (Rs. {currentDiscount:0.##})");
         }
         if (!validator.Finish())
@@ -675,7 +675,7 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
             submitting = false;
         }
     }
-    /// <summary>The three values this form edits, compared with the ones it was loaded with: the new amount, the effective month and the reason.</summary>
+    /// <summary>Compare amount, effective month and reason with the loaded values.</summary>
     private bool IsDirty() =>
         !savedSuccessfully &&
         DialogResult != DialogResult.OK &&
@@ -688,7 +688,10 @@ public sealed class ChangeFeeAssignmentAmountForm : ApplicationWindowForm
         return ModernMessageDialog.ConfirmDiscardOnce(this, IsDirty, ref discardConfirmed);
     }
 }
-/// <summary>Discount: calls the existing dbo.SaveStudentFeeDiscount (fixed this same phase - see the SQL script's header). Only usable on the current open row, same as Discontinue/Change Amount.</summary>
+/// <summary>Edit discounts on the current open assignment through dbo.SaveStudentFeeDiscount.</summary>
+// Owner policy (BL-06): monthly changes affect unbilled periods; nonmonthly changes may
+// update uncancelled charges with no completed allocations, capped by gross amount.
+// BL-09 retains assignment-level audit history for these changes.
 public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
 {
     /* UX - field problems are marked on the fields, all at once, not shown in message boxes. */
@@ -711,7 +714,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
     private readonly string initialDiscountAmountText;
     /* Set only once the discount has been written, so that path closes without the unsaved-changes prompt. */
     private bool savedSuccessfully;
-    /* One confirmation per close gesture. Assigning DialogResult on a modal form raises FormClosing too, so a single Cancel click would otherwise ask twice. */
+    /* Confirm once: setting DialogResult also raises FormClosing. */
     private bool discardConfirmed;
     public ChangeFeeDiscountForm(int studentFeeAssignmentId, string feeTypeName, decimal standardAmount, decimal currentDiscount,
         DataRow? periodContext = null)
@@ -776,7 +779,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary"
         };
-        /* The guard runs here rather than from the button's own DialogResult, because a button that assigns DialogResult dismisses the modal form before the confirmation can keep it open. */
+        /* Confirm before assigning DialogResult so Cancel can keep the dialog open. */
         cancel.Click += (_, _) => {
             if (!ConfirmDiscard())
                 return;
@@ -797,7 +800,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
             Margin = new Padding(0),
             Padding = new Padding(0)
         };
-        /* The discount is a rupee amount only (the discount column and the stored procedure's @DiscountAmount parameter are both plain money - no percentage mode exists), so the field says so. */
+        /* Discount is a rupee amount, not a percentage. */
         fields.Controls.Add(HumanUi.Field("Discount Amount (Rs.)", discountAmount, true), 0, 0);
         fields.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
         fields.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));

@@ -354,6 +354,8 @@ FOR ATTACH;";
         QueryUserSetCoreAsync(procedure, 120, cancellationToken, WithCurrentUser(parameters));
     public static Task<DataSet> QueryUserSetAsync(string procedure, int commandTimeoutSeconds, CancellationToken cancellationToken, params SqlParameter[] parameters) =>
         QueryUserSetCoreAsync(procedure, commandTimeoutSeconds, cancellationToken, WithCurrentUser(parameters));
+    // Accepted local trust boundary (BL-03): SQL receives the signed-in application UserId.
+    // This does not authenticate independent clients with the same local SQL rights.
     private static SqlParameter[] WithCurrentUser(SqlParameter[] parameters)
     {
         foreach (SqlParameter parameter in parameters)

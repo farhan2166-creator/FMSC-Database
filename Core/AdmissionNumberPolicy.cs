@@ -84,10 +84,8 @@ internal static class AdmissionNumberPolicy
         var order=Comparer<string>.Create(AdmissionNumbers.Compare);
         string? lower=dated.Where(item=>item.Date<date.Date).Select(item=>item.Number).OrderByDescending(number=>number,order).FirstOrDefault();
         string? upper=dated.Where(item=>item.Date>date.Date).Select(item=>item.Number).OrderBy(number=>number,order).FirstOrDefault();
-        // User decision (2026-10-12): chronology assists the suggestion only.
-        // Manual numbers must be valid and unique, with valid dates/year, but may
-        // override chronological advice. Verified historical suggestions retain
-        // their existing exception to surrounding date order.
+        // Owner policy (BL-04): valid, unused manual numbers may override chronology advice.
+        // Date/year validation and the verified-historical suggestion exception still apply.
         if(verifiedHistoricalRegister) { lower=null; upper=null; }
         if(lower is not null && upper is not null && AdmissionNumbers.Compare(lower,upper)>=0)
             return new(null,lower,upper,used,null);

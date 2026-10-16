@@ -22,11 +22,12 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     private DataTable certificateResults = new();
     private string? savedEditorSnapshot;
     private string EditorSnapshot() => string.Join("\u001f", sportName.Text, performance.Text, certificateDate.Value.Date.ToString("yyyy-MM-dd"));
+    // Owner policy (UFA-04): a new date-only draft is abandonable; saved-record date edits count.
     private bool HasCertificateEdits => student.SelectedId > 0 &&
         (selectedSportsCertificateId > 0
             ? savedEditorSnapshot is not null && savedEditorSnapshot != EditorSnapshot()
             : !string.IsNullOrWhiteSpace(sportName.Text) || !string.IsNullOrWhiteSpace(performance.Text));
-    /* Finding 13 - a search debounce tick that lands while a modal (print preview, confirmation) is open runs inside that modal's message loop and re-binds the picker underneath it. */
+    /* Suspend search debounce while a modal dialog is open. */
     private bool suppressStudentChanged;
     private int selectedSportsCertificateId;
     private readonly ModernButton createCertificateButton = new() {
@@ -73,13 +74,13 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
             (_, _) => ClearForm();
         printButton.Click +=
             (_, _) => PrintSelected();
-        /* printing calls a Get*PrintData procedure, which requires Certificates.Print, while this page is reached with Certificates.Create. Without this gate a create-only user was offered a Print button the database would refuse. */
+        /* Gate printing separately with Certificates.Print; creation uses Certificates.Create. */
         GateAction(printButton, "Certificates.Print");
         refreshButton.Click +=
             (_, _) => RefreshCertificates();
         RelocateFromActions(createCertificateButton, clearButton);
         TrackStudentSearchStatus(student);
-        /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
+        /* Filter as the operator types; load only after a committed student selection. */
         if (initialize) StudentSearchCache.Warm();
         student.SelectionChangeGuard = _ => !creatingCertificate &&
             (!HasCertificateEdits || Confirm("Discard the unsaved certificate changes and choose another student?", UiText.Dialogs.UnsavedChanges));
@@ -227,7 +228,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         catch (Exception ex)
         {
             Fail(ex);
-            /* Finding 11 - the load failed, so the grid must not keep showing the previous student's certificates, and the buttons must be recomputed for the empty list. */
+            /* Clear stale certificates and recompute actions after a failed load. */
             certificateResults =
                 new DataTable();
             Bind(certificateResults);
@@ -244,7 +245,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     private void FormatCertificateGrid()
     {
         CertificateRecordOrder.ArrangeColumns(Grid, "SportsCertificateId");
-        /* The click handlers below read the row from certificateResults by the clicked row INDEX, which only matches the grid while it is in the table's own order. */
+        /* Keep grid order aligned with certificateResults for index-based selection. */
         LockGridOrder();
         SetGridWidth("SportsCertificateId", 110);
         if (Grid.Columns.Contains("SportsCertificateId"))
@@ -402,7 +403,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
             DateTime certDate =
                 certificateDate.Value.Date;
             createCertificateButton.Enabled = false;
-            // awaited so the caller's disabled button covers the whole write. @UserId is passed explicitly and equals CurrentUser.UserId, so ExecuteUserAsync's automatic injection supplies the same value.
+            // Await the full write while actions are held; pass the current actor.
             using var hold = BeginBusy(BusyMessage, this);
             await writeCertificate(new[] {
                 DatabaseHelper.P(
@@ -489,7 +490,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
                 "Sports certificate updated successfully.";
             AddSuggestionIfNew(sportName, sportName.Text);
             AddSuggestionIfNew(performance, performance.Text);
-            /* same rule as the create path: the student this certificate was updated for must still be the selected one, or the reload would show the previous student's certificates under the… */
+            /* Refresh only if the saved certificate's student is still selected. */
             if (IsDisposed || student.SelectedId != admissionId)
                 return;
             ClearCertificateFields();

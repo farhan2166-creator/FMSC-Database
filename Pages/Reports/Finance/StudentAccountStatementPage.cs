@@ -142,7 +142,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
                     return;
                 ClearDisplayedStudents();
             };
-        /* A displayed statement is produced from the checked students and the from/to dates, and the campus/year/class/section boxes plus the search text decide which students those are. */
+        /* Statement scope includes checked students, date range and student-search filters. */
         foreach (LookupBox filter in new[] { campus, year, cls, section })
             filter.SelectedIndexChanged += (_, _) => OnFiltersChanged();
         studentSearch.TextChanged +=
@@ -376,7 +376,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         }
         catch { dialog.Dispose(); throw; }
     }
-    // This is additive only - the free-text search, campus/year/class/section filters, and multi-student/family statement logic below are completely unchanged.
+    // Retain existing group/family selection alongside single-student search.
     public StudentAccountStatementPage(int preloadAdmissionId)
         : this()
     {
@@ -671,7 +671,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             row.Cells["AdmissionId"]
                 .Value);
     }
-    /* everything that decides what the displayed statement contains: the search context and the free-text search pick the students, the checked set (with its family expansions) is what LoadStatement actually reads. */
+    /* Include search scope, checked students and family expansion in the statement signature. */
     private string FilterSignature()
     {
         var admissionIds =
@@ -776,7 +776,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             Fail(ex);
         }
     }
-    // note: signature changed from "async void" to "async Task" (Rule 2 - a behavior-preserving refactor, not a logic change) solely so the new preload constructor below can await…
+    // Return Task so preload callers can await the student search.
     private async Task SearchStudents()
     {
         try
@@ -786,7 +786,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
                 studentSearch.SelectedId > 0
                     ? AdmissionNumbers.ForId(studentSearch.SelectedId)
                     : studentSearch.Text.Trim();
-            /* Admission Number is an independent filter (): a number in Student Search matches on Admission Number whatever Campus / Academic Year / Class / Section say. */
+            /* An admission-number search is independent of campus/year/class/section filters. */
             bool byAdmissionId = AdmissionNumbers.TryNormalize(search, out string admissionNumber);
             if (byAdmissionId) search = admissionNumber;
             bool contextSet =
@@ -910,7 +910,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         }
         return false;
     }
-    /// <summary>GetClassSections returns one row per campus/class/section placement, so the same section repeats (once per class, once per campus). A section filter needs each section once.</summary>
+    /// <summary>Deduplicate sections returned once per campus/class placement.</summary>
     private static DataTable DistinctSections(DataTable classSections)
     {
         var result = new DataTable();
@@ -1613,7 +1613,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     private bool printingDueReport;
     private async Task PrintDueReport()
     {
-        /* this method awaited the institution name with no re-entrancy guard and no post-await disposal check, while every other async method in this file re-checks. */
+        /* Guard export re-entry and recheck disposal after reading the institution name. */
         if (printingDueReport || IsDisposed)
             return;
         printingDueReport = true;

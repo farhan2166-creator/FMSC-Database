@@ -30,7 +30,7 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
         Text = "Select a student to view their family.",
         AutoEllipsis = true
     };
-    // AdmissionIds currently shown as cards for the loaded family. The first entry is always the highest-class ("head") member, since GetStudentFamily returns rows in that order.
+    // Displayed admission IDs; the first is the highest-class family member.
     private readonly List<int> currentMemberAdmissionIds = new();
     private string currentHeadFatherName = string.Empty;
     private FamilyMemberCard? selectedCard;
@@ -49,11 +49,10 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
         var addMember = AddAction("Add Member", async (_, _) => await RunFamilyActionAsync(AddMemberAsync), "Success");
         /* removing a member deletes a sibling link, so it is guarded like adding one. */
         var removeMember = AddAction("Remove Selected Member", async (_, _) => await RunFamilyActionAsync(RemoveSelectedMemberAsync), "Danger");
-    /* Students.Family opens this workspace. Both add and remove use Students.Administer
-       in C# and SQL; migration 3 removes the inconsistent Students.Siblings guard. */
+    /* Students.Family permits viewing; add/remove require Students.Administer in both C# and SQL. */
         GateAction(addMember, "Students.Administer");
         GateAction(removeMember, "Students.Administer");
-        /* Item 14 - both actions work on the family currently rendered (currentMemberAdmissionIds, selectedCard). */
+        /* Actions target the currently displayed family and selected card. */
         _addMemberButton = addMember;
         _removeMemberButton = removeMember;
         SetFamilyActionsEnabled(false);
@@ -172,7 +171,7 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
     }
     private ModernButton? _addMemberButton;
     private ModernButton? _removeMemberButton;
-    /* Item 14 - an action GateAction has taken away stays taken away: that decision is the permission's, not this page's. */
+    /* Preserve permission-denied action states. */
     private readonly bool _canChangeFamily =
         CurrentUser.HasPermission("Students.Administer");
     private bool familyActionBusy;
@@ -219,7 +218,7 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
                 ClearMembersView();
                 return;
             }
-            /* Item 14 - the cards, the member ids and the selected card on screen belong to the student being replaced. */
+            /* Clear cards and selection when switching students. */
             ClearMembersView();
             version = _familyLoadVersion;
             SetStatus("Loading family members...");
@@ -246,7 +245,7 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
                 return;
             }
             RenderMembers(members);
-            /* Item 14 - only a load that landed puts the two actions back. */
+            /* Restore actions only after a current load succeeds. */
             SetFamilyActionsEnabled(currentMemberAdmissionIds.Count > 0);
             SetStatus($"{members.Rows.Count} member(s) loaded.");
         }
@@ -386,7 +385,7 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
                 DatabaseHelper.P("@UserId", CurrentUser.UserId),
                 DatabaseHelper.Int("@FamilyMemberId", familyMemberId)));
             selectedCard = null;
-            // If the student the picker was keyed on is the one just removed, fall back to another remaining member so we keep looking at the same family instead…
+            // If the removed student was selected, select another remaining family member.
             int? preserve = removedAdmissionId == selectedAdmissionId
                 ? currentMemberAdmissionIds.FirstOrDefault(id => id != removedAdmissionId)
                 : selectedAdmissionId;
@@ -411,7 +410,7 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
             ? Convert.ToString(row[columnName]) ?? string.Empty
             : string.Empty;
     }
-    // A single student's info tile: name, class/section, registration and status, plus a colored relationship badge (Head of Family / Brother / Sister).
+    // Show student identity, placement, status and family relationship.
     private sealed class FamilyMemberCard : RoundedPanel
     {
         private readonly Color baseBorderColor;
@@ -470,7 +469,7 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
                 TextAlign = ContentAlignment.MiddleLeft,
                 AutoEllipsis = true
             };
-            /* Admission Number leads (it is what identifies the student); the status follows on the same line. The registration number is not shown on the card. */
+            /* Lead with Admission Number and status; omit registration from the card. */
             var identityParts = new List<string>();
             if (admissionId > 0)
                 identityParts.Add($"Admission {AdmissionNumbers.ForId(admissionId)}");

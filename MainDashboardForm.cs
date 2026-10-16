@@ -44,7 +44,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     private readonly List<DashboardNavButton> navButtons = new();
     private readonly List<NavigationCommand> navigationCommands = new();
     private readonly Dictionary<Keys,DashboardNavButton> navigationShortcutTargets=new();
-    /* which module/title each sidebar entry opens, so a page reached from a Quick Action or from Open Report can highlight the same entry the sidebar would. */
+    /* Map destinations to sidebar entries for consistent highlighting. */
     private readonly Dictionary<DashboardNavButton, string> navTargets = new();
     private Button? _commandButton;
     private ModernTextBox? _globalSearchBox;
@@ -69,7 +69,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     internal MainDashboardForm(Action<string, Exception>? navigationFailureReporter)
     {
         this.navigationFailureReporter = navigationFailureReporter;
-        // Every control size in this app is computed programmatically (AppMetrics/AppTheme, using DPI-aware TextRenderer measurements that already reflect the real font/DPI), never left to WinForms' built-in Font/Dpi auto-scaling.
+        // Shared DPI-aware metrics own geometry; do not add WinForms auto-scaling on top.
         AutoScaleMode = AutoScaleMode.None;
         /* leaving the application is a page switch, so the same guard the in-app navigation check runs is applied on close. */
         FormClosing += (_, e) => {
@@ -89,7 +89,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             AppMetrics.DashboardMinimumWidth,
             AppMetrics.DashboardMinimumHeight);
         BackColor = AppTheme.PageBackground;
-        // Establish the adaptive scale factor from the actual screen working area *before* any sidebar/topbar/page is built, using a deterministic estimate of the chrome this form is about to…
+        // Establish scale from the working area before building the window.
         PrimeInitialScale();
         // The shell establishes its metric context before constructing controls.
         CaptureLayoutDpi();
@@ -191,7 +191,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     }
     private const int BackupStaleWarningDays = 14;
     private bool _backupFreshnessChecked;
-    /// <summary>One-time-per-session check, shown after the dashboard first loads, that nudges whoever can create backups to take one if the most recent successful backup is missing or older than <see cref="BackupStaleWarningDays"/> days.</summary>
+    /// <summary>Once per session, prompt eligible users when the last successful backup is missing or stale.</summary>
     private async Task CheckBackupFreshnessAsync()
     {
         if (_backupFreshnessChecked)
@@ -426,12 +426,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             Width = AppScale.Scale(250, AppScale.ControlSizeScale),
             Height = AppMetrics.InputControlHeight,
             Margin = new Padding(6, 2, 8, 2),
-            /* This box only opens Quick Navigation: it searches pages and features, never students, so the caption says so (it used to promise "students"). */
+            /* Quick Navigation searches pages and features, not students. */
             PlaceholderText = "Search features...",
-            /* Out of the Tab order: it is only reached by clicking it, never by tabbing through the form or by the form choosing a first control to focus. */
+            /* Exclude the click-only Quick Navigation launcher from tab order. */
             TabStop = false
         };
-        /* Feature / page names are text, so the box takes no digits: typed digits are refused (with a beep) and any that arrive by paste are stripped. */
+        /* Reject typed digits and remove pasted digits from feature search. */
         _globalSearchBox.KeyPress += (_, e) => {
             if (!char.IsDigit(e.KeyChar))
                 return;
@@ -666,7 +666,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Finance",
                 PageTitles.StudentFeeCorrections,
                 "Fees.Collect"),
-            // Manual monthly posting and its reversal: the operator picks the month and posts the fees they choose, or reverses a posting that has not been collected.
+            // Monthly posting and unpaid-posting reversal share this workspace.
             new(
                 "Daily Collection Closing",
                 () => new DailyCollectionClosingPage(),
@@ -1379,8 +1379,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 null,
                 (_, _) => SignOut()));
         menu.Closed += (_, _) => {
-            /* ToolStripDropDown still accesses its handle after Closed while completing an
-             * item click. Immediate disposal here broke every account-menu command. */
+            /* Defer disposal until ToolStripDropDown finishes processing the account-menu click. */
             if (!IsDisposed && IsHandleCreated)
                 BeginInvoke(new MethodInvoker(menu.Dispose));
             else
@@ -1584,7 +1583,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 string.Equals(target, key, StringComparison.OrdinalIgnoreCase);
         }
     }
-    /* The explicit parameter types pick the factory-taking constructor: the report page is then built by NavigateTo, after its leave check has passed. */
+    /* Construct the report only after NavigateTo accepts leaving the current page. */
     private Control BuildReportsWorkspace() { return new ReportsHomePage((Func<Control> factory, string module, string title) => NavigateTo(factory, module, title)); }
     private void OnThemeChanged(
         object? sender,
@@ -1629,7 +1628,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         }
         SyncActiveNav(_currentModule, _currentTitle);
     }
-    /// <summary>The one unsaved-changes question, asked by every path that leaves the current page: in-app navigation and closing the application both run it.</summary>
+    /// <summary>Use one unsaved-work confirmation for navigation and application close.</summary>
     private bool ConfirmLeaveCurrentPage()
     {
         /* some work cannot survive the page being disposed or the application exiting. */

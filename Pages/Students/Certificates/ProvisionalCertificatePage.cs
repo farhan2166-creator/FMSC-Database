@@ -50,14 +50,15 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
     private string? newContentSnapshot;
     private string EditorSnapshot() => ContentSnapshot() + "\u001f" + certificateDate.Value.Date.ToString("yyyy-MM-dd");
     private string ContentSnapshot() => string.Join("\u001f", examType.Text, examYear.Text, boardName.Text, rollNumber.Text, marksObtained.Text, marksOutOf.Text, grade.Text, otherSubjects.Text, string.Join("|", subjectsList.CheckedItems.Cast<object>().Select(item => item.ToString())));
+    // Owner policy (UFA-04): a new date-only draft is abandonable; saved-record date edits count.
     private bool HasCertificateEdits => student.SelectedId > 0 &&
         (selectedProvisionalCertificateId > 0
             ? savedEditorSnapshot is not null && savedEditorSnapshot != EditorSnapshot()
             : newContentSnapshot is not null && newContentSnapshot != ContentSnapshot());
     private DataTable subjectsTable = new();
-    /* Finding 3 - subject ids of the entries appended to the list below because the selected certificate holds them but the current subject list does not. */
+    /* Track certificate subjects missing from the current subject catalog. */
     private readonly List<int> savedSubjectIds = new();
-    /* Finding 13 - a search debounce tick that lands while a modal (print preview, confirmation) is open runs inside that modal's message loop and re-binds the picker underneath it. */
+    /* Suspend search debounce while a modal dialog is open. */
     private bool suppressStudentChanged;
     private int selectedProvisionalCertificateId;
     private readonly ModernButton createCertificateButton = new() {
@@ -125,7 +126,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         rollNumber.KeyPress += (_, e) => {
             if (IsPeshawarBoard && !char.IsControl(e.KeyChar) && !char.IsAsciiDigit(e.KeyChar)) e.Handled = true;
         };
-        /* The handler was also synchronous, which is why disabling the button alone could not help: the queued second click arrives after the work has already finished. */
+        /* Hold the synchronous handler through queued clicks to prevent duplicate saves. */
         createCertificateButton.Click += async (_, _) => await RunCreateCertificateAsync();
         updateCertificateButton.Click +=
             (_, _) => UpdateCertificate();
@@ -135,13 +136,13 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             (_, _) => ClearForm();
         printButton.Click +=
             (_, _) => PrintSelected();
-        /* printing calls a Get*PrintData procedure, which requires Certificates.Print, while this page is reached with Certificates.Create. Without this gate a create-only user was offered a Print button the database would refuse. */
+        /* Gate printing separately with Certificates.Print; creation uses Certificates.Create. */
         GateAction(printButton, "Certificates.Print");
         refreshButton.Click +=
             (_, _) => RefreshCertificates();
         RelocateFromActions(createCertificateButton, clearButton);
         TrackStudentSearchStatus(student);
-        /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
+        /* Filter as the operator types; load only after a committed student selection. */
         if (initialize) StudentSearchCache.Warm();
         student.SelectionChangeGuard = _ => !creatingCertificate &&
             (!HasCertificateEdits || Confirm("Discard the unsaved certificate changes and choose another student?", UiText.Dialogs.UnsavedChanges));
@@ -647,7 +648,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         catch (Exception ex)
         {
             Fail(ex);
-            /* Finding 11 - the load failed, so the grid must not keep showing the previous student's certificates, and the buttons must be recomputed for the empty list. */
+            /* Clear stale certificates and recompute actions after a failed load. */
             certificateResults =
                 new DataTable();
             Bind(certificateResults);
@@ -664,7 +665,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
     private void FormatCertificateGrid()
     {
         CertificateRecordOrder.ArrangeColumns(Grid, "ProvisionalCertificateId");
-        /* The click handlers below read the row from certificateResults by the clicked row INDEX, which only matches the grid while it is in the table's own order. */
+        /* Keep grid order aligned with certificateResults for index-based selection. */
         LockGridOrder();
         SetGridWidth("ProvisionalCertificateId", 60);
         if (Grid.Columns.Contains("ProvisionalCertificateId"))
@@ -765,7 +766,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 GetDate(row, "CertificateDate");
             certificateDate.Value =
                 certDate ?? DateTime.Today;
-            /* GetProvisionalCertificateRecords only returns the column once sql_certificates.sql has been applied - until then say so and leave what the operator typed alone rather than inventing a value. */
+            /* Preserve typed text when the database omits certificate subject data. */
             string? selectionHint =
                 null;
             if (row.Table.Columns.Contains("OtherSubjects"))
@@ -800,7 +801,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             SetStatus($"Unable to read the selected certificate: {DbMessage.UserMessage(ex)}", true);
         }
     }
-    /// <summary>Ticks the subjects this certificate holds. Returns a hint for the status line when something about them could not be shown, or null when all is well.</summary>
+    /// <summary>Select stored subjects and report any that cannot be displayed.</summary>
     private string? LoadSubjectsForCertificate(int provisionalCertificateId)
     {
         try
@@ -968,7 +969,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             int admissionId =
                 student.SelectedId;
             createCertificateButton.Enabled = false;
-            // awaited so the caller's disabled button covers the whole write. @UserId is passed explicitly and equals CurrentUser.UserId, so ExecuteUserAsync's automatic injection supplies the same value.
+            // Await the full write while actions are held; pass the current actor.
             using var hold = BeginBusy(BusyMessage, this);
             await writeCertificate(new[] {
                 DatabaseHelper.P(
@@ -1007,7 +1008,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 DatabaseHelper.P("@SubjectIds", GetCheckedSubjectIdsCsv()) });
             successMessage =
                 "Certificate created successfully.";
-            /* refresh only when the student this certificate was created for is still the selected one. The success message above stays: the write did happen. */
+            /* Refresh only for the current student; retain success because the write committed. */
             if (IsDisposed || student.SelectedId != admissionId)
                 return;
             ClearCertificateFields();
@@ -1087,7 +1088,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 DatabaseHelper.P("@SubjectIds", GetCheckedSubjectIdsCsv()));
             successMessage =
                 "Certificate updated successfully.";
-            /* same rule as the create path: the student this certificate was updated for must still be the selected one, or the reload would show the previous student's certificates under the… */
+            /* Refresh only if the saved certificate's student is still selected. */
             if (IsDisposed || student.SelectedId != admissionId)
                 return;
             ClearCertificateFields();
