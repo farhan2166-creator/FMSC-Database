@@ -19,6 +19,8 @@ Compose / Bulk follows **choose template → find/select contacts → preview �
 
 Use Windows display scaling for readable text. The application follows the monitor's DPI and usable desktop area. On smaller screens, dialog content may scroll; use the scrollbars or Tab to reach fields and bottom actions. Enlarging a window gives grids and flexible content more space while standard entry controls retain sensible dimensions. Printing and report zoom controls retain their existing behavior.
 
+Result messages stay within two font-scaled lines so feedback cannot displace the workspace. Hover over the status text for full details. A warning or unknown save outcome still requires its stated recovery checks before retrying.
+
 ## Common workspaces
 
 | Work | Where to start | Operational caution |

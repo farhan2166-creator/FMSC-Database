@@ -1236,10 +1236,10 @@ public sealed class StudentTransferReadmissionPage : V2Page
         // Capture the submitted destination before awaiting the operation; the controls
         // may change while it runs. Do not infer a final admission number or section.
         string completionMessage = operation switch {
-            "Transfer Section" => $"Section transfer completed.\nDestination: {destinationSectionName}.",
-            "Transfer Class" => $"Class transfer completed.\nDestination class: {destinationClassName}.",
-            "Transfer Campus" => $"Campus transfer completed.\nDestination campus: {destinationCampusName}.",
-            "Re-Admit" => $"Readmission completed.\nDestination: {destinationCampusName} — {destinationSectionName} ({destinationYearName}).",
+            "Transfer Section" => $"Section changed to {destinationSectionName}.",
+            "Transfer Class" => $"Class changed to {destinationClassName}.",
+            "Transfer Campus" => $"Campus changed to {destinationCampusName}.",
+            "Re-Admit" => $"Readmitted: {destinationCampusName} · {destinationSectionName} · {destinationYearName}.",
             _ => "Student operation completed."
         };
         if (operation is "Transfer Class" or "Transfer Campus")
@@ -1253,18 +1253,18 @@ public sealed class StudentTransferReadmissionPage : V2Page
                 _ => ""
             };
             if (feeChoice.Length > 0)
-                completionMessage += "\nFee handling: " + feeChoice + ".";
+                completionMessage += " " + feeChoice + ".";
             if (replaceScheduledFees)
-                completionMessage += "\nSelected: replace unbilled scheduled rates and waivers from that month.";
+                completionMessage += " Replace unbilled scheduled rates and waivers from that month.";
         }
         else if (operation == "Re-Admit")
         {
             if (readmissionMonthlyStart is DateTime month)
-                completionMessage += $"\nMonthly fees start: {month:MMM yyyy}.";
+                completionMessage += $" Monthly fees from {month:MMM yyyy}.";
             if (chargeYearlyFees is bool charge)
                 completionMessage += charge
-                    ? "\nYearly fee decision: charge yearly fees."
-                    : "\nYearly fee decision: waive yearly fees for this placement.";
+                    ? " Yearly fees charged."
+                    : " Yearly fees waived for this placement.";
         }
         SetStatus("Processing student lifecycle operation...");
         try

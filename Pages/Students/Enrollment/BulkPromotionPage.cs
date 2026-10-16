@@ -1083,15 +1083,10 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             if (!serverCountsRead)
             {
                 /* An unreadable result leaves promotion outcome unknown; do not claim success. */
-                Warn(
-                    $"The student promotion request was sent for {attempted:N0} student(s), but the " +
-                    "server's own result could not be read, so this screen cannot confirm how many " +
-                    "students were actually processed.\n\n" +
-                    $"Ticked as Promote: {promoteCount:N0}\n" +
-                    $"Ticked as Hold Back: {holdCount:N0}\n\n" +
-                    "Reload the candidate list and check the students' placements before assuming " +
-                    "the promotion was applied - do not simply retry.");
+                string unknown = $"Outcome unknown. Check History and placements before retrying ({attempted:N0} selected).";
+                Warn(unknown);
                 await LoadCandidates();
+                if (!IsDisposed) Warn(unknown);
                 return;
             }
             DataRow serverResult = result.Rows[0];
@@ -1105,35 +1100,24 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                 ? 0
                 : Convert.ToInt32(serverResult["HeldBackCount"]);
             string outcome =
-                $"Student promotion result from the server:\n\n" +
-                $"Selected: {attempted:N0} student(s)\n" +
-                $"Processed: {processed:N0}\n" +
-                $"Promoted: {promoted:N0}\n" +
-                $"Held Back: {heldBack:N0}";
+                $"Processed {processed:N0}/{attempted:N0} · Promoted: {promoted:N0} · Held back: {heldBack:N0}.";
             Action reportOutcome;
             if (processed < attempted)
             {
                 /* Partial outcome - never present this as success. */
-                outcome +=
-                    $"\n\nNOT processed: {attempted - processed:N0} of the {attempted:N0} selected " +
-                    "student(s). Reload the list and check those students before retrying.";
-                string partial = outcome;
+                string partial = $"Incomplete promotion. Check History and placements before retrying. " +
+                    $"{attempted - processed:N0} not processed. " + outcome;
                 reportOutcome = () => Warn(partial);
             }
             else if (processed > attempted || promoted + heldBack != processed)
             {
                 /* The server's figures do not line up with what was ticked, so report them without claiming anything about the selection. */
-                outcome +=
-                    $"\n\nThe server's figures do not match the ticked selection exactly. " +
-                    "Check the students' placements before relying on this result.";
-                string mismatch = outcome;
+                string mismatch = "Counts do not match. Verify History and placements before continuing. " + outcome;
                 reportOutcome = () => Warn(mismatch);
             }
             else
             {
-                string complete =
-                    outcome +
-                    $"\n\nAll {processed:N0} selected student(s) were processed.";
+                string complete = outcome;
                 reportOutcome = () => Info(complete);
             }
             reportOutcome();
@@ -1153,8 +1137,8 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             {
                 nextSteps.Offer(
                     promoted == 1
-                        ? $"1 student promoted to {destinationName}. Their new-year fees start only after their return is confirmed."
-                        : $"{promoted:N0} students promoted to {destinationName}. Their new-year fees start only after each return is confirmed.",
+                        ? $"Promoted to {destinationName}. Confirm Return to start billing."
+                        : $"{promoted:N0} promoted to {destinationName}. Confirm each return to start billing.",
                     promotedAdmissionId,
                     StudentFlow.ConfirmReturn(primary: true));
             }

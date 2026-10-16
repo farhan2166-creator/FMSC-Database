@@ -131,8 +131,8 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             Font = AppTheme.NormalFont,
             ForeColor = AppTheme.MutedText,
             TextAlign = ContentAlignment.MiddleRight,
-            AutoEllipsis = false,
-            AutoSize = true,
+            AutoEllipsis = true,
+            AutoSize = false,
             UseMnemonic = false,
             Margin = Padding.Empty,
             Padding = new Padding(8, 4, 8, 4),
@@ -437,14 +437,23 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         int statusWidth=hasText?Math.Min(desired,Math.Max(1,width/2)):0;
         if(column==1)statusWidth=Math.Max(1,width-header.GetColumnWidths()[0]);
         if(header.ColumnStyles[column].SizeType==SizeType.Absolute)header.ColumnStyles[column].Width=statusWidth;
-        StatusLabel.MaximumSize=new Size(Math.Max(1,statusWidth),0);StatusLabel.Visible=hasText;
-        int height=hasText?TextRenderer.MeasureText(StatusLabel.Text,StatusLabel.Font,
-            new Size(Math.Max(1,statusWidth-StatusLabel.Padding.Horizontal),int.MaxValue),
-            TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix|TextFormatFlags.TextBoxControl).Height+StatusLabel.Padding.Vertical:0;
-        if(hasText)height=Math.Max(height,StatusLabel.GetPreferredSize(new Size(Math.Max(1,statusWidth),0)).Height);
+        StatusLabel.Visible=hasText;
+        int height=MeasureStatusHeight(Math.Max(1,statusWidth));
         if(header==_externalStatusHeader && header.Parent is TableLayoutPanel root)
             root.RowStyles[0].Height=Math.Max(AppMetrics.TextHeight(AppTheme.ButtonFont)+8,height);
         return height;
+    }
+    private int MeasureStatusHeight(int width)
+    {
+        // Status must not displace the workspace; full wording remains in the tooltip and accessibility text.
+        int lineHeight=AppMetrics.TextHeight(StatusLabel.Font);
+        int maximum=2*lineHeight+StatusLabel.Padding.Vertical;
+        StatusLabel.MaximumSize=new Size(Math.Max(1,width),maximum);
+        if(string.IsNullOrWhiteSpace(StatusLabel.Text))return 0;
+        int measured=TextRenderer.MeasureText(StatusLabel.Text,StatusLabel.Font,
+            new Size(Math.Max(1,width-StatusLabel.Padding.Horizontal),int.MaxValue),
+            TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix|TextFormatFlags.TextBoxControl).Height;
+        return Math.Min(maximum,Math.Max(lineHeight,measured)+StatusLabel.Padding.Vertical);
     }
     /// <summary>Space reserved for action-bar status before buttons wrap.</summary>
     protected virtual int ActionStatusWidth => 240;
@@ -501,13 +510,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 if(StatusLabel.Parent==layout) {
                     StatusLabel.Visible=hasStatus;
                     int statusWidth=Math.Max(1,width-actionWidth);
-                    StatusLabel.MaximumSize=new Size(statusWidth,0);
-                    if(hasStatus) {
-                        var textSize=TextRenderer.MeasureText(StatusLabel.Text,StatusLabel.Font,
-                            new Size(Math.Max(1,statusWidth-StatusLabel.Padding.Horizontal),int.MaxValue),
-                            TextFormatFlags.WordBreak|TextFormatFlags.NoPrefix|TextFormatFlags.TextBoxControl);
-                        statusHeight=Math.Max(AppMetrics.TextHeight(StatusLabel.Font),textSize.Height)+StatusLabel.Padding.Vertical;
-                    }
+                    statusHeight=MeasureStatusHeight(statusWidth);
                 }
                 Actions.Visible=hasActions;
                 bool visible=hasActions || hasStatus;_actionBar.Visible=visible;
@@ -1138,6 +1141,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         PageStatusKind kind)
     {
         StatusLabel.Text = message;
+        StatusLabel.AccessibleDescription = message;
         _statusKind = kind;
         _statusToolTip.SetToolTip(StatusLabel, message);
         ApplyStatusVisual();

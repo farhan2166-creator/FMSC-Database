@@ -4479,8 +4479,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     {
         if (unconfirmedAdmission is not { } submitted) return;
         savedAdmissionReadyForNext = false;
-        SetStatus($"Admission {submitted.Number}: the save outcome could not be confirmed. Your entries and photo are retained. " +
-            "Use Check Saved Admission or Find Student. Do not submit this student again until you verify whether the admission exists.", PageStatusKind.Warning);
+        SetStatus($"Admission {submitted.Number}: outcome unknown. Entries and photo retained. " +
+            "Use Check Saved Admission or Find Student before retrying. Do not resubmit an existing admission.", PageStatusKind.Warning);
         UpdateStudentWorkspace();
     }
 
@@ -4531,13 +4531,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         AddSuggestionIfNew(address, address.Text);
         AddSuggestionIfNew(placeOfBirthInput, placeOfBirthInput.Text);
         AddSuggestionIfNew(casteTribe, casteTribe.Text);
-        string message = submitted.Historical ? "Historical student saved for legacy review. No fees were generated."
-            : "Student admitted. Placement and opening fees are ready.";
-        if (submitted.DiscountCount > 0) message += " The typed fee discount(s) have been saved.";
-        if (confirmation.Reconciled) message += " The saved record was verified after an incomplete save reply.";
-        message += reloaded ? " The form has been kept open with the saved student details."
-            : " The form could not be refreshed; open this student from Find Student before further edits. " + reloadError;
-        if (!photoSaved) message += " The selected photo was not saved; it is retained here. Use Retry Photo Save.";
+        string message = submitted.Historical ? "Historical student saved for review. No fees generated."
+            : "Admitted. Placement and opening fees ready.";
+        if (submitted.DiscountCount > 0) message += " Discounts saved.";
+        if (confirmation.Reconciled) message += " Save verified after an incomplete reply.";
+        message += reloaded ? ""
+            : " Refresh failed. Reopen from Find Student before editing. " + reloadError;
+        if (!photoSaved) message += " Photo retained but not saved. Use Retry Photo Save.";
         SetStatus(message, photoSaved && reloaded ? PageStatusKind.Success : PageStatusKind.Warning);
         savedAdmissionReadyForNext = photoSaved && reloaded;
     }
@@ -4673,8 +4673,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             bool hadPhoto = _pendingPhotoData is not null;
             bool photoSaved = await PersistPendingPhotoIfAnyAsync(savedStudent);
             if (IsDisposed || currentAdmissionId != savedStudent || admissionLoadVersion != savedVersion) return;
-            string success = AssigningFirstPlacement ? "Student details and verified first placement saved. No fees were generated."
-                : "Student details and fee discounts updated successfully.";
+            string success = AssigningFirstPlacement ? "Details and first placement saved. No fees generated."
+                : "Details and discounts saved.";
             /* The details are committed; reload failure means stale display, not failed Save. */
             try
             {
@@ -4682,7 +4682,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 if (IsDisposed || currentAdmissionId != savedStudent) return;
                 SetStatus(success + (photoSaved && hadPhoto ? " Photo saved." : "") +
                     (!photoSaved ? " Photo not saved; use Retry Photo Save." : "") +
-                    (!refreshed ? " The form could not refresh; reopen the student from Find Student before further edits." : ""),
+                    (!refreshed ? " Refresh failed. Reopen from Find Student before editing." : ""),
                     photoSaved && refreshed ? PageStatusKind.Success : PageStatusKind.Warning);
             }
             catch (Exception nonFatalException55)
@@ -4690,7 +4690,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException55, "StudentAdmissionPage: SaveExistingAsync fallback");
                 SetStatus(success + (photoSaved && hadPhoto ? " Photo saved." : "") +
                     (!photoSaved ? " Photo not saved; use Retry Photo Save." : "") +
-                    " The form could not refresh. Reopen the student from Find Student before further edits.", PageStatusKind.Warning);
+                    " Refresh failed. Reopen from Find Student before editing.", PageStatusKind.Warning);
             }
         }
         catch (Exception ex)
