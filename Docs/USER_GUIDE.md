@@ -23,6 +23,12 @@ Result messages stay within two font-scaled lines so feedback cannot displace th
 
 Confirmation dialogs show the question first, then important consequences and the details to review. Yes/No buttons are centered. Family payments and matching student records use read-only tables; scroll through long details before confirming. The payment counter keeps its approved Yes default, while restore and duplicate-student confirmations default to No. Enter uses the selected default; Escape declines a Yes/No question.
 
+## Entry and search actions
+
+On shared record-entry pages, **New Record** clears entry fields and starts a new record. It deliberately discards unsaved entry edits. **Clear Search** resets the list search without clearing the entry. Ctrl+N keeps its existing New Record behavior.
+
+In Setup Readiness, select an issue and use **Open Selected Setup**. The action is disabled while checking or when your account cannot open that destination; the status line explains when administrator help is needed. Double-click follows the same checks.
+
 ## Common workspaces
 
 | Work | Where to start | Operational caution |

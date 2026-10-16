@@ -72,6 +72,7 @@ internal static partial class Program
             CheckAdmissionPostSaveBaseline();
             CheckMeaningfulCertificateContent();
             CheckSelectiveWorkspaceGuards();
+            CheckSetupReadinessActions();
             CheckLifecycleCloseGuard();
             CheckCertificateSubmissionGuard();
             CheckQuickRegistrationTabGuard();

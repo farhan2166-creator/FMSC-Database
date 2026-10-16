@@ -11,27 +11,36 @@ public sealed class SetupReadinessPage : V2Page
     private readonly Action<Func<Control>, string, string> navigate;
     private readonly ModernButton open;
     private bool checking;
-    public SetupReadinessPage(Action<Func<Control>, string, string> navigate) : base(
+    private readonly Func<Task<DataTable>> checkSetup;
+    private string? checkSummary;
+    private bool hasIssues;
+    public SetupReadinessPage(Action<Func<Control>, string, string> navigate)
+        : this(navigate, () => SetupReadiness.CheckAsync(), true) { }
+    internal SetupReadinessPage(Action<Func<Control>, string, string> navigate, Func<Task<DataTable>> checkSetup, bool initialize) : base(
         PageTitles.SetupReadiness, "Check what needs to be set up before admitting students or billing fees.")
     {
         this.navigate = navigate;
+        this.checkSetup = checkSetup;
         AddBusyAction("Check Again", CheckAsync, "Primary");
         open = AddAction("Open Selected Setup", (_, _) => OpenSelected(), "Secondary");
         UseWrappingToolbar();
         open.Enabled = false;
         SetContent(Grid);
-        Grid.SelectionChanged += (_, _) => open.Enabled = Grid.CurrentRow?.DataBoundItem is DataRowView;
+        Grid.SelectionChanged += (_, _) => UpdateOpenAction();
+        open.EnabledChanged += (_, _) => { if (open.Enabled && !CanOpenSelected()) UpdateOpenAction(); };
         Grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) OpenSelected(); };
-        Defer(CheckAsync);
+        if (initialize) Defer(CheckAsync);
     }
     private async Task CheckAsync()
     {
         if (checking) return;
         checking = true;
-        open.Enabled = false;
+        checkSummary = null;
+        UpdateOpenAction();
+        SetStatus("Checking setup…");
         try
         {
-            var issues = await SetupReadiness.CheckAsync();
+            var issues = await checkSetup();
             if (IsDisposed) return;
             Bind(issues);
             Grid.Columns["PageKey"].Visible = false;
@@ -39,16 +48,18 @@ public sealed class SetupReadinessPage : V2Page
             Grid.Columns["Issue"].FillWeight = 80;
             Grid.Columns["Issue"].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             Grid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.DisplayedCells;
-            SetStatus(issues.Rows.Count == 0 ? "The checked setup is ready. Optional fees and transport rates should still be reviewed for your school." :
-                $"{issues.Rows.Count} setup item(s) need attention. Select one to open its setup page.", issues.Rows.Count > 0);
+            hasIssues = issues.Rows.Count > 0;
+            checkSummary = hasIssues
+                ? $"{issues.Rows.Count} setup item(s) need attention. Select one to open its setup page."
+                : "The checked setup is ready. Optional fees and transport rates should still be reviewed for your school.";
         }
         catch (Exception ex) { Grid.DataSource = null; if (!IsDisposed) Fail(ex); }
-        finally { checking = false; }
+        finally { checking = false; if (!IsDisposed) UpdateOpenAction(); }
     }
-    private void OpenSelected()
+    private (Func<Control> Factory, string Module, string Title, string Permission)? SelectedDestination()
     {
-        if (Grid.CurrentRow?.DataBoundItem is not DataRowView row) return;
-        (Func<Control> Factory, string Module, string Title, string Permission)? route = Convert.ToString(row["PageKey"]) switch {
+        if (Grid.CurrentRow?.DataBoundItem is not DataRowView row) return null;
+        return Convert.ToString(row["PageKey"]) switch {
             "Profile" => (() => new SchoolProfilePage(), "School Setup", "School Profile", "System.Setup"),
             "Campuses" => (() => new CampusesPage(), "School Setup", "Campuses", "System.Setup"),
             "Assignments" => (() => new CampusClassSectionAssignmentsPage(), "School Setup", PageTitles.CampusAssignments, "System.Setup"),
@@ -57,7 +68,28 @@ public sealed class SetupReadinessPage : V2Page
             "Backup" => (() => new BackupRestorePage(), "Administration", PageTitles.BackupRestore, "Backup.Create"),
             _ => null
         };
-        if (route is { } destination && CurrentUser.HasPermission(destination.Permission))
+    }
+    private bool CanOpenSelected() => !checking && SelectedDestination() is { } destination && CurrentUser.HasPermission(destination.Permission);
+    private void UpdateOpenAction()
+    {
+        var destination = SelectedDestination();
+        bool permitted = destination is { } route && CurrentUser.HasPermission(route.Permission);
+        open.Enabled = !checking && permitted;
+        string guidance = checking ? "Wait for the setup check to finish."
+            : destination is null ? "Select a setup item with an available page."
+            : !permitted ? $"Ask an administrator to open {destination.Value.Title}. Your account cannot open this page."
+            : $"Open {destination.Value.Title}.";
+        open.AccessibleDescription = guidance;
+        SetToolTip(open, guidance);
+        if (!checking && checkSummary is not null)
+            SetStatus(destination is not null && !permitted ? guidance : checkSummary,
+                destination is not null && !permitted || hasIssues);
+    }
+    private void OpenSelected()
+    {
+        UpdateOpenAction();
+        if (!CanOpenSelected()) return;
+        if (SelectedDestination() is { } destination)
             navigate(destination.Factory, destination.Module, destination.Title);
     }
 }
