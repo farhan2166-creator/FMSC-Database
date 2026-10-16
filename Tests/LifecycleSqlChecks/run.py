@@ -120,7 +120,7 @@ def write_evidence(output, report):
 
 
 def validate_evidence(output, forbidden=()):
-    allowed = {"commit", "runId", "result", "schemaVersion", "engine", "scenarios", "limitations", "expectedRefusals"}
+    allowed = {"commit", "runId", "result", "schemaVersion", "engine", "scenarios", "limitations", "expectedRefusals", "measurements", "workingTreeDirty"}
     report = json.loads((output / "report.json").read_text())
     if set(report) - allowed or report["result"] not in ("PASS", "FAIL", "BLOCKED"):
         raise ValueError("Unexpected evidence metadata.")
@@ -128,6 +128,9 @@ def validate_evidence(output, forbidden=()):
     for scenario in report["scenarios"]:
         if set(scenario) - permitted or scenario["result"] not in ("PASS", "FAIL", "BLOCKED"):
             raise ValueError("Unexpected scenario payload.")
+    for key, value in report.get("measurements", {}).items():
+        if not re.fullmatch(r"[a-zA-Z][a-zA-Z0-9_]{0,79}", key) or type(value) not in (float, int) or not 0 <= value < 1e12:
+            raise ValueError("Unexpected numeric measurement.")
     if report["result"] == "PASS" and any(s["result"] != "PASS" for s in report["scenarios"]):
         raise ValueError("Failed/blocked scenarios cannot be reported as PASS.")
     payload = (output / "report.json").read_text() + (output / "summary.md").read_text()
@@ -148,17 +151,20 @@ def main():
     parser.add_argument("--dotnet", default="dotnet")
     parser.add_argument("--cleanup", action="store_true")
     parser.add_argument("--communication-only", action="store_true", help="Focused disposable communication iteration; does not run the other SQL suites.")
+    parser.add_argument("--level3", action="store_true", help="Also execute bounded Level 3 faults, backup/restore and measured workloads in a separate owned catalog.")
     parser.add_argument("--diagnostics", type=Path, help="Optional local private diagnostic file; never upload it.")
     parser.add_argument("--inject-provision-failure", action="store_true", help="Exercise failure evidence and container cleanup; always exits nonzero.")
     args = parser.parse_args()
     if args.output is None or args.state is None:
         parser.error("--output and --state are required for execution/cleanup")
+    if args.level3 and args.communication_only:
+        parser.error("--level3 cannot be combined with --communication-only")
     if args.cleanup:
         remove_owned(args.state)
         return 0
     token = uuid.uuid4()
     output = args.output.resolve()
-    report = {"commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "runId": str(token), "scenarios": [], "limitations": [
+    report = {"commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "runId": str(token), "workingTreeDirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()), "scenarios": [], "measurements": {"HostLogicalCpus": os.cpu_count() or 0, "HostMemoryMiB": os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") / (1024 * 1024)}, "limitations": [
         "Linux real-SQL lifecycle/integration tests; existing desktop CI separately runs Windows control contracts and PDF export.",
         "No interactive visual, printing, installer, Windows LocalDB/operator-account or actual network-loss acceptance.",
         "No real school rows are imported: pinned data-free SQL test fixture only, fresh synthetic records. This test does not approve or check the current repository DACPAC.",
@@ -223,6 +229,8 @@ def main():
         if path.exists():
             data = json.loads(path.read_text())
             report["engine"] = data.get("engine")
+            report["schemaVersion"] = data.get("schemaVersion")
+            report.setdefault("measurements", {}).update(data.get("measurements", {}))
             report["expectedRefusals"] = report.get("expectedRefusals", 0) + data.get("expectedRefusals", 0)
             report["scenarios"] += [{"name": s["Name"], "result": s["Result"], "assertions": s["Assertions"], "seconds": s["Seconds"],
                 "assertion": s.get("Assertion"), "category": s.get("Category"), "sqlError": s.get("SqlError")} for s in data["scenarios"]]
@@ -294,6 +302,9 @@ def main():
                 ("Administration SQL", "AdministrationSqlChecks", "Administration", None)]:
                 count = stage(label, lambda p=project, s=suffix, m=mode: existing(p, s, m))
                 report["scenarios"][-1]["assertions"] = count
+            if args.level3:
+                stage("Level 3 database provisioning", lambda: provision("Reliability"))
+                stage("Level 3 SQL reliability", lambda: run_lifecycle(["--level3"], "reliability.json"))
         stage("Communication database provisioning", lambda: provision("Communication"))
         stage("Communication SQL", lambda: run_lifecycle(["--communication"], "communication.json"))
         if args.communication_only:

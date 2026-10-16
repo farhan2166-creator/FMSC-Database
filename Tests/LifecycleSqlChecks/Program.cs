@@ -6,6 +6,7 @@ internal static class Program
     internal static async Task<int> Main(string[] args)
     {
         string path = Environment.GetEnvironmentVariable("FMSC_TEST_REPORT_PATH") ?? throw new InvalidOperationException("A test evidence path is required.");
+        if (args.Contains("--level3-journal-child")) return await ReliabilityChecks.JournalChild();
         Fixture? fixture = null;
         bool ready = await Evidence.Stage("Fixture: isolated target and synthetic school", () => {
             Sql.ValidateTarget();
@@ -21,6 +22,7 @@ internal static class Program
         {
             if (args.Contains("--communication")) await CommunicationSqlChecks.Run(fixture!,Evidence);
             else if (args.Contains("--mutation-fixture")) await SeedLegacyMutation(fixture!);
+            else if (args.Contains("--level3")) await new ReliabilityChecks(fixture!, Evidence).Run();
             else if (!args.Contains("--fixture-only")) await new Lifecycle(fixture!, Evidence).Run();
         }
         Evidence.Save(path);

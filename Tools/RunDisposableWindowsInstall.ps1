@@ -1,6 +1,6 @@
 # Real installation acceptance on a GitHub-hosted disposable Windows runner.
 # Runs the production installer against a pinned schema-only, record-free test fixture.
-param([string]$ProjectDirectory = (Split-Path $PSScriptRoot -Parent))
+param([string]$ProjectDirectory = (Split-Path $PSScriptRoot -Parent), [switch]$Level3)
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows' -or
@@ -34,6 +34,9 @@ $stage='Runner isolation'
 $checks=[Collections.Generic.List[string]]::new()
 $status='BLOCKED'
 $msiCoverage='NOT_TESTED'
+$level3Owner=[guid]::NewGuid().ToString()
+$themeFile=Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'FMSC_SMS/theme.txt'
+$ownedTheme=$false
 New-Item -ItemType Directory -Path $evidence -Force | Out-Null
 
 function Stage([string]$Name) { $script:stage=$Name; Write-Host "ACCEPTANCE STAGE: $Name" }
@@ -50,12 +53,48 @@ function LocalDbExe {
     if (Test-Path -LiteralPath $known -PathType Leaf) { return $known }
     return $null
 }
+function Invoke-ActualInstaller {
+    $installer=Join-Path $release 'core.ps1'
+    $psi=[Diagnostics.ProcessStartInfo]::new('powershell.exe')
+    foreach ($a in @('-NoProfile','-ExecutionPolicy','Bypass','-File',$installer)) { [void]$psi.ArgumentList.Add($a) }
+    $psi.UseShellExecute=$false
+    $psi.RedirectStandardInput=$true
+    $psi.RedirectStandardOutput=$true
+    $psi.RedirectStandardError=$true
+    $script:ownedInstallation=$true
+    $p=[Diagnostics.Process]::Start($psi)
+    if (-not $p) { throw 'Failed to start installer process.' }
+    $stdout=$p.StandardOutput.ReadToEndAsync()
+    $stderr=$p.StandardError.ReadToEndAsync()
+    $p.StandardInput.WriteLine('N')  # Do not start interactive WinForms UI.
+    $p.StandardInput.Close()
+    if (-not $p.WaitForExit(720000)) {
+        try { $p.Kill($true) } catch { }
+        throw 'Installer timed out; never claim success.'
+    }
+    $installerOutput=$stdout.GetAwaiter().GetResult()
+    $installerError=$stderr.GetAwaiter().GetResult()
+    # Retain synthetic diagnostics on the disposable runner only, never as artifacts.
+    $installerOutput | Set-Content -LiteralPath (Join-Path $root 'installer-private.log')
+    return $p.ExitCode
+}
+function Assert-Level3Database {
+    $marker=@(Sql 'FMSC_DB' "SET NOCOUNT ON; SELECT CONVERT(nvarchar(36),value) FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_Level3InstallOwner';")
+    if (($marker -join '').Trim() -ne $script:level3Owner) { throw 'Synthetic installation ownership changed; operation refused.' }
+    Sql 'FMSC_DB' "IF (SELECT COUNT(*) FROM sys.database_files WHERE physical_name IN (N'C:\ProgramData\FMSC_Database\FMSC_DB.mdf',N'C:\ProgramData\FMSC_Database\FMSC_DB_log.ldf'))<>2 THROW 51005,'Unexpected synthetic file identity',1;" | Out-Null
+}
+function Install-Snapshot {
+    Assert-Level3Database
+    return ((@(Sql 'FMSC_DB' "SET NOCOUNT ON; SELECT CONVERT(varchar(64),HASHBYTES('SHA2_256',CONVERT(varbinary(max),(SELECT (SELECT * FROM dbo.SchoolProfile FOR JSON PATH) School,(SELECT * FROM dbo.Users ORDER BY UserId FOR JSON PATH) Users,(SELECT * FROM dbo.Roles ORDER BY RoleId FOR JSON PATH) Roles,(SELECT * FROM dbo.DatabaseVersion ORDER BY VersionId FOR JSON PATH) Versions FOR JSON PATH))),2); SELECT CONVERT(nvarchar(36),database_guid) FROM sys.database_recovery_status WHERE database_id=DB_ID();")) -join '').Trim()
+}
+
 function WriteEvidence {
     $report=[ordered]@{
         sourceCommit=$env:GITHUB_SHA
         result=$script:status
         lastStage=$script:stage
         localDbMsiCoverage=$script:msiCoverage
+        level3=[bool]$Level3
         cleanup=$script:cleanupResult
         checksPassed=@($script:checks.ToArray())
         limitations=@(
@@ -223,32 +262,8 @@ EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@
     $checks.Add('Generated a record-free version-6 MDF/LDF pair from the reviewed SQL model')
 
     Stage 'Actual FMSC Windows installer execution'
-    $installer=Join-Path $release 'core.ps1'
-    $psi=[Diagnostics.ProcessStartInfo]::new('powershell.exe')
-    foreach ($a in @('-NoProfile','-ExecutionPolicy','Bypass','-File',$installer)) { [void]$psi.ArgumentList.Add($a) }
-    $psi.UseShellExecute=$false
-    $psi.RedirectStandardInput=$true
-    $psi.RedirectStandardOutput=$true
-    $psi.RedirectStandardError=$true
-    $ownedInstallation=$true
-    $p=[Diagnostics.Process]::Start($psi)
-    if (-not $p) { throw 'Failed to start installer process.' }
-    $stdout=$p.StandardOutput.ReadToEndAsync()
-    $stderr=$p.StandardError.ReadToEndAsync()
-    $p.StandardInput.WriteLine('N')  # Do not start interactive WinForms UI.
-    $p.StandardInput.Close()
-    if (-not $p.WaitForExit(720000)) {
-        try { $p.Kill($true) } catch { }
-        throw 'Installer timed out; never claim success.'
-    }
-    $installerOutput=$stdout.GetAwaiter().GetResult()
-    $installerError=$stderr.GetAwaiter().GetResult()
-    # Retain synthetic diagnostics on the disposable runner only, never as artifacts.
-    $installerOutput | Set-Content -LiteralPath (Join-Path $root 'installer-private.log')
-    if ($p.ExitCode -ne 0) {
-        $failure=Select-String -LiteralPath (Join-Path $live 'Install.log') -Pattern 'ERROR:' -ErrorAction SilentlyContinue | Select-Object -Last 1
-        throw "Actual installer failed with exit code $($p.ExitCode). $($failure.Line) $installerError"
-    }
+    $exit=Invoke-ActualInstaller
+    if ($exit -ne 0) { throw "Actual installer failed with exit code $exit; inspect private runner diagnostics." }
     $installLog=Join-Path $live 'Install.log'
     if (-not (Test-Path -LiteralPath $installLog) -or
         -not (Select-String -LiteralPath $installLog -Pattern 'FMSC SMS installation completed successfully\.' -Quiet)) {
@@ -277,6 +292,103 @@ IF (SELECT COUNT(*) FROM sys.database_files WHERE physical_name IN
     THROW 51004,'Installed database does not use the expected copied file pair',1;
 '@ | Out-Null
     $checks.Add('Installed application launched in verification mode and accepted base SQL schema')
+    if ($Level3) {
+        Stage 'Level 3 installation ownership and fictional preservation records'
+        Sql 'FMSC_DB' "DECLARE @Owner uniqueidentifier='$level3Owner'; EXEC sys.sp_addextendedproperty @name=N'FMSC_Level3InstallOwner',@value=@Owner;" | Out-Null
+        Assert-Level3Database
+        Sql 'FMSC_DB' @'
+SET NOCOUNT ON;
+INSERT dbo.Roles(RoleName,Description) VALUES(N'Administrator',N'Synthetic installation acceptance');
+DECLARE @Role int=SCOPE_IDENTITY();
+INSERT dbo.Users(Username,RoleId,MustChangePassword) VALUES(N'level3_install_fixture',@Role,1);
+DECLARE @User int=SCOPE_IDENTITY();
+INSERT dbo.UserRoles(UserId,RoleId) VALUES(@User,@Role);
+INSERT dbo.SchoolProfile(SchoolProfileId,SchoolName,CreatedAt,UpdatedAt,CreatedByUserId,UpdatedByUserId)
+VALUES(1,N'Fictional Level 3 Install School',SYSUTCDATETIME(),SYSUTCDATETIME(),@User,@User);
+'@ | Out-Null
+        if (Test-Path -LiteralPath $themeFile) { throw 'Theme settings already exist; refusing to overwrite them.' }
+        New-Item -ItemType Directory -Path (Split-Path $themeFile -Parent) -Force | Out-Null
+        '0' | Set-Content -LiteralPath $themeFile
+        $ownedTheme=$true
+        $themeHash=(Get-FileHash -LiteralPath $themeFile).Hash
+        $before=Install-Snapshot
+        # The installed pair is a copy; only the owned release template is removed.
+        Remove-Item -LiteralPath (Join-Path $database 'FMSC_DB.mdf'),(Join-Path $database 'FMSC_DB_log.ldf') -Force
+        foreach ($id in @('L3-INS-02','L3-INS-03')) {
+            Stage "$id actual update/reinstallation without a database template"
+            Assert-Level3Database
+            $exit=Invoke-ActualInstaller
+            if ($exit -ne 0 -or (Install-Snapshot) -ne $before -or (Get-FileHash -LiteralPath $themeFile).Hash -ne $themeHash) {
+                throw "$id did not preserve fictional SQL records, database identity and user theme settings."
+            }
+            $checks.Add("$id | Actual installer preserves owned SQL records, database GUID and theme bytes without packaged MDF/LDF")
+        }
+        Stage 'L3-INS-04 missing published application prerequisite'
+        Assert-Level3Database
+        $sourceExe=Join-Path $app 'FMSC_SMS.exe'
+        Move-Item -LiteralPath $sourceExe -Destination "$sourceExe.held"
+        try {
+            if ((Invoke-ActualInstaller) -eq 0) { throw 'Missing source executable was accepted.' }
+            if ((Install-Snapshot) -ne $before -or -not (Test-Path -LiteralPath (Join-Path $installed 'FMSC_SMS.exe'))) { throw 'Prerequisite refusal damaged the installed app/database.' }
+        } finally { Move-Item -LiteralPath "$sourceExe.held" -Destination $sourceExe }
+        $checks.Add('L3-INS-04 cloud subset | Missing application prerequisite refused without replacing live app/data; MSI refusal is separately unit tested')
+        Stage 'L3-INS-05 simulated partial activation failure and actual filesystem rollback'
+        Assert-Level3Database
+        & {
+            param($projectPath,$testRoot)
+            $tokens=$null; $parseErrors=$null
+            $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $projectPath 'Installer/core.ps1'),[ref]$tokens,[ref]$parseErrors)
+            if ($parseErrors.Count) { throw 'Production installer does not parse.' }
+            $definition=@($ast.FindAll({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Enable-StagedApplication'},$true))
+            if ($definition.Count -ne 1) { throw 'Expected one production activation function.' }
+            Invoke-Expression $definition[0].Extent.Text
+            function Write-Log { param($Message) }
+            $fixture=Join-Path $testRoot ('activation-'+[guid]::NewGuid().ToString('N'))
+            $fixtureApp=Join-Path $fixture 'live'
+            $fixtureStage=Join-Path $fixture 'stage'
+            $fixtureRollback=Join-Path $fixture 'rollback'
+            New-Item -ItemType Directory -Path $fixtureApp,$fixtureStage -Force | Out-Null
+            'old executable sentinel' | Set-Content -LiteralPath (Join-Path $fixtureApp 'FMSC_SMS.exe')
+            'new executable sentinel' | Set-Content -LiteralPath (Join-Path $fixtureStage 'FMSC_SMS.exe')
+            $oldHash=(Get-FileHash -LiteralPath (Join-Path $fixtureApp 'FMSC_SMS.exe')).Hash
+            function Move-Item {
+                [CmdletBinding()] param([string]$LiteralPath,[string]$Destination,[switch]$Force)
+                if ($LiteralPath -eq $fixtureStage -and $Destination -eq $fixtureApp) {
+                    New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+                    'partial activation' | Set-Content -LiteralPath (Join-Path $Destination 'partial.txt')
+                    throw [IO.IOException]::new('Controlled test-only activation interruption')
+                }
+                Microsoft.PowerShell.Management\Move-Item @PSBoundParameters
+            }
+            $refused=$false
+            try { Enable-StagedApplication -Staging $fixtureStage -AppDir $fixtureApp -RollbackDir $fixtureRollback }
+            catch { if ($_.Exception.Message -notmatch 'Controlled test-only activation interruption') { throw }; $refused=$true }
+            if (-not $refused -or (Get-FileHash -LiteralPath (Join-Path $fixtureApp 'FMSC_SMS.exe')).Hash -ne $oldHash -or
+                (Test-Path -LiteralPath (Join-Path $fixtureApp 'partial.txt')) -or (Test-Path -LiteralPath $fixtureRollback)) {
+                throw 'Partial activation did not restore the exact previous application and remove unsafe partial output.'
+            }
+            Remove-Item -LiteralPath $fixture -Recurse -Force
+        } $project $root
+        if ((Install-Snapshot) -ne $before) { throw 'Activation fault test changed the installed SQL snapshot.' }
+        $checks.Add('L3-INS-05 | Test-only injected partial directory move exercises production rollback; exact previous bytes restored and partial output removed; not a power-loss test')
+        Stage 'Level 3 complete installer ZIP integrity, no database files'
+        $zipPath=Join-Path $root 'installer-synthetic.zip'
+        Compress-Archive -Path (Join-Path $release '*') -DestinationPath $zipPath
+        $archive=[IO.Compression.ZipFile]::OpenRead($zipPath)
+        try {
+            $entries=@($archive.Entries | ForEach-Object { $_.FullName.Replace('\','/') })
+            foreach ($required in @('FMSC_SMS/FMSC_SMS.exe','core.ps1','Install FMSC_SMS.bat','Tools/SqlLocalDB.msi','Tools/sqlcmd.exe','Database/PUT_MDF_AND_LDF_HERE.txt','READ_ME_FIRST.txt','SHA256SUMS.txt')) {
+                if ($required -notin $entries) { throw "ZIP is missing $required" }
+            }
+            if (@($entries | Where-Object { $_ -match '(?i)\.(mdf|ldf|ndf|bak)$' }).Count) { throw 'Database file entered the installer ZIP.' }
+            foreach ($entry in $archive.Entries) {
+                if ($entry.Length -eq 0) { continue }
+                $stream=$entry.Open()
+                try { $stream.CopyTo([IO.Stream]::Null) } finally { $stream.Dispose() }
+            }
+        } finally { $archive.Dispose() }
+        $checks.Add('L3 ZIP | All required non-database assets present and readable; no MDF/LDF/NDF/BAK files; ZIP remains private and is deleted')
+    }
     $status='PASS'
     Write-Host 'PASS: Disposable real Windows installer and synthetic LocalDB acceptance.'
 }
@@ -288,6 +400,7 @@ catch {
 finally {
     try {
         if ($ownedDatabase) {
+            if ($Level3 -and $ownedTheme) { Assert-Level3Database }
             Sql 'master' "IF DB_ID(N'FMSC_DB') IS NOT NULL BEGIN ALTER DATABASE [FMSC_DB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [FMSC_DB]; END;" | Out-Null
             if (((@(Sql 'master' "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.databases WHERE name=N'FMSC_DB';")) -join '').Trim() -ne '0') {
                 throw 'Owned disposable database still exists after cleanup.'
@@ -301,6 +414,7 @@ finally {
                 if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
             }
         }
+        if ($ownedTheme -and (Test-Path -LiteralPath $themeFile)) { Remove-Item -LiteralPath $themeFile -Force }
         if ($ownedRoot) { Remove-Item -LiteralPath $root -Recurse -Force }
         $cleanupResult='PASS'
     }
