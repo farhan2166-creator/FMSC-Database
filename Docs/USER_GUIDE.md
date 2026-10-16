@@ -105,3 +105,7 @@ Administrators maintain user accounts and permissions. General tasks require rol
 Never email or commit the live `FMSC_DB.mdf`, `FMSC_DB_log.ldf`, `.bak` backups, or student reports to a public repository or support ticket. When reporting a bug, record the screen, steps, expected/actual result, approximate time and **sanitized** screenshot/log only.
 
 For installation and recovery issues, use [installation](INSTALLATION.md) and [backup/recovery](BACKUP_RECOVERY.md).
+
+## Help for rules and unexpected results
+
+Open **Help & FAQ** on the dashboard. Search in ordinary words, combine Topic and Rule type filters, and follow Where to go. System rules are protected; School settings have a supported authorized editor; User choices remain within permitted options. Help is offline and does not grant action access. Related questions clear the current filters to show their destination. See [Help Center instructions and acceptance limits](HELP_CENTER.md).

@@ -1,26 +1,68 @@
-# FMSC_SMS — Help & FAQ Center
+# Help & FAQ Center
 
-The **Help & FAQ** dashboard entry opens a read-only, searchable operator guide. It does not connect to SQL or require additional permissions. It is intended to explain business workflows, not to grant access to them.
+Open **Help & FAQ** from the dashboard. It works offline, needs no school database connection or additional action permission, and never grants access to the workflows it describes. The catalog has **126 questions in 15 topics**: all 77 original questions reviewed, 49 additions, no entries removed. Overlapping questions about departure and history, or partial collection and remaining balance, answer different operator concerns and are retained.
 
-## Contents
+Search using ordinary words such as `unpaid fees`, `pending siblings`, `payment refresh`, `correction unknown`, `stop transport` or `photo zoom`. All meaningful search terms must match. Titles rank above keywords, workspace/rule labels and answer-only matches. Case, punctuation and explicit spelling aliases are normalized; there is no approximate substring or online AI search. An exact question ranks first. Explicit term groups cover dues/unpaid/balance, admission spellings, enrollment/enrolment, parent/guardian, family/sibling, payment/collection, cancellation spellings, database/LocalDB/SQL and more. Context-sensitive concepts such as transfer vs departure, and refund vs cancellation, remain distinct.
 
-The initial catalog has **77 question-and-answer pairs** across **15 categories**: Getting Started; School Setup; Admissions; Student Search; Students & Families; Promotion; Fees & Rates; Billing; Collection; Reports; Staff; Permissions; Database & Recovery; Communication; and Administration.
+Combine **Topic** and **Rule type** filters with search. The count describes matching questions, not student records. A no-result state suggests fewer terms or clearing the two filters. Ctrl+F focuses and selects the search text. Arrow keys select a result; Enter moves to its answer. Related questions open on Enter or double-click, clear the current search/filters and select their stable destination. No related link executes an application operation.
 
-Each entry includes the exact operator question, a plain-English answer, synonyms/search keywords, an indication of whether the decision is a protected database/application rule or a user-configurable choice, and the menu/workspace where the operator should continue.
+The answer includes its question, plain-language rule labels, explanation, any important caution and **Where to go**. Everything stays in a scrollable reading area, avoiding fixed-height question clipping. The results move above the answer on narrower effective client widths. Existing shared theme fonts, colors and DPI helpers are retained. Related results also scroll; they never consume the whole answer area.
 
-Search performs case-insensitive AND matching on space-separated terms against questions, answers, keywords, category, decision source and destination. Topic filtering and search can be combined. The result count and a readable empty state update as users type. Results and answers remain local/offline, so no school data is sent to a search service.
+## Rule labels and technical ownership
 
-## Source-of-truth boundaries
+An entry can carry more than one label:
 
-Entries are operator-facing summaries grounded in: `Docs/USER_GUIDE.md`, `ADMISSION_WORKFLOW.md`, `Docs/BACKUP_RECOVERY.md`, `Docs/COMMUNICATION_CENTER.md`, `Docs/INSTALLATION.md`, `PROJECT_STRUCTURE.md`, `Core/PermissionCatalog.json`, current navigation in `MainDashboardForm.cs`, and constraints in `Schema/Constraints`.
+| Label | Meaning |
+|---|---|
+| System rule | Protected behavior; an Administrator still cannot bypass data-integrity rules through ordinary actions. |
+| School setting | A supported authorized editor can change the documented policy or setup value. |
+| User choice | An operator selects among valid alternatives. |
+| Permission required | The action requires the relevant access in addition to valid data. |
+| Recovery guidance | Determine the recorded outcome or use the supported recovery path before retrying. |
 
-**The FAQ is not an executable policy.** On any disagreement, actual live schema/stored procedures, runtime compatibility, current user permissions, and C# application behavior take precedence. Historical documents can lag the current schema (currently v6). Labels such as “SQL financial restriction” describe the documented ownership of a rule, not proof of a full code-path audit for that entry. Re-check source and SQL against each FAQ when the associated workflow changes.
+Maintainer-only ownership records SQL, C#, configurable data and external provider/environment dependencies. It is separate from operator labels. Source references and related IDs live with each entry. See the [coverage matrix](FAQ_COVERAGE_MATRIX.md) for every question and the [source audit](FAQ_AUDIT_REPORT.md) for corrections and unresolved differences.
 
-The help catalog is in `Pages/Help/HelpCatalog.cs` and its UI is in `Pages/Help/HelpCenterPage.cs`. To add an entry, provide category, natural-language question, answer, keyword synonyms, decision owner/source, and exact navigation hint. Avoid developer jargon in answers; keep them actionable and never suggest bypassing permissions or direct SQL edits. Don't put credentials, connection strings or individual student data in help text.
+## Structure and maintenance
 
-## Follow-up acceptance
+- `Pages/Help/HelpCatalog.cs`: model, rule labels, precomputed search index, fixed synonym groups, filters, ranking and related lookup. The existing two-argument `Find` API remains supported, with an optional rule filter.
+- `HelpCatalog.Basics.cs`, `.Students.cs`, `.Finance.cs`, `.Communication.cs`: module content. One shared catalog/search API; no SQL-backed help store or new runtime dependency.
+- `Pages/Help/HelpCenterPage.cs`: existing dashboard page enhanced with rule filtering, keyboard access, related questions and responsive themed reading.
+- `Tests/HelpChecks`: portable production-catalog checks without WinForms, database or network access.
+- `Tests/ThemeSmokeChecks/Program.HelpCenter.cs`: Windows control contracts, integrated into the existing suite and available independently with `--help-center`.
 
-- Verify release build and permission-independent navigation from the dashboard.
-- On a Windows UI session, test search, changing categories, keyboard selection, no-result state, narrow DPI/window layout, and theme changes.
-- Ask an operator unfamiliar with the implementation to locate solutions for “pending registration paid,” “unknown payment save,” “student not posted,” “missing permission,” and “restore older backup.”
-- Before claiming exhaustive coverage, conduct a separate C# ↔ live schema stored-procedure audit for finer-grained flags and edge cases. The initial FAQ is a substantial operator guide, not a guarantee that every stored procedure branch is documented.
+To change an answer:
+
+1. Inspect the current screen, writer, SQL procedure/trigger/constraint and permission code. Do not treat historical audit prose as an executable rule.
+2. Preserve its ID. IDs `FAQ-001`–`FAQ-077` were assigned to the original order because the initial catalog had no IDs. Append new IDs; never derive them from mutable titles.
+3. Explain the supported next action, relevant authorization and history/balance consequences. Add a caution for uncertain outcomes or financial effects. Avoid procedure names in the operator answer.
+4. Attach precise existing source paths, with method/type/object symbols where practical. Record all relevant ownership layers. Mark genuine configuration only when an authorized editor exists.
+5. Link a few useful, distinct follow-up questions by ID. No self-links, duplicates, broken references or cycles.
+6. Update the coverage matrix and source audit when a rule or evidence boundary changes. A source reference resolving is necessary, but is not proof that the prose is correct.
+7. Run the checks below and review the answer in Windows. Do not edit SQL, permissions or approved database assets to match an answer.
+
+## Verification commands
+
+From the repository root, using .NET 8:
+
+```powershell
+dotnet run --project Tests/HelpChecks/HelpChecks.csproj -c Release
+dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
+dotnet build FMSC_SMS.sln -c Release
+dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --help-center
+```
+
+Linux compilation of the solution/Windows control project requires `-p:EnableWindowsTargeting=true`. The Windows control executable cannot run on Linux. The portable suite validates unique IDs/questions, required metadata, source paths/symbols, complete related graphs, real searches, ranking, combined filters, no results and offline dependencies. It also provides a bounded search timing smoke check, not a production performance certification.
+
+The existing Desktop CI runs the portable Help checks and includes Help control checks in its focused post-fix suite; no installer/release workflow or existing check is removed.
+
+The Windows control suite needs a disposable Windows profile and no database. It checks construction while signed out, search, empty state, related Enter behavior, theme changes, compact sizes and disposal. It is a control-contract suite, not real operator desktop acceptance.
+
+## Windows acceptance still required
+
+1. Open Help while signed in as Administrator and as a restricted user; compare the same offline catalog. Confirm protected destination access is unchanged.
+2. Test keyboard Tab/Shift+Tab, Ctrl+F, result arrows, Enter into the answer, answer scrolling and related Enter/double-click. Check screen-reader names and reading order with Windows Narrator.
+3. Use 1280×720, 1366×768, 1920×1080 and larger working areas at 100%, 125%, 150% and 200% scaling where available. Verify all filters, readable answer text, horizontal/vertical split and scrolling. Move between monitors with different DPI.
+4. Switch regular and lightweight themes with an answer selected. Confirm contrast, selection and filters remain intact. Read the longest answer and a warning without clipping.
+5. Ask an operator to resolve pending sibling registration, a payment with unknown outcome, Hold promotion, transport stopping and an older restore. Confirm the actual supported destination and permission.
+
+No real school data is needed. These checks remain pending until actually performed. GitHub hosted checks are not reported green while the owner's Actions allowance is exhausted.

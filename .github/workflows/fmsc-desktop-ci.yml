@@ -50,6 +50,9 @@ jobs:
       - name: Run portable audit regression checks
         run: dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
 
+      - name: Run offline Help Center catalog and search checks
+        run: dotnet run --project Tests/HelpChecks/HelpChecks.csproj -c Release
+
       - name: Run synthetic performance and state checks
         run: dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
 

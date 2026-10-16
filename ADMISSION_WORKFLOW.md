@@ -12,7 +12,7 @@ User decisions, updated 2026-10-13:
 - Cancel Registration is available only for pending quick registrations. It preserves history and reverses eligible unpaid bills; paid allocations require fee corrections/refunds first. Once an official admission number is allocated, cancellation is refused. Use Mark as Left for departure and the correction workspaces for details or fees.
 - Existing records remain legacy records until the one-time Go Live operation. They may be corrected in Admission and marked verified. Student, placement or fee edits clear verification.
 - Go Live requires verified active legacy records with valid dates and mandatory fee setup. It previews the go-live date, billing month and optional replacement placement date, then atomically activates the reviewed set. Recorded placement dates are preserved by default. Existing financial history is retained; conflicting dates block activation. Stale previews and repeated execution are refused.
-- Confirmed operational academic years cannot be edited. Movement uses Promotion, Transfer or Re-admission. Audited genuine date corrections remain available.
+- The academic year on a confirmed operational enrollment is protected. Movement uses Promotion, Transfer or Re-admission; genuine placement errors use the audited correction workflow. Calendar.Manage users can still edit Academic Years within its unique-name, valid-date and non-overlap rules; this does not move student placements.
 - Student Data Review combines legacy progress, record issues/history and possible duplicates. It opens Admission for editing. Duplicate review does not automatically merge or delete students.
 - After Go Live completes, its action and legacy setup tab disappear permanently, using the saved database completion state on every reopen. Quick Registration is available only from Dashboard Quick Actions, not the navigation sidebar.
 - Quick Registration has a Registration Form tab and a separate Pending Registrations tab. The pending list searches temporary references, child/parent names and contact numbers. Open Registration or a double-click loads the Registration Form for editing basic details and discounts. Selecting a row enables Review / Confirm on the pending list; the Registration Form has no confirmation action. Returning to the list refreshes it, so confirmed and cancelled records disappear from the pending list.
@@ -29,7 +29,7 @@ Legacy verification and Go Live are operator actions on the current database;
 supplying the snapshot does not run Go Live or change school records.
 
 The live development schema, runtime compatibility contract and FMSC.dacpac
-include this workflow. Application and database schema versions remain v1.
+include this workflow. The current runtime database schema requirement is version 6. The application version is separate from the database schema version.
 Local recovery backups, when retained, belong in the ignored RecoveryBackups directory.
 
 Run Validation/AdmissionWorkflowChecks.ps1 and

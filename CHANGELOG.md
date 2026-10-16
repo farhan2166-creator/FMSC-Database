@@ -20,6 +20,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Added
 
+- Enhance the existing offline Help & FAQ Center: 126 source-linked questions across 15 topics, plain-language rule labels, ranked synonym search, topic/rule filters, related questions and responsive themed reading. Clarify calendar vs enrollment protection, supported role editing, payment recovery and retired communication setup guidance; application business rules remain unchanged.
+
 - Added an opt-in disposable Windows installation acceptance workflow: approved data-free schema fixture, real signed LocalDB prerequisite, validated complete installer, synthetic MDF/LDF, and installed-app verification. It reports pristine-MSI gaps and uploads sanitized evidence only; it does not test real school data or approve production deployment.
 
 - Added a manually dispatchable, DACPAC-triggered, schema-only reference extractor. It stores complete per-object model XML and SQL module bodies, tracks changed definitions and proposes a draft synchronization PR without importing data or approving changes.

@@ -378,3 +378,9 @@ Database/*.bak
 /Tests/CommunicationChecks/*
 !/Tests/CommunicationChecks/*.cs
 !/Tests/CommunicationChecks/*.csproj
+
+# Offline help catalog checks (source only).
+!/Tests/HelpChecks/
+/Tests/HelpChecks/*
+!/Tests/HelpChecks/*.cs
+!/Tests/HelpChecks/*.csproj
