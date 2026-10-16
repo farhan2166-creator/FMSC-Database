@@ -602,10 +602,10 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         var result=await LoadRegistrationAsync(id,afterSave:true);
         if(IsDisposed||result==RegistrationLoadOutcome.Superseded)return;
         if(result==RegistrationLoadOutcome.Loaded)
-            SetStatus(isNew?$"Saved {reference}. Print Bill or collect payment. For a sibling, use Add Another Child; admission confirmation can wait."
-                : "Registration changes saved. Review / Confirm is on Pending Registrations.",PageStatusKind.Success);
+            SetStatus(isNew?$"Saved {reference}. Print Bill, collect payment or Add Another Child. Confirm later from Pending Registrations."
+                : "Changes saved. Review / Confirm from Pending Registrations.",PageStatusKind.Success);
         else
-            SetStatus($"{reference} was saved to the database, but the screen could not refresh. Use Reload Registration before further edits, printing or payment. Do not save it again.",PageStatusKind.Warning);
+            SetStatus($"{reference} saved. Do not save again. Use Reload Registration before editing, printing or payment.",PageStatusKind.Warning);
     }
 
     private async Task SavePendingAsync(){

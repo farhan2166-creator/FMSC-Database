@@ -3099,20 +3099,17 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             {
                 /* The money is taken and the rows above prove it, so this is not a failure of the collection. */
                 Warn(
-                    $"The collection completed for {posted} students, but " +
-                    $"{distinctReceipts.Count} distinct receipt numbers came back, so " +
-                    "a single family receipt number could not be confirmed. " +
-                    "Check Recent Payments for receipt details.");
+                    $"Collection recorded for {posted} students. Check Recent Payments: " +
+                    $"{distinctReceipts.Count} receipt numbers returned; no single family receipt confirmed.");
             }
             else
             {
                 Info(
                     receipts.Count == 0
-                        ? $"{transactionType} completed successfully."
+                        ? $"{transactionType} recorded."
                         : isFamilyCollection
-                            ? $"{transactionType} completed for {posted} students under one " +
-                              $"family receipt: {singleReceipt}."
-                            : $"{transactionType} completed successfully. Receipt: {singleReceipt}.");
+                            ? $"{transactionType} recorded for {posted} students. Family receipt: {singleReceipt}."
+                            : $"{transactionType} recorded. Receipt: {singleReceipt}.");
             }
             // A confirmed new payment replaces the previous payment's print context.
             lastCollectionReceipt = null;

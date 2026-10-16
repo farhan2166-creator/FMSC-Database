@@ -449,7 +449,7 @@ public sealed class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges, IBusyP
                 admissionId = Convert.ToInt32(confirmed.Rows[0]["AdmissionId"]);
             }
             returnDraftBaseline=null;
-            Info("Return admission confirmed. Opening charges are ready in Fee Collection." + billingFrom);
+            Info("Return confirmed. Opening charges ready in Fee Collection." + billingFrom);
             StudentSearchCache.Invalidate();
             if (compactDialog)
             {
@@ -467,7 +467,7 @@ public sealed class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges, IBusyP
             {
                 string who = studentName.Length > 0 ? studentName : "the student";
                 nextSteps.Offer(
-                    $"Return confirmed for {who}.{billingFrom} Print the bill, then take the payment in Fee Collection.",
+                    $"Return confirmed: {who}.{billingFrom} Print Bill or collect fees.",
                     admissionId,
                     FlowStep.Do("Print Bill", "Fees.View", PrintBillAsync),
                     StudentFlow.FeeCollection(primary: true));
