@@ -1,0 +1,32 @@
+title = "FMSC source secret checks"
+
+[extend]
+useDefault = true
+
+# Default rules cover tokens, API credentials and private keys. Also flag
+# literal passwords even when their entropy is too low for a generic API key.
+[[rules]]
+id = "fmsc-literal-password"
+description = "A password is assigned a literal value"
+regex = '''(?i)(?:["'](?:password|pwd)["']|\b(?:password|pwd))[ \t]*[:=][ \t]*["']([^\s"'][^"'\r\n]{3,})["']'''
+secretGroup = 1
+keywords = ["password", "pwd"]
+
+[[rules.allowlists]]
+description = "Exact existing synthetic WinForms/SQL fixture values, only in their test files"
+condition = "AND"
+paths = ['''^Tests/(?:AdministrationSqlChecks/Program\.cs|ThemeSmokeChecks/Program(?:\.Administration)?\.cs)$''']
+regexTarget = "secret"
+regexes = ['''^(?:Fixture password 12345|captured password)$''']
+
+[[rules]]
+id = "fmsc-connection-password"
+description = "A SQL connection string contains a literal password"
+regex = '''(?i)(?:server|data source|user id|uid)\s*=\s*[^"'\r\n]{0,300}?;\s*(?:password|pwd)\s*=\s*([^;"'\s\r\n]+)'''
+secretGroup = 1
+keywords = ["password", "pwd"]
+
+[[rules.allowlists]]
+description = "A C# interpolated variable is not a literal connection password"
+regexTarget = "secret"
+regexes = ['''^\{[A-Za-z_][A-Za-z0-9_.]*\}$''']

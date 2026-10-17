@@ -1,0 +1,49 @@
+name: FMSC Security Checks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fmsc-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secrets-and-sensitive-files:
+    name: Secrets and sensitive files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out complete history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      # Free MIT-licensed CLI, not the licensed Gitleaks marketplace action.
+      # Review the version and pinned official archive hash together on updates.
+      - name: Download checksum-pinned Gitleaks CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          scanner_dir="$RUNNER_TEMP/gitleaks"
+          mkdir -p "$scanner_dir"
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output "$scanner_dir/archive.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $scanner_dir/archive.tar.gz" | sha256sum --check --status
+          tar -xzf "$scanner_dir/archive.tar.gz" -C "$scanner_dir" gitleaks
+          chmod 755 "$scanner_dir/gitleaks"
+
+      - name: Verify detection using disposable dummy fixtures
+        run: python Tools/test_security.py --gitleaks "$RUNNER_TEMP/gitleaks/gitleaks"
+
+      - name: Scan source history and forbidden file names
+        run: python Tools/check_security.py --gitleaks "$RUNNER_TEMP/gitleaks/gitleaks"

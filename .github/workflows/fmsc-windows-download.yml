@@ -1,0 +1,90 @@
+name: FMSC Private Windows Application ZIP
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Verify and package Windows x64
+    if: github.ref == 'refs/heads/main'
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Restore and compile desktop application
+        run: |
+          dotnet restore FMSC_SMS.sln
+          dotnet build FMSC_SMS.sln -c Release --no-restore
+
+      - name: Compile WinForms smoke fixtures (no interactive UI)
+        run: dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
+
+      - name: Run portable C# regression checks
+        run: dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
+
+      - name: Run synthetic performance and lifecycle checks
+        run: dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
+
+      # The ordinary PortableRelease publish remains subject to its installer/MSI
+      # and optional detached-MDF/LDF validation. Only this GitHub Actions
+      # app-only bundle skips those full-installer preparation/copy targets.
+      - name: Publish self-contained Windows x64 application
+        shell: pwsh
+        run: |
+          dotnet publish FMSC_SMS.csproj -c Release -r win-x64 --self-contained true --output out/windows-x64-app -p:CIAppOnlyBundle=true -p:PublishSingleFile=false -p:PublishTrimmed=false
+          if ($LASTEXITCODE -ne 0) { throw "Windows publish failed." }
+
+      - name: Verify ZIP contents and add build manifest
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:GITHUB_WORKSPACE 'out/windows-x64-app'
+          foreach ($name in @('FMSC_SMS.exe', 'FMSC_SMS.dll', 'FMSC_SMS.deps.json', 'FMSC_SMS.runtimeconfig.json')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $root $name) -PathType Leaf)) {
+              throw "Missing Windows application output: $name"
+            }
+          }
+          $forbidden = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.Extension.ToLowerInvariant() -in @('.mdf','.ldf','.bak','.msi') })
+          if ($forbidden.Count -gt 0) { throw "The application ZIP must never include database or installer files." }
+          @(
+            'FMSC_SMS - Windows x64 application-only download'
+            'Source commit: ${{ github.sha }}'
+            'Build run: ${{ github.run_number }}'
+            'Built with: .NET 8 (self-contained, WinForms)'
+            ''
+            'This is NOT a complete installer or a GitHub public Release.'
+            'It contains no student records, MDF/LDF, LocalDB MSI, or database migrations.'
+            'The existing school PC still needs its approved SQL LocalDB setup and compatible schema-6 database.'
+            'For fresh installation or schema migration, use the separately validated installer package.'
+            'GitHub Actions CI does not run interactive Windows UI, physical printer, or school-database tests.'
+          ) | Set-Content -LiteralPath (Join-Path $root 'BUILD_INFO.txt') -Encoding utf8
+          $lines = @(Get-ChildItem -LiteralPath $root -File -Recurse | Sort-Object FullName | ForEach-Object {
+            $rel = [System.IO.Path]::GetRelativePath($root, $_.FullName).Replace('\', '/')
+            '{0}  {1}' -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $rel
+          })
+          $lines | Set-Content -LiteralPath (Join-Path $root 'SHA256SUMS.txt') -Encoding utf8
+
+      # Artifacts are accessible only to authorized viewers of this private repo.
+      # No gh release create, deployment, school SQL connection, or public upload.
+      - name: Upload private Windows ZIP
+        uses: actions/upload-artifact@v7
+        with:
+          name: FMSC_SMS-Windows-x64-app-only-${{ github.run_number }}
+          path: out/windows-x64-app/
+          retention-days: 14
+          if-no-files-found: error

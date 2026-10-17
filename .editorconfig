@@ -1,0 +1,118 @@
+root = true
+# =========================================================
+# FMSC_SMS C# CODE STYLE
+# =========================================================
+[*.cs]
+# =========================================================
+# INDENTATION
+# =========================================================
+indent_style = space
+indent_size = 4
+tab_width = 4
+# =========================================================
+# FILE
+# =========================================================
+end_of_line = crlf
+insert_final_newline = true
+# =========================================================
+# USING DIRECTIVES
+# =========================================================
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+# =========================================================
+# BRACES
+# =========================================================
+# Keep normal C# braces on their own line.
+csharp_new_line_before_open_brace = methods, types, properties, accessors, control_blocks
+# Always keep braces for control blocks.
+csharp_prefer_braces = true:suggestion
+# =========================================================
+# COMPACT BLOCKS
+# =========================================================
+# Allow very small blocks to remain on one line where
+# Visual Studio's formatter considers it appropriate.
+csharp_preserve_single_line_blocks = true
+# Keep simple statements together when possible.
+csharp_preserve_single_line_statements = true
+# =========================================================
+# EXPRESSIONS
+# =========================================================
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+# =========================================================
+# NULLABILITY
+# =========================================================
+csharp_style_throw_expression = true:suggestion
+csharp_style_conditional_delegate_call = true:suggestion
+csharp_style_null_propagation = true:suggestion
+csharp_style_coalesce_expression = true:suggestion
+# =========================================================
+# PATTERN MATCHING
+# =========================================================
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+# =========================================================
+# MODERN C#
+# =========================================================
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_prefer_extended_property_pattern = true:suggestion
+# =========================================================
+# QUALIFICATION
+# =========================================================
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+# =========================================================
+# ACCESSIBILITY
+# =========================================================
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:suggestion
+# =========================================================
+# MODERN BLOCKS
+# =========================================================
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_style_namespace_declarations = file_scoped:suggestion
+# =========================================================
+# SPACING
+# =========================================================
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_space_between_method_call_parameter_list_parentheses = false
+csharp_space_between_parentheses = false
+csharp_space_after_cast = false
+# =========================================================
+# NEW LINES
+# =========================================================
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+# Do not force chained members onto separate lines.
+csharp_new_line_before_members_in_chained_calls = false
+# =========================================================
+# OBJECT / COLLECTION INITIALIZERS
+# =========================================================
+csharp_style_collection_initializer = true:suggestion
+csharp_style_object_initializer = true:suggestion
+# =========================================================
+# WRAPPING
+# =========================================================
+# Keep short blocks together.
+csharp_preserve_single_line_blocks = true
+# Keep simple statements together.
+csharp_preserve_single_line_statements = true
+# =========================================================
+# FILE HEADERS
+# =========================================================
+file_header_template = unset
+# =========================================================
+# JSON
+# =========================================================
+[*.json]
+indent_size = 2
+# =========================================================
+# XML
+# =========================================================
+[*.xml]
+indent_size = 2

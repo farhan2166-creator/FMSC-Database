@@ -1,0 +1,154 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- Opt-in test binary; normal builds contain no disposable-target override. -->
+    <PropertyGroup Condition="'$(FmscLevel2)' == 'true'">
+        <DefineConstants>$(DefineConstants);FMSC_LEVEL2</DefineConstants>
+        <OutputPath>bin\Level2\$(Configuration)\</OutputPath>
+    </PropertyGroup>
+    <Target Name="RejectLevel2Publish" BeforeTargets="PrepareForPublish" Condition="'$(FmscLevel2)' == 'true'">
+        <Error Text="The isolated Level 2 test binary must never be published as a school application." />
+    </Target>
+    <ItemGroup>
+        <!-- Portable shortcut checks build separately with simulated controls. -->
+        <Compile Remove="Tests/**/*.cs" />
+        <Compile Remove="Apps/**/*.cs" />
+    </ItemGroup>
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net8.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UseWindowsForms>true</UseWindowsForms>
+		<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+		<ApplicationIcon>Assets\FMSC_Logo Icon.ico</ApplicationIcon>
+		<Version>1.0.0</Version>
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
+	</PropertyGroup>
+	<ItemGroup>
+		<Content Include="Assets\academics.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\administration.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\dashboard.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\finance.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\FMSC_Logo Icon.ico" CopyToOutputDirectory="PreserveNewest" />
+		<Content Include="Assets\logo.png" CopyToOutputDirectory="PreserveNewest" />
+		<Content Include="Assets\header.png" CopyToOutputDirectory="PreserveNewest" />
+		<Content Include="Assets\promotion.png">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\reports.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\setup.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\staff.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Assets\students.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="Pages\Reports\Templates\*.rdlc">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<Link>Reports\%(Filename)%(Extension)</Link>
+			<Visible>false</Visible>
+		</Content>
+	</ItemGroup>
+	<ItemGroup>
+		<None Remove="Assets\academics.png" />
+		<None Remove="Assets\administration.png" />
+		<None Remove="Assets\dashboard.png" />
+		<None Remove="Assets\finance.png" />
+		<None Remove="Assets\promotion.png" />
+		<None Remove="Assets\reports.png" />
+		<None Remove="Assets\setup.png" />
+		<None Remove="Assets\staff.png" />
+		<None Remove="Assets\students.png" />
+	</ItemGroup>
+	<ItemGroup>
+		<EmbeddedResource Include="Core\DatabaseCompatibilityRequirements.json" />
+		<EmbeddedResource Include="Core\DatabaseMigrationRequirements.json" />
+		<EmbeddedResource Include="Core\PermissionCatalog.json" LogicalName="FMSC_SMS.Core.PermissionCatalog.json" />
+		<EmbeddedResource Include="Pages\Students\Admissions\PlacementCorrection.sql" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+		<PackageReference Include="PDFsharp-MigraDoc-GDI" Version="6.2.4" />
+		<PackageReference Include="ReportViewerCore.WinForms" Version="15.1.33" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Update="Installer\core.ps1">
+			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		</None>
+		<None Update="Installer\Install FMSC_SMS.bat">
+			<CopyToOutputDirectory>Never</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+	<!-- Established user decision (see AGENTS.md): the user places the latest detached MDF/LDF
+	     in ../Database when preparing a release package. Their absence during development
+	     is expected and must not be reported as a release-readiness blocker.
+	     Database snapshots are optional for app-only updates. When supplied in the adjacent
+	     Database folder (or DeploymentDatabaseDirectory), validate and copy both detached files.
+	     Fresh installations still require a compatible snapshot; existing live data is preserved. -->
+	<!-- Only the private GitHub Actions application-only ZIP may skip installer
+	     prerequisites/copying. Normal full release publishing remains validated. -->
+	<!-- Validate installer, prerequisite, migrations and any supplied database snapshot before publishing. -->
+	<Target Name="ValidateDeploymentAssets" BeforeTargets="PrepareForPublish" Condition="'$(CIAppOnlyBundle)' != 'true' Or '$(GITHUB_ACTIONS)' != 'true'">
+		<PropertyGroup>
+			<DeploymentDatabaseDirectory Condition="'$(DeploymentDatabaseDirectory)' == ''">$(MSBuildProjectDirectory)\..\Database</DeploymentDatabaseDirectory>
+			<DeploymentMigrationDirectory Condition="'$(DeploymentMigrationDirectory)' == ''">$(MSBuildProjectDirectory)\Migrations</DeploymentMigrationDirectory>
+			<LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == '' AND Exists('$(MSBuildProjectDirectory)\..\Tools\SqlLocalDB.msi')">$(MSBuildProjectDirectory)\..\Tools\SqlLocalDB.msi</LocalDbMsiPath>
+			<LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == '' AND Exists('$(MSBuildProjectDirectory)\..\LocalDB\SqlLocalDB.msi')">$(MSBuildProjectDirectory)\..\LocalDB\SqlLocalDB.msi</LocalDbMsiPath>
+			<LocalDbMsiPath Condition="'$(LocalDbMsiPath)' == ''">$(MSBuildProjectDirectory)\..\Tools\SqlLocalDB.msi</LocalDbMsiPath>
+			<_InstallerScript>$(MSBuildProjectDirectory)\Installer\core.ps1</_InstallerScript>
+			<_InstallerText>$([System.IO.File]::ReadAllText('$(_InstallerScript)'))</_InstallerText>
+			<!-- [$] escapes the PowerShell variable marker from MSBuild property expansion. -->
+			<_RequiredSchemaVersion>$([System.Text.RegularExpressions.Regex]::Match('$(_InstallerText)', '[$]DatabaseVersion = [^0-9]*([0-9]+)').Groups[1].Value)</_RequiredSchemaVersion>
+		</PropertyGroup>
+		<Error Condition="'$(_RequiredSchemaVersion)' == ''" Text="Could not read the required schema version from Installer\core.ps1. Expected a line like: `$DatabaseVersion = '6'" />
+		<ItemGroup>
+			<_RequiredDeploymentFile Include="$(MSBuildProjectDirectory)\Installer\core.ps1" />
+			<_RequiredDeploymentFile Include="$(MSBuildProjectDirectory)\Installer\Install FMSC_SMS.bat" />
+		</ItemGroup>
+		<Error Condition="'@(_RequiredDeploymentFile)' != '' AND !Exists('%(FullPath)')" Text="Required release asset is missing: %(FullPath). Publishing has been stopped." />
+		<!-- LocalDB must be bundled; sqlcmd can be resolved by the installer. The self-contained publish includes the .NET Desktop Runtime. -->
+		<Error Condition="!Exists('$(LocalDbMsiPath)')" Text="Required LocalDB prerequisite is missing: $(LocalDbMsiPath). Supply LocalDbMsiPath or place SqlLocalDB.msi in ..\Tools or ..\LocalDB." />
+		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Installer\ValidateReleaseAssets.ps1&quot; -DatabaseDirectory &quot;$(DeploymentDatabaseDirectory)&quot; -LocalDbMsiPath &quot;$(LocalDbMsiPath)&quot;"
+              EnvironmentVariables="PSModulePath=$(SystemRoot)\System32\WindowsPowerShell\v1.0\Modules" />
+	</Target>
+	<Target Name="CopyDeploymentFiles" AfterTargets="Publish" DependsOnTargets="ValidateDeploymentAssets" Condition="'$(CIAppOnlyBundle)' != 'true' Or '$(GITHUB_ACTIONS)' != 'true'">
+		<PropertyGroup>
+			<ReleaseRoot Condition="'$(ReleaseRoot)' == ''">$(MSBuildProjectDirectory)\..\FMSC_SMS_Release\</ReleaseRoot>
+		</PropertyGroup>
+		<MakeDir Directories="$(ReleaseRoot)Database" Condition="Exists('$(DeploymentDatabaseDirectory)\FMSC_DB.mdf')" />
+		<Copy SourceFiles="$(DeploymentDatabaseDirectory)\FMSC_DB.mdf" DestinationFiles="$(ReleaseRoot)Database\FMSC_DB.mdf" SkipUnchangedFiles="true" Condition="Exists('$(DeploymentDatabaseDirectory)\FMSC_DB.mdf')" />
+		<Copy SourceFiles="$(DeploymentDatabaseDirectory)\FMSC_DB_log.ldf" DestinationFiles="$(ReleaseRoot)Database\FMSC_DB_log.ldf" SkipUnchangedFiles="true" Condition="Exists('$(DeploymentDatabaseDirectory)\FMSC_DB_log.ldf')" />
+		<MakeDir Directories="$(ReleaseRoot)Tools" />
+		<ItemGroup>
+			<_InstallerToolFile Include="$(MSBuildProjectDirectory)\..\Tools\*" />
+		</ItemGroup>
+		<Copy SourceFiles="@(_InstallerToolFile)" DestinationFolder="$(ReleaseRoot)Tools" SkipUnchangedFiles="true" Condition="'@(_InstallerToolFile)' != ''" />
+		<Copy SourceFiles="$(LocalDbMsiPath)" DestinationFiles="$(ReleaseRoot)Tools\SqlLocalDB.msi" SkipUnchangedFiles="true" />
+		<MakeDir Directories="$(ReleaseRoot)Migrations" />
+		<ItemGroup>
+			<MigrationFiles Include="$(DeploymentMigrationDirectory)\*.sql" />
+		</ItemGroup>
+		<Copy SourceFiles="@(MigrationFiles)" DestinationFiles="@(MigrationFiles->'$(ReleaseRoot)Migrations\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\core.ps1" DestinationFiles="$(ReleaseRoot)core.ps1" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\Install FMSC_SMS.bat" DestinationFiles="$(ReleaseRoot)Install FMSC_SMS.bat" SkipUnchangedFiles="true" />
+	</Target>
+	<ItemGroup>
+	  <EditorConfigFiles Remove=".editorconfig" />
+	</ItemGroup>
+	<ItemGroup>
+	  <None Include=".editorconfig" />
+	</ItemGroup>
+<ItemGroup><EmbeddedResource Include="Services/Communication/Schema.sql" LogicalName="FMSC_SMS.Communication.Schema.sql" /></ItemGroup>
+</Project>

@@ -1,0 +1,56 @@
+name: FMSC Disposable Windows Installation Acceptance
+
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+
+concurrency:
+  group: fmsc-disposable-windows-install
+  cancel-in-progress: false
+
+jobs:
+  clean-install:
+    name: Real Windows installer with approved synthetic LocalDB
+    runs-on: windows-2022
+    if: github.event_name == 'workflow_dispatch' || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository)
+    timeout-minutes: 55
+    env:
+      FMSC_DISPOSABLE_INSTALL: approved-synthetic-only
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - name: Check out this commit (no school data or secrets)
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Install full FMSC package on disposable Windows with synthetic SQL
+        shell: pwsh
+        timeout-minutes: 45
+        run: .\Tools\RunDisposableWindowsInstall.ps1 -ProjectDirectory . -Level3
+
+      - name: Publish sanitized acceptance summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fmsc-disposable-install-evidence-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/fmsc-install-evidence/report.json
+            ${{ runner.temp }}/fmsc-install-evidence/summary.md
+          if-no-files-found: warn
+          retention-days: 7
+
+# This opt-in / focused same-repository PR test runs actual core.ps1 with synthetic
+# MDF/LDF pair. It never imports, packages, commits or uploads any school database.
+# On GitHub-hosted images LocalDB might be preinstalled; the report records the
+# missing pristine-MSI coverage instead of claiming it was tested.

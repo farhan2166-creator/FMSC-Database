@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "FMSC_SMS": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false
+    }
+  }
+}

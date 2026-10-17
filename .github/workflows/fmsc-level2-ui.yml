@@ -1,0 +1,72 @@
+name: FMSC Level 2 UI infrastructure
+on:
+  workflow_dispatch:
+    inputs:
+      interactive:
+        description: Run on a dedicated unlocked desktop runner with the fmsc-level2-interactive label
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  build-only:
+    name: Build UI driver and validate safety contracts (no interactive claim)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/FMSC.dacpac
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - run: |
+          dotnet build Tests/Level2UiChecks/Level2UiChecks.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build Tests/Level2Fixture/Level2Fixture.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet build FMSC_SMS.csproj -c Release -p:FmscLevel2=true
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s Tests/Level2UiChecks -p 'test_*.py' -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          'Build and safety checks only; no visible UI tests ran on this hosted runner.' >> $env:GITHUB_STEP_SUMMARY
+        shell: pwsh
+  interactive-desktop:
+    name: Real desktop scenarios (manual dedicated runner only)
+    if: github.event_name == 'workflow_dispatch' && inputs.interactive
+    runs-on: [self-hosted, Windows, X64, fmsc-level2-interactive]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/FMSC.dacpac
+      - name: Exercise fictional operator workflows
+        shell: pwsh
+        run: ./Tools/Run-Level2.ps1
+      - name: Validate fictional UI evidence
+        id: evidence
+        if: always()
+        shell: pwsh
+        run: |
+          Get-ChildItem artifacts/level2/evidence -Directory | ForEach-Object {
+            python Tests/Level2UiChecks/validate_report.py $_.FullName
+            if ($LASTEXITCODE -ne 0) { throw 'Level 2 evidence validation failed.' }
+          }
+      - name: Upload validated fictional UI evidence only
+        if: always() && steps.evidence.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: fmsc-level2-ui-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/level2/evidence/**
+          if-no-files-found: error
+          retention-days: 7
+# No pull_request_target, automatic self-hosted PR runs, school database inputs,
+# raw log uploads, credential uploads or claims of desktop acceptance from build-only.
