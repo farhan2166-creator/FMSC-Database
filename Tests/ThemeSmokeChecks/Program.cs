@@ -53,6 +53,11 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} setup readiness control checks.");
             return;
         }
+        if(args.Contains("--level3"))
+        {
+            CheckLevel3Components();
+            return;
+        }
         if(args.Contains("--post-fix"))
         {
             CheckValidationBadges();
