@@ -112,3 +112,15 @@ The first attempt at `cbf6a40` had the same pre-run failure: [Desktop](https://g
 **17 LOCAL REQUIRED scenarios plus 4 Windows installer scenarios BLOCKED** remain incomplete. The [local plan](LEVEL3_LOCAL_TEST_PLAN.md) covers operator workflows, real DPI/resolution/mixed-monitor behavior, sustained memory, actual SQL-backed report rendering, printer output, LocalDB file faults and pristine-MSI/reboot acceptance. Native component tests and controlled activation rollback still need Windows execution despite their successful compilation / Linux filesystem subset.
 
 Financial consistency, disposable SQL backup/restore/integrity and controlled recovery are verified for the tested fixture. Physical power loss, disk failure, genuine provider delivery, distributed school database compatibility and deployment acceptance are not established. Keep [PR #48](https://github.com/farhan2166-creator/FMSC-Database/pull/48) open and unmerged pending Windows/local results and owner approval.
+
+## Windows continuation — 2026-10-16
+
+Tested commit: `88037290153cb6c0f2ab38b919565440523cd907` on the everyday Windows PC. .NET SDK 9.0.318 targets the installed .NET 8 Windows Desktop runtime; SDK 8 is unavailable.
+
+- `dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --level3`: PASS, 254 Windows component assertions, 240 dialog cycles, 19-page synthetic PDF. Restore reported NU1900 because NuGet vulnerability metadata was unreachable; this is not a completed dependency vulnerability audit.
+- `pwsh -NoProfile -File Tests/Level3Checks/TestActivation.ps1`: PASS, injected partial activation restores the exact original bytes and cleanup passes.
+- Existing Python unittest discovery suites: Level3Checks 8 PASS, LifecycleSqlChecks 10 PASS, Level2UiChecks 6 PASS (including compiled Level2 target guard). These are harness regressions, not execution of SQL lifecycle scenarios.
+
+Commands used a workspace-owned temporary directory. The Windows component run used the compile-time FmscLevel2 isolated profile with owner `bd7bfaa3-f20d-43ae-9bcb-152d66c44b67`; no SQL database was provisioned or connected. Exports contain fictional rows only. No installed school settings, database files or prerequisites were changed.
+
+Docker and WSL are absent, so the container SQL suite was NOT RUN again here. The recorded earlier cloud SQL evidence remains tied to its original commit. Real installer/update/reinstall/pristine prerequisite cases remain BLOCKED pending a disposable Windows VM; no prerequisite installation was attempted on this PC. Physical DPI/mixed-display, sustained SQL-backed UI and operator acceptance remain LOCAL REQUIRED. The user requested that further manual mouse testing stop. These passing components do not complete the entire 45-scenario acceptance matrix; PR #48 remains open pending the missing acceptance evidence.
