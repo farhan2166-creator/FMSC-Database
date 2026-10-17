@@ -52,7 +52,7 @@ public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedC
         await ExecuteAsync(async()=>{
             installed=await store.IsInstalledAsync(lifetime.Token);
             tabs.Enabled=installed;
-            if(!installed){operational.Text="Communication setup is missing or incompatible. Ask your administrator to review setup in the current installer. No database changes were made.";SetStatus(operational.Text,PageStatusKind.Warning);return;}
+            if(!installed){operational.Text="Communication setup is missing or incompatible. Ask your administrator to review the approved communication setup and recovery guidance. No database changes were made.";SetStatus(operational.Text,PageStatusKind.Warning);return;}
             await RefreshOperational();
             await RefreshTemplates();
             foreach(var item in new[]{(campus,"Campuses","CampusId","CampusName"),(year,"Years","AcademicYearId","YearName"),(cls,"Classes","ClassId","ClassName"),(section,"Sections","SectionId","SectionName")})
