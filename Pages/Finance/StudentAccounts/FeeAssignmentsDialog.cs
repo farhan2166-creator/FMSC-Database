@@ -702,6 +702,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
     private readonly ModernDatePicker fromMonth = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "MMMM-yyyy", ShowUpDown = true };
     private readonly ModernDatePicker throughMonth = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "MMMM-yyyy", ShowUpDown = true };
     private readonly CheckBox fullWaiver = new() { Text = "No Fee for This Period", AutoSize = true };
+    private readonly ModernComboBox concession = HumanUi.Combo();
     private bool monthly;
     private DateTime initialFrom, initialThrough;
     private readonly ModernButton saveButton = new() {
@@ -712,6 +713,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
     };
     /* The discount this form was loaded with, so Cancel on an untouched form closes without asking about changes that are not there. */
     private readonly string initialDiscountAmountText;
+    private readonly string initialConcession;
     /* Set only once the discount has been written, so that path closes without the unsaved-changes prompt. */
     private bool savedSuccessfully;
     /* Confirm once: setting DialogResult also raises FormClosing. */
@@ -727,23 +729,20 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(AppScale.Scale(560, AppScale.ControlSizeScale), AppScale.Scale(480, AppScale.ControlSizeScale));
+        ClientSize = new Size(AppScale.Scale(560, AppScale.ControlSizeScale), AppScale.Scale(550, AppScale.ControlSizeScale));
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
+        concession.Items.AddRange(new object[] { "None", "Free", "Scholarship", "Waived" });
+        concession.SelectedIndex = 0;
         discountAmount.Text = currentDiscount.ToString("0.##");
         if (studentFeeAssignmentId > 0 || periodContext != null)
         {
             var context = periodContext ?? FeeDiscountPeriod.Context(studentFeeAssignmentId);
             monthly = Convert.ToString(context["Frequency"]) == "Monthly";
-            DateTime minimum = new(DateTime.Today.Year, DateTime.Today.Month, 1);
-            if (context["LastBilledMonth"] != DBNull.Value)
-                minimum = new[] { minimum, Convert.ToDateTime(context["LastBilledMonth"]).AddMonths(1) }.Max();
-            if (context["EffectiveFrom"] != DBNull.Value)
-                minimum = new[] { minimum, Convert.ToDateTime(context["EffectiveFrom"]) }.Max();
+            if (context.Table.Columns.Contains("ConcessionLabel") && context["ConcessionLabel"] is string label) concession.SelectedItem = label;
+            DateTime minimum = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1).AddMonths(1);
             DateTime end = Convert.ToDateTime(context["EndDate"]);
             end = new DateTime(end.Year, end.Month, 1);
-            if (context["EffectiveTo"] != DBNull.Value && Convert.ToDateTime(context["EffectiveTo"])<end)
-                end=Convert.ToDateTime(context["EffectiveTo"]);
             if (monthly && minimum > end) saveButton.Enabled = false;
             if (monthly && minimum <= end)
             {
@@ -751,6 +750,8 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
                 fromMonth.MaxDate = throughMonth.MaxDate = end;
                 fromMonth.Value = minimum;
                 throughMonth.Value = end;
+                fromMonth.Enabled = false;
+                throughMonth.Enabled = false;
             }
         }
         initialFrom = fromMonth.Value;
@@ -759,11 +760,18 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
             discountAmount.Enabled = !fullWaiver.Checked;
             discountAmount.Text = fullWaiver.Checked ? standardAmount.ToString("0.##") : currentDiscount.ToString("0.##");
         };
+        concession.SelectedIndexChanged += (_, _) => {
+            bool exempt = concession.Text is "Free" or "Waived";
+            fullWaiver.Enabled = !exempt;
+            if (exempt) fullWaiver.Checked = true;
+        };
+        if (concession.Text is "Free" or "Waived") { fullWaiver.Enabled = false; fullWaiver.Checked = true; }
         fromMonth.ValueChanged += (_, _) => {
             throughMonth.MinDate = fromMonth.Value;
         };
         BuildLayout(feeTypeName);
         initialDiscountAmountText = discountAmount.Text;
+        initialConcession = concession.Text;
         saveButton.Click += (_, _) => Save();
         /* The window's own close (X, Alt+F4, Esc) is guarded the same way; programmatic closes are left alone. */
         FormClosing += (_, e) => {
@@ -807,6 +815,9 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         fields.RowStyles.Add(new RowStyle(SizeType.Absolute, monthly ? AppMetrics.FieldRowHeight : 0));
         fields.RowStyles.Add(new RowStyle(SizeType.Absolute, monthly ? AppMetrics.FieldRowHeight : 0));
         fields.Controls.Add(fullWaiver, 0, 1);
+        fields.RowCount = 5;
+        fields.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
+        fields.Controls.Add(HumanUi.Field("Concession", concession), 0, 4);
         if (monthly)
         {
             fields.Controls.Add(HumanUi.Field("From Month", fromMonth, true), 0, 2);
@@ -838,7 +849,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         if (submitting || savedSuccessfully)
             return;
         validator.Begin();
-        bool discountParsed = InputParse.TryWholeAmount(discountAmount.Text, out decimal discount) && discount >= 0 && WholeRupees.IsWhole(discount);
+        bool discountParsed = InputParse.TryWholeAmount(string.IsNullOrWhiteSpace(discountAmount.Text) ? "0" : discountAmount.Text, out decimal discount) && discount >= 0 && WholeRupees.IsWhole(discount);
         if (!discountParsed)
             validator.Fail(discountAmount, "Enter whole rupees, 0 or more (0 = none)");
         else if (discount > standardAmount)
@@ -852,9 +863,10 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         try
         {
             if (monthly)
-                FeeDiscountPeriod.Save(studentFeeAssignmentId, discount,
-                    new DateTime(fromMonth.Value.Year, fromMonth.Value.Month, 1),
-                    new DateTime(throughMonth.Value.Year, throughMonth.Value.Month, 1));
+                DatabaseHelper.ExecuteUser("SaveStudentFeeDiscount",
+                    DatabaseHelper.Int("@StudentFeeAssignmentId", studentFeeAssignmentId),
+                    DatabaseHelper.P("@DiscountAmount", discount),
+                    DatabaseHelper.P("@ConcessionLabel", concession.Text == "None" ? null : concession.Text));
             else DatabaseHelper.ExecuteUser(
                 "SaveStudentFeeDiscount",
                 DatabaseHelper.Int("@StudentFeeAssignmentId", studentFeeAssignmentId),
@@ -882,7 +894,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
     private bool IsDirty() =>
         !savedSuccessfully &&
         DialogResult != DialogResult.OK &&
-        (discountAmount.Text != initialDiscountAmountText ||
+        (discountAmount.Text != initialDiscountAmountText || concession.Text != initialConcession ||
          fullWaiver.Checked ||
          monthly && (fromMonth.Value.Year != initialFrom.Year || fromMonth.Value.Month != initialFrom.Month ||
                      throughMonth.Value.Year != initialThrough.Year || throughMonth.Value.Month != initialThrough.Month));

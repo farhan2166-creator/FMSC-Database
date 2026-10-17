@@ -15,5 +15,7 @@ CREATE TABLE [dbo].[FeePayments] (
     [CreatedByUserId]     INT             NOT NULL,
     [CreatedAt]           DATETIME2 (0)   NOT NULL,
     [RelatedFeePaymentId] INT             NULL,
-    [IsGroupPayment]      BIT             NOT NULL
+    [IsGroupPayment]      BIT             NOT NULL,
+    [IsCreditApplication] BIT NOT NULL,
+    [ConcessionLinesJson] NVARCHAR(MAX) NULL
 );

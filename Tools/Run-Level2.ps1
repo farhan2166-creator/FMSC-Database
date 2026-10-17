@@ -162,6 +162,16 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
         $connection="Server=(localdb)\$catalog;Initial Catalog=$catalog;Integrated Security=True;TrustServerCertificate=True"
         & dotnet tool run sqlpackage -- '/Action:Publish' "/SourceFile:$fixture" "/TargetConnectionString:$connection" '/p:DropObjectsNotInSource=False' '/p:DropExtendedPropertiesNotInSource=False' '/p:ScriptDatabaseOptions=False' '/Quiet:True'
         Native 'Publish approved schema'
+        Sql $catalog "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');" | Out-Null
+        foreach($migration in Get-ChildItem (Join-Path $repo 'Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName}) {
+            if([int]$migration.BaseName -le 6 -or [int]$migration.BaseName -gt 19){continue}
+            VerifyTarget
+            $migrationScript=Join-Path $run ('migration-'+$migration.BaseName+'.sql')
+            "SET XACT_ABORT ON;`nBEGIN TRANSACTION;`n"+(Get-Content -LiteralPath $migration.FullName -Raw)+"`nCOMMIT TRANSACTION;" | Set-Content -LiteralPath $migrationScript -Encoding utf8
+            & sqlcmd -S "(localdb)\$catalog" -E -d $catalog -b -l 20 -t 90 -i $migrationScript | Out-Null
+            Native "Disposable migration $($migration.BaseName)"
+        }
+
     } finally {Pop-Location}
     Stage 'Seed fictional reference data'
     VerifyTarget

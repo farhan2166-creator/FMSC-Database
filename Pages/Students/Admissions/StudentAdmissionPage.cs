@@ -43,6 +43,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         public string FeeTypeName { get; set; } = "";
         public decimal StandardAmount { get; set; }
         public decimal DiscountAmount { get; set; }
+        public string ConcessionLabel { get; set; } = "None";
         public decimal NetAmount { get; set; }
         public string Frequency { get; set; } = "";
         public bool IsMandatory { get; set; }
@@ -497,10 +498,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     "fee row for fee type " + fee.FeeTypeId,
                     string.Format(
                         System.Globalization.CultureInfo.InvariantCulture,
-                        "{0}:{1}:{2}",
+                        "{0}:{1}:{2}:{3}",
                         fee.FeeTypeId,
                         fee.DiscountAmount,
-                        fee.NetAmount)));
+                        fee.NetAmount, fee.ConcessionLabel)));
         }
         parts.Add(
             new AdmissionPart(
@@ -1552,7 +1553,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             DataGridViewAutoSizeColumnsMode.None;
         feeGrid.Columns.Clear();
         feeGrid.CellBeginEdit += (_, e) => {
-            if (_editEnrollmentId > 0 && feeGrid.Columns[e.ColumnIndex].Name == "DiscountAmount")
+            if (feeGrid.Columns[e.ColumnIndex].Name == "DiscountAmount" &&
+                Convert.ToString(feeGrid.Rows[e.RowIndex].Cells["ConcessionLabel"].Value) is "Free" or "Waived")
+                e.Cancel = true;
+            if ((_editEnrollmentId > 0 || !CurrentUser.HasPermission("Fees.Adjust")) && feeGrid.Columns[e.ColumnIndex].Name is "DiscountAmount" or "ConcessionLabel")
                 e.Cancel = true;
         };
         feeGrid.Columns.Add(
@@ -1653,6 +1657,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 "Remove",
                 34,
                 false));
+        var concessionColumn = new DataGridViewComboBoxColumn { Name = "ConcessionLabel", DataPropertyName = "ConcessionLabel",
+            HeaderText = "Concession", Width = 120, FlatStyle = FlatStyle.Flat };
+        concessionColumn.Items.AddRange("None", "Free", "Scholarship", "Waived");
+        feeGrid.Columns.Insert(feeGrid.Columns["NetAmount"].Index, concessionColumn);
+        feeGrid.CurrentCellDirtyStateChanged += (_, _) => {
+            if (feeGrid.IsCurrentCellDirty && feeGrid.CurrentCell is DataGridViewComboBoxCell)
+                feeGrid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+        };
         /* Submit admission discounts with fee selections so opening charges use the net amount. */
         feeGrid.CellValidating +=
             FeeGrid_CellValidating;
@@ -1823,6 +1835,20 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         object? sender,
         DataGridViewCellValidatingEventArgs e)
     {
+        if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && feeGrid.Columns[e.ColumnIndex].Name == "ConcessionLabel")
+        {
+            var selected = feeGrid.Rows[e.RowIndex];
+            if (selected.DataBoundItem is FeeSelectionRow fee && fee.Frequency != "Monthly" &&
+                Convert.ToString(selected.Cells["ConcessionLabel"].Value) != "None")
+            {
+                selected.Cells["ConcessionLabel"].Value = "None";
+                Warn("Use the bill discount for a one-off fee. Concession labels apply to monthly fees.");
+                return;
+            }
+            if (Convert.ToString(selected.Cells["ConcessionLabel"].Value) is "Free" or "Waived")
+                selected.Cells["DiscountAmount"].Value = selected.Cells["StandardAmount"].Value;
+            return;
+        }
         if (e.RowIndex < 0 ||
             e.ColumnIndex < 0 ||
             feeGrid.Columns[e.ColumnIndex].Name != "DiscountAmount")
@@ -2401,6 +2427,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                         : 0,
                     FeeTypeCode = feeTypeCode,
                     FeeTypeName = feeTypeName,
+                    ConcessionLabel = table.Columns.Contains("ConcessionLabel") && row["ConcessionLabel"] is string label ? label : "None",
                     StandardAmount = Convert.ToDecimal(row["StandardAmount"]),
                     DiscountAmount = row["DiscountAmount"] == DBNull.Value
                         ? 0m
@@ -4338,7 +4365,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 return;
             }
             if(!AdmissionNumbers.TryNormalize(admissionIdValue.Text,out string cleanAdmissionNumber)) return;
-            admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber").Value=cleanAdmissionNumber;
+                        admissionParameters.Add(DatabaseHelper.P("@FeeConcessionsJson", System.Text.Json.JsonSerializer.Serialize(
+                _selectedFees.Where(f => f.ConcessionLabel != "None").Select(f => new { f.FeeTypeId, f.ConcessionLabel }))));
+admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber").Value=cleanAdmissionNumber;
             var submitted = new AdmissionSubmission(cleanAdmissionNumber, studentName,
                 Convert.ToString(admissionParameters.First(p => p.ParameterName == "@FatherName").Value) ?? "",
                 Convert.ToDateTime(admissionParameters.First(p => p.ParameterName == "@AdmissionDate").Value),

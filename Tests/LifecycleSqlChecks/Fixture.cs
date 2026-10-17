@@ -11,8 +11,9 @@ internal sealed class Fixture
     {
         if (Sql.Count("SELECT COUNT(*) FROM dbo.Students;") != 0 || Sql.Count("SELECT COUNT(*) FROM dbo.Users;") != 0)
             throw new InvalidOperationException("Reference fixtures require an empty schema-only database, never imported school data.");
-        // The schema is already reviewed as v6; a schema-only publish has no version/reference rows.
-        Sql.Query("INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');");
+        // The runner publishes the approved v6 model, then applies the numbered migrations.
+        if (Convert.ToString(Sql.Scalar("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC;")) != DatabaseHelper.RequiredDatabaseSchemaVersion)
+            throw new InvalidOperationException("Apply the numbered migrations to the disposable fixture before seeding reference data.");
         Sql.Query("INSERT dbo.AdmissionNumberCounter(CounterId,LastNumber) VALUES(1,1000);");
         // DacFx round-trips this property as varchar. Repair ONLY this disposable fixture's identity/type.
         Sql.Query("DECLARE @Scope uniqueidentifier=NEWID(); EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@Scope;");

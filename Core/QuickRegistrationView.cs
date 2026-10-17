@@ -50,8 +50,13 @@ internal sealed record QuickRegistrationView(int Id, string Status, string Stude
             throw new InvalidDataException("Registration payment flags have an unexpected type.");
         // Work on a copy so validation/derived columns never partially mutate the current bill.
         var data = source.Copy();
+        if (!data.Columns.Contains("ConcessionLabel"))
+            data.Columns.Add(new DataColumn("ConcessionLabel", typeof(string)) { DefaultValue = "None" });
         foreach (DataRow row in data.Rows)
         {
+            if (row.IsNull("ConcessionLabel")) row["ConcessionLabel"] = "None";
+            if (Convert.ToString(row["ConcessionLabel"]) is not ("None" or "Free" or "Scholarship" or "Waived"))
+                throw new InvalidDataException("A registration fee concession is invalid.");
             foreach (string column in new[] { "FeeTypeId", "Amount", "Discount", "Include", "IsMandatory", "IsTransportLinked" })
                 if (row.IsNull(column)) throw new InvalidDataException($"Registration fee '{column}' is missing.");
             if ((int)row["FeeTypeId"] <= 0 || data.Columns.Contains("HasPayments") && row.IsNull("HasPayments"))

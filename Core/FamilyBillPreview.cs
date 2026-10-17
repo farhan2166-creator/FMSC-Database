@@ -38,13 +38,32 @@ internal static class FamilyBillPreview
                 AND S.AdmissionId NOT IN(SELECT CONVERT(int,[value]) FROM OPENJSON(@Ids)))
             THROW 51000,'The family has new members. Refresh before printing the whole family bill.',1;
         SELECT COALESCE(S.AdmissionNumber,S.QuickReference) Reference,S.StudentName,
-            F.FeeTypeName,F.DisplayOrder FeeDisplayOrder,B.BillingMonth,B.DiscountAmount,
+            CASE WHEN A.ConcessionLabel IS NULL THEN F.FeeTypeName ELSE CONCAT(F.FeeTypeName,N' — ',A.ConcessionLabel) END FeeTypeName,F.DisplayOrder FeeDisplayOrder,B.BillingMonth,B.DiscountAmount,
             dbo.GetFeeChargeBalance(B.BillingChargeId) Due
         FROM dbo.Students S JOIN dbo.BillingCharges B ON B.AdmissionId=S.AdmissionId
         JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
+        LEFT JOIN dbo.StudentFeeAssignments A ON A.StudentFeeAssignmentId=B.StudentFeeAssignmentId
         WHERE S.AdmissionId IN(SELECT CONVERT(int,[value]) FROM OPENJSON(@Ids))
-            AND B.Status<>N'Cancelled' AND dbo.GetFeeChargeBalance(B.BillingChargeId)>0
-        ORDER BY S.AdmissionId,B.BillingMonth,F.DisplayOrder,F.FeeTypeName,B.BillingChargeId;
+            AND B.Status<>N'Cancelled' AND (dbo.GetFeeChargeBalance(B.BillingChargeId)>0 OR
+             (B.NetAmount=0 AND A.ConcessionLabel IS NOT NULL AND B.BillingMonth=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1)))
+        UNION ALL
+        SELECT COALESCE(S.AdmissionNumber,S.QuickReference),S.StudentName,
+            CONCAT(F.FeeTypeName,N' — ',A.ConcessionLabel),F.DisplayOrder,
+            DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1),A.DiscountAmount,CONVERT(decimal(12,2),0)
+        FROM dbo.StudentFeeAssignments A JOIN dbo.FeeTypes F ON F.FeeTypeId=A.FeeTypeId
+        JOIN dbo.Students S ON S.AdmissionId=A.AdmissionId
+        JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId
+        WHERE A.AdmissionId IN(SELECT CONVERT(int,[value]) FROM OPENJSON(@Ids))
+            AND S.LegacySetupPending=0 AND E.Status IN(N'Active',N'Pending') AND E.BillingStartDate IS NOT NULL
+            AND (E.Status=N'Pending' OR (E.BillingReady=1 AND E.PlacementConfirmedAt IS NOT NULL))
+            AND CONVERT(date,GETDATE()) BETWEEN Y.StartDate AND Y.EndDate
+            AND A.CancelledAt IS NULL AND A.Frequency=N'Monthly' AND A.ConcessionLabel IS NOT NULL AND A.Amount=A.DiscountAmount
+            AND DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1)>=DATEFROMPARTS(YEAR(E.BillingStartDate),MONTH(E.BillingStartDate),1)
+            AND (A.EffectiveFrom IS NULL OR A.EffectiveFrom<=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1))
+            AND (A.EffectiveTo IS NULL OR A.EffectiveTo>=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1))
+            AND NOT EXISTS(SELECT 1 FROM dbo.BillingCharges B WHERE B.EnrollmentId=A.EnrollmentId AND B.FeeTypeId=A.FeeTypeId
+                AND B.Status<>N'Cancelled' AND B.BillingMonth=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1))
+        ORDER BY Reference,BillingMonth,FeeDisplayOrder,FeeTypeName;
         """;
 
     internal static Task<DataTable> ReadMembersAsync(int admissionId) => ReadMembersAsync(admissionId, "Students.View");

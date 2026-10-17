@@ -103,6 +103,8 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         grid.Columns["IsTransportLinked"].Visible = false;
         grid.Columns.Add("ConfiguredOrder", "ConfiguredOrder");
         grid.Columns["ConfiguredOrder"].Visible = false;
+        grid.Columns.Add("ConcessionLabel", "Concession");
+        grid.Columns["ConcessionLabel"].DisplayIndex = 3;
         foreach (var name in new[] { "StandardAmount", "DiscountAmount", "NetAmount" })
         {
             grid.Columns[name].DefaultCellStyle = new DataGridViewCellStyle {
@@ -258,6 +260,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
                     grid.Rows.Count);
                 grid.Rows[index].Cells["EffectiveFrom"].Tag = effectiveFrom == DBNull.Value
                     ? null : Convert.ToDateTime(effectiveFrom);
+                grid.Rows[index].Cells["ConcessionLabel"].Value = row.Table.Columns.Contains("ConcessionLabel") ? row["ConcessionLabel"] : "";
                 grid.Rows[index].Cells["EffectiveTo"].Tag = effectiveTo == DBNull.Value
                     ? null : Convert.ToDateTime(effectiveTo);
                 if (Convert.ToString(grid.Rows[index].Cells["Status"].Value) == "Historical")
