@@ -8,6 +8,7 @@ on:
     paths:
       - '.github/workflows/fmsc-disposable-windows-install.yml'
       - 'Tools/RunDisposableWindowsInstall.ps1'
+      - 'Tests/Level3Checks/**'
 
 permissions:
   contents: read
@@ -44,7 +45,7 @@ jobs:
       - name: Install full FMSC package on disposable Windows with synthetic SQL
         shell: pwsh
         timeout-minutes: 45
-        run: .\Tools\RunDisposableWindowsInstall.ps1 -ProjectDirectory .
+        run: .\Tools\RunDisposableWindowsInstall.ps1 -ProjectDirectory . -Level3
 
       - name: Publish sanitized acceptance summary
         if: always()

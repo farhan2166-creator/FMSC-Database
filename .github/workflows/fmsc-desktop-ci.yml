@@ -47,6 +47,20 @@ jobs:
         timeout-minutes: 5
         run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --post-fix
 
+      - name: Run Level 3 noninteractive resource and export checks
+        timeout-minutes: 5
+        env:
+          FMSC_LEVEL3_WINDOWS_EVIDENCE: ${{ runner.temp }}/fmsc-level3-windows
+        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --level3
+
+      - name: Upload sanitized Windows component measurements
+        uses: actions/upload-artifact@v7
+        with:
+          name: fmsc-level3-windows-${{ github.run_id }}
+          path: ${{ runner.temp }}/fmsc-level3-windows/report.json
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Run portable audit regression checks
         run: dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
 

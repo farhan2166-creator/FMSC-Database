@@ -4,6 +4,10 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ## [Unreleased]
 
+### Added
+- Level 3 cloud reliability checks for guarded SQL faults, backup/restore, concurrency and measured fictional workloads, plus Windows component/update acceptance and a complete 45-scenario evidence/local-requirement matrix.
+
+
 ### Documentation
 
 - Shorten C# comments and record accepted business policies beside their implementations. Historical audits, executable code, SQL, database artifacts and installer behavior are unchanged.
