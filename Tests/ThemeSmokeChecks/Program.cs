@@ -47,6 +47,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} communication layout, focus and workflow checks.");
             return;
         }
+        if(args.Contains("--setup-readiness"))
+        {
+            CheckSetupReadinessActions();
+            Console.WriteLine($"PASS: {checks} setup readiness control checks.");
+            return;
+        }
         if(args.Contains("--level3"))
         {
             CheckLevel3Components();
@@ -77,6 +83,7 @@ internal static partial class Program
             CheckAdmissionPostSaveBaseline();
             CheckMeaningfulCertificateContent();
             CheckSelectiveWorkspaceGuards();
+            CheckSetupReadinessActions();
             CheckLifecycleCloseGuard();
             CheckCertificateSubmissionGuard();
             CheckQuickRegistrationTabGuard();

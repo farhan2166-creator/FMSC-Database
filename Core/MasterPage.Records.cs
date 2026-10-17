@@ -943,7 +943,8 @@ public partial class MasterPage
             Padding = new Padding(UiDesignSystem.Spacing.Sm, 0, 0, 0)
         };
         var clearButton = new ModernButton {
-            Text = UiText.Actions.Clear,
+            Text = "Clear Search",
+            AccessibleDescription = "Clear the record search without changing entry fields.",
             Height = AppMetrics.InputControlHeight,
             ThemeRole = "Secondary",
             Image = UiHelper.CreateGlyphIcon("↺", AppTheme.MutedText, 16),
@@ -959,7 +960,7 @@ public partial class MasterPage
             if (_staffRecordPicker is not null) _staffRecordPicker.Focus();
             else _recordSearchBox.Focus();
         };
-        int clearWidth = AppScale.Scale(105, AppScale.ControlSizeScale);
+        int clearWidth = Math.Max(AppScale.Scale(105, AppScale.ControlSizeScale), clearButton.PreferredSize.Width);
         int countWidth = AppScale.Scale(165, AppScale.ControlSizeScale);
         int columns = 4;
         var toolbar = new TableLayoutPanel {
