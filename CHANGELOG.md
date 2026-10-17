@@ -27,6 +27,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Added
 
+- Enhance the existing offline Help & FAQ Center: 126 source-linked questions across 15 topics, plain-language rule labels, ranked synonym search, topic/rule filters, related questions and responsive themed reading. Clarify calendar vs enrollment protection, supported role editing, payment recovery and retired communication setup guidance; application business rules remain unchanged.
+
 - Added an opt-in disposable Windows installation acceptance workflow: approved data-free schema fixture, real signed LocalDB prerequisite, validated complete installer, synthetic MDF/LDF, and installed-app verification. It reports pristine-MSI gaps and uploads sanitized evidence only; it does not test real school data or approve production deployment.
 
 - Added a manually dispatchable, DACPAC-triggered, schema-only reference extractor. It stores complete per-object model XML and SQL module bodies, tracks changed definitions and proposes a draft synchronization PR without importing data or approving changes.
@@ -41,6 +43,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 - Added an isolated Level 1 SQL lifecycle harness in [PR #14](https://github.com/farhan2166-creator/FMSC-Database/pull/14), with schema-only approved-model provenance, fictional school fixtures, persisted admission/fees/promotion/recovery assertions, existing-suite integration and sanitized CI evidence. Production application/database/installer behavior is unchanged; real Windows and deployment acceptance remain separate.
 
 ### Fixed
+
+- Bound Help Center splitter transitions during compact layout changes to prevent the reproduced Windows startup/layout exception.
 
 - Refresh Setup Readiness navigation after the current grid cell changes, so permission guidance follows the selected destination.
 - Remove obsolete installer setup instructions from the missing Communication Center module warning; direct operators to administrator-reviewed setup and recovery guidance.

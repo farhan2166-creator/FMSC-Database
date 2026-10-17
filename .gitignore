@@ -379,6 +379,11 @@ Database/*.bak
 !/Tests/CommunicationChecks/*.cs
 !/Tests/CommunicationChecks/*.csproj
 
+# Offline help catalog checks (source only).
+!/Tests/HelpChecks/
+/Tests/HelpChecks/*
+!/Tests/HelpChecks/*.cs
+!/Tests/HelpChecks/*.csproj
 # Level 3 keeps source/catalog only; private SQL and generated evidence stay outside it.
 !/Tests/Level3Checks/
 /Tests/Level3Checks/*

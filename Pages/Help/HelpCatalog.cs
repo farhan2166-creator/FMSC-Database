@@ -1,101 +1,104 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace FMSC_SMS.Pages.Help;
 
-internal sealed record HelpEntry(string Category, string Question, string Answer, string Keywords, string RuleSource, string WhereToGo);
+internal enum HelpRule { System, Setting, Choice, Permission, Recovery }
+[Flags]
+internal enum HelpOwner { SQL = 1, CSharp = 2, ConfigurableData = 4, Environment = 8 }
 
-internal static class HelpCatalog
+internal sealed record HelpEntry(
+    string Id, string Category, string Question, string Answer, string Keywords, string WhereToGo,
+    IReadOnlyList<HelpRule> Rules, HelpOwner Owners, IReadOnlyList<string> Sources,
+    IReadOnlyList<string> RelatedIds, string Warning);
+
+/// <summary>Offline, read-only catalog. Source references are maintainer evidence, not executable links.</summary>
+internal static partial class HelpCatalog
 {
-    internal static IReadOnlyList<HelpEntry> Entries { get; } = new List<HelpEntry>
+    internal static string RuleLabel(HelpRule rule) => rule switch
     {
-        new("Getting Started", "How do I begin working in FMSC?", "Sign in with your own account. Check the correct academic year and campus, then open the relevant workspace from the sidebar. Use Ctrl+K to search navigation destinations you are permitted to open. If an action is missing, ask your administrator to review access rather than using another user's account.", "login,start,dashboard,academic year,menu", "C# workflow", "Daily Work"),
-        new("Getting Started", "Why can’t I find a page in the menu?", "Navigation is filtered by your permissions. Some tools live inside their parent workspace rather than having a separate menu item. Try Ctrl+K; if the destination is still unavailable, request the appropriate role permission.", "missing page,menu,permission,search,navigation", "C# and SQL security", "Account / Users & Roles"),
-        new("Getting Started", "How do I find an action quickly?", "Press Ctrl+K and type a destination name. The search covers permitted destinations even if their sidebar groups are collapsed. F1 opens the shortcut reference.", "ctrl k,shortcut,find menu,help", "C# workflow", "Dashboard"),
-        new("Getting Started", "What should I check before saving school records?", "Verify the selected student, school year, campus, class, section, and relevant dates. Check your entries and charges before saving. When the result is uncertain, reconcile it before retrying.", "save,check,context,date,school", "Operator decision", "Relevant workspace"),
-        new("Getting Started", "Why does the screen ask whether to discard changes?", "Some pages detect unsaved drafts. Choose Stay to keep editing, or confirm discard only when you no longer need the changes. A running save cannot be abandoned until the operation completes.", "draft,unsaved,stay,discard,navigate", "C# workflow", "Current page"),
-        new("Getting Started", "Can I use the application on a small display?", "The layout adapts to the available space. Some complex forms intentionally scroll on small windows. Use Tab or scrollbars to reach controls; do not assume hidden content has been removed.", "small screen,scroll,dpi,scale,window", "C# layout", "Windows Display Settings"),
-        new("School Setup", "In what order should I configure a new school?", "Start with School Profile and Officials, then Campuses, Academic Years, Classes & Sections, Campus Assignments, and Subjects. Open Setup Readiness to identify missing prerequisites before admitting students or posting fees.", "first setup,school,campus,year,class,section", "User-configurable setup", "School Setup → Setup Readiness"),
-        new("School Setup", "Why can’t I choose a particular campus, class, or section?", "Only valid configured combinations are offered. Check that the campus, class, section and academic context are created and correctly assigned. Do not enter an invalid placement directly into SQL.", "campus,class,section,filter,assignment", "Database relationship and C# filtering", "School Setup → Campus Assignments"),
-        new("School Setup", "Can I edit a confirmed academic year?", "Confirmed operational academic years are protected against ordinary editing. Student movement should use Promotion, Transfer or Re-admission. Genuine corrections need the audited correction workflow.", "year,confirmed,edit,date,calendar", "Protected business rule", "School Setup → Academic Years"),
-        new("School Setup", "Can I change a school's name or officials?", "Authorized users can edit School Profile and School Officials. Their saved details are used in report and certificate layouts, so review names and designations carefully.", "school name,principal,official,letterhead", "User-configurable setup", "School Setup → School Profile"),
-        new("Admissions", "How do I admit a new student directly?", "Open Daily Work → Student Admissions, enter identity and guardian details, choose a valid placement, review opening charges, then Save. Direct admission activates placement and posts opening fees together; no separate Confirm Placement is required.", "admit,new student,opening fees,save", "C# workflow and database transaction", "Daily Work → Student Admissions"),
-        new("Admissions", "How is Quick Registration different from Direct Admission?", "Quick Registration creates a pending student with a temporary reference. The official admission and registration numbers are assigned only when an authorized user confirms the registration. Pending records have separate review/search tools.", "quick,pending,temporary,reference,admission number", "Database-enforced lifecycle", "Dashboard → Quick Registration"),
-        new("Admissions", "Can a pending registration pay fees?", "Yes. Pending registrations may receive eligible payments, including family collection. They are excluded from ordinary monthly posting, promotion, and official certificates until confirmation.", "pending,payment,quick,monthly", "Protected business rule", "Dashboard → Quick Registration"),
-        new("Admissions", "How do I finish a pending registration?", "Open Dashboard → Quick Registration → Pending Registrations. Find and review the record, save any outstanding edits, then select Review / Confirm. Confirmation allocates official numbers while retaining valid bills, payments and family links.", "confirm,quick,pending,registration number", "Database transaction and user action", "Quick Registration → Pending Registrations"),
-        new("Admissions", "Why can’t I cancel an already confirmed admission?", "Cancel Registration is only for pending Quick Registration. Once official admission numbers are assigned, use Mark as Left for departure and approved correction workflows for record or fee errors. History is preserved.", "cancel,confirmed,leave,delete", "Protected database lifecycle", "Student Admissions / Student Management"),
-        new("Admissions", "What happens when I mark a student as left?", "Mark as Left closes the admitted placement and retains history. It does not automatically erase legitimate outstanding dues or require a certificate. Review later-month charges before confirming departure.", "left,withdraw,departure,dues,certificate", "Database lifecycle and operator decision", "Student Admissions"),
-        new("Admissions", "Why can’t I cancel a pending registration with paid charges?", "Paid allocations must be addressed through an authorized fee correction/refund workflow first. Cancellation can reverse eligible unpaid bills, but it cannot silently discard money already received.", "cancel,pending,paid,refund,charge", "SQL financial restriction", "Quick Registration / Student Fee Corrections"),
-        new("Admissions", "Why was a possible duplicate student flagged?", "Similar identity details can trigger a warning. Examine the existing student before proceeding. Duplicate review does not automatically merge or delete records; an authorized operator decides after verification.", "duplicate,name,parent,student", "C# validation and operator review", "Student Record Checks"),
-        new("Admissions", "What is Legacy Verification / Go Live?", "Historical student records remain in a review state until corrected and verified. Go Live previews the affected verified, active records and dates, then performs a guarded one-time activation. Changed records may require verification again; stale previews are refused.", "legacy,go live,verify,old students", "Protected database state transition", "Student Record Checks / Student Admissions"),
-        new("Admissions", "Why did a previously verified legacy record become unverified?", "Edits to the student, placement or fees clear verification so the changed record can be reviewed again. Recheck the corrections before Go Live.", "legacy,unverified,editing,go live", "Protected lifecycle rule", "Student Record Checks"),
-        new("Admissions", "What should I do if admission Save times out?", "Do not create a second admission. Keep the original request and use Check Save Outcome or the page's recovery instructions. Search/reopen the student and ask an administrator if reconciliation cannot determine whether the transaction committed.", "timeout,unknown,save,retry,duplicate", "Database idempotency and C# recovery", "Student Admissions"),
-        new("Student Search", "How does searching by admission number work?", "Entering an admission number clears the placement/status filters. Changing campus, year, class or status clears the admission-number search. Search again after changes; old results are cleared and Open Student stays disabled until a new result is selected.", "search,admission number,filters,open student", "C# workflow", "Find Student"),
-        new("Student Search", "Why are the student search results empty?", "Confirm your search mode and filters, then click Search again. Name and father's-name searches may be combined with placement filters. Reset clears all search modes; no matches does not necessarily mean a student was deleted.", "empty,filter,search,reset,no results", "C# workflow", "Find Student"),
-        new("Student Search", "Can I combine name and class filters?", "Yes. Student/father name can be filtered by placement. Admission-number search uses a separate mode, so entering it clears campus, academic year, class and status filters.", "name,father,class,search", "C# workflow", "Find Student"),
-        new("Students & Families", "How do I link siblings?", "Select the correct student in Student Profile, choose Open Family / Siblings, find and verify the related record, and confirm the link if you have administration permission. Reopen the profile to see updated family details.", "family,siblings,link,guardian", "User decision with SQL relationship checks", "Student Profile → Open Family / Siblings"),
-        new("Students & Families", "Does linking a sibling change every child's contacts?", "In Quick Registration, linking an existing family may populate shared parent/contact/address details and protect the stored parent name. Contact/address edits to the pending child do not automatically overwrite the whole family's records.", "family,quick,parent,contact,address", "C# and database relationship rule", "Quick Registration"),
-        new("Students & Families", "Can a student leave without deleting their history?", "Yes. Use the supported Mark as Left or Transfers / Re-Admission workflow. Student history and legitimate financial balances are retained; deleting rows directly is not a supported substitute.", "left,transfer,history,delete", "Protected database lifecycle", "Student Management"),
-        new("Students & Families", "Where should I correct an existing student's details?", "Open Student Admissions for allowed record or placement corrections, or use the appropriate Student Management review workflow. Some historical/confirmed placements are locked to ordinary editing and require audited corrections.", "correct,edit,student,placement", "Permission-controlled workflow", "Student Admissions / Student Record Checks"),
-        new("Promotion", "How do I promote students to the next academic year?", "Open Student Management → Student Promotion, select source and destination year/class/section, review eligible students, select intended candidates, then confirm the batch. Verify results and open View Promotion History for the completed batch.", "promote,batch,next year,history", "User choice and SQL transaction", "Student Management → Student Promotion"),
-        new("Promotion", "Why is a promoted student not immediately billable next year?", "The new placement may await Confirm Return Admission. Complete that workflow before normal next-year billing; the system protects the distinction between a promoted candidate and a confirmed return.", "promotion,return,year,fees,billing", "Protected database lifecycle", "Confirm Return Admission"),
-        new("Promotion", "How do I review a past promotion?", "Open Student Promotion and choose View Promotion History in Promotion Details. The history view supports source year/class/section filtering; blank source filters show all history. Close it to return without losing current promotion selections.", "promotion,history,filter,review", "C# navigation and SQL permission", "Student Promotion → View Promotion History"),
-        new("Promotion", "Why can't I promote the same student twice?", "Promotion enforces a valid source enrollment and prevents repeated/invalid processing of an already-promoted student. Review the current enrollment and history rather than retrying blindly.", "duplicate,promote,twice,enrollment", "SQL lifecycle restriction", "Student Promotion"),
-        new("Fees & Rates", "Where are fee rates and frequencies chosen?", "Authorized users configure Fee Types and the Fee Rate Setup matrix for the appropriate school/placement scope. Review amount, frequency, effective context and saved selections before applying them.", "fee type,rate,frequency,configuration", "User-configurable policy with SQL validation", "Fees & Billing → Fee Rate Setup"),
-        new("Fees & Rates", "Does changing a fee rate rewrite old charges?", "No. Rate changes generally govern future eligible billing. Existing committed charges and payments require their own correction or reversal workflows; do not edit past transactions by changing setup values.", "rate,old fee,history,effective", "Financial preservation rule", "Fee Rate Setup / Student Fee Corrections"),
-        new("Fees & Rates", "Can I use decimal amounts such as 1500.50?", "New financial entries follow whole-rupee rules, enforced by input validation and trusted SQL constraints. Existing historical fractions, where present, must not be silently rounded or rewritten.", "decimal,rupee,fraction,rounding", "Hardcoded SQL constraint and C# validation", "Fee Rate Setup / Fee Collection"),
-        new("Fees & Rates", "How do discounts and waivers work?", "Authorized users can review a student-specific assignment, discount, effective month or full-period waiver through the fee-assignment/correction tools. Protected paid charges are not silently changed; confirm the preview and saved outcome.", "discount,waiver,transport,assignment", "User choice within SQL financial restrictions", "Student Fee Corrections"),
-        new("Fees & Rates", "Can fee rates be copied or updated in bulk?", "Yes, when authorized. Copy and bulk rate tools provide source/destination scopes and explicit reviewed plans. Review skip/overwrite decisions and resolve stale previews rather than applying an old plan.", "copy,bulk,overwrite,fee matrix", "Configurable choice and C#/SQL stale-plan guards", "Fee Rate Setup"),
-        new("Billing", "How do I post monthly fees?", "Open Fees & Billing → Fee Posting, select the correct year and scope, preview eligible students/months, then confirm. Review posting status before another attempt; completed periods should not be posted twice.", "post,monthly,year,charges", "User selection with SQL duplicate protection", "Fees & Billing → Fee Posting"),
-        new("Billing", "Why isn't a student eligible for monthly posting?", "Check their admission stage, enrollment status, academic year, confirmed return, fee assignment and already-posted months. Pending Quick Registration and unconfirmed return records are restricted.", "unposted,missing,monthly,pending,eligible", "Protected SQL lifecycle and configuration", "Fee Posting / Unposted Fees report"),
-        new("Billing", "Can I reverse a posted charge?", "Use the Fee Posting reversal or Student Fee Corrections workflow with a reason and reviewed scope. Charges linked to collected money have additional protections and may require payment corrections first.", "reverse,posting,refund,paid", "Protected SQL transaction", "Fee Posting / Student Fee Corrections"),
-        new("Billing", "What does Unposted Fees show?", "It identifies eligible fee coverage that has not been posted for the selected scope or billing cycle. Review assignments and student status before creating any missing charges.", "unposted,missing charges,report", "SQL-backed reporting", "Reports / Fee Posting"),
-        new("Collection", "How do I collect a partial payment?", "Open Daily Work → Fee Collection, find and verify the student, enter a whole-rupee amount, review allocation and confirmation, then save. Reopen the account or receipt to verify the paid and outstanding balances.", "partial,payment,collect,balance", "User choice and SQL allocation", "Daily Work → Fee Collection"),
-        new("Collection", "Why doesn't the payment equal a student's entire balance?", "Partial payment is allowed where the workflow permits it. The database records the amount actually paid and its charge allocations; remaining dues continue to appear in account and aging reports.", "partial,remaining,due,allocation", "SQL financial ledger", "Fee Collection / Account Statement"),
-        new("Collection", "What if the payment succeeds but the page fails to refresh?", "First check the saved transaction, account or receipt using the page's reconciliation guidance. A refresh failure is not proof that the payment failed. Do not press Collect again until the outcome is known.", "payment,timeout,refresh,duplicate,unknown", "SQL request identity and C# recovery", "Fee Collection"),
-        new("Collection", "Can I collect twice accidentally for a settled balance?", "The application disables or refuses repeated settled collections and SQL guards protect the underlying allocation. Verify the account before starting any different payment; don't rely on clicking Save repeatedly.", "duplicate,settled,collect,twice", "SQL financial restriction", "Fee Collection"),
-        new("Collection", "Where can I see a student's full financial history?", "Open Reports → Student Account Statement. Choose a student and optional date range; unchecked dates show the complete account. The statement separates charges, allocations and opening/closing balances.", "statement,ledger,history,student,dates", "User-selected report filters", "Reports → Student Account Statement"),
-        new("Collection", "How do I produce a statement for a family or several students?", "Turn on Group / family statements, choose placement filters, Find Students, select Include or Include Family, then View Statement. Changing to another mode clears selections, including selections from unseen result pages.", "family,group,include,statement,multiple", "C# selection workflow", "Student Account Statement"),
-        new("Collection", "What is Daily Collection Closing?", "This records and reviews physical counted totals against recorded collections. Enter whole-rupee actual amounts where available; leave Refund/Correction actuals blank and explain them in Notes. Closing does not invent counted cash for adjustments.", "closing,cash,daily,refund,notes", "User input with financial reporting rules", "Fees & Billing → Daily Collection Closing"),
-        new("Collection", "Does a cancelled collection create a payment?", "No. Cancelling the confirmation should leave payment and allocation records unchanged. If the result is uncertain because of an interruption, reconcile it before resubmitting.", "cancel,collection,confirmation", "SQL transactional safeguard", "Fee Collection"),
-        new("Reports", "What is the difference between a statement and Annual Receipts?", "The Student Account Statement explains charges, payments and balances across an optional period. Annual Receipts is a year-specific receipt printout reached from the statement window or Student Profile.", "receipts,annual,statement,difference", "Report workflow", "Reports → Student Account Statement"),
-        new("Reports", "Why is Export disabled after I change a filter?", "Changing the student or date period makes the previous statement stale. Click View Statement again so the exported content matches the current selection.", "export,disabled,filter,refresh", "C# stale-result protection", "Student Account Statement"),
-        new("Reports", "Why are some reports or certificates unavailable?", "Printing and viewing use specific permissions; some certificates also require valid student lifecycle/clearance data. Check the selected student and ask your administrator about the destination's permission.", "report,certificate,missing,disabled", "SQL permission and lifecycle", "Reports / Student Certificates"),
-        new("Reports", "Can I print a document for a pending registration?", "Official student certificates require confirmed admission. Complete pending registration review and confirmation first; check the relevant certificate's additional eligibility requirements.", "pending,certificate,print", "Protected lifecycle rule", "Quick Registration / Student Certificates"),
-        new("Reports", "How do I avoid printing the wrong student's information?", "Verify the admission number/name, date range and academic year before preview/export. Always check the selected printer and destination path; printed or exported copies contain personal data.", "wrong student,print,privacy,export", "Operator responsibility", "Reports / Student Certificates"),
-        new("Staff", "How are staff details maintained?", "Open Staff → Staff Management to find, add or edit staff records with authorized access. Staff employment and status changes use the staff workspace, not student admission.", "staff,employee,employment,status", "User input with SQL validation", "Staff → Staff Management"),
-        new("Staff", "Where are staff certificates located?", "Teacher/Lecturer and Bank Account certificates belong under Staff rather than Student Certificates. Verify the selected employee and saved details before producing the document.", "teacher,bank,staff,certificate", "C# navigation and reporting", "Staff"),
-        new("Permissions", "Can an administrator limit what a user can see or do?", "Yes. Users and Roles configure allowed operations for ordinary accounts. Menu entries may disappear when access is missing, and protected changes also have SQL-side checks. Administrator retains protected full authority.", "permission,role,admin,user,grant", "User-configurable grants and hardcoded safeguards", "Account → Users & Roles"),
-        new("Permissions", "Can anyone give themselves Administrator rights?", "No. The Administrator role is protected; ordinary role editing does not replace its authority. Have the authorized administrator manage permitted user grants rather than sharing credentials.", "administrator,admin,role,protected", "Protected SQL permission policy", "Account → Users & Roles"),
-        new("Permissions", "What is the difference between view and edit permissions?", "Viewing student, fee, staff or audit information does not automatically permit modifying it. For example, family viewing and changing family membership have separate permissions. Ask for the specific action you need.", "view,edit,permission,family,read only", "Database authorization", "Account → Users & Roles"),
-        new("Permissions", "Who can restore a database backup?", "Restoration requires the separate Backup.Restore privilege and multiple safety checks. Backup.Create alone is not restoration authority. A restore can replace newer records and must be planned by the administrator.", "restore,permission,backup,admin", "SQL permission and recovery safeguard", "System Maintenance → Backup / Restore"),
-        new("Database & Recovery", "Why won't the application connect to the database?", "Check the displayed error and Windows user, SQL LocalDB availability, and approved database location. Try the offered Reconnect or Restart Connection actions when appropriate. Do not delete or replace existing MDF/LDF files.", "connection,localdb,offline,startup,repair", "C# startup and database compatibility", "Connection screen"),
-        new("Database & Recovery", "Can Repair Connection recover missing school records?", "No. Repair Connection can help repair the SQL engine or connection prerequisites; it cannot recreate missing records. A compatible, verified backup and administrator-led recovery are required for lost data.", "repair,missing records,database,backup", "Hardcoded safety boundary", "Connection screen / Backup Restore"),
-        new("Database & Recovery", "How do I make a verified backup?", "With Backup.Create permission, go to System Maintenance → Backup / Restore, select an approved folder and Back Up Data. Confirm the success message and .bak path; the application verifies the generated backup before reporting success. Keep a protected separate copy.", "backup,bak,verify,copy", "User decision with SQL verification", "System Maintenance → Backup / Restore"),
-        new("Database & Recovery", "What happens if I restore an older backup?", "Restore can replace current data, so newer records may be lost. The workflow checks the backup identity, requires a verified pre-restore safety backup and confirmation, then checks compatibility afterward. Never treat restore as a harmless undo.", "restore,older,overwrite,lost,data", "Protected SQL and C# recovery", "Backup / Restore"),
-        new("Database & Recovery", "What does database schema compatibility mean?", "At startup, FMSC checks required database version and structural features. A version number alone is not enough. If compatibility fails, do not bypass validation or manually patch a school database; request an approved upgrade/recovery review.", "schema,version,compatibility,migration", "Hardcoded runtime contract", "Startup / System Maintenance"),
-        new("Database & Recovery", "Is the DACPAC the application's live database?", "No. A DACPAC is a package of database structure/reference material, not the installed school's active LocalDB records. Never copy it over operational MDF/LDF files or treat it as a restore backup.", "dacpac,mdf,ldf,backup,schema", "Deployment boundary", "Installation / System Maintenance"),
-        new("Database & Recovery", "Why does the app remind me about backups?", "Users with backup creation access may receive a once-per-session reminder if no successful backup is recorded or the last recorded successful backup is more than 14 days old. The reminder does not itself make a backup.", "reminder,14 days,backup,warning", "Hardcoded C# reminder threshold", "System Maintenance → Backup / Restore"),
-        new("Communication", "Why don't all students with phone numbers appear as message recipients?", "Communication Center uses saved, verified contacts with appropriate consent; a number on a student record is not automatically approved for messaging. Add From School Records, verify recipient ownership and record permission to contact them.", "contact,consent,guardian,phone,recipient", "SQL consent restriction and operator decision", "Communication Center → Contacts / Consent"),
-        new("Communication", "How do I prepare and send a message?", "Choose a reviewed template, find and select eligible contacts, preview exclusions and rendered text, then Create Draft. Review it in Outbox and submit/approve as required. Live delivery needs separately authorized settings and a running dispatcher.", "template,compose,bulk,draft,send", "Configurable workflow with SQL guards", "Communication Center"),
-        new("Communication", "Why does a message say Accepted instead of Delivered?", "Accepted means a provider supplied a reference; it is not confirmation that the recipient received the message. Sent, Delivered and Read need later provider evidence. Do not send again merely because confirmation is delayed.", "accepted,sent,delivered,status,unknown", "Provider evidence and SQL state machine", "Communication Center → Outbox"),
-        new("Communication", "Can I change a message draft into a live campaign later?", "No. Disabled/Simulation drafts remain non-live snapshots even when the mode changes. Review the current configuration and create a new campaign when separately approved for live sending.", "simulation,live,draft,mode", "Hardcoded safety restriction", "Communication Center"),
-        new("Communication", "What can administrators configure for messages?", "Authorized administrators can configure providers, templates, consent, limits, quiet hours, budgets and approval thresholds. SQL still enforces opt-out, deduplication, permissions and retry safety; changing limits does not bypass consent.", "threshold,budget,quiet hours,provider,limits", "User-configurable policy within SQL restrictions", "Communication Center → Settings"),
-        new("Communication", "Why is a message blocked or excluded in Preview?", "Typical reasons are missing consent, unverified numbers, unavailable templates, permissions, channel mapping, live-mode limits, or changed financial eligibility. Review the specific exclusion; don't work around it by manually sending the same content.", "excluded,preview,blocked,consent", "SQL eligibility and configurable settings", "Communication Center → Preview"),
-        new("Communication", "What happens if the provider times out?", "An unknown delivery outcome must be investigated through provider status and Outbox history. The dispatcher avoids blindly repeating uncertain sends, protecting families from duplicate messages.", "timeout,retry,unknown,message", "SQL idempotency and worker recovery", "Communication Center → Outbox"),
-        new("Administration", "Where can I review significant changes?", "Authorized operators can open System Maintenance → Audit Logs to review available recorded activity. Audit visibility is permission controlled. Do not change SQL records directly to erase or repair history.", "audit,history,change,logs", "Database audit and access control", "System Maintenance → Audit Logs"),
-        new("Administration", "How should I report an application problem?", "Record the screen, exact action, expected and actual behavior, approximate time and a sanitized screenshot. Do not include actual student data, passwords, complete sensitive logs or database files in ordinary support reports.", "bug,error,help,support,screenshot", "Operator guidance", "Current screen"),
-        new("Administration", "Can I install an update by replacing the database files?", "No. Use the verified installer and approved migration/backup flow. Existing school MDF/LDF data must be preserved; replacing the active database with a template or DACPAC is unsafe.", "update,install,migration,mdf,ldf", "Hardcoded installer safety policy", "Installation / Backup Restore"),
-    }.AsReadOnly();
+        HelpRule.System => "System rule", HelpRule.Setting => "School setting",
+        HelpRule.Choice => "User choice", HelpRule.Permission => "Permission required",
+        HelpRule.Recovery => "Recovery guidance", _ => throw new ArgumentOutOfRangeException(nameof(rule))
+    };
 
-    internal static IEnumerable<HelpEntry> Find(string? term, string? category)
+    internal static IReadOnlyList<HelpEntry> Entries { get; } = Array.AsReadOnly(
+        BasicsEntries().Concat(StudentsEntries()).Concat(FinanceEntries()).Concat(CommunicationEntries())
+            .OrderBy(e => e.Id, StringComparer.Ordinal).ToArray());
+
+    private sealed record SearchEntry(HelpEntry Entry, HashSet<string> Title, HashSet<string> Keywords,
+        HashSet<string> Context, HashSet<string> Body);
+
+    // Explicit equivalences, not fuzzy substring matching: "role" must not match "controller".
+    private static readonly Dictionary<string, string> Aliases = BuildAliases();
+    private static readonly HashSet<string> StopWords = new(StringComparer.Ordinal)
     {
-        var query = Entries.AsEnumerable();
-        if (!string.IsNullOrWhiteSpace(category) && category != "All topics")
-            query = query.Where(e => string.Equals(e.Category, category, StringComparison.OrdinalIgnoreCase));
-        if (string.IsNullOrWhiteSpace(term)) return query;
-        string[] words = term.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return query.Where(e => words.All(w => (e.Question + " " + e.Answer + " " + e.Keywords + " " + e.Category + " " + e.WhereToGo + " " + e.RuleSource).Contains(w, StringComparison.OrdinalIgnoreCase)));
+        "a", "an", "the", "i", "my", "me", "we", "our", "you", "your", "do", "does", "did", "is", "are", "was",
+        "be", "been", "can", "cant", "cannot", "why", "how", "what", "where", "when", "to", "of", "for", "and", "or",
+        "in", "on", "at", "it", "its", "this", "that", "with", "have", "has", "should", "will", "not", "after", "before"
+    };
+    private static readonly SearchEntry[] Index = Entries.Select(e => new SearchEntry(e,
+        Tokens(e.Question), Tokens(e.Keywords), Tokens(e.Category + " " + e.WhereToGo + " " + string.Join(" ", e.Rules.Select(RuleLabel))),
+        Tokens(e.Answer + " " + e.Warning))).ToArray();
+
+    internal static IEnumerable<HelpEntry> Find(string? term, string? category, HelpRule? rule = null)
+    {
+        string[] words = Tokens(term ?? "").Where(w => !StopWords.Contains(w)).ToArray();
+        string phrase = Normalize(term ?? "");
+        return Index.Where(x => (string.IsNullOrWhiteSpace(category) || category == "All topics" ||
+                string.Equals(x.Entry.Category, category, StringComparison.OrdinalIgnoreCase)) &&
+                (!rule.HasValue || x.Entry.Rules.Contains(rule.Value)))
+            .Select(x => (x.Entry, Score: Score(x, words, phrase)))
+            .Where(x => x.Score >= 0).OrderByDescending(x => x.Score).ThenBy(x => x.Entry.Id, StringComparer.Ordinal)
+            .Select(x => x.Entry);
     }
+
+    private static int Score(SearchEntry entry, string[] words, string phrase)
+    {
+        int score = 0;
+        foreach (string word in words)
+        {
+            int weight = entry.Title.Contains(word) ? 12 : entry.Keywords.Contains(word) ? 9 :
+                entry.Context.Contains(word) ? 5 : entry.Body.Contains(word) ? 1 : -1;
+            if (weight < 0) return -1; // Every meaningful term must match; never silently drop a filter word.
+            score += weight;
+        }
+        if (words.Length > 0 && Normalize(entry.Entry.Question) == phrase) score += 100;
+        return score;
+    }
+
+    private static string Normalize(string value) => value.ToLowerInvariant().Replace("’", "").Replace("'", "");
+    private static HashSet<string> Tokens(string value) => Regex.Matches(Normalize(value), @"[\p{L}\p{Nd}]+")
+        .Select(m => Aliases.TryGetValue(m.Value, out string? canonical) ? canonical : m.Value).ToHashSet(StringComparer.Ordinal);
+
+    private static Dictionary<string, string> BuildAliases()
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (string group in new[]
+        {
+            "outstanding dues unpaid balance balances", "admission admissions admit admision admisison",
+            "registration registrations register", "enrollment enrolment enrollments enrolments",
+            "fee fees", "charge charges", "billing posting post", "payment payments collection collect",
+            "receipt receipts", "parent parents guardian guardians", "family families sibling siblings",
+            "permission permissions access", "role roles", "database localdb sql", "cancel cancelled canceled cancellation",
+            "reverse reversed reversal undo", "refund refunds", "left withdraw withdrawal", "student students",
+            "class classes", "section sections", "academic academics", "year years", "photo photos image images",
+            "tuition tution", "save saved saving", "filter filters filtering", "search searching", "confirm confirmed confirmation",
+            "promotion promote promoted", "discount discounts", "report reports", "rate rates", "template templates",
+            "schedule scheduled scheduling", "message messages messaging", "staff employee employees", "link linking linked",
+            "unlink unlinking delink", "configure configuration settings setting", "backup backups", "restore restoring",
+            "print printing", "number numbers", "date dates", "correction corrections", "partial installment instalment",
+            "authorize authorized authorised", "program programme programs programmes", "color colour", "center centre"
+        })
+        {
+            string[] words = group.Split(' ');
+            foreach (string word in words) result.Add(word, words[0]);
+        }
+        return result;
+    }
+
+    internal static IReadOnlyList<HelpEntry> Related(HelpEntry entry) => entry.RelatedIds
+        .Select(id => Entries.First(e => e.Id == id)).ToArray();
 }

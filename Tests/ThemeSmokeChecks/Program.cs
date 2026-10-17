@@ -34,6 +34,17 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--help-center-interactive"))
+        {
+            ShowHelpCenterAcceptance();
+            return;
+        }
+        if(args.Contains("--help-center"))
+        {
+            CheckHelpCenter();
+            Console.WriteLine($"PASS: {checks} offline Help Center control checks.");
+            return;
+        }
         if(args.Contains("--validation-badges"))
         {
             CheckValidationBadges();
@@ -72,6 +83,7 @@ internal static partial class Program
             CheckMessageDialogs();
             CheckStudentAccountFlow();
             CheckStudentSearchModes();
+            CheckHelpCenter();
             Console.WriteLine("ACCOUNT_FLOW: check refused regeneration");
             CheckStatementRegenerationFreshness();
             Console.WriteLine("ACCOUNT_FLOW: check multi-student async assembly");
@@ -225,6 +237,7 @@ internal static partial class Program
             CheckPdfFileDurability();
             CheckAdministrationEditors();
             CheckSignInGuard();
+            CheckHelpCenter();
             Console.WriteLine($"PASS: {checks} Windows theme switching, structure, rendering and resource checks.");
         }
         finally { AppTheme.SetTheme(originalTheme); }

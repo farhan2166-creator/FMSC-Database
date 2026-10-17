@@ -13,7 +13,7 @@ The reference definition is retained at `Services/Communication/Schema.sql` for 
 
 The add-on has its own version and exact stored-module definition checks plus essential column/index/trusted-constraint checks. An altered procedure disables the page. This is additional validation, not a replacement for the reviewed base DACPAC contract. Do not remove the schema from a database that contains communication history as a routine rollback. Stop dispatch, disable the module and retain/restore an approved backup under the normal recovery procedure.
 
-Installer verification runs the staged application with a headless, explicit Windows-authenticated LocalDB connection. It bypasses normal startup/attachment, login and dispatch. A timeout or lost commit acknowledgement stops activation and retains the verified backup path; rerun the installer to verify the module rather than blindly reapplying SQL. A valid module on that next run is recognized and preserved. Real LocalDB/operator-account and clean-PC installation acceptance still require a disposable Windows machine.
+The current installer verifies base compatibility before application activation; it no longer installs this module. Runtime communication checks validate an existing module separately. If it is missing or incompatible, ask for a reviewed data-preserving deployment/recovery path; rerunning the installer does not recreate it. Real LocalDB/operator-account and clean-PC installation acceptance still require a disposable Windows machine.
 
 ## First use without provider accounts
 
