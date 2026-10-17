@@ -83,7 +83,7 @@ internal static class RecoveryWorkflows
                 Desktop.Wait(()=>ui.TryWindow("School Records Connection")==null?new object():null,"successful reconnect",45);
             }
             ui.Click("Load Eligible Fees",ControlType.Button);
-            Desktop.Wait(()=>ui.Find("Post Selected Fees",ControlType.Button) is {IsEnabled:true} button?button:null,"eligible read preview after reconnection");
+            Desktop.Wait(()=>ui.Find("Post Eligible Fees",ControlType.Button) is {IsEnabled:true} button?button:null,"eligible read preview after reconnection");
             Identity.Check(!ui.Process!.HasExited&&Identity.Count("SELECT COUNT(*) FROM dbo.FeePayments;")==payments&&
                 Identity.Count("SELECT COUNT(*) FROM dbo.BillingCharges;")==charges,"Read retry crashed or changed financial records.");
             Identity.Check(FinanceWorkflows.Paid()==paid&&FinanceWorkflows.Allocated()==allocated&&FinanceWorkflows.Charges()==charged,"Connection interruption changed financial amounts.");

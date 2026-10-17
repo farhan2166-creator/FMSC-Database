@@ -92,13 +92,20 @@ internal static class AdmissionNumberPolicy
         string? anchor=dated.Where(item=>item.Date<=date.Date).OrderByDescending(item=>item.Date)
             .ThenByDescending(item=>item.Number,order).Select(item=>item.Number).FirstOrDefault();
         string? suggestion=null;
-        if(upper is null && end.Date>=DateTime.Today && date.Date==DateTime.Today)
+        // An incomplete legacy register can end before today. Continue its whole
+        // numbers whenever no later dated record bounds this admission.
+        if(upper is null)
         {
             long maximum=used.Select(number=>long.Parse(new string(number.TakeWhile(char.IsDigit).ToArray()),CultureInfo.InvariantCulture)).DefaultIfEmpty(0).Max();
             if(maximum<long.MaxValue-1) suggestion=(maximum+1).ToString(CultureInfo.InvariantCulture);
         }
         else if(anchor is not null)
         {
+            // Confirmed register policy: insert between known dated records with
+            // a suffix, even while legacy data is incomplete. For example, with
+            // 6570 dated 03-Apr-2025 and 6571..6589 dated 04-Apr-2025, another
+            // admission on 03-Apr correctly suggests 6570a. An admission after
+            // the last known date instead continues whole numbers (6590 above).
             string main=new string(anchor.TakeWhile(char.IsDigit).ToArray());
             string suffix=anchor[main.Length..];
             for(int attempt=0;attempt<=used.Count;attempt++)

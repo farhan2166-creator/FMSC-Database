@@ -17,7 +17,7 @@ public sealed class StudentDataReviewPage : UserControl, IBusyPage, IUnsavedChan
         tabs=new TabControl{Dock=DockStyle.Fill,Font=AppTheme.NormalFont};
         tabs.Selecting+=(_,e)=>{if(IsBusy)e.Cancel=true;};
         void Add(string title,Func<Control> factory){var tab=new TabPage(title){BackColor=AppTheme.Surface,Tag=factory};tabs.TabPages.Add(tab);}
-        var legacyTab=new TabPage("Legacy Verification"){BackColor=AppTheme.Surface};
+        var legacyTab=new TabPage("Awaiting Student Setup"){BackColor=AppTheme.Surface};
         legacyTab.Tag=(Func<Control>)(()=>{
             var page=new AdmissionReviewListPage(navigate,false);
             page.LegacySetupCompleted+=()=>{tabs.TabPages.Remove(legacyTab);legacyTab.Dispose();};
@@ -50,7 +50,7 @@ public sealed class AdmissionReviewListPage : V2Page
     private readonly ModernTextBox search=HumanUi.TextBox(false,200);
     private readonly CheckBox remaining=new(){Text="Needs review only",AutoSize=true},active=new(){Text="Active students only",AutoSize=true,Checked=true};
     public AdmissionReviewListPage(Action<Func<Control>,string,string> navigate,bool pending,Func<int,Task>? openRegistration=null)
-        : base(pending?"Pending Registrations":"Legacy Verification",pending?"Find an unfinished registration and open it to edit details, confirm admission or cancel.":"Correct records in Admission and mark them verified. Finish legacy setup once all active records are ready.")
+        : base(pending?"Pending Registrations":"Awaiting Student Setup",pending?"Find an unfinished registration and open it to edit details, confirm admission or cancel.":"Open a student in Admission, then use Student Setup / Placement Corrections to review placement, fees and start billing individually.")
     {
         this.navigate=navigate;this.pending=pending;this.openRegistration=openRegistration;
         AddBusyAction("Refresh",RefreshAsync,"Secondary");
@@ -110,7 +110,7 @@ public sealed class AdmissionReviewListPage : V2Page
     internal Task RefreshRecordsAsync()=>RefreshAsync();
     private void UpdateLegacySetupState(bool completed)
     {
-        if(goLive is not null)goLive.Visible=!completed&&CurrentUser.HasPermission("Students.Administer");
+        if(goLive is not null)goLive.Visible=false;
         if(completed){SetStatus("Legacy setup is complete.");LegacySetupCompleted?.Invoke();}
     }
     private async Task RefreshAsync()
@@ -154,7 +154,7 @@ public sealed class AdmissionReviewListPage : V2Page
         if(IsDisposed||recordView is null)return;
         string filter=AdmissionReviewFilter.Create(pending,active.Checked,remaining.Checked,search.Text);
         if(recordView.RowFilter!=filter){recordView.RowFilter=filter;ClearSelection();}
-        SetStatus(pending?$"{recordView.Count} pending registration(s).":$"{verifiedCount}/{activeCount} active students verified · {recordView.Count} shown.");
+        SetStatus(pending?$"{recordView.Count} pending registration(s).":$"{records.Rows.Count} students awaiting setup · {recordView.Count} shown.");
     }
     protected override void Dispose(bool disposing)
     {

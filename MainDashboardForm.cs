@@ -613,6 +613,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     PageTitles.StudentPurchases,
                     "Fees.Collect"),
                 new(
+                    PageTitles.FeePosting,
+                    () => FeePostingWorkspace.Create(),
+                    "Finance",
+                    PageTitles.FeePosting,
+                    "Fees.Collect"),
+                new(
                     PageTitles.StudentCertificates,
                     () => new StudentCertificatesPage(
                         (factory, module, title) => NavigateTo(factory, module, title)),

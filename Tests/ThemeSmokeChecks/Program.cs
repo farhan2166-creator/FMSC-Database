@@ -34,6 +34,18 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--monthly-repost"))
+        {
+            CheckMonthlyRepostClick();
+            Console.WriteLine($"PASS: {checks} monthly repost click checks.");
+            return;
+        }
+        if(args.Contains("--additional-fee-scope"))
+        {
+            CheckAdditionalFeeScope();
+            Console.WriteLine($"PASS: {checks} additional-fee selection scope checks.");
+            return;
+        }
         if(args.Contains("--family-counter-sql"))
         {
             var task=CheckFamilyCounterSqlAsync();

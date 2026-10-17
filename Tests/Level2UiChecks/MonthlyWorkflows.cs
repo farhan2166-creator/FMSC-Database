@@ -14,8 +14,8 @@ internal static class MonthlyWorkflows
             Identity.Check(!year.IsEnabled&&year.AsComboBox().Value=="Fictional "+DateTime.UtcNow.Year,"Posting must remain locked to the actual current academic year.");
             ui.Select("Campus","Fictional Main Campus");ui.Select("Class","Class 7 (Fictional Middle School)");ui.Select("Fee Type","Tuition fee");
             ui.Select("Billing Month",$"February {DateTime.UtcNow.Year}  -  1 to post");ui.Click("Load Eligible Fees",ControlType.Button);
-            Desktop.Wait(()=>ui.Find("Post Selected Fees",ControlType.Button) is {IsEnabled:true} b?b:null,"eligible monthly preview");
-            ui.Click("Post Selected Fees",ControlType.Button);ui.Click("Yes",ControlType.Button,ui.Window("Post Monthly Fees"));
+            Desktop.Wait(()=>ui.Find("Post Eligible Fees",ControlType.Button) is {IsEnabled:true} b?b:null,"eligible monthly preview");
+            ui.Click("Post Eligible Fees",ControlType.Button);ui.Click("Yes",ControlType.Button,ui.Window("Post Monthly Fees"));
             DateTime month=new(DateTime.UtcNow.Year,2,1);
             Desktop.Wait(()=>Identity.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE BillingMonth=@Month;",new SqlParameter("@Month",month))==1?new object():null,"monthly charge commit");
             Identity.Check(Identity.Money("SELECT NetAmount FROM dbo.BillingCharges WHERE BillingMonth=@Month;",new SqlParameter("@Month",month))==6000,"Current Class 7 month differs from its configured 6000 rate.");

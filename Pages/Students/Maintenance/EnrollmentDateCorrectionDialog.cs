@@ -74,15 +74,17 @@ internal sealed class EnrollmentDateCorrectionDialog : ApplicationWindowForm
                 plan = preview.Rows[0];
                 reviewedStart = start.Value.Date; reviewedBilling = billing.Checked ? billing.Value.Date : null;
                 reviewedReason = reason.Text.Trim(); reviewedLegacy = legacy.Checked;
-                impact.Text = $"Placement Start Date: {start.Value:dd MMM yyyy}\r\nBilling start: " +
+                bool blocked = Convert.ToInt32(plan["BlockedCount"]) > 0;
+                impact.Text = (blocked ? "CORRECTION BLOCKED — Apply is disabled. Nothing has changed.\r\n\r\n" : "") +
+                    $"Proposed Placement Start Date: {start.Value:dd MMM yyyy}\r\nProposed billing start: " +
                     (billing.Checked ? billing.Value.ToString("dd MMM yyyy") : "not set") +
-                    $"\r\n\r\nCancel {plan["CancelCount"]} charge(s): Rs. {Convert.ToDecimal(plan["CancelledAmount"]):0.##}" +
-                    $"\r\nAdd {plan["AddCount"]} charge(s): Rs. {Convert.ToDecimal(plan["AddedAmount"]):0.##}" +
+                    $"\r\n\r\nWould cancel {plan["CancelCount"]} charge(s): Rs. {Convert.ToDecimal(plan["CancelledAmount"]):0.##}" +
+                    $"\r\nWould add {plan["AddCount"]} charge(s): Rs. {Convert.ToDecimal(plan["AddedAmount"]):0.##}" +
                     $"\r\nReview covers billing through {Convert.ToDateTime(plan["ThroughDate"]):MMM yyyy}." +
                     (plan["ReturnDate"] is DateTime returned ? $"\r\nResulting confirmed return date: {returned:dd MMM yyyy}." : "") +
-                    "\r\n\r\nCancelled charges remain in history. Payments stay unchanged. Apply saves the reviewed dates and charge changes together.";
-                if (Convert.ToInt32(plan["BlockedCount"]) > 0)
-                    impact.Text += $"\r\n\r\n{plan["BlockedCount"]} affected charge(s) have payment or other recorded history. Review them in Student Fees. The database does not allow this correction yet; nothing has changed.";
+                    (blocked
+                        ? $"\r\n\r\n{plan["BlockedCount"]} affected charge(s) have payment or other recorded history. These dates cannot be applied while that history exists. Review the affected charges and their payments in Student Fees / Fee Corrections before reviewing this correction again. Existing dates, charges and payments remain unchanged."
+                        : "\r\n\r\nCancelled charges remain in history. Payments stay unchanged. Apply saves the reviewed dates and charge changes together.");
             }
             catch (Exception ex) { plan = null; impact.Text = DbMessage.UserMessage(ex); }
             finally { if (!IsDisposed) SetBusy(false); }

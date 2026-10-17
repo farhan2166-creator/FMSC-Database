@@ -106,7 +106,7 @@ public sealed class AdditionalFeeEntry : UserControl
         discountField.TabIndex = 3;
         reasonField.TabIndex = 4;
         var guidance = new Label {
-            Text = "Each purchase or event is a separate charge and stays in collection until paid.",
+            Text = "Choose a one-off purchase or event. Admission, tuition and recurring transport fees use their own fee workflows.",
             AutoSize = true, ForeColor = AppTheme.MutedText,
             Font = AppTheme.NormalFont, Dock = DockStyle.Fill
         };

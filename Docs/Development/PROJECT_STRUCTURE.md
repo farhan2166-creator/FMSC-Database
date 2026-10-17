@@ -58,7 +58,7 @@ Permissions remain attached to each existing action. User/role administration re
 | Bulk Adjust Fees | Bulk Fee Rate Changes — `BulkFeeRateChangesForm` |
 | Fee Statement | Student Account Statement — `StudentAccountStatementPage` |
 | Student Annual Fee Ledger | Annual Fee Receipts — `AnnualFeeReceiptsPage` |
-| Missing Charge Candidates / Not Posted Yet | Unposted Fees — `UnpostedFeesReportPage` |
+| Missing monthly bills / not posted yet | Post Monthly Fees — `FeePostingPage` (month counts and eligible-student preview) |
 | DefineClasses / DefineSections / DefineSubjects / DefineCampuses | ClassesPage / SectionsPage / SubjectsPage / CampusesPage |
 | DefineFeeTypes / DefineUsers / StaffPage | FeeTypesPage / UsersPage / StaffProfilePage |
 
