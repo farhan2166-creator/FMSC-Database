@@ -455,28 +455,29 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                 /* A correction states the FINAL collected amount, so it must strictly reduce what was collected. */
                 if (transactionType == "Correction" && (amount<0m || amount >= selectedPaymentAmount))
                 {
-                    Warn($"A correction must be less than the Rs. {selectedPaymentAmount:N0} collected. " +
-                         "It sets the final collected amount, so correcting it to the same " +
-                         "amount would change nothing - to undo the whole payment, use Reversal instead.");
+                    Warn($"Enter a final amount of Rs. 0 or more, below Rs. {selectedPaymentAmount:N0}. " +
+                         "Use Reversal to undo the whole payment.");
                     actionAmount.Focus();
                     return;
                 }
             }
-            string description = transactionType switch {
-                "Correction" => amount == 0m
-                    ? "Correct the selected collection down to 0 (the collection is undone financially)."
-                    : $"Correct the selected collection to a final collected amount of Rs. {amount:0.##}.",
-                "Refund" => $"Refund Rs. {amount:0.##} from the selected payment.",
-                _ => $"Reverse the entire payment of Rs. {amount:0.##}."
+            string question = transactionType switch {
+                "Correction" => $"Set the final collected amount to Rs. {amount:0.##}?",
+                "Refund" => $"Refund Rs. {amount:0.##}?",
+                _ => $"Reverse the full payment of Rs. {amount:0.##}?"
             };
-            string confirmation =
-                description + "\r\n\r\n" +
-                $"Student: {selectedStudentName}\r\n" +
-                $"Payment: {selectedPaymentId} (Rs. {selectedPaymentAmount:0.##} collected)\r\n" +
-                $"Date: {transactionDate.Value:d}\r\n" +
-                $"Reason: {reason.Text.Trim()}\r\n\r\n" +
-                "This changes money already recorded as collected and cannot be undone. " +
-                "Check the amount and the selected payment before continuing.";
+            var confirmation = new MessageDialogContent(
+                question,
+                Explanation: transactionType == "Correction" && amount == 0m
+                    ? "A final amount of zero undoes the collection financially." : null,
+                Facts: new (string, string)[] {
+                    ("Student", selectedStudentName),
+                    ("Payment", selectedPaymentId.ToString()),
+                    ("Originally collected", $"Rs. {selectedPaymentAmount:0.##}"),
+                    ("Date", transactionDate.Value.ToString("d")),
+                    ("Reason", reason.Text.Trim())
+                },
+                Notice: "This changes recorded money and cannot be undone. Check the payment and amount before choosing Yes.");
             if (ModernMessageDialog.Show(
                     FindForm(),
                     confirmation,

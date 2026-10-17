@@ -42,7 +42,7 @@ concurrency:
 
 jobs:
   lifecycle-sql:
-    name: Real SQL lifecycle and persisted-state checks
+    name: Real SQL lifecycle, persisted state and Level 3 reliability
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
@@ -79,10 +79,12 @@ jobs:
         run: |
           test ! -f FMSC.dacpac
           python -m unittest discover -s Tests/LifecycleSqlChecks -p 'test_*.py' -v
+          python -m unittest discover -s Tests/Level3Checks -p 'test_*.py' -v
+          python -m unittest discover -s Tests/Level2UiChecks -p 'test_*.py' -v
 
       - name: Provision fictional school and execute real lifecycle
         run: >-
-          python Tests/LifecycleSqlChecks/run.py
+          python Tests/LifecycleSqlChecks/run.py --level3
           --output "$RUNNER_TEMP/fmsc-level1-evidence"
           --state "$RUNNER_TEMP/fmsc-level1-owner.json"
 
@@ -118,6 +120,24 @@ jobs:
           else
             echo 'Level 1 did not reach the harness. Inspect the failed checkout/tooling step; no SQL success is claimed.' >> "$GITHUB_STEP_SUMMARY"
           fi
+
+      - name: Generate complete Level 3 matrix with local requirements kept separate
+        if: always()
+        run: >-
+          python Tests/Level3Checks/report.py
+          --sql "$RUNNER_TEMP/fmsc-level1-evidence/report.json"
+          --output "$RUNNER_TEMP/fmsc-level3-evidence"
+
+      - name: Upload complete Level 3 SQL scenario matrix
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: fmsc-level3-sql-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/fmsc-level3-evidence/report.json
+            ${{ runner.temp }}/fmsc-level3-evidence/summary.md
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Upload sanitized evidence only
         if: always()
