@@ -141,10 +141,13 @@ public class ApplicationWindowForm : Form
             root is ScrollableControl { AutoScroll: true } ||
             root.GetType().Namespace?.StartsWith("Microsoft.Reporting", StringComparison.Ordinal) == true) return;
         Size minimum = root.Size;
+        int rootIndex = Controls.GetChildIndex(root);
         Controls.Remove(root);
         viewport = new ResponsiveViewport(root, minimum);
         Controls.Add(viewport);
-        caption?.BringToFront();
+        Controls.SetChildIndex(viewport, rootIndex);
+        // Top docking runs in reverse z-order: the caption must dock first.
+        caption?.SendToBack();
     }
     protected override void OnLocationChanged(EventArgs e)
     {

@@ -841,10 +841,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         ConfigureFieldSuggestions();
         /* Keep student search and admission actions together in the toolbar. */
         quickStudent.Dock = DockStyle.None;
-        quickStudent.Width = AppScale.Scale(320);
-        // Keep the finder width independent of status text and action visibility.
-        quickStudent.MinimumSize = new Size(AppScale.Scale(320), 0);
-        quickStudent.MaximumSize = new Size(AppScale.Scale(320), 0);
+        // Keep a stable compact finder so the normal action row also fits Print.
+        quickStudent.Width = AppScale.Scale(220);
+        quickStudent.MinimumSize = new Size(AppScale.Scale(220), 0);
+        quickStudent.MaximumSize = new Size(AppScale.Scale(220), 0);
         quickStudent.Margin = new Padding(
             4,
             Math.Max(0, (AppTheme.CompactButtonHeight - AppMetrics.InputControlHeight) / 2),
@@ -870,10 +870,12 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         // re-enable Save after an unconfirmed admission reply.
         saveButton = AddAction(UiText.Actions.Save, async (_, _) => await Save(), "Success");
         saveAndNewButton = AddAction("Save & New", async (_, _) => await SaveAndStartNextAsync(), "Success");
+        // Temporarily hidden at the owner's request to leave more room for Print.
+        saveAndNewButton.Visible = false;
         checkAdmissionButton = AddAction("Check Saved Admission", async (_, _) => await RecheckAdmissionAsync(), "Secondary");
         checkAdmissionButton.Visible = false;
         UiAccessibility.Describe(keepPlacement, "Keep placement for the next student",
-            "Retain campus, academic year, class and section for Clear / New and Save & New. Student details and discounts are cleared.");
+            "Retain campus, academic year, class and section for Clear / New. Student details and discounts are cleared.");
         AddToolbarSeparator();
         /* Collect the fee once the admission is saved, then print - the order the work happens in. */
         foreach (string operation in new[] { "Transfer Section", "Transfer Class", "Transfer Campus", "Re-Admit" })
@@ -945,12 +947,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         SetActionButtonImage("Save", "✓");
         SetActionButtonImage("Print ▾", "▣");
         SetActionButtonImage("Collect Payment", "Rs");
-        // Native preferred sizing includes the real font, caption and padding
-        // after the dashboard changes scale. Let the toolbar wrap whole buttons.
+        // Fit the actual captions instead of retaining the shared 122px width
+        // for short actions, which needlessly pushes Print onto another row.
         foreach (var action in Actions.Controls.OfType<ModernButton>())
         {
+            action.MinimumSize = new Size(AppScale.Scale(88, AppScale.ControlSizeScale), AppMetrics.ButtonHeight);
+            action.Padding = new Padding(AppScale.Scale(12), 0, AppScale.Scale(12), 0);
             action.AutoSize = true;
-            action.AutoSizeMode = AutoSizeMode.GrowOnly;
+            action.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         }
         LoadCampuses();
         Campus.SelectedIndexChanged +=

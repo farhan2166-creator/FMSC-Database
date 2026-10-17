@@ -48,6 +48,16 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} family counter workflow checks.");
             return;
         }
+        if(args.Contains("--admission-layout"))
+        {
+            CheckAdmissionToolbarRows();
+            CheckReportCaptionOrder();
+            CheckValidationBadges();
+            CheckDpiGeometryAndMinimum();
+            CheckDialogScrollHost();
+            Console.WriteLine($"PASS: {checks} admission and report window layout checks.");
+            return;
+        }
         if(args.Contains("--help-center-interactive"))
         {
             ShowHelpCenterAcceptance();
@@ -86,6 +96,8 @@ internal static partial class Program
         if(args.Contains("--post-fix"))
         {
             CheckValidationBadges();
+            CheckAdmissionToolbarRows();
+            CheckReportCaptionOrder();
             CheckCommunicationWorkspace();
             CheckCommunicationGuidance();
             CheckDatePickerVisibility();

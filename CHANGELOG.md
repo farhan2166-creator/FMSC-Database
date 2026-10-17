@@ -16,6 +16,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Changed
 
+- Temporarily hide Admission's Save & New button to leave more room for Print. Use Save followed by Clear / New for the next student.
 - Distinguish New Record from Clear Search in shared setup editors. Setup Readiness disables unavailable destinations and navigation during checks, with inline permission guidance.
 - Clarified payment-adjustment and placement confirmations with aligned details, and shortened Communication Center guidance while preserving warnings and confirmation defaults.
 
@@ -45,6 +46,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 - Added an isolated Level 1 SQL lifecycle harness in [PR #14](https://github.com/farhan2166-creator/FMSC-Database/pull/14), with schema-only approved-model provenance, fictional school fixtures, persisted admission/fees/promotion/recovery assertions, existing-suite integration and sanitized CI evidence. Production application/database/installer behavior is unchanged; real Windows and deployment acceptance remain separate.
 
 ### Fixed
+
+- Keep report-preview captions above the print toolbar and preserve the content viewport's docking order. Compact Admission finder/action sizing keeps Print beside the other actions at ordinary widths while narrow windows still wrap whole buttons.
 
 - Bound Help Center splitter transitions during compact layout changes to prevent the reproduced Windows startup/layout exception.
 
