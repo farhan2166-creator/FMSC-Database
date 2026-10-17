@@ -17,5 +17,6 @@ CREATE TABLE [dbo].[BillingCharges] (
     [Remarks]                NVARCHAR (500)   NULL,
     [CreatedAt]              DATETIME2 (0)    NOT NULL,
     [ChargeKind]             NVARCHAR (20)    NOT NULL,
-    [ManualRequestId]        UNIQUEIDENTIFIER NULL
+    [ManualRequestId]        UNIQUEIDENTIFIER NULL,
+    [CorrectionOfBillingChargeId] BIGINT NULL
 );

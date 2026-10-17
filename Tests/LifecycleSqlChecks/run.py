@@ -32,7 +32,7 @@ def verify_baseline():
     The real SQL scenarios and live runtime contract enforce their own behavior.
     """
     requirement = re.search(r'RequiredDatabaseSchemaVersion\s*=\s*"(\d+)"', (ROOT / "DatabaseHelper.cs").read_text())
-    if requirement is None or requirement.group(1) != "6":
+    if requirement is None or requirement.group(1) != "19":
         raise ValueError("Production schema requirement changed; review the SQL test fixture before running tests.")
 
     def provider_version(project):
@@ -107,7 +107,7 @@ def write_evidence(output, report):
     (output / "report.json").write_text(json.dumps(report, indent=2))
     rows = report["scenarios"]
     summary = ["# FMSC_SMS Level 1 automated evidence", "", f"Commit: `{report['commit']}`", f"Run: `{report['runId']}`",
-               f"Engine: SQL Server 2022 ({report.get('engine') or 'unverified'}); required schema: 6", "",
+               f"Engine: SQL Server 2022 ({report.get('engine') or 'unverified'}); required schema: 19", "",
                f"PASS: {sum(s['result']=='PASS' for s in rows)} · FAIL: {sum(s['result']=='FAIL' for s in rows)} · BLOCKED: {sum(s['result']=='BLOCKED' for s in rows)}",
                "", "| Scenario | Result | Assertions | Seconds |", "|---|---|---:|---:|"]
     summary += [f"| {s['name'].replace('|','/')} | {s['result']} | {s.get('assertions',0)} | {s.get('seconds',0):.2f} |" for s in rows]
@@ -219,6 +219,11 @@ def main():
         prefix = [str(args.sqlpackage)] if args.sqlpackage else [args.dotnet, "tool", "run", "sqlpackage", "--"]
         execute(prefix + ["/Action:Publish", "/SourceFile:" + package, "/TargetConnectionString:" + env["FMSC_AUDIT_CONNECTION"], "/p:CreateNewDatabase=True"], timeout=240, cwd=PROJECT)
         sql(catalog, "DECLARE @Owner uniqueidentifier='" + str(token) + "'; EXEC sys.sp_addextendedproperty @name=N'FMSC_Level1Owner',@value=@Owner;")
+        # The approved data-free fixture is v6; exercise numbered upgrades rather than changing its model.
+        sql(catalog, "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');")
+        for migration in sorted((ROOT / "Migrations").glob("*.sql"), key=lambda p: int(p.stem)):
+            if 6 < int(migration.stem) <= 19:
+                sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;")
         return catalog
 
     def run_lifecycle(mode, report_name):

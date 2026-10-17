@@ -66,6 +66,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     private readonly System.Windows.Forms.Timer _scaleDebounceTimer = new() {
         Interval = 350
     };
+    private readonly System.Windows.Forms.Timer billingMonthTimer = new() { Interval = 60000 };
     public MainDashboardForm() : this(null) { }
     internal MainDashboardForm(Action<string, Exception>? navigationFailureReporter)
     {
@@ -147,6 +148,11 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             UpdateSidebarModeForWindowWidth();
         Shown += (_, _) =>
             _ = CheckBackupFreshnessAsync();
+        Shown += async (_, _) => await AutomaticMonthlyBilling.CheckAsync(this);
+        AutomaticMonthlyBilling.StatusChanged += ShowBillingStatus;
+        billingMonthTimer.Tick += async (_, _) => await AutomaticMonthlyBilling.CheckAsync(this);
+        billingMonthTimer.Start();
+        Activated += async (_, _) => await AutomaticMonthlyBilling.CheckAsync(this);
         Disposed += (_, _) => {
             AppTheme.ThemeChanged -= OnThemeChanged;
             AppScale.ScaleChanged -= OnScaleChanged;
@@ -154,6 +160,8 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             _scaleDebounceTimer.Dispose();
             KeyDown -= OnMainKeyDown;
             sidebarToolTip.Dispose();
+            AutomaticMonthlyBilling.StatusChanged -= ShowBillingStatus;
+            billingMonthTimer.Dispose();
         };
         NavigateTo(
             () => new WelcomePage(
@@ -162,6 +170,10 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             "Dashboard",
             "Overview");
         ResumeLayout(true);
+    }
+    private void ShowBillingStatus(string message)
+    {
+        if (!IsDisposed) status.Text = message;
     }
     private static int DashboardTopBarHeight() =>
         Math.Max(
@@ -1348,9 +1360,10 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Hot Keys",
                 null,
                 (_, _) => OpenHotKeysPageAfterAccountMenuCloses()));
-        menu.Items.Add(new ToolStripMenuItem("Database - Connection Help", null, (_, _) => {
+        menu.Items.Add(new ToolStripMenuItem("Database - Connection Help", null, async (_, _) => {
             using var connection = new DatabaseConnectionForm(startup: false);
             connection.ShowDialog(this);
+            await AutomaticMonthlyBilling.CheckAsync(this, force: true);
         }));
         var theme =
             new ToolStripMenuItem(

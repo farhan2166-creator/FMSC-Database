@@ -12,7 +12,7 @@ internal static class QuickRegistrationWriter
 {
     internal const string FeeQuery = """
         SELECT F.FeeTypeId,F.FeeTypeName,F.IsMandatory,F.IsTransportLinked,C.Amount,C.Frequency,
-            CONVERT(bit,F.IsMandatory) [Include],CONVERT(decimal(12,2),0) Discount
+            CONVERT(bit,F.IsMandatory) [Include],CONVERT(decimal(12,2),0) Discount,CONVERT(nvarchar(20),N'None') ConcessionLabel
         FROM dbo.CampusClassSections P CROSS JOIN dbo.FeeTypes F
         LEFT JOIN dbo.FeeConfigurations C ON C.CampusId=P.CampusId AND C.ClassId=P.ClassId AND C.FeeTypeId=F.FeeTypeId
         WHERE P.ClassSectionId=@Placement AND (F.IsMandatory=1 OR C.FeeTypeId IS NOT NULL)
@@ -36,12 +36,12 @@ internal static class QuickRegistrationWriter
 
     private const string StoredFeesSql = """
         SELECT A.StudentFeeAssignmentId,F.FeeTypeId,F.FeeTypeName,F.IsMandatory,F.IsTransportLinked,
-            A.Amount,A.Frequency,CONVERT(bit,1) [Include],A.DiscountAmount Discount,
+            A.Amount,A.Frequency,CONVERT(bit,1) [Include],A.DiscountAmount Discount,ISNULL(A.ConcessionLabel,N'None') ConcessionLabel,
             CONVERT(bit,CASE WHEN EXISTS(SELECT 1 FROM dbo.BillingCharges B JOIN dbo.FeePaymentAllocations PA ON PA.BillingChargeId=B.BillingChargeId
                 JOIN dbo.FeePayments FP ON FP.FeePaymentId=PA.FeePaymentId WHERE B.StudentFeeAssignmentId=A.StudentFeeAssignmentId AND FP.Status=N'Completed') THEN 1 ELSE 0 END) HasPayments
         FROM dbo.StudentFeeAssignments A JOIN dbo.FeeTypes F ON F.FeeTypeId=A.FeeTypeId
         JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId
-        WHERE E.AdmissionId=@Admission AND E.Status IN(N'Pending',N'Active') AND A.CancelledAt IS NULL
+        WHERE E.AdmissionId=@Admission AND E.Status IN(N'Pending',N'Active') AND A.CancelledAt IS NULL AND A.EffectiveTo IS NULL
         ORDER BY F.DisplayOrder,F.FeeTypeName;
         """;
 

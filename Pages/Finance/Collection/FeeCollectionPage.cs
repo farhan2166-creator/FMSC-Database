@@ -248,6 +248,13 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         addChargeButton = AddAction(
             "Add Charge", (_, _) => OpenAdditionalFee(), "Secondary");
         addChargeButton.Enabled = false;
+        AddAction("Student Credit", async (_, _) => {
+            if (admissionId <= 0) { Warn("Select a student first."); return; }
+            using var dialog = new StudentCreditDialog(admissionId);
+            dialog.ShowDialog(FindForm());
+            await LoadChargesAsync(loadVersion);
+            await LoadRecentPaymentsAsync(loadVersion);
+        }, "Secondary");
         // Reuse existing projection and statement views for Future Fees and History.
         futureFeesButton =
             AddAction(
@@ -278,7 +285,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             };
         /* Delegate menu actions to the existing buttons so permissions and enabled states remain authoritative. */
         studentFeesMenuButton = new ModernButton {
-            Text = "Student Fees ▾",
+            Text = "Student Fees â–¾",
             ThemeRole = "Secondary",
             AutoSize = true
         };
@@ -971,7 +978,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     : 0m;
             row.Cells["Pay"].Value =
                 selected
-                    ? "−"
+                    ? "âˆ’"
                     : "+";
             UpdateCollectionTotals();
             SyncPaymentFieldToGrid();
@@ -1038,7 +1045,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 selected;
             row.Cells["Pay"].Value =
                 selected
-                    ? "−"
+                    ? "âˆ’"
                     : "+";
             UpdateCollectionTotals();
             SyncPaymentFieldToGrid();
@@ -1323,7 +1330,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             student.SelectedId;
         admissionId =
             selectedAdmissionId;
-        primaryPayer.Text=selectedAdmissionId>0 ? $"{StudentNameFor(selectedAdmissionId)} · #{AdmissionNumbers.ForId(selectedAdmissionId)} (included)" : "";
+        primaryPayer.Text=selectedAdmissionId>0 ? $"{StudentNameFor(selectedAdmissionId)} Â· #{AdmissionNumbers.ForId(selectedAdmissionId)} (included)" : "";
         enrollmentId = 0;
         enrollment.ClearLookup();
         charges.Rows.Clear();
@@ -1430,7 +1437,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     GetText(row, "SectionName");
                 string display =
                     $"{GetText(row, "YearName")}, " +
-                    $"{className} — " +
+                    $"{className} â€” " +
                     $"{sectionName} " +
                     $"({status})";
                 dt.Rows.Add(
@@ -1521,7 +1528,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             SetStatus(
                 dt.Rows.Count == 1
                     ? "Current placement loaded."
-                    : "Current placement loaded. Other outstanding placements are available.");
+                    : "All outstanding placements loaded. Each bill retains its original academic year.");
         }
         catch (Exception ex)
         {
@@ -1547,59 +1554,10 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 Fail(ex);
         }
     }
-    /// <summary>Append outstanding charges without clearing; rank monthly fees first, then tuition and transport.</summary>
-    private static int SettlementRank(
-        DataRow row,
-        Dictionary<int, string> frequencyByAssignment)
-    {
-        string code =
-            GetText(row, "FeeTypeCode");
-        string name =
-            GetText(row, "FeeTypeName");
-        int assignmentId =
-            GetInt(row, "StudentFeeAssignmentId");
-        string frequency =
-            frequencyByAssignment.TryGetValue(assignmentId, out string? billedAs) && billedAs is not null
-                ? billedAs
-                : string.Empty;
-        string chargeKind = GetText(row, "ChargeKind");
-        bool monthly = string.Equals(chargeKind, "Monthly", StringComparison.OrdinalIgnoreCase) ||
-            string.IsNullOrWhiteSpace(chargeKind) && string.Equals(frequency, "Monthly", StringComparison.OrdinalIgnoreCase);
-        int feeRank = string.Equals(code, "TUITION", StringComparison.OrdinalIgnoreCase) ||
-            name.Contains("tuition", StringComparison.OrdinalIgnoreCase) ? 0 :
-            string.Equals(code, "TRANSPORT", StringComparison.OrdinalIgnoreCase) ||
-            name.Contains("transport", StringComparison.OrdinalIgnoreCase) ? 1 : 2;
-        return (monthly ? 0 : 10) + feeRank;
-    }
-    /// <summary>Resolve settlement priority from assignment frequency rather than guessing from fee type.</summary>
-    private static async Task<Dictionary<int, string>> LoadAssignmentFrequenciesAsync(
-        int forEnrollmentId)
-    {
-        var frequencies =
-            new Dictionary<int, string>();
-        if (forEnrollmentId <= 0)
-            return frequencies;
-        try
-        {
-            DataTable assignments =
-                await DatabaseHelper.QueryUserAsync(
-                    "GetStudentFeeAssignments",
-                    DatabaseHelper.Int("@EnrollmentId", forEnrollmentId));
-            foreach (DataRow row in assignments.Rows)
-            {
-                int id =
-                    GetInt(row, "StudentFeeAssignmentId");
-                if (id > 0)
-                    frequencies[id] = GetText(row, "Frequency");
-            }
-        }
-        catch (Exception nonFatalException30)
-        {
-            FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException30, "FeeCollectionPage: LoadAssignmentFrequenciesAsync fallback");
-            /* Ranking only - see the summary above. */
-        }
-        return frequencies;
-    }
+    /// <summary>Tuition first; other fees share chronological priority.</summary>
+    private static int SettlementRank(DataRow row) =>
+        string.Equals(GetText(row, "FeeTypeCode"), "TUITION", StringComparison.OrdinalIgnoreCase) ||
+        GetText(row, "FeeTypeName").Contains("tuition", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
     private async Task<int> AppendChargesAsync(
         int forAdmissionId,
         int forEnrollmentId,
@@ -1612,16 +1570,13 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         var chargesTask = DatabaseHelper.QueryUserAsync(
             "GetOutstandingCharges",
             DatabaseHelper.Int("@AdmissionId", forAdmissionId),
-            DatabaseHelper.Int("@EnrollmentId", forEnrollmentId),
+            DatabaseHelper.Int("@EnrollmentId", 0),
             DatabaseHelper.Date("@AsOfDate", DateTime.Today));
-        var frequenciesTask = LoadAssignmentFrequenciesAsync(forEnrollmentId);
         // Same Fees.View permission as the former direct query; stable catalog
         // data can use the existing user-scoped cache across sibling accounts.
         var feeOrderTask = DatabaseHelper.QueryUserAsync("GetFeeTypes");
-        await Task.WhenAll(chargesTask, frequenciesTask, feeOrderTask);
+        await Task.WhenAll(chargesTask, feeOrderTask);
         DataTable raw = await chargesTask;
-        Dictionary<int, string> frequencyByAssignment =
-            await frequenciesTask;
         var feeOrderRows = await feeOrderTask;
         var feeOrder=feeOrderRows.AsEnumerable().ToDictionary(row=>GetInt(row,"FeeTypeId"),row=>GetInt(row,"DisplayOrder"));
         /* Version -1 identifies explicit sibling ticks that append charges on demand. */
@@ -1638,14 +1593,12 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         {
             return 0;
         }
-        /* Monthly fees precede other charges; tuition then transport within that group. */
+        /* Oldest tuition first, then all other charges in date order. */
         List<DataRow> ordered =
             raw.Rows
                 .Cast<DataRow>()
                 .OrderBy(
-                    row => SettlementRank(
-                        row,
-                        frequencyByAssignment))
+                    row => SettlementRank(row))
                 .ToList();
         int added = 0;
         var listedCharges = charges.Rows.Cast<DataGridViewRow>()
@@ -1665,7 +1618,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             string chargeLabel = GetText(row, "FeeTypeName").Replace(" Fee", "");
             string chargeReason = GetText(row, "Remarks");
             if (additional && !string.IsNullOrWhiteSpace(chargeReason))
-                chargeLabel += " — " + chargeReason;
+                chargeLabel += " â€” " + chargeReason;
             string periodLabel = additional
                 ? FormatDueDate(row["ChargeDate"])
                 : FormatBillingMonth(row["BillingMonth"]);
@@ -1689,16 +1642,16 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             charges.Rows[index].Cells["Balance"].Tag = outstanding;
             charges.Rows[index].Cells["Pay"].Value = "+";
             charges.Rows[index].Cells["BillingChargeId"].Value = chargeId;
-            charges.Rows[index].Cells["BillingChargeId"].Tag = SettlementRank(row, frequencyByAssignment);
+            charges.Rows[index].Cells["BillingChargeId"].Tag = SettlementRank(row);
             object period = additional ? row["ChargeDate"] : row["BillingMonth"];
             charges.Rows[index].Cells["BillingMonth"].Tag = period == DBNull.Value
                 ? DateTime.MinValue : Convert.ToDateTime(period);
             charges.Rows[index].Cells["AdmissionId"].Value = forAdmissionId;
-            charges.Rows[index].Cells["EnrollmentId"].Value = forEnrollmentId;
+            charges.Rows[index].Cells["EnrollmentId"].Value = GetInt(row, "EnrollmentId");
             charges.Rows[index].Cells["StudentName"].Value=StudentNameFor(forAdmissionId);
             charges.Rows[index].Cells["FeeDisplayOrder"].Value=feeOrder.GetValueOrDefault(GetInt(row,"FeeTypeId"),int.MaxValue);
-            charges.Rows[index].Cells["StudentName"].ToolTipText=$"{StudentNameFor(forAdmissionId)} · Admission {AdmissionNumbers.ForId(forAdmissionId)}";
-            charges.Rows[index].Cells["FeeTypeName"].ToolTipText=$"{GetText(row,"FeeTypeName")} · Due {FormatDueDate(row["DueDate"])}";
+            charges.Rows[index].Cells["StudentName"].ToolTipText=$"{StudentNameFor(forAdmissionId)} Â· Admission {AdmissionNumbers.ForId(forAdmissionId)}";
+            charges.Rows[index].Cells["FeeTypeName"].ToolTipText=$"{GetText(row,"FeeTypeName")} Â· Due {FormatDueDate(row["DueDate"])}";
             added++;
         }
         if (added > 0) charges.Sort(new StudentChargeComparer(admissionId));
@@ -1719,9 +1672,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     Convert.ToString(left.Cells["StudentName"].Value),Convert.ToString(right.Cells["StudentName"].Value));
                 return name!=0 ? name : leftStudent.CompareTo(rightStudent);
             }
-            int feeOrder=Convert.ToInt32(left.Cells["FeeDisplayOrder"].Value)
-                .CompareTo(Convert.ToInt32(right.Cells["FeeDisplayOrder"].Value));
-            if(feeOrder!=0) return feeOrder;
+            int priority = Convert.ToInt32(left.Cells["BillingChargeId"].Tag)
+                .CompareTo(Convert.ToInt32(right.Cells["BillingChargeId"].Tag));
+            if (priority != 0) return priority;
             int period=ChargePeriod(left).CompareTo(ChargePeriod(right));
             return period!=0 ? period : Convert.ToInt64(left.Cells["BillingChargeId"].Value)
                 .CompareTo(Convert.ToInt64(right.Cells["BillingChargeId"].Value));
@@ -1780,7 +1733,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 item.Row.Cells["Amount"].Value = give;
                 /* Every row is visited now, so the tick and the marker are always consistent with the amount - no stale "+" left on a row from a previous, larger payment. */
                 item.Row.Tag = give > 0m;
-                item.Row.Cells["Pay"].Value = give > 0m ? "−" : "+";
+                item.Row.Cells["Pay"].Value = give > 0m ? "âˆ’" : "+";
                 remaining -= give;
                 placed += give;
             }
@@ -1933,7 +1886,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 if (!string.IsNullOrWhiteSpace(GetText(row, "ClassName")))
                     name += $"  ({GetText(row, "ClassName")})";
                 // The family read includes EnrollmentId. Without an enrollment there is nothing to collect for that child, so they are shown as unavailable rather than silently omitted.
-                if(!active) name += " — pending fees";
+                if(!active) name += " â€” pending fees";
                 string label = memberEnrollmentId > 0
                     ? name
                     : $"{name}  - no active placement";
@@ -2406,7 +2359,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     give > 0m;
                 row.Cells["Pay"].Value =
                     give > 0m
-                        ? "−"
+                        ? "âˆ’"
                         : "+";
                 remaining -=
                     give;
@@ -2661,7 +2614,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         int receiptEnrollmentId = enrollmentId;
         string receiptPaymentMethod = method.Text;
         DateTime receiptTransactionDate = paymentDate.Value;
-        /* The student, enrollment and sibling pickers stay live during the write, so choosing another student while it ran let the post-commit block… */
+        /* The student, enrollment and sibling pickers stay live during the write, so choosing another student while it ran let the post-commit blockâ€¦ */
         bool studentWasEnabled = student.Enabled;
         bool enrollmentWasEnabled = enrollment.Enabled;
         bool siblingsWasEnabled = siblings.Enabled;
@@ -2714,9 +2667,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 MarkCollectionField(paymentDate, "Not in the future");
                 return;
             }
-            /* Allocations grouped by STUDENT, not one flat list. dbo.ProcessFeeTransaction is scoped to a single (AdmissionId, EnrollmentId) and writes one FeePayments row per call. */
+            /* Allocations grouped by student AND enrolment, not one flat list. dbo.ProcessFeeTransaction is scoped to a single (AdmissionId, EnrollmentId) and writes one FeePayments row per call. */
             var allocationsByStudent =
-                new Dictionary<int, (int EnrollmentId, List<(long chargeId, decimal amount)> Rows)>();
+                new Dictionary<(int AdmissionId, int EnrollmentId), (int EnrollmentId, List<(long chargeId, decimal amount)> Rows)>();
             var receiptLines =
                 new List<(
                     string feeType,
@@ -2724,6 +2677,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     decimal nominalAmount,
                     decimal actualAmount)>();
             decimal amount;
+            decimal surplusCredit = 0m;
             decimal discount = 0m;
             // Populated inside the Collection branch below; used afterwards to work out the balance remaining for the receipt.
             decimal totalDueBeforeThisTransaction = 0m;
@@ -2822,11 +2776,11 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                         if (rowEnrollmentId <= 0)
                             rowEnrollmentId = enrollmentId;
                         if (!allocationsByStudent.TryGetValue(
-                                rowAdmissionId,
+                                (rowAdmissionId, rowEnrollmentId),
                                 out var group))
                         {
                             group = (rowEnrollmentId, new List<(long chargeId, decimal amount)>());
-                            allocationsByStudent[rowAdmissionId] = group;
+                            allocationsByStudent[(rowAdmissionId, rowEnrollmentId)] = group;
                         }
                         group.Rows.Add(
                             (
@@ -2873,11 +2827,11 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                         if (discountEnrollmentId <= 0)
                             discountEnrollmentId = enrollmentId;
                         if (!allocationsByStudent.TryGetValue(
-                                discountAdmissionId,
+                                (discountAdmissionId, discountEnrollmentId),
                                 out var discountGroup))
                         {
                             discountGroup = (discountEnrollmentId, new List<(long chargeId, decimal amount)>());
-                            allocationsByStudent[discountAdmissionId] = discountGroup;
+                            allocationsByStudent[(discountAdmissionId, discountEnrollmentId)] = discountGroup;
                         }
                         discountGroup.Rows.Add(
                             (
@@ -2894,11 +2848,13 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                             x => x.amount > 0m)
                         .Sum(
                             x => x.amount);
-                if (Math.Abs(GetAmount(paymentAmount) - amount) > 0.005m)
+                if (GetAmount(paymentAmount) < amount)
                 {
-                    MarkCollectionField(paymentAmount, "Received amount must match the allocated payment.");
+                    MarkCollectionField(paymentAmount, "Received amount cannot be less than the allocated payment.");
                     return;
                 }
+                surplusCredit = GetAmount(paymentAmount) - amount;
+                amount += surplusCredit;
                 if (amount <= 0m &&
                     discount <= 0m)
                 {
@@ -2913,6 +2869,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 discount > 0m
                     ? $"Collect Rs. {amount:0.##} and apply a discount of Rs. {discount:0.##}."
                     : $"Collect Rs. {amount:0.##}.";
+            if (surplusCredit > 0m)
+                description += $"\r\nRs. {surplusCredit:N0} is retained as credit for {receiptStudentName}.";
             /* The payment date is stamped on the receipt and the ledger. */
             description +=
                 $"\r\nPayment date: {paymentDate.Value:dd-MMM-yyyy hh:mm tt}   Method: {method.Text}.";
@@ -2930,8 +2888,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 {
                     description += $"\r\n{GetText(row.Cells["FeeTypeName"].Value)} ({GetText(row.Cells["BillingMonth"].Value)}): " +
                         $"bill discount Rs. {oldDiscount:0.##} to Rs. {GetDecimal(row.Cells["AppliedDiscount"].Value):0.##}.";
-                    confirmationFacts.Add(($"{GetText(row.Cells["FeeTypeName"].Value)} · {GetText(row.Cells["BillingMonth"].Value)}",
-                        $"Bill discount: Rs. {oldDiscount:0.##} → Rs. {GetDecimal(row.Cells["AppliedDiscount"].Value):0.##}"));
+                    confirmationFacts.Add(($"{GetText(row.Cells["FeeTypeName"].Value)} Â· {GetText(row.Cells["BillingMonth"].Value)}",
+                        $"Bill discount: Rs. {oldDiscount:0.##} â†’ Rs. {GetDecimal(row.Cells["AppliedDiscount"].Value):0.##}"));
                 }
             }
             /* When siblings are included, say so up front, and say it in the terms the system now uses: ONE family collection under ONE receipt number. */
@@ -2948,33 +2906,16 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     : payingFor.TryGetValue(groupAdmissionId, out var whoInfo)
                         ? whoInfo.Name
                         : $"Admission {AdmissionNumbers.ForId(groupAdmissionId)}";
-            /* A student whose charges are covered by a discount alone is refused by the database. */
-            var discountOnlyStudents = allocationLines
-                .Where(g => !g.Value.Rows.Any(r => r.amount > 0m))
-                .Select(g => WhoIs(g.Key))
-                .ToList();
-            if (discountOnlyStudents.Count > 0)
-            {
-                Alert(
-                    $"{string.Join(", ", discountOnlyStudents)}: the charges ticked for " +
-                    (discountOnlyStudents.Count == 1 ? "this student" : "these students") +
-                    " would be covered by the discount only. A receipt needs a payment amount for " +
-                    "every student on it, so this collection cannot be posted as it stands.\r\n\r\n" +
-                    "Either enter a payment for that student - even part of the amount - or take the " +
-                    "discount off and untick that student, and collect from the others.\r\n" +
-                    "To waive a charge completely instead, cancel the charge itself: right-click its " +
-                    "row and choose Reverse Charge.");
-                return;
-            }
+            int payingStudentCount = allocationLines.Select(group => group.Key.AdmissionId).Distinct().Count();
             using var confirmationRows = new DataTable();
             confirmationRows.Columns.Add("Admission No.");
             confirmationRows.Columns.Add("Student");
             confirmationRows.Columns.Add("Payment (Rs.)", typeof(decimal));
             confirmationRows.Columns.Add("Discount (Rs.)", typeof(decimal));
-            if (allocationLines.Count > 1)
+            if (payingStudentCount > 1)
             {
                 description +=
-                    $"\r\n\r\nThis is ONE FAMILY COLLECTION: {allocationLines.Count} students " +
+                    $"\r\n\r\nThis is ONE FAMILY COLLECTION: {payingStudentCount} students " +
                     "collected from in a single transaction, under ONE family receipt number " +
                     "that covers every child. Each child's fees stay attributed to that child.";
                 foreach (var group in allocationLines)
@@ -2985,8 +2926,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     decimal studentDiscount = -group.Value.Rows
                         .Where(r => r.amount < 0m)
                         .Sum(r => r.amount);
-                    string who = WhoIs(group.Key);
-                    confirmationRows.Rows.Add(AdmissionNumbers.ForId(group.Key), who, studentTotal, studentDiscount);
+                    string who = WhoIs(group.Key.AdmissionId);
+                    confirmationRows.Rows.Add(AdmissionNumbers.ForId(group.Key.AdmissionId), who, studentTotal, studentDiscount);
                     /* What is left is each child's own payment, with the discount that goes with it so the figures on the receipt are recognisable. */
                     description += studentDiscount > 0m
                         ? $"\r\n    - {who}: Rs. {studentTotal:0.##} (discount Rs. {studentDiscount:0.##})"
@@ -3001,15 +2942,15 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 return;
             }
             var confirmMessage = new MessageDialogContent(
-                allocationLines.Count > 1 ? $"Record payment for {allocationLines.Count} students?" : "Record this payment?",
-                Explanation: allocationLines.Count > 1 ? "One family receipt covers this payment. Each child's fees stay under their own record." : null,
+                payingStudentCount > 1 ? $"Record payment for {payingStudentCount} students?" : "Record this payment?",
+                Explanation: payingStudentCount > 1 ? "One family receipt covers this payment. Each child's fees stay under their own record." : null,
                 Facts: confirmationFacts,
-                Records: allocationLines.Count > 1 ? confirmationRows : null,
+                Records: payingStudentCount > 1 ? confirmationRows : null,
                 Notice: "This records the payment immediately and is final. Check every amount before choosing Yes.");
             if (ModernMessageDialog.Show(
                     FindForm(),
                     confirmMessage,
-                    allocationLines.Count > 1 ? "Confirm Family Collection" : "Confirm Fee Transaction",
+                    payingStudentCount > 1 ? "Confirm Family Collection" : "Confirm Fee Transaction",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning,
                     // BUSINESS RULE: Yes is intentionally the default for fast counter entry after
@@ -3023,7 +2964,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             /* A failure on the third child left the first two children's money committed while the operator was told the collection had failed. */
             DataTable result;
             string recoverySummary = description + "\r\nStudents: " + string.Join(", ",
-                allocationLines.Select(group => $"{WhoIs(group.Key)} [AdmissionId {group.Key}]"));
+                allocationLines.Select(group => $"{WhoIs(group.Key.AdmissionId)} [AdmissionId {group.Key}]"));
             var billDiscountEdits = charges.Rows.Cast<DataGridViewRow>()
                 .Where(r => !r.IsNewRow && r.Cells["GrossAmount"].Tag is decimal original &&
                     original != GetDecimal(r.Cells["AppliedDiscount"].Value))
@@ -3031,7 +2972,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     GetInt(r.Cells["AdmissionId"].Value),GetInt(r.Cells["EnrollmentId"].Value),
                     (decimal)r.Cells["GrossAmount"].Tag!,GetDecimal(r.Cells["AppliedDiscount"].Value),
                     GetDecimal(r.Cells["Balance"].Tag))).ToArray();
-            if (allocationLines.Count == 1)
+            if (allocationLines.Count == 1 && surplusCredit == 0m && SelectedBillStudents().Length == 1)
             {
                 var single = allocationLines[0];
                 decimal singleAmount = single.Value.Rows
@@ -3042,7 +2983,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                         "ProcessFeeTransaction",
                         billDiscountEdits,
                         recoverySummary,
-                        DatabaseHelper.Int("@AdmissionId", single.Key),
+                        DatabaseHelper.Int("@AdmissionId", single.Key.AdmissionId),
                         DatabaseHelper.Int(
                             "@EnrollmentId",
                             single.Value.EnrollmentId > 0
@@ -3070,6 +3011,10 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                         "ProcessFamilyFeeTransaction",
                         billDiscountEdits,
                         recoverySummary,
+                        DatabaseHelper.P("@ReceivedAmount", amount),
+                        DatabaseHelper.Int("@CreditAdmissionId", admissionId),
+                        DatabaseHelper.P("@CreditRequestId", Guid.NewGuid()),
+                        DatabaseHelper.P("@IncludedStudentsJson", System.Text.Json.JsonSerializer.Serialize(SelectedBillStudents())),
                         DatabaseHelper.P(
                             "@TransactionType",
                             transactionType),
@@ -3095,7 +3040,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                                 Tvp.FamilyAllocations(
                                     allocationLines.Select(
                                         g => (
-                                            g.Key,
+                                            g.Key.AdmissionId,
                                             g.Value.EnrollmentId > 0
                                                 ? g.Value.EnrollmentId
                                                 : enrollmentId,
@@ -3117,7 +3062,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     receipts.Add(thisReceipt);
             }
             /* One row per child, guaranteed by the procedure before it commits, so this is the number of children whose fees were collected. */
-            int posted = result.Rows.Count;
+            int posted = result.Columns.Contains("AdmissionId") ? result.AsEnumerable().Select(row => GetInt(row,"AdmissionId")).Distinct().Count() : result.Rows.Count;
             /* made a family collection carry ONE receipt number shared by every child, and the procedure returns that same number on every row. The distinct list is the real answer. */
             List<string> distinctReceipts = receipts
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -3128,12 +3073,12 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             confirmedReceipt = string.Join(", ", distinctReceipts);
             bool isFamilyCollection = posted > 1;
             bool receiptNumberMissing =
-                isFamilyCollection && singleReceipt.Length == 0;
+                isFamilyCollection && amount > 0m && singleReceipt.Length == 0;
             if (receiptNumberMissing)
             {
                 /* The money is taken and the rows above prove it, so this is not a failure of the collection. */
                 Warn(
-                    $"Collection recorded for {posted} students. Check Recent Payments: " +
+                    $"Collection recorded for {payingStudentCount} students. Check Recent Payments: " +
                     $"{distinctReceipts.Count} receipt numbers returned; no single family receipt confirmed.");
             }
             else
@@ -3142,7 +3087,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     receipts.Count == 0
                         ? $"{transactionType} recorded."
                         : isFamilyCollection
-                            ? $"{transactionType} recorded for {posted} students. Family receipt: {singleReceipt}."
+                            ? $"{transactionType} recorded for {payingStudentCount} students. Family receipt: {singleReceipt}."
                             : $"{transactionType} recorded. Receipt: {singleReceipt}.");
             }
             // A confirmed new payment replaces the previous payment's print context.
@@ -3154,7 +3099,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 !string.IsNullOrWhiteSpace(singleReceipt) &&
                 receiptLines.Count > 0)
             {
-                if (posted > 1)
+                if (posted > 1 || allocationLines.Count > 1 || surplusCredit > 0m || SelectedBillStudents().Length > 1)
                 {
                     lastCollectionReceipt = null;
                     lastGroupReceiptNumber = singleReceipt;
@@ -3162,7 +3107,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                         printReceiptButton.Enabled = true;
                     /* Held and re-asserted after the reloads below, because those reload the charges and set their own status text - without this the operator would never see which receipt was issued. */
                     multiStudentReceiptNote =
-                        $"Collected Rs. {amount:0.##} across {posted} students under family " +
+                        $"Collected Rs. {amount:0.##} across {payingStudentCount} students under family " +
                         $"receipt {singleReceipt}. One receipt covers every child; " +
                         "Print Receipt prints it.";
                 }
@@ -3852,7 +3797,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         billBusy=true;
         try
         {
-            using var busy=BeginBusy("Reviewing family returns…",this);
+            using var busy=BeginBusy("Reviewing family returnsâ€¦",this);
             using(var dialog=new ApplicationWindowForm{Text="Family / Returns",StartPosition=FormStartPosition.CenterParent,
                 Size=new Size(AppScale.Scale(1150),AppScale.Scale(740)),ShowInTaskbar=false})
             {
@@ -3880,7 +3825,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         billBusy=true;
         try
         {
-            using var busy=BeginBusy("Preparing outstanding bill…",this);
+            using var busy=BeginBusy("Preparing outstanding billâ€¦",this);
             await FamilyBillPreview.ShowAsync(FindForm(),anchor,selected,()=>!IsDisposed && admissionId==anchor
                 && enrollmentId==placement && loadVersion==version && selected.SequenceEqual(SelectedBillStudents()));
         }

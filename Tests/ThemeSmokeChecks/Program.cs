@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--billing-design"))
+        {
+            CheckBillingDesignDialogs();
+            Console.WriteLine($"PASS: {checks} billing dialog checks (no database connection).");
+            return;
+        }
         if(args.Contains("--monthly-repost"))
         {
             CheckMonthlyRepostClick();

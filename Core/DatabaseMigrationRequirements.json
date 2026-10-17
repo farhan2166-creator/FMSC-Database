@@ -24,6 +24,71 @@
       "schema": "dbo",
       "name": "MutationRequests",
       "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "BillingAutomationState",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "fn_MonthlyBillingCandidates",
+      "type": "IF"
+    },
+    {
+      "schema": "dbo",
+      "name": "RunAutomaticMonthlyBilling",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "StudentCreditEntries",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "GetStudentCredit",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "ProcessStudentCredit",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "ApplyStudentCredit_Internal",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "GetFeeReceiptLines",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "FeeBillCorrections",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "AdjustBillingChargeRate",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "PreviewFeeRateCorrections",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "ApplyFeeRateCorrections",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "GetMonthlyBillingStartDate",
+      "type": "FN"
     }
   ],
   "columns": [
@@ -182,6 +247,66 @@
       "isNullable": false,
       "isIdentity": false,
       "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "FeePayments",
+      "name": "IsCreditApplication",
+      "type": "bit",
+      "maxLength": 1,
+      "precision": 1,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "FeePayments",
+      "name": "ConcessionLinesJson",
+      "type": "nvarchar",
+      "maxLength": -1,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentFeeAssignments",
+      "name": "ConcessionLabel",
+      "type": "nvarchar",
+      "maxLength": 40,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "BillingCharges",
+      "name": "CorrectionOfBillingChargeId",
+      "type": "bigint",
+      "maxLength": 8,
+      "precision": 19,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "BillingAutomationState",
+      "name": "StartMonth",
+      "type": "date",
+      "maxLength": 3,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
     }
   ],
   "uniqueIndexes": [
@@ -205,6 +330,13 @@
       "name": "PK_MutationRequests",
       "filter": null,
       "keys": "RequestId"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentCreditEntries",
+      "name": "UX_StudentCreditEntries_Request",
+      "filter": null,
+      "keys": "RequestId,AdmissionId,EntryKind"
     }
   ],
   "foreignKeys": [

@@ -141,6 +141,10 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         fees.CellContentClick+=async(_,e)=>{if(e.RowIndex>=0&&e.ColumnIndex>=0&&fees.Columns[e.ColumnIndex].Name=="Remove"&&fees.Rows[e.RowIndex].DataBoundItem is DataRowView row)await RemoveFeeAsync(row.Row);};
         addFee.Click+=async(_,_)=>await ShowAddFeeAsync();
         Disposed+=(_,_)=>feeMenu.Dispose();
+        var concessionColumn = new DataGridViewComboBoxColumn { Name="ConcessionLabel", DataPropertyName="ConcessionLabel",
+            HeaderText="Concession", Width=120, FlatStyle=FlatStyle.Flat };
+        concessionColumn.Items.AddRange("None","Free","Scholarship","Waived");
+        fees.Columns.Add(concessionColumn);
         fees.Columns["Amount"].DefaultCellStyle.Format=fees.Columns["Discount"].DefaultCellStyle.Format=fees.Columns["NetAmount"].DefaultCellStyle.Format="N0";
         fees.CellValidating+=(_,e)=>{
             if(e.RowIndex<0||fees.Columns[e.ColumnIndex].Name!="Discount")return;
@@ -148,11 +152,16 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
             e.Cancel=!valid;if(!valid)SetStatus("Enter a whole-rupee discount between zero and its fee amount.");
         };
         fees.DataError+=(_,e)=>{e.ThrowException=false;SetStatus("Enter a valid discount amount.");};
-        fees.CurrentCellDirtyStateChanged+=(_,_)=>{if(fees.IsCurrentCellDirty&&fees.CurrentCell is DataGridViewCheckBoxCell)fees.CommitEdit(DataGridViewDataErrorContexts.Commit);};
-        fees.CellValueChanged+=(_,e)=>{if(e.ColumnIndex>=0&&fees.Columns[e.ColumnIndex].Name!="Remove")UpdateTotal();};
+        fees.CurrentCellDirtyStateChanged+=(_,_)=>{if(fees.IsCurrentCellDirty&&fees.CurrentCell is DataGridViewCheckBoxCell or DataGridViewComboBoxCell)fees.CommitEdit(DataGridViewDataErrorContexts.Commit);};
+        fees.CellValueChanged+=(_,e)=>{
+            if(e.RowIndex>=0&&e.ColumnIndex>=0&&fees.Columns[e.ColumnIndex].Name=="ConcessionLabel"&&
+                fees.Rows[e.RowIndex].DataBoundItem is DataRowView entry&&Convert.ToString(entry["ConcessionLabel"]) is "Free" or "Waived")
+                entry["Discount"]=entry["Amount"];
+            if(e.ColumnIndex>=0&&fees.Columns[e.ColumnIndex].Name!="Remove")UpdateTotal();
+            if(e.ColumnIndex>=0&&fees.Columns[e.ColumnIndex].Name=="ConcessionLabel")UpdateActions();};
         fees.CellEndEdit+=(_,_)=>{if(fees.CurrentRow?.DataBoundItem is DataRowView row)row.EndEdit();UpdateTotal();};
         foreach(var input in new[]{name,parent,contact,address})input.TextChanged+=(_,_)=>PendingEditChanged();
-        var feeCard=HumanUi.Card("Opening Bill", "Use + Add Fee or × to change the opening bill. Paid fees are protected; saved fee changes apply immediately.");
+        var feeCard=HumanUi.Card("Opening Bill", "Use + Add Fee or × to change the opening bill. Monthly assignment discounts begin next month. Paid fees are protected; adjust unpaid bills in Fee Collection.");
         var feeContent=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};feeContent.RowStyles.Add(new RowStyle(SizeType.Percent,100));feeContent.RowStyles.Add(new RowStyle(SizeType.AutoSize));feeContent.Controls.Add(fees,0,0);var feeFooter=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=true};feeFooter.Controls.Add(addFee);feeFooter.Controls.Add(total);feeContent.Controls.Add(feeFooter,0,1);feeCard.Content.Controls.Add(feeContent);
         root=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2 };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(4)));
@@ -368,15 +377,17 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         // Switching grid ReadOnly can reset individual column/cell flags.
         // Restore the edit policy after every busy or saved-state transition.
         foreach(DataGridViewColumn column in fees.Columns)column.ReadOnly=column.Name switch{
-            "Discount"=>!editing||!CurrentUser.HasPermission("Fees.Adjust"),"Include"=>!editing||savedStudent>0,"Remove"=>false,_=>true};
+            "Discount"=>!editing||!CurrentUser.HasPermission("Fees.Adjust"),"ConcessionLabel"=>!editing||savedStudent>0||!CurrentUser.HasPermission("Fees.Adjust"),"Include"=>!editing||savedStudent>0,"Remove"=>false,_=>true};
         foreach(DataGridViewRow row in fees.Rows)if(row.DataBoundItem is DataRowView data){
             row.Cells["Include"].ReadOnly=!editing||savedStudent>0||(Convert.ToBoolean(data.Row["IsMandatory"])&&!CurrentUser.HasPermission("Fees.Adjust"));
             bool removable=editing&&!Convert.ToBoolean(data.Row["HasPayments"])&&CurrentUser.HasPermission("Fees.Adjust");
             if(!Equals(row.Cells["Remove"].Value,removable?"×":""))row.Cells["Remove"].Value=removable?"×":"";
             row.Cells["Remove"].ToolTipText=Convert.ToBoolean(data.Row["HasPayments"])?"This fee has a payment. Use Fee Corrections.":!CurrentUser.HasPermission("Fees.Adjust")?"Fee adjustment permission is required.":"Remove this fee from the opening bill.";
+            row.Cells["ConcessionLabel"].ReadOnly = !editing || savedStudent > 0 ||
+                !CurrentUser.HasPermission("Fees.Adjust") || Convert.ToString(data.Row["Frequency"]) != "Monthly";
             bool paid=Convert.ToBoolean(data.Row["HasPayments"]);
-            row.Cells["Discount"].ReadOnly=!editing||paid||!CurrentUser.HasPermission("Fees.Adjust");
-            row.Cells["Discount"].ToolTipText=paid?"This fee has a payment. Use Fee Corrections to adjust it.":"";
+            row.Cells["Discount"].ReadOnly=!editing||paid||!CurrentUser.HasPermission("Fees.Adjust")||(savedStudent>0&&Convert.ToString(data.Row["ConcessionLabel"])!="None")||Convert.ToString(data.Row["Frequency"])!="Monthly"&&savedStudent>0||Convert.ToString(data.Row["ConcessionLabel"]) is "Free" or "Waived";
+            row.Cells["Discount"].ToolTipText=paid?"This fee has a payment. Use Fee Corrections to adjust it.":savedStudent>0?"Future monthly discounts use Fee Discount in Admission / Review. Existing bills are adjusted in Fee Collection.":"Monthly discounts begin next month.";
         }}
     private void UpdateTotal(){if(applyingRegistration)return;if(!rates.Columns.Contains("Include")){total.Text="Bill Total: Rs. 0";return;}decimal amount=rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["Include"])).Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));total.Text=$"Bill Total: Rs. {amount:N0}";PendingEditChanged();}
     private void StartNextDraft(bool startNewFamily)
@@ -424,6 +435,9 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
                 DatabaseHelper.P("@StudentName",name.Text.Trim()),DatabaseHelper.P("@FatherName",parent.Text.Trim()),DatabaseHelper.P("@ContactNumber",contact.Text.Trim()),DatabaseHelper.P("@Address",address.Text.Trim()),DatabaseHelper.P("@Disability","No"),DatabaseHelper.Bit("@UsesTransport",selected.Any(r=>Convert.ToBoolean(r["IsTransportLinked"]))),
                 new SqlParameter("@SelectedFeeTypeIds",SqlDbType.Structured){TypeName="dbo.FeeTypeIdList",Value=Tvp.FeeTypeIds(selected.Select(r=>Convert.ToInt32(r["FeeTypeId"])))},
                 new SqlParameter("@AdmissionDiscounts",SqlDbType.Structured){TypeName="dbo.AdmissionFeeDiscountType",Value=Tvp.AdmissionFeeDiscounts(selected.Where(r=>Convert.ToDecimal(r["Discount"])>0).Select(r=>(Convert.ToInt32(r["FeeTypeId"]),Convert.ToDecimal(r["Discount"]))))}};
+            args.Add(DatabaseHelper.P("@FeeConcessionsJson",System.Text.Json.JsonSerializer.Serialize(
+                selected.Where(r=>Convert.ToString(r["ConcessionLabel"])!="None")
+                    .Select(r=>new { FeeTypeId=Convert.ToInt32(r["FeeTypeId"]),ConcessionLabel=Convert.ToString(r["ConcessionLabel"]) }))));
             args.Add(new SqlParameter("@ExcludedFeeTypeIds",SqlDbType.Structured){TypeName="dbo.FeeTypeIdList",Value=Tvp.FeeTypeIds(rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["IsMandatory"])&&!Convert.ToBoolean(r["Include"])).Select(r=>Convert.ToInt32(r["FeeTypeId"])))});
             foreach(string key in new[]{"DateOfBirth","PlaceOfBirth","Gender","BFormNumber","Religion","BloodGroup","AlternateContactNumber","PreviousSchool","FatherOccupation"})args.Add(DatabaseHelper.P("@"+key,null));
             await SubmitNewRegistrationAsync(args.ToArray());

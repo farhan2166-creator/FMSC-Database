@@ -1102,6 +1102,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         var feeDecision = TransferFeeSyncDialog.FeeDecision.Keep;
         DateTime? feeEffectiveMonth = null;
         bool replaceScheduledFees = false;
+        string paidReductionAction = "Credit";
         DateTime? readmissionMonthlyStart=null;
         bool? chargeYearlyFees=null;
         string? reviewedReadmissionRates=null;
@@ -1219,6 +1220,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
                     feeDecision = dialog.Decision;
                     feeEffectiveMonth = dialog.EffectiveMonth;
                     replaceScheduledFees = dialog.ReplaceScheduledFees;
+                    paidReductionAction = dialog.PaidReductionAction;
                 }
             }
             catch (Exception ex)
@@ -1247,7 +1249,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
             string feeChoice = feeDecision switch {
                 TransferFeeSyncDialog.FeeDecision.Keep => "Keep current fees",
                 TransferFeeSyncDialog.FeeDecision.NextMonth => "New fees from next month",
-                TransferFeeSyncDialog.FeeDecision.CurrentMonth => "New fees from this month (unbilled fees only)",
+                TransferFeeSyncDialog.FeeDecision.CurrentMonth => "New fees follow the School Profile cutoff; issued bills receive the difference",
                 TransferFeeSyncDialog.FeeDecision.CustomMonth when feeEffectiveMonth is DateTime month =>
                     $"New fees from {month:MMM yyyy}",
                 _ => ""
@@ -1297,7 +1299,8 @@ public sealed class StudentTransferReadmissionPage : V2Page
                                 DatabaseHelper.P("@FeePolicy", feePolicy),
                                 DatabaseHelper.P("@FeeSyncReason", feeSyncReason),
                                 DatabaseHelper.P("@FeeEffectiveMonth", feeEffectiveMonth),
-                                DatabaseHelper.Bit("@ReplaceScheduledFees", replaceScheduledFees));
+                                DatabaseHelper.Bit("@ReplaceScheduledFees", replaceScheduledFees),
+                                DatabaseHelper.P("@PaidReductionAction", paidReductionAction));
                             break;
                         }
                     case "Transfer Campus":
@@ -1313,7 +1316,8 @@ public sealed class StudentTransferReadmissionPage : V2Page
                                 DatabaseHelper.P("@FeePolicy", feePolicy),
                                 DatabaseHelper.P("@FeeSyncReason", feeSyncReason),
                                 DatabaseHelper.P("@FeeEffectiveMonth", feeEffectiveMonth),
-                                DatabaseHelper.Bit("@ReplaceScheduledFees", replaceScheduledFees));
+                                DatabaseHelper.Bit("@ReplaceScheduledFees", replaceScheduledFees),
+                                DatabaseHelper.P("@PaidReductionAction", paidReductionAction));
                             break;
                         }
                     case "Re-Admit":
@@ -1362,7 +1366,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         if (decision == TransferFeeSyncDialog.FeeDecision.Keep)
             return (null, null);
         string policy = decision switch {
-            TransferFeeSyncDialog.FeeDecision.CurrentMonth => "CURRENT_MONTH",
+            TransferFeeSyncDialog.FeeDecision.CurrentMonth => "SCHOOL_CUTOFF",
             TransferFeeSyncDialog.FeeDecision.CustomMonth => "CUSTOM_MONTH",
             _ => "NEXT_MONTH"
         };

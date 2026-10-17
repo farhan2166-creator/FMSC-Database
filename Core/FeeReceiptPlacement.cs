@@ -19,8 +19,8 @@ internal static class FeeReceiptPlacement
                     -SUM(CASE WHEN X.PaymentMethod=N'Refund' THEN X.TotalAmount ELSE 0 END) Refunded,
                     -SUM(CASE WHEN X.PaymentMethod=N'Correction' THEN X.TotalAmount ELSE 0 END) Corrected
                     FROM dbo.FeePayments X WHERE X.RelatedFeePaymentId=P.FeePaymentId
-                    AND X.Status=N'Completed' AND X.TotalAmount<0) A
-                WHERE P.RelatedFeePaymentId IS NULL
+                    AND X.Status=N'Completed' AND X.TotalAmount<0 AND X.IsCreditApplication=0) A
+                WHERE P.RelatedFeePaymentId IS NULL AND P.IsCreditApplication=0
                     AND P.AdmissionId IN (SELECT AdmissionId FROM dbo.FeePayments WHERE ReceiptNumber=@ReceiptNumber)
                 ORDER BY P.PaymentDate DESC,P.FeePaymentId DESC;
                 """, DatabaseHelper.Int("@UserId",CurrentUser.UserId),
@@ -33,7 +33,7 @@ internal static class FeeReceiptPlacement
                 row.Field<string>("AdmissionNumber") == admissionNumber && row.Field<string>("ReceiptNumber") == receipt
                 && (first.Field<int>("PaymentEnrollmentId") == 0
                     || row.Field<int>("EnrollmentId") == first.Field<int>("PaymentEnrollmentId"))).ToList();
-            if (originals.Count == 0)
+            if (originals.Count == 0 && page.Any(row => Convert.ToDecimal(row["Amount"]) != 0m))
                 throw new InvalidOperationException("The original payment could not be read. Reload the student before printing.");
             decimal original = originals.Sum(row => Convert.ToDecimal(row["TotalAmount"]));
             decimal refunded = originals.Sum(row => Convert.ToDecimal(row["Refunded"]));
@@ -50,19 +50,11 @@ internal static class FeeReceiptPlacement
             if (show)
             {
                 int admissionId = latest!.Field<int>("AdmissionId");
-                var enrollments = await Task.Run(() => DatabaseHelper.QuerySql("""
-                    EXEC dbo.RequirePermission @UserId,N'Fees.View';
-                    SELECT EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId;
-                    """, DatabaseHelper.Int("@UserId",CurrentUser.UserId),
-                    DatabaseHelper.Int("@AdmissionId",admissionId)));
-                foreach (DataRow enrollment in enrollments.Rows)
-                {
-                    var charges = await DatabaseHelper.QueryUserAsync("GetOutstandingCharges",
-                        DatabaseHelper.Int("@AdmissionId",admissionId),
-                        DatabaseHelper.Int("@EnrollmentId",enrollment.Field<int>("EnrollmentId")),
-                        DatabaseHelper.Date("@AsOfDate",DateTime.Today));
-                    balance += charges.AsEnumerable().Sum(row => Convert.ToDecimal(row["Balance"]));
-                }
+                var charges = await DatabaseHelper.QueryUserAsync("GetOutstandingCharges",
+                    DatabaseHelper.Int("@AdmissionId", admissionId),
+                    DatabaseHelper.Int("@EnrollmentId", 0),
+                    DatabaseHelper.Date("@AsOfDate", DateTime.Today));
+                balance = charges.AsEnumerable().Sum(row => Convert.ToDecimal(row["Balance"]));
             }
             foreach (var row in page)
             {
@@ -95,25 +87,6 @@ internal static class FeeReceiptPlacement
             DatabaseHelper.P("@ReceiptNumber", receiptNumber),
             DatabaseHelper.P("@ReadPermission", readPermission)
         };
-        return Task.Run(() => DatabaseHelper.QuerySql("""
-            EXEC dbo.RequirePermission @UserId,@ReadPermission;
-            SELECT S.StudentName,S.FatherName,FP.AdmissionId,FP.EnrollmentId,
-                C.ClassName,SEC.SectionName,CMP.CampusName,
-                FT.FeeTypeName,BC.BillingMonth,FPA.Amount,FP.ReceiptNumber,FP.PaymentDate
-            FROM dbo.FeePayments FP
-            JOIN dbo.Students S ON S.AdmissionId=FP.AdmissionId
-            JOIN dbo.Enrollments E ON E.EnrollmentId=FP.EnrollmentId
-            JOIN dbo.CampusClassSections CCS ON CCS.ClassSectionId=E.ClassSectionId
-            JOIN dbo.Classes C ON C.ClassId=CCS.ClassId
-            JOIN dbo.Sections SEC ON SEC.SectionId=CCS.SectionId
-            JOIN dbo.Campuses CMP ON CMP.CampusId=CCS.CampusId
-            JOIN dbo.FeePaymentAllocations FPA ON FPA.FeePaymentId=FP.FeePaymentId
-            JOIN dbo.BillingCharges BC ON BC.BillingChargeId=FPA.BillingChargeId
-            JOIN dbo.FeeTypes FT ON FT.FeeTypeId=BC.FeeTypeId
-            WHERE FP.ReceiptNumber=@ReceiptNumber AND FP.RelatedFeePaymentId IS NULL AND FPA.Amount<>0
-            ORDER BY S.StudentName,FP.EnrollmentId,
-                CASE WHEN BC.BillingMonth IS NULL THEN 0 ELSE 1 END,
-                BC.BillingMonth,FT.DisplayOrder,FT.FeeTypeName;
-            """,parameters));
+        return DatabaseHelper.QueryUserAsync("GetFeeReceiptLines", parameters);
     }
 }

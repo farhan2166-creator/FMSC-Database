@@ -35,6 +35,8 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
     private readonly CheckBox replaceSchedule = new() { Text="Replace unbilled scheduled rates / waivers from that month",AutoSize=true };
     public DateTime? EffectiveMonth => customMonthOption.Checked ? new DateTime(effectiveMonth.Value.Year,effectiveMonth.Value.Month,1) : null;
     public bool ReplaceScheduledFees => !keepOption.Checked && replaceSchedule.Checked;
+    private readonly ModernComboBox paidReduction = HumanUi.Combo();
+    public string PaidReductionAction => paidReduction.SelectedIndex == 1 ? "Refund" : "Credit";
     private readonly List<ComparisonRow> rows = new();
     private readonly DataGridView grid = HumanUi.Grid(false);
     private readonly RadioButton keepOption = new() {
@@ -69,10 +71,17 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         LoadComparison(enrollmentId, destinationCampusId, destinationClassId);
+        paidReduction.Items.AddRange(new object[] { "Keep paid reductions as credit", "Refund paid reductions" });
+        paidReduction.SelectedIndex = 0;
+        var policy = DatabaseHelper.QuerySql("SELECT dbo.GetMonthlyBillingStartDate(@Date) StartDate;", DatabaseHelper.Date("@Date", transferDate));
+        DateTime cutoffDate = Convert.ToDateTime(policy.Rows[0]["StartDate"]);
+        currentMonthOption.Text = $"Use School Profile cutoff: new fees from {cutoffDate:MMMM yyyy}";
+
         effectiveMonth.MinDate = new DateTime(transferDate.Year,transferDate.Month,1);
         DateTime lastBilled = existingPeriods.Select(row => PeriodDate(row,"LastBilledMonth") ?? effectiveMonth.MinDate.AddMonths(-1)).DefaultIfEmpty(effectiveMonth.MinDate.AddMonths(-1)).Max();
         effectiveMonth.Value = lastBilled >= effectiveMonth.MinDate ? lastBilled.AddMonths(1) : effectiveMonth.MinDate;
         HasFeeDifference = rows.Any(r => r.Changes);
+        if (CanApplyDestinationFees) { keepOption.Checked = false; currentMonthOption.Checked = true; }
         BuildLayout(studentDisplay, currentPlacementLabel, destinationPlacementLabel, transferDate);
     }
     private void LoadComparison(int enrollmentId, int destinationCampusId, int destinationClassId)
@@ -188,7 +197,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
             summary.Controls.Add(value, 1, row);
         }
         var note = new Label {
-            Text = "Preview below. Bills and payments stay unchanged; new rates start after the last billed month.",
+            Text = "Review the new rates below. Issued monthly bills receive only the required difference; paid reductions follow your credit/refund choice.",
             Dock = DockStyle.Top,
             AutoSize = true,
             Font = AppTheme.NormalFont,
@@ -298,6 +307,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         customRow.Controls.Add(effectiveMonth);
         choicePanel.Controls.Add(customRow);
         choicePanel.Controls.Add(replaceSchedule);
+        choicePanel.Controls.Add(HumanUi.Field("Paid reductions", paidReduction));
         // Radio buttons need one shared parent to remain mutually exclusive.
         customMonthOption.CheckedChanged += (_, _) => {
             if(customMonthOption.Checked) {
@@ -394,7 +404,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
                 && (PeriodDate(row,"EffectiveTo")??DateTime.MaxValue)>=target));
             if(!changed) continue;
             DateTime? billed=periods.Select(row=>PeriodDate(row,"LastBilledMonth")).Max();
-            if(billed>=target) return $"{comparison.FeeTypeName} is billed through {billed:MMM yyyy}. Choose a later month or keep current fees.";
+            if(billed>=target && comparison.Frequency != "Monthly") return $"{comparison.FeeTypeName} is billed through {billed:MMM yyyy}. Choose a later month or keep current fees.";
             if(!replaceSchedule.Checked && periods.Any(row=>
                 Convert.ToInt32(row["StudentFeeAssignmentId"])==comparison.CurrentAssignmentId
                 ? PeriodDate(row,"EffectiveFrom")>=target

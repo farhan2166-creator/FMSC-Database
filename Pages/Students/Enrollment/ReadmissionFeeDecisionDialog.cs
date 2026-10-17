@@ -36,6 +36,9 @@ internal sealed class ReadmissionFeeDecisionDialog : ApplicationWindowForm
             impact.Text=confirm.Enabled ? $"New monthly fees: Rs. {monthly:N0}, starting {((DateTime)months.SelectedValue!):MMM yyyy}.\nOpening charges: Rs. {monthly+(charge.Checked?yearly:0):N0}. Old debt remains Rs. {oldDebt:N0}."
                 : "Select both decisions to continue. Nothing has been saved.";
         }
+        var recommendation=DatabaseHelper.QuerySql("SELECT dbo.GetMonthlyBillingStartDate(@Date) StartDate;",DatabaseHelper.Date("@Date",enrollmentDate));
+        DateTime suggested=Convert.ToDateTime(recommendation.Rows[0]["StartDate"]);
+        months.SelectedValue=new DateTime(suggested.Year,suggested.Month,1);
         months.SelectedIndexChanged+=(_,_)=>Update(); charge.CheckedChanged+=(_,_)=>Update(); waive.CheckedChanged+=(_,_)=>Update();
         confirm.Click+=(_,_)=>{MonthlyStartMonth=(DateTime)months.SelectedValue!; ChargeYearlyFees=charge.Checked; DialogResult=DialogResult.OK;};
         var root=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Padding=new Padding(16)};

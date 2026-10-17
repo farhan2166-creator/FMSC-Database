@@ -3,8 +3,25 @@ using FMSC_SMS.Pages.Students.Admissions;
 using FMSC_SMS.Pages.Students.Maintenance;
 using Microsoft.Data.SqlClient;
 
+// Read-only startup-contract check for the owned billing fixture; no school target is accepted.
+if(args.SequenceEqual(new[]{"--billing-compatibility"}))
+{
+    string value=Environment.GetEnvironmentVariable("FMSC_BILLING_CHECK_CONNECTION")??throw new Exception("Missing owned billing fixture.");
+    string owner=Environment.GetEnvironmentVariable("FMSC_BILLING_CHECK_OWNER")??throw new Exception("Missing fixture owner.");
+    var target=new SqlConnectionStringBuilder(value);
+    if(!Guid.TryParseExact(owner,"N",out _) || target.InitialCatalog!="FMSC_BillingChecks_"+owner ||
+       target.DataSource!=@"(localdb)\FMSC_BillingChecks_"+owner || !target.IntegratedSecurity || target.AttachDBFilename.Length>0)
+        throw new Exception("Only the owned billing-test LocalDB instance is accepted.");
+    using var connection=new SqlConnection(value);connection.Open();
+    using var guard=new SqlCommand("SELECT CONVERT(nvarchar(32),value) FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_BillingChecksOwner';",connection);
+    if(Convert.ToString(guard.ExecuteScalar())!=owner)throw new Exception("Wrong billing fixture owner.");
+    DatabaseCompatibility.Validate(connection);
+    Console.WriteLine("PASS: production startup/restore compatibility validates the migrated billing fixture.");
+    return;
+}
+
 // The name guard prevents running writes against the school database accidentally.
-if(args.Length!=0) throw new ArgumentException("Use a disposable schema-6 baseline; legacy upgrade modes have been retired.");
+if(args.Length!=0) throw new ArgumentException("Use a disposable migrated baseline; legacy upgrade modes have been retired.");
 string connectionText=Environment.GetEnvironmentVariable("FMSC_AUDIT_CONNECTION")??throw new Exception("Set FMSC_AUDIT_CONNECTION to an explicitly disposable restored database.");
 var builder=new SqlConnectionStringBuilder(connectionText);
 bool localSqlAuth=!builder.IntegratedSecurity && builder.DataSource.StartsWith("127.0.0.1,",StringComparison.Ordinal) && builder.UserID=="sa";
@@ -20,7 +37,7 @@ int checks=0;
 void Assert(bool ok,string label){if(!ok)throw new Exception(label);Console.WriteLine("PASS: "+label);checks++;}
 async Task Refused(Func<Task> action,string label)
 {try{await action();}catch(InvalidOperationException e) when(e.Message.Contains("changed",StringComparison.OrdinalIgnoreCase)){Console.WriteLine("PASS: "+label);checks++;return;}throw new Exception("Expected stale-state refusal: "+label);}
-Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="6","migration 6 installed on clone");
+Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="19","current migrations installed on clone");
 using(var compatible=DatabaseHelper.GetConnection()){
     compatible.Open();DatabaseCompatibility.Validate(compatible);
     Assert(true,"production startup/restore compatibility contract accepts migrated schema");

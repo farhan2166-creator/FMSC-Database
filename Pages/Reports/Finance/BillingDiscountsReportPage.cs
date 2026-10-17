@@ -5,7 +5,7 @@ public sealed class BillingDiscountsReportPage : CanonicalFinanceReportPage
     public BillingDiscountsReportPage() : base(
         "Billing & Discounts", "Review fee charges and their discounts.",
         "GetBillingAndDiscountsReport", "FMSC_Billing_Discounts",
-        new[] { "Billing Summary", "Billing Detail", "Discount Detail" },
+        new[] { "Billing Summary", "Billing Detail", "Discount Detail", "Concession Assignments" },
         new[] { "Day", "Week", "Month", "Class", "Campus", "Fee Type" },
         true, false, false, true)
     { }

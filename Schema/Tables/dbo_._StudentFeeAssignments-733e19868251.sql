@@ -14,5 +14,6 @@ CREATE TABLE [dbo].[StudentFeeAssignments] (
     [UpdatedAt]              DATETIME2 (0)   NOT NULL,
     [EffectiveFrom]          DATE            NULL,
     [EffectiveTo]            DATE            NULL,
-    [CancelledAt]            DATETIME2 (7)   NULL
+    [CancelledAt]            DATETIME2 (7)   NULL,
+    [ConcessionLabel] NVARCHAR(20) NULL
 );
