@@ -11,6 +11,7 @@ internal sealed class Report
     internal int Assertions;
     internal int ExpectedRefusals;
     internal string? Engine;
+    internal readonly Dictionary<string, double> Measurements = new();
     internal void Check(bool condition, string assertion)
     {
         if (!condition) throw new AssertionFailure(assertion);
@@ -45,6 +46,7 @@ internal sealed class Report
         File.WriteAllText(path, JsonSerializer.Serialize(new {
             schemaVersion = DatabaseHelper.RequiredDatabaseSchemaVersion, engine = Engine,
             assertionCount = Assertions, expectedRefusals = ExpectedRefusals, scenarios = Scenarios,
+            measurements = Measurements,
             limitations = new[] {
                 "Real SQL and linked production writers; no interactive desktop/UI acceptance.",
                 "Schema-only approved DACPAC: exported row data is excluded.",

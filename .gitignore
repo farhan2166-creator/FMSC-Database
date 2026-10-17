@@ -378,3 +378,11 @@ Database/*.bak
 /Tests/CommunicationChecks/*
 !/Tests/CommunicationChecks/*.cs
 !/Tests/CommunicationChecks/*.csproj
+
+# Level 3 keeps source/catalog only; private SQL and generated evidence stay outside it.
+!/Tests/Level3Checks/
+/Tests/Level3Checks/*
+!/Tests/Level3Checks/*.cs
+!/Tests/Level3Checks/*.py
+!/Tests/Level3Checks/catalog.json
+!/Tests/Level3Checks/*.ps1

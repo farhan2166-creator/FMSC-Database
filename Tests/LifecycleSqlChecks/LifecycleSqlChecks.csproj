@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../Level3Checks/ReliabilityChecks.cs" Link="ReliabilityChecks.cs" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
     <Compile Include="../../Services/Communication/*.cs" Exclude="../../Services/Communication/WindowsGatewayStore.cs" Link="Communication/%(Filename)%(Extension)" />
     <Compile Include="../QuickRegistrationSqlChecks/DatabaseContext.cs" Link="DatabaseContext.cs" />
