@@ -47,6 +47,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} communication layout, focus and workflow checks.");
             return;
         }
+        if(args.Contains("--setup-readiness"))
+        {
+            CheckSetupReadinessActions();
+            Console.WriteLine($"PASS: {checks} setup readiness control checks.");
+            return;
+        }
         if(args.Contains("--post-fix"))
         {
             CheckValidationBadges();

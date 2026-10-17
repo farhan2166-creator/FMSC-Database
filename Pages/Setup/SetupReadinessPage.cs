@@ -27,6 +27,8 @@ public sealed class SetupReadinessPage : V2Page
         open.Enabled = false;
         SetContent(Grid);
         Grid.SelectionChanged += (_, _) => UpdateOpenAction();
+        // SelectionChanged can precede CurrentRow moving to the new destination.
+        Grid.CurrentCellChanged += (_, _) => UpdateOpenAction();
         open.EnabledChanged += (_, _) => { if (open.Enabled && !CanOpenSelected()) UpdateOpenAction(); };
         Grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) OpenSelected(); };
         if (initialize) Defer(CheckAsync);
