@@ -14,6 +14,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Changed
 
+- Clarified payment-adjustment and placement confirmations with aligned details, and shortened Communication Center guidance while preserving warnings and confirmation defaults.
+
 - Replace the XML-heavy `DatabaseSchema/` reference export with real DacFx-generated SQL `CREATE` scripts in `Schema/`. The generated review PR removes the old files only after replacement scripts are produced and reports inline/unsupported model objects in a JSON manifest; no school data or database changes.
 
 - Pause routine Dependabot NuGet and GitHub Actions version-update PRs until the owner chooses to resume. Existing PRs, security-alert settings, security updates and secret scanning remain unchanged.
@@ -38,6 +40,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 - Added an isolated Level 1 SQL lifecycle harness in [PR #14](https://github.com/farhan2166-creator/FMSC-Database/pull/14), with schema-only approved-model provenance, fictional school fixtures, persisted admission/fees/promotion/recovery assertions, existing-suite integration and sanitized CI evidence. Production application/database/installer behavior is unchanged; real Windows and deployment acceptance remain separate.
 
 ### Fixed
+
+- Remove obsolete installer setup instructions from the missing Communication Center module warning; direct operators to administrator-reviewed setup and recovery guidance.
 
 - Center message-dialog buttons with a readable gap. Show clear decision headings, prominent consequences, aligned fields and read-only record tables for payment, promotion, backup and duplicate-student confirmations. Preserve confirmation defaults, keyboard choices, exact values and recovery payloads; long details scroll while buttons remain visible.
 
