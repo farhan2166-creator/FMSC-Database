@@ -5,6 +5,34 @@ using FMSC_SMS.Pages.Security;
 
 internal static partial class Program
 {
+    private static void ShowHelpCenterAcceptance()
+    {
+        // Reuse the production page without application startup or a SQL fixture.
+        // Require the existing owned profile route before any theme can be saved.
+        var app = typeof(HelpCenterPage).Assembly;
+        var target = app.GetType("FMSC_SMS.Core.Level2Target")
+            ?? throw new InvalidOperationException("Interactive Help checks require FmscLevel2=true.");
+        _ = target.GetProperty("Root", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null);
+        var originalTheme = AppTheme.CurrentTheme;
+        using var host = new Form { Text = "FMSC Help acceptance — offline owned test profile", ClientSize = new Size(1100, 700) };
+        using var page = new HelpCenterPage();
+        var bar = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true };
+        var themes = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 230, AccessibleName = "Acceptance theme" };
+        themes.DataSource = AppTheme.SelectableThemes.ToArray(); themes.SelectedItem = originalTheme;
+        themes.SelectedIndexChanged += (_, _) => AppTheme.SetTheme((AppThemeType)themes.SelectedItem!);
+        var sizes = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150, AccessibleName = "Acceptance window size" };
+        sizes.Items.AddRange(new object[] { "1100 x 700", "600 x 500", "420 x 340" }); sizes.SelectedIndex = 0;
+        sizes.SelectedIndexChanged += (_, _) => host.ClientSize = sizes.SelectedIndex switch { 1 => new Size(600, 500), 2 => new Size(420, 340), _ => new Size(1100, 700) };
+        bar.Controls.AddRange(new Control[] { themes, sizes });
+        host.Controls.Add(page); host.Controls.Add(bar);
+        host.Shown += (_, _) => page.Controls.Find("HelpSearch", true).Single().Focus();
+        Console.WriteLine($"Interactive Help source: {app.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion}; DPI {host.DeviceDpi}.");
+        foreach (var screen in Screen.AllScreens) Console.WriteLine($"Display bounds {screen.Bounds}; working area {screen.WorkingArea}; primary {screen.Primary}.");
+        try { host.ShowDialog(); }
+        finally { AppTheme.SetTheme(originalTheme); }
+        Console.WriteLine("Interactive Help host closed; observations must be recorded separately from automated assertions.");
+    }
+
     private static void CheckHelpCenter()
     {
         var previous = (CurrentUser.UserId, CurrentUser.Username, CurrentUser.RoleName,
@@ -51,7 +79,8 @@ internal static partial class Program
                 Check(answer.BackColor == AppTheme.Surface && answer.ForeColor == AppTheme.Text, "Answer adopts theme colors");
             }
             var split = page.Controls.OfType<TableLayoutPanel>().Single().Controls.OfType<SplitContainer>().Single();
-            foreach (var size in new[] { new Size(1100, 700), new Size(600, 500), new Size(420, 340) })
+            foreach (var size in new[] { new Size(1100, 700), new Size(600, 500), new Size(420, 340),
+                new Size(1100, 340), new Size(420, 700), new Size(1100, 700) })
             {
                 host.ClientSize = size; Application.DoEvents();
                 Check(split.Orientation == (split.Width < DpiLayout.Pixels(760, page.DeviceDpi) ? Orientation.Horizontal : Orientation.Vertical), "Layout adapts to effective available width");

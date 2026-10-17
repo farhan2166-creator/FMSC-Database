@@ -34,6 +34,11 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--help-center-interactive"))
+        {
+            ShowHelpCenterAcceptance();
+            return;
+        }
         if(args.Contains("--help-center"))
         {
             CheckHelpCenter();

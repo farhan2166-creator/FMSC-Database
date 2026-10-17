@@ -74,8 +74,17 @@ public sealed class HelpCenterPage : UserControl
 
     private void FitSplit()
     {
+        // Table layout can temporarily give either axis no room for the splitter.
+        // Orientation reuses the old distance, so bound it for both axes first.
+        int sharedAvailable = Math.Min(split.Width, split.Height) - split.SplitterWidth;
+        if (sharedAvailable <= 0) return;
         bool compact = split.Width < DpiLayout.Pixels(760, DeviceDpi);
-        split.Orientation = compact ? Orientation.Horizontal : Orientation.Vertical;
+        var orientation = compact ? Orientation.Horizontal : Orientation.Vertical;
+        if (split.Orientation != orientation)
+        {
+            split.SplitterDistance = Math.Min(split.SplitterDistance, sharedAvailable);
+            split.Orientation = orientation;
+        }
         int available = (compact ? split.Height : split.Width) - split.SplitterWidth;
         if (available > 0) split.SplitterDistance = Math.Clamp(available / 3, 0, available);
     }

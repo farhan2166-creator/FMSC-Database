@@ -66,3 +66,5 @@ The Windows control suite needs a disposable Windows profile and no database. It
 5. Ask an operator to resolve pending sibling registration, a payment with unknown outcome, Hold promotion, transport stopping and an older restore. Confirm the actual supported destination and permission.
 
 No real school data is needed. These checks remain pending until actually performed. GitHub hosted checks are not reported green while the owner's Actions allowance is exhausted.
+
+Windows follow-up: see [16 October verification](WINDOWS_VERIFICATION_2026-10-16.md) for the reproduced splitter defect, focused fix, native checks and remaining interactive limitations.
