@@ -21,6 +21,8 @@ Use Windows display scaling for readable text. The application follows the monit
 
 Result messages stay within two font-scaled lines so feedback cannot displace the workspace. Hover over the status text for full details. A warning or unknown save outcome still requires its stated recovery checks before retrying.
 
+Report previews keep the window title above the print toolbar. Student Admissions uses a compact finder and caption-sized actions so Print stays with the other actions when there is room; narrower windows still wrap whole buttons.
+
 Confirmation dialogs show the question first, then important consequences and the details to review. Yes/No buttons are centered. Family payments and matching student records use read-only tables; scroll through long details before confirming. The payment counter keeps its approved Yes default, while restore and duplicate-student confirmations default to No. Enter uses the selected default; Escape declines a Yes/No question.
 
 ## Entry and search actions

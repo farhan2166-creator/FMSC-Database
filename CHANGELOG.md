@@ -44,6 +44,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Fixed
 
+- Keep report-preview captions above the print toolbar and preserve the content viewport's docking order. Compact Admission finder/action sizing keeps Print beside the other actions at ordinary widths while narrow windows still wrap whole buttons.
+
 - Bound Help Center splitter transitions during compact layout changes to prevent the reproduced Windows startup/layout exception.
 
 - Refresh Setup Readiness navigation after the current grid cell changes, so permission guidance follows the selected destination.
