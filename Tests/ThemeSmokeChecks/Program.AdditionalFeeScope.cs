@@ -22,6 +22,11 @@ internal static partial class Program
         var b=Start();pending.Dequeue().SetResult(Rows(42));PumpUntil(()=>b.IsCompleted,"Current candidate load settles");
         typeof(AdditionalFeePostingPage).GetMethod("SelectAll",flags)!.Invoke(page,null);
         Check(Field<HashSet<int>>("selected").SetEquals(new[]{42}),"Select All uses only the current loaded campus candidates");
+        Field<ModernDatePicker>("date").Value=DateTime.Today.AddDays(-1);
+        Check(Field<DataTable?>("candidates") is null&&Field<HashSet<int>>("selected").Count==0&&!Field<ModernButton>("post").Enabled,"Charge-date changes clear candidates, selections and posting eligibility");
+        var changedDate=Start();Field<ModernDatePicker>("date").Value=DateTime.Today;
+        pending.Dequeue().SetResult(Rows(44));PumpUntil(()=>changedDate.IsCompleted,"Obsolete charge-date load settles");
+        Check(Field<DataTable?>("candidates") is null,"Old charge-date result cannot reappear under a different date");
         Field<LookupBox>("campus").SelectedValue=1;
         Check(Field<HashSet<int>>("selected").Count==0&&!Field<ModernButton>("post").Enabled,"Filter changes clear both selections and posting eligibility");
         var late=Start();page.Dispose();pending.Dequeue().SetResult(Rows(43));PumpUntil(()=>late.IsCompleted,"Disposed candidate load settles");

@@ -16,22 +16,23 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
     private Guid requestId = Guid.NewGuid();
     private bool loading;
     private readonly LatestReadScope candidateReads=new();
-    private (int Year,int Campus,int Class,int Section)? loadedScope;
+    private (int Year,int Campus,int Class,int Section,DateTime ChargeDate)? loadedScope;
     private readonly Func<int,int,int,int,Task<DataTable>> loadCandidates;
     private readonly ModernButton selectAll,post;
-    private (int Year,int Campus,int Class,int Section) CurrentScope=>(year.SelectedId,campus.SelectedId,klass.SelectedId,section.SelectedId);
+    private (int Year,int Campus,int Class,int Section,DateTime ChargeDate) CurrentScope=>(year.SelectedId,campus.SelectedId,klass.SelectedId,section.SelectedId,date.Value.Date);
     private bool CurrentCandidates=>candidates is not null&&loadedScope==CurrentScope;
     private void UpdateSelectionActions()
     {
         selectAll.Enabled=!posting&&CurrentCandidates&&candidates!.Rows.Count>0;
         post.Enabled=!posting&&CurrentCandidates&&selected.Count>0&&CurrentUser.HasPermission("Fees.Collect");
     }
-    public AdditionalFeePostingPage() : this((y,c,k,s)=>DatabaseHelper.QueryUserAsync("GetAdditionalFeeCandidates",
-        DatabaseHelper.Int("@AcademicYearId",y),DatabaseHelper.Int("@CampusId",c),DatabaseHelper.Int("@ClassId",k),DatabaseHelper.Int("@SectionId",s))) { }
-    internal AdditionalFeePostingPage(Func<int,int,int,int,Task<DataTable>> loadCandidates,bool initialize=true) : base("Post Additional Fee",
+    public AdditionalFeePostingPage() : this(null) { }
+    internal AdditionalFeePostingPage(Func<int,int,int,int,Task<DataTable>>? loadCandidates,bool initialize=true) : base("Post Additional Fee",
         "Select students and add the same fee charge to each.")
     {
-        this.loadCandidates=loadCandidates;
+        this.loadCandidates=loadCandidates ?? ((y,c,k,s)=>DatabaseHelper.QueryUserAsync("GetAdditionalFeeCandidates",
+            DatabaseHelper.Int("@AcademicYearId",y),DatabaseHelper.Int("@CampusId",c),DatabaseHelper.Int("@ClassId",k),
+            DatabaseHelper.Int("@SectionId",s),DatabaseHelper.Date("@ChargeDate",date.Value.Date)));
         Disposed+=(_,_)=>candidateReads.Dispose();
         var load = AddBusyAction("Load Students", LoadAsync, "Secondary");
         selectAll = AddAction(UiText.Actions.SelectAll, (_, _) => SelectAll(), "Secondary");
@@ -95,6 +96,7 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
         campus.SelectedIndexChanged += (_, _) => ClearCandidates();
         klass.SelectedIndexChanged += (_, _) => ClearCandidates();
         section.SelectedIndexChanged += (_, _) => ClearCandidates();
+        date.ValueChanged += (_, _) => ClearCandidates();
         year.Enabled = false;
         UpdateSelectionActions();
         if(initialize)Defer(BindAsync);
@@ -167,7 +169,7 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
             }
             finally{loading=false;}
             UpdateSelectionActions();
-            SetStatus($"{candidates.Rows.Count} admitted students loaded. Tick those to charge.");
+            SetStatus($"{candidates.Rows.Count} students eligible on {scope.ChargeDate:dd MMM yyyy}. Students whose billing has not started are excluded. Tick those to charge.");
         }
         catch(Exception ex)
         {

@@ -1,0 +1,50 @@
+SET NOCOUNT ON;
+SET QUOTED_IDENTIFIER ON;
+SET XACT_ABORT ON;
+DECLARE @TestAdmission int=(SELECT TOP(1) S.AdmissionId FROM dbo.Students S WHERE LegacySetupPending=1 AND S.AdmissionDate<='20261001' AND NOT EXISTS(SELECT 1 FROM dbo.Enrollments E WHERE E.AdmissionId=S.AdmissionId) ORDER BY S.AdmissionId DESC);
+IF @TestAdmission IS NULL THROW 51012,'No pending no-placement test fixture is available.',1;
+DECLARE @TestEnrollment int=0;
+DECLARE @BeforePending int=(SELECT COUNT(*) FROM dbo.Students WHERE LegacySetupPending=1);
+DECLARE @BeforeFees int=(SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE AdmissionId=@TestAdmission);
+DECLARE @BeforeCharges int=(SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=@TestAdmission);
+DECLARE @Preview TABLE(Snapshot varchar(64),OpeningTotal decimal(12,2),ChargeCount int);
+DECLARE @Fees nvarchar(max)=N'[{"FeeTypeId":2,"Amount":400,"DiscountAmount":50,"Frequency":"Monthly"},{"FeeTypeId":1,"Amount":4000,"DiscountAmount":0,"Frequency":"Yearly"}]';
+BEGIN TRAN;
+INSERT @Preview EXEC dbo.ActivateStudentBilling @UserId=1,@AdmissionId=@TestAdmission,@EnrollmentId=@TestEnrollment,@YearId=28,@PlacementId=1,@StartDate='20261001',@BillingStart='20261001',@StudentName=N'Nouman Niaz Khalil',@FatherName=N'Niaz Gul',@Fees=@Fees,@Reason=N'Rollback activation validation',@Preview=1;
+IF (SELECT OpeningTotal FROM @Preview)<>4350 THROW 51000,'Incorrect preview total',1;
+DECLARE @Snapshot varchar(64)=(SELECT Snapshot FROM @Preview);
+EXEC dbo.ActivateStudentBilling @UserId=1,@AdmissionId=@TestAdmission,@EnrollmentId=@TestEnrollment,@YearId=28,@PlacementId=1,@StartDate='20261001',@BillingStart='20261001',@StudentName=N'Nouman Niaz Khalil',@FatherName=N'Niaz Gul',@Fees=@Fees,@Reason=N'Rollback activation validation',@Preview=0,@ExpectedSnapshot=@Snapshot;
+SELECT @TestEnrollment=EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=@TestAdmission AND Status=N'Active';
+IF NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@TestAdmission AND LegacySetupPending=0 AND Status=N'Active' AND LegacyVerifiedAt IS NOT NULL) THROW 51001,'Student not activated',1;
+IF NOT EXISTS(SELECT 1 FROM dbo.Enrollments WHERE EnrollmentId=@TestEnrollment AND BillingReady=1 AND PlacementConfirmedAt IS NOT NULL) THROW 51002,'Placement not activated',1;
+IF (SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE EnrollmentId=@TestEnrollment)<>4350 THROW 51003,'Incorrect charges',1;
+IF (SELECT COUNT(*) FROM dbo.Students WHERE LegacySetupPending=1)<>@BeforePending-1 THROW 51004,'Other students changed',1;
+ROLLBACK;
+IF (SELECT COUNT(*) FROM dbo.Students WHERE LegacySetupPending=1)<>@BeforePending OR (SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE AdmissionId=@TestAdmission)<>@BeforeFees OR (SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=@TestAdmission)<>@BeforeCharges THROW 51005,'Rollback did not restore test state',1;
+PRINT 'PASS: preview, individual activation, confirmed placement, discounts, charges, student isolation and complete rollback';
+SET @TestEnrollment=0;
+-- A changed request cannot reuse a preview, and mandatory fees cannot be omitted.
+DECLARE @Rejected bit=0;
+BEGIN TRY
+ EXEC dbo.ActivateStudentBilling @UserId=1,@AdmissionId=@TestAdmission,@EnrollmentId=@TestEnrollment,@YearId=28,@PlacementId=1,@StartDate='20261001',@BillingStart='20261001',@StudentName=N'Nouman Niaz Khalil',@FatherName=N'Niaz Gul',@Fees=@Fees,@Reason=N'Changed after preview',@Preview=0,@ExpectedSnapshot=@Snapshot;
+END TRY BEGIN CATCH IF ERROR_NUMBER()<>59969 THROW; SET @Rejected=1; END CATCH;
+IF @Rejected=0 THROW 51006,'Stale request was accepted',1;
+SET @Rejected=0;
+BEGIN TRY
+ EXEC dbo.ActivateStudentBilling @UserId=1,@AdmissionId=@TestAdmission,@EnrollmentId=@TestEnrollment,@YearId=28,@PlacementId=1,@StartDate='20261001',@BillingStart='20261001',@StudentName=N'Nouman Niaz Khalil',@FatherName=N'Niaz Gul',@Fees=N'[{"FeeTypeId":2,"Amount":400,"DiscountAmount":0,"Frequency":"Monthly"}]',@Reason=N'Missing mandatory fee test',@Preview=1;
+END TRY BEGIN CATCH IF ERROR_NUMBER()<>59968 THROW; SET @Rejected=1; END CATCH;
+IF @Rejected=0 THROW 51007,'Missing mandatory fee was accepted',1;
+PRINT 'PASS: changed preview and missing mandatory fees rejected';
+-- Exercise a blank legacy record with no placement; all changes are rolled back.
+DECLARE @Blank int=(SELECT TOP(1) S.AdmissionId FROM dbo.Students S WHERE S.LegacySetupPending=1 AND NULLIF(LTRIM(RTRIM(S.StudentName)),N'') IS NULL AND S.AdmissionDate<='20261001' AND NOT EXISTS(SELECT 1 FROM dbo.Enrollments E WHERE E.AdmissionId=S.AdmissionId) ORDER BY S.AdmissionId DESC);
+IF @Blank IS NULL THROW 51008,'No blank pending fixture is available',1;
+DELETE @Preview;
+BEGIN TRAN;
+INSERT @Preview EXEC dbo.ActivateStudentBilling @UserId=1,@AdmissionId=@Blank,@EnrollmentId=0,@YearId=28,@PlacementId=1,@StartDate='20261001',@BillingStart='20261001',@StudentName=N'Rollback blank record',@FatherName=N'Rollback parent',@Fees=@Fees,@Reason=N'Blank record activation validation',@Preview=1;
+SET @Snapshot=(SELECT Snapshot FROM @Preview);
+EXEC dbo.ActivateStudentBilling @UserId=1,@AdmissionId=@Blank,@EnrollmentId=0,@YearId=28,@PlacementId=1,@StartDate='20261001',@BillingStart='20261001',@StudentName=N'Rollback blank record',@FatherName=N'Rollback parent',@Fees=@Fees,@Reason=N'Blank record activation validation',@Preview=0,@ExpectedSnapshot=@Snapshot;
+IF NOT EXISTS(SELECT 1 FROM dbo.Enrollments WHERE AdmissionId=@Blank AND BillingReady=1 AND PlacementConfirmedAt IS NOT NULL) THROW 51009,'Blank record not placed',1;
+IF (SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE AdmissionId=@Blank)<>4350 THROW 51010,'Blank record charges incorrect',1;
+ROLLBACK;
+IF EXISTS(SELECT 1 FROM dbo.Enrollments WHERE AdmissionId=@Blank) THROW 51011,'Blank record rollback failed',1;
+PRINT 'PASS: blank legacy record details, new placement and opening charges; complete rollback';

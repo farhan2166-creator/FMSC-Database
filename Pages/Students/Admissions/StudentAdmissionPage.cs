@@ -140,18 +140,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly ModernComboBox transport = HumanUi.Combo();
     private bool UsesTransport =>
         string.Equals(transport.Text, "Yes", StringComparison.OrdinalIgnoreCase);
-    private readonly CheckBox assignFirstPlacement = new() { Text = "Record verified first placement", AutoSize = true };
-    private readonly ModernComboBox firstPlacementStatus = HumanUi.Combo();
-    private readonly ModernDatePicker firstEnrollmentDate = HumanUi.Date();
-    private readonly ModernDatePicker firstWithdrawalDate = HumanUi.Date();
-    private Control firstPlacementStatusField = null!;
-    private Control firstEnrollmentDateField = null!;
-    private Control firstWithdrawalDateField = null!;
     private RowStyle placementCardRow = null!;
     private float normalPlacementCardHeight;
-    private bool initializingFirstPlacement;
-    private bool HistoricalAdmission => currentAdmissionId <= 0 && assignFirstPlacement.Checked;
-    private bool AssigningFirstPlacement => currentAdmissionId > 0 && _editEnrollmentId <= 0 && assignFirstPlacement.Checked;
     private TableLayoutPanel placementEditGrid = null!;
     private TableLayoutPanel placementViewGrid = null!;
     private readonly Panel placementHost = new() { Dock = DockStyle.Fill };
@@ -279,10 +269,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private ModernButton? checkAdmissionButton;
     private AdmissionSubmission? unconfirmedAdmission;
     private bool savedAdmissionReadyForNext;
-    private readonly ModernCheckBox keepPlacement = new() {
-        Text = "Keep placement", Checked = true, AutoSize = true,
-        Margin = new Padding(4, 6, 4, 0)
-    };
     private bool saveBusy;
     /* UX - inline validation, the post-save "what next" strip, and the toolbar buttons a running save must not be interrupted by. */
     private FormValidator? admissionValidator;
@@ -425,9 +411,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         {
             /* Exclude quick-find text from the admission draft. */
             if (IsWithinQuickFind(control) || IsWithinFeePreviewMonth(control))
-                continue;
-            // This is an entry preference, not part of the student's record.
-            if (ReferenceEquals(control, keepPlacement))
                 continue;
             /* Treat inaccessible fields as empty when comparing drafts. */
             bool editable =
@@ -637,7 +620,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 CaptureAdmissionBaseline();
         };
         Disposed += (_, _) => photoRead.Dispose();
-        firstPlacementStatus.Items.AddRange(new object[] { "Active", "Left" });
         viewEnrollmentDate.Text=editEnrollmentDate.Text="-";
         RecordTextPolicy.WireInput(name, "@StudentName");
         RecordTextPolicy.WireInput(fatherName, "@FatherName");
@@ -647,27 +629,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         RecordTextPolicy.WireInput(placeOfBirthInput, "@PlaceOfBirth");
         RecordTextPolicy.WireInput(casteTribe, "@CasteTribe");
         NationalIdentityInput.Attach(bform);
-        firstEnrollmentDate.ShowCheckBox = true;
-        firstEnrollmentDate.Checked = false;
-        // Owner policy (BL-05): unknown historical withdrawal dates stay blank; never invent a date.
-        firstWithdrawalDate.ShowCheckBox = true;
-        firstWithdrawalDate.Checked = false;
-        assignFirstPlacement.CheckedChanged += (_, _) => {
-            if (initializingFirstPlacement) return;
-            if (currentAdmissionId <= 0)
-            {
-                feeStructureLoadVersion++;
-                if (HistoricalAdmission)
-                {
-                    _selectedFees.Clear();
-                    feeStatus.Text = "Historical record verification does not generate fees.";
-                }
-                else Defer(LoadFeeStructure);
-                feeGrid.Enabled = !HistoricalAdmission;
-            }
-            ShowPlacementSummary(currentAdmissionId > 0);
-        };
-        firstPlacementStatus.SelectedIndexChanged += (_, _) => { if (!initializingFirstPlacement) UpdateAdmissionEntryFlow(); };
         UiHelper.DisposePictureImageOnDispose(photoPreview);
         StudentPhotoViewForm.EnableZoom(photoPreview, () => currentAdmissionId > 0
             ? $"{AdmissionNumbers.ForId(currentAdmissionId)} - {name.Text.Trim()}"
@@ -691,7 +652,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         if (registrationReview)
         {
             quickStudent.Visible = findButton!.Visible = newAdmissionButton!.Visible = saveAndNewButton!.Visible = false;
-            enrollmentActionsButton!.Visible = collectPaymentButton!.Visible = admissionPrintButton!.Visible = keepPlacement.Visible = false;
+            enrollmentActionsButton!.Visible = collectPaymentButton!.Visible = admissionPrintButton!.Visible = false;
             var confirm = AddBusyAction("Confirm Admission", CompleteRegistrationAsync, "Success");
             GateAction(confirm, "Students.Admit");
             var cancel = AddBusyAction("Cancel Registration", () => CloseAdmissionAsync(true), "Warning");
@@ -864,7 +825,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 StartNewAdmission();
             }, "Secondary");
         UiAccessibility.Describe(newAdmissionButton, "Clear and start a new admission",
-            "Discard current student entries and start a new admission. Placement is retained when Keep placement is selected.");
+            "Discard current student entries and placement selections, then start a new admission.");
         /* Guard Save against duplicate submissions; Clear is local and printing is read-only. */
         // These actions own their enabled state; a generic busy action must not
         // re-enable Save after an unconfirmed admission reply.
@@ -874,8 +835,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         saveAndNewButton.Visible = false;
         checkAdmissionButton = AddAction("Check Saved Admission", async (_, _) => await RecheckAdmissionAsync(), "Secondary");
         checkAdmissionButton.Visible = false;
-        UiAccessibility.Describe(keepPlacement, "Keep placement for the next student",
-            "Retain campus, academic year, class and section for Clear / New. Student details and discounts are cleared.");
         AddToolbarSeparator();
         /* Collect the fee once the admission is saved, then print - the order the work happens in. */
         foreach (string operation in new[] { "Transfer Section", "Transfer Class", "Transfer Campus", "Re-Admit" })
@@ -891,16 +850,12 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     CurrentUser.HasPermission(item.Text == "Re-Admit" ? "Students.Administer" : "Enrollment.Manage");
         };
         enrollmentActionsMenu.Items.Add(new ToolStripSeparator());
-        var correctPlacement = enrollmentActionsMenu.Items.Add("Placement History / Corrections");
+        var correctPlacement = enrollmentActionsMenu.Items.Add("Student Setup / Placement Corrections");
         correctPlacement.Click += async (_, _) => await OpenPlacementCorrectionAsync();
         enrollmentActionsMenu.Opening += (_, _) => correctPlacement.Enabled = currentAdmissionId > 0 && !IsPendingRegistration && !saveBusy && CurrentUser.HasPermission("Students.Administer");
-        var verifyLegacy = enrollmentActionsMenu.Items.Add("Mark Legacy Record Verified");
-        verifyLegacy.Click += async (_, _) => await VerifyLegacyAsync();
         var markLeft = enrollmentActionsMenu.Items.Add("Mark as Left");
         markLeft.Click += async (_, _) => await CloseAdmissionAsync(false);
         enrollmentActionsMenu.Opening += (_, _) => {
-            verifyLegacy.Visible = legacySetupPending && currentAdmissionId > 0;
-            verifyLegacy.Enabled = !saveBusy && CurrentUser.HasPermission("Students.Administer");
             markLeft.Visible = _workspaceStudentStatus == "Active" && currentAdmissionId > 0;
             markLeft.Enabled = !saveBusy && CurrentUser.HasPermission("Students.Administer");
         };
@@ -1362,17 +1317,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             0);
         studentGuardianCard.Content.Controls.Add(
             studentGuardianContent);
-        var placementHeader = new Panel {
-            Width = AppScale.Scale(180), Margin = Padding.Empty, Padding = Padding.Empty
-        };
-        keepPlacement.Dock = DockStyle.Right;
-        placementHeader.Controls.Add(keepPlacement);
-        var admissionCard = HumanUi.Card("Admission / Placement", null, Accent, placementHeader);
+        var admissionCard = HumanUi.Card("Admission / Placement", null, Accent);
         admissionCard.Padding = new Padding(UiDesignSystem.Spacing.Sm, 3,
             UiDesignSystem.Spacing.Sm, 3);
         admissionCard.Content.Padding = Padding.Empty;
-        placementHeader.SendToBack();
-        keepPlacement.Margin = Padding.Empty;
         var placementTitle = admissionCard.Header.Controls.OfType<Label>().First();
         admissionCard.Header.Controls.Remove(placementTitle);
         var placementTitleRow = new TableLayoutPanel {
@@ -1405,12 +1353,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         placementEditGrid.Controls.Add(AdmissionField("Class", Class, true), 0, 1);
         placementEditGrid.Controls.Add(AdmissionField("Section", Section, true), 1, 1);
         placementEditGrid.Controls.Add(AdmissionField("Transport", transport), 2, 1);
-        firstPlacementStatusField = AdmissionField("Verified status", firstPlacementStatus, true);
-        firstEnrollmentDateField = AdmissionField("Placement Start Date", firstEnrollmentDate, true);
-        firstWithdrawalDateField = AdmissionField("Withdrawal date (if known)", firstWithdrawalDate);
-        placementEditGrid.Controls.Add(firstPlacementStatusField, 0, 2);
-        placementEditGrid.Controls.Add(firstEnrollmentDateField, 1, 2);
-        placementEditGrid.Controls.Add(firstWithdrawalDateField, 2, 2);
         placementViewGrid = AdmissionGrid(4, 2);
         placementViewGrid.ColumnStyles.Clear();
         foreach (ColumnStyle column in placementEditGrid.ColumnStyles)
@@ -1442,8 +1384,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         placementContent.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.NormalFont)));
         placementContent.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
         var placementHelp = new Panel { Dock = DockStyle.Fill, Margin = Padding.Empty };
-        assignFirstPlacement.Dock = DockStyle.Right;
-        placementHelp.Controls.Add(assignFirstPlacement);
         placementContent.Controls.Add(placementHelp, 0, 0);
         placementContent.Controls.Add(placementHost, 0, 1);
         admissionCard.Content.Controls.Add(placementContent);
@@ -2088,15 +2028,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         placementViewGrid.Visible = locked;
         registrationNo.Visible = !locked;
         viewRegistrationNo.Visible = locked;
-        assignFirstPlacement.Visible = missing || currentAdmissionId <= 0;
-        assignFirstPlacement.Text = currentAdmissionId <= 0 ? "Historical record (no fees)" : "Record verified first placement";
-        bool review = missing || HistoricalAdmission;
-        firstPlacementStatusField.Visible = review;
-        firstEnrollmentDateField.Visible = review;
-        firstWithdrawalDateField.Visible = review;
-        placementEditGrid.RowStyles[2].Height = review ? AdmissionFieldRowHeight : 0;
-        if (placementCardRow is not null)
-            placementCardRow.Height = normalPlacementCardHeight + (review ? AdmissionFieldRowHeight : 0);
+        placementEditGrid.RowStyles[2].Height = 0;
+        if (placementCardRow is not null) placementCardRow.Height = normalPlacementCardHeight;
         admissionDate.Enabled = currentAdmissionId <= 0;
         UpdateAdmissionEntryFlow();
     }
@@ -2246,13 +2179,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         _editYearId = 0;
         _editClassId = 0;
         ShowPlacementSummary(false);
-        ClearAll(true, keepPlacement.Checked);
+        ClearAll();
         UpdateStudentWorkspace();
         SwitchTab(0);
-        SetStatus(
-            keepPlacement.Checked && Campus.SelectedId > 0
-                ? "New · Placement kept"
-                : "New admission");
+        SetStatus("New admission");
     }
     private void UpdateAdmissionIdDisplay()
     {
@@ -2310,7 +2240,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 SetStatus("Select an academic year for the admission number.");
                 return;
             }
-            var plan=await AdmissionNumberPolicy.LoadAsync(date,yearId,HistoricalAdmission);
+            var plan=await AdmissionNumberPolicy.LoadAsync(date,yearId,false);
             if(IsDisposed || saveBusy || version!=admissionNumberVersion || currentAdmissionId>0 || date!=admissionDate.Value.Date || yearId!=Year.SelectedId) return;
             admissionNumberPlan=plan;
             // Refresh the proposal on date/year changes, keeping the final number editable.
@@ -2318,9 +2248,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             admissionIdValue.Text = automaticAdmissionNumber;
             admissionIdValue.PlaceholderText=string.Empty;
             if(plan.Error is not null) SetStatus(plan.Error,true);
-            else if(HistoricalAdmission) SetStatus(plan.Suggested is not null
-                ? $"Suggested: {plan.Suggested}. Verify with the register."
-                : "Enter the verified register admission number.");
             else if(plan.Suggested is not null) SetStatus($"Suggested admission no.: {plan.Suggested}. Edit if needed.");
             else SetStatus("Enter an unused register number for this date.",true);
         }
@@ -2764,22 +2691,12 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             !(dob.Checked && dob.Value.Date > admissionDate.Value.Date),
             "Later than admission date",
             () => !(dob.Checked && dob.Value.Date > admissionDate.Value.Date));
-        if ((isNew && detailsComplete) || AssigningFirstPlacement)
+        if (isNew && detailsComplete)
         {
             v.Required(Campus, "Select a campus");
             v.Required(Year, "Select a year");
             v.Required(Class, "Select a class");
             v.Required(Section, "Select a section");
-        }
-        if (AssigningFirstPlacement || HistoricalAdmission)
-        {
-            v.Required(firstPlacementStatus, "Choose Active or Left");
-            v.Check(firstEnrollmentDate, firstEnrollmentDate.Checked && firstEnrollmentDate.Value.Date >= admissionDate.Value.Date && firstEnrollmentDate.Value.Date <= DateTime.Today,
-                "Confirm a date on/after admission, not future");
-            bool left = firstPlacementStatus.Text == "Left";
-            v.Check(firstPlacementStatus, _workspaceStudentStatus != "Left" || left, "Use Left for a historical left student");
-            v.Check(firstWithdrawalDate, !firstWithdrawalDate.Checked || (left && firstWithdrawalDate.Value.Date >= firstEnrollmentDate.Value.Date && firstWithdrawalDate.Value.Date <= DateTime.Today),
-                "Withdrawal must follow placement, not future");
         }
         v.Check(contact, IsValidOptionalPhone(contact.Text),
             PakistanPhoneNumber.ValidationMessage, () => IsValidOptionalPhone(contact.Text));
@@ -2804,23 +2721,16 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private void UpdateAdmissionEntryFlow()
     {
         bool missing = currentAdmissionId > 0 && _editEnrollmentId <= 0;
-        bool placementUnlocked = currentAdmissionId <= 0 ? HasRequiredAdmissionDetails() : missing && assignFirstPlacement.Checked;
-        firstPlacementStatus.Enabled = AssigningFirstPlacement || HistoricalAdmission;
-        firstEnrollmentDate.Enabled = AssigningFirstPlacement || HistoricalAdmission;
-        firstWithdrawalDate.Enabled = (AssigningFirstPlacement || HistoricalAdmission) && firstPlacementStatus.Text == "Left";
-        assignFirstPlacement.Enabled = CurrentUser.HasPermission("Enrollment.Manage");
+        bool placementUnlocked = currentAdmissionId <= 0 && HasRequiredAdmissionDetails();
         Campus.Enabled = placementUnlocked;
         Year.Enabled = placementUnlocked;
         Class.Enabled = placementUnlocked;
         Section.Enabled = placementUnlocked;
         transport.Enabled = placementUnlocked;
-        placementGuidance.Text = HistoricalAdmission
-            ? "Historical record: confirm the register number, placement and dates. No fees are generated."
-            : missing ? "No placement: tick verified first placement, then confirm placement and dates. No fees are generated."
-            : currentAdmissionId > 0
-                ? "Use Actions → Placement History / Corrections to review placement."
-                : placementUnlocked ? "Choose Campus, Academic Year, Class and Section in order."
-                    : "Complete the required student and family fields above to unlock academic placement.";
+        placementGuidance.Text = currentAdmissionId > 0
+            ? "Use Actions → Student Setup / Placement Corrections for placement and billing."
+            : placementUnlocked ? "Choose Campus, Academic Year, Class and Section in order."
+                : "Complete the required student and family fields above to unlock academic placement.";
         placementGuidance.ForeColor = placementUnlocked
             ? AppTheme.MutedText
             : AppTheme.Warning;
@@ -3161,18 +3071,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             viewTransport.Text =
                 transportText;
             if (IsDisposed || version != admissionLoadVersion) return false;
-            initializingFirstPlacement = true;
-            try
-            {
-                assignFirstPlacement.Checked = false;
-                firstPlacementStatus.SelectedItem = _workspaceStudentStatus;
-                firstEnrollmentDate.Value = admissionDate.Value;
-                firstEnrollmentDate.Checked = false;
-                bool hasWithdrawal = !row.IsNull("WithdrawalDate");
-                firstWithdrawalDate.Value = hasWithdrawal ? Convert.ToDateTime(row["WithdrawalDate"]) : admissionDate.Value;
-                firstWithdrawalDate.Checked = hasWithdrawal;
-            }
-            finally { initializingFirstPlacement = false; }
             if (_editEnrollmentId <= 0)
                 await PrepareFirstPlacementAsync(_editCampusId);
             if (IsDisposed || version != admissionLoadVersion) return false;
@@ -3251,7 +3149,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private async Task LoadFeeStructure()
     {
         bool editing = currentAdmissionId > 0;
-        if (editing || HistoricalAdmission)
+        if (editing)
             return;
         int campusId = Campus.SelectedId;
         int yearId = Year.SelectedId;
@@ -3279,7 +3177,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             /* Await the loader, which clears available options before its first await. */
             await LoadAvailableFeeOptionsAsync(campusId, yearId, classId);
             if (IsDisposed ||
-                version != feeStructureLoadVersion || HistoricalAdmission ||
+                version != feeStructureLoadVersion ||
                 Campus.SelectedId != campusId ||
                 Year.SelectedId != yearId ||
                 Class.SelectedId != classId)
@@ -3817,14 +3715,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         });
         if (!IsPendingRegistration) RegistrationFinished?.Invoke();
     }
-    private async Task VerifyLegacyAsync()
-    {
-        if (HasUnsavedChanges) { SetStatus("Save corrections before marking this legacy record verified."); return; }
-        await RunBusyAsync("Verifying legacy record…", async () => {
-            await DatabaseHelper.ExecuteUserAsync("VerifyLegacyStudent", DatabaseHelper.Int("@AdmissionId", currentAdmissionId));
-            SetStatus("Legacy record verified. Later edits to details, placement or fees require verification again.");
-        });
-    }
     private async Task CloseAdmissionAsync(bool cancel)
     {
         if (currentAdmissionId <= 0 || saveBusy || (cancel && (!registrationReview || !IsPendingRegistration))) return;
@@ -3846,8 +3736,15 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private async Task OpenPlacementCorrectionAsync()
     {
         if (currentAdmissionId <= 0 || saveBusy || !CurrentUser.HasPermission("Students.Administer")) return;
-        if (HasUnsavedChanges) { SetStatus("Save personal-detail changes before correcting placement."); return; }
+        if (HasUnsavedChanges) { SetStatus("Save personal-detail changes before opening student setup or corrections."); return; }
         int admissionId = currentAdmissionId;
+        if (legacySetupPending)
+        {
+            using var setup = new StudentBillingSetupDialog(admissionId);
+            setup.ShowDialog(FindForm());
+            if (setup.Changed && !IsDisposed && currentAdmissionId == admissionId) await LoadStudentForEditAsync(admissionId);
+            return;
+        }
         using var dialog = new StudentPlacementCorrectionDialog(admissionId, name.Text);
         dialog.ShowDialog(FindForm());
         if (dialog.Changed && !IsDisposed && currentAdmissionId == admissionId) await LoadStudentForEditAsync(admissionId);
@@ -4277,7 +4174,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             saveButton.Enabled = false;
         /* Hold actions that could replace the admission while Save is running. */
         BusyScope holdInterfering =
-            BeginBusy(string.Empty, findButton, newAdmissionButton, quickStudent, saveAndNewButton, keepPlacement);
+            BeginBusy(string.Empty, findButton, newAdmissionButton, quickStudent, saveAndNewButton);
         try
         {
             if (currentAdmissionId > 0)
@@ -4315,7 +4212,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         try
         {
             using (HoldSubmittedInputs())
-                admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId,HistoricalAdmission);
+                admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId,false);
             /* Show all field errors and focus the first invalid input. */
             if (!ValidateAdmissionInline(isNew: true))
                 return;
@@ -4336,14 +4233,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     return;
             /* Validate discounts before writing any admission data. */
             var typedDiscounts = new List<(int feeTypeId, decimal discount)>();
-            if (!HistoricalAdmission && !TryBuildTypedDiscountsByFeeType(out typedDiscounts))
+            if (!TryBuildTypedDiscountsByFeeType(out typedDiscounts))
                 return;
             using var submittedInputs = HoldSubmittedInputs();
             string? bloodGroup =
                 blood.SelectedIndex > 0
                     ? blood.Text.Trim()
                     : null;
-            if (HistoricalAdmission) typedDiscounts.Clear();
             var admissionParameters = new List<SqlParameter> {
                 DatabaseHelper.P("@AdmissionNumber", string.IsNullOrWhiteSpace(admissionIdValue.Text) ? null : admissionIdValue.Text.Trim()),
                 DatabaseHelper.P(
@@ -4423,7 +4319,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     "@SelectedFeeTypeIds",
                     System.Data.SqlDbType.Structured) {
                     TypeName = "dbo.FeeTypeIdList",
-                    Value = Tvp.FeeTypeIds(HistoricalAdmission ? Array.Empty<int>() :
+                    Value = Tvp.FeeTypeIds(
                         _selectedFees
                             .Where(f => !f.IsMandatory)
                             .Select(f => f.FeeTypeId))
@@ -4434,14 +4330,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     TypeName = "dbo.AdmissionFeeDiscountType",
                     Value = Tvp.AdmissionFeeDiscounts(typedDiscounts)
                 } };
-            if (HistoricalAdmission)
-            {
-                admissionParameters.Add(DatabaseHelper.P("@VerifiedEnrollmentDate", firstEnrollmentDate.Checked ? firstEnrollmentDate.Value.Date : null));
-                admissionParameters.Add(DatabaseHelper.P("@VerifiedStatus", firstPlacementStatus.Text));
-                admissionParameters.Add(DatabaseHelper.P("@VerifiedWithdrawalDate", firstWithdrawalDate.Checked ? firstWithdrawalDate.Value.Date : null));
-            }
-            bool savedHistorical = HistoricalAdmission;
-            admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId,savedHistorical);
+
+            admissionNumberPlan=await AdmissionNumberPolicy.LoadAsync(admissionDate.Value.Date,Year.SelectedId);
             if(admissionNumberPlan.Validate(admissionIdValue.Text) is { } numberingProblem)
             {
                 Warn(numberingProblem);
@@ -4453,11 +4343,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 Convert.ToString(admissionParameters.First(p => p.ParameterName == "@FatherName").Value) ?? "",
                 Convert.ToDateTime(admissionParameters.First(p => p.ParameterName == "@AdmissionDate").Value),
                 Convert.ToInt32(admissionParameters.First(p => p.ParameterName == "@AdmissionCampusId").Value),
-                savedHistorical, typedDiscounts.Count);
+                false, typedDiscounts.Count);
             int submittedVersion = admissionLoadVersion;
             unconfirmedAdmission = submitted;
             var confirmation = await AdmissionSaveConfirmation.SubmitAsync(submitted,
-                () => DatabaseHelper.QueryUserSetAsync(savedHistorical ? "AdmitHistoricalStudent" : "AdmitStudent", admissionParameters.ToArray()),
+                () => DatabaseHelper.QueryUserSetAsync("AdmitStudent", admissionParameters.ToArray()),
                 ReadSubmittedAdmissionAsync);
             if (IsDisposed || submittedVersion != admissionLoadVersion) return;
             await ApplyAdmissionConfirmationAsync(submitted, confirmation);
@@ -4552,14 +4442,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     {
         await DatabaseHelper.ExecuteUserAsync(
             "SaveStudentDetailsWithFirstEnrollment",
-            DatabaseHelper.Bit("@CreateFirstEnrollment", AssigningFirstPlacement),
-            DatabaseHelper.P("@PlacementCampusId", AssigningFirstPlacement ? Campus.SelectedId : null),
-            DatabaseHelper.P("@PlacementAcademicYearId", AssigningFirstPlacement ? Year.SelectedId : null),
-            DatabaseHelper.P("@PlacementClassSectionId", AssigningFirstPlacement ? Section.SelectedId : null),
-            DatabaseHelper.P("@PlacementEnrollmentDate", AssigningFirstPlacement && firstEnrollmentDate.Checked ? firstEnrollmentDate.Value.Date : null),
-            DatabaseHelper.P("@PlacementStatus", AssigningFirstPlacement ? firstPlacementStatus.Text : null),
-            DatabaseHelper.P("@PlacementLeavingDate", AssigningFirstPlacement && firstWithdrawalDate.Checked ? firstWithdrawalDate.Value.Date : null),
-            DatabaseHelper.Bit("@PlacementUsesTransport", AssigningFirstPlacement && UsesTransport),
             DatabaseHelper.P("@AdmissionNumber", IsPendingRegistration ? null : admissionIdValue.Text.Trim()),
             DatabaseHelper.Int(
                 "@AdmissionId",
@@ -4675,8 +4557,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             bool hadPhoto = _pendingPhotoData is not null;
             bool photoSaved = await PersistPendingPhotoIfAnyAsync(savedStudent);
             if (IsDisposed || currentAdmissionId != savedStudent || admissionLoadVersion != savedVersion) return;
-            string success = AssigningFirstPlacement ? "Details and first placement saved. No fees generated."
-                : "Details and discounts saved.";
+            string success = "Details and discounts saved.";
             /* The details are committed; reload failure means stale display, not failed Save. */
             try
             {
@@ -4789,7 +4670,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
     }
     private void ClearAll(
-    bool clearGenerated = true, bool retainPlacement = false)
+    bool clearGenerated = true)
     {
         /* Invalidate student reads before clearing the form. */
         admissionLoadVersion++;
@@ -4829,12 +4710,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             transport.SelectedIndex = 0;
         if (clearGenerated)
             registrationNo.Clear();
-        initializingFirstPlacement = true;
-        assignFirstPlacement.Checked = false;
-        firstPlacementStatus.SelectedItem = "Active";
-        firstEnrollmentDate.Checked = false;
-        firstWithdrawalDate.Checked = false;
-        initializingFirstPlacement = false;
         feeGrid.Enabled = true;
         registrationNo.PlaceholderText =
             "Assigned after admission";
@@ -4843,13 +4718,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         dob.Value =
             DateTime.Today.AddYears(-5);
         dob.Checked = false;
-        if (!retainPlacement)
-        {
-            if (Campus.Items.Count > 0) Campus.SelectedIndex = -1;
-            if (Year.Items.Count > 0) Year.SelectedIndex = -1;
-            if (Section.Items.Count > 0) Section.SelectedIndex = -1;
-            if (Class.Items.Count > 0) Class.SelectedIndex = -1;
-        }
+        if (Campus.Items.Count > 0) Campus.SelectedIndex = -1;
+        if (Year.Items.Count > 0) Year.SelectedIndex = -1;
+        if (Section.Items.Count > 0) Section.SelectedIndex = -1;
+        if (Class.Items.Count > 0) Class.SelectedIndex = -1;
         ShowPlacementSummary(false);
         viewRegistrationNo.Text = "-";
         viewAdmissionDate.Text = "-";
@@ -4888,22 +4760,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             AdmissionContextSubtitle);
         /* Capture the empty form as clean. */
         CaptureAdmissionBaseline();
-        if (retainPlacement && Campus.SelectedId > 0 && Year.SelectedId > 0 && Class.SelectedId > 0)
-        {
-            int clearedVersion = admissionLoadVersion;
-            var clearedFields = AdmissionParts(false).Where(part => !part.Where.StartsWith("fee row for fee type ", StringComparison.Ordinal)).ToArray();
-            Defer(async () => {
-                await LoadFeeStructure();
-                if (IsDisposed || clearedVersion != admissionLoadVersion || currentAdmissionId > 0)
-                    return;
-                var currentFields = AdmissionParts(_pendingPhotoData is not null)
-                    .Where(part => !part.Where.StartsWith("fee row for fee type ", StringComparison.Ordinal));
-                // Automatic mandatory-fee defaults are clean; concurrent typing remains dirty.
-                if (clearedFields.SequenceEqual(currentFields) &&
-                    _selectedFees.All(fee => fee.IsMandatory && fee.DiscountAmount == 0))
-                    CaptureAdmissionBaseline();
-            });
-        }
     }
 }
 

@@ -1,6 +1,5 @@
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Reports;
-using FMSC_SMS.Pages.Reports.Finance;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Billing;
 /// <summary>Manual Monthly Fee Posting - the operator decides what fee to post, for which month, and for whom. Re-clicking Post is therefore harmless - the second click posts nothing.</summary>
@@ -9,9 +8,6 @@ public sealed class FeePostingPage : V2Page, IBusyPage
     private bool posting;
     public bool IsBusy => posting;
     public string BusyMessage => "Monthly fees are being posted. Wait for the result before leaving.";
-    private const string PostColumn = "__Post";
-    /// <summary>A tickable eligible charge. StudentFeeAssignmentId + BillingMonth is the same pair UX_BillingCharges_ActivePeriod keys on, so it identifies exactly the row that would be created.</summary>
-    private readonly record struct PostingKey(int StudentFeeAssignmentId, DateTime BillingMonth);
     private readonly LookupBox academicYear = new() { Enabled = false, TabStop = false };
     /// <summary>The months that can still be posted. LookupBox keys are integers, so each month is keyed as yyyymm (see BillingMonthKey) and shown as text.</summary>
     private readonly LookupBox monthBox = new();
@@ -20,7 +16,6 @@ public sealed class FeePostingPage : V2Page, IBusyPage
     private readonly LookupBox section = new();
     /// <summary>LookupBox.Bind always inserts a blanket row with id 0 ("-- Select --") first.</summary>
     private readonly LookupBox feeType = new();
-    private readonly HashSet<PostingKey> selectedKeys = new();
     /// <summary>The full preview result. Held here rather than read back off the grid, because the grid only ever contains the current page of it.</summary>
     private DataTable? eligibleRows;
     /// <summary>The procedure's own summary row for this month.</summary>
@@ -31,6 +26,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
     private DateTime loadedMonth;
     /* Set while the page itself rebinds a list, so that rebinding does not look like the operator changing a filter. */
     private bool suppressFilterEvents;
+    private bool lookupsReady;
     /* Guards RefreshMonthsAsync: only the newest request may land. */
     private int monthsLoadVersion;
     private ModernButton postButton = null!;
@@ -40,35 +36,28 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         Padding = new Padding(8, 6, 8, 6), Font = AppTheme.NormalFont,
         BackColor = AppTheme.SurfaceSecondary
     };
-    public FeePostingPage()
+    public FeePostingPage() : this(true) { }
+    internal FeePostingPage(bool initialize)
         : base(
             "Post Monthly Fees",
-            "Review student fee rates and post selected monthly charges.")
+            "Review and post all eligible monthly fees for the chosen month and filters.")
     {
-        // The grid must accept a tick. Every other column is made read-only in ConfigureGrid, so nothing but the tick column is editable.
-        Grid.ReadOnly = false;
+        Grid.ReadOnly = true;
 #if FMSC_LEVEL2
         Grid.AccessibleName = "Monthly posting preview";
 #endif
-        Grid.SelectionMode = DataGridViewSelectionMode.CellSelect;
-        Grid.MultiSelect = false;
-        Grid.EditMode = DataGridViewEditMode.EditOnEnter;
-        Grid.CellFormatting += OnCellFormatting;
-        Grid.CurrentCellDirtyStateChanged += OnCurrentCellDirtyStateChanged;
-        Grid.CellValueChanged += OnCellValueChanged;
         var loadPreview = AddBusyAction(
             "Load Eligible Fees",
             LoadPreviewAsync,
             "Primary");
-        /* posting creates financial obligations for every ticked row, so a double click must not post twice. */
+        var refreshMonths = AddBusyAction("Refresh Months", ReloadMonthsAsync, "Secondary");
+        /* posting creates financial obligations for every eligible row, so a double click must not post twice. */
         postButton = AddBusyAction(
-            "Post Selected Fees",
-            PostSelectedAsync,
+            "Post Eligible Fees",
+            PostEligibleAsync,
             "Success");
-        var checkBilling = AddAction("Check Billing Status", (_, _) => OpenBillingStatus(), "Secondary");
-        checkBilling.Enabled = CurrentUser.HasPermission("Fees.Reports.View");
-        RelocateFromActions(loadPreview, postButton, checkBilling);
-        Defer(BindLookupsAsync);
+        RelocateFromActions(refreshMonths, loadPreview, postButton);
+        if (initialize) Defer(BindLookupsAsync);
         // The entries carry a count, so the open list is wider than the field.
         monthBox.DropDownWidth = AppScale.Scale(320);
         var filters = ReportUi.Bar(
@@ -89,25 +78,18 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         klass.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
         section.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
         feeType.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
-        SetContent(ReportUi.Layout(filters, Grid, "Post Monthly Fees", loadPreview, postButton, checkBilling));
+        SetContent(ReportUi.Layout(filters, Grid, "Post Monthly Fees", refreshMonths, loadPreview, postButton));
         Grid.Parent?.Controls.Add(postingOutcome);
         Grid.BringToFront();
-    }
-    private void OpenBillingStatus()
-    {
-        if (!CurrentUser.HasPermission("Fees.Reports.View")) return;
-        DateTime? month = BillingMonthKey.ToMonth(monthBox.SelectedId);
-        if (month is null) { Warn("Choose a billing month before checking its billing status."); return; }
-        using var dialog = new ApplicationWindowForm {
-            Text = "Billing Status", StartPosition = FormStartPosition.CenterParent,
-            Size = new Size(AppScale.Scale(1100), AppScale.Scale(700)),
-            MinimumSize = new Size(AppScale.Scale(900), AppScale.Scale(550)),
-            BackColor = AppTheme.PageBackground
+        VisibleChanged += async (_, _) => {
+            if (Visible && lookupsReady && !posting) await ReloadMonthsAsync();
         };
-        dialog.Controls.Add(new BillingStatusReportPage(academicYear.SelectedId, campus.SelectedId, month.Value) {
-            Dock = DockStyle.Fill
-        });
-        dialog.ShowDialog(FindForm());
+    }
+    private async Task ReloadMonthsAsync()
+    {
+        if (posting) return;
+        InvalidatePreview(announce: false);
+        await RefreshMonthsAsync();
     }
     /// <summary>every filter the preview query is built from, in one comparable string, read from the live controls.</summary>
     private string FilterSignature() =>
@@ -122,15 +104,13 @@ public sealed class FeePostingPage : V2Page, IBusyPage
     /// <summary>The loaded preview no longer describes the filters on screen, so it is dropped rather than left to be posted under them.</summary>
     private void InvalidatePreview(bool announce = true)
     {
-        if (eligibleRows is null &&
-            selectedKeys.Count == 0)
+        if (eligibleRows is null)
         {
             return;
         }
         appliedFilterSignature = null;
         eligibleRows = null;
         eligibleSummary = null;
-        selectedKeys.Clear();
         /* The preview cache goes with the grid, so the superseded rows cannot be paged or exported under the new filters. */
         InvalidateReport();
         if (announce)
@@ -153,7 +133,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         // User decision (2026-10-11, scenario audit SC-02): academic-year month
         // eligibility is handled by this C# workflow. The DropDownList is bound only
         // to GetPostableMonths' bounded year list; filter changes invalidate the preview,
-        // and PostSelectedAsync rechecks that scope before sending its captured month.
+        // and PostEligibleAsync rechecks that scope before sending its captured month.
         // Do not add SQL changes solely for a direct call bypassing this workflow.
         int version = ++monthsLoadVersion;
         // Read on the UI thread, before the await.
@@ -248,51 +228,6 @@ public sealed class FeePostingPage : V2Page, IBusyPage
                 Fail(ex);
         }
     }
-    private static PostingKey KeyOf(DataRow row) =>
-        new(
-            Convert.ToInt32(row["StudentFeeAssignmentId"]),
-            Convert.ToDateTime(row["BillingMonth"]).Date);
-    /// <summary>The tick is drawn from selectedKeys, never from the cell's own value, so paging and re-binding cannot lose or invent a tick.</summary>
-    private void OnCellFormatting(object? sender, DataGridViewCellFormattingEventArgs e)
-    {
-        if (e.RowIndex < 0 || e.ColumnIndex < 0)
-            return;
-        if (Grid.Columns[e.ColumnIndex].Name != PostColumn)
-            return;
-        if (Grid.Rows[e.RowIndex].DataBoundItem is not DataRowView view)
-            return;
-        bool isSelected = selectedKeys.Contains(KeyOf(view.Row));
-        if (e.Value is bool current && current == isSelected)
-            return;
-        e.Value = isSelected;
-        e.FormattingApplied = true;
-    }
-    /// <summary>A checkbox cell does not commit until focus leaves it, so without this the tick would be invisible to selectedKeys until the user clicked elsewhere.</summary>
-    private void OnCurrentCellDirtyStateChanged(object? sender, EventArgs e)
-    {
-        if (Grid.IsCurrentCellDirty &&
-            Grid.CurrentCell is DataGridViewCheckBoxCell)
-        {
-            Grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
-        }
-    }
-    private void OnCellValueChanged(object? sender, DataGridViewCellEventArgs e)
-    {
-        if (e.RowIndex < 0 || e.ColumnIndex < 0)
-            return;
-        if (Grid.Columns[e.ColumnIndex].Name != PostColumn)
-            return;
-        if (Grid.Rows[e.RowIndex].DataBoundItem is not DataRowView view)
-            return;
-        var key = KeyOf(view.Row);
-        bool nowTicked =
-            Grid.Rows[e.RowIndex].Cells[e.ColumnIndex].Value is bool ticked && ticked;
-        if (nowTicked)
-            selectedKeys.Add(key);
-        else
-            selectedKeys.Remove(key);
-        UpdateSelectionSummary();
-    }
     private async Task BindLookupsAsync()
     {
         try
@@ -316,6 +251,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             // GetFeeTypes returns active types ordered by DisplayOrder.
             feeType.Bind(await feeTypesTask, "FeeTypeId", "FeeTypeName");
             suppressFilterEvents = false;
+            lookupsReady = true;
             await RefreshMonthsAsync();
         }
         catch (Exception ex)
@@ -342,7 +278,6 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             DateTime previewMonth = chosenMonth.Value;
             /* F6/F7 - the filters this query is run for, re-checked after the awaits. */
             string requestedFilters = FilterSignature();
-            selectedKeys.Clear();
             // Empty TVP = every assigned fee type is eligible, which is what the procedures read as "all".
             var feeTypes = new SqlParameter("@FeeTypeIds", SqlDbType.Structured) {
                 TypeName = "dbo.FeeTypeIdList",
@@ -365,13 +300,13 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             DataTable summary = result.Tables.Count > 1 ? result.Tables[1] : new DataTable();
             if (!string.Equals(requestedFilters, FilterSignature(), StringComparison.Ordinal))
                 return;
-            // Keep our own reference to the FULL, unpaged result before binding, because BindReportAsync pages the grid and Post must act on every ticked row, not merely the page…
+            // Keep our own reference to the FULL, unpaged result before binding, because BindReportAsync pages the grid and Post must act on every eligible row, not merely the page…
             eligibleRows = rows;
             eligibleSummary = summary.Rows.Count > 0 ? summary.Rows[0] : null;
             loadedMonth = previewMonth;
             appliedFilterSignature = requestedFilters;
             await BindReportAsync(() => Task.FromResult(rows));
-            // The filters can move while the grid is being bound; the change handler has already dropped the preview, so do not tick or announce it.
+            // The filters can move while the grid is being bound; the change handler has already dropped the preview, so do not announce it.
             if (!string.Equals(requestedFilters, FilterSignature(), StringComparison.Ordinal))
                 return;
             ConfigureGrid();
@@ -384,12 +319,8 @@ public sealed class FeePostingPage : V2Page, IBusyPage
                     true);
                 return;
             }
-            // Reversed bills require a fresh decision, even when ordinary fees are preselected.
-            foreach (DataRow row in rows.Rows)
-                if(!Convert.ToString(row["EligibilityNote"])!.StartsWith("Previously reversed",StringComparison.Ordinal))
-                    selectedKeys.Add(KeyOf(row));
-            UpdateSelectionSummary();
-            // Repaint so the default ticks appear.
+            UpdatePreviewSummary();
+            // Repaint the read-only preview.
             Grid.Invalidate();
         }
         catch (Exception ex)
@@ -403,8 +334,8 @@ public sealed class FeePostingPage : V2Page, IBusyPage
     protected override void OnReportPageBound()
     {
         ConfigureGrid();
-        if (eligibleRows is not null && selectedKeys.Count > 0)
-            UpdateSelectionSummary();
+        if (eligibleRows is not null)
+            UpdatePreviewSummary();
     }
     private void ConfigureGrid()
     {
@@ -417,26 +348,8 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         HideColumn("ChargeDate");
         HideColumn("DueDate");
         HideColumn("DiscountAmount");
-        // Added after the data columns, then moved to the front so it reads first without disturbing the natural order of the preview.
-        if (!Grid.Columns.Contains(PostColumn))
-        {
-            var post = new DataGridViewCheckBoxColumn {
-                Name = PostColumn,
-                HeaderText = "Post?",
-                Width = AppScale.Scale(60),
-                MinimumWidth = AppScale.Scale(60),
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-                SortMode = DataGridViewColumnSortMode.NotSortable,
-                ReadOnly = false
-            };
-            post.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            Grid.Columns.Add(post);
-        }
-        Grid.Columns[PostColumn].DisplayIndex = 0;
-        // Everything except the tick column is display-only: this is a confirmation screen, not an editor. Amounts are decided by the fee assignment and are never typed here.
-        foreach (DataGridViewColumn column in Grid.Columns)
-            if (column.Name != PostColumn)
-                column.ReadOnly = true;
+        Grid.ReadOnly = true;
+        foreach (DataGridViewColumn column in Grid.Columns) column.ReadOnly = true;
         /* Students are identified by Admission Number, so it comes first; the registration number (a reporting label) follows it. */
         ShowColumn("AdmissionNumber", "Admission Number", 115);
         SetHeader("RegistrationNumber", "Reg. No.", 95);
@@ -451,59 +364,16 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         SetHeader("EligibilityNote", "Status", 170);
         Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
     }
-    private void UpdateSelectionSummary()
+    private void UpdatePreviewSummary()
     {
-        if (eligibleRows is null)
-            return;
-        decimal selectedNet = 0m;
-        int selectedCount = 0;
-        var students = new HashSet<int>();
-        var allStudents = new HashSet<int>();
-        foreach (DataRow row in eligibleRows.Rows)
-        {
-            allStudents.Add(Convert.ToInt32(row["AdmissionId"]));
-            if (!selectedKeys.Contains(KeyOf(row)))
-                continue;
-            selectedCount++;
-            selectedNet += Convert.ToDecimal(row["NetAmount"]);
-            students.Add(Convert.ToInt32(row["AdmissionId"]));
-        }
-        // When the procedure's own summary row is available it is used verbatim.
-        string scope;
-        if (eligibleSummary is not null &&
-            eligibleSummary.Table is not null &&
-            eligibleSummary.Table.Columns.Contains("ChargesToPost"))
-        {
-            int eligibleCharges = Convert.ToInt32(eligibleSummary["ChargesToPost"]);
-            int eligibleStudents = Convert.ToInt32(eligibleSummary["EligibleStudents"]);
-            decimal eligibleNet = Convert.ToDecimal(eligibleSummary["TotalNet"]);
-            scope =
-                $"{loadedMonth:MMMM yyyy}: {eligibleCharges:N0} eligible charge(s) " +
-                $"across {eligibleStudents:N0} student(s), net Rs. {eligibleNet:N0}.";
-            if (eligibleCharges > eligibleRows.Rows.Count)
-            {
-                scope +=
-                    $" {eligibleCharges - eligibleRows.Rows.Count:N0} of them are beyond the " +
-                    "first page shown, but all eligible charges are ticked and will be " +
-                    "posted unless you untick them.";
-            }
-        }
-        else
-        {
-            scope =
-                $"{loadedMonth:MMMM yyyy}: {eligibleRows.Rows.Count:N0} eligible " +
-                $"charge(s) across {allStudents.Count:N0} student(s).";
-        }
-        if (selectedCount == 0)
-        {
-            SetStatus($"{scope} Nothing is ticked.", true);
-            return;
-        }
-        SetStatus(
-            $"{scope} Selected: {selectedCount:N0} charge(s) for {students.Count:N0} " +
-            $"student(s), net Rs. {selectedNet:N0}.");
+        if (eligibleRows is null) return;
+        int students = eligibleRows.AsEnumerable().Select(row => Convert.ToInt32(row["AdmissionId"])).Distinct().Count();
+        decimal total = eligibleRows.AsEnumerable().Sum(row => Convert.ToDecimal(row["NetAmount"]));
+        int reversed = eligibleRows.AsEnumerable().Count(row => Convert.ToString(row["EligibilityNote"])!.StartsWith("Previously reversed", StringComparison.Ordinal));
+        SetStatus($"{loadedMonth:MMMM yyyy}: {eligibleRows.Rows.Count:N0} eligible charge(s) for {students:N0} student(s), net Rs. {total:N0}. All listed fees across all pages will be posted after confirmation." +
+            (reversed > 0 ? $" Includes {reversed:N0} previously reversed fee(s) to post again." : ""));
     }
-    private async Task PostSelectedAsync()
+    private async Task PostEligibleAsync()
     {
         if (posting) return;
         posting = true;
@@ -512,7 +382,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             using var busy = BeginBusy(BusyMessage, this);
             if (eligibleRows is null || eligibleRows.Rows.Count == 0)
             {
-                Warn("Load the eligible fees first, then choose what to post.");
+                Warn("Load the eligible fees first, then review the list before posting.");
                 return;
             }
             // The captured preview month and rows must still match the bounded month
@@ -531,11 +401,11 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             DataTable previewSnapshot = eligibleRows;
             var chosen = previewSnapshot.Rows
                 .Cast<DataRow>()
-                .Where(row => selectedKeys.Contains(KeyOf(row)))
+
                 .ToList();
             if (chosen.Count == 0)
             {
-                Warn("No fees are ticked, so there is nothing to post.");
+                Warn("No eligible fees remain in this preview.");
                 return;
             }
             decimal net = chosen.Sum(row => Convert.ToDecimal(row["NetAmount"]));
@@ -551,9 +421,9 @@ public sealed class FeePostingPage : V2Page, IBusyPage
                     $"Post {chosen.Count:N0} fee(s) for {students:N0} student(s) for {month}?" +
                     $"\n\n{scopeText}" +
                     $"\n\nTotal net payable: Rs. {net:N0}\n\n" +
-                    "Only the ticked rows are posted. Fees already posted for this month " +
+                    "All eligible rows in this loaded preview are posted. Fees already posted for this month " +
                     $"are untouched, and nothing is posted for any month other than {month}."+
-                    (reversedCount>0 ? $"\n\n{reversedCount} previously reversed fee(s) will receive new charges because you selected them." : string.Empty),
+                    (reversedCount>0 ? $"\n\n{reversedCount} previously reversed fee(s) will receive new charges because they are included in this preview." : string.Empty),
                     "Post Monthly Fees",
                     defaultYes: false))
                 return;
@@ -568,7 +438,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             // This is what makes the posting explicit rather than filter-driven: the database writes these rows and nothing else.
             var selection = Tvp.PostingSelectionsFromPreview(
                 eligibleRows,
-                row => selectedKeys.Contains(KeyOf(row)));
+                _ => true);
             var selectionParameter = new SqlParameter("@Selection", SqlDbType.Structured) {
                 TypeName = "dbo.PostingSelectionType",
                 Value = selection

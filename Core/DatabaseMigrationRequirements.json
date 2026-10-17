@@ -2,6 +2,21 @@
   "objects": [
     {
       "schema": "dbo",
+      "name": "RequireWholeMonthReversal",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "StudentAdmissionFeeAcknowledgements",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "ActivateStudentBilling",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
       "name": "QuickRegistrationRequests",
       "type": "U "
     },
