@@ -34,13 +34,13 @@ Findings are **not eight newly discovered software bugs**. Three are confirmed s
 - **Security checks success at this exact SHA:** [run 38562380944](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38562380944). Gitleaks/forbidden filename scan reported no detections in the fetched history/staged change scope. This is not proof that all secrets or personal data are absent.
 - **Previous complete installer run:** [run 38528371049](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38528371049), built at **08fa039080a7…**, succeeded and uploaded the private **FMSC_SMS-Complete-Windows-x64-Add-Database-Files** artifact: 633 uploaded files, approximately 161.3 MB reported artifact bytes. It predates the latest code and Action version updates; it is not the current release candidate. The MSI was verified in that older run; the current CI uses an intentional dummy MSI *only for its isolated publish test*.
 - [Current complete installer workflow](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/.github/workflows/fmsc-complete-installer.yml#L1-L220) is manual, private, win-x64, and configured to exclude MDF/LDF while bundling tools and migration scripts. [Desktop CI](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/.github/workflows/fmsc-desktop-ci.yml#L1-L78) deliberately avoids live SQL and interactive GUI. A successful workflow **does not** equate to a tested installation.
-- [Prior master audit](FMSC_MASTER_AUDIT.md), [historical archive](FMSC_HISTORICAL_AUDITS.md) and [end-user flow audit](FMSC_END_USER_FLOW_AUDIT_2026-10-14.md) remain the evidence trail, with original revision-specific claims retained.
+- [Prior master audit](../FMSC_MASTER_AUDIT.md), [historical archive](../Archive/FMSC_HISTORICAL_AUDITS.md) and [end-user flow audit](FMSC_END_USER_FLOW_AUDIT_2026-10-14.md) remain the evidence trail, with original revision-specific claims retained.
 
 ## Findings with operator scenarios and safe follow-up
 
 ### PMA-01 — Older-schema migration remains enabled despite approved no-upgrade target policy (High; CONFIRMED)
 
-**Source:** [Installer/core.ps1 database gate and migration branch](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/Installer/core.ps1#L1382-L1645); [master audit owner-approved policy](FMSC_MASTER_AUDIT.md#owner-policy-and-migration-retirement-verification--14-october-2026); [migration files](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/Migrations/6.sql#L1-L20).
+**Source:** [Installer/core.ps1 database gate and migration branch](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/Installer/core.ps1#L1382-L1645); [master audit owner-approved policy](../FMSC_MASTER_AUDIT.md#owner-policy-and-migration-retirement-verification--14-october-2026); [migration files](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/Migrations/6.sql#L1-L20).
 
 **Reproduction by code path:** For an existing schema below required version 6, the installer selects *.sql migration files, checks a contiguous chain, requests operator confirmation, takes a pre-migration backup and invokes the migrations. This branch is executable today. The approved target policy documented in the master audit, by contrast, requires older/newer/structurally incompatible databases to be rejected without upgrade or reseed. Therefore code and target deployment policy differ.
 
@@ -84,7 +84,7 @@ The application intentionally uses custom adaptive geometry and AutoScaleMode.No
 
 ### PMA-06 — Live SQL integration suites are outside standard CI (Medium; COVERAGE GAP)
 
-**Source:** [FMSC_SMS.sln](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/FMSC_SMS.sln#L1-L30) (only the application project); [desktop workflow](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/.github/workflows/fmsc-desktop-ci.yml#L35-L78) (WinForms post-fix contract, portable regression and synthetic checks); [SQL integration test projects](../Tests/MutationSqlChecks/MutationSqlChecks.csproj), [Quick Registration SQL](../Tests/QuickRegistrationSqlChecks/QuickRegistrationSqlChecks.csproj) and [Administration SQL](../Tests/AdministrationSqlChecks/AdministrationSqlChecks.csproj).
+**Source:** [FMSC_SMS.sln](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/FMSC_SMS.sln#L1-L30) (only the application project); [desktop workflow](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/.github/workflows/fmsc-desktop-ci.yml#L35-L78) (WinForms post-fix contract, portable regression and synthetic checks); [SQL integration test projects](../../Tests/MutationSqlChecks/MutationSqlChecks.csproj), [Quick Registration SQL](../../Tests/QuickRegistrationSqlChecks/QuickRegistrationSqlChecks.csproj) and [Administration SQL](../../Tests/AdministrationSqlChecks/AdministrationSqlChecks.csproj).
 
 Current CI does **not** spin up a disposable SQL Server database or run these integration suites. Prior audits record historical disposable SQL work, but that work does not prove every later commit or the owner's detached snapshot.
 
@@ -92,7 +92,7 @@ Current CI does **not** spin up a disposable SQL Server database or run these in
 
 ### PMA-07 — No complete installer artifact is proven for the latest HEAD (Medium; ACCEPTANCE OPEN)
 
-**Source:** [old successful full installer run](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38528371049), [newest main desktop CI](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38562380878), [updated upload-artifact@v7](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/.github/workflows/fmsc-complete-installer.yml#L211-L219), [release checklist](../Docs/RELEASE_CHECKLIST.md).
+**Source:** [old successful full installer run](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38528371049), [newest main desktop CI](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38562380878), [updated upload-artifact@v7](https://github.com/farhan2166-creator/FMSC-Database/blob/4c25103f4930d6cbd23e2c41100f474429d1c7e9/.github/workflows/fmsc-complete-installer.yml#L211-L219), [release checklist](../../Docs/RELEASE_CHECKLIST.md).
 
 The prior verified full ZIP was at **08fa039…**, while the present HEAD is **4c25103…** after workflow action major updates. The latest desktop CI passed the *disposable publish fixture*, which is deliberately **not** a signed-LocalDB-MSI complete installer test and does not upload a distributable ZIP. Therefore no current-sha complete private installer artifact or end-to-end install is proven.
 
@@ -132,7 +132,7 @@ Dependabot proposes **Microsoft.Data.SqlClient 7.0.2 → 7.1.1** and **PDFsharp-
 5. **Run UI-only DPI/responsive pass** as a separate PR and record a small/large/multi-monitor acceptance matrix (PMA-05), without touching business logic.
 6. **Exercise disposable SQL and financial recovery scenarios** (PMA-06) and full physical report/print workflow.
 7. **Trigger and independently verify a fresh full private installer ZIP** at the final accepted SHA (PMA-07); do not upload school database files.
-8. **Review the remaining dependency PR** independently (PMA-08). Promote to GO only after the [release checklist](../Docs/RELEASE_CHECKLIST.md) has actual test evidence and owner approval.
+8. **Review the remaining dependency PR** independently (PMA-08). Promote to GO only after the [release checklist](../../Docs/RELEASE_CHECKLIST.md) has actual test evidence and owner approval.
 
 ## Guardrails / explicit non-findings
 
@@ -149,6 +149,6 @@ Dependabot proposes **Microsoft.Data.SqlClient 7.0.2 → 7.1.1** and **PDFsharp-
 - [Security run at head](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38562380944)
 - [Prior successful complete-installer artifact run](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38528371049)
 - [Merged PR #11](https://github.com/farhan2166-creator/FMSC-Database/pull/11), [merged PR #10](https://github.com/farhan2166-creator/FMSC-Database/pull/10), [pending PR #12](https://github.com/farhan2166-creator/FMSC-Database/pull/12)
-- [Master audit](FMSC_MASTER_AUDIT.md) and [release acceptance checklist](../Docs/RELEASE_CHECKLIST.md)
+- [Master audit](../FMSC_MASTER_AUDIT.md) and [release acceptance checklist](../../Docs/RELEASE_CHECKLIST.md)
 
 **Final audit judgement:** Current source passes automated checks. The code is **not yet independently signed off for production deployment** because installer contract/policy alignment and user-account, database-clone, DPI/printing and current-artifact acceptance are incomplete.

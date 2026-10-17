@@ -2,7 +2,7 @@
 
 **Archived historical record:** References below to DACPAC approval commands and removed utilities document old verification and are not current release instructions. See `Docs/RELEASE_CHECKLIST.md` for current validation.
 
-**Historical verification record.** Applied migrations 2–7 and their upgrade-only test modes were retired on 15 October 2026. The commands below that apply those scripts describe earlier releases. Current SQL suites require a disposable copy of the schema-6 baseline; the deployment migrations folder is currently empty. See the current [installation guide](../Docs/INSTALLATION.md).
+**Historical verification record.** Applied migrations 2–7 and their upgrade-only test modes were retired on 15 October 2026. The commands below that apply those scripts describe earlier releases. Current SQL suites require a disposable copy of the schema-6 baseline; the deployment migrations folder is currently empty. See the current [installation guide](../../Docs/INSTALLATION.md).
 
 The approved policy is whole rupees for fees, discounts and payments. Fractions
 must be rejected without silently rounding a draft or historical record.

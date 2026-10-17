@@ -3,7 +3,7 @@
 **Consolidated:** 14 October 2026  
 **Pre-consolidation source revision:** [`83bb0b6fe2720bb0ada6da7304dbeac4d4d3de34`](https://github.com/farhan2166-creator/FMSC-Database/tree/83bb0b6fe2720bb0ada6da7304dbeac4d4d3de34/Audit)
 
-This archive indexes the **complete original five reports**, including detailed evidence, code-line references, audit IDs, accepted decisions, historical tests, original statuses, and subsequent fix narratives. Original documents are **not rewritten or discarded**: all five remain readable at their immutable Git revision links below, along with their complete version histories. Statuses within them are pinned to the revision they reviewed and may have been superseded. Consult [FMSC_MASTER_AUDIT.md](FMSC_MASTER_AUDIT.md) for present status and release decisions.
+This archive indexes the **complete original five reports**, including detailed evidence, code-line references, audit IDs, accepted decisions, historical tests, original statuses, and subsequent fix narratives. Original documents are **not rewritten or discarded**: all five remain readable at their immutable Git revision links below, along with their complete version histories. Statuses within them are pinned to the revision they reviewed and may have been superseded. Consult [FMSC_MASTER_AUDIT.md](../FMSC_MASTER_AUDIT.md) for present status and release decisions.
 
 ## Preserved source reports (full original content)
 

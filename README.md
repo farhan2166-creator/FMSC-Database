@@ -6,6 +6,8 @@ FMSC_SMS is a Windows desktop school-management application built with **C#**, *
 
 ## Documentation
 
+Browse the [documentation index](Docs/README.md) or the [audit index](Audit/README.md). Workflow notes, design guides and developer reference documents are grouped under `Docs/`; historical reviews and verification records are grouped under `Audit/Reviews` and `Audit/Archive`.
+
 | Audience | Start here |
 |---|---|
 | School operator | [User guide](Docs/USER_GUIDE.md) |
@@ -13,12 +15,11 @@ FMSC_SMS is a Windows desktop school-management application built with **C#**, *
 | Administrator restoring data | [Backups and recovery](Docs/BACKUP_RECOVERY.md) |
 | Developer / Codex | [Architecture](Docs/ARCHITECTURE.md) and [development / PR workflow](Docs/DEVELOPMENT_WORKFLOW.md) |
 | Release owner | [Release acceptance checklist](Docs/RELEASE_CHECKLIST.md) |
-| Owner refreshing the DACPAC | [Automated verification and approval alignment](Docs/DACPAC_REFRESH.md) |
 | Communication administrator | [Communication Center setup, consent and live-delivery prerequisites](Docs/COMMUNICATION_CENTER.md) |
 | Everyone tracking changes | [Changelog](CHANGELOG.md) |
-| Audit findings | [Current master audit](Audit/FMSC_MASTER_AUDIT.md) and [historical evidence](Audit/FMSC_HISTORICAL_AUDITS.md) |
+| Audit findings | [Current master audit](Audit/FMSC_MASTER_AUDIT.md) and [historical evidence](Audit/Archive/FMSC_HISTORICAL_AUDITS.md) |
 
-For detailed screen naming, see [project structure](PROJECT_STRUCTURE.md). [Admission workflow decisions](ADMISSION_WORKFLOW.md) contain historical process context and should be read with the current code and schema-version notes.
+For detailed screen naming, see [project structure](Docs/Development/PROJECT_STRUCTURE.md). [Admission workflow decisions](Docs/Workflows/ADMISSION_WORKFLOW.md) contain historical process context and should be read with the current code and schema-version notes.
 
 ## Technical overview
 
@@ -43,17 +44,17 @@ The Windows CI additionally builds and runs focused WinForms page/host tests and
 
 ## Private GitHub Actions
 
-- [Desktop CI](.github/workflows/fmsc-desktop-ci.yml): push/PR checks for `main`.
+- [Desktop CI](.github/workflows/fmsc-desktop-ci.yml): manually started checks.
 - [Windows application-only ZIP](.github/workflows/fmsc-windows-download.yml): manual application bundle; **not** a complete installer.
 - [Complete Windows installer ZIP](.github/workflows/fmsc-complete-installer.yml): manual private package with installer scripts, migrations, and prerequisites; the owner adds the detached MDF/LDF **after download** for a fresh install.
 
-Run status, download availability and retention are shown in the [Actions tab](../../actions). No GitHub workflow installs onto a school PC or publishes a public release.
+Run status, download availability and retention are shown in the [Actions tab](https://github.com/farhan2166-creator/FMSC-Database/actions). No GitHub workflow installs onto a school PC or publishes a public release.
 
 ## Dependency updates and secret checks
 
 [Routine Dependabot version updates](.github/dependabot.yml) are paused for NuGet and GitHub Actions (`open-pull-requests-limit: 0`). Existing PRs remain available for review. Security-alert settings, security-update PRs (if enabled) and secret scanning are unchanged. To resume weekly Monday updates with grouped minor/patch proposals, restore both limits to `3`. Updates require human review and passing Windows CI; there is no automatic merge.
 
-[Security Checks](.github/workflows/fmsc-security.yml) runs on pull requests and pushes to `main`. It uses the free, MIT-licensed Gitleaks CLI to scan fetched history and staged changes, and blocks database snapshots/backups, private key containers and sensitive configuration file names. Failure output identifies files/rules without printing credential values or uploading scanner reports. No paid security service or additional token is required; ordinary private-repository Actions usage limits apply.
+[Security Checks](.github/workflows/fmsc-security.yml) runs only when started manually. It uses the free, MIT-licensed Gitleaks CLI to scan fetched history and staged changes, and blocks database snapshots/backups, private key containers and sensitive configuration file names. Failure output identifies files/rules without printing credential values or uploading scanner reports. No paid security service or additional token is required; ordinary private-repository Actions usage limits apply.
 
 For handling failures, local commands, narrow fixture exceptions and reviewing update PRs, see [development workflow](Docs/DEVELOPMENT_WORKFLOW.md#security-checks). Dependabot configuration changes take effect after merging into `main`.
 

@@ -18,7 +18,7 @@ The application cross-builds for Windows with zero warnings and errors. All elev
 - Check grid amounts, dates, admission numbers, names, selection, sorting and keyboard navigation in reports, admissions, fee collection and setup.
 - Run each finance report with a location, reopen it, confirm the reminder, clear filters, then reopen again. Check that unsuccessful reports and filter changes during loading do not save a new location. Review saved filters under a restricted user and after a lookup is removed. Restore an existing workspace tab and confirm its own selections take priority over the last-completed-report preference.
 - On a test database, verify report success, empty results, failure and retry. A failed refresh should not leave a previous result available to print or page.
-- Review report and posting screens at laptop sizes and increased display scaling using UI_TUNING_GUIDE.md.
+- Review report and posting screens at laptop sizes and increased display scaling using the [UI tuning guide](../../Docs/Design/UI_TUNING_GUIDE.md).
 - On a test database, review posting confirmation, selected students and net total. Verify full and partial outcomes, filter changes during refresh, and a refresh failure after a confirmed write. The last confirmed outcome should remain visible, with refresh failures still reported.
 - Review generic reports and the existing receipt, reminder, class-sheet and class-summary previews, including multi-page results and a sample print/export.
 
