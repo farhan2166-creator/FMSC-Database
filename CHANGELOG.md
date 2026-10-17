@@ -5,6 +5,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 ## [Unreleased]
 
 ### Added
+
+- Add outstanding student/family bills and a Family / Returns shortcut to Fee Collection. Family cards show placement/year and billing readiness; each return uses the existing guarded confirmation dialog. Quick Registration warns when linked returning siblings still lack new-year charges.
 - Level 3 cloud reliability checks for guarded SQL faults, backup/restore, concurrency and measured fictional workloads, plus Windows component/update acceptance and a complete 45-scenario evidence/local-requirement matrix.
 
 

@@ -28,6 +28,7 @@
     <Compile Include="../../Core/QuickRegistrationRecoveryJournal.cs" Link="QuickRegistrationRecoveryJournal.cs" />
     <Compile Include="../../Core/QuickRegistrationView.cs" Link="QuickRegistrationView.cs" />
     <Compile Include="../../Core/AdmissionBillReport.Data.cs" Link="AdmissionBillReport.Data.cs" />
+    <Compile Include="../../Core/FamilyBillingData.cs" Link="FamilyBillingData.cs" />
     <Compile Include="../../Core/ReceiptReportData.cs" Link="ReceiptReportData.cs" />
     <Compile Include="../../Core/StudentPhotoDraft.cs" Link="StudentPhotoDraft.cs" />
     <Compile Include="../../Core/AdmissionSaveConfirmation.cs" Link="AdmissionSaveConfirmation.cs" />

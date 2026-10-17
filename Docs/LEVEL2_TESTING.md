@@ -1,5 +1,8 @@
 # Level 2: interactive Windows operator testing
 
+The existing provisioner also supports `pwsh -NoProfile -File Tools/Run-Level2.ps1 -FamilyCounterOnly`.
+This separate scoped mode uses the same absent unique LocalDB instance/catalog, owned private files, record-free fixture verification and cleanup. It runs `ThemeSmokeChecks --family-counter-sql` against fictional production admissions, promotion, a linked pending child and one explicit return. It tests actual outstanding-bill reads, selection/membership refusals and preserved charges/payments. It does **not** drive operator UI, confirm physical printing or claim a passing Level 2 acceptance matrix. `family-counter-results.json` and `environment.json` record its limited scope and cleanup. Normal app binaries refuse this SQL mode before the first connection.
+
 Level 2 launches the real FMSC_SMS WinForms application as a separate process and
 uses FlaUI/UI Automation, mouse input and keyboard input on an unlocked Windows
 desktop. It never calls form event handlers or seeds a student/payment/promotion

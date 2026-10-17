@@ -1,5 +1,6 @@
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Students.Dialogs;
+using FMSC_SMS.Pages.Students.Enrollment;
 namespace FMSC_SMS.Pages.Students.Profile;
 public sealed class StudentFamilyPage : V2Page, IBusyPage
 {
@@ -35,12 +36,23 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
     private string currentHeadFatherName = string.Empty;
     private FamilyMemberCard? selectedCard;
     private int _familyLoadVersion;
+    private readonly Func<int, Task<DataTable>> readMembers;
+    private readonly Func<int, Task<bool>> confirmReturn;
+    private ModernButton? confirmReturnButton;
     public StudentFamilyPage() : this(0) { }
     public StudentFamilyPage(int preloadAdmissionId) : this(preloadAdmissionId,true) { }
-    internal StudentFamilyPage(int preloadAdmissionId,bool initialize) : base(
+    internal StudentFamilyPage(int preloadAdmissionId,bool initialize)
+        : this(preloadAdmissionId, initialize, FamilyBillPreview.ReadMembersAsync, null) { }
+    internal StudentFamilyPage(int preloadAdmissionId,bool initialize,Func<int,Task<DataTable>> readMembers,
+        Func<int,Task<bool>>? confirmReturn) : base(
         "Family / Siblings",
         "Manage families and siblings. Create families in Student Admissions > Fees & Siblings.")
     {
+        this.readMembers=readMembers;
+        this.confirmReturn=confirmReturn ?? (id=>{
+            using var dialog=new ConfirmReturnAdmissionDialog(id);
+            return Task.FromResult(dialog.ShowDialog(FindForm())==DialogResult.OK);
+        });
         var refresh = AddBusyAction(UiText.Actions.Refresh, async () => {
             if (student.SelectedId <= 0) { Warn(UiText.Prompts.SelectStudent); return; }
             await LoadFamilyForSelectedStudentAsync();
@@ -52,17 +64,19 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
     /* Students.Family permits viewing; add/remove require Students.Administer in both C# and SQL. */
         GateAction(addMember, "Students.Administer");
         GateAction(removeMember, "Students.Administer");
+        confirmReturnButton=AddAction("Confirm Selected Return",async(_,_)=>await RunFamilyActionAsync(ConfirmSelectedReturnAsync),"Primary");
+        GateAction(confirmReturnButton,"Students.Administer");
         /* Actions target the currently displayed family and selected card. */
         _addMemberButton = addMember;
         _removeMemberButton = removeMember;
         SetFamilyActionsEnabled(false);
-        RelocateFromActions(refresh, addMember, removeMember);
+        RelocateFromActions(refresh, addMember, removeMember, confirmReturnButton);
         student.UserSelectionChanged += async (_, _) => await LoadFamilyForSelectedStudentAsync();
         student.SelectionCleared += (_, _) => ClearMembersView();
         student.RowFilter = row => familyAdmissionIds.Contains(GetInt(row, "AdmissionId"));
         student.SearchFailed += ex => Fail(ex);
         if(initialize)StudentSearchCache.Warm();
-        Load += async (_, _) => await LoadStudentsAsync(
+        if(initialize)Load += async (_, _) => await LoadStudentsAsync(
             preserveAdmissionId: preloadAdmissionId > 0 ? preloadAdmissionId : null,
             initialSelection: preloadAdmissionId > 0);
         var details = HumanUi.Card("Family / Siblings", "Pick a student who already has a family to view or manage it below.");
@@ -74,7 +88,7 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         fields.Controls.Add(HumanUi.Field("Student", student, true), 0, 0);
         details.Content.Controls.Add(fields);
-        var buttonRow = HumanUi.ButtonRow(refresh, addMember, removeMember);
+        var buttonRow = HumanUi.ButtonRow(refresh, addMember, removeMember, confirmReturnButton);
         buttonRow.Dock = DockStyle.Bottom;
         details.Content.Controls.Add(buttonRow);
         headHost.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
@@ -176,14 +190,14 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
         CurrentUser.HasPermission("Students.Administer");
     private bool familyActionBusy;
     public bool IsBusy=>familyActionBusy;
-    public string BusyMessage=>"The family link is being updated. Wait for the result and refreshed family before leaving.";
+    public string BusyMessage=>"A family link or return is being processed. Wait for the result and refreshed family before leaving.";
     private async Task RunFamilyActionAsync(Func<Task> action)
     {
         if (familyActionBusy) return;
         familyActionBusy = true;
         try
         {
-            using var busy = BeginBusy("Updating family…", _addMemberButton, _removeMemberButton, student);
+            using var busy = BeginBusy("Processing family…", _addMemberButton, _removeMemberButton, confirmReturnButton, student);
             await action();
         }
         finally
@@ -194,6 +208,9 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
     }
     private void SetFamilyActionsEnabled(bool enabled)
     {
+        if(confirmReturnButton is not null)
+            confirmReturnButton.Enabled=enabled && !familyActionBusy && selectedCard?.AwaitsReturn==true
+                && CurrentUser.HasPermission("Students.Administer");
         if (!_canChangeFamily)
             return;
         if (_addMemberButton is not null &&
@@ -222,16 +239,14 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
             ClearMembersView();
             version = _familyLoadVersion;
             SetStatus("Loading family members...");
-            var familyLookup = await DatabaseHelper.QueryUserAsync(
-                "GetStudentFamily",
-                DatabaseHelper.Int("@AdmissionId", admissionId));
+            var familyLookup = await readMembers(admissionId);
             /* The captured student must still be the selected one: this load runs while the picker stays live. */
             if (IsDisposed || version != _familyLoadVersion ||
                 student.SelectedId != admissionId)
             {
                 return;
             }
-            if (familyLookup.Rows.Count == 0 || !familyLookup.Columns.Contains("FamilyId"))
+            if (familyLookup.Rows.Count == 0 || !familyLookup.Columns.Contains("FamilyId") || familyLookup.Rows[0].IsNull("FamilyId"))
             {
                 ClearMembersView();
                 SetStatus("This student does not currently belong to a family.", true);
@@ -247,7 +262,8 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
             RenderMembers(members);
             /* Restore actions only after a current load succeeds. */
             SetFamilyActionsEnabled(currentMemberAdmissionIds.Count > 0);
-            SetStatus($"{members.Rows.Count} member(s) loaded.");
+            int waiting=members.AsEnumerable().Count(FamilyBillingData.AwaitsReturn);
+            SetStatus($"{members.Rows.Count} member(s) loaded. {waiting} awaiting return. Select a child to review their readiness.");
         }
         catch (Exception ex)
         {
@@ -302,12 +318,13 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
             familyMemberId: GetInt(row, "FamilyMemberId"),
             admissionId: GetInt(row, "AdmissionId"),
             studentName: GetText(row, "StudentName"),
-            classSection: BuildClassSection(row),
-            registrationNumber: GetText(row, "RegistrationNumber"),
-            statusText: GetText(row, "Status"),
+            classSection: BuildClassSection(row)+(GetText(row,"AcademicYear").Length>0?" · "+GetText(row,"AcademicYear"):""),
+            studentReference: GetText(row,"AdmissionNumber").Length>0?GetText(row,"AdmissionNumber"):GetText(row,"QuickReference"),
+            statusText: FamilyBillingData.Readiness(row),
             relationshipLabel: label,
             relationshipColor: color,
-            isHead: isHead);
+            isHead: isHead,
+            awaitsReturn: FamilyBillingData.AwaitsReturn(row));
         card.CardSelected += (_, _) => SelectCard(card);
         return card;
     }
@@ -317,7 +334,28 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
         selectedCard = card;
         card.SetSelected(true);
         SetFamilyActionsEnabled(currentMemberAdmissionIds.Count > 0);
-        SetStatus($"Selected {card.StudentName}. Use Remove Selected Member to remove them from this family.");
+        SetStatus($"Selected {card.StudentName}. "+(card.AwaitsReturn
+            ? "Review and confirm this child's return before printing new-year fees."
+            : "Review the child's billing readiness above. Family changes retain their fees and payments."));
+    }
+    private async Task ConfirmSelectedReturnAsync()
+    {
+        if(selectedCard is not { AwaitsReturn:true } card || !CurrentUser.HasPermission("Students.Administer"))return;
+        int anchor=student.SelectedId, version=_familyLoadVersion;
+        try
+        {
+            bool confirmed=await confirmReturn(card.AdmissionId);
+            if(IsDisposed || anchor!=student.SelectedId || version!=_familyLoadVersion)return;
+            await LoadFamilyForSelectedStudentAsync();
+            if(IsDisposed || anchor!=student.SelectedId || _familyLoadVersion!=version+1)return;
+            var next=headHost.Controls.OfType<FamilyMemberCard>().Concat(membersFlow.Controls.OfType<FamilyMemberCard>())
+                .FirstOrDefault(member=>member.AwaitsReturn);
+            if(next is not null)SelectCard(next);
+            SetStatus(confirmed ? "Return confirmed for "+card.StudentName+". "+
+                (next is null?"Review the family bill in Fee Collection.":"Next: "+next.StudentName+". Review and confirm separately.")
+                : "Return was not confirmed. Family readiness has been refreshed.");
+        }
+        catch(Exception ex){if(!IsDisposed)Fail(ex);}
     }
     private static string BuildClassSection(DataRow row)
     {
@@ -417,21 +455,23 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
         public int FamilyMemberId { get; }
         public int AdmissionId { get; }
         public string StudentName { get; }
+        public bool AwaitsReturn { get; }
         public event EventHandler? CardSelected;
         public FamilyMemberCard(
             int familyMemberId,
             int admissionId,
             string studentName,
             string classSection,
-            string registrationNumber,
+            string studentReference,
             string statusText,
             string relationshipLabel,
             Color relationshipColor,
-            bool isHead)
+            bool isHead, bool awaitsReturn)
         {
             FamilyMemberId = familyMemberId;
             AdmissionId = admissionId;
             StudentName = studentName;
+            AwaitsReturn=awaitsReturn;
             Width = AppScale.Scale(220);
             Height = AppScale.Scale(134);
             Margin = new Padding(UiDesignSystem.Spacing.Sm);
@@ -472,7 +512,7 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
             /* Lead with Admission Number and status; omit registration from the card. */
             var identityParts = new List<string>();
             if (admissionId > 0)
-                identityParts.Add($"Admission {AdmissionNumbers.ForId(admissionId)}");
+                identityParts.Add(studentReference.Length>0?studentReference:$"Student {admissionId}");
             if (!string.IsNullOrWhiteSpace(statusText))
                 identityParts.Add(statusText);
             string registrationLine = string.Join(" · ", identityParts);
@@ -496,6 +536,9 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
             layout.Controls.Add(classLabel, 0, 1);
             layout.Controls.Add(registrationLabel, 0, 2);
             layout.Controls.Add(badge, 0, 3);
+            AccessibleName=studentName+" · "+classSection+" · "+registrationLine;
+            registrationLabel.AccessibleName=registrationLine;
+            classLabel.AccessibleName=classSection;
             Controls.Add(layout);
             void RaiseSelected(object? sender, EventArgs e) =>
                 CardSelected?.Invoke(this, EventArgs.Empty);

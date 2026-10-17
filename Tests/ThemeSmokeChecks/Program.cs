@@ -34,6 +34,20 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--family-counter-sql"))
+        {
+            var task=CheckFamilyCounterSqlAsync();
+            PumpUntil(()=>task.IsCompleted,"Owned family-counter SQL scenarios complete",TimeSpan.FromSeconds(90));
+            task.GetAwaiter().GetResult();
+            Console.WriteLine($"PASS: {checks} owned family-counter SQL assertions.");
+            return;
+        }
+        if(args.Contains("--family-counter"))
+        {
+            CheckFamilyCounter();
+            Console.WriteLine($"PASS: {checks} family counter workflow checks.");
+            return;
+        }
         if(args.Contains("--help-center-interactive"))
         {
             ShowHelpCenterAcceptance();
@@ -96,6 +110,7 @@ internal static partial class Program
             CheckMeaningfulCertificateContent();
             CheckSelectiveWorkspaceGuards();
             CheckSetupReadinessActions();
+            CheckFamilyCounter();
             CheckLifecycleCloseGuard();
             CheckCertificateSubmissionGuard();
             CheckQuickRegistrationTabGuard();
@@ -243,10 +258,10 @@ internal static partial class Program
         finally { AppTheme.SetTheme(originalTheme); }
     }
 
-    private static void PumpUntil(Func<bool> completed, string message)
+    private static void PumpUntil(Func<bool> completed, string message, TimeSpan? timeout=null)
     {
         var deadline = System.Diagnostics.Stopwatch.StartNew();
-        while (!completed() && deadline.Elapsed < TimeSpan.FromSeconds(5))
+        while (!completed() && deadline.Elapsed < (timeout ?? TimeSpan.FromSeconds(5)))
         { Application.DoEvents(); Thread.Yield(); }
         Check(completed(), message);
     }

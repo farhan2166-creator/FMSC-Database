@@ -5,8 +5,9 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Collection;
 public sealed class FeeCollectionPage : V2Page, IBusyPage
 {
-    public bool IsBusy => transactionBusy;
-    public string BusyMessage => "Please wait for the fee collection to finish recording.";
+    public bool IsBusy => transactionBusy || billBusy;
+    public string BusyMessage => billBusy ? "Finish the family bill or return workflow before leaving." : "Please wait for the fee collection to finish recording.";
+    private bool billBusy;
     private readonly StudentPicker student = new();
     private readonly LookupBox enrollment = new();
     private readonly DataGridView charges =
@@ -176,11 +177,14 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             e.Handled = true;
         };
     }
-    public FeeCollectionPage()
+    private readonly bool initialize;
+    public FeeCollectionPage() : this(true) { }
+    internal FeeCollectionPage(bool initialize)
         : base(
             "Fee Collection",
             "Record student and family fee payments.")
     {
+        this.initialize=initialize;
         BuildStudentSearch();
     }
     public FeeCollectionPage(int preloadAdmissionId)
@@ -283,12 +287,26 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         studentFeesMenu.Items.Add(new ToolStripSeparator());
         studentFeesMenu.Items.Add("Account Statement", null, (_, _) => historyButton?.PerformClick());
         studentFeesMenu.Items.Add("Payment History", null, (_, _) => paymentHistoryButton?.PerformClick());
+        studentFeesMenu.Items.Add(new ToolStripSeparator());
+        var printBillItem=new ToolStripMenuItem("Print Outstanding Bill") {
+            ToolTipText="Selected child and ticked siblings: all posted unpaid charges, including older years. This is not a payment receipt."
+        };
+        printBillItem.Click+=async(_,_)=>await PrintSelectedFamilyBillAsync();
+        studentFeesMenu.Items.Add(printBillItem);
+        var familyReturnsItem=new ToolStripMenuItem("Family / Returns");
+        familyReturnsItem.Click+=async(_,_)=>await OpenFamilyReturnsAsync();
+        studentFeesMenu.Items.Add(familyReturnsItem);
         studentFeesMenu.Opening += (_, _) => {
             if (studentFeesMenu.Items.Count < 5) return;
             studentFeesMenu.Items[0].Enabled = addChargeButton?.Enabled == true;
             studentFeesMenu.Items[1].Enabled = futureFeesButton?.Enabled == true;
             studentFeesMenu.Items[3].Enabled = historyButton?.Enabled == true;
             studentFeesMenu.Items[4].Enabled = paymentHistoryButton?.Enabled == true;
+            printBillItem.Available=CurrentUser.HasPermission("Fees.View");
+            printBillItem.Enabled=admissionId>0 && !IsBusy && !siblingBusy && CurrentUser.HasPermission("Fees.View");
+            familyReturnsItem.Available=CurrentUser.HasPermission("Students.Family");
+            familyReturnsItem.Enabled=admissionId>0 && !IsBusy && !siblingBusy && CurrentUser.HasPermission("Students.Family") && CurrentUser.HasPermission("Students.View");
+            familyReturnsItem.ToolTipText="Review family readiness and individual returns. Requires family and student-view access.";
         };
         studentFeesMenuButton.Click += (_, _) =>
             studentFeesMenu.Show(studentFeesMenuButton, new Point(0, studentFeesMenuButton.Height));
@@ -308,7 +326,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             paymentHistoryButton,
             clear);
         /* Start reading the student list now so the first keystroke filters at once. */
-        StudentSearchCache.Warm();
+        if(initialize)StudentSearchCache.Warm();
         /* Clear the previous student's data without changing the search text. */
         student.SelectionCleared += (_, _) => {
             if (suppressStudentEvents ||
@@ -3809,6 +3827,65 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         }
         if(payingFor.TryGetValue(id,out var info) && !string.IsNullOrWhiteSpace(info.Name)) return info.Name;
         return $"Admission {AdmissionNumbers.ForId(id)}";
+    }
+    private int[] SelectedBillStudents() => new[] { admissionId }.Concat(siblings.CheckedIndices.Cast<int>()
+        .Select(SiblingAdmissionIdAt)).Distinct().OrderBy(id=>id).ToArray();
+
+    private static bool HasEnteredAmount(string text) => !string.IsNullOrWhiteSpace(text)
+        && (!decimal.TryParse(text,out var amount) || amount!=0m);
+
+    private bool HasDraftBillDiscounts() => HasEnteredAmount(discountAmount.Text)
+        || charges.Rows.Cast<DataGridViewRow>().Where(row=>!row.IsNewRow).Any(row=>
+            GetDecimal(row.Cells["AppliedDiscount"].Value)!=GetDecimal(row.Cells["GrossAmount"].Tag));
+
+    private async Task OpenFamilyReturnsAsync()
+    {
+        if(IsBusy || siblingBusy || admissionId<=0 || !CurrentUser.HasPermission("Students.Family") || !CurrentUser.HasPermission("Students.View"))return;
+        if(!charges.EndEdit())return;
+        if(HasDraftBillDiscounts() || !string.IsNullOrWhiteSpace(reference.Text) || !string.IsNullOrWhiteSpace(remarks.Text)
+            || HasEnteredAmount(paymentAmount.Text))
+        {
+            Warn("Finish or clear the current payment draft before managing family returns. Your entered payment has been retained.");
+            return;
+        }
+        int anchor=admissionId;
+        billBusy=true;
+        try
+        {
+            using var busy=BeginBusy("Reviewing family returns…",this);
+            using(var dialog=new ApplicationWindowForm{Text="Family / Returns",StartPosition=FormStartPosition.CenterParent,
+                Size=new Size(AppScale.Scale(1150),AppScale.Scale(740)),ShowInTaskbar=false})
+            {
+                var family=new FMSC_SMS.Pages.Students.Profile.StudentFamilyPage(anchor){Dock=DockStyle.Fill};
+                dialog.Controls.Add(family);ModalPageCloseGuard.Attach(dialog,family);
+                dialog.ShowDialog(FindForm());
+            }
+            if(!IsDisposed && admissionId==anchor)await LoadStudentByAdmissionId(anchor);
+        }
+        catch(Exception ex){if(!IsDisposed)Fail(ex);}
+        finally{billBusy=false;}
+    }
+
+    private async Task PrintSelectedFamilyBillAsync()
+    {
+        if(IsBusy || siblingBusy || admissionId<=0 || !CurrentUser.HasPermission("Fees.View"))return;
+        if(!charges.EndEdit())return;
+        if(HasDraftBillDiscounts())
+        {
+            Warn("The bill uses saved charges. Review the unsaved discount changes before printing; they have not been included.");
+            return;
+        }
+        int anchor=admissionId, placement=enrollmentId, version=loadVersion;
+        int[] selected=SelectedBillStudents();
+        billBusy=true;
+        try
+        {
+            using var busy=BeginBusy("Preparing outstanding bill…",this);
+            await FamilyBillPreview.ShowAsync(FindForm(),anchor,selected,()=>!IsDisposed && admissionId==anchor
+                && enrollmentId==placement && loadVersion==version && selected.SequenceEqual(SelectedBillStudents()));
+        }
+        catch(Exception ex){if(!IsDisposed)Fail(ex);}
+        finally{billBusy=false;}
     }
     private static string FormatDueDate(
         object value)

@@ -633,17 +633,8 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         if(IsBusy||recoveryBlocked||needsRefresh||savedStudent<=0||!CurrentUser.HasPermission("Fees.View")||!fees.EndEdit()||HasPendingChanges)return;
         busy=true;UpdateActions();
         try{
-            var data=await Task.Run(()=>DatabaseHelper.QuerySql("""
-                EXEC dbo.RequirePermission @UserId,N'Fees.View';
-                DECLARE @Family int=(SELECT FamilyId FROM dbo.FamilyMembers WHERE AdmissionId=@Admission);
-                SELECT COALESCE(S.AdmissionNumber,S.QuickReference) Reference,S.StudentName,F.FeeTypeName,F.DisplayOrder FeeDisplayOrder,B.BillingMonth,B.DiscountAmount,dbo.GetFeeChargeBalance(B.BillingChargeId) Due
-                FROM dbo.Students S JOIN dbo.BillingCharges B ON B.AdmissionId=S.AdmissionId JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
-                WHERE (S.AdmissionId=@Admission OR S.AdmissionId IN(SELECT AdmissionId FROM dbo.FamilyMembers WHERE FamilyId=@Family))
-                AND B.Status<>N'Cancelled' AND dbo.GetFeeChargeBalance(B.BillingChargeId)>0 ORDER BY S.AdmissionId,B.BillingMonth,F.DisplayOrder,F.FeeTypeName,B.BillingChargeId;
-                """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Admission",savedStudent)));
-            if(data.Rows.Count==0){Warn("There are no outstanding charges to print.");return;}
-            var institution=await InstitutionProfile.GetPrintIdentityAsync();
-            AdmissionBillReport.ShowFamily(FindForm(),institution,parent.Text.Trim(),data);
+            int id=savedStudent, version=registrationLoadVersion;
+            await FamilyBillPreview.ShowAsync(FindForm(),id,isCurrent:()=>!IsDisposed && savedStudent==id && registrationLoadVersion==version && !needsRefresh && !recoveryBlocked && !HasPendingChanges);
         }catch(Exception ex){Fail(ex);}
         finally{busy=false;if(!IsDisposed)UpdateActions();}
     }

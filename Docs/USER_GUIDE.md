@@ -23,6 +23,14 @@ Result messages stay within two font-scaled lines so feedback cannot displace th
 
 Confirmation dialogs show the question first, then important consequences and the details to review. Yes/No buttons are centered. Family payments and matching student records use read-only tables; scroll through long details before confirming. The payment counter keeps its approved Yes default, while restore and duplicate-student confirmations default to No. Enter uses the selected default; Escape declines a Yes/No question.
 
+## Family counter: returning students and new siblings
+
+In **Fee Collection**, find any child and open **Student Fees → Family / Returns**. The existing Family / Siblings window shows each child's year, placement and readiness. Select an **Awaiting Return** child and choose **Confirm Selected Return**. Review that child's date, transport and opening fees in the existing dialog. After confirmation, readiness refreshes and the next waiting child is selected; they are not confirmed automatically. Pending new registrations use their own registration review, not return confirmation.
+
+Close the family window to reload the selected student's placement and fees. Tick the siblings to include, then use **Student Fees → Print Outstanding Bill**. The bill includes all posted unpaid charges for those children, including older periods. It is separate from **Print Receipt**, which follows a saved payment. Finish or clear an entered payment draft before opening Family / Returns; unsaved discount changes must be reviewed before printing a saved-charge bill.
+
+For a new sibling, continue using **Quick Registration → Link Existing Parent**. Saving that child does not confirm the other children's return. Printing warns if selected family members still await return or placement review. You can decline and finish the return reviews first, or explicitly print only charges already posted. A zero balance or missing bill line does not prove a child has completed return admission.
+
 ## Entry and search actions
 
 On shared record-entry pages, **New Record** clears entry fields and starts a new record. It deliberately discards unsaved entry edits. **Clear Search** resets the list search without clearing the entry. Ctrl+N keeps its existing New Record behavior.

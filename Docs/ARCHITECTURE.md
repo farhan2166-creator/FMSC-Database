@@ -47,6 +47,8 @@ Portable sizing checks and Windows native-control fixtures cover synthetic clien
 
 ## Data correctness and safety contracts
 
+- Family bills reuse `AdmissionBillReport` through the read-only `FamilyBillPreview` coordinator. Canonical membership is rechecked in SQL before printing; whole-family reads also refuse newly added members missing from their snapshot. Readiness is derived from actual student/enrollment state, separately from outstanding charges. `StudentFamilyPage` opens the existing guarded return dialog one child at a time. No bill print confirms a return, creates charges or records a payment.
+
 - **Use SQL-side transaction and permission enforcement** for financial/state-changing work. A button disabled in WinForms is not a substitute for server authorization.
 - **Unknown commit acknowledgment is not a failed transaction.** Several admission, fee and certificate flows use request IDs/reconciliation; preserve original IDs and payload identity when retrying, and explicitly expose unresolved outcomes.
 - Preserve whole-rupee validation, paid-charge protections, historical student placement, backup recovery identity and owner-approved business rules. See [master audit](../Audit/FMSC_MASTER_AUDIT.md).

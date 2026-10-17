@@ -22,6 +22,27 @@ internal static class RegistrationBillChecks
         Check(family.AsEnumerable().All(r=>r.Field<string>("DocumentTitle")=="FAMILY PAYMENT BILL"&&r.Field<string>("StudentName")=="Parent"),"Several child references use the family title and parent heading");
         Check(family.AsEnumerable().Count(r=>r.Field<string>("FamilyRowKind")=="Student")==2,"Same-name children keep separate reference-based headings");
         Check(family.AsEnumerable().Where(r=>r.Field<string>("FamilyRowKind")=="Fee").Sum(r=>r.Field<decimal>("Amount"))==2100m&&charges.Rows.Count==3,"Family bill retains every charge and leaves its source unchanged");
+        using var members=new DataTable();
+        members.Columns.Add("AdmissionId",typeof(int));members.Columns.Add("StudentName");members.Columns.Add("Status");
+        members.Columns.Add("EnrollmentStatus");members.Columns.Add("BillingReady",typeof(bool));members.Columns.Add("PlacementConfirmedAt",typeof(DateTime));
+        members.Rows.Add(41,"Same Name","Active","Active",false,new DateTime(2026,4,1));
+        members.Rows.Add(42,"Same Name","Active","Active",true,new DateTime(2026,4,1));
+        members.Rows.Add(43,"New Child","Pending","Active",false,DBNull.Value);
+        Check(FamilyBillingData.Readiness(members.Rows[0])=="Awaiting Return","An unready confirmed promoted placement requires an explicit return");
+        Check(FamilyBillingData.Readiness(members.Rows[1])=="Ready for Billing","Confirmed return readiness is shown independently of outstanding balance");
+        Check(FamilyBillingData.Readiness(members.Rows[2])=="Pending Registration","A linked new child does not become a returning/admitted student");
+        Check(FamilyBillingData.SelectMembers(members,null).SequenceEqual(new[]{41,42,43}),"Registration bill includes the whole actual family");
+        Check(FamilyBillingData.SelectMembers(members,new[]{42,43,42}).SequenceEqual(new[]{42,43}),"Counter bill honors selected distinct children");
+        Check(FamilyBillingData.IncompleteNotice(members,new[]{42,43})=="","Unchecked returning children do not change selected billing scope");
+        Check(FamilyBillingData.IncompleteNotice(members,new[]{41,43}).Contains("Awaiting Return")&&FamilyBillingData.IncompleteNotice(members,new[]{41}).Contains("older dues"),"Mixed family billing warns about missing new-year charges and includes older posted dues explicitly");
+        foreach(var ids in new[]{Array.Empty<int>(),new[]{0},new[]{99},new[]{41,99}}){
+            bool refused=false;try{FamilyBillingData.SelectMembers(members,ids);}catch(InvalidOperationException){refused=true;}
+            Check(refused,"Empty, invalid, stale or unrelated family selection is refused");
+        }
+        members.Rows[0]["PlacementConfirmedAt"]=DBNull.Value;
+        Check(!FamilyBillingData.AwaitsReturn(members.Rows[0])&&FamilyBillingData.Readiness(members.Rows[0])=="Review Placement","Unconfirmed/legacy placement cannot be passed off as promoted return");
+        members.Rows[1]["Status"]="Left";
+        Check(FamilyBillingData.Readiness(members.Rows[1])=="Left"&&!FamilyBillingData.AwaitsReturn(members.Rows[1]),"A departed child is not automatically returned");
         return checks;
     }
 }

@@ -4,7 +4,8 @@ param(
     [string]$PythonPath,
     [switch]$PreflightOnly,
     [switch]$StartupOnly,
-    [switch]$AdmissionsOnly
+    [switch]$AdmissionsOnly,
+    [switch]$FamilyCounterOnly
 )
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
@@ -84,7 +85,7 @@ function BlockedReport([string]$Reason) {
     $summary | Set-Content -LiteralPath (Join-Path $script:evidence 'summary.md') -Encoding utf8
 }
 try {
-    if([int][bool]$PreflightOnly+[int][bool]$StartupOnly+[int][bool]$AdmissionsOnly -gt 1) {throw 'Choose only one scoped mode.'}
+    if([int][bool]$PreflightOnly+[int][bool]$StartupOnly+[int][bool]$AdmissionsOnly+[int][bool]$FamilyCounterOnly -gt 1) {throw 'Choose only one scoped mode.'}
     if(-not $IsWindows -and $PSVersionTable.PSEdition -ne 'Desktop') {throw 'Windows is required.'}
     $desktopGate=[Threading.Mutex]::new($false,'Local\FMSC_SMS.Level2Desktop')
     try {$ownsDesktopGate=$desktopGate.WaitOne(0)}
@@ -125,6 +126,10 @@ try {
         & dotnet build (Join-Path $repo "Tests/$project/$project.csproj") -c Release -o (Join-Path $run $project) -v quiet
         Native "$project build"
     }
+    if($FamilyCounterOnly) {
+        & dotnet build (Join-Path $repo 'Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj') -c Release '-p:FmscLevel2=true' -o (Join-Path $run 'FamilyCounterChecks') -v quiet
+        Native 'Family counter native/SQL harness build'
+    }
     & dotnet (Join-Path $appOutput 'FMSC_SMS.dll') '--verify-level2-guards'
     Native 'Operational target rejection regressions'
     $env:FMSC_LEVEL2_PROBE_BINARY=Join-Path $appOutput 'FMSC_SMS.dll'
@@ -163,9 +168,18 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
     & dotnet (Join-Path $run 'Level2Fixture/Level2Fixture.dll')
     Native 'Reference fixture'
     VerifyTarget
-    Stage 'Interactive operator workflows'
-    & dotnet (Join-Path $run 'Level2UiChecks/Level2UiChecks.dll') (Join-Path $appOutput 'FMSC_SMS.exe') $evidence
-    $exitCode=$LASTEXITCODE
+    if($FamilyCounterOnly) {
+        Stage 'Family counter SQL scenarios (no operator UI or physical printing)'
+        & dotnet (Join-Path $run 'FamilyCounterChecks/ThemeSmokeChecks.dll') '--family-counter-sql'
+        $exitCode=$LASTEXITCODE
+        [ordered]@{sourceCommit=$env:FMSC_LEVEL2_COMMIT;status=if($exitCode -eq 0){'Pass'}else{'Fail'};
+            scope='Owned fictional family SQL scenarios only; no Level 2 interactive acceptance claimed.'} |
+            ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'family-counter-results.json') -Encoding utf8
+    } else {
+        Stage 'Interactive operator workflows'
+        & dotnet (Join-Path $run 'Level2UiChecks/Level2UiChecks.dll') (Join-Path $appOutput 'FMSC_SMS.exe') $evidence
+        $exitCode=$LASTEXITCODE
+    }
     }
 } catch {
     # Exception text/native output may contain machine details; publish a bounded reason only.
