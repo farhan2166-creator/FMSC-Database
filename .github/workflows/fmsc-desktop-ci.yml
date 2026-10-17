@@ -1,0 +1,97 @@
+name: FMSC .NET Desktop CI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fmsc-desktop-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-check:
+    name: Build and portable regression checks
+    runs-on: windows-2022
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Restore application
+        run: dotnet restore FMSC_SMS.sln
+
+      - name: Build desktop application (Release)
+        run: dotnet build FMSC_SMS.sln -c Release --no-restore
+
+      - name: Compile native WinForms smoke checks
+        run: dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
+
+      - name: Run focused post-fix Windows control contracts
+        timeout-minutes: 5
+        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --post-fix
+
+      - name: Run Level 3 noninteractive resource and export checks
+        timeout-minutes: 5
+        env:
+          FMSC_LEVEL3_WINDOWS_EVIDENCE: ${{ runner.temp }}/fmsc-level3-windows
+        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --level3
+
+      - name: Upload sanitized Windows component measurements
+        uses: actions/upload-artifact@v7
+        with:
+          name: fmsc-level3-windows-${{ github.run_id }}
+          path: ${{ runner.temp }}/fmsc-level3-windows/report.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Run portable audit regression checks
+        run: dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
+
+      - name: Run offline Help Center catalog and search checks
+        run: dotnet run --project Tests/HelpChecks/HelpChecks.csproj -c Release
+
+      - name: Run synthetic performance and state checks
+        run: dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
+
+      - name: Test LocalDB MSI recovery without running an installer
+        shell: pwsh
+        run: .\Tools\TestInstallerLocalDb.ps1
+
+      - name: Test migration discovery, versions and backup ordering
+        shell: powershell
+        run: .\Tools\TestInstallerMigrations.ps1
+
+      - name: Build optional communication worker and webhook host
+        run: |
+          dotnet build Apps/Worker/Worker.csproj -c Release
+          dotnet build Apps/Host/Host.csproj -c Release
+
+      - name: Run deterministic communication provider checks (no live delivery)
+        run: dotnet run --project Tests/CommunicationChecks/CommunicationChecks.csproj -c Release
+
+      - name: Verify disposable publish and module isolation
+        shell: pwsh
+        run: .\Tools\TestPublishPowerShell.ps1 -ProjectDirectory .
+
+# Safety boundaries:
+# - No installation, signing or release upload. Publish regression output uses
+#   a disposable readability fixture, never a deployable LocalDB MSI/package.
+# - Genuine complete-installer packaging separately verifies the Microsoft MSI;
+#   fresh installations require the owner's detached compatible MDF/LDF.
+# - No SQL mutation/integration tests: those require a disposable test database.
+# - Only --post-fix control contracts execute here, using injected reads and
+#   confirmation decisions with startup disabled. No school SQL is used.
+# - Full native UI/DPI/printing acceptance needs an interactive Windows desktop.

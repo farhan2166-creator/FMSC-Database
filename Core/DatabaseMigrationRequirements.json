@@ -1,0 +1,265 @@
+{
+  "objects": [
+    {
+      "schema": "dbo",
+      "name": "QuickRegistrationRequests",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "MutationRequests",
+      "type": "U "
+    }
+  ],
+  "columns": [
+    {
+      "schema": "dbo",
+      "objectName": "QuickRegistrationRequests",
+      "name": "RequestId",
+      "type": "uniqueidentifier",
+      "maxLength": 16,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "QuickRegistrationRequests",
+      "name": "UserId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "QuickRegistrationRequests",
+      "name": "PayloadHash",
+      "type": "binary",
+      "maxLength": 32,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "QuickRegistrationRequests",
+      "name": "AdmissionId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "QuickRegistrationRequests",
+      "name": "CreatedUtc",
+      "type": "datetime2",
+      "maxLength": 8,
+      "precision": 27,
+      "scale": 7,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "name": "RequestId",
+      "type": "uniqueidentifier",
+      "maxLength": 16,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "name": "UserId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "name": "Kind",
+      "type": "nvarchar",
+      "maxLength": 80,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "name": "PayloadHash",
+      "type": "binary",
+      "maxLength": 32,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "name": "FeePaymentId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "name": "BankCertificateId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "name": "ResultJson",
+      "type": "nvarchar",
+      "maxLength": -1,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "name": "CreatedUtc",
+      "type": "datetime2",
+      "maxLength": 8,
+      "precision": 27,
+      "scale": 7,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    }
+  ],
+  "uniqueIndexes": [
+    {
+      "schema": "dbo",
+      "objectName": "QuickRegistrationRequests",
+      "name": "PK_QuickRegistrationRequests",
+      "filter": null,
+      "keys": "RequestId"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "QuickRegistrationRequests",
+      "name": "UQ_QuickRegistrationRequests_AdmissionId",
+      "filter": null,
+      "keys": "AdmissionId"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "name": "PK_MutationRequests",
+      "filter": null,
+      "keys": "RequestId"
+    }
+  ],
+  "foreignKeys": [
+    {
+      "schema": "dbo",
+      "objectName": "QuickRegistrationRequests",
+      "referencedSchema": "dbo",
+      "referencedObject": "Users",
+      "columns": "UserId",
+      "referencedColumns": "UserId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "QuickRegistrationRequests",
+      "referencedSchema": "dbo",
+      "referencedObject": "Students",
+      "columns": "AdmissionId",
+      "referencedColumns": "AdmissionId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "referencedSchema": "dbo",
+      "referencedObject": "Users",
+      "columns": "UserId",
+      "referencedColumns": "UserId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "referencedSchema": "dbo",
+      "referencedObject": "FeePayments",
+      "columns": "FeePaymentId",
+      "referencedColumns": "FeePaymentId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "referencedSchema": "dbo",
+      "referencedObject": "BankAccountOpeningCertificates",
+      "columns": "BankCertificateId",
+      "referencedColumns": "BankAccountOpeningCertificateId",
+      "deleteAction": 0,
+      "updateAction": 0
+    }
+  ],
+  "databaseProperties": [
+    {
+      "name": "FMSC_QuickRegistrationScope",
+      "type": "uniqueidentifier"
+    }
+  ],
+  "checkConstraints": [
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "name": "CK_MutationRequests_Kind"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "MutationRequests",
+      "name": "CK_MutationRequests_Result"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directories:
+      - "/"
+      - "/Tests/*"
+      - "/Apps/Host"
+      - "/Apps/Worker"
+    schedule:
+      interval: weekly
+      day: monday
+    # Owner-requested pause: restore to 3 to resume routine version-update PRs.
+    # This does not disable Dependabot security updates or alerts.
+    open-pull-requests-limit: 0
+    groups:
+      nuget-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    # Keep routine GitHub Actions version-update PRs paused as well.
+    open-pull-requests-limit: 0
+    groups:
+      actions-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]

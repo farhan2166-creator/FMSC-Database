@@ -1,0 +1,142 @@
+[
+  {
+    "Code": "Backup.Create",
+    "Name": "Create Backup",
+    "Description": "Create a database backup."
+  },
+  {
+    "Code": "Backup.Restore",
+    "Name": "Restore Backup",
+    "Description": "Restore the database from a backup."
+  },
+  {
+    "Code": "Backup.View",
+    "Name": "View Backups",
+    "Description": "View database backup information."
+  },
+  {
+    "Code": "Calendar.Manage",
+    "Name": "Manage Calendar",
+    "Description": "Manage academic terms/calendar"
+  },
+  {
+    "Code": "Certificates.Create",
+    "Name": "Create Certificates",
+    "Description": "Create certificates."
+  },
+  {
+    "Code": "Certificates.Print",
+    "Name": "Print Certificates",
+    "Description": "Print certificates."
+  },
+  {
+    "Code": "Enrollment.Manage",
+    "Name": "Manage Enrollment",
+    "Description": "Manage enrollment records."
+  },
+  {
+    "Code": "Fees.Adjust",
+    "Name": "Adjust Fees",
+    "Description": "Request/review/complete fee adjustments"
+  },
+  {
+    "Code": "Fees.Collect",
+    "Name": "Collect Fee",
+    "Description": "Record a student fee payment."
+  },
+  {
+    "Code": "Fees.Configuration.Manage",
+    "Name": "Manage Fee Configuration",
+    "Description": "Create and modify class fee configuration."
+  },
+  {
+    "Code": "Fees.Reports.View",
+    "Name": "View billing status checks",
+    "Description": "Check unposted or missing charges and billing cycle status. General report categories use Reports.View."
+  },
+  {
+    "Code": "Fees.Statement.View",
+    "Name": "View annual fee receipts",
+    "Description": "Open and print annual student fee receipts; also needs report and fee viewing access."
+  },
+  {
+    "Code": "Fees.View",
+    "Name": "View Fees",
+    "Description": "View student fee information."
+  },
+  {
+    "Code": "Reports.View",
+    "Name": "View student and finance reports",
+    "Description": "Open student and finance report categories and their exports. Fees.Reports.View is a separate billing-status check."
+  },
+  {
+    "Code": "Staff.Manage",
+    "Name": "Manage Staff",
+    "Description": "Create and update staff records."
+  },
+  {
+    "Code": "Staff.View",
+    "Name": "View Staff",
+    "Description": "View staff records."
+  },
+  {
+    "Code": "Students.Administer",
+    "Name": "Maintain student records and lifecycle",
+    "Description": "Edit saved student details and photos, manage family membership, re-admission, placement/status and legacy/lifecycle maintenance."
+  },
+  {
+    "Code": "Students.Admit",
+    "Name": "Admit Student",
+    "Description": "Create a new student admission."
+  },
+  {
+    "Code": "Students.Family",
+    "Name": "Open family workspace",
+    "Description": "View student families; changing members also requires Students.Administer."
+  },
+  {
+    "Code": "Students.Leave",
+    "Name": "Leave Student",
+    "Description": "Mark a student as leaving the school."
+  },
+  {
+    "Code": "Students.View",
+    "Name": "View Students",
+    "Description": "View student records and searches."
+  },
+  {
+    "Code": "System.Administration",
+    "Name": "Manage system administration",
+    "Description": "Manage users, roles, permissions and audit access. The Administrator role separately retains full application authority."
+  },
+  {
+    "Code": "System.Audit",
+    "Name": "View Audit Logs",
+    "Description": "View administrative audit history."
+  },
+  {
+    "Code": "System.Roles",
+    "Name": "View roles and permissions",
+    "Description": "Read role definitions and the permission catalog. Editing also requires System.Roles.Manage."
+  },
+  {
+    "Code": "System.Roles.Manage",
+    "Name": "Edit Accountant permissions",
+    "Description": "Save the Accountant description and permissions; requires role viewing access. Administrator remains protected with full authority."
+  },
+  {
+    "Code": "System.Setup",
+    "Name": "Manage School Setup",
+    "Description": "Manage school and system configuration."
+  },
+  {
+    "Code": "System.Users",
+    "Name": "View users",
+    "Description": "Read user accounts. Editing also requires System.Users.Manage and role viewing access."
+  },
+  {
+    "Code": "System.Users.Manage",
+    "Name": "Create and edit users",
+    "Description": "Save normal user accounts and reset their passwords; requires user and role viewing access."
+  }
+]
