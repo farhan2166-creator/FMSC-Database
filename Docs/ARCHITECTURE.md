@@ -35,7 +35,7 @@ The compatibility contract combines version requirements with schema structural 
 | `Core/` | Shared UI, input validation, page state, read coordination, reports, atomic file writing, recovery and access-policy helpers |
 | `Services/Backup/` | Verified backups, pre-restore safety backup, SQL restore and compatibility checks |
 
-The page organization and navigation group names are documented in [PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md). Avoid adding a second helper for behavior that already lives in shared `Core` classes.
+The page organization and navigation group names are documented in [PROJECT_STRUCTURE.md](Development/PROJECT_STRUCTURE.md). Avoid adding a second helper for behavior that already lives in shared `Core` classes.
 
 ## Shared DPI and layout ownership
 

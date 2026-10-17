@@ -12,6 +12,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Documentation
 
+- Organize loose workflow, design and developer documents under Docs; group audit reviews and historical records under Audit, with navigation indexes and updated relative links.
 - Shorten C# comments and record accepted business policies beside their implementations. Historical audits, executable code, SQL, database artifacts and installer behavior are unchanged.
 
 ### Changed
@@ -97,7 +98,7 @@ The following end-user-flow corrections are proposed in [PR #8](https://github.c
 ### Documentation
 - Added a project overview and operator, installation, recovery, architecture, release-readiness, and development-workflow guides.
 - Added a pull-request template prompting contributors and Codex to explain behavior changes, safety implications, tests, and manual acceptance requirements.
-- Established a single current [master audit](Audit/FMSC_MASTER_AUDIT.md) with a [historical index](Audit/FMSC_HISTORICAL_AUDITS.md) for earlier investigations.
+- Established a single current [master audit](Audit/FMSC_MASTER_AUDIT.md) with a [historical index](Audit/Archive/FMSC_HISTORICAL_AUDITS.md) for earlier investigations.
 
 ### Build and delivery
 - Existing Windows desktop CI and manually triggered private application-only and complete-installer artifact workflows are documented. **Workflow existence does not mean a complete installer has passed deployment acceptance.**
@@ -109,4 +110,4 @@ The application assembly version in `FMSC_SMS.csproj` and the database's require
 
 When a pull request changes behavior, add an Unreleased entry describing the operator-visible result and a PR link. Move entries to a dated version section only after an actual release approval.
 
-For the original fixes, implementation passes, schema verification and historical decisions, see the [historical audit index](Audit/FMSC_HISTORICAL_AUDITS.md) and commit history.
+For the original fixes, implementation passes, schema verification and historical decisions, see the [historical audit index](Audit/Archive/FMSC_HISTORICAL_AUDITS.md) and commit history.

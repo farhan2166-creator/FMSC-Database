@@ -56,7 +56,7 @@ In Setup Readiness, select an issue and use **Open Selected Setup**. The action 
 | Staff and certificates | **Staff / Student Certificates** | Finish or intentionally discard edits before switching records |
 | Back up and restore | **System Maintenance → Backup / Restore** | Restore is restricted and can replace newer records; see [recovery guide](BACKUP_RECOVERY.md) |
 
-Screen naming and source mapping: [PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md).
+Screen naming and source mapping: [PROJECT_STRUCTURE.md](Development/PROJECT_STRUCTURE.md).
 
 ## Recommended daily routine
 
@@ -75,7 +75,7 @@ Screen naming and source mapping: [PROJECT_STRUCTURE.md](../PROJECT_STRUCTURE.md
 
 Admission saves hold the submitted details until saving and refresh finish. For **Mark as Left / Cancel Registration** or **Legacy Go Live**, Review holds the inputs; changing them after review requires another review. Wait for a pending operation to finish before closing.
 
-For business-rule context see [ADMISSION_WORKFLOW.md](../ADMISSION_WORKFLOW.md). The current runtime requires schema 6 even if historical text in that file refers to older database versions.
+For business-rule context see [ADMISSION_WORKFLOW.md](Workflows/ADMISSION_WORKFLOW.md). The current runtime requires schema 6 even if historical text in that file refers to older database versions.
 
 ## Find Student
 

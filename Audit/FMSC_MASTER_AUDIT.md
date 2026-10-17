@@ -2,14 +2,14 @@
 
 **Updated:** 14 October 2026  
 **Reviewed source:** [`14aba80a8751322e04aa028f960e0a68efaf08f2`](https://github.com/farhan2166-creator/FMSC-Database/commit/14aba80a8751322e04aa028f960e0a68efaf08f2) for the read-only migration-retirement verification below. Historical findings retain their original source freezes.
-**Historical evidence:** [FMSC_HISTORICAL_AUDITS.md](FMSC_HISTORICAL_AUDITS.md)
-**Current post-merge audit:** [FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md](FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md) — read-only review of main 4c25103f4930; Windows desktop CI and security checks passed at this SHA, but current complete-installer and native/operator/database acceptance remain open. This supersedes only the older CI-status snapshot, not historical tests or recorded owner decisions.
+**Historical evidence:** [FMSC_HISTORICAL_AUDITS.md](Archive/FMSC_HISTORICAL_AUDITS.md)
+**Current post-merge audit:** [FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md](Reviews/FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md) — read-only review of main 4c25103f4930; Windows desktop CI and security checks passed at this SHA, but current complete-installer and native/operator/database acceptance remain open. This supersedes only the older CI-status snapshot, not historical tests or recorded owner decisions.
 
 > **Release acceptance: PENDING.** A passing Windows CI build verifies automated tests, not a complete installer on a real school PC. Do not deploy as an unqualified production release until the deployment and operator checks below are recorded. This document is a consolidation of recorded evidence, not a new execution of all tests.
 
 ## End-user-flow corrections under review
 
-The merged [end-user-flow audit](FMSC_END_USER_FLOW_AUDIT_2026-10-14.md) remains historical evidence at its reviewed source. [PR #8](https://github.com/farhan2166-creator/FMSC-Database/pull/8) proposes the corrections below on a separate branch; it is not an automatic merge or deployment approval.
+The merged [end-user-flow audit](Reviews/FMSC_END_USER_FLOW_AUDIT_2026-10-14.md) remains historical evidence at its reviewed source. [PR #8](https://github.com/farhan2166-creator/FMSC-Database/pull/8) proposes the corrections below on a separate branch; it is not an automatic merge or deployment approval.
 
 **Reviewed implementation:** [`5b664f3952feeef339a0af1b9ca4c39c553357a2`](https://github.com/farhan2166-creator/FMSC-Database/commit/5b664f3952feeef339a0af1b9ca4c39c553357a2). [Windows CI run 38554464212](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38554464212) completed successfully: Release compilation (zero warnings/errors), 148 focused Windows control checks, 657 portable checks, 32,183 synthetic performance/state checks, 273 SQL-module fingerprints, 12 schema-artifact tests, Windows PowerShell verification, full disposable publication and altered-DACPAC rejection. These are focused automated checks, not an interactive deployment acceptance.
 
@@ -31,7 +31,7 @@ No SQL, migration, reviewed DACPAC, installer, financial transaction/recovery im
 
 | Finding or area | Current disposition | What is still needed |
 |---|---|---|
-| 64 historical BL/F/FR/IA/DP/RT/FQA findings | Preserved with original IDs, implementation history, owner decisions, caveats and links in the [historical archive](FMSC_HISTORICAL_AUDITS.md) | Preserve deliberate deferrals and accepted business policies. Recheck version-dependent historical claims before acting |
+| 64 historical BL/F/FR/IA/DP/RT/FQA findings | Preserved with original IDs, implementation history, owner decisions, caveats and links in the [historical archive](Archive/FMSC_HISTORICAL_AUDITS.md) | Preserve deliberate deferrals and accepted business policies. Recheck version-dependent historical claims before acting |
 | FQA-01–25 | All 25 source-fixed or resolved by owner decisions in previous implementation pass | Native Windows and representative database release acceptance remains a separate gate |
 | RFA-01 — Quick Registration tab guard | Source-fixed; 26 focused Windows page/host contract checks passed in recorded CI run | Real delayed SQL operations, mouse/keyboard navigation and unknown outcomes |
 | RFA-02 — New Regular Certificate date draft | Source-fixed; focused Windows checks passed | End-user interactions with representative records |
@@ -98,6 +98,6 @@ Missing snapshots during normal development are expected under [AGENTS.md](../AG
 
 ## Full preservation and traceability
 
-The second document, **[FMSC_HISTORICAL_AUDITS.md](FMSC_HISTORICAL_AUDITS.md)**, indexes all five exact original reports via immutable Git links. This includes all 64 legacy finding IDs, three RFA findings, two RVA verification tasks, the six RR release findings, original source evidence, SQL verification and subsequent Windows CI results. All originals and versions also remain at the [pre-consolidation source revision](https://github.com/farhan2166-creator/FMSC-Database/tree/83bb0b6fe2720bb0ada6da7304dbeac4d4d3de34/Audit).
+The second document, **[FMSC_HISTORICAL_AUDITS.md](Archive/FMSC_HISTORICAL_AUDITS.md)**, indexes all five exact original reports via immutable Git links. This includes all 64 legacy finding IDs, three RFA findings, two RVA verification tasks, the six RR release findings, original source evidence, SQL verification and subsequent Windows CI results. All originals and versions also remain at the [pre-consolidation source revision](https://github.com/farhan2166-creator/FMSC-Database/tree/83bb0b6fe2720bb0ada6da7304dbeac4d4d3de34/Audit).
 
 For future work, update **this master** with date, reviewed commit, precise evidence and status. Keep original report text frozen in Git history and cite its commit. Do not create repeated progress files for the same findings. No application, installer, SQL, migration, or school database changes are authorized by this document.
