@@ -870,10 +870,12 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         // re-enable Save after an unconfirmed admission reply.
         saveButton = AddAction(UiText.Actions.Save, async (_, _) => await Save(), "Success");
         saveAndNewButton = AddAction("Save & New", async (_, _) => await SaveAndStartNextAsync(), "Success");
+        // Temporarily hidden at the owner's request to leave more room for Print.
+        saveAndNewButton.Visible = false;
         checkAdmissionButton = AddAction("Check Saved Admission", async (_, _) => await RecheckAdmissionAsync(), "Secondary");
         checkAdmissionButton.Visible = false;
         UiAccessibility.Describe(keepPlacement, "Keep placement for the next student",
-            "Retain campus, academic year, class and section for Clear / New and Save & New. Student details and discounts are cleared.");
+            "Retain campus, academic year, class and section for Clear / New. Student details and discounts are cleared.");
         AddToolbarSeparator();
         /* Collect the fee once the admission is saved, then print - the order the work happens in. */
         foreach (string operation in new[] { "Transfer Section", "Transfer Class", "Transfer Campus", "Re-Admit" })

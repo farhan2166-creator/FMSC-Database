@@ -14,6 +14,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Changed
 
+- Temporarily hide Admission's Save & New button to leave more room for Print. Use Save followed by Clear / New for the next student.
 - Distinguish New Record from Clear Search in shared setup editors. Setup Readiness disables unavailable destinations and navigation during checks, with inline permission guidance.
 - Clarified payment-adjustment and placement confirmations with aligned details, and shortened Communication Center guidance while preserving warnings and confirmation defaults.
 

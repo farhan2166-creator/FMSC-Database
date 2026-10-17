@@ -19,12 +19,14 @@ internal static partial class Program
             using var window = new Form { ClientSize = new Size(1500, 200) };
             actions.Dock = DockStyle.Fill; actions.WrapContents = true; actions.Visible = true;
             window.Controls.Add(actions); window.Show(); Application.DoEvents();
-            Check(actions.Controls.OfType<ModernButton>().Count(b=>b.Visible) == 7,
-                "Admission fixture measures all seven ordinary authorized actions");
-            foreach (int width in new[] { 1100, 1250, 1400, 1560 })
+            Check(actions.Controls.OfType<ModernButton>().Count(b=>b.Visible) == 6,
+                "Admission fixture measures all six ordinary authorized actions");
+            Check(!actions.Controls.OfType<ModernButton>().Single(b=>b.Text=="Save & New").Visible,
+                "Admission Save & New stays temporarily hidden to leave room for Print");
+            foreach (int width in new[] { 1100, 1150, 1250, 1400, 1560 })
             {
                 window.ClientSize = new Size(width, 200); Application.DoEvents();
-                if (width >= 1250)
+                if (width >= 1150)
                     Check(actions.Controls.OfType<ModernButton>().Single(b=>b.Text=="Print ▾").Top ==
                         actions.Controls.OfType<ModernButton>().Single(b=>b.Text=="Save").Top,
                         "Admission Print stays with Save at ordinary toolbar widths");
