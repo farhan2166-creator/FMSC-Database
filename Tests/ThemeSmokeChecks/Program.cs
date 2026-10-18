@@ -115,6 +115,7 @@ internal static partial class Program
         {
             CheckValidationBadges();
             CheckAdmissionToolbarRows();
+            CheckSchoolWorkflow();
             CheckReportCaptionOrder();
             CheckCommunicationWorkspace();
             CheckCommunicationGuidance();

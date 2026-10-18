@@ -49,7 +49,7 @@ try {
  # DacFx round-trips this recovery identity as varchar. Repair only this owned schema-only fixture.
  [void](Query "DECLARE @Scope uniqueidentifier=NEWID(); EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@Scope;")
  # Migration changes run under the same transaction boundary used by deployment.
- foreach($file in Get-ChildItem (Join-Path $projectRoot 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName}) {
+ foreach($file in @(Get-ChildItem (Join-Path $projectRoot 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql'; Get-ChildItem (Join-Path $projectRoot 'Migrations') -Filter '*.sql') | Sort-Object {[int]$_.BaseName}) {
   $content=Get-Content -LiteralPath $file.FullName -Raw
   $connection=[Data.SqlClient.SqlConnection]::new("Server=$instance;Database=$catalog;Integrated Security=True;TrustServerCertificate=True")
   $connection.Open();$transaction=$connection.BeginTransaction()

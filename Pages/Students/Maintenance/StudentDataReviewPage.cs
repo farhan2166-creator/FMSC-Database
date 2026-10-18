@@ -17,13 +17,6 @@ public sealed class StudentDataReviewPage : UserControl, IBusyPage, IUnsavedChan
         tabs=new TabControl{Dock=DockStyle.Fill,Font=AppTheme.NormalFont};
         tabs.Selecting+=(_,e)=>{if(IsBusy)e.Cancel=true;};
         void Add(string title,Func<Control> factory){var tab=new TabPage(title){BackColor=AppTheme.Surface,Tag=factory};tabs.TabPages.Add(tab);}
-        var legacyTab=new TabPage("Awaiting Student Setup"){BackColor=AppTheme.Surface};
-        legacyTab.Tag=(Func<Control>)(()=>{
-            var page=new AdmissionReviewListPage(navigate,false);
-            page.LegacySetupCompleted+=()=>{tabs.TabPages.Remove(legacyTab);legacyTab.Dispose();};
-            return page;
-        });
-        tabs.TabPages.Add(legacyTab);
         Add("Record Issues / History",()=>new StudentRecordChecksPage(navigate));
         Add("Possible Duplicates",()=>new DuplicateStudentAuditPage(navigate));
         TabStrip.Apply(tabs,AppTheme.ModuleAccent("Students"));Controls.Add(TabStrip.CreateHost(tabs));
@@ -41,7 +34,6 @@ public sealed class AdmissionReviewListPage : V2Page
     private readonly ModernButton? goLive;
     private readonly ModernButton? reviewRegistration;
     private readonly ModernButton open;
-    internal event Action? LegacySetupCompleted;
     internal event Action<int>? RegistrationReviewed;
     private DataTable records=new();
     private DataView? recordView;
@@ -111,7 +103,7 @@ public sealed class AdmissionReviewListPage : V2Page
     private void UpdateLegacySetupState(bool completed)
     {
         if(goLive is not null)goLive.Visible=false;
-        if(completed){SetStatus("Legacy setup is complete.");LegacySetupCompleted?.Invoke();}
+        if(completed){SetStatus("Legacy setup is complete.");}
     }
     private async Task RefreshAsync()
     {

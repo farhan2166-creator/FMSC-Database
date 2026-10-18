@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../Pages/Finance/StudentAccounts/PaymentAdjustmentState.cs" Link="PaymentAdjustmentState.cs" />
     <Compile Include="../../Core/AppTheme.Appearance.cs" Link="AppTheme.Appearance.cs" />
     <Compile Include="../../Core/QuickRegistrationAccess.cs" Link="QuickRegistrationAccess.cs" />
     <Compile Include="../../Core/DailyClosingSummary.cs" Link="DailyClosingSummary.cs" />
