@@ -27,8 +27,8 @@ internal static partial class Program
             summary.Columns.Add("BillingMonth", typeof(DateTime)); summary.Columns.Add("CurrentCharges", typeof(int)); summary.Columns.Add("CurrentAmount", typeof(decimal));
             summary.Rows.Add(DateTime.Today, 0, 0m);
             data.Tables.Add();
-            var students = data.Tables.Add(); students.Columns.Add("AdmissionId", typeof(int)); students.Columns.Add("IsLegacyReference", typeof(bool));
-            students.Rows.Add(42, false);
+            var students = data.Tables.Add(); students.Columns.Add("AdmissionId", typeof(int)); students.Columns.Add("IsLegacyReference", typeof(bool)); students.Columns.Add("StudentName");
+            students.Rows.Add(42, false, "Fictional Student");
             string? destination = null;
             using var status = new BillingStatusPage((_, _, title) => destination = title, () => Task.FromResult(data), false);
             typeof(BillingStatusPage).GetField("review", flags)!.SetValue(status, data);
@@ -39,7 +39,7 @@ internal static partial class Program
             var grid = (DataGridView)typeof(V2Page).GetField("Grid", flags)!.GetValue(status)!;
             status.BindingContext = new BindingContext(); grid.BindingContext = status.BindingContext;
             grid.DataSource = students.DefaultView;
-            if (grid.Rows.Count > 0) grid.CurrentCell = grid.Rows[0].Cells[0];
+            if (grid.Rows.Count > 0) grid.CurrentCell = grid.Rows[0].Cells["StudentName"];
             typeof(BillingStatusPage).GetMethod("OpenStudent", flags)!.Invoke(status, new object[] { false });
             Check(destination == PageTitles.Admissions, "A billing exception opens the selected student's admission setup without starting a write");
             destination = null;
