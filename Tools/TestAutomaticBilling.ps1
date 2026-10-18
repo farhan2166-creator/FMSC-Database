@@ -290,7 +290,7 @@ try {
  try {
   $env:FMSC_BILLING_CHECK_CONNECTION="Server=$instance;Database=$catalog;Integrated Security=True;TrustServerCertificate=True"
   $env:FMSC_BILLING_CHECK_OWNER=$owner
-  & dotnet run --no-restore --project (Join-Path $projectRoot 'Tests/QuickRegistrationSqlChecks/QuickRegistrationSqlChecks.csproj') -- --billing-compatibility
+  & dotnet run -c Release --project (Join-Path $projectRoot 'Tests/QuickRegistrationSqlChecks/QuickRegistrationSqlChecks.csproj') -- --billing-compatibility
   Native 'Production billing schema compatibility'
  } finally {$env:FMSC_BILLING_CHECK_CONNECTION=$oldConnection;$env:FMSC_BILLING_CHECK_OWNER=$oldOwner}
  Write-Output "PASS: $checks automatic-billing SQL checks."

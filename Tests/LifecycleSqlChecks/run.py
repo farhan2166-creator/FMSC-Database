@@ -167,8 +167,8 @@ def main():
     report = {"commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "runId": str(token), "workingTreeDirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()), "scenarios": [], "measurements": {"HostLogicalCpus": os.cpu_count() or 0, "HostMemoryMiB": os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") / (1024 * 1024)}, "limitations": [
         "Linux real-SQL lifecycle/integration tests; existing desktop CI separately runs Windows control contracts and PDF export.",
         "No interactive visual, printing, installer, Windows LocalDB/operator-account or actual network-loss acceptance.",
-        "No real school rows are imported: pinned data-free SQL test fixture only, fresh synthetic records. This test does not approve or check the current repository DACPAC.",
-        "Test-only seed sets schema version 6 and repairs DacFx recovery-scope type; this does not prove the owner's distributed database snapshot.",
+        "No real school rows are imported: schema-only packages and fresh synthetic records. Both the pinned upgrade fixture and current release DACPAC are published into separate owned catalogs.",
+        "Test-only seeds set baseline schema versions and repair DacFx recovery-scope type; this does not prove the owner's distributed MDF/LDF snapshot.",
         "Legacy PowerShell scripts that back up FMSC_DB or hardcode school IDs are inspected but never executed."]}
     current_stage = None
     private = tempfile.TemporaryDirectory(prefix="fmsc-level1-private-")
