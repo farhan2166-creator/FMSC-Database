@@ -19,6 +19,8 @@ public sealed class StudentDataReviewPage : UserControl, IBusyPage, IUnsavedChan
         void Add(string title,Func<Control> factory){var tab=new TabPage(title){BackColor=AppTheme.Surface,Tag=factory};tabs.TabPages.Add(tab);}
         Add("Record Issues / History",()=>new StudentRecordChecksPage(navigate));
         Add("Possible Duplicates",()=>new DuplicateStudentAuditPage(navigate));
+        if (CurrentUser.HasPermission("Students.Administer") && CurrentUser.HasPermission("Students.View"))
+            Add("Existing Student Setup",()=>new AdmissionReviewListPage(navigate,false));
         TabStrip.Apply(tabs,AppTheme.ModuleAccent("Students"));Controls.Add(TabStrip.CreateHost(tabs));
         void LoadTab(){var selected=tabs.SelectedTab;if(selected is not null&&selected.Controls.Count==0&&selected.Tag is Func<Control> create){var page=create();page.Dock=DockStyle.Fill;selected.Controls.Add(page);}}
         tabs.SelectedIndexChanged+=(_,_)=>LoadTab();Load+=(_,_)=>LoadTab();

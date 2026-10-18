@@ -606,6 +606,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     PageTitles.Admissions,
                     "Students.Admit"),
                 new(
+                    "Quick Registration",
+                    () => new QuickRegistrationPage((factory, module, title) => NavigateTo(factory, module, title)),
+                    "Students",
+                    "Quick Registration",
+                    "Students.Admit"),
+                new(
                     "Student Profile",
                     () => new StudentProfilePage(
                         (factory, module, title) => NavigateTo(factory, module, title)),
@@ -630,6 +636,31 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     "Finance",
                     PageTitles.FeePosting,
                     "Fees.Collect"),
+            new(
+                PageTitles.StudentFeeCorrections,
+                () => new StudentFeeAdjustmentsPage(),
+                "Finance",
+                PageTitles.StudentFeeCorrections,
+                "Fees.Collect"),
+            new(
+                "Daily Collection Closing",
+                () => new DailyCollectionClosingPage(),
+                "Finance",
+                "Daily Collection Closing",
+                "Fees.Collect"),
+            new(
+                PageTitles.StudentPromotion,
+                () => new BulkPromotionPage(
+                    (factory, module, title) => NavigateTo(factory, module, title)),
+                "Promotion",
+                PageTitles.StudentPromotion,
+                "Enrollment.Manage"),
+            new(
+                PageTitles.StudentRecordChecks,
+                () => new StudentDataReviewPage((factory, module, title) => NavigateTo(factory, module, title)),
+                "Students",
+                PageTitles.StudentRecordChecks,
+                "Students.View"),
                 new(
                     PageTitles.StudentCertificates,
                     () => new StudentCertificatesPage(
@@ -637,7 +668,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     "Certificates",
                     PageTitles.StudentCertificates,
                     "Certificates.Create")
-            },
+            }.Where(item => item.Title != "Quick Registration" || QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)).ToArray(),
             expandInitially: true);
         AddModule(
             flow,
@@ -653,52 +684,11 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Students",
                 "Family / Siblings",
                 "Students.Family"),
-            Section("PROMOTION"),
-            new(
-                PageTitles.StudentPromotion,
-                () => new BulkPromotionPage(
-                    (factory, module, title) => NavigateTo(factory, module, title)),
-                "Promotion",
-                PageTitles.StudentPromotion,
-                "Enrollment.Manage"),
-            Section("ADMISSION & DATA REVIEW"),
-            new(
-                PageTitles.StudentRecordChecks,
-                () => new StudentDataReviewPage((factory, module, title) => NavigateTo(factory, module, title)),
-                "Students",
-                PageTitles.StudentRecordChecks,
-                "Students.View"),
+
+
             // Normal family work opens from Student Profile. Retain the existing
             // route for an account granted family access without profile access.
             }.Where(item => item.Title != "Family / Siblings" || !CurrentUser.HasPermission("Students.View")).ToArray());
-        AddModule(
-            flow,
-            "finance.png",
-            "Fees & Billing",
-            AppTheme.Primary,
-            new NavigationItem[]
-            {
-            // Keep adjustments separate from daily collection because corrections, refunds and reversals change money already recorded.
-            new(
-                PageTitles.StudentFeeCorrections,
-                () => new StudentFeeAdjustmentsPage(),
-                "Finance",
-                PageTitles.StudentFeeCorrections,
-                "Fees.Collect"),
-            new(
-                "Daily Collection Closing",
-                () => new DailyCollectionClosingPage(),
-                "Finance",
-                "Daily Collection Closing",
-                "Fees.Collect"),
-            Section("FEE SETUP"),
-            new(
-                PageTitles.FeeRateSetup,
-                () => FeeConfigurationWorkspace.Create(),
-                "Finance",
-                PageTitles.FeeRateSetup,
-                "Fees.Configuration.Manage"),
-                        });
         AddModule(
             flow,
             "staff.png",
@@ -797,6 +787,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "School Setup",
                 "Subjects",
                 "System.Setup"),
+            new(
+                PageTitles.FeeRateSetup,
+                () => FeeConfigurationWorkspace.Create(),
+                "Finance",
+                PageTitles.FeeRateSetup,
+                "Fees.Configuration.Manage"),
             });
         AddModule(
             flow,

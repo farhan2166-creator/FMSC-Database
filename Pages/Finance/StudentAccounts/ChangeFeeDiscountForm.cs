@@ -46,6 +46,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         this.submit=submit??SubmitRecoverableAsync;
         Text=$"Review Fee Terms — {fee}";StartPosition=FormStartPosition.CenterParent;
         Size=new Size(AppScale.Scale(1040),AppScale.Scale(820));MinimumSize=new Size(850,650);
+        amount.ZeroAsPlaceholder = newRate.ZeroAsPlaceholder = true;
         amount.Text=discount.ToString("0.##");newRate.Text=rate.ToString("0.##");
         concession.Items.AddRange(new object[]{"None","Free","Scholarship","Waived"});concession.SelectedIndex=0;
         paidReduction.Items.AddRange(new object[]{"Keep paid reductions as credit","Refund paid reductions"});paidReduction.SelectedIndex=0;

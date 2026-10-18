@@ -4,6 +4,13 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ## [1.1.0-rc.2] - 2026-10-18
 
+- Make Billing Center titles and guidance concise and consistent; use posting/reversal labels instead of generic report instructions.
+- Show additional-fee periods as month/year in Fee Collection and display charge remarks in their own column.
+- Show zero-value numeric inputs as focus-aware placeholders. Use optional Remarks for additional fees, student setup and ordinary fee-configuration notes; retain contextual reasons for corrections and reversals.
+- Add Manual / Advance Posting with a reviewed month range and optional student filter for vacation fees; post the range in one transaction using existing monthly eligibility and duplicate checks.
+- Show admission number, student, father and recorded class/section in Billing Status with natural admission-number sorting; leave missing placements blank.
+- Move Fee Rate Setup to School Setup and student fee corrections, daily collection closing, student promotion and student data review to Daily Work; remove the Fees & Billing navigation group.
+- Fill the campus/class/section picker from the highlighted list row during keyboard navigation; Enter accepts the choice and closes the list.
 - Let the operator choose concession periods, issued-bill treatment and credit/refund, with a financial preview and save-outcome recovery.
 - Offer admission-month or following-month concessions in direct admission and Quick Registration.
 - Let leaving retain issued monthly bills, apply the school cutoff or waive from a chosen month; preview full correction chains.

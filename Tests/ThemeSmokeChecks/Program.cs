@@ -34,6 +34,60 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--family-panel"))
+        {
+            using var form = new Form { ClientSize = new Size(320, 600) };
+            using var list = new FamilyStudentList { Dock = DockStyle.Fill, CheckOnClick = true };
+            list.Items.Add("6590 · Test One\nPlay Group - F · Sibling", true);
+            list.Items.Add("6591 · Test Two\nClass 1 - A · Sibling", false);
+            form.Controls.Add(list); form.Show(); Application.DoEvents();
+            Check(list.GetItemRectangle(0).Height >= list.Font.Height * 2 + 12, "Family rows have space for two lines");
+            Check(list.CheckedItems.Count == 1 && list.GetItemChecked(0), "CheckedListBox selection semantics are preserved");
+            list.SetItemChecked(1, true);
+            Check(list.CheckedItems.Count == 2, "Individual check state updates normally");
+            Directory.CreateDirectory("artifacts/billing-ui");
+            using var image = new Bitmap(form.Width, form.Height); form.DrawToBitmap(image, new Rectangle(Point.Empty, image.Size));
+            image.Save("artifacts/billing-ui/family-panel.png");
+            Console.WriteLine($"PASS: {checks} family panel checks.");
+            return;
+        }
+        if (args.Contains("--family-confirmation"))
+        {
+            CheckFamilyConfirmationLayout();
+            Console.WriteLine($"PASS: {checks} family confirmation layout checks.");
+            return;
+        }
+        if (args.Contains("--billing-layout"))
+        {
+            CheckBillingLayout();
+            Console.WriteLine($"PASS: {checks} Billing Center layout checks (no database connection).");
+            return;
+        }
+        if (args.Contains("--numeric-placeholders"))
+        {
+            CheckNumericPlaceholders();
+            Console.WriteLine($"PASS: {checks} numeric placeholder checks (no database connection).");
+            return;
+        }
+        if (args.Contains("--advance-posting"))
+        {
+            CheckAdvancePosting();
+            CheckMonthlyRepostClick();
+            Console.WriteLine($"PASS: {checks} manual / advance posting checks (no database connection).");
+            return;
+        }
+        if (args.Contains("--billing-grid"))
+        {
+            CheckBillingGrid();
+            Console.WriteLine($"PASS: {checks} billing grid checks (no database connection).");
+            return;
+        }
+        if (args.Contains("--placement-picker"))
+        {
+            CheckPlacementPickerNavigation();
+            Console.WriteLine($"PASS: {checks} placement picker checks (no database connection).");
+            return;
+        }
         if(args.Contains("--billing-design"))
         {
             CheckBillingDesignDialogs();

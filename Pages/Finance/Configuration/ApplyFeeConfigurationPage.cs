@@ -91,7 +91,7 @@ public sealed class ApplyFeeConfigurationPage : V2Page
         applyRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
         applyRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 75f));
         applyRow.Controls.Add(HumanUi.Field("New Rates Start From", effectiveFrom, true), 0, 0);
-        applyRow.Controls.Add(HumanUi.Field("Reason (optional)", reason), 1, 0);
+        applyRow.Controls.Add(HumanUi.Field("Remarks (optional)", reason), 1, 0);
         /* Preview and Apply were removed from the action bar and never placed, so the page had no buttons. */
         var closeButton = new ModernButton {
             Text = UiText.Actions.Close, Width = AppScale.Scale(100), Height = AppMetrics.ButtonHeight, ThemeRole = "Secondary"

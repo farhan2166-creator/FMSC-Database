@@ -11,6 +11,14 @@ internal sealed class IssuedBillPicker : ApplicationWindowForm
     internal IssuedBillPicker(DataTable issuedBills,string fee)
     {
         Text=$"Issued Bills — {fee}";StartPosition=FormStartPosition.CenterParent;
+        // Display a recognizable reference without issuing or changing database numbers.
+        issuedBills = issuedBills.Copy();
+        if (issuedBills.Columns.Contains("Charge Ref"))
+        {
+            issuedBills.Columns["Charge Ref"]!.ColumnName = "Bill Ref";
+            foreach (DataRow row in issuedBills.Rows)
+                row["Bill Ref"] = $"FMSC-BILL-{Convert.ToDateTime(row["Issued"]):yyyy}-{Convert.ToInt64(row["BillingChargeId"]):D4}";
+        }
         ClientSize=new Size(AppScale.Scale(950),AppScale.Scale(500));MinimumSize=new Size(700,350);
         grid.Dock=DockStyle.Fill;grid.ReadOnly=true;grid.MultiSelect=false;grid.SelectionMode=DataGridViewSelectionMode.FullRowSelect;
         grid.DataSource=issuedBills;grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;

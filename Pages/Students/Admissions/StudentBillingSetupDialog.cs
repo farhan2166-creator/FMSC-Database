@@ -51,7 +51,9 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
         admissionFeeHandling.Items.AddRange(new object[] { "Already paid before system", "Charge admission fee now" });
         admissionFeeHandling.SelectedIndex = -1;
         Field("Admission fee handling", admissionFeeHandling, 0, 3);
-        Field("Setup reason", reason, 1, 3);
+        var remarksField = HumanUi.Field("Remarks", reason, false);
+        remarksField.Height = AppMetrics.FieldRowHeight;
+        fields.Controls.Add(remarksField, 1, 3);
         root.Controls.Add(fields, 0, 1);
         var feeTools = HumanUi.ButtonRow(reloadFees, history);
         feeTools.Dock = DockStyle.Fill;
@@ -94,7 +96,7 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
         {
             var students = await DatabaseHelper.QueryUserAsync("GetStudentDetails", DatabaseHelper.Int("@AdmissionId", admission));
             var student = students.Rows[0]; studentName.Text = Convert.ToString(student["StudentName"]); fatherName.Text = Convert.ToString(student["FatherName"]);
-            reason.Text = "Reviewed individual student setup";
+            reason.Clear();
             var years = await DatabaseHelper.QueryUserAsync("GetAcademicYears"); year.Bind(years, "AcademicYearId", "YearName");
             placements = await DatabaseHelper.QueryUserAsync("GetClassSections", DatabaseHelper.Int("@CampusId", 0), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0)); placement.Bind(placements);
             var records = await DatabaseHelper.QueryUserAsync("GetStudentEnrollmentsForLifecycle", DatabaseHelper.Int("@AdmissionId", admission));
@@ -171,7 +173,7 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
         return DatabaseHelper.QueryUserAsync("ActivateStudentBilling", DatabaseHelper.Int("@AdmissionId", admission), DatabaseHelper.Int("@EnrollmentId", enrollment),
             DatabaseHelper.Int("@YearId", year.SelectedId), DatabaseHelper.Int("@PlacementId", placement.SelectedId), DatabaseHelper.Date("@StartDate", start.Value.Date),
             DatabaseHelper.Date("@BillingStart", billing.Value.Date), DatabaseHelper.P("@StudentName", studentName.Text.Trim()), DatabaseHelper.P("@FatherName", fatherName.Text.Trim()),
-            DatabaseHelper.P("@Fees", json), DatabaseHelper.P("@Reason", reason.Text.Trim()), DatabaseHelper.Bit("@Preview", expected is null), DatabaseHelper.P("@ExpectedSnapshot", expected), DatabaseHelper.Bit("@AdmissionFeeAlreadyPaid", AdmissionFeeAlreadyPaid));
+            DatabaseHelper.P("@Fees", json), DatabaseHelper.P("@Reason", string.IsNullOrWhiteSpace(reason.Text) ? "Student setup" : reason.Text.Trim()), DatabaseHelper.Bit("@Preview", expected is null), DatabaseHelper.P("@ExpectedSnapshot", expected), DatabaseHelper.Bit("@AdmissionFeeAlreadyPaid", AdmissionFeeAlreadyPaid));
     }
     private async Task ReviewAsync()
     {

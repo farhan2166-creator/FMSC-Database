@@ -38,7 +38,6 @@ internal static class AppHotKeys
         ("Dashboard",Keys.Alt|Keys.D1,"Alt+1"),
         ("Daily Work",Keys.Alt|Keys.D2,"Alt+2"),
         ("Student Management",Keys.Alt|Keys.D3,"Alt+3"),
-        ("Fees & Billing",Keys.Alt|Keys.D4,"Alt+4"),
         ("Staff",Keys.Alt|Keys.D5,"Alt+5"),
         ("Reports",Keys.Alt|Keys.D6,"Alt+6"),
         ("School Setup",Keys.Alt|Keys.D7,"Alt+7"),

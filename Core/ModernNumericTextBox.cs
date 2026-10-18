@@ -16,7 +16,9 @@ namespace FMSC_SMS.Core
         public event EventHandler? ValueChanged;
         public ModernNumericTextBox()
         {
-            Text = FormatValue(_value);
+            RefreshDisplay();
+            GotFocus += (_, _) => PlaceholderText = "";
+            LostFocus += (_, _) => UpdatePlaceholder();
             KeyPress += FilterKeyPress;
             Leave += (_, _) => CommitFromText();
             TextChanged += (_, _) => { if (!_refreshingDisplay) _textEdited = true; };
@@ -99,10 +101,12 @@ namespace FMSC_SMS.Core
         private void RefreshDisplay()
         {
             _refreshingDisplay = true;
-            Text = FormatValue(_value);
+            Text = _value == 0 ? "" : FormatValue(_value);
+            UpdatePlaceholder();
             _refreshingDisplay = false;
             _textEdited = false;
         }
+        private void UpdatePlaceholder() => PlaceholderText = ContainsFocus ? "" : FormatValue(0);
         private string FormatValue(decimal v)
         {
             string format = _thousandsSeparator ? "#,0" : "0";
@@ -139,6 +143,7 @@ namespace FMSC_SMS.Core
                 return;
             _textEdited = false;
             string raw = Text.Trim();
+            if (raw.Length == 0) { Value = 0; return; }
             if (!decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal parsed))
             {
                 parsed = _value;

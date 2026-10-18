@@ -9,7 +9,7 @@ internal static class MonthlyWorkflows
         if(!report.Passed("L2-PRO-06")) {report.BlockIds("Current-year return confirmation is required before this monthly posting.","L2-FIN-03");return;}
         if(DateTime.Today.Month<2) {report.BlockIds("January's opening month is already billed; there is no later current-year month eligible for this posting scenario yet.","L2-FIN-03");return;}
         report.Run("L2-FIN-03",ui,()=>{
-            ui.Navigate("Fee Posting","Fees & Billing");
+            ui.Navigate("Fee Posting","Daily Work");
             var year=ui.Find("Academic Year",ControlType.ComboBox);
             Identity.Check(!year.IsEnabled&&year.AsComboBox().Value=="Fictional "+DateTime.UtcNow.Year,"Posting must remain locked to the actual current academic year.");
             ui.Select("Campus","Fictional Main Campus");ui.Select("Class","Class 7 (Fictional Middle School)");ui.Select("Fee Type","Tuition fee");

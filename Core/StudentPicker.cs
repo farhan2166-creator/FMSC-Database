@@ -391,6 +391,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
         _header.Columns = _columns;
     }
     internal virtual string EntityPlural => "students";
+    internal virtual bool FillFromHighlightedRow => false;
     internal virtual Task<DataTable> LoadSourceAsync() => StudentSearchCache.GetAllAsync();
     internal virtual List<ColumnSpec> PlanColumns(List<Entry> entries, Font font)
         => StudentPickerColumnPlanner.Apply(entries, font);
@@ -538,7 +539,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
             EventArgs.Empty);
     }
     // Choosing
-    private void Commit(Entry entry)
+    private void Commit(Entry entry, bool keepPopupOpen = false)
     {
         if (entry.Id <= 0)
             return;
@@ -560,7 +561,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
             _suppress = false;
         }
         _searchSession.Cancel();
-        HidePopup();
+        if (!keepPopupOpen) HidePopup();
         if (!_text.Focused)
             _text.Focus();
         ShowTextStart();
@@ -709,6 +710,8 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
                     count - 1);
         _list.SelectedIndex =
             next;
+        if (FillFromHighlightedRow && _list.SelectedItem is Entry entry)
+            Commit(entry, keepPopupOpen: true);
         return true;
     }
     private bool HandleEnter()

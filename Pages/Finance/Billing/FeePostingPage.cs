@@ -11,6 +11,9 @@ public sealed class FeePostingPage : V2Page, IBusyPage
     private readonly LookupBox academicYear = new() { Enabled = false, TabStop = false };
     /// <summary>The months that can still be posted. LookupBox keys are integers, so each month is keyed as yyyymm (see BillingMonthKey) and shown as text.</summary>
     private readonly LookupBox monthBox = new();
+    private readonly LookupBox throughMonth = new();
+    private readonly StudentPicker student = new();
+    private DataTable postableMonths = new();
     private readonly LookupBox campus = new();
     private readonly LookupBox klass = new();
     private readonly LookupBox section = new();
@@ -18,12 +21,11 @@ public sealed class FeePostingPage : V2Page, IBusyPage
     private readonly LookupBox feeType = new();
     /// <summary>The full preview result. Held here rather than read back off the grid, because the grid only ever contains the current page of it.</summary>
     private DataTable? eligibleRows;
-    /// <summary>The procedure's own summary row for this month.</summary>
-    private DataRow? eligibleSummary;
     /* The filter set the preview on screen was actually loaded with. */
     private string? appliedFilterSignature;
     /// <summary>The month the preview on screen was loaded for.</summary>
     private DateTime loadedMonth;
+    private DateTime loadedThrough;
     /* Set while the page itself rebinds a list, so that rebinding does not look like the operator changing a filter. */
     private bool suppressFilterEvents;
     private bool lookupsReady;
@@ -39,8 +41,8 @@ public sealed class FeePostingPage : V2Page, IBusyPage
     public FeePostingPage() : this(true) { }
     internal FeePostingPage(bool initialize)
         : base(
-            "Post Monthly Fees",
-            "Review and post all eligible monthly fees for the chosen month and filters.")
+            "Manual / Advance Posting",
+            "Post missed or upcoming monthly fees. Review the charges before posting.")
     {
         Grid.ReadOnly = true;
 #if FMSC_LEVEL2
@@ -60,25 +62,32 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         if (initialize) Defer(BindLookupsAsync);
         // The entries carry a count, so the open list is wider than the field.
         monthBox.DropDownWidth = AppScale.Scale(320);
-        var filters = ReportUi.Bar(
-            ("Academic Year", academicYear),
-            ("Billing Month", monthBox),
+        var filters = ReportUi.Bar(4,
+            ("Academic year", academicYear),
+            ("From month", monthBox),
+            ("Through month (optional)", throughMonth),
+            ("Student (optional)", student),
             ("Campus", campus),
             ("Class", klass),
             ("Section", section),
-            ("Fee Type", feeType));
+            ("Fee type", feeType));
         /* any filter change drops the loaded preview, so Post can never send one filter's rows under another filter's label. */
         monthBox.SelectedIndexChanged += (_, _) => {
             if (!suppressFilterEvents)
                 InvalidatePreview();
         };
+        throughMonth.SelectedIndexChanged += (_, _) => { if (!suppressFilterEvents) InvalidatePreview(); };
+        student.UserSelectionChanged += (_, _) => InvalidatePreview();
+        student.SelectionCleared += (_, _) => InvalidatePreview();
         /* The year and every filter also change WHICH months still have something to post, so they refresh the month list as well as dropping the preview. */
         academicYear.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
         campus.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
         klass.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
         section.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
         feeType.SelectedIndexChanged += async (_, _) => await OnScopeChangedAsync();
-        SetContent(ReportUi.Layout(filters, Grid, "Post Monthly Fees", refreshMonths, loadPreview, postButton));
+        SetContent(ReportUi.WorkflowLayout(filters, Grid, "Posting Scope",
+            "Choose months and students, then load fees. Blank Through month means one month; blank Student includes the selected scope.",
+            "Monthly Fees", "Review the charges before posting. Receive payments in Fee Collection.", refreshMonths, loadPreview, postButton));
         Grid.Parent?.Controls.Add(postingOutcome);
         Grid.BringToFront();
         VisibleChanged += async (_, _) => {
@@ -97,6 +106,9 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             '|',
             academicYear.SelectedId,
             monthBox.SelectedId,
+            throughMonth.SelectedId,
+            student.SelectedId,
+            student.Text,
             campus.SelectedId,
             klass.SelectedId,
             section.SelectedId,
@@ -110,13 +122,12 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         }
         appliedFilterSignature = null;
         eligibleRows = null;
-        eligibleSummary = null;
         /* The preview cache goes with the grid, so the superseded rows cannot be paged or exported under the new filters. */
         InvalidateReport();
         if (announce)
         {
             SetStatus(
-                "Filters changed. Load the eligible fees again before posting.",
+                "Filters changed. Load Eligible Fees again before posting.",
                 true);
         }
     }
@@ -171,6 +182,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
                 return;
             // The operator may have picked a month from the old list while this was loading; that pick, not the one read before the await, is what to keep.
             previousKey = monthBox.SelectedId;
+            int previousThrough = throughMonth.SelectedId;
             var months = new DataTable();
             months.Columns.Add("MonthKey", typeof(int));
             months.Columns.Add("Display", typeof(string));
@@ -193,6 +205,9 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             {
                 monthBox.Bind(months, "MonthKey", "Display");
                 monthBox.SelectedValue = wanted;
+                postableMonths = months;
+                throughMonth.Bind(months, "MonthKey", "Display", "Same as From Month");
+                throughMonth.SelectedValue = BillingMonthKey.IsListed(months, previousThrough) ? previousThrough : 0;
             }
             finally
             {
@@ -205,7 +220,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             {
                 if (yearId <= 0)
                 {
-                    SetStatus("Choose an Academic Year to see the months that can be posted.", true);
+                    SetStatus("Choose an academic year to see available months.", true);
                 }
                 else if (months.Rows.Count == 0)
                 {
@@ -218,7 +233,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
                 {
                     SetStatus(
                         $"{months.Rows.Count:N0} month(s) still have fees to post. " +
-                        "Choose a month, then Load Eligible Fees.");
+                        "Choose months and optional filters, then Load Eligible Fees.");
                 }
             }
         }
@@ -245,11 +260,11 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             DataTable years = await yearsTask;
             HumanUi.BindCurrentAcademicYear(academicYear, years);
             // Classes and Sections are global lists (they are not per-campus), so they are bound unscoped - the same as the Class/Section filters on the other fee pages.
-            campus.Bind(await campusesTask, "CampusId", "CampusName");
-            klass.Bind(await classesTask, "ClassId", "ClassName");
-            section.Bind(await sectionsTask, "SectionId", "SectionName");
+            campus.Bind(await campusesTask, "CampusId", "CampusName", "All campuses");
+            klass.Bind(await classesTask, "ClassId", "ClassName", "All classes");
+            section.Bind(await sectionsTask, "SectionId", "SectionName", "All sections");
             // GetFeeTypes returns active types ordered by DisplayOrder.
-            feeType.Bind(await feeTypesTask, "FeeTypeId", "FeeTypeName");
+            feeType.Bind(await feeTypesTask, "FeeTypeId", "FeeTypeName", "All fee types");
             suppressFilterEvents = false;
             lookupsReady = true;
             await RefreshMonthsAsync();
@@ -276,34 +291,49 @@ public sealed class FeePostingPage : V2Page, IBusyPage
                 return;
             }
             DateTime previewMonth = chosenMonth.Value;
+            DateTime lastMonth = BillingMonthKey.ToMonth(throughMonth.SelectedId) ?? previewMonth;
+            if (lastMonth < previewMonth) { Warn("Through Month must be the same as or after From Month."); return; }
+            if (student.SelectedId == 0 && !string.IsNullOrWhiteSpace(student.Text))
+            { Warn("Choose a student from the search list, or clear Student to include everyone in the selected scope."); return; }
+            int selectedStudent = student.SelectedId;
+            var selectedMonths = postableMonths.AsEnumerable().Select(row => BillingMonthKey.ToMonth(Convert.ToInt32(row["MonthKey"]))!.Value)
+                .Where(month => month >= previewMonth && month <= lastMonth).OrderBy(month => month).ToArray();
+            if (selectedMonths.Length == 0) { Warn("Refresh Months and choose a month with eligible fees."); return; }
             /* F6/F7 - the filters this query is run for, re-checked after the awaits. */
             string requestedFilters = FilterSignature();
             // Empty TVP = every assigned fee type is eligible, which is what the procedures read as "all".
-            var feeTypes = new SqlParameter("@FeeTypeIds", SqlDbType.Structured) {
-                TypeName = "dbo.FeeTypeIdList",
-                Value = Tvp.FeeTypeIds(
-                    feeType.SelectedId > 0
-                        ? new[] { feeType.SelectedId }
-                        : Array.Empty<int>())
-            };
-            // @ExcludeAlreadyPosted = 1: fees already posted for this month are not eligible and are not listed.
-            DataSet result = await DatabaseHelper.QueryUserSetAsync(
-                "PreviewMonthlyFees",
-                DatabaseHelper.Int("@AcademicYearId", academicYear.SelectedId),
-                DatabaseHelper.Date("@BillingMonth", previewMonth),
-                DatabaseHelper.Int("@CampusId", campus.SelectedId),
-                DatabaseHelper.Int("@ClassId", klass.SelectedId),
-                DatabaseHelper.Int("@SectionId", section.SelectedId),
-                feeTypes,
-                DatabaseHelper.Bit("@ExcludeAlreadyPosted", true));
-            DataTable rows = result.Tables.Count > 0 ? result.Tables[0] : new DataTable();
-            DataTable summary = result.Tables.Count > 1 ? result.Tables[1] : new DataTable();
+            DataTable? combined = null;
+            foreach (DateTime selectedMonth in selectedMonths)
+            {
+                var feeTypes = new SqlParameter("@FeeTypeIds", SqlDbType.Structured) {
+                    TypeName = "dbo.FeeTypeIdList",
+                    Value = Tvp.FeeTypeIds(
+                        feeType.SelectedId > 0
+                            ? new[] { feeType.SelectedId }
+                            : Array.Empty<int>())
+                };
+                // @ExcludeAlreadyPosted = 1: fees already posted for this month are not eligible and are not listed.
+                using DataSet result = await DatabaseHelper.QueryUserSetAsync(
+                    "PreviewMonthlyFees",
+                    DatabaseHelper.Int("@AcademicYearId", academicYear.SelectedId),
+                    DatabaseHelper.Date("@BillingMonth", selectedMonth),
+                    DatabaseHelper.Int("@CampusId", campus.SelectedId),
+                    DatabaseHelper.Int("@ClassId", klass.SelectedId),
+                    DatabaseHelper.Int("@SectionId", section.SelectedId),
+                    feeTypes,
+                    DatabaseHelper.Bit("@ExcludeAlreadyPosted", true));
+                var monthRows = result.Tables[0];
+                combined ??= monthRows.Clone();
+                foreach (DataRow row in monthRows.Rows)
+                    if (selectedStudent <= 0 || Convert.ToInt32(row["AdmissionId"]) == selectedStudent) combined.ImportRow(row);
+                }
+            DataTable rows = combined ?? new DataTable();
             if (!string.Equals(requestedFilters, FilterSignature(), StringComparison.Ordinal))
                 return;
             // Keep our own reference to the FULL, unpaged result before binding, because BindReportAsync pages the grid and Post must act on every eligible row, not merely the page…
             eligibleRows = rows;
-            eligibleSummary = summary.Rows.Count > 0 ? summary.Rows[0] : null;
             loadedMonth = previewMonth;
+            loadedThrough = lastMonth;
             appliedFilterSignature = requestedFilters;
             await BindReportAsync(() => Task.FromResult(rows));
             // The filters can move while the grid is being bound; the change handler has already dropped the preview, so do not announce it.
@@ -313,7 +343,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             if (rows.Rows.Count == 0)
             {
                 SetStatus(
-                    $"Nothing is eligible for {previewMonth:MMMM yyyy}. Every fee " +
+                    $"Nothing is eligible for {PeriodLabel}. Every fee " +
                     "for this month is either already posted, not yet effective for the " +
                     "student, or the filters match nobody.",
                     true);
@@ -370,9 +400,10 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         int students = eligibleRows.AsEnumerable().Select(row => Convert.ToInt32(row["AdmissionId"])).Distinct().Count();
         decimal total = eligibleRows.AsEnumerable().Sum(row => Convert.ToDecimal(row["NetAmount"]));
         int reversed = eligibleRows.AsEnumerable().Count(row => Convert.ToString(row["EligibilityNote"])!.StartsWith("Previously reversed", StringComparison.Ordinal));
-        SetStatus($"{loadedMonth:MMMM yyyy}: {eligibleRows.Rows.Count:N0} eligible charge(s) for {students:N0} student(s), net Rs. {total:N0}. All listed fees across all pages will be posted after confirmation." +
+        SetStatus($"{PeriodLabel}: {eligibleRows.Rows.Count:N0} eligible charge(s) for {students:N0} student(s), net Rs. {total:N0}. All listed fees across all pages will be posted after confirmation." +
             (reversed > 0 ? $" Includes {reversed:N0} previously reversed fee(s) to post again." : ""));
     }
+    private string PeriodLabel => loadedThrough <= loadedMonth ? loadedMonth.ToString("MMMM yyyy") : $"{loadedMonth:MMMM yyyy} through {loadedThrough:MMMM yyyy}";
     private async Task PostEligibleAsync()
     {
         if (posting) return;
@@ -413,7 +444,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
                 .Select(row => Convert.ToInt32(row["AdmissionId"]))
                 .Distinct()
                 .Count();
-            string month = loadedMonth.ToString("MMMM yyyy");
+            string month = PeriodLabel;
             int postingYearId = academicYear.SelectedId;
             string scopeText = $"Academic year: {academicYear.Text}\nCampus: {campus.Text}; Class: {klass.Text}; Section: {section.Text}";
             int reversedCount=chosen.Count(row=>Convert.ToString(row["EligibilityNote"])!.StartsWith("Previously reversed",StringComparison.Ordinal));
@@ -421,8 +452,8 @@ public sealed class FeePostingPage : V2Page, IBusyPage
                     $"Post {chosen.Count:N0} fee(s) for {students:N0} student(s) for {month}?" +
                     $"\n\n{scopeText}" +
                     $"\n\nTotal net payable: Rs. {net:N0}\n\n" +
-                    "All eligible rows in this loaded preview are posted. Fees already posted for this month " +
-                    $"are untouched, and nothing is posted for any month other than {month}."+
+                    "Only the listed student/month fees in this preview will be posted. Existing bills are untouched. " +
+                    "This creates bills; it does not record payment. Collect payment in Fee Collection afterward."+
                     (reversedCount>0 ? $"\n\n{reversedCount} previously reversed fee(s) will receive new charges because they are included in this preview." : string.Empty),
                     "Post Monthly Fees",
                     defaultYes: false))
@@ -436,19 +467,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
                 return;
             }
             // This is what makes the posting explicit rather than filter-driven: the database writes these rows and nothing else.
-            var selection = Tvp.PostingSelectionsFromPreview(
-                eligibleRows,
-                _ => true);
-            var selectionParameter = new SqlParameter("@Selection", SqlDbType.Structured) {
-                TypeName = "dbo.PostingSelectionType",
-                Value = selection
-            };
-            DataTable result = await DatabaseHelper.QueryUserAsync(
-                "PostSelectedMonthlyFees",
-                DatabaseHelper.Int("@AcademicYearId", postingYearId),
-                DatabaseHelper.Date("@BillingMonth", loadedMonth),
-                selectionParameter,
-                DatabaseHelper.P("@Reason", $"Posted from Post Monthly Fees for {month}."));
+            DataTable result = await PostMonthsAsync(previewSnapshot, postingYearId, CurrentUser.UserId, month);
             int created = 0;
             int notPosted = 0;
             bool countsAvailable = result.Rows.Count > 0 && result.Columns.Contains("ChargesCreated")
@@ -480,6 +499,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
             SetStatus(resultText, notPosted > 0 || !countsAvailable);
             // Refresh the month list first: a month that is now fully posted leaves it, which is what stops the operator picking it again.
             int postedKey = BillingMonthKey.From(loadedMonth);
+            InvalidatePreview(announce: false);
             await RefreshMonthsAsync();
             if (monthBox.SelectedId == postedKey)
             {
@@ -501,6 +521,49 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         }
         finally { posting = false; }
     }
+
+    internal static async Task<DataTable> PostMonthsAsync(DataTable preview, int yearId, int actor, string period)
+    {
+        // Each month retains the existing permission and eligibility checks. One
+        // outer transaction keeps a vacation range together if any month fails.
+        return await Task.Run(() => {
+            using var connection = DatabaseHelper.GetConnection();
+            DatabaseHelper.OpenConnection(connection);
+            using var transaction = connection.BeginTransaction();
+            int created = 0, skipped = 0;
+            try
+            {
+                foreach (DateTime month in PreviewMonths(preview))
+                {
+                    using var command = new SqlCommand("PostSelectedMonthlyFees", connection, transaction) {
+                        CommandType = CommandType.StoredProcedure, CommandTimeout = 120
+                    };
+                    command.Parameters.AddRange(new[] {
+                        DatabaseHelper.Int("@UserId", actor), DatabaseHelper.Int("@AcademicYearId", yearId),
+                        DatabaseHelper.Date("@BillingMonth", month),
+                        new SqlParameter("@Selection", SqlDbType.Structured) { TypeName = "dbo.PostingSelectionType",
+                            Value = Tvp.PostingSelectionsFromPreview(preview, row => Convert.ToDateTime(row["BillingMonth"]) == month) },
+                        DatabaseHelper.P("@Reason", $"Manual / advance monthly posting: {period}.")
+                    });
+                    var result = new DataTable();
+                    using (var adapter = new SqlDataAdapter(command)) adapter.Fill(result);
+                    if (result.Rows.Count != 1 || !result.Columns.Contains("ChargesCreated") || !result.Columns.Contains("RowsNotPosted"))
+                        throw new InvalidOperationException("Posting did not return verified counts. The month range was not committed.");
+                    created += Convert.ToInt32(result.Rows[0]["ChargesCreated"]);
+                    skipped += Convert.ToInt32(result.Rows[0]["RowsNotPosted"]);
+                }
+                transaction.Commit();
+            }
+            catch { try { transaction.Rollback(); } catch { /* Preserve the original failure. */ } throw; }
+            var summary = new DataTable();
+            summary.Columns.Add("ChargesCreated", typeof(int)); summary.Columns.Add("RowsNotPosted", typeof(int));
+            summary.Rows.Add(created, skipped);
+            return summary;
+        });
+    }
+
+    internal static DateTime[] PreviewMonths(DataTable preview) => preview.AsEnumerable()
+        .Select(row => Convert.ToDateTime(row["BillingMonth"])).Distinct().OrderBy(month => month).ToArray();
     private void HideColumn(string columnName)
     {
         if (Grid.Columns.Contains(columnName))

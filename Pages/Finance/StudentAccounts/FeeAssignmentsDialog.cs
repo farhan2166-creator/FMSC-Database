@@ -379,7 +379,7 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
         /* caption and consequence both use the field's real meaning - the selected month is the last month that stays active. */
         fields.Controls.Add(HumanUi.Field("Stop Transport From", effectiveTo, true), 0, 0);
         fields.Controls.Add(effectiveConsequence, 0, 1);
-        fields.Controls.Add(HumanUi.Field("Reason (optional)", reason), 0, 2);
+        fields.Controls.Add(HumanUi.Field("Remarks (optional)", reason), 0, 2);
         card.Content.Controls.Add(fields);
         var buttons = HumanUi.ButtonRow(discontinueButton, cancel);
         buttons.Dock = DockStyle.Fill;

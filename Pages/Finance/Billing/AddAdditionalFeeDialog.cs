@@ -97,7 +97,7 @@ public sealed class AdditionalFeeEntry : UserControl
         fields.Controls.Add(dateField, 1, 0);
         fields.Controls.Add(amountField, 0, 1);
         fields.Controls.Add(discountField, 1, 1);
-        var reasonField = HumanUi.Field("What is this charge for?", reason, true, fillHeight: false);
+        var reasonField = HumanUi.Field("Remarks", reason, false, fillHeight: false);
         fields.Controls.Add(reasonField, 0, 2);
         fields.SetColumnSpan(reasonField, 2);
         feeTypeField.TabIndex = 0;
@@ -221,7 +221,6 @@ public sealed class AdditionalFeeEntry : UserControl
         validator.Rule(amount, () => amount.Value > 0 && WholeRupees.IsWhole(amount.Value), "Enter a positive whole-rupee amount");
         if (amount.Value > 0)
             validator.Rule(discount, () => discount.Value >= 0 && discount.Value <= amount.Value && WholeRupees.IsWhole(discount.Value), "Enter a whole-rupee discount no greater than the amount");
-        validator.Required(reason, "Describe the charge");
         validator.Rule(chargeDate,
             () => earliestChargeDate.HasValue && chargeDate.Value.Date >= earliestChargeDate.Value
                 && chargeDate.Value.Date <= DateTime.Today,
@@ -243,7 +242,7 @@ public sealed class AdditionalFeeEntry : UserControl
                 DatabaseHelper.Date("@ChargeDate", chargeDate.Value),
                 DatabaseHelper.P("@Amount", amount.Value),
                 DatabaseHelper.P("@DiscountAmount", discount.Value),
-                DatabaseHelper.P("@Reason", reason.Text.Trim()),
+                DatabaseHelper.P("@Reason", string.IsNullOrWhiteSpace(reason.Text) ? $"Additional fee: {feeType.Text}" : reason.Text.Trim()),
                 new SqlParameter("@Selection", SqlDbType.Structured) {
                     TypeName = "dbo.ManualChargeSelectionType",
                     Value = Tvp.ManualChargeSelection(new[] { enrollmentId })

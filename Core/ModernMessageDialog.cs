@@ -134,6 +134,8 @@ public static class ModernMessageDialog
             }
             Add(facts);
         }
+        DataGridView? recordsGrid = null;
+        int recordsRow = -1;
         if (content.Records is { Columns.Count: > 0 } records)
         {
             var grid = HumanUi.Grid(false);
@@ -155,10 +157,19 @@ public static class ModernMessageDialog
             grid.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCellsExceptHeaders;
             grid.DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             grid.Height = grid.ColumnHeadersHeight + Math.Min(8, Math.Max(1, records.Rows.Count)) * AppMetrics.GridRowHeight + AppScale.Scale(8);
+            recordsGrid = grid;
+            recordsRow = body.RowCount;
             Add(grid);
+            body.RowStyles[recordsRow].SizeType = SizeType.Absolute;
+            body.RowStyles[recordsRow].Height = grid.Height + grid.Margin.Vertical;
         }
+        bool fittingBody = false;
         void FitBody()
         {
+            if (fittingBody) return;
+            fittingBody = true;
+            try
+            {
             int available = Math.Max(1, viewport.ClientSize.Width - SystemInformation.VerticalScrollBarWidth);
             body.Width = available;
             foreach (Label label in body.Controls.OfType<Label>())
@@ -170,6 +181,17 @@ public static class ModernMessageDialog
                 foreach (Label label in facts.Controls)
                     label.MaximumSize = new Size(Math.Max(1, (facts.GetColumn(label) == 0 ? caption : available - caption) - label.Margin.Horizontal), 0);
             }
+            if (recordsGrid is not null)
+            {
+                recordsGrid.Width = available;
+                recordsGrid.AutoResizeRows(DataGridViewAutoSizeRowsMode.AllCellsExceptHeaders);
+                int rowsHeight = recordsGrid.Rows.Cast<DataGridViewRow>().Take(8).Sum(row => row.Height);
+                int height = recordsGrid.ColumnHeadersHeight + Math.Max(AppMetrics.GridRowHeight, rowsHeight) + AppScale.Scale(8);
+                recordsGrid.Height = height;
+                body.RowStyles[recordsRow].Height = height + recordsGrid.Margin.Vertical;
+            }
+            }
+            finally { fittingBody = false; }
         }
         viewport.SizeChanged += (_, _) => FitBody();
         root.Controls.Add(iconLabel, 0, 0); root.Controls.Add(viewport, 1, 0);
@@ -207,10 +229,17 @@ public static class ModernMessageDialog
         root.Controls.Add(buttonsPanel, 0, 1); root.SetColumnSpan(buttonsPanel, 2);
         form.Controls.Add(root);
         int bodyWidth = Math.Max(1, width - root.Padding.Horizontal - AppScale.Scale(48) - SystemInformation.VerticalScrollBarWidth);
+        form.ClientSize = new Size(width, AppScale.Scale(300));
+        form.PerformLayout();
         viewport.Size = new Size(bodyWidth, AppScale.Scale(300)); FitBody();
         int preferred = body.GetPreferredSize(new Size(bodyWidth, 0)).Height + root.Padding.Vertical + AppMetrics.ButtonHeight + AppScale.Scale(32);
         form.ClientSize = new Size(width, Math.Min(Math.Max(AppScale.Scale(230), preferred), Math.Max(1, work.Height - AppScale.Scale(80))));
-        form.Shown += (_, _) => { FitBody(); form.ActiveControl = initialFocus; };
+        form.Shown += (_, _) => {
+            FitBody(); body.PerformLayout();
+            int fitted = body.GetPreferredSize(new Size(body.Width, 0)).Height + root.Padding.Vertical + AppMetrics.ButtonHeight + AppScale.Scale(32);
+            form.ClientSize = new Size(width, Math.Min(Math.Max(AppScale.Scale(230), fitted), Math.Max(1, work.Height - AppScale.Scale(80))));
+            form.ActiveControl = initialFocus;
+        };
         form.KeyDown += (_, e) => {
             if (e.KeyCode == Keys.Escape)
                 form.DialogResult = buttons == MessageBoxButtons.YesNo ? DialogResult.No : DialogResult.Cancel;

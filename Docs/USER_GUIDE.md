@@ -49,8 +49,8 @@ In Setup Readiness, select an issue and use **Open Selected Setup**. The action 
 | Provisional registration | **Student Admissions → Registration & Pending** | Pending records have a temporary reference; an official admission/registration number is assigned only upon confirmation |
 | Student history and family | **Student Profile / Student Management** | Verify the selected student before editing or printing |
 | Student leave/transfer/re-admission | **Student Management → Transfers / Re-Admission** | Preserve history; do not treat leaving as deleting the student |
-| Fee configuration | **Fees & Billing → Fee Rate Setup** | Rates affect future billing; use approved whole-rupee rules |
-| Post fees or corrections | **Daily Work → Billing Center / Fees & Billing → Student Fee Corrections** | Verify class/academic year/student and review existing postings before repeating |
+| Fee configuration | **School Setup → Fee Rate Setup** | Rates affect future billing; use approved whole-rupee rules |
+| Post fees or corrections | **Daily Work → Billing Center / Daily Work → Student Fee Corrections** | Verify class/academic year/student and review existing postings before repeating |
 | Receive a payment | **Daily Work → Fee Collection** | Reconcile an uncertain save outcome before attempting another payment |
 | School or financial reports | **Reports** | Confirm student, time range, report filters and selected printer/export path |
 | Staff and certificates | **Staff / Student Certificates** | Finish or intentionally discard edits before switching records |
@@ -69,8 +69,10 @@ Screen naming and source mapping: [PROJECT_STRUCTURE.md](Development/PROJECT_STR
 
 ## Admissions and Quick Registration
 
-Student Admissions is the single intake workspace: **Admit / Edit Student**,
-**Registration & Pending**, and **Existing Student Setup**. Billing Center's
+**Daily Work → Student Admissions** opens the admission form directly.
+**Daily Work → Quick Registration** contains Registration Form and Pending Registrations.
+**Existing Student Setup** is a tab under
+**Daily Work → Student Data Review**. Billing Center's
 student exception lists open the selected record directly for setup or collection.
 See [school operations](SCHOOL_OPERATIONS.md) for the complete daily sequence.
 

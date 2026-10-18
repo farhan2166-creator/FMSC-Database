@@ -16,11 +16,12 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
     internal StudentCreditDialog(int studentId, bool loadOnShow = true)
     {
         admissionId = studentId;
+        amount.ZeroAsPlaceholder = true;
         Text = "Student Credit"; StartPosition = FormStartPosition.CenterParent;
-        Size = new Size(AppScale.Scale(850), AppScale.Scale(620));
-        MinimumSize = new Size(650, 450);
+        Size = new Size(AppScale.Scale(1050), AppScale.Scale(700));
+        MinimumSize = new Size(AppScale.Scale(850), AppScale.Scale(520));
         action.Items.AddRange(new object[] { "Deposit", "Refund", "Transfer" }); action.SelectedIndex = 0;
-        action.SelectedIndexChanged += (_, _) => sibling.Enabled = action.Text == "Transfer";
+        action.SelectedIndexChanged += (_, _) => { sibling.Enabled = action.Text == "Transfer"; if (action.Text == "Transfer" && sibling.Items.Count > 0) sibling.SelectedIndex = 0; else sibling.SelectedIndex = -1; };
         sibling.Enabled = false;
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 1, RowCount = 4 };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -49,10 +50,55 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
         try
         {
             using DataSet data = await DatabaseHelper.QueryUserSetAsync("GetStudentCredit", DatabaseHelper.Int("@AdmissionId", admissionId));
+            var identities = await DatabaseHelper.QuerySqlAsync("""
+                EXEC dbo.RequirePermission @UserId,N'Fees.View';
+                SELECT S.AdmissionId,S.AdmissionNumber,S.StudentName FROM dbo.Students S
+                WHERE S.AdmissionId=@AdmissionId OR EXISTS(
+                    SELECT 1 FROM dbo.StudentCreditEntries C WHERE C.AdmissionId=@AdmissionId AND C.CounterpartyAdmissionId=S.AdmissionId);
+                """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@AdmissionId", admissionId));
             if (IsDisposed) return;
-            balance.Text = $"Available credit: Rs. {Convert.ToDecimal(data.Tables[0].Rows[0]["AvailableCredit"]):N0}\n" +
-                "Credit stays with this student across academic years and leaving/readmission. Using credit is not new money received.";
-            history.DataSource = data.Tables[1].Copy();
+            var owner = identities.AsEnumerable().FirstOrDefault(row => Convert.ToInt32(row["AdmissionId"]) == admissionId);
+            string identity = owner is null ? "Student Credit" : $"{owner["AdmissionNumber"]} · {owner["StudentName"]}";
+            Text = $"Student Credit — {identity}";
+            balance.Text = $"{identity}\nAvailable credit: Rs. {Convert.ToDecimal(data.Tables[0].Rows[0]["AvailableCredit"]):N0}\n" +
+                "Positive entries add credit; negative entries reduce it. Transfers move credit between siblings without receiving new money.";
+            var entries = data.Tables[1].Copy();
+            entries.Columns.Add("TransferDetails", typeof(string));
+            foreach (DataRow entry in entries.Rows)
+            {
+                string kind = Convert.ToString(entry["EntryKind"]) ?? "";
+                entry["TransferDetails"] = Convert.ToString(entry["Reason"]) ?? "";
+                if (!entries.Columns.Contains("CounterpartyAdmissionId") || entry["CounterpartyAdmissionId"] is DBNull) continue;
+                var other = identities.AsEnumerable().FirstOrDefault(row => Convert.ToInt32(row["AdmissionId"]) == Convert.ToInt32(entry["CounterpartyAdmissionId"]));
+                if (other is not null)
+                {
+                    string note = Convert.ToString(entry["Reason"]) ?? "";
+                    entry["TransferDetails"] = $"{(kind == "TransferIn" ? "From" : "To")} {other["AdmissionNumber"]} · {other["StudentName"]}" +
+                        (string.IsNullOrWhiteSpace(note) ? "" : $" — {note}");
+                }
+            }
+            history.DataSource = entries;
+            foreach (string column in new[] { "CounterpartyAdmissionId", "CounterpartyAdmissionNumber", "Reason" })
+                if (history.Columns.Contains(column)) history.Columns[column].Visible = false;
+            history.Columns["TransferDetails"].HeaderText = "Details";
+            history.Columns["TransferDetails"].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+            history.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCellsExceptHeaders;
+            history.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            history.Columns["TransferDetails"].FillWeight = 220;
+            history.Columns["EntryKind"].FillWeight = 110;
+            history.Columns["Amount"].FillWeight = 100;
+            history.Columns["EntryKind"].HeaderText = "Credit Activity";
+            history.Columns["Amount"].HeaderText = "Credit Change (Rs.)";
+            history.Columns["Amount"].DefaultCellStyle.Format = "+#,0.##;-#,0.##;0";
+            if (history.Columns.Contains("CreatedAt"))
+            {
+                history.Columns["CreatedAt"].Visible = true;
+                history.Columns["CreatedAt"].HeaderText = "Date / Time";
+                history.Columns["CreatedAt"].DefaultCellStyle.Format = "dd-MMM-yyyy h:mm tt";
+                history.Columns["CreatedAt"].DisplayIndex = 0;
+            }
+            history.CellFormatting -= FormatCreditActivity;
+            history.CellFormatting += FormatCreditActivity;
             DataTable family = await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Fees.View';
                 SELECT DISTINCT S.AdmissionId,S.StudentName FROM dbo.FamilyMembers A
@@ -60,8 +106,20 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
                 WHERE A.AdmissionId=@AdmissionId AND B.AdmissionId<>@AdmissionId ORDER BY S.StudentName;
                 """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@AdmissionId", admissionId));
             sibling.DataSource = family; sibling.DisplayMember = "StudentName"; sibling.ValueMember = "AdmissionId";
+            if (action.Text != "Transfer") sibling.SelectedIndex = -1;
         }
         catch (Exception ex) { ModernMessageDialog.ShowError(this, DbMessage.UserMessage(ex), "Student Credit"); }
+    }
+
+    private void FormatCreditActivity(object? sender, DataGridViewCellFormattingEventArgs e)
+    {
+        if (history.Columns[e.ColumnIndex].Name != "EntryKind") return;
+        e.Value = Convert.ToString(e.Value) switch {
+            "TransferIn" => "Transfer received", "TransferOut" => "Transfer sent",
+            "Deposit" => "Credit deposit", "Refund" => "Credit refund",
+            "Apply" or "Application" => "Applied to fees", _ => e.Value
+        };
+        e.FormattingApplied = true;
     }
 
     private async Task SaveAsync()

@@ -66,7 +66,7 @@ public sealed class SetupReadinessPage : V2Page
             "Campuses" => (() => new CampusesPage(), "School Setup", "Campuses", "System.Setup"),
             "Assignments" => (() => new CampusClassSectionAssignmentsPage(), "School Setup", PageTitles.CampusAssignments, "System.Setup"),
             "Years" => (() => new AcademicYearsPage(), "School Setup", "Academic Years", "Calendar.Manage"),
-            "Fees" => (() => FeeConfigurationWorkspace.Create(), "Finance", PageTitles.FeeRateSetup, "Fees.Configuration.Manage"),
+            "Fees" => (() => FeeConfigurationWorkspace.Create(), "School Setup", PageTitles.FeeRateSetup, "Fees.Configuration.Manage"),
             "Backup" => (() => new BackupRestorePage(), "Administration", PageTitles.BackupRestore, "Backup.Create"),
             _ => null
         };

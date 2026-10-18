@@ -6,7 +6,7 @@ internal static class PromotionWorkflows
     internal static void Run(Desktop ui,Evidence report)
     {
         report.Run("L2-PRO-01",ui,()=>{
-            ui.Click("Student Management",ControlType.Button);ui.Click("Student Promotion",ControlType.Button);
+            ui.Click("Daily Work",ControlType.Button);ui.Click("Student Promotion",ControlType.Button);
             ui.Select("Source Campus","Fictional Main Campus");
             ui.Select("Source Academic Year","Fictional "+(DateTime.UtcNow.Year-1));
             ui.Select("Source Class","Class 6 (Fictional Middle School)");
