@@ -20,7 +20,7 @@
 		<UseWindowsForms>true</UseWindowsForms>
 		<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 		<ApplicationIcon>Assets\FMSC_Logo Icon.ico</ApplicationIcon>
-		<Version>1.1.0-rc.1</Version>
+		<Version>1.1.0-rc.2</Version>
 		<AssemblyVersion>1.1.0.0</AssemblyVersion>
 		<FileVersion>1.1.0.0</FileVersion>
 	</PropertyGroup>

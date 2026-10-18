@@ -2,23 +2,35 @@ using System.Text.Json;
 
 namespace FMSC_SMS.Core;
 
-internal enum MutationKind { FeeAdjustment, BankCertificateCreate }
+internal enum MutationKind { FeeAdjustment, BankCertificateCreate, FeeConcession }
 internal enum MutationOutcome { Saved, Rejected, Unconfirmed }
 internal sealed record MutationIntent(Guid Id,MutationKind Kind,int UserId,string Scope,string PayloadHash,string Summary,DateTime StartedUtc);
 internal sealed record MutationResult(MutationKind Kind,int SubjectId,int OriginId,int RecordId,string Receipt,string TransactionType,decimal Amount,decimal? Balance)
 {
+    public DateTime? EffectiveFrom { get; init; }
+    public DateTime? EffectiveThrough { get; init; }
+    public decimal? ReleasedPaidAmount { get; init; }
     internal void Validate()
     {
         if(!Enum.IsDefined(Kind)||SubjectId<=0||RecordId<=0||Receipt is null||Receipt.Length>100||
             Kind==MutationKind.FeeAdjustment&&(OriginId<=0||TransactionType is not ("Correction" or "Refund" or "Reversal"))||
-            Kind==MutationKind.BankCertificateCreate&&TransactionType!="BankCertificateCreate")
+            Kind==MutationKind.BankCertificateCreate&&TransactionType!="BankCertificateCreate"||
+            Kind==MutationKind.FeeConcession&&(OriginId<=0||TransactionType!="FeeConcession"||EffectiveFrom is null||EffectiveThrough is null||EffectiveFrom>EffectiveThrough||ReleasedPaidAmount is null or <0))
             throw new InvalidDataException("The saved operation identity could not be verified.");
         WholeRupees.Require(Amount);
+        if (ReleasedPaidAmount is decimal released) WholeRupees.Require(released);
     }
     internal DataTable ToTable()
     {
         Validate();var table=new DataTable();
-        if(Kind==MutationKind.BankCertificateCreate){table.Columns.Add("BankAccountOpeningCertificateId",typeof(int));table.Columns.Add("StaffId",typeof(int));table.Rows.Add(RecordId,SubjectId);}
+        if(Kind==MutationKind.FeeConcession)
+        {
+            table.Columns.Add("StudentFeeAssignmentId",typeof(int));table.Columns.Add("AdmissionId",typeof(int));
+            table.Columns.Add("EffectiveFrom",typeof(DateTime));table.Columns.Add("EffectiveThrough",typeof(DateTime));
+            table.Columns.Add("Difference",typeof(decimal));table.Columns.Add("ReleasedPaidAmount",typeof(decimal));
+            table.Rows.Add(RecordId,SubjectId,EffectiveFrom!.Value,EffectiveThrough!.Value,Amount,ReleasedPaidAmount!.Value);
+        }
+        else if(Kind==MutationKind.BankCertificateCreate){table.Columns.Add("BankAccountOpeningCertificateId",typeof(int));table.Columns.Add("StaffId",typeof(int));table.Rows.Add(RecordId,SubjectId);}
         else{table.Columns.Add("FeePaymentId",typeof(int));table.Columns.Add("ReceiptNumber");table.Columns.Add("TransactionType");table.Columns.Add("Amount",typeof(decimal));table.Columns.Add("Balance",typeof(decimal));table.Rows.Add(RecordId,Receipt,TransactionType,Amount,(object?)Balance??DBNull.Value);}
         return table;
     }

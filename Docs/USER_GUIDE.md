@@ -80,7 +80,7 @@ See [school operations](SCHOOL_OPERATIONS.md) for the complete daily sequence.
 
 Admission saves hold the submitted details until saving and refresh finish. For **Mark as Left / Cancel Registration** or **Legacy Go Live**, Review holds the inputs; changing them after review requires another review. Wait for a pending operation to finish before closing.
 
-For business-rule context see [ADMISSION_WORKFLOW.md](Workflows/ADMISSION_WORKFLOW.md). The current runtime requires schema 20 even if historical text in that file refers to older database versions.
+For business-rule context see [ADMISSION_WORKFLOW.md](Workflows/ADMISSION_WORKFLOW.md). The current runtime requires schema 21 even if historical text in that file refers to older database versions.
 
 ## Find Student
 

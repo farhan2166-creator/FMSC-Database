@@ -62,8 +62,11 @@ An administrator reviews missed months and chooses whether to include them.
 Manual Recovery is for reviewed exceptions, including deliberately reposting a
 reversed charge. Automatic billing does not silently recreate reversals.
 
-Change recurring concessions/discounts from the next month. To change an issued
-bill, use its unpaid-balance adjustment or an explicit bill-rate correction.
+Choose recurring concession start/end months in Fee Concession. Review whether
+issued bills in that period should also change, and choose credit or refund for
+paid reductions. A temporary concession restores the prior agreement afterward.
+For a separate issued-bill change, use its unpaid-balance adjustment or an explicit
+bill-rate correction.
 Paid rate reductions release the paid difference as credit or an explicit refund;
 original payments remain in history. Review the correction preview before saving.
 
@@ -71,7 +74,8 @@ original payments remain in history. Review the correction preview before saving
 
 Promotion/readmission selects a new placement and rates without copying old debt.
 Confirm actual returns individually. Transfer and leaving use the configured
-cutoff; review the financial effect before applying. Paid money must be reconciled,
+cutoff by default. Leaving can retain issued bills or waive from a chosen month;
+review the financial effect before applying. Paid money must be reconciled,
 not deleted. A leaving student can still owe earlier fees or hold unused credit.
 
 ## Close the day
@@ -84,6 +88,6 @@ student statements and outstanding balances, and make a verified backup.
 
 Use the verified database-free complete installer artifact. A fresh install gets
 the owner's matching detached database pair locally after download. An existing
-schema-19 installation upgrades through migration 20 with a verified backup before
+schema-19/20 installation upgrades through migrations 20/21 with a verified backup before
 application activation. Never replace an installed school database with a test
 fixture or a development DACPAC. See INSTALLATION.md and RELEASE_READINESS.md.

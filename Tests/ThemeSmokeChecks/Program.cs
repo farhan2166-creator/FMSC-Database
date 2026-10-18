@@ -143,6 +143,7 @@ internal static partial class Program
             CheckSetupReadinessActions();
             CheckFamilyCounter();
             CheckLifecycleCloseGuard();
+            CheckOperatorConcessionChoices();
             CheckCertificateSubmissionGuard();
             CheckQuickRegistrationTabGuard();
             CheckRegularNewCertificateDraft();

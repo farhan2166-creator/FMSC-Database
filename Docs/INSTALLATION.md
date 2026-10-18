@@ -10,7 +10,7 @@ The [Complete Windows Installer ZIP](../.github/workflows/fmsc-complete-installe
 FMSC_SMS/                 Published self-contained app and resources
 Database/                 You provide FMSC_DB.mdf and FMSC_DB_log.ldf for a fresh install
 Tools/                    Signed Microsoft SqlLocalDB.msi and verified sqlcmd.exe
-Migrations/               Pending numbered SQL migrations; 20.sql upgrades schema 19
+Migrations/               Pending numbered SQL migrations; 20.sql upgrades schema 19; 21.sql upgrades schema 20
 Install FMSC_SMS.bat
 core.ps1
 READ_ME_FIRST.txt         Packaging instructions
@@ -51,7 +51,7 @@ If silent LocalDB installation fails (for example, MSI code 1603), the current i
 
 - Take and **verify** a recoverable backup first and note its storage path.
 - Do **not** copy a replacement MDF/LDF over an installed school's existing pair.
-- Run the same verified installer with the app closed. This release requires schema 20. Migration 20 supports the schema-19 baseline and verifies a recovery backup first. Older databases require a separately reviewed upgrade path. A newer schema must not be downgraded.
+- Run the same verified installer with the app closed. This release requires schema 21. Migrations 20 and 21 support schema 19/20 respectively, with a verified recovery backup first. Older databases require a separately reviewed upgrade path. A newer schema must not be downgraded.
 - Record the automatic pre-migration safety backup, installer status, original/current version, and post-upgrade application compatibility. Recovery requires a tested restore path.
 - If anything fails, **do not manually rerun SQL migrations on the live school database**. Follow [recovery](BACKUP_RECOVERY.md), and use a verified disposable clone for diagnosis.
 
