@@ -4,7 +4,12 @@ These instructions are for maintainers and Codex working on FMSC_SMS.
 
 ## Owner-selected verification scope
 
-GitHub verification workflows are manual-only (`workflow_dispatch`), including desktop, security, SQL lifecycle, Level 2 and disposable installation checks. Pushes and pull requests do not start them automatically. Run them from Actions only when explicitly requested or as part of an agreed release verification.
+Desktop, SQL lifecycle, Level 2 and disposable installation workflows remain manually
+runnable. Security checks also run on main pushes and pull requests. Publishing a
+`release/*` branch explicitly starts the Release Readiness workflow, composing
+security, Windows component tests, real SQL scenarios and disposable installation.
+Ordinary feature branches do not start the full release matrix. No workflow uses
+production school data or deploys to a school PC.
 
 For small UI-only changes, inspect the affected code and use only a relevant focused check when needed. Do not repeat full regression, SQL, performance, installer or interactive desktop suites for a button visibility or spacing change. Choose broader checks for the affected behavior when a change touches data, payments, security, recovery or deployment. Record what actually ran; manual-only workflows do not imply passing verification. This owner-selected scope takes precedence over the generic check lists below.
 

@@ -1,0 +1,26 @@
+name: FMSC Release Readiness
+
+# Publishing a release/* branch is an explicit request for full release checks.
+# Ordinary feature branches and main retain their existing trigger policy.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['release/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fmsc-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    uses: ./.github/workflows/fmsc-security.yml
+  desktop:
+    uses: ./.github/workflows/fmsc-desktop-ci.yml
+  sql:
+    uses: ./.github/workflows/fmsc-lifecycle-sql-ci.yml
+  installation:
+    needs: [security, desktop, sql]
+    uses: ./.github/workflows/fmsc-disposable-windows-install.yml
