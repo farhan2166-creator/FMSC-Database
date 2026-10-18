@@ -33,6 +33,8 @@ jobs:
 
       - name: Check out test source and data-free SQL fixture
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Install .NET 8
         uses: actions/setup-dotnet@v6
