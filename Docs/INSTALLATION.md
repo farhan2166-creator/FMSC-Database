@@ -4,7 +4,7 @@ This describes the **existing FMSC_SMS installer**; it does not replace it. Use 
 
 ## What is delivered
 
-The private [Complete Windows Installer ZIP](../.github/workflows/fmsc-complete-installer.yml) is designed to include:
+The [Complete Windows Installer ZIP](../.github/workflows/fmsc-complete-installer.yml) is designed to include:
 
 ```text
 FMSC_SMS/                 Published self-contained app and resources
@@ -29,7 +29,7 @@ The installer checks `Migrations` for top-level `*.sql` files. An empty or missi
 ## Before a fresh install
 
 1. Choose the intended **Windows operator account** and confirm it can access the database after elevated installation. LocalDB instances are per-Windows-user; installation as a different administrator is a known cross-account risk.
-2. Download the private installer artifact from the [Actions page](https://github.com/farhan2166-creator/FMSC-Database/actions). Verify the exact source commit, successful job, artifact integrity and contents.
+2. Download the database-free installer artifact from the [Actions page](https://github.com/farhan2166-creator/FMSC-Database/actions). Verify the exact source commit, successful job, artifact integrity and contents.
 3. Extract the ZIP **completely** into a normal writable folder. Do not run scripts inside the compressed archive.
 4. Obtain the owner-approved, compatible **detached** database pair. Both `FMSC_DB.mdf` and `FMSC_DB_log.ldf` must come from the **same** verified snapshot. Never copy an attached/live database or replace a production database with a DACPAC.
 5. Put the two files inside the extracted top-level `Database/` folder (beside `core.ps1`); check exact filenames. Neither file belongs in GitHub, email, or CI.
@@ -51,7 +51,7 @@ If silent LocalDB installation fails (for example, MSI code 1603), the current i
 
 - Take and **verify** a recoverable backup first and note its storage path.
 - Do **not** copy a replacement MDF/LDF over an installed school's existing pair.
-- Run the same verified installer with the app closed. This release requires the schema 20. Migration 20 supports the schema-19 baseline and verifies a recovery backup first. Older databases require a separately reviewed upgrade path. A newer schema must not be downgraded.
+- Run the same verified installer with the app closed. This release requires schema 20. Migration 20 supports the schema-19 baseline and verifies a recovery backup first. Older databases require a separately reviewed upgrade path. A newer schema must not be downgraded.
 - Record the automatic pre-migration safety backup, installer status, original/current version, and post-upgrade application compatibility. Recovery requires a tested restore path.
 - If anything fails, **do not manually rerun SQL migrations on the live school database**. Follow [recovery](BACKUP_RECOVERY.md), and use a verified disposable clone for diagnosis.
 

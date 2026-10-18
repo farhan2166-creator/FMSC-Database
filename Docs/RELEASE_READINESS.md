@@ -37,7 +37,7 @@ No physical printer, school Windows profile or live delivery acceptance is claim
 The schema model comparison against main `8300557` removes exactly four procedures
 and changes only `comm.IngestMeta`; no table, column, key, constraint or other module
 is changed. Current DACPAC SHA256:
-`62f77e4dd41307ef8bc6195622fcd80999552b4ecbeaca3c6ac9ebc30b73ffc1`.
+`db7650b3477f99a35f2404b355eced984c13deba8aa4b51db79a9d760d806c1b`.
 
 | Retired procedure | Supported replacement / evidence |
 |---|---|
