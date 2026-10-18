@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--fee-documents"))
+        {
+            CheckFeeDocuments();
+            Console.WriteLine($"PASS: {checks} fee document checks, including RDLC PNG/PDF rendering.");
+            return;
+        }
         if (args.Contains("--collection-credit"))
         {
             CheckCollectionCredit();

@@ -6,7 +6,7 @@ internal static partial class Program
 {
     private static void CheckCollectionCredit()
     {
-        Check(FMSC_SMS.DatabaseHelper.RequiredDatabaseSchemaVersion == "22", "Application expects the installed credit migration");
+        Check(FMSC_SMS.DatabaseHelper.RequiredDatabaseSchemaVersion == "23", "Application expects the installed credit migration");
         using var page = new FeeCollectionPage(false);
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var type = typeof(FeeCollectionPage);

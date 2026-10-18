@@ -87,7 +87,7 @@ BEGIN
   @Credit decimal(12,2)=(SELECT SUM(CreditRemaining) FROM OPENJSON(@Students) WITH(CreditRemaining decimal(12,2))),
   @CashApplied decimal(12,2)=COALESCE((SELECT SUM(Cash) FROM @Lines),0);
  INSERT dbo.CollectionReceipts(CollectionReceiptId,ReceiptNumber,PrimaryAdmissionId,TransactionDate,CreatedByUserId,CashReceived,CashApplied,CreditApplied,DiscountApplied,BalanceRemaining,CreditRemaining,PaymentMethod,Remarks,SnapshotJson)
- VALUES(@ReceiptId,@Receipt,@PrimaryAdmissionId,@TransactionDate,@UserId,@CashReceived,@CashApplied,@CreditApplied,@DiscountApplied,@Balance,@Credit,@PaymentMethod,@Remarks,CONCAT(N'{"Students":',@Students,N',"Lines":',@Details,N'}'));
+ VALUES(@ReceiptId,@Receipt,@PrimaryAdmissionId,@TransactionDate,@UserId,@CashReceived,@CashApplied,@CreditApplied,@DiscountApplied,@Balance,@Credit,CASE WHEN @CashReceived=0 AND @CreditApplied>0 THEN N'Account Credit' WHEN @CreditApplied>0 THEN CONCAT(@PaymentMethod,N' + credit') ELSE @PaymentMethod END,@Remarks,CONCAT(N'{"Students":',@Students,N',"Lines":',@Details,N'}'));
  INSERT dbo.CollectionReceiptPayments SELECT @ReceiptId,FeePaymentId FROM @Payments;
  SELECT @ReceiptId CollectionReceiptId,@Receipt ReceiptNumber,@PrimaryAdmissionId AdmissionId,@Balance Balance;
 END;
@@ -98,6 +98,31 @@ BEGIN
  SET NOCOUNT ON; EXEC dbo.RequirePermission @UserId,N'Fees.View';
  DECLARE @Id uniqueidentifier=(SELECT CollectionReceiptId FROM dbo.CollectionReceipts WHERE ReceiptNumber=@ReceiptNumber);
  IF @Id IS NULL SELECT TOP(1) @Id=L.CollectionReceiptId FROM dbo.CollectionReceiptPayments L JOIN dbo.FeePayments P ON P.FeePaymentId=L.FeePaymentId WHERE P.ReceiptNumber=@ReceiptNumber;
+ -- Older or automatic credit movements have no collection batch. Print the
+ -- identified application on its own; do not infer a batch from timestamps.
+ IF @Id IS NULL AND EXISTS(SELECT 1 FROM dbo.FeePayments WHERE ReceiptNumber=@ReceiptNumber AND IsCreditApplication=1)
+ BEGIN
+  DECLARE @Payment int=(SELECT TOP(1) FeePaymentId FROM dbo.FeePayments WHERE ReceiptNumber=@ReceiptNumber AND IsCreditApplication=1);
+  SELECT CONCAT(N'FMSC-CR-',YEAR(P.PaymentDate),N'-',RIGHT(N'0000'+CONVERT(nvarchar(20),P.FeePaymentId),CASE WHEN LEN(CONVERT(nvarchar(20),P.FeePaymentId))>4 THEN LEN(CONVERT(nvarchar(20),P.FeePaymentId)) ELSE 4 END)) ReceiptNumber,
+   P.AdmissionId PrimaryAdmissionId,P.CreatedAt TransactionDate,CONVERT(decimal(12,2),0) CashReceived,CONVERT(decimal(12,2),0) CashApplied,
+   P.TotalAmount CreditApplied,CONVERT(decimal(12,2),0) DiscountApplied,
+   COALESCE((SELECT SUM(dbo.GetFeeChargeBalance(BillingChargeId)) FROM dbo.BillingCharges WHERE AdmissionId=P.AdmissionId AND Status<>N'Cancelled'),0) BalanceRemaining,
+   COALESCE((SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=P.AdmissionId),0) CreditRemaining,
+   N'Account Credit' PaymentMethod,N'Historical credit application; balances shown are current.'+CASE WHEN P.Status<>N'Completed' THEN N' Status: '+P.Status ELSE N'' END ReceiptStatus
+  FROM dbo.FeePayments P WHERE FeePaymentId=@Payment;
+  SELECT S.AdmissionId,COALESCE(S.AdmissionNumber,S.QuickReference) AdmissionNumber,S.StudentName,S.FatherName,
+   COALESCE((SELECT SUM(dbo.GetFeeChargeBalance(BillingChargeId)) FROM dbo.BillingCharges WHERE AdmissionId=S.AdmissionId AND Status<>N'Cancelled'),0) BalanceRemaining,
+   COALESCE((SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=S.AdmissionId),0) CreditRemaining,
+   CONVERT(decimal(12,2),0) CashApplied,P.TotalAmount CreditApplied,CONVERT(decimal(12,2),0) DiscountApplied
+  FROM dbo.FeePayments P JOIN dbo.Students S ON S.AdmissionId=P.AdmissionId WHERE P.FeePaymentId=@Payment;
+  SELECT B.BillingChargeId ChargeId,B.AdmissionId,B.EnrollmentId,B.NetAmount AmountBefore,CONVERT(decimal(12,2),0) Discount,CONVERT(decimal(12,2),0) Cash,A.Amount Credit,
+   F.FeeTypeName,COALESCE(B.BillingMonth,B.ChargeDate) FeePeriod,C.ClassName,SEC.SectionName,CA.CampusName,dbo.GetFeeChargeBalance(B.BillingChargeId) BalanceAfter
+  FROM dbo.FeePaymentAllocations A JOIN dbo.BillingCharges B ON B.BillingChargeId=A.BillingChargeId JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
+  JOIN dbo.Enrollments E ON E.EnrollmentId=B.EnrollmentId JOIN dbo.CampusClassSections CCS ON CCS.ClassSectionId=E.ClassSectionId
+  JOIN dbo.Classes C ON C.ClassId=CCS.ClassId JOIN dbo.Sections SEC ON SEC.SectionId=CCS.SectionId JOIN dbo.Campuses CA ON CA.CampusId=CCS.CampusId
+  WHERE A.FeePaymentId=@Payment ORDER BY COALESCE(B.BillingMonth,B.ChargeDate),F.DisplayOrder,B.BillingChargeId;
+  RETURN;
+ END;
  SELECT R.*,CASE WHEN EXISTS(SELECT 1 FROM dbo.CollectionReceiptPayments L JOIN dbo.FeePayments P ON P.FeePaymentId=L.FeePaymentId WHERE L.CollectionReceiptId=R.CollectionReceiptId AND
   (P.Status<>N'Completed' OR EXISTS(SELECT 1 FROM dbo.FeePayments X WHERE X.RelatedFeePaymentId=P.FeePaymentId AND X.Status=N'Completed')))
   THEN N'Original receipt; later adjustments recorded. See Payment History.' ELSE N'' END ReceiptStatus FROM dbo.CollectionReceipts R WHERE CollectionReceiptId=@Id;
@@ -110,8 +135,14 @@ AS
 BEGIN
  SET NOCOUNT ON; EXEC dbo.RequirePermission @UserId,N'Fees.View';
  SELECT R.CollectionReceiptId,R.ReceiptNumber,R.TransactionDate,R.PaymentMethod,R.CashApplied+R.CreditApplied TotalSettled,
-  S.CashApplied,S.CreditApplied,S.DiscountApplied,(SELECT COUNT(*) FROM OPENJSON(R.SnapshotJson,'$.Students')) StudentCount
+  S.CashApplied,S.CreditApplied,S.DiscountApplied,(SELECT COUNT(*) FROM OPENJSON(R.SnapshotJson,'$.Students')) StudentCount,
+  S.CashApplied+S.CreditApplied-COALESCE(N.NetSettled,0) Adjusted,COALESCE(N.NetSettled,0) NetSettled
  FROM dbo.CollectionReceipts R CROSS APPLY OPENJSON(R.SnapshotJson,'$.Students') WITH(AdmissionId int,CashApplied decimal(12,2),CreditApplied decimal(12,2),DiscountApplied decimal(12,2)) S
+ OUTER APPLY(SELECT SUM(CASE WHEN P.Status<>N'Completed' THEN 0 ELSE CASE WHEN COALESCE(A.Applied,0)+COALESCE(X.Adjusted,0)<0 THEN 0 ELSE COALESCE(A.Applied,0)+COALESCE(X.Adjusted,0) END END) NetSettled
+  FROM dbo.CollectionReceiptPayments L JOIN dbo.FeePayments P ON P.FeePaymentId=L.FeePaymentId
+  OUTER APPLY(SELECT SUM(Amount) Applied FROM dbo.FeePaymentAllocations WHERE FeePaymentId=P.FeePaymentId) A
+  OUTER APPLY(SELECT SUM(FA.Amount) Adjusted FROM dbo.FeePayments FP JOIN dbo.FeePaymentAllocations FA ON FA.FeePaymentId=FP.FeePaymentId WHERE FP.RelatedFeePaymentId=P.FeePaymentId AND FP.Status=N'Completed') X
+  WHERE L.CollectionReceiptId=R.CollectionReceiptId AND P.AdmissionId=@AdmissionId) N
  WHERE S.AdmissionId=@AdmissionId ORDER BY R.TransactionDate DESC,R.CreatedAt DESC;
  SELECT L.FeePaymentId FROM dbo.CollectionReceiptPayments L JOIN dbo.FeePayments P ON P.FeePaymentId=L.FeePaymentId WHERE P.AdmissionId=@AdmissionId;
 END;

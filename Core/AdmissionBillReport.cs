@@ -6,11 +6,13 @@ internal static partial class AdmissionBillReport
 
     internal static void ShowFamily(Form? owner, InstitutionProfile.PrintIdentity institution, string parent, DataTable charges)
     {
-        var data=BuildFamilyData(institution.Name,institution.ContactNumber,institution.Address,parent,charges);
-        string path=Path.Combine(AppContext.BaseDirectory,"Reports","AdmissionBill.rdlc");
-        RdlcReportPreview.Show(owner,charges.AsEnumerable().Select(r=>Convert.ToString(r["Reference"])).Distinct().Count()>1?"Family Bill":"Student Bill",path,"FeeReceiptData",data,fitPageWidth:false,reportDefinition:ReceiptReportLayout.Definition(path,data,splitFeePeriod:false));
+        using var grouped=BuildFamilyData(institution.Name,institution.ContactNumber,institution.Address,parent,charges);
+        bool family=charges.AsEnumerable().Select(row=>Convert.ToString(row["Reference"])).Distinct().Count()>1;
+        using var data=family?grouped.Copy():StudentBillData(grouped);
+        string path=Path.Combine(AppContext.BaseDirectory,"Reports",family?"FamilyBill.rdlc":"StudentBill.rdlc");
+        RdlcReportPreview.Show(owner,family?"Family Bill":"Student Bill",path,"FeeReceiptData",data,
+            reportDefinition:ReceiptReportLayout.SizeToContent(path,data));
     }
-
     internal static void Show(Form? owner, InstitutionProfile.PrintIdentity institution,
         string studentName, int admissionId, string classSection, IReadOnlyList<Line> lines, bool showDiscount,
         string campusName = "", string fatherName = "")
@@ -21,16 +23,17 @@ internal static partial class AdmissionBillReport
         decimal discount = showDiscount ? lines.Sum(line => line.Discount) : 0m;
         decimal total = lines.Sum(line => line.Amount);
         foreach (var line in lines)
-            data.Rows.Add(1, institution.Name, "PAYMENT BILL", "STUDENT COPY",
-                (provisional?"BILL-":"ADM-") + reference, studentName,
+            data.Rows.Add(1, institution.Name, "STUDENT PAYMENT BILL", "PARENT COPY",
+                "BILL-" + reference, studentName,
                 reference, classSection,
                 DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt"), "",
                 line.FeeName,
                 line.Amount, discount, total, 0m, "", "", discount > 0m, false,
                 institution.ContactNumber, institution.Address, campusName, fatherName, line.Period);
+        foreach(DataRow row in data.Rows) row["DocumentKind"]="Bill";
         ReceiptReportData.GroupPeriods(data);
-        string path = Path.Combine(AppContext.BaseDirectory, "Reports", "AdmissionBill.rdlc");
+        string path = Path.Combine(AppContext.BaseDirectory, "Reports", "StudentBill.rdlc");
         RdlcReportPreview.Show(owner, provisional?"Registration Bill":"Admission Bill", path, "FeeReceiptData", data,
-            fitPageWidth: false, reportDefinition: ReceiptReportLayout.Definition(path, data));
+            fitPageWidth: false, reportDefinition: ReceiptReportLayout.SizeToContent(path, data));
     }
 }
