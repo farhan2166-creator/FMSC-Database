@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+using FMSC_SMS.Pages.Finance.StudentAccounts;
 
 internal sealed partial class SchoolScenarios
 {
@@ -139,6 +140,13 @@ internal sealed partial class SchoolScenarios
         SaveTerms(id,month,month,0);
         r.Check(Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE BillingChargeId=@C OR CorrectionOfBillingChargeId=@C;",Sql.P("@C",bill))==5000&&ChainDue(bill)==1000&&Credit(child.Student)==500,
             "Later removal uses the reviewed 5000 fee basis and keeps paid credit until its use is explicitly chosen.");
+        var waived=EarlierChild("Prior correction and later waiver example");long waivedBill=Tuition(waived.Enrollment);
+        Rate(waivedBill,6000);await Pay(waived.Student,waived.Enrollment,0,(waivedBill,-500));
+        var actual=FeeDiscountPeriod.BillContext(waivedBill);
+        r.Check(Convert.ToDecimal(actual["StandardAmount"])==6000&&Convert.ToDecimal(actual["DiscountAmount"])==500,
+            "Opening a bill review includes a later unpaid waiver as well as its prior rate correction, preventing accidental recharging.");
+        using(var unchanged=ReviewConcession(TermsArgs(Assignment(waived.Enrollment),new DateTime(f.AdmissionDate.Year,f.AdmissionDate.Month,1),new DateTime(f.AdmissionDate.Year,f.AdmissionDate.Month,1),500,true,rate:6000,agreement:false,bill:waivedBill)))
+            r.Check(Convert.ToDecimal(unchanged.Tables[0].Rows[0]["Difference"])==0,"Reviewing the actual current bill terms proposes no new liability by default.");
         DateTime june=month.AddMonths(1);SaveTerms(id,june,june,5000,6000,full:false);
         r.Check(Sql.Money("SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@E AND FeeTypeId=@F AND EffectiveFrom=@M;",Sql.P("@E",child.Enrollment),Sql.P("@F",f.Tuition),Sql.P("@M",june))==5000,
             "The operator can retain a fixed scholarship while increasing its fee, without an implicit full waiver.");
@@ -162,6 +170,13 @@ internal sealed partial class SchoolScenarios
         SaveTerms(purchaseId,month,month,0,1000,agreement:false,bill:first,full:true);
         r.Check(ChainDue(first)==0&&ChainDue(second)==1200&&Credit(child.Student)==500,"A full concession on one purchase returns its paid 500 as credit without changing another purchase.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.FeePayments WHERE AdmissionId=@S AND TotalAmount=2000 AND IsCreditApplication=0;",Sql.P("@S",child.Student))==1,"The original annual receipt remains intact after financial correction.");
+        using var list=FeeDiscountPeriod.IssuedBills(child.Enrollment,f.Purchase);
+        r.Check(list.Rows.Count==2&&list.AsEnumerable().Any(row=>Convert.ToInt64(row["BillingChargeId"])==first&&Convert.ToDecimal(row["Due"])==0)&&
+            list.AsEnumerable().Any(row=>Convert.ToInt64(row["BillingChargeId"])==second&&Convert.ToDecimal(row["Due"])==1200),
+            "The production issued-bill reader exposes both purchases, including the settled purchase, scoped to this student's placement.");
+        var selected=FeeDiscountPeriod.BillContext(first);
+        r.Check(Convert.ToDecimal(selected["StandardAmount"])==1000&&Convert.ToDecimal(selected["DiscountAmount"])==1000&&Convert.ToInt64(selected["BillingChargeId"])==first,
+            "The production review context retains the selected bill and its fully waived corrected terms.");
     }
     private async Task ClosedBillTerms()
     {

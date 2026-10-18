@@ -7,6 +7,7 @@ namespace FMSC_SMS.Pages.Finance.StudentAccounts;
 public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
 {
     private readonly int assignment;
+    private readonly string identity;
     private readonly decimal standardAmount;
     private readonly ModernTextBox newRate=HumanUi.TextBox(false,20);
     private readonly CheckBox changeRate=new(){Text="Change the agreed fee",AutoSize=true},
@@ -51,6 +52,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         context??=id>0?FeeDiscountPeriod.Context(id):null;
         monthly=context is not null&&Convert.ToString(context["Frequency"])=="Monthly";
         validContext=context is not null;
+        identity=context?.Table.Columns.Contains("StudentName")==true?$"{context["AdmissionNumber"]} · {context["StudentName"]} · {context["YearName"]}":"";
         agreementAllowed=context is not null&&(!context.Table.Columns.Contains("Status")||Convert.ToString(context["Status"]) is "Active" or "Pending");
         billId=context?.Table.Columns.Contains("BillingChargeId")==true?Convert.ToInt64(context["BillingChargeId"]):null;
         updateAgreement.Checked=agreementAllowed&&billId is null;
@@ -119,9 +121,9 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         foreach(var (title,grid) in new[]{("Issued bills",bills),("Agreed fee periods",schedule)})
         {var tab=new TabPage(title);grid.Dock=DockStyle.Fill;tab.Controls.Add(grid);tabs.TabPages.Add(tab);}
         var close=new ModernButton{Text="Close",DialogResult=DialogResult.Cancel};CancelButton=close;
-        var root=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(12),ColumnCount=1,RowCount=4};
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.Controls.Add(fields,0,0);root.Controls.Add(impact,0,1);root.Controls.Add(tabs,0,2);root.Controls.Add(HumanUi.ButtonRow(review,save,check,close),0,3);Controls.Add(root);
+        var root=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(12),ColumnCount=1,RowCount=5};
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.Controls.Add(new Label{Text=identity,AutoSize=true,Dock=DockStyle.Fill,Padding=new Padding(6)},0,0);root.Controls.Add(fields,0,1);root.Controls.Add(impact,0,2);root.Controls.Add(tabs,0,3);root.Controls.Add(HumanUi.ButtonRow(review,save,check,close),0,4);Controls.Add(root);
         UiHelper.SetGridEmptyMessage(bills,"Review to see current and proposed issued bills.");
         UiHelper.SetGridEmptyMessage(schedule,"Review to see concession periods, including scheduled fee rates.");
     }

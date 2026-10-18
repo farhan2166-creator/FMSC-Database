@@ -9,7 +9,7 @@ public sealed class FeeAssignmentsDialog : ApplicationWindowForm
     public bool ReviewCompleted => panel.ReviewCompleted;
     public FeeAssignmentsDialog(int enrollmentId, int admissionId, string studentDisplay)
     {
-        Text = "Fee Discounts & Transport";
+        Text = $"Fee Discounts & Transport — {studentDisplay}";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;

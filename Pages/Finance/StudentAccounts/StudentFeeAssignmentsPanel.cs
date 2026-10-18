@@ -231,6 +231,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             ReferenceMonth = FeeAssignmentPresentation.PostingMonth(dt);
             foreach (DataRow row in dt.Rows)
             {
+                if(Convert.ToString(row["Frequency"])=="As Needed")continue; // Purchases are listed individually in Review Issued Bill.
                 object effectiveFrom = row.Table.Columns.Contains("EffectiveFrom") ? row["EffectiveFrom"] : DBNull.Value;
                 object effectiveTo = row.Table.Columns.Contains("EffectiveTo") ? row["EffectiveTo"] : DBNull.Value;
                 object lastBilledMonth = row.Table.Columns.Contains("LastBilledMonth") ? row["LastBilledMonth"] : DBNull.Value;
@@ -374,7 +375,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
     private void UpdateButtonStates()
     {
         var row = SelectedRow;
-        issuedBillButton.Enabled=row is not null&&CurrentUser.HasPermission("Fees.Adjust");
+        issuedBillButton.Enabled=enrollmentId>0&&CurrentUser.HasPermission("Fees.Adjust");
         if(enrollmentHasLeft) {
             addButton.Enabled=discontinueButton.Enabled=startTransportButton.Enabled=reviewButton.Enabled=false;
             discountButton.Enabled=row is not null&&CurrentUser.HasPermission("Fees.Adjust");
@@ -405,7 +406,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
                 "Review Fee Terms...");
         discount.Enabled = (enrollmentHasLeft||row.Tag is not true)&&CurrentUser.HasPermission("Fees.Adjust");
         discount.Click += (_, _) => ChangeDiscount();
-        var issued=rowMenu.Items.Add("Review an Issued Bill...");issued.Enabled=CurrentUser.HasPermission("Fees.Adjust");issued.Click+=(_,_)=>ReviewIssuedBill();
+        var issued=rowMenu.Items.Add("Review issued bills for this fee...");issued.Enabled=CurrentUser.HasPermission("Fees.Adjust");issued.Click+=(_,_)=>ReviewIssuedBill(Convert.ToInt32(row.Cells["FeeTypeId"].Value),Convert.ToString(row.Cells["FeeTypeName"].Value));
         if(IsTransport(row))
         {
             var stop=rowMenu.Items.Add("Stop Transport...");
@@ -478,7 +479,6 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
     {
         var row=SelectedRow;
         if(row is null||!CurrentUser.HasPermission("Fees.Adjust"))return;
-        if(Convert.ToString(row.Cells["Frequency"].Value)=="As Needed"){ReviewIssuedBill();return;}
         try
         {
             int id=Convert.ToInt32(row.Cells["StudentFeeAssignmentId"].Value);
@@ -488,14 +488,13 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         }
         catch(Exception ex){ModernMessageDialog.Show(FindForm(),DbMessage.UserMessage(ex),"Review Fee Terms",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
     }
-    private void ReviewIssuedBill()
+    private void ReviewIssuedBill(int? feeType=null,string? feeName=null)
     {
-        var row=SelectedRow;
-        if(row is null||!CurrentUser.HasPermission("Fees.Adjust"))return;
+        if(enrollmentId<=0||!CurrentUser.HasPermission("Fees.Adjust"))return;
         try
         {
-            using var data=FeeDiscountPeriod.IssuedBills(Convert.ToInt32(row.Cells["StudentFeeAssignmentId"].Value));
-            using var picker=new IssuedBillPicker(data,Convert.ToString(row.Cells["FeeTypeName"].Value)??"Fee");
+            using var data=FeeDiscountPeriod.IssuedBills(enrollmentId,feeType);
+            using var picker=new IssuedBillPicker(data,feeName??$"Student {AdmissionNumbers.ForId(admissionId)}");
             if(picker.ShowDialog(this)!=DialogResult.OK)return;
             var context=FeeDiscountPeriod.BillContext(picker.SelectedBillId);
             using var form=new ChangeFeeDiscountForm(Convert.ToInt32(context["StudentFeeAssignmentId"]),Convert.ToString(context["FeeTypeName"])??"Fee",
