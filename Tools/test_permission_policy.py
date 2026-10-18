@@ -1,4 +1,5 @@
 """Check the pinned data-free SQL test fixture, embedded catalog and access consumers."""
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -52,6 +53,15 @@ class PermissionPolicyChecks(unittest.TestCase):
         self.assertEqual(required, 20)
         self.assertEqual(int(installer.group(1)), required)
         self.assertEqual({'20.sql'}, {path.name for path in (ROOT/'Migrations').glob('*.sql')})
+
+    def test_release_schema_package_integrity(self):
+        with zipfile.ZipFile(ROOT/'fmsc.dacpac') as package:
+            origin = ET.fromstring(package.read('Origin.xml'))
+            checksums = [node for node in origin.iter() if node.tag.endswith('}Checksum')]
+            self.assertTrue(checksums, 'DACPAC must contain its model checksum.')
+            for checksum in checksums:
+                part = checksum.get('Uri').lstrip('/')
+                self.assertEqual(hashlib.sha256(package.read(part)).hexdigest().upper(), checksum.text.upper(), part)
 
     def test_metadata_fits_sql_columns(self):
         for entry in self.catalog:
