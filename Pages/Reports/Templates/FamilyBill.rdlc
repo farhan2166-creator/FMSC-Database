@@ -1563,6 +1563,10 @@
           <DataField>FamilyBatch</DataField>
           <rd:TypeName>System.String</rd:TypeName>
         </Field>
+        <Field Name="FeePeriod">
+          <DataField>FeePeriod</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
         <Field Name="FeeDescription">
           <DataField>FeeDescription</DataField>
           <rd:TypeName>System.String</rd:TypeName>
@@ -1619,7 +1623,7 @@
         <Field Name="FamilyAmountText">
           <DataField>FamilyAmountText</DataField>
         </Field>
-      <Field Name="BillStudentKey">
+        <Field Name="BillStudentKey">
           <DataField>BillStudentKey</DataField>
           <rd:TypeName>System.String</rd:TypeName>
         </Field>
