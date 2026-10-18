@@ -27,6 +27,8 @@ internal sealed class SchoolScenarios(Fixture f, Report r)
 
     internal async Task Run()
     {
+        await r.Stage("School: legacy activation acknowledges historical admission fees", LegacyActivation);
+        await r.Stage("School: opening fees honor cutoff and prospective discounts", OpeningDiscounts);
         await r.Stage("School: partial payment and remaining-balance waiver", PartialWaiver);
         await r.Stage("School: paid bill reductions, credit and repeated rate changes", PaidRateCorrection);
         await r.Stage("School: credit deposit replay, sibling transfer and cash refund", Credits);
@@ -65,6 +67,53 @@ internal sealed class SchoolScenarios(Fixture f, Report r)
             "Migration preserves student count, receipts and the exact unpaid tuition balance.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM sys.procedures WHERE name IN(N'GetRoles',N'GetUserRoles',N'GetRolesAndPermissions',N'GetAdjustableFeePayments');") == 0,
             "The four retired read procedures are absent after the upgrade.");
+    }
+
+    private async Task LegacyActivation()
+    {
+        int student = Sql.Count("""
+            INSERT dbo.Students(AdmissionNumber,AdmissionDate,AdmissionCampusId,StudentName,FatherName,Status,LegacySetupPending)
+            VALUES(N'99999991',@Date,@Campus,N'Historical Fee Example',N'Fictional Parent',N'Active',1);
+            SELECT CONVERT(int,SCOPE_IDENTITY());
+            """, Sql.P("@Date", f.PromotionDate), Sql.P("@Campus", f.Campus));
+        string fees = System.Text.Json.JsonSerializer.Serialize(new[] { new { FeeTypeId=f.Tuition, Amount=5000, DiscountAmount=0, Frequency="Monthly" } });
+        SqlParameter[] Args(bool preview, string? snapshot = null) => new[] {
+            Sql.P("@UserId", f.Admin), Sql.P("@AdmissionId", student), Sql.P("@YearId", f.NextYear), Sql.P("@PlacementId", f.Placement6),
+            Sql.P("@StartDate", f.PromotionDate), Sql.P("@BillingStart", new DateTime(DateTime.Today.Year,DateTime.Today.Month,1)),
+            Sql.P("@StudentName", "Historical Fee Example"), Sql.P("@FatherName", "Fictional Parent"), Sql.P("@Fees", fees),
+            Sql.P("@Reason", "Fictional individually reviewed activation"), Sql.P("@AdmissionFeeAlreadyPaid", true), Sql.P("@Preview", preview), Sql.P("@ExpectedSnapshot", snapshot)
+        };
+        string snapshot = Convert.ToString(Sql.Proc("ActivateStudentBilling", Args(true)).Rows[0]["Snapshot"])!;
+        int enrollment = Convert.ToInt32(Sql.Proc("ActivateStudentBilling", Args(false, snapshot)).Rows[0]["EnrollmentId"]);
+        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.StudentAdmissionFeeAcknowledgements WHERE AdmissionId=@S;", Sql.P("@S", student))==1,
+            "Historical admission fees have one explicit acknowledgement.");
+        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.FeePayments WHERE AdmissionId=@S;", Sql.P("@S", student))==0 &&
+            Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE AdmissionId=@S;", Sql.P("@S", student))==5000,
+            "Activation posts only reviewed tuition, without inventing an admission payment or back-billing earlier months.");
+        await r.Refused("An acknowledged admission fee cannot be charged later", () => {
+            Sql.Proc("AddStudentFeeAssignment", Sql.P("@UserId", f.Admin), Sql.P("@EnrollmentId", enrollment), Sql.P("@FeeTypeId", f.AdmissionFee));
+            return Task.CompletedTask;
+        },59971);
+    }
+
+    private Task OpeningDiscounts()
+    {
+        object? old = Sql.Scalar("SELECT FeeProrationCutoffDay FROM dbo.SchoolProfile;");
+        Sql.Query("UPDATE dbo.SchoolProfile SET FeeProrationCutoffDay=15;");
+        try
+        {
+            foreach (var (day,expected) in new[] { (5,5000m), (15,4000m) })
+            {
+                var args = f.AdmissionArgs("Cutoff Discount Example " + day);
+                args.Single(p=>p.ParameterName=="@AdmissionDate").Value = new DateTime(f.AdmissionDate.Year,4,day);
+                args.Single(p=>p.ParameterName=="@AdmissionDiscounts").Value = Tvp.AdmissionFeeDiscounts(new[] { (f.Tuition,1000m) });
+                int enrollment = Convert.ToInt32(Sql.Proc("AdmitStudent",args).Rows[0]["EnrollmentId"]);
+                r.Check(Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE EnrollmentId=@E AND FeeTypeId=@F;",Sql.P("@E",enrollment),Sql.P("@F",f.Tuition))==expected,
+                    day<15 ? "Before cutoff, opening tuition is full price; the chosen discount starts next month." : "On cutoff, opening tuition starts next month and uses its prospective discount.");
+            }
+        }
+        finally { Sql.Query("UPDATE dbo.SchoolProfile SET FeeProrationCutoffDay=@Old;",Sql.P("@Old",old)); }
+        return Task.CompletedTask;
     }
 
     private async Task PartialWaiver()
