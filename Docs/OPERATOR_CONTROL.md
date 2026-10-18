@@ -33,6 +33,9 @@ shows available credit before, credit to use, and credit remaining. If selected,
 application follows the displayed order: oldest due tuition, then other due fees;
 future-dated obligations do not consume credit early. Credit use may settle an
 older bill outside the selected correction period. It creates no cash received.
+This choice governs the current fee change. Normal monthly-billing checks can
+later apply account credit to eligible dues, including already issued bills.
+For money that should be returned as cash, choose Refund.
 
 A signed-in operator still needs Fees.Adjust at save time. A changed bill/payment
 invalidates the review. An uncertain save requires Check Save Outcome; the saved
