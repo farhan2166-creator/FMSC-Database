@@ -216,7 +216,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
                 EXEC dbo.RequirePermission @UserId,N'Students.View';
                 SELECT Status FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId;
                 """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@EnrollmentId",enrollmentId));
-            enrollmentHasLeft=placement.Rows.Count>0 && !string.Equals(Convert.ToString(placement.Rows[0]["Status"]),"Active",StringComparison.OrdinalIgnoreCase);
+            enrollmentHasLeft=placement.Rows.Count>0 && Convert.ToString(placement.Rows[0]["Status"]) is not ("Active" or "Pending");
             var dt = DatabaseHelper.QueryUser(
                 "GetStudentFeeAssignments",
                 DatabaseHelper.Int("@EnrollmentId", enrollmentId));
@@ -389,7 +389,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         discontinueButton.Enabled = isOpenRowSelected && IsTransport(row!);
         changeAmountButton.Enabled = isOpenRowSelected;
         discountButton.Enabled = row != null && row.Tag is not true &&
-            !HasEnded(row);
+            Convert.ToString(row.Cells["Frequency"].Value)=="Monthly" && CurrentUser.HasPermission("Fees.Adjust");
         startTransportButton.Enabled = enrollmentId>0 && addButton.Enabled && !hasOpenTransport;
     }
     /// <summary>Fills the fee row menu and says whether it should open at all. A historical row therefore opens the menu with everything greyed out rather than pretending the actions apply.</summary>
@@ -414,8 +414,8 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         change.Click += (_, _) => ChangeAmount();
         var discount =
             rowMenu.Items.Add(
-                "Fee Discount...");
-        discount.Enabled = row.Tag is not true && !HasEnded(row);
+                "Review Concession Period...");
+        discount.Enabled = row.Tag is not true && Convert.ToString(row.Cells["Frequency"].Value)=="Monthly" && CurrentUser.HasPermission("Fees.Adjust");
         discount.Click += (_, _) => ChangeDiscount();
         if(IsTransport(row))
         {

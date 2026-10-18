@@ -62,7 +62,7 @@ Portable sizing checks and Windows native-control fixtures cover synthetic clien
 
 - Communication Center is optional and separately verified. Its already-applied setup script is retired and is not offered by the current installer. Fresh installations needing messaging use an owner-approved snapshot that includes the module; existing communication data is preserved. Opening the page does not install its schema or enable live dispatch. See [current deployment guidance](COMMUNICATION_CENTER.md).
 - Normal full packaging uses `Properties/PublishProfiles/PortableRelease.pubxml`, `Installer/ValidateReleaseAssets.ps1` and `Installer/core.ps1`.
-- This release requires the current schema-20 baseline. Applied migrations 2–7 are retired. An empty or missing migrations folder skips migration execution; numbered SQL files newer than the installed base version run in numeric order within the schema version supported by that release.
+- This release requires the current schema-21 baseline. Applied migrations 2–7 are retired. An empty or missing migrations folder skips migration execution; numbered SQL files newer than the installed base version run in numeric order within the schema version supported by that release.
 - The private complete-installer workflow obtains signed LocalDB MSI and pinned sqlcmd, bundles the application and scripts **without** school database files. The owner supplies verified detached MDF/LDF locally after download for a fresh install.
 - `CIAppOnlyBundle` is intentionally scoped to the separate app-only artifact, not the full installer validation.
 
@@ -82,7 +82,7 @@ GitHub Actions builds on `windows-2022`. Passing automated tests does **not** pr
 
 Before editing, read [AGENTS.md](../AGENTS.md), [development workflow](DEVELOPMENT_WORKFLOW.md), the active [audit](../Audit/FMSC_MASTER_AUDIT.md), and the relevant feature sources. Keep changes incremental; require a focused PR explaining behavior, safety impact, tests, and migration requirements. Do not edit or introduce real school data into test fixtures.
 
-## Current operator flow and schema 20
+## Current operator flow and schema 21
 
 Student Admissions groups direct admission/editing, pending registrations and
 existing-student activation. Student Data Review contains record corrections and
@@ -90,8 +90,8 @@ duplicate review. Billing Center groups status/exception resolution, reviewed
 recovery, additional charges and posting reversals. Exceptions open the selected
 student's setup or collection page with current permission checks.
 
-The app, installer, worker and webhook host require schema 20. Migration 20 upgrades
-the supported schema-19 baseline, fixes the optional communication callback version
+The app, installer, worker and webhook host require schema 21. Migrations 20 and 21 upgrade
+the supported schema-19/20 baselines, align the optional communication callback version
 guard and retires unused GetRoles, GetUserRoles, GetRolesAndPermissions and GetAdjustableFeePayments readers.
 No school/financial/permission rows are rewritten. Historical migrations 7–19 exist
 only under the isolated test fixture and are never copied into release packages.

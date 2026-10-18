@@ -58,6 +58,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     private readonly LookupBox year = new();
     private readonly PlacementPicker placement = new();
     private readonly ModernDatePicker joining = HumanUi.Date();
+    private readonly CheckBox monthlyConcessionsFromAdmission=new(){Text="Apply monthly concessions from the admission month",Checked=true,AutoSize=true};
     private readonly ModernButton addFee = new() { Text="+ Add Fee", ThemeRole="Secondary", AutoSize=true, Height=AppMetrics.ButtonHeight };
     private readonly ContextMenuStrip feeMenu = new();
     private readonly DataGridView fees = new() { Dock=DockStyle.Fill, AllowUserToAddRows=false, AllowUserToDeleteRows=false, AutoGenerateColumns=false, RowHeadersVisible=false };
@@ -161,8 +162,8 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
             if(e.ColumnIndex>=0&&fees.Columns[e.ColumnIndex].Name=="ConcessionLabel")UpdateActions();};
         fees.CellEndEdit+=(_,_)=>{if(fees.CurrentRow?.DataBoundItem is DataRowView row)row.EndEdit();UpdateTotal();};
         foreach(var input in new[]{name,parent,contact,address})input.TextChanged+=(_,_)=>PendingEditChanged();
-        var feeCard=HumanUi.Card("Fee Plan", "Monthly discounts start next month. Opening tuition before that date uses the full rate. Save, then Print Bill or open Fee Collection for the actual charges due. Paid fees remain protected.");
-        var feeContent=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};feeContent.RowStyles.Add(new RowStyle(SizeType.Percent,100));feeContent.RowStyles.Add(new RowStyle(SizeType.AutoSize));feeContent.Controls.Add(fees,0,0);var feeFooter=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=true};feeFooter.Controls.Add(addFee);feeFooter.Controls.Add(total);feeContent.Controls.Add(feeFooter,0,1);feeCard.Content.Controls.Add(feeContent);
+        var feeCard=HumanUi.Card("Fee Plan", "Choose whether monthly concessions begin in the admission month or the following month. Print Bill or open Fee Collection for the actual posted dues.");
+        var feeContent=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3};feeContent.RowStyles.Add(new RowStyle(SizeType.AutoSize));feeContent.RowStyles.Add(new RowStyle(SizeType.Percent,100));feeContent.RowStyles.Add(new RowStyle(SizeType.AutoSize));feeContent.Controls.Add(monthlyConcessionsFromAdmission,0,0);feeContent.Controls.Add(fees,0,1);var feeFooter=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=true};feeFooter.Controls.Add(addFee);feeFooter.Controls.Add(total);feeContent.Controls.Add(feeFooter,0,2);feeCard.Content.Controls.Add(feeContent);
         root=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2 };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(4)));
         root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.Controls.Add(registrationCard,0,0);root.Controls.Add(feeCard,0,1);SetContent(root);
@@ -373,6 +374,8 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
             ? $"{familyReference} · "+(savedFamilyMemberCount>1?$"Family: {savedFamilyMemberCount} children · Link or unlink a parent above.":"One child · You can link an existing parent above.")
             : familyAnchor>0?$"Parent linked · {familyReference} · Use Unlink Parent to change it.":"Enter a child, or use Link Existing Parent above.");
         addFee.Enabled=editing&&feesLoaded&&(savedStudent==0||!HasPendingChanges&&CurrentUser.HasPermission("Fees.Adjust"));
+        monthlyConcessionsFromAdmission.Visible=savedStudent==0;
+        monthlyConcessionsFromAdmission.Enabled=editing&&savedStudent==0&&CurrentUser.HasPermission("Fees.Adjust");
         fees.ReadOnly=!editing;
         // Switching grid ReadOnly can reset individual column/cell flags.
         // Restore the edit policy after every busy or saved-state transition.
@@ -387,7 +390,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
                 !CurrentUser.HasPermission("Fees.Adjust") || Convert.ToString(data.Row["Frequency"]) != "Monthly";
             bool paid=Convert.ToBoolean(data.Row["HasPayments"]);
             row.Cells["Discount"].ReadOnly=!editing||paid||!CurrentUser.HasPermission("Fees.Adjust")||(savedStudent>0&&Convert.ToString(data.Row["ConcessionLabel"])!="None")||Convert.ToString(data.Row["Frequency"])!="Monthly"&&savedStudent>0||Convert.ToString(data.Row["ConcessionLabel"]) is "Free" or "Waived";
-            row.Cells["Discount"].ToolTipText=paid?"This fee has a payment. Use Fee Corrections to adjust it.":savedStudent>0?"Future monthly discounts use Fee Discount in Admission / Review. Existing bills are adjusted in Fee Collection.":"Monthly discounts begin next month.";
+            row.Cells["Discount"].ToolTipText=paid?"This fee has a payment. Use Fee Corrections to adjust it.":savedStudent>0?"Future monthly discounts use Fee Discount in Admission / Review. Existing bills are adjusted in Fee Collection.":"Use the selected start for monthly concessions.";
         }}
     private void UpdateTotal()
     {
@@ -416,7 +419,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         // Start a fresh child; only the family link and shared details carry over.
         // Invalidate any previous fee load before clearing the placement.
         ++registrationLoadVersion;++familyLoadVersion;++loadVersion;loadingFamily=false;needsRefresh=false;savedStudent=0;savedFamilyMemberId=savedFamilyMemberCount=0;savedStatus="";savedSnapshot="";expectedQuote="";loadingFees=false;feesLoaded=false;
-        name.Clear();joining.Value=DateTime.Today;year.SelectedValue=defaultAcademicYear;
+        name.Clear();monthlyConcessionsFromAdmission.Checked=true;joining.Value=DateTime.Today;year.SelectedValue=defaultAcademicYear;
         placement.SelectedValue=0;rates=new();fees.DataSource=null;
         validator.Begin();UpdateTotal();UpdateActions();name.Focus();
         SetStatus("Enter the next child and choose their placement. Family details are retained.");
@@ -451,6 +454,8 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
                     .Select(r=>new { FeeTypeId=Convert.ToInt32(r["FeeTypeId"]),ConcessionLabel=Convert.ToString(r["ConcessionLabel"]) }))));
             args.Add(new SqlParameter("@ExcludedFeeTypeIds",SqlDbType.Structured){TypeName="dbo.FeeTypeIdList",Value=Tvp.FeeTypeIds(rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["IsMandatory"])&&!Convert.ToBoolean(r["Include"])).Select(r=>Convert.ToInt32(r["FeeTypeId"])))});
             foreach(string key in new[]{"DateOfBirth","PlaceOfBirth","Gender","BFormNumber","Religion","BloodGroup","AlternateContactNumber","PreviousSchool","FatherOccupation"})args.Add(DatabaseHelper.P("@"+key,null));
+            if(selected.Any(r=>Convert.ToString(r["Frequency"])=="Monthly"&&Convert.ToDecimal(r["Discount"])>0))
+                args.Add(DatabaseHelper.Date("@MonthlyDiscountFrom",new DateTime(joining.Value.Year,joining.Value.Month,1).AddMonths(monthlyConcessionsFromAdmission.Checked?0:1)));
             await SubmitNewRegistrationAsync(args.ToArray());
         }catch(Exception ex){ReadRecoveryRecord();if(recoveryBlocked)ShowSaveRecovery();else Fail(ex);}finally{busy=false;UpdateActions();}
     }
@@ -527,11 +532,11 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
     }
     private sealed record EditorState(int Student, string Status, string Snapshot, string Quote, int Anchor, string Reference,
         string[] Basics, bool FeesLoaded, bool NeedsRefresh, DataTable Rates, string Name, string Parent, string Contact,
-        string Address, DateTime Joining, int Year, int Placement, int FamilyId, string FamilyText, bool FamilyShown, string Total, int MemberId, int MemberCount);
+        string Address, DateTime Joining, int Year, int Placement, int FamilyId, string FamilyText, bool FamilyShown, string Total, int MemberId, int MemberCount, bool ConcessionsFromAdmission);
 
     private EditorState CaptureEditor() => new(savedStudent,savedStatus,savedSnapshot,expectedQuote,familyAnchor,familyReference,
         savedBasics,feesLoaded,needsRefresh,rates,name.Text,parent.Text,contact.Text,address.Text,joining.Value,
-        year.SelectedId,placement.SelectedId,family.SelectedId,family.Text,registrationContent.RowStyles[0].Height>0,total.Text,savedFamilyMemberId,savedFamilyMemberCount);
+        year.SelectedId,placement.SelectedId,family.SelectedId,family.Text,registrationContent.RowStyles[0].Height>0,total.Text,savedFamilyMemberId,savedFamilyMemberCount,monthlyConcessionsFromAdmission.Checked);
 
     private void RestoreEditor(EditorState state)
     {
@@ -542,7 +547,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         name.Text=state.Name;parent.Text=state.Parent;contact.Text=state.Contact;address.Text=state.Address;
         joining.Value=state.Joining;year.SelectedValue=state.Year;placement.SelectedValue=state.Placement;
         family.SetStudent(state.FamilyId,state.FamilyText);ShowFamilyPicker(state.FamilyShown);fees.DataSource=rates;
-        total.Text=state.Total;
+        total.Text=state.Total;monthlyConcessionsFromAdmission.Checked=state.ConcessionsFromAdmission;
     }
 
     private async Task<RegistrationLoadOutcome> LoadRegistrationAsync(int id, bool afterSave=false)

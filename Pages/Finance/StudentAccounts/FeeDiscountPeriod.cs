@@ -4,7 +4,7 @@ namespace FMSC_SMS.Pages.Finance.StudentAccounts;
 internal static class FeeDiscountPeriod
 {
     public static DataRow Context(int id) => DatabaseHelper.QuerySql("""
-        SELECT S.ConcessionLabel, S.Frequency, S.EffectiveFrom, S.EffectiveTo, A.EndDate,
+        SELECT S.ConcessionLabel, S.Frequency, S.EffectiveFrom, S.EffectiveTo, A.StartDate, A.EndDate, E.EnrollmentDate,
             (SELECT MAX(B.BillingMonth) FROM dbo.BillingCharges B
              WHERE B.StudentFeeAssignmentId=S.StudentFeeAssignmentId) LastBilledMonth
         FROM dbo.StudentFeeAssignments S

@@ -36,7 +36,15 @@ internal static partial class Program
                 rows.Columns.Add("PaidReturnAmount", typeof(decimal)).DefaultValue = 0m;
                 rows.Rows.Add("synthetic-review", "0", "0", "0", "0", "0", "0", "1", "0", "Synthetic fixture only"); return rows;
             }
+            if(!legacy)
+            {
+                var policy=(ModernComboBox)typeof(CloseAdmissionDialog).GetField("monthlyPolicy",flags)!.GetValue(dialog)!;
+                policy.SelectedIndex=1;
+                Check(policy.Items.Count==3,"Departure offers school cutoff, retained bills and a chosen waiver month");
+            }
             Click(review);
+            if(!legacy)Check(Convert.ToString(calls[0].Single(p=>p.ParameterName=="@MonthlyFeePolicy").Value)=="KeepIssued",
+                "The operator's retained-bill decision is submitted explicitly instead of a locked cutoff flag");
             Check(calls.Count == 1 && RefusesClose() && Children(dialog).OfType<ModernDatePicker>().All(d => !d.Enabled),
                 "Pending lifecycle review holds all inputs and refuses title-bar/Alt+F4 close");
             Click(review); Click(apply);

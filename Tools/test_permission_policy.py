@@ -50,9 +50,9 @@ class PermissionPolicyChecks(unittest.TestCase):
         self.assertIsNotNone(application)
         self.assertIsNotNone(installer)
         required = int(application.group(1))
-        self.assertEqual(required, 20)
+        self.assertEqual(required, 21)
         self.assertEqual(int(installer.group(1)), required)
-        self.assertEqual({'20.sql'}, {path.name for path in (ROOT/'Migrations').glob('*.sql')})
+        self.assertEqual({'20.sql', '21.sql'}, {path.name for path in (ROOT/'Migrations').glob('*.sql')})
 
     def test_release_schema_package_integrity(self):
         with zipfile.ZipFile(ROOT/'fmsc.dacpac') as package:

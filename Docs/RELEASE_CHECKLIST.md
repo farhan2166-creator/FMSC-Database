@@ -2,7 +2,7 @@
 
 **Release candidate commit:** `________________`  
 **Application version:** `________________`  
-**Required DB schema version:** `20` (confirm against current code)\
+**Required DB schema version:** `21` (confirm against current code)\
 **Reviewer and test date:** `________________`  
 **Windows account / OS / target hardware:** `________________`
 
@@ -28,7 +28,7 @@
 
 - [ ] [Complete installer workflow](../.github/workflows/fmsc-complete-installer.yml) finished **successfully** at the same SHA.
 - [ ] Downloaded database-free Actions artifact and recorded URL, run ID and checksum.
-- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, a `Migrations/` folder (empty when there are no pending scripts), required app resources, readme and communication deployment guide. Historical migrations 7–19 are test fixtures only; migration 20 supports the schema-19 baseline. Future numbered scripts must record their versions and match the application release; the installer backs up before applying them.
+- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, a `Migrations/` folder (empty when there are no pending scripts), required app resources, readme and communication deployment guide. Historical migrations 7–19 are test fixtures only; migrations 20/21 support the schema-19/20 baselines. Future numbered scripts must record their versions and match the application release; the installer backs up before applying them.
 - [ ] Copied installer and any pending numbered SQL files match the source commit; copied-helper migration discovery/version tests passed. Start a new workflow run for new source rather than rerunning an older run.
 - [ ] Microsoft LocalDB MSI signature and pinned sqlcmd digest were verified by the workflow; double-check source of prerequisites if changed.
 - [ ] DB snapshot is **not** included in Actions. The owner locally supplies matching **detached** `FMSC_DB.mdf` and `FMSC_DB_log.ldf` only for fresh-install validation.
@@ -41,7 +41,7 @@
 - [ ] Existing schema version upgraded with correct migration order using a restored **disposable clone**; original data and recovery scope preserved.
 - [ ] Verified pre-migration backup and rollback/recovery scenario tested.
 - [ ] App startup and full schema compatibility check pass after install/upgrade.
-- [ ] Communication module: current installers preserve the supplied/installed module and verify its runtime contract; migration 20 updates the supported callback and removes its audit write. The retired optional setup is not offered again. Verify contacts/history/settings are preserved and sending remains disabled until explicitly configured.
+- [ ] Communication module: current installers preserve the supplied/installed module and verify its runtime contract; the migrations align the supported callback and retire its audit write. The retired optional setup is not offered again. Verify contacts/history/settings are preserved and sending remains disabled until explicitly configured.
 - [ ] Deliberately invalid, newer, missing and mismatched database/prerequisite scenarios refuse unsafe installation.
 
 ## 5. School workflow acceptance

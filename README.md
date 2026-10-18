@@ -27,7 +27,7 @@ For detailed screen naming, see [project structure](Docs/Development/PROJECT_STR
 ## Technical overview
 
 - **Platform:** Windows x64; WinForms on .NET 8. The complete installer publishes a self-contained Windows application.
-- **Database:** Local SQL Server database `FMSC_DB`, normally managed through the current Windows user's `(localdb)\MSSQLLocalDB` instance. The application expects **schema version 20** and checks structural compatibility.
+- **Database:** Local SQL Server database `FMSC_DB`, normally managed through the current Windows user's `(localdb)\MSSQLLocalDB` instance. The application expects **schema version 21** and checks structural compatibility.
 - **Database delivery:** Fresh installs require an owner-provided, verified, **detached matching MDF/LDF pair**. Real school database files, backup files and credentials must not be committed to GitHub or uploaded to Actions.
 - **Installer:** `Installer/core.ps1`, launched by `Install FMSC_SMS.bat` in the release bundle. Existing installation and migration behavior must be tested against a disposable copy before production.
 - **Reporting:** PDF/CSV and RDLC report components are included; physical printing and target-printer settings require Windows acceptance.

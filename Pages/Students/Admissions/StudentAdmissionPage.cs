@@ -221,6 +221,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     };
     private RowStyle? photoSaveRow, photoActionsRow;
     private readonly DataGridView feeGrid = HumanUi.Grid(false);
+    private readonly CheckBox monthlyConcessionsFromAdmission = new() { Text="Apply monthly concessions from the admission month", Checked=true, AutoSize=true };
     private readonly ModernComboBox feePreviewMonth=HumanUi.Combo();
     public bool IsBusy => saveBusy || photoBusy || BusyOperationRunning;
     public string BusyMessage => BusyOperationRunning ? BusyOperationMessage+" Wait for the result before leaving." : photoBusy ? "Please wait while the student's photo is being prepared or saved." : "Please wait while the admission is being saved.";
@@ -411,7 +412,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         foreach (Control control in ControlsRecursive(this))
         {
             /* Exclude quick-find text from the admission draft. */
-            if (IsWithinQuickFind(control) || IsWithinFeePreviewMonth(control))
+            if (ReferenceEquals(control,monthlyConcessionsFromAdmission) || IsWithinQuickFind(control) || IsWithinFeePreviewMonth(control))
                 continue;
             /* Treat inaccessible fields as empty when comparing drafts. */
             bool editable =
@@ -507,6 +508,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             new AdmissionPart(
                 "the pending photo",
                 pendingPhoto ? "photo" : "no-photo"));
+        parts.Add(new AdmissionPart("monthly concession timing",currentAdmissionId<=0?(monthlyConcessionsFromAdmission.Checked?"Admission month":"Following month"):string.Empty));
         return parts;
     }
     /// <summary>Whether this control belongs to the student finder.</summary>
@@ -1955,7 +1957,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 Padding = AdmissionDetailsCardPadding,
                 Margin = Padding.Empty
             };
-            feeLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(48)));
+            feeLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
             feeLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             feeLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
             feePreviewMonth.Enabled=false;
@@ -1965,7 +1967,12 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             };
             feeStatus.AutoEllipsis=false;
             feeStatus.Font = AppTheme.SmallFont;
-            feeLayout.Controls.Add(feeStatus, 0, 0);
+            var feeHeading=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2 };
+            feeHeading.RowStyles.Add(new RowStyle(SizeType.Percent,50));feeHeading.RowStyles.Add(new RowStyle(SizeType.Percent,50));
+            feeHeading.Controls.Add(feeStatus,0,0);feeHeading.Controls.Add(monthlyConcessionsFromAdmission,0,1);
+            monthlyConcessionsFromAdmission.Visible=currentAdmissionId<=0;
+            monthlyConcessionsFromAdmission.Enabled=currentAdmissionId<=0&&CurrentUser.HasPermission("Fees.Adjust");
+            feeLayout.Controls.Add(feeHeading, 0, 0);
             feeLayout.Controls.Add(feeGrid, 0, 1);
             var manageFees = new ModernButton {
                 Text = "Fee Discounts & Transport",
@@ -2057,6 +2064,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         placementEditGrid.RowStyles[2].Height = 0;
         if (placementCardRow is not null) placementCardRow.Height = normalPlacementCardHeight;
         admissionDate.Enabled = currentAdmissionId <= 0;
+        monthlyConcessionsFromAdmission.Visible=currentAdmissionId<=0;
+        monthlyConcessionsFromAdmission.Enabled=currentAdmissionId<=0&&!saveBusy&&CurrentUser.HasPermission("Fees.Adjust");
         UpdateAdmissionEntryFlow();
     }
     /// <summary>A thin divider between groups of toolbar controls.</summary>
@@ -2364,6 +2373,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         int version = ++feeAssignmentsLoadVersion;
         feeGrid.DataSource = null;
         _selectedFees.Clear();
+        if(currentAdmissionId<=0)monthlyConcessionsFromAdmission.Checked=true;
         if (enrollmentId <= 0)
         {
             feeStatus.Text =
@@ -3191,6 +3201,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         int version = ++feeStructureLoadVersion;
         _selectedFees.Clear();
+        if(currentAdmissionId<=0)monthlyConcessionsFromAdmission.Checked=true;
         if (campusId <= 0 || yearId <= 0 || classId <= 0)
         {
             _availableFeeOptions = new List<FeeConfigOption>();
@@ -4367,6 +4378,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if(!AdmissionNumbers.TryNormalize(admissionIdValue.Text,out string cleanAdmissionNumber)) return;
                         admissionParameters.Add(DatabaseHelper.P("@FeeConcessionsJson", System.Text.Json.JsonSerializer.Serialize(
                 _selectedFees.Where(f => f.ConcessionLabel != "None").Select(f => new { f.FeeTypeId, f.ConcessionLabel }))));
+            if(_selectedFees.Any(f=>f.Frequency=="Monthly"&&f.DiscountAmount>0))
+                admissionParameters.Add(DatabaseHelper.Date("@MonthlyDiscountFrom",new DateTime(admissionDate.Value.Year,admissionDate.Value.Month,1).AddMonths(monthlyConcessionsFromAdmission.Checked?0:1)));
 admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber").Value=cleanAdmissionNumber;
             var submitted = new AdmissionSubmission(cleanAdmissionNumber, studentName,
                 Convert.ToString(admissionParameters.First(p => p.ParameterName == "@FatherName").Value) ?? "",
@@ -4766,6 +4779,7 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
         feePreviewMonth.Enabled=false;
         feePreviewEnrollmentId=0;
         _selectedFees.Clear();
+        if(currentAdmissionId<=0)monthlyConcessionsFromAdmission.Checked=true;
         _availableFeeOptions = new List<FeeConfigOption>();
         feeGrid.DataSource = _selectedFees;
         feeStatus.Text =

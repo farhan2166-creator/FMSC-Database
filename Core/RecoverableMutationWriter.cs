@@ -25,7 +25,7 @@ internal static class RecoverableMutationWriter
     private static void Permission(SqlConnection c,SqlTransaction t,int user,MutationKind kind,bool write,bool otherOwner=false)
     {
         using var q=new SqlCommand("EXEC dbo.RequirePermission @UserId,@Permission;"+(otherOwner?" EXEC dbo.RequirePermission @UserId,N'System.Administration';":""),c,t);
-        q.Parameters.AddRange(new[]{DatabaseHelper.Int("@UserId",user),DatabaseHelper.P("@Permission",kind==MutationKind.FeeAdjustment?(write?"Fees.Adjust":"Fees.View"):"Certificates.Create")});q.ExecuteNonQuery();
+        q.Parameters.AddRange(new[]{DatabaseHelper.Int("@UserId",user),DatabaseHelper.P("@Permission",kind==MutationKind.BankCertificateCreate?"Certificates.Create":write?"Fees.Adjust":"Fees.View")});q.ExecuteNonQuery();
     }
     private static void Lock(SqlConnection c,SqlTransaction t,Guid id,bool read)
     {
@@ -60,7 +60,12 @@ internal static class RecoverableMutationWriter
                 using var t=c.BeginTransaction(IsolationLevel.Serializable);var state=new Transaction(t,commit);
                 return MutationSaveCoordinator.Execute(state,()=>{
                     Permission(c,t,user,intent.Kind,true);Lock(c,t,intent.Id,false);if(ReadMarker(c,t,intent) is {} prior)return prior;
-                    using var command=new SqlCommand(intent.Kind==MutationKind.FeeAdjustment?"ProcessFeeTransaction":"CreateBankAccountOpeningCertificate",c,t){CommandType=CommandType.StoredProcedure,CommandTimeout=120};
+                    string procedure=intent.Kind switch {
+                        MutationKind.FeeAdjustment=>"ProcessFeeTransaction",
+                        MutationKind.FeeConcession=>"SaveStudentFeeDiscount",
+                        MutationKind.BankCertificateCreate=>"CreateBankAccountOpeningCertificate",
+                        _=>throw new InvalidOperationException("Unsupported operation.") };
+                    using var command=new SqlCommand(procedure,c,t){CommandType=CommandType.StoredProcedure,CommandTimeout=120};
                     command.Parameters.AddRange(parameters.Where(p=>!p.ParameterName.Equals("@UserId",StringComparison.OrdinalIgnoreCase)).Select(p=>(SqlParameter)((ICloneable)p).Clone()).ToArray());command.Parameters.Add(DatabaseHelper.Int("@UserId",user));
                     state.SubmissionStarted=true;var data=new DataTable();using(var adapter=new SqlDataAdapter(command))adapter.Fill(data);
                     var saved=Response(intent.Kind,parameters,data);saved.Validate();
@@ -76,6 +81,16 @@ internal static class RecoverableMutationWriter
         if(data.Rows.Count!=1)throw new InvalidDataException("The operation did not return one authoritative saved result.");var row=data.Rows[0];
         object? Arg(string name)=>args.First(p=>p.ParameterName.Equals(name,StringComparison.OrdinalIgnoreCase)).Value;
         int Key(string column)=>row.Table.Columns.Contains(column)&&row[column] is int id&&id>0?id:throw new InvalidDataException("The saved operation identity is invalid.");
+        if(kind==MutationKind.FeeConcession)
+        {
+            int assignment=Convert.ToInt32(Arg("@StudentFeeAssignmentId"));
+            if(Key("StudentFeeAssignmentId")!=assignment||Convert.ToDateTime(row["EffectiveFrom"])!=Convert.ToDateTime(Arg("@EffectiveFrom"))||
+                Convert.ToDateTime(row["EffectiveThrough"])!=Convert.ToDateTime(Arg("@EffectiveThrough")))
+                throw new InvalidDataException("The saved concession does not match the reviewed assignment and period.");
+            return new(kind,Key("AdmissionId"),assignment,assignment,"","FeeConcession",Convert.ToDecimal(row["Difference"]),null) {
+                EffectiveFrom=Convert.ToDateTime(row["EffectiveFrom"]),EffectiveThrough=Convert.ToDateTime(row["EffectiveThrough"]),
+                ReleasedPaidAmount=Convert.ToDecimal(row["ReleasedPaidAmount"]) };
+        }
         if(kind==MutationKind.BankCertificateCreate){int staff=Convert.ToInt32(Arg("@StaffId"));if(Key("StaffId")!=staff)throw new InvalidDataException("The saved certificate belongs to a different staff member.");return new(kind,staff,0,Key("BankAccountOpeningCertificateId"),"","BankCertificateCreate",Arg("@MonthlyIncome") is null or DBNull?0m:Convert.ToDecimal(Arg("@MonthlyIncome")),null);}
         string type=Convert.ToString(Arg("@TransactionType"))??"";decimal amount=Convert.ToDecimal(Arg("@Amount"));if(Convert.ToString(row["TransactionType"])!=type||Convert.ToDecimal(row["Amount"])!=amount)throw new InvalidDataException("The saved adjustment does not match the submitted operation.");
         int origin=Convert.ToInt32(Arg("@FeePaymentId")),resultId=type=="Reversal"?origin:Key("FeePaymentId");

@@ -2,6 +2,14 @@
 
 Notable user-facing, database, installer, and operational changes will be tracked here. This file begins as a **forward-looking** changelog; it is not a fabricated complete history of previous builds.
 
+## [1.1.0-rc.2] - 2026-10-18
+
+- Let the operator choose concession periods, issued-bill treatment and credit/refund, with a financial preview and save-outcome recovery.
+- Offer admission-month or following-month concessions in direct admission and Quick Registration.
+- Let leaving retain issued monthly bills, apply the school cutoff or waive from a chosen month; preview full correction chains.
+- Upgrade schema 20 to 21 without rewriting school records; remove audit-only preparation from revised procedures.
+- Record remaining policy-review boundaries in Docs/OPERATOR_CONTROL.md instead of treating passing tests as completion of the operating model.
+
 ## [1.1.0-rc.1] - 2026-10-18
 
 ### Changed
