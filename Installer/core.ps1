@@ -1,6 +1,6 @@
 $ErrorActionPreference = 'Stop'
 $AppName = 'FMSC School Management System'
-$AppVersion = '1.0.0'
+$AppVersion = '1.1.0-rc.1'
 $DatabaseVersion = '20'
 $ReleaseRoot = $PSScriptRoot
 $AppSource      = Join-Path $ReleaseRoot 'FMSC_SMS'

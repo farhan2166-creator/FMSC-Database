@@ -136,7 +136,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Frequency",DataPropertyName="Frequency",HeaderText=UiText.Fees.Frequency,ReadOnly=true,Width=100 });
         fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Amount",DataPropertyName="Amount",HeaderText=UiText.Fees.Amount,ReadOnly=true,Width=110 });
         fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Discount",DataPropertyName="Discount",HeaderText=UiText.Fees.Discount,ReadOnly=!CurrentUser.HasPermission("Fees.Adjust"),Width=125 });
-        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="NetAmount",DataPropertyName="NetAmount",HeaderText=UiText.Fees.NetAmount,ReadOnly=true,Width=145 });
+        fees.Columns.Add(new DataGridViewTextBoxColumn { Name="NetAmount",DataPropertyName="NetAmount",HeaderText="Plan Net",ReadOnly=true,Width=145 });
         fees.Columns.Add(CreateCrossActionColumn("Remove",useColumnTextForButtonValue:false));
         fees.CellContentClick+=async(_,e)=>{if(e.RowIndex>=0&&e.ColumnIndex>=0&&fees.Columns[e.ColumnIndex].Name=="Remove"&&fees.Rows[e.RowIndex].DataBoundItem is DataRowView row)await RemoveFeeAsync(row.Row);};
         addFee.Click+=async(_,_)=>await ShowAddFeeAsync();
@@ -161,7 +161,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
             if(e.ColumnIndex>=0&&fees.Columns[e.ColumnIndex].Name=="ConcessionLabel")UpdateActions();};
         fees.CellEndEdit+=(_,_)=>{if(fees.CurrentRow?.DataBoundItem is DataRowView row)row.EndEdit();UpdateTotal();};
         foreach(var input in new[]{name,parent,contact,address})input.TextChanged+=(_,_)=>PendingEditChanged();
-        var feeCard=HumanUi.Card("Opening Bill", "Use + Add Fee or × to change the opening bill. Monthly assignment discounts begin next month. Paid fees are protected; adjust unpaid bills in Fee Collection.");
+        var feeCard=HumanUi.Card("Fee Plan", "Monthly discounts start next month. Opening tuition before that date uses the full rate. Save, then Print Bill or open Fee Collection for the actual charges due. Paid fees remain protected.");
         var feeContent=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};feeContent.RowStyles.Add(new RowStyle(SizeType.Percent,100));feeContent.RowStyles.Add(new RowStyle(SizeType.AutoSize));feeContent.Controls.Add(fees,0,0);var feeFooter=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=true};feeFooter.Controls.Add(addFee);feeFooter.Controls.Add(total);feeContent.Controls.Add(feeFooter,0,1);feeCard.Content.Controls.Add(feeContent);
         root=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2 };
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(4)));
@@ -389,7 +389,18 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
             row.Cells["Discount"].ReadOnly=!editing||paid||!CurrentUser.HasPermission("Fees.Adjust")||(savedStudent>0&&Convert.ToString(data.Row["ConcessionLabel"])!="None")||Convert.ToString(data.Row["Frequency"])!="Monthly"&&savedStudent>0||Convert.ToString(data.Row["ConcessionLabel"]) is "Free" or "Waived";
             row.Cells["Discount"].ToolTipText=paid?"This fee has a payment. Use Fee Corrections to adjust it.":savedStudent>0?"Future monthly discounts use Fee Discount in Admission / Review. Existing bills are adjusted in Fee Collection.":"Monthly discounts begin next month.";
         }}
-    private void UpdateTotal(){if(applyingRegistration)return;if(!rates.Columns.Contains("Include")){total.Text="Bill Total: Rs. 0";return;}decimal amount=rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["Include"])).Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));total.Text=$"Bill Total: Rs. {amount:N0}";PendingEditChanged();}
+    private void UpdateTotal()
+    {
+        if(applyingRegistration)return;
+        if(!rates.Columns.Contains("Include")){total.Text="Select the fee plan.";return;}
+        var selected=rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["Include"])).ToArray();
+        decimal monthly=selected.Where(r=>Convert.ToString(r["Frequency"])=="Monthly")
+            .Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));
+        decimal other=selected.Where(r=>Convert.ToString(r["Frequency"])!="Monthly")
+            .Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));
+        total.Text=$"Monthly plan: Rs. {monthly:N0} · Yearly / one-time fees: Rs. {other:N0}";
+        PendingEditChanged();
+    }
     private void StartNextDraft(bool startNewFamily)
     {
         if(IsBusy||recoveryBlocked||needsRefresh||!fees.EndEdit())return;

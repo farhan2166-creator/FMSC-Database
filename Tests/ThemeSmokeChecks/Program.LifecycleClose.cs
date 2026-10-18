@@ -33,6 +33,7 @@ internal static partial class Program
             {
                 var rows = new DataTable();
                 foreach (string column in new[] { "Snapshot", "ChargeCount", "Outstanding", "FutureCount", "FutureAmount", "FuturePaid", "BlockedCount", "ActiveStudents", "UnverifiedStudents", "ReviewDetails" }) rows.Columns.Add(column);
+                rows.Columns.Add("PaidReturnAmount", typeof(decimal)).DefaultValue = 0m;
                 rows.Rows.Add("synthetic-review", "0", "0", "0", "0", "0", "0", "1", "0", "Synthetic fixture only"); return rows;
             }
             Click(review);
