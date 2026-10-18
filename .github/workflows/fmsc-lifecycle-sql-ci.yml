@@ -24,7 +24,7 @@ jobs:
           folder = Path(os.environ['RUNNER_TEMP']) / 'fmsc-level1-evidence'
           folder.mkdir()
           report = {'commit': os.environ['GITHUB_SHA'], 'runId': os.environ['GITHUB_RUN_ID'],
-                    'result': 'BLOCKED', 'schemaVersion': '20', 'engine': None,
+                    'result': 'BLOCKED', 'schemaVersion': '21', 'engine': None,
                     'scenarios': [{'name': 'Checkout/tooling/harness startup', 'result': 'BLOCKED',
                                    'assertions': 0, 'seconds': 0, 'assertion': 'The harness has not started.'}],
                     'limitations': ['No SQL execution is claimed until the harness replaces this startup evidence.']}

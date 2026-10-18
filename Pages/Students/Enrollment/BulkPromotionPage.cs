@@ -3,6 +3,7 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Enrollment;
 public sealed class BulkPromotionPage : V2Page, IBusyPage
 {
+    private readonly CheckBox carryConcessions=new(){Text="Carry monthly concessions into the new placement",AutoSize=true};
     private bool processing;
     public bool IsBusy => processing;
     public string BusyMessage => "Student promotions are being processed. Wait for the result before leaving.";
@@ -108,6 +109,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         : base(PageTitles.StudentPromotion, "Move a class or selected students to their next class.")
     {
         nextSteps = new NextStepBar(navigate, Fail);
+        SetToolTip(carryConcessions,"Unchecked: reset monthly concessions for return review. Checked: carry the final prior agreement, capped at the new fee; full concessions cover the new rate.");
         historyButton = AddAction("View Promotion History", (_, _) => OpenHistory(), "Secondary");
         RelocateFromActions(historyButton);
         SetToolTip(historyButton, "Review completed promotions for the selected source year, class and section. Leave filters blank to view all history. Report access is required.");
@@ -211,11 +213,14 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             new Padding(0, 0, 8, 0);
         destinationTable.Margin =
             new Padding(8, 0, 0, 0);
+        promotionSetupTable.RowCount=3;
+        promotionSetupTable.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         promotionSetupTable.Controls.Clear();
         promotionSetupTable.Controls.Add(sourceTable, 0, 0);
         promotionSetupTable.Controls.Add(destinationTable, 1, 0);
         promotionSetupTable.Controls.Add(remarksField, 0, 1);
         promotionSetupTable.SetColumnSpan(remarksField, 2);
+        promotionSetupTable.Controls.Add(carryConcessions,0,2);promotionSetupTable.SetColumnSpan(carryConcessions,2);
     }
     private static void ConfigureInnerTable(TableLayoutPanel table, int rowCount)
     {
@@ -409,6 +414,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             AppMetrics.CardHeaderHeight()
             + AppMetrics.CardContentVerticalPadding
             + (AppMetrics.FieldRowHeight * 3)
+            + carryConcessions.PreferredSize.Height + carryConcessions.Margin.Vertical
             + 8;
         root.RowStyles.Add(
             new RowStyle(SizeType.Absolute, setupHeight));
@@ -740,6 +746,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         destinationSectionField.Enabled = idle && campus && destinationClassChosen;
         effectiveDateField.Enabled = idle && destinationYearChosen;
         remarksField.Enabled = idle;
+        carryConcessions.Enabled=idle&&CurrentUser.HasPermission("Fees.Adjust");
         loadButton.Enabled = idle && campus && sourceYearChosen && sourceClassChosen;
         selectAllButton.Enabled = idle && hasRows;
         clearSelectionButton.Enabled = idle && hasRows;
@@ -1007,6 +1014,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                     ("Effective date", effective.ToString("dd-MMM-yyyy")),
                     ("Promote", promoteCount.ToString("N0")),
                     ("Hold back", holdCount.ToString("N0")),
+                    ("Monthly concessions",carryConcessions.Checked?"Carry the final prior-placement agreement, capped at the new fee":"Reset; review when confirming return"),
                     ("Section mapping", string.IsNullOrWhiteSpace(mappingSummary) ? "As selected above" : mappingSummary.Trim())
                 },
                 Notice: "Each student gets a new placement in the destination year. Held-back students keep their class. Confirm return admission before billing.");
@@ -1041,7 +1049,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                 ? await MatchingSectionPromotion.RunAsync(decisions,sourceYear.SelectedId,destinationYear.SelectedId,
                     sourceCampus.SelectedId,sourceClass.SelectedId,sourceSection.SelectedId,destinationClass.SelectedId,
                     effectiveDate.Value.Date,remarks.Text.Trim(),sectionMapping,
-                    selected.ToDictionary(row=>Convert.ToInt32(row["AdmissionId"]),row=>Convert.ToInt32(row["SectionId"])))
+                    selected.ToDictionary(row=>Convert.ToInt32(row["AdmissionId"]),row=>Convert.ToInt32(row["SectionId"])),carryConcessions.Checked)
                 : await DatabaseHelper.QueryUserAsync(
                 "BulkPromoteStudents",
                 DatabaseHelper.Int(
@@ -1069,7 +1077,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                     "@EffectiveDate",
                     effectiveDate.Value),
                 parameter,
-                DatabaseHelper.P("@Remarks", remarks.Text.Trim()));
+                DatabaseHelper.P("@Remarks", remarks.Text.Trim()),DatabaseHelper.Bit("@CarryConcessions",carryConcessions.Checked));
             int attempted = selected.Count;
             bool serverCountsRead =
                 result.Rows.Count > 0 &&
@@ -1155,7 +1163,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         destinationClass.ClearLookup();
         destinationSection.ClearLookup();
         effectiveDate.Value = CurrentYearStart();
-        remarks.Clear();
+        remarks.Clear();carryConcessions.Checked=false;
         candidateData = null;
         candidatesGrid.DataSource = null;
         nextSteps.Dismiss();

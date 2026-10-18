@@ -13,6 +13,8 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     throw 'Runner lacks elevation needed for the real installer.'
 }
 $project=[IO.Path]::GetFullPath($ProjectDirectory)
+$expectedSchema=[regex]::Match((Get-Content -LiteralPath (Join-Path $project 'Installer/core.ps1') -Raw), '\$DatabaseVersion\s*=\s*''([0-9]+)''').Groups[1].Value
+if (-not $expectedSchema) { throw 'Cannot determine the installer schema contract.' }
 $root=Join-Path $env:RUNNER_TEMP 'fmsc-disposable-installer'
 $evidence=Join-Path $env:RUNNER_TEMP 'fmsc-install-evidence'
 $release=Join-Path $root 'release'
@@ -295,7 +297,7 @@ EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@
 
     Stage 'Installed app schema verification'
     $version=@(Sql 'FMSC_DB' 'SET NOCOUNT ON; SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC;')
-    if (($version -join '').Trim() -ne '20') { throw 'Wrong schema version installed.' }
+    if (($version -join '').Trim() -ne $expectedSchema) { throw 'Wrong schema version installed.' }
     $exe=Join-Path $installed 'FMSC_SMS.exe'
     $verify=Start-Process -FilePath $exe -ArgumentList @('--verify-installation',('"'+$instance+'"'),'FMSC_DB') -PassThru
     $null=$verify.Handle

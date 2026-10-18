@@ -2,7 +2,8 @@
 
 ## Using and maintaining the application
 
-- [Operator guide](USER_GUIDE.md)
+- [Operator guide](USER_GUIDE.md) and [operator decisions](OPERATOR_CONTROL.md)
+- [Current release readiness](RELEASE_READINESS.md)
 - [Installation](INSTALLATION.md) and [backup / recovery](BACKUP_RECOVERY.md)
 - [Help & FAQ Center](HELP_CENTER.md)
 - [Family counter billing](FAMILY_COUNTER_BILLING.md)

@@ -62,17 +62,19 @@ An administrator reviews missed months and chooses whether to include them.
 Manual Recovery is for reviewed exceptions, including deliberately reposting a
 reversed charge. Automatic billing does not silently recreate reversals.
 
-Choose recurring concession start/end months in Fee Concession. Review whether
-issued bills in that period should also change, and choose credit or refund for
-paid reductions. A temporary concession restores the prior agreement afterward.
-For a separate issued-bill change, use its unpaid-balance adjustment or an explicit
-bill-rate correction.
-Paid rate reductions release the paid difference as credit or an explicit refund;
-original payments remain in history. Review the correction preview before saving.
+Use **Review Fee Terms** from Fee Discounts & Transport to choose the fee rate,
+concession period, agreement changes and issued-bill treatment. Fee Collection's
+bill menu can correct one annual, monthly or purchase bill. Paid reductions become
+the chosen credit or refund; original payments remain in history. Credit stays on
+account unless its use is selected, and the preview states how much will be used.
+Closed placements permit reviewed bill corrections without reopening the student.
+See [operator decisions](OPERATOR_CONTROL.md) for the full choices and safeguards.
 
 ## Movement and departure
 
 Promotion/readmission selects a new placement and rates without copying old debt.
+Promotion can reset monthly concessions or carry the final prior agreement;
+review the actual fee plan when confirming return.
 Confirm actual returns individually. Transfer and leaving use the configured
 cutoff by default. Leaving can retain issued bills or waive from a chosen month;
 review the financial effect before applying. Paid money must be reconciled,

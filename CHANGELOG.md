@@ -8,7 +8,9 @@ Notable user-facing, database, installer, and operational changes will be tracke
 - Offer admission-month or following-month concessions in direct admission and Quick Registration.
 - Let leaving retain issued monthly bills, apply the school cutoff or waive from a chosen month; preview full correction chains.
 - Upgrade schema 20 to 21 without rewriting school records; remove audit-only preparation from revised procedures.
-- Record remaining policy-review boundaries in Docs/OPERATOR_CONTROL.md instead of treating passing tests as completion of the operating model.
+- Review fee rates and concessions together for monthly, annual and individual purchase bills, including closed placements. Retain credit unless its use is explicitly selected; show credit before/use/remaining in the review.
+- Make carrying monthly concessions through promotion an explicit choice; remove the unused amount editor while retaining its SQL compatibility API.
+- Document the operator choices and remaining school-PC acceptance in Docs/OPERATOR_CONTROL.md.
 
 ## [1.1.0-rc.1] - 2026-10-18
 

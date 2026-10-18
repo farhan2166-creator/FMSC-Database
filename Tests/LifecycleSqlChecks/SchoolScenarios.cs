@@ -31,6 +31,10 @@ internal sealed partial class SchoolScenarios(Fixture f, Report r)
         await r.Stage("Operator: temporary concessions, paid bills and exact recovery", ConcessionChoices);
         await r.Stage("Operator: stale concession preview and atomic refusal", ConcessionRefusals);
         await r.Stage("Operator: leaving choices reconcile complete bill chains", LeavingChoices);
+        await r.Stage("Operator: reviewed rates, unchanged net terms and explicit waiver mode", ReviewedRates);
+        await r.Stage("Operator: annual and individual purchase corrections", AnnualAndPurchaseTerms);
+        await r.Stage("Operator: closed-placement bill corrections preserve history", ClosedBillTerms);
+        await r.Stage("Operator: promotion resets or carries monthly concessions", PromotionConcessionChoices);
         await r.Stage("School: legacy activation acknowledges historical admission fees", LegacyActivation);
         await r.Stage("School: opening fees honor cutoff and prospective discounts", OpeningDiscounts);
         await r.Stage("School: partial payment and remaining-balance waiver", PartialWaiver);
