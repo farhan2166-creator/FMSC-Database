@@ -75,7 +75,16 @@ function Invoke-ActualInstaller {
     $installerOutput=$stdout.GetAwaiter().GetResult()
     $installerError=$stderr.GetAwaiter().GetResult()
     # Retain synthetic diagnostics on the disposable runner only, never as artifacts.
-    $installerOutput | Set-Content -LiteralPath (Join-Path $root 'installer-private.log')
+    @($installerOutput,$installerError) | Set-Content -LiteralPath (Join-Path $root 'installer-private.log')
+    if ($p.ExitCode -ne 0) {
+        # Only fixed installer phase names and known error categories enter public
+        # logs. Raw diagnostics can contain SQL/configuration and remain private.
+        $phases=[regex]::Matches($installerOutput,'STEP [1-8] OF 8  -  [A-Z ]+')
+        if ($phases.Count) { Write-Host ('Installer stopped during '+$phases[$phases.Count-1].Value.Trim()) }
+        foreach ($reason in @('Invalid version number','Invalid database schema version','FMSC_SMS.exe was not found','Installation stopped to prevent an application downgrade')) {
+            if (($installerOutput+$installerError).Contains($reason)) { Write-Host ('Installer failure category: '+$reason) }
+        }
+    }
     return $p.ExitCode
 }
 function Assert-Level3Database {

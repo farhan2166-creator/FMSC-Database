@@ -176,8 +176,10 @@ internal static class CommunicationSqlChecks
             var body=Payload(false);report.Check(await receiver.ReceiveAsync(body,Signature(body),now,default) && State(claim.Id)=="Submitting","An early signed receipt is held while HTTP acknowledgement is still pending.");
             await store.CompleteAsync(claim,"MetaCloud",new(DeliveryState.Accepted,reference));
             report.Check(State(claim.Id)=="Delivered" && Sql.Count("SELECT COUNT(*) FROM comm.PendingReceipt WHERE ProviderReference=@Ref",Sql.P("@Ref",reference))==0,"Acknowledgement reconciles the early signed receipt with the exact message without losing delivery evidence.");
-            int audits=Sql.Count("SELECT COUNT(*) FROM comm.Audit;");await receiver.ReceiveAsync(body,Signature(body),now,default);
-            report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Audit;")==audits,"Replayed signed callback is durably deduplicated.");
+            int inbox=Sql.Count("SELECT COUNT(*) FROM comm.WebhookInbox;");await receiver.ReceiveAsync(body,Signature(body),now,default);
+            report.Check(Sql.Count("SELECT COUNT(*) FROM comm.WebhookInbox;")==inbox,"Replayed signed callback is durably deduplicated.");
+            report.Check(Sql.Count("SELECT COUNT(*) FROM comm.Audit WHERE Operation='SignedMetaCallback';")==0,
+                "The revised callback records recovery and delivery evidence without writing its retired audit entry.");
             report.Check(!await receiver.ReceiveAsync(body,"sha256=invalid",now,default),"Unsigned input never reaches SQL ingestion.");
             body=Payload(true);report.Check(await receiver.ReceiveAsync(body,Signature(body),now,default) && Sql.Count("SELECT COUNT(*) FROM comm.Contact WHERE ContactId=@Id AND OptedOut=1 AND WhatsAppConsent=0",Sql.P("@Id",contact))==1,"Signed inbound STOP suppresses future WhatsApp messages.");
             await report.Refused("A stale contact editor cannot undo a newer opt-out",()=>Contact(true,false,true,staleRevision),51004);

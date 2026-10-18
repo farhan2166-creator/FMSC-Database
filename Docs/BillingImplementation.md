@@ -1,5 +1,7 @@
 # Agreed billing implementation — 18 October 2026
 
+> Historical design record. Current release routes and schema-20 deployment are described in [School operations](SCHOOL_OPERATIONS.md) and [Release readiness](RELEASE_READINESS.md).
+
 Work in the project folder only. No live database changes or Git operations.
 Existing migrations 7–13 are pending and must not be rewritten or assumed applied.
 New migrations remain unapplied until separately deployed.

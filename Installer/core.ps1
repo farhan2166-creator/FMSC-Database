@@ -126,11 +126,44 @@ function Convert-ToVersion {
         [string]$Version
     )
     try {
-        return [System.Version]::Parse($Version)
+        if ($Version -notmatch '^(?<Core>\d+\.\d+\.\d+(?:\.\d+)?)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
+            throw 'Invalid application version format.'
+        }
+        $Core = $Matches.Core
+        if (($Core -split '\.').Count -eq 3) { $Core += '.0' }
+        return [System.Version]::Parse($Core)
     }
     catch {
         throw "Invalid version number: $Version"
     }
+}
+function Compare-ApplicationVersion {
+    param([string]$Left, [string]$Right)
+    $Comparison = (Convert-ToVersion $Left).CompareTo((Convert-ToVersion $Right))
+    if ($Comparison -ne 0) { return $Comparison }
+    # Build metadata does not determine precedence. A final release is newer
+    # than its prereleases; numeric prerelease identifiers compare numerically.
+    $LeftPre = ($Left -split '\+',2)[0] -split '-',2
+    $RightPre = ($Right -split '\+',2)[0] -split '-',2
+    if ($LeftPre.Count -eq 1 -and $RightPre.Count -eq 1) { return 0 }
+    if ($LeftPre.Count -eq 1) { return 1 }
+    if ($RightPre.Count -eq 1) { return -1 }
+    $LeftParts = $LeftPre[1] -split '\.'
+    $RightParts = $RightPre[1] -split '\.'
+    for ($Index=0; $Index -lt [Math]::Min($LeftParts.Count,$RightParts.Count); $Index++) {
+        $L = $LeftParts[$Index]; $R = $RightParts[$Index]
+        $LNumeric = $L -match '^\d+$'; $RNumeric = $R -match '^\d+$'
+        if ($LNumeric -and $RNumeric) {
+            $L = $L.TrimStart('0'); $R = $R.TrimStart('0')
+            $Comparison = $L.Length.CompareTo($R.Length)
+            if ($Comparison -eq 0) { $Comparison = [String]::CompareOrdinal($L,$R) }
+        }
+        elseif ($LNumeric) { $Comparison = -1 }
+        elseif ($RNumeric) { $Comparison = 1 }
+        else { $Comparison = [String]::CompareOrdinal($L,$R) }
+        if ($Comparison -ne 0) { return $Comparison }
+    }
+    return $LeftParts.Count.CompareTo($RightParts.Count)
 }
 function Convert-ToDbVersion {
     param(
@@ -322,15 +355,8 @@ function Get-InstalledApplicationVersion {
         }
         $Version =
             $Version.Split('+')[0].Trim()
-        if ($Version -match '^\d+\.\d+\.\d+$') {
-            return $Version
-        }
-        if ($Version -match '^\d+\.\d+\.\d+\.\d+$') {
-            return (
-                ($Version -split '\.')[0..2] -join '.'
-            )
-        }
-        return $null
+        $null = Convert-ToVersion $Version
+        return $Version
     }
     catch {
         return $null
@@ -1002,8 +1028,7 @@ try {
     Pause-Long
     Write-Section `
         'STEP 2 OF 8  -  APPLICATION VERSION CHECK'
-    $ReleaseAppVersion =
-        Convert-ToVersion $AppVersion
+    $null = Convert-ToVersion $AppVersion
     $InstalledAppVersion =
         Get-InstalledApplicationVersion
     if ($InstalledAppVersion) {
@@ -1011,9 +1036,8 @@ try {
             "Installed application version : $InstalledAppVersion"
         Write-Step `
             "Release application version   : $AppVersion"
-        $InstalledVersionObject =
-            Convert-ToVersion $InstalledAppVersion
-        if ($InstalledVersionObject -gt $ReleaseAppVersion) {
+        $VersionComparison = Compare-ApplicationVersion $InstalledAppVersion $AppVersion
+        if ($VersionComparison -gt 0) {
             throw (
                 "The installed application is newer than this release.`r`n`r`n" +
                 "Installed application: $InstalledAppVersion`r`n" +
@@ -1021,7 +1045,7 @@ try {
                 "Installation stopped to prevent an application downgrade."
             )
         }
-        if ($InstalledVersionObject -eq $ReleaseAppVersion) {
+        if ($VersionComparison -eq 0) {
             Write-Success `
                 'Same application version detected.'
             Write-Host `
