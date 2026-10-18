@@ -8,6 +8,22 @@ internal static class StudentFeeAssignmentAdd
         using var connection=DatabaseHelper.GetConnection();
         DatabaseHelper.OpenConnection(connection);
         using var transaction=connection.BeginTransaction(IsolationLevel.Serializable);
+        using (var acknowledgement = new SqlCommand("""
+            SELECT COUNT(*)
+            FROM dbo.Enrollments E
+            JOIN dbo.StudentAdmissionFeeAcknowledgements A WITH(UPDLOCK,HOLDLOCK)
+                ON A.AdmissionId=E.AdmissionId
+            JOIN dbo.FeeTypes F ON F.FeeTypeId=@FeeTypeId
+            WHERE E.EnrollmentId=@EnrollmentId AND F.FeeTypeCode=N'ADMISSION';
+            """, connection, transaction))
+        {
+            acknowledgement.Parameters.AddRange(new[] {
+                DatabaseHelper.Int("@EnrollmentId", enrollmentId),
+                DatabaseHelper.Int("@FeeTypeId", feeTypeId)
+            });
+            if (Convert.ToInt32(acknowledgement.ExecuteScalar()) > 0)
+                throw new InvalidOperationException("This student's admission fee is recorded as already paid before the system. It cannot be charged again.");
+        }
         using var command=new SqlCommand("""
             EXEC dbo.RequirePermission @UserId,N'Fees.Adjust';
             IF NOT EXISTS(SELECT 1 FROM dbo.FeeTypes WHERE FeeTypeId=@FeeTypeId AND IsTransportLinked=1)

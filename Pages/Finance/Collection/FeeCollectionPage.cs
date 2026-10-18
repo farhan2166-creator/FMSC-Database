@@ -178,6 +178,18 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         };
     }
     private readonly bool initialize;
+    private readonly int preloadFocusAdmissionId;
+    internal override bool FocusEntryField()
+    {
+        if (preloadFocusAdmissionId > 0 && admissionId == preloadFocusAdmissionId &&
+            HasOutstandingCharges() && paymentAmount.CanFocus)
+        {
+            bool focused = paymentAmount.Focus();
+            if (focused) paymentAmount.SelectAll();
+            return focused;
+        }
+        return base.FocusEntryField();
+    }
     public FeeCollectionPage() : this(true) { }
     internal FeeCollectionPage(bool initialize)
         : base(
@@ -192,6 +204,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     {
         if (preloadAdmissionId > 0)
         {
+            preloadFocusAdmissionId = preloadAdmissionId;
             Defer(() => LoadStudentByAdmissionId(preloadAdmissionId));
         }
     }
@@ -285,7 +298,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             };
         /* Delegate menu actions to the existing buttons so permissions and enabled states remain authoritative. */
         studentFeesMenuButton = new ModernButton {
-            Text = "Student Fees â–¾",
+            Text = "Student Fees ▾",
             ThemeRole = "Secondary",
             AutoSize = true
         };
@@ -728,8 +741,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         paymentSummary.Content.Controls.Add(paymentScroll);
 
         var actions = new FlowLayoutPanel {
-            Dock = DockStyle.Fill, WrapContents = false,
-            Padding = new Padding(0, 6, 0, 0), Margin = new Padding(0)
+            Dock = DockStyle.Right, WrapContents = false,
+            AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = Padding.Empty, Margin = Padding.Empty
         };
         paymentHistoryButton!.Text = "Recent Payments";
         foreach (Control button in new Control[] { studentFeesMenuButton!, paymentHistoryButton })
@@ -754,18 +768,18 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         workspace.Controls.Add(work, 0, 0);
         workspace.Controls.Add(paymentSummary, 1, 0);
         context.SetHeaderText("Student", "Search by admission number, student or father name.");
+        context.Header.Controls.Add(actions);
+        context.Header.Controls.SetChildIndex(actions, context.Header.Controls.Count - 1);
         chargeCard.SetHeaderText("Outstanding Charges", "Review the charges included in this payment.");
         var root = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3,
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
             Padding = new Padding(0), Margin = new Padding(0)
         };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(1)));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 16));
         root.Controls.Add(context, 0, 0);
         root.Controls.Add(workspace, 0, 1);
-        root.Controls.Add(actions, 0, 2);
         SetContent(root, null);
         FormFlow.EnterMovesToNext(this);
         FormFlow.OrderTableFields(root);
@@ -978,7 +992,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     : 0m;
             row.Cells["Pay"].Value =
                 selected
-                    ? "âˆ’"
+                    ? "−"
                     : "+";
             UpdateCollectionTotals();
             SyncPaymentFieldToGrid();
@@ -1045,7 +1059,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 selected;
             row.Cells["Pay"].Value =
                 selected
-                    ? "âˆ’"
+                    ? "−"
                     : "+";
             UpdateCollectionTotals();
             SyncPaymentFieldToGrid();
@@ -1305,6 +1319,15 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 suppressStudentEvents = false;
             }
             await SelectStudentAsync(version);
+            // Navigation may focus the search before the preloaded bills finish loading.
+            // Advance that initial focus, while preserving any input the operator moved to.
+            if (!IsDisposed && ContainsFocus && student.ContainsFocus &&
+                this.admissionId == admissionId && student.SelectedId == admissionId &&
+                HasOutstandingCharges() && paymentAmount.CanFocus)
+            {
+                paymentAmount.Focus();
+                paymentAmount.SelectAll();
+            }
         }
         catch (Exception ex)
         {
@@ -1330,7 +1353,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             student.SelectedId;
         admissionId =
             selectedAdmissionId;
-        primaryPayer.Text=selectedAdmissionId>0 ? $"{StudentNameFor(selectedAdmissionId)} Â· #{AdmissionNumbers.ForId(selectedAdmissionId)} (included)" : "";
+        primaryPayer.Text=selectedAdmissionId>0 ? $"{StudentNameFor(selectedAdmissionId)} · #{AdmissionNumbers.ForId(selectedAdmissionId)} (included)" : "";
         enrollmentId = 0;
         enrollment.ClearLookup();
         charges.Rows.Clear();
@@ -1437,7 +1460,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     GetText(row, "SectionName");
                 string display =
                     $"{GetText(row, "YearName")}, " +
-                    $"{className} â€” " +
+                    $"{className} — " +
                     $"{sectionName} " +
                     $"({status})";
                 dt.Rows.Add(
@@ -1618,7 +1641,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             string chargeLabel = GetText(row, "FeeTypeName").Replace(" Fee", "");
             string chargeReason = GetText(row, "Remarks");
             if (additional && !string.IsNullOrWhiteSpace(chargeReason))
-                chargeLabel += " â€” " + chargeReason;
+                chargeLabel += " — " + chargeReason;
             string periodLabel = additional
                 ? FormatDueDate(row["ChargeDate"])
                 : FormatBillingMonth(row["BillingMonth"]);
@@ -1650,8 +1673,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             charges.Rows[index].Cells["EnrollmentId"].Value = GetInt(row, "EnrollmentId");
             charges.Rows[index].Cells["StudentName"].Value=StudentNameFor(forAdmissionId);
             charges.Rows[index].Cells["FeeDisplayOrder"].Value=feeOrder.GetValueOrDefault(GetInt(row,"FeeTypeId"),int.MaxValue);
-            charges.Rows[index].Cells["StudentName"].ToolTipText=$"{StudentNameFor(forAdmissionId)} Â· Admission {AdmissionNumbers.ForId(forAdmissionId)}";
-            charges.Rows[index].Cells["FeeTypeName"].ToolTipText=$"{GetText(row,"FeeTypeName")} Â· Due {FormatDueDate(row["DueDate"])}";
+            charges.Rows[index].Cells["StudentName"].ToolTipText=$"{StudentNameFor(forAdmissionId)} · Admission {AdmissionNumbers.ForId(forAdmissionId)}";
+            charges.Rows[index].Cells["FeeTypeName"].ToolTipText=$"{GetText(row,"FeeTypeName")} · Due {FormatDueDate(row["DueDate"])}";
             added++;
         }
         if (added > 0) charges.Sort(new StudentChargeComparer(admissionId));
@@ -1733,7 +1756,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 item.Row.Cells["Amount"].Value = give;
                 /* Every row is visited now, so the tick and the marker are always consistent with the amount - no stale "+" left on a row from a previous, larger payment. */
                 item.Row.Tag = give > 0m;
-                item.Row.Cells["Pay"].Value = give > 0m ? "âˆ’" : "+";
+                item.Row.Cells["Pay"].Value = give > 0m ? "−" : "+";
                 remaining -= give;
                 placed += give;
             }
@@ -1886,7 +1909,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 if (!string.IsNullOrWhiteSpace(GetText(row, "ClassName")))
                     name += $"  ({GetText(row, "ClassName")})";
                 // The family read includes EnrollmentId. Without an enrollment there is nothing to collect for that child, so they are shown as unavailable rather than silently omitted.
-                if(!active) name += " â€” pending fees";
+                if(!active) name += " — pending fees";
                 string label = memberEnrollmentId > 0
                     ? name
                     : $"{name}  - no active placement";
@@ -2113,9 +2136,12 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             int selectedEnrollment = enrollmentId;
             var summaries = await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Fees.View';
-                SELECT P.FeePaymentId,P.TotalAmount,P.Status,
+                SELECT P.FeePaymentId,P.TotalAmount,P.Status,P.PaymentMethod,
+                    C.EntryKind AS CreditKind,
                     ISNULL(A.Refunded,0) Refunded,ISNULL(A.Corrected,0) Corrected
                 FROM dbo.FeePayments P
+                OUTER APPLY (SELECT TOP(1) EntryKind FROM dbo.StudentCreditEntries
+                    WHERE FeePaymentId=P.FeePaymentId ORDER BY CreditEntryId) C
                 OUTER APPLY (SELECT
                     -SUM(CASE WHEN X.PaymentMethod=N'Refund' THEN X.TotalAmount ELSE 0 END) Refunded,
                     -SUM(CASE WHEN X.PaymentMethod=N'Correction' THEN X.TotalAmount ELSE 0 END) Corrected
@@ -2142,7 +2168,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 decimal refunded = GetDecimal(summary,"Refunded");
                 decimal corrected = GetDecimal(summary,"Corrected");
                 bool reversed = GetText(summary,"Status") == "Reversed";
-                decimal net = reversed ? 0m : Math.Max(0m,original-refunded-corrected);
+                decimal net = reversed ? 0m : original < 0m ? original : Math.Max(0m,original-refunded-corrected);
                 string transactionType = GetText(row, "TransactionType");
                 string displayTransaction = transactionType.ToUpperInvariant() switch {
                     "PAYMENT" => "Collected",
@@ -2153,10 +2179,23 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 };
                 displayTransaction = reversed ? "Reversed" : refunded > 0m && corrected > 0m ? "Refunded / Corrected"
                     : refunded > 0m ? "Refunded" : corrected > 0m ? "Corrected" : "Collected";
+                string creditKind = GetText(summary, "CreditKind");
+                string chargeType = GetText(row, "ChargeType");
+                if (!reversed && creditKind.Length > 0)
+                {
+                    displayTransaction = creditKind switch {
+                        "Deposit" => "Credit deposit",
+                        "Refund" => "Credit refund",
+                        _ => "Credit " + creditKind
+                    };
+                    chargeType = "Student credit";
+                }
+                else if (!reversed && original < 0m)
+                    displayTransaction = GetText(summary, "PaymentMethod") == "Refund" ? "Refunded" : "Corrected";
                 int index = recentPayments.Rows.Add(
                     FormatDate(row, "TransactionDate"),
                     GetText(row, "ReceiptNumber"),
-                    GetText(row, "ChargeType"),
+                    chargeType,
                     displayTransaction,
                     original,
                     GetText(row, "PaymentMethod"),
@@ -2359,7 +2398,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     give > 0m;
                 row.Cells["Pay"].Value =
                     give > 0m
-                        ? "âˆ’"
+                        ? "−"
                         : "+";
                 remaining -=
                     give;
@@ -2614,7 +2653,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         int receiptEnrollmentId = enrollmentId;
         string receiptPaymentMethod = method.Text;
         DateTime receiptTransactionDate = paymentDate.Value;
-        /* The student, enrollment and sibling pickers stay live during the write, so choosing another student while it ran let the post-commit blockâ€¦ */
+        /* The student, enrollment and sibling pickers stay live during the write, so choosing another student while it ran let the post-commit block… */
         bool studentWasEnabled = student.Enabled;
         bool enrollmentWasEnabled = enrollment.Enabled;
         bool siblingsWasEnabled = siblings.Enabled;
@@ -2888,8 +2927,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 {
                     description += $"\r\n{GetText(row.Cells["FeeTypeName"].Value)} ({GetText(row.Cells["BillingMonth"].Value)}): " +
                         $"bill discount Rs. {oldDiscount:0.##} to Rs. {GetDecimal(row.Cells["AppliedDiscount"].Value):0.##}.";
-                    confirmationFacts.Add(($"{GetText(row.Cells["FeeTypeName"].Value)} Â· {GetText(row.Cells["BillingMonth"].Value)}",
-                        $"Bill discount: Rs. {oldDiscount:0.##} â†’ Rs. {GetDecimal(row.Cells["AppliedDiscount"].Value):0.##}"));
+                    confirmationFacts.Add(($"{GetText(row.Cells["FeeTypeName"].Value)} · {GetText(row.Cells["BillingMonth"].Value)}",
+                        $"Bill discount: Rs. {oldDiscount:0.##} → Rs. {GetDecimal(row.Cells["AppliedDiscount"].Value):0.##}"));
                 }
             }
             /* When siblings are included, say so up front, and say it in the terms the system now uses: ONE family collection under ONE receipt number. */
@@ -3324,8 +3363,14 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             };
         reprintReceiptButton = reprintButton;
         reprintButton.Click += async (_, _) => await ReprintSelectedReceiptAsync();
+        var creditHistory = new ModernButton { Text = "Credit History", ThemeRole = "Secondary" };
+        creditHistory.Click += async (_, _) => {
+            using var credit = new StudentCreditDialog(admissionId);
+            credit.ShowDialog(dialog);
+            await LoadRecentPaymentsAsync(++loadVersion);
+        };
         var buttons =
-            HumanUi.ButtonRow(reprintButton, closeButton);
+            HumanUi.ButtonRow(reprintButton, creditHistory, closeButton);
         buttons.Dock = DockStyle.Bottom;
         buttons.Margin = new Padding(0, 10, 0, 0);
         var root =
@@ -3797,7 +3842,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         billBusy=true;
         try
         {
-            using var busy=BeginBusy("Reviewing family returnsâ€¦",this);
+            using var busy=BeginBusy("Reviewing family returns…",this);
             using(var dialog=new ApplicationWindowForm{Text="Family / Returns",StartPosition=FormStartPosition.CenterParent,
                 Size=new Size(AppScale.Scale(1150),AppScale.Scale(740)),ShowInTaskbar=false})
             {
@@ -3825,7 +3870,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         billBusy=true;
         try
         {
-            using var busy=BeginBusy("Preparing outstanding billâ€¦",this);
+            using var busy=BeginBusy("Preparing outstanding bill…",this);
             await FamilyBillPreview.ShowAsync(FindForm(),anchor,selected,()=>!IsDisposed && admissionId==anchor
                 && enrollmentId==placement && loadVersion==version && selected.SequenceEqual(SelectedBillStudents()));
         }
