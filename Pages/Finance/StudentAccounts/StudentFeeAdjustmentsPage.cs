@@ -63,6 +63,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         operation.SelectedIndexChanged += (_, _) => { if(!updatingOperation) UpdateActionMode(); };
         actionAmount.Width = AppScale.Scale(120);
         reason.Width = AppScale.Scale(300);
+        actionAmount.ZeroAsPlaceholder = true;
         ConfigureDecimalInput(actionAmount);
         /* The shared student finder (StudentPicker): type in the box and the list narrows on every keystroke. */
         if(initialize)StudentSearchCache.Warm();

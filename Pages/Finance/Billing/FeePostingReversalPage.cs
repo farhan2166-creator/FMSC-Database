@@ -17,8 +17,9 @@ public sealed class FeePostingReversalPage : V2Page, IBusyPage
     private bool hasLoaded;
     public bool IsBusy => BusyOperationRunning;
     public string BusyMessage => "The whole month's posting is being reversed. Wait for the result.";
-    public FeePostingReversalPage() : base("Reverse a Posting",
-        "Current academic year only. Reverse the latest month first, in full. Any payment history protects the entire month.")
+    public FeePostingReversalPage() : this(true) { }
+    internal FeePostingReversalPage(bool initialize) : base("Reverse a Posting",
+        "Review and reverse the latest monthly posting. The reversal covers the whole school.")
     {
         reason.PlaceholderText="Why was this month posted by mistake?";
         var preview=AddBusyAction("Preview Whole Month",PreviewAsync,"Secondary");
@@ -27,11 +28,13 @@ public sealed class FeePostingReversalPage : V2Page, IBusyPage
         reverseButton.Enabled=false;
         RelocateFromActions(refresh,preview,reverseButton);
         var filters=ReportUi.Bar(("Latest reversible month",monthBox),("Reason (required)",reason));
-        SetContent(ReportUi.Layout(filters,Grid,"Whole-Month Reversal",refresh,preview,reverseButton));
+        SetContent(ReportUi.WorkflowLayout(filters,Grid,"Reversal Scope",
+            "Only the latest month in the current academic year is eligible. Payment history blocks reversal.",
+            "Charges to Reverse", "Review the whole month and enter a reason before reversing.",refresh,preview,reverseButton));
         monthBox.DropDownWidth=AppScale.Scale(440);
         monthBox.SelectedIndexChanged+=(_,_)=>{if(!rebinding)ClearPreview();};
         reason.TextChanged+=(_,_)=>UpdateReverse();
-        Defer(RefreshMonthsAsync);
+        if (initialize) Defer(RefreshMonthsAsync);
         VisibleChanged+=async(_,_)=>{
             if(Visible&&hasLoaded&&!IsBusy)await RefreshMonthsAsync();
         };
@@ -60,8 +63,8 @@ public sealed class FeePostingReversalPage : V2Page, IBusyPage
             try {monthBox.Bind(choices,"MonthKey","Display","No month selected");monthBox.SelectedValue=choices.Rows.Count>0?choices.Rows[0]["MonthKey"]:0;}
             finally {rebinding=false;}
             SetStatus(rows.Rows.Count==0
-                ? "No month is reversible. Only the latest posted month in the current academic year is considered; payment history or closed placements protect the whole month. Earlier months cannot be skipped."
-                : "Preview the entire month's charges. No campus, class, student or fee-type exclusions are allowed.",rows.Rows.Count==0);
+                ? "No eligible month. Only the latest current-year posting can be reversed; payment history or closed placements block reversal."
+                : "Preview the whole month, review the charges and enter a reason. Individual charges cannot be excluded.",rows.Rows.Count==0);
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
     }
@@ -75,6 +78,14 @@ public sealed class FeePostingReversalPage : V2Page, IBusyPage
         {
             var rows=await DatabaseHelper.QueryUserAsync("PreviewPostingReversal",DatabaseHelper.Date("@BillingMonth",month.Value),AllFeeTypes());
             if(IsDisposed||version!=readVersion)return;
+            if (!rows.Columns.Contains("ClassSection")) rows.Columns.Add("ClassSection", typeof(string));
+            foreach (DataRow row in rows.Rows)
+            {
+                string klass = Convert.ToString(row["ClassName"])?.Trim() ?? "";
+                string section = Convert.ToString(row["SectionName"])?.Trim() ?? "";
+                row["ClassSection"] = klass.Length == 0 ? "" : section.Length == 0 ? klass : $"{klass} - {section}";
+            }
+            if (rows.Columns.Contains("AdmissionNumber")) rows = AdmissionNumbers.Sort(rows);
             await BindReportAsync(()=>Task.FromResult(rows));
             if(IsDisposed||version!=readVersion){InvalidateReport();return;}
             previewRows=rows; loadedMonth=month.Value;
@@ -87,8 +98,13 @@ public sealed class FeePostingReversalPage : V2Page, IBusyPage
     protected override void OnReportPageBound()=>ConfigureGrid();
     private void ConfigureGrid()
     {
-        foreach(var name in new[]{"BillingChargeId","HasCollectedMoney","GrossAmount","DiscountAmount","Snapshot"})
+        foreach(var name in new[]{"BillingChargeId","HasCollectedMoney","GrossAmount","DiscountAmount","Snapshot","RegistrationNumber","ClassName","SectionName","CollectedAmount","UncollectedAmount"})
             if(Grid.Columns.Contains(name))Grid.Columns[name].Visible=false;
+        int index = 0;
+        foreach (string name in new[] { "AdmissionNumber", "StudentName", "CampusName", "ClassSection", "FeeTypeName", "ChargeKind", "BillingMonth", "NetAmount", "CollectedAmount", "UncollectedAmount", "ReversalNote" })
+            if (Grid.Columns.Contains(name)) Grid.Columns[name].DisplayIndex = index++;
+        if (Grid.Columns.Contains("ClassSection")) Grid.Columns["ClassSection"].HeaderText = "Class - Section";
+        if (Grid.Columns.Contains("BillingMonth")) Grid.Columns["BillingMonth"].DefaultCellStyle.Format = "MMM yyyy";
     }
     private async Task ReverseAsync()
     {

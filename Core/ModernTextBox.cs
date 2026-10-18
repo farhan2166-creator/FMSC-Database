@@ -8,6 +8,17 @@ namespace FMSC_SMS.Core
         private LiveTextSuggestions? _liveSuggestions;
         private AutoCompleteMode _autoCompleteMode;
         private bool _invalid;
+        private bool _zeroAsPlaceholder;
+        /// <summary>Show an empty numeric editor while retaining zero for existing text-based parsers.</summary>
+        public bool ZeroAsPlaceholder
+        {
+            get => _zeroAsPlaceholder;
+            set { _zeroAsPlaceholder = value; Text = Text; UpdateNumericPlaceholder(); }
+        }
+        private void UpdateNumericPlaceholder()
+        {
+            if (_zeroAsPlaceholder) _inner.PlaceholderText = _inner.Focused ? "" : "0";
+        }
         private int _radius =
             Math.Max(1, AppTheme.ControlRadius - 2);
         private const int TextInsetLeft = 8;
@@ -64,8 +75,8 @@ namespace FMSC_SMS.Core
                 BackColor = AppTheme.SurfaceElevated
             };
             _inner.TextChanged += (_, _) => OnTextChanged(EventArgs.Empty);
-            _inner.GotFocus += (_, _) => { OnGotFocus(EventArgs.Empty); Invalidate(); };
-            _inner.LostFocus += (_, _) => { OnLostFocus(EventArgs.Empty); Invalidate(); };
+            _inner.GotFocus += (_, _) => { UpdateNumericPlaceholder(); OnGotFocus(EventArgs.Empty); Invalidate(); };
+            _inner.LostFocus += (_, _) => { if (_zeroAsPlaceholder) Text = Text; UpdateNumericPlaceholder(); OnLostFocus(EventArgs.Empty); Invalidate(); };
             _inner.MouseEnter += (_, _) => { _isHovered = true; Invalidate(); };
             _inner.MouseLeave += (_, _) => { _isHovered = false; Invalidate(); };
             _inner.Enter += (_, _) => OnEnter(EventArgs.Empty);
@@ -120,8 +131,13 @@ namespace FMSC_SMS.Core
         [AllowNull]
         public override string Text
         {
-            get => _inner?.Text ?? string.Empty;
-            set { if (_inner != null) _inner.Text = value ?? string.Empty; }
+            get => _zeroAsPlaceholder && string.IsNullOrWhiteSpace(_inner?.Text) ? "0" : _inner?.Text ?? string.Empty;
+            set {
+                if (_inner == null) return;
+                bool zero = _zeroAsPlaceholder && decimal.TryParse(value, System.Globalization.NumberStyles.Number,
+                    System.Globalization.CultureInfo.InvariantCulture, out decimal number) && number == 0;
+                _inner.Text = zero ? "" : value ?? string.Empty;
+            }
         }
         /// <summary>A multiline field must accept Enter as a new line. Setting it with Multiline fixes every multiline field at once, including the shared ones built by HumanUi.TextBox.</summary>
         public bool Multiline

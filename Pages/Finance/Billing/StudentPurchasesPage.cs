@@ -52,7 +52,7 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
         recent.AutoGenerateColumns = false;
         recent.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         foreach (var (name, caption, weight) in new[] {
-            ("ChargeDate", "Date", 120), ("Item", "Purchase / Reason", 180),
+            ("ChargeDate", "Date", 120), ("FeeTypeName", "Fee Type", 150), ("Item", "Remarks", 180),
             ("NetAmount", "Net (Rs.)", 85), ("Balance", "Balance (Rs.)", 100),
             ("Status", "Status", 95)
         })

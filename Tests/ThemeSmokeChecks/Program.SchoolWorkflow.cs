@@ -15,11 +15,13 @@ internal static partial class Program
         try
         {
             CurrentUser.SignIn(7777, "School workflow fixture", "Administrator", false, Array.Empty<string>());
-            using var admission = (WorkspacePage)AdmissionsWorkspace.Create((_, _, _) => { });
-            var tabs = (TabControl)typeof(WorkspacePage).GetField("_tabs", flags)!.GetValue(admission)!;
-            Check(tabs.TabPages.Cast<TabPage>().Select(t => t.Text).SequenceEqual(new[] {
-                "Admit / Edit Student", "Registration & Pending", "Existing Student Setup" }),
-                "An administrator can reach direct admission, pending registrations and existing-student activation from one workspace");
+            using var admission = AdmissionsWorkspace.Create((_, _, _) => { });
+            Check(admission is StudentAdmissionPage, "Admissions opens the form directly without wrapper tabs");
+            using var reviewPage = new FMSC_SMS.Pages.Students.Maintenance.StudentDataReviewPage((_, _, _) => { });
+            var reviewTabs = (TabControl)reviewPage.GetType().GetField("tabs", flags)!.GetValue(reviewPage)!;
+            Check(reviewTabs.TabPages.Cast<TabPage>().Select(t => t.Text).SequenceEqual(new[] {
+                "Record Issues / History", "Possible Duplicates", "Existing Student Setup" }),
+                "Student Data Review includes existing-student setup for an administrator");
             Check(!admission.IsHandleCreated, "Admission route inspection starts no SQL loaders");
 
             var data = new DataSet();

@@ -111,7 +111,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         checkSave=AddAction("Check Save Outcome",async(_,_)=>await CheckSaveOutcomeAsync(),"Secondary");
         next=AddAction("Add Another Child", (_,_)=>StartNextDraft(false), "Secondary");
         bill=AddBusyAction("Print Bill", PrintBillAsync, "Secondary");
-        collect=AddAction("Collect Payment",(_,_)=>navigate(()=>new FMSC_SMS.Pages.Finance.Collection.FeeCollectionPage(savedStudent),"Fees & Billing","Fee Collection"),"Primary");
+        collect=AddAction("Collect Payment",(_,_)=>navigate(()=>new FMSC_SMS.Pages.Finance.Collection.FeeCollectionPage(savedStudent),"Daily Work","Fee Collection"),"Primary");
         newFamily=AddAction("New Family",(_,_)=>StartNextDraft(true),"Secondary");
         GateAction(save,"Students.Admit"); GateAction(collect,"Fees.Collect");
         GateAction(next,"Students.Administer");

@@ -6,9 +6,9 @@ public static class FeePostingWorkspace
     public static Control Create(Action<Func<Control>, string, string>? navigate = null) =>
         new WorkspacePage(
             PageTitles.FeePosting,
-            "Monthly fees are automatic. Review billing exceptions or use administrative recovery when needed.",
+            "Review automatic billing, post fees or reverse a monthly posting. Receive payments in Fee Collection.",
             ("Billing Status", () => new BillingStatusPage(navigate)),
-            ("Manual Recovery", () => new FeePostingPage()),
+            ("Manual / Advance Posting", () => new FeePostingPage()),
             ("Post Additional Fee", () => new AdditionalFeePostingPage()),
             ("Reverse a Posting", () => new FeePostingReversalPage()));
 }

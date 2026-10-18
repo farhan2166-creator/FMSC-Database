@@ -1,6 +1,7 @@
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Finance.Collection;
 using FMSC_SMS.Pages.Students.Admissions;
+using FMSC_SMS.Pages.Reports;
 
 namespace FMSC_SMS.Pages.Finance.Billing;
 
@@ -21,7 +22,7 @@ public sealed class BillingStatusPage : V2Page, IBusyPage
         : this(navigate, AutomaticMonthlyBilling.ReviewAsync, true) { }
 
     internal BillingStatusPage(Action<Func<Control>, string, string>? navigate, Func<Task<DataSet>> read, bool initialize)
-        : base("Billing Status", "Resolve setup exceptions, review missed months and open the selected student's account.")
+        : base("Billing Status", "Review pending billing and students needing attention.")
     {
         this.navigate = navigate;
         this.read = read;
@@ -40,11 +41,19 @@ public sealed class BillingStatusPage : V2Page, IBusyPage
         collect = AddAction("Open Fee Collection", (_, _) => OpenStudent(true), "Secondary");
         Grid.SelectionChanged += (_, _) => UpdateActions();
         Grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) OpenStudent(false); };
-        var root = new Panel { Dock = DockStyle.Fill };
-        var filter = HumanUi.Field("Show", view);
-        filter.Dock = DockStyle.Top;
-        root.Controls.Add(Grid); root.Controls.Add(filter); root.Controls.Add(summary);
-        SetContent(root);
+        RelocateFromActions(refresh, run, openStudent, collect);
+        var filter = ReportUi.Bar(("Show", view));
+        var scope = new Panel { Dock = DockStyle.Top, Padding = new Padding(0, 0, 0, 8) };
+        scope.Controls.Add(filter); scope.Controls.Add(summary);
+        // Docked AutoSize labels include padding in their laid-out height.
+        // PreferredHeight omits that space and clips the following filter.
+        void FitScope() => scope.Height = summary.Height + filter.Height + scope.Padding.Vertical;
+        summary.SizeChanged += (_, _) => FitScope();
+        filter.SizeChanged += (_, _) => FitScope();
+        FitScope();
+        SetContent(ReportUi.WorkflowLayout(scope, Grid, "Billing Review",
+            "Choose a view and refresh. Run billing to review pending or missed months.",
+            "Billing Results", "Select a student to open setup or fee collection.", refresh, run, openStudent, collect));
         Disposed += (_, _) => { generation++; review?.Dispose(); };
         UpdateActions();
         if (initialize) Defer(RefreshAsync);
@@ -86,6 +95,8 @@ public sealed class BillingStatusPage : V2Page, IBusyPage
         try
         {
             DataSet current = await read();
+            if (current.Tables[2].Rows.Count > 0)
+                AddStudentDetails(current.Tables[2], await StudentSearchCache.GetAllAsync());
             if (IsDisposed || request != generation) { current.Dispose(); return; }
             DataSet? previous = review;
             Grid.DataSource = null;
@@ -95,7 +106,7 @@ public sealed class BillingStatusPage : V2Page, IBusyPage
             summary.Text = $"{Convert.ToDateTime(row["BillingMonth"]):MMMM yyyy}: " +
                 $"{row["CurrentCharges"]} charges pending · Rs. {Convert.ToDecimal(row["CurrentAmount"]):N0}\n" +
                 $"{current.Tables[2].AsEnumerable().Count(item => !Convert.ToBoolean(item["IsLegacyReference"])):N0} students need attention. " +
-                "Select a student below to resolve setup or open collection. Legacy records are never activated by this review.";
+                "Select a student to open setup or collection. Legacy references are excluded from automatic billing.";
             Display();
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
@@ -105,10 +116,38 @@ public sealed class BillingStatusPage : V2Page, IBusyPage
     private void Display()
     {
         if (review is null) return;
-        Grid.DataSource = view.SelectedIndex == 0 ? review.Tables[1] :
-            new DataView(review.Tables[2]) { RowFilter = view.SelectedIndex == 2 ? "IsLegacyReference = true" : "IsLegacyReference = false" };
+        if (view.SelectedIndex == 0) Grid.DataSource = review.Tables[1];
+        else
+        {
+            var students = review.Tables[2];
+            AdmissionNumbers.AddSortColumns(students);
+            Grid.DataSource = new DataView(students) {
+                RowFilter = view.SelectedIndex == 2 ? "IsLegacyReference = true" : "IsLegacyReference = false",
+                Sort = students.Columns.Contains("AdmissionNumber") ? "__AdmissionNumberBase ASC, __AdmissionNumberSuffix ASC" : "AdmissionId ASC"
+            };
+            int index = 0;
+            foreach (string name in new[] { "AdmissionNumber", "StudentName", "FatherName", "ClassSection", "IsLegacyReference", "Reason" })
+                if (Grid.Columns.Contains(name)) Grid.Columns[name].DisplayIndex = index++;
+            if (Grid.Columns.Contains("ClassSection")) Grid.Columns["ClassSection"].HeaderText = "Class - Section";
+        }
         if (Grid.Columns.Contains("BillingMonth")) Grid.Columns["BillingMonth"].DefaultCellStyle.Format = "MMMM yyyy";
         if (Grid.Columns.Contains("Amount")) Grid.Columns["Amount"].DefaultCellStyle.Format = "N0";
         UpdateActions();
+    }
+
+    internal static void AddStudentDetails(DataTable exceptions, DataTable students)
+    {
+        foreach (string column in new[] { "FatherName", "ClassSection" })
+            if (!exceptions.Columns.Contains(column)) exceptions.Columns.Add(column, typeof(string));
+        var lookup = students.AsEnumerable().ToLookup(row => Convert.ToInt32(row["AdmissionId"]));
+        foreach (DataRow row in exceptions.Rows)
+        {
+            var student = lookup[Convert.ToInt32(row["AdmissionId"])].FirstOrDefault();
+            string Read(string column) => student is not null && students.Columns.Contains(column) && !student.IsNull(column)
+                ? Convert.ToString(student[column])?.Trim() ?? "" : "";
+            row["FatherName"] = Read("FatherName");
+            string className = Read("ClassName"), section = Read("SectionName");
+            row["ClassSection"] = className.Length == 0 ? "" : section.Length == 0 ? className : $"{className} - {section}";
+        }
     }
 }

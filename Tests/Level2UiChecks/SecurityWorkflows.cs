@@ -22,8 +22,8 @@ internal static class SecurityWorkflows
             ui.DashboardAfterLogin();
             foreach(var scope in new[]{
                 (Group:"Daily Work",Forbidden:new[]{"Student Admissions"}),
-                (Group:"Student Management",Forbidden:new[]{"Student Promotion"}),
-                (Group:"Fees & Billing",Forbidden:new[]{"Fee Rate Setup"}),
+                (Group:"Daily Work",Forbidden:new[]{"Student Promotion"}),
+                (Group:"School Setup",Forbidden:new[]{"Fee Rate Setup"}),
                 (Group:"School Setup",Forbidden:new[]{"School Profile","Academic Years","Campuses"})})
             {
                 if(ui.TryFind(scope.Group,ControlType.Button) is {IsEnabled:true})ui.Click(scope.Group,ControlType.Button);

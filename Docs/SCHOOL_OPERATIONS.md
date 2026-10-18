@@ -14,11 +14,13 @@ Open **Daily Work → Student Admissions**:
 - **Admit / Edit Student:** complete the child's details and placement, review the
   opening fees and save. Admission, placement and opening charges commit together.
   Record money through Fee Collection, then print the receipt.
-- **Registration & Pending:** use when registration precedes formal admission.
+- **Daily Work → Quick Registration:** use when registration precedes formal admission.
   Save a temporary QR reference, link siblings where appropriate and collect
   reviewed opening fees if needed. Later complete details and confirm from the
   pending list. Confirmation keeps the same child, bills and payments.
-- **Existing Student Setup:** review a historical record, explicitly choose its
+For historical records, open **Daily Work → Student Data Review → Existing Student Setup**:
+
+- Review a historical record, explicitly choose its
   current placement and billing start, and choose whether admission fees were
   already paid before the system. A prior-payment acknowledgement creates neither
   a new charge nor a fabricated cash receipt. Only the selected child is activated.
@@ -59,8 +61,17 @@ Legacy reference records stay excluded. Select a setup exception to open that
 child's setup or collection account. This navigation does not activate anyone.
 
 An administrator reviews missed months and chooses whether to include them.
-Manual Recovery is for reviewed exceptions, including deliberately reposting a
-reversed charge. Automatic billing does not silently recreate reversals.
+**Manual / Advance Posting** handles reviewed exceptions and upcoming months,
+including summer vacations. Choose **From Month** and **Through Month** (leave
+Through Month blank for one month). Select a student to bill only that child,
+or leave Student blank to include everyone matching Campus, Class, Section and
+Fee Type. Load Eligible Fees, review the student/month rows and combined total,
+then Post Eligible Fees. Only unposted eligible months in the current academic
+year appear. The selected range posts in one transaction. Existing charges are
+skipped, so automatic billing will not create them again. Open Fee Collection
+to receive the advance payment; posting bills does not record a payment.
+Previously reversed fees are clearly marked and require deliberate confirmation.
+Automatic billing does not silently recreate reversals.
 
 Use **Review Fee Terms** from Fee Discounts & Transport to choose the fee rate,
 concession period, agreement changes and issued-bill treatment. Fee Collection's

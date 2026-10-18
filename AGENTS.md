@@ -15,6 +15,12 @@ and the supplied snapshot. An empty migration folder alone does not establish
 that a release is blocked. Installation, existing-database upgrades, and recovery
 testing are separate verification questions; report concrete findings about them.
 
+# Database change delivery
+
+Put all required database schema or stored-procedure changes in versioned SQL
+scripts in `Migrations` so the user can reapply them after restoring the original
+database. Do not rely on changes made only to the currently attached database.
+
 # Gradual audit retirement
 
 When revising a stored procedure, remove its writes to the retiring audit system

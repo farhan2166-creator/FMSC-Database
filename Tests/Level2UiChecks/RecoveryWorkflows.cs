@@ -63,7 +63,7 @@ internal static class RecoveryWorkflows
         if(!report.Passed("L2-FIN-03")) {report.BlockIds("Current-year posting/return prerequisites did not complete.","L2-UX-07");return;}
         if(DateTime.Today.Month<3) {report.BlockIds("The March read-only preview used for fault/retry is not eligible yet on the current calendar date.","L2-UX-07");return;}
         report.Run("L2-UX-07",ui,()=>{
-            ui.Navigate("Fee Posting","Fees & Billing");
+            ui.Navigate("Fee Posting","Daily Work");
             Identity.Check(ui.Find("Academic Year",ControlType.ComboBox).AsComboBox().Value=="Fictional "+DateTime.UtcNow.Year,"Wrong current posting year.");
             ui.Select("Campus","Fictional Main Campus");ui.Select("Class","Class 7 (Fictional Middle School)");
             ui.Select("Fee Type","Tuition fee");

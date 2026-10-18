@@ -122,7 +122,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
         decimal recorded = amounts.AsEnumerable().Sum(r => Convert.ToDecimal(r["Recorded Amount"]));
         bool complete = amounts.AsEnumerable().Where(r => !IsAdjustment(r)).All(r => !r.IsNull("Actual Amount"));
         decimal actual = amounts.AsEnumerable().Where(r => !r.IsNull("Actual Amount")).Sum(r => Convert.ToDecimal(r["Actual Amount"]));
-        totals.Text = $"Recorded net: Rs. {recorded:N2} · Actual net: " + (complete ? $"Rs. {actual:N2} · Difference: Rs. {actual - recorded:N2}" : "Awaiting all amounts");
+        totals.Text = $"Recorded net: Rs. {recorded:#,0.##} · Actual net: " + (complete ? $"Rs. {actual:#,0.##} · Difference: Rs. {actual - recorded:#,0.##}" : "Awaiting all amounts");
     }
     private async Task LoadAsync()
     {
@@ -143,7 +143,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
             foreach (DataGridViewColumn column in Grid.Columns)
             {
                 column.ReadOnly = column.Name != "Actual Amount";
-                if (column.Name.Contains("Amount") || column.Name == "Difference") column.DefaultCellStyle.Format = "N2";
+                if (column.Name.Contains("Amount") || column.Name == "Difference") column.DefaultCellStyle.Format = "#,0.##";
             }
             Grid.Columns["Actual Amount"].DefaultCellStyle.BackColor = AppTheme.SurfaceSecondary;
             foreach (DataGridViewRow row in Grid.Rows)
@@ -219,7 +219,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
             GridPrintJob.ShowPreview(FindForm(), school, "Daily Collection Closing",
                 $"{loadedDay:dd-MMM-yyyy} · {state["ClosingStatus"]} · Revision {state["Revision"]}\n" +
                 $"Submitted: {state["SubmittedBy"]} {state["SubmittedAt"]} · Approved: {state["ApprovedBy"]} {state["ApprovedAt"]}\nNotes: {notes.Text}",
-                printable, CurrentUser.Username, "N2");
+                printable, CurrentUser.Username, "#,0.##");
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
         finally { busy = false; if (!IsDisposed) UpdateActions(); }
@@ -233,17 +233,7 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
             var history = await DatabaseHelper.QueryUserAsync("GetDailyCollectionClosingHistory",
                 DatabaseHelper.Date("@ClosingDate", day.Value.Date));
             if (IsDisposed) return;
-            using var dialog = new ApplicationWindowForm {
-                Text = $"Closing History — {day.Value:dd-MMM-yyyy}",
-                StartPosition = FormStartPosition.CenterParent, Size = new Size(AppScale.Scale(1050), AppScale.Scale(550))
-            };
-            var historyGrid = new DataGridView {
-                Dock = DockStyle.Fill, ReadOnly = true, AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false, AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
-                DataSource = history, Font = AppTheme.NormalFont
-            };
-            dialog.Controls.Add(historyGrid);
-            HumanUi.ApplyGridStyle(historyGrid, AppTheme.Primary);
+            using var dialog = new ClosingHistoryDialog(history, day.Value.Date);
             dialog.ShowDialog(FindForm());
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }

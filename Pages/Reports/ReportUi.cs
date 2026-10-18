@@ -62,6 +62,8 @@ internal static class ReportUi
         return panel;
     }
     public static TableLayoutPanel Bar(params (string Caption, Control Control)[] fields)
+        => Bar(int.MaxValue, fields);
+    internal static TableLayoutPanel Bar(int maximumColumns, params (string Caption, Control Control)[] fields)
     {
         int columns = Math.Max(1, fields.Length);
         int rowHeight =
@@ -90,7 +92,8 @@ internal static class ReportUi
         {
             if (arranging || table.IsDisposed) return;
             var arrangement = ReportFilterArrangement.For(fields.Length,
-                table.ClientSize.Width - table.Padding.Horizontal, AppScale.Scale(150));
+                Math.Min(table.ClientSize.Width - table.Padding.Horizontal,
+                    maximumColumns == int.MaxValue ? int.MaxValue : maximumColumns * AppScale.Scale(150)), AppScale.Scale(150));
             if (table.ColumnCount == arrangement.Columns && table.RowCount == arrangement.Rows) return;
             arranging = true;
             table.SuspendLayout();
@@ -129,7 +132,13 @@ internal static class ReportUi
         => BuildLayout(filters, grid, resultTitle, true, actionButtons);
     public static Control CompactLayout(Control filters, DataGridView grid, string resultTitle, Action filtersCleared, params Control[] actionButtons)
         => BuildLayout(filters, grid, resultTitle, true, actionButtons, filtersCleared);
-    private static Control BuildLayout(Control filters, DataGridView grid, string resultTitle, bool compact, Control[] actionButtons, Action? filtersCleared = null)
+    internal static Control WorkflowLayout(Control filters, DataGridView grid, string filterTitle, string filterGuidance,
+        string resultTitle, string resultGuidance, params Control[] actionButtons)
+        => BuildLayout(filters, grid, resultTitle, true, actionButtons, filterTitle: filterTitle,
+            filterGuidance: filterGuidance, resultGuidance: resultGuidance);
+    private static Control BuildLayout(Control filters, DataGridView grid, string resultTitle, bool compact, Control[] actionButtons, Action? filtersCleared = null,
+        string filterTitle = "Report Filters", string filterGuidance = "Choose the scope below, then run the report. All and unchecked optional dates include every value.",
+        string resultGuidance = "Review the generated report below.")
     {
         var clear = new ModernButton {
             Text = "Clear Filters",
@@ -159,7 +168,7 @@ internal static class ReportUi
         };
         accessory.Controls.Add(active);
         accessory.Controls.Add(clear);
-        var filterCard = HumanUi.Card("Report Filters", "Choose the scope below, then run the report. All and unchecked optional dates include every value.", accessory: accessory);
+        var filterCard = HumanUi.Card(filterTitle, filterGuidance, accessory: accessory);
         filterCard.Content.Controls.Add(filters);
         /* each date picker's value as the page built it. Captured here, at construction, because this is the one moment those defaults are on screen. */
         var dateBaselines = Descendants(filters)
@@ -258,7 +267,7 @@ internal static class ReportUi
             else filterCard.Content.Controls.Add(buttonRow);
             buttonRowHeight = AppMetrics.ButtonRowHeight;
         }
-        var resultCard = HumanUi.Card(resultTitle, "Review the generated report below.");
+        var resultCard = HumanUi.Card(resultTitle, resultGuidance);
         resultCard.Content.Controls.Add(grid);
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill,

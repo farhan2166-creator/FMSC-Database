@@ -38,6 +38,7 @@ public sealed class PlacementPicker : StudentPicker
     }
 
     internal override string EntityPlural => "placements";
+    internal override bool FillFromHighlightedRow => true;
     internal override Task<DataTable> LoadSourceAsync() => Task.FromResult(source);
     internal override string[] CellsFor(DataRow row) => new[] { Read(row, "CampusName"), Read(row, "ClassName"), Read(row, "SectionName") };
 
