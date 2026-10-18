@@ -76,3 +76,9 @@ if(args.Contains("--profile-search"))ReviewFilterProfile.Run();
 Console.WriteLine($"PASS: {MutationRecoveryChecks.Run()} mutation commit-outcome and durable journal checks.");
 
 Console.WriteLine($"PASS: {DpiLayoutChecks.Run()} synthetic DPI density and monitor work-area checks.");
+
+var creditState = FMSC_SMS.Pages.Finance.StudentAccounts.PaymentAdjustmentState.Create("Completed", "Cash", 3000m, false, 0m, 0m, creditEntry: true);
+Assert(creditState.Actions.Length == 0 && creditState.Remaining == 0, "Credit deposits cannot be adjusted as ordinary cash collections");
+var releasedState = FMSC_SMS.Pages.Finance.StudentAccounts.PaymentAdjustmentState.Create("Completed", "Cash", 5000m, false, 0m, 0m, releasedToCredit: 1000m);
+Assert(releasedState.Remaining == 4000m && !releasedState.Actions.Contains("Reversal"), "Paid money released to credit is excluded from the remaining adjustable receipt");
+Console.WriteLine("PASS: 2 credit/receipt adjustment eligibility checks.");

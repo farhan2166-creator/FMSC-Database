@@ -24,3 +24,6 @@ jobs:
   installation:
     needs: [security, desktop, sql]
     uses: ./.github/workflows/fmsc-disposable-windows-install.yml
+  package:
+    needs: [installation]
+    uses: ./.github/workflows/fmsc-complete-installer.yml

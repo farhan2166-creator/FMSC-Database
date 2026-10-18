@@ -274,12 +274,17 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                 SELECT P.FeePaymentId,P.EnrollmentId,P.PaymentDate TransactionDate,
                     P.ReceiptNumber,P.PaymentMethod,P.TotalAmount PaidAmount,P.Status,
                     P.RelatedFeePaymentId,O.ReceiptNumber OriginalReceipt,
-                    ISNULL(R.Refunded,0) Refunded,ISNULL(R.Corrected,0) Corrected
+                    ISNULL(R.Refunded,0) Refunded,ISNULL(R.Corrected,0) Corrected,
+                    ISNULL(R.ReleasedToCredit,0) ReleasedToCredit,
+                    CONVERT(bit,CASE WHEN P.IsCreditApplication=1 OR EXISTS(
+                        SELECT 1 FROM dbo.StudentCreditEntries C WHERE C.FeePaymentId=P.FeePaymentId)
+                        THEN 1 ELSE 0 END) IsCreditEntry
                 FROM dbo.FeePayments P
                 LEFT JOIN dbo.FeePayments O ON O.FeePaymentId=P.RelatedFeePaymentId
                 OUTER APPLY (SELECT
                     -SUM(CASE WHEN A.PaymentMethod=N'Refund' THEN A.TotalAmount ELSE 0 END) Refunded,
-                    -SUM(CASE WHEN A.PaymentMethod=N'Correction' THEN A.TotalAmount ELSE 0 END) Corrected
+                    -SUM(CASE WHEN A.PaymentMethod=N'Correction' THEN A.TotalAmount ELSE 0 END) Corrected,
+                    -SUM(CASE WHEN A.IsCreditApplication=1 THEN A.TotalAmount ELSE 0 END) ReleasedToCredit
                     FROM dbo.FeePayments A WHERE A.RelatedFeePaymentId=P.FeePaymentId
                     AND A.Status=N'Completed' AND A.TotalAmount<0) R
                 WHERE P.AdmissionId=@AdmissionId ORDER BY P.PaymentDate DESC,P.FeePaymentId DESC;
@@ -290,7 +295,8 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                 .Select(row=>(Row:row,State:PaymentAdjustmentState.Create(
                     GetText(row,"Status"),GetText(row,"PaymentMethod"),
                     GetDecimal(row,"PaidAmount"),GetInt(row,"RelatedFeePaymentId")>0,
-                    GetDecimal(row,"Refunded"),GetDecimal(row,"Corrected"))))
+                    GetDecimal(row,"Refunded"),GetDecimal(row,"Corrected"),
+                    row["IsCreditEntry"] is bool credit && credit,GetDecimal(row,"ReleasedToCredit"))))
                 .OrderBy(entry=>entry.State.Actions.Length==0)
                 .ThenByDescending(entry=>GetDate(entry.Row,"TransactionDate"))
                 .ThenByDescending(entry=>GetInt(entry.Row,"FeePaymentId"));

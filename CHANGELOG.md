@@ -4,6 +4,17 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ## [Unreleased]
 
+### Changed
+
+- Group direct admission, pending registration and existing-student activation in Student Admissions. Billing Center exceptions now open the selected student's setup or collection account; remove duplicate navigation paths.
+- Align application, installer and optional communication runtimes on schema 20. The transactional 19→20 migration preserves school and financial rows and retires three unused role-read procedures.
+
+### Fixed
+
+- Stop offering credit deposits/applications as ordinary payment corrections, and exclude amounts already released to credit from the adjustable balance.
+- Restore deleted verification sources/tools, correct outdated test/schema assumptions, repair Help Center source links, and verify release branches through security, Windows, SQL, installation and database-free packaging checks.
+- Remove a date-prefixed maintenance patch from release migration discovery; its guard is already in the baseline.
+
 ### Added
 
 - Add outstanding student/family bills and a Family / Returns shortcut to Fee Collection. Family cards show placement/year and billing readiness; each return uses the existing guarded confirmation dialog. Quick Registration warns when linked returning siblings still lack new-year charges.

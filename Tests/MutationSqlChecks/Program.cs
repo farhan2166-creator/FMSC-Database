@@ -100,5 +100,5 @@ var deniedArgs=Refund(10m);var deniedRequest=Intent(MutationKind.FeeAdjustment,d
 Check(denied.Outcome==MutationOutcome.Rejected&&Refunds()==before,"Accountant access is preserved and cannot acquire fee-adjustment authority through recovery");
 CurrentUser.UserId=admin;
 Check(await RecoverableMutationWriter.CheckAsync(deniedRequest) is null,"Administrator can verify a refused operator request as absent without performing it");
-using(var compatible=DatabaseHelper.GetConnection()){compatible.Open();DatabaseCompatibility.Validate(compatible);Check(true,"current app compatibility accepts migrated schema 19");}
+using(var compatible=DatabaseHelper.GetConnection()){compatible.Open();DatabaseCompatibility.Validate(compatible);Check(true,"current app compatibility accepts migrated schema 20");}
 Console.WriteLine($"PASS: {checks} native request recovery checks on the disposable clone.");

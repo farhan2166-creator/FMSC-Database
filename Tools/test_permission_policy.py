@@ -49,9 +49,9 @@ class PermissionPolicyChecks(unittest.TestCase):
         self.assertIsNotNone(application)
         self.assertIsNotNone(installer)
         required = int(application.group(1))
-        self.assertEqual(required, 19)
+        self.assertEqual(required, 20)
         self.assertEqual(int(installer.group(1)), required)
-        self.assertEqual(set(), {path.name for path in (ROOT/'Migrations').glob('*.sql')})
+        self.assertEqual({'20.sql'}, {path.name for path in (ROOT/'Migrations').glob('*.sql')})
 
     def test_metadata_fits_sql_columns(self):
         for entry in self.catalog:

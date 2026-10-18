@@ -37,7 +37,7 @@ int checks=0;
 void Assert(bool ok,string label){if(!ok)throw new Exception(label);Console.WriteLine("PASS: "+label);checks++;}
 async Task Refused(Func<Task> action,string label)
 {try{await action();}catch(InvalidOperationException e) when(e.Message.Contains("changed",StringComparison.OrdinalIgnoreCase)){Console.WriteLine("PASS: "+label);checks++;return;}throw new Exception("Expected stale-state refusal: "+label);}
-Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])=="19","current migrations installed on clone");
+Assert(Convert.ToString(Query("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC").Rows[0][0])==DatabaseHelper.RequiredDatabaseSchemaVersion,"current migrations installed on clone");
 using(var compatible=DatabaseHelper.GetConnection()){
     compatible.Open();DatabaseCompatibility.Validate(compatible);
     Assert(true,"production startup/restore compatibility contract accepts migrated schema");

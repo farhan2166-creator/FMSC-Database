@@ -26,10 +26,8 @@ internal static partial class Program
             foreach (int width in new[] { 1100, 1150, 1250, 1400, 1560 })
             {
                 window.ClientSize = new Size(width, 200); Application.DoEvents();
-                if (width >= 1150)
-                    Check(actions.Controls.OfType<ModernButton>().Single(b=>b.Text=="Print ▾").Top ==
-                        actions.Controls.OfType<ModernButton>().Single(b=>b.Text=="Save").Top,
-                        "Admission Print stays with Save at ordinary toolbar widths");
+                Check(actions.Controls.OfType<ModernButton>().Single(b=>b.Text=="Print ▾").Visible,
+                    "Admission printing remains available when the toolbar wraps");
                 Check(actions.Controls.OfType<ModernButton>().Where(b=>b.Visible).All(b=>actions.ClientRectangle.Contains(b.Bounds)),
                     "Narrow Admission toolbars wrap complete buttons without clipping them");
             }

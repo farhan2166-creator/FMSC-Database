@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+using FMSC_SMS.Services.Communication;
 
 // End-to-end business examples against the actual release DACPAC, not just the
 // historical upgrade fixture. Every amount below belongs to a fictional school.
@@ -26,11 +27,45 @@ internal sealed class SchoolScenarios(Fixture f, Report r)
 
     internal async Task Run()
     {
+        await r.Stage("School: schema upgrade preserves records and optional communication", Upgrade);
         await r.Stage("School: partial payment and remaining-balance waiver", PartialWaiver);
         await r.Stage("School: paid bill reductions, credit and repeated rate changes", PaidRateCorrection);
         await r.Stage("School: credit deposit replay, sibling transfer and cash refund", Credits);
         await r.Stage("School: pending registration confirmation preserves paid opening bill", PendingConfirmation);
         await r.Stage("School: automatic monthly posting excludes legacy and reversed fees", AutomaticBilling);
+    }
+
+    private async Task Upgrade()
+    {
+        using var connection = DatabaseHelper.GetConnection(); connection.Open();
+        using var stream = typeof(FMSC_SMS.Core.CommunicationInstallation).Assembly
+            .GetManifestResourceStream("FMSC_SMS.Communication.Schema.sql")!;
+        using var reader = new StreamReader(stream);
+        string script = await reader.ReadToEndAsync();
+        r.Check(await CommunicationFixture.InstallAsync(connection, script) == CommunicationInstallation.Ready,
+            "The optional communication fixture installs disabled against the current base schema.");
+        var child = Admit("Upgrade Preservation Example");
+        long charge = Tuition(child.Enrollment);
+        await Pay(child.Student, child.Enrollment, 1000, (charge, 1000));
+        int students = Sql.Count("SELECT COUNT(*) FROM dbo.Students;");
+        decimal received = Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments;");
+        // Reconstruct only the known old module version check, then exercise the
+        // production migration. This owned database is never a school target.
+        Sql.Query("""
+            DECLARE @Definition nvarchar(max)=OBJECT_DEFINITION(OBJECT_ID(N'comm.IngestMeta'));
+            SET @Definition=REPLACE(@Definition,N'FROM dbo.DatabaseVersion)<>20',N'FROM dbo.DatabaseVersion)<>6');
+            SET @Definition=N'ALTER '+SUBSTRING(@Definition,CHARINDEX(N'PROCEDURE',@Definition),LEN(@Definition));
+            EXEC sys.sp_executesql @Definition;
+            UPDATE dbo.DatabaseVersion SET VersionNumber=N'19' WHERE VersionId=(SELECT MAX(VersionId) FROM dbo.DatabaseVersion);
+            """);
+        string migration = File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "Migrations", "20.sql"));
+        Sql.Query("BEGIN TRANSACTION;\n" + migration + "\nCOMMIT TRANSACTION;");
+        r.Check(await CommunicationSchemaContract.VerifyAsync(connection), "An existing callback module matches the runtime contract after migration 20.");
+        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Students;") == students &&
+            Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments;") == received && Due(charge) == 4000,
+            "Migration preserves student count, receipts and the exact unpaid tuition balance.");
+        r.Check(Sql.Count("SELECT COUNT(*) FROM sys.procedures WHERE name IN(N'GetRoles',N'GetUserRoles',N'GetRolesAndPermissions');") == 0,
+            "The three retired role-read procedures are absent after the upgrade.");
     }
 
     private async Task PartialWaiver()

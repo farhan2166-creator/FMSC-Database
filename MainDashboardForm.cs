@@ -600,7 +600,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             {
                 new(
                     PageTitles.Admissions,
-                    () => new StudentAdmissionPage(
+                    () => AdmissionsWorkspace.Create(
                         (factory, module, title) => NavigateTo(factory, module, title)),
                     "Students",
                     PageTitles.Admissions,
@@ -626,7 +626,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     "Fees.Collect"),
                 new(
                     PageTitles.FeePosting,
-                    () => FeePostingWorkspace.Create(),
+                    () => FeePostingWorkspace.Create((factory, module, title) => NavigateTo(factory, module, title)),
                     "Finance",
                     PageTitles.FeePosting,
                     "Fees.Collect"),
@@ -685,18 +685,11 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Finance",
                 PageTitles.StudentFeeCorrections,
                 "Fees.Collect"),
-            // Monthly posting and unpaid-posting reversal share this workspace.
             new(
                 "Daily Collection Closing",
                 () => new DailyCollectionClosingPage(),
                 "Finance",
                 "Daily Collection Closing",
-                "Fees.Collect"),
-            new(
-                PageTitles.FeePosting,
-                () => FeePostingWorkspace.Create(),
-                "Finance",
-                PageTitles.FeePosting,
                 "Fees.Collect"),
             Section("FEE SETUP"),
             new(
