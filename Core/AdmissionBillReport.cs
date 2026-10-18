@@ -8,7 +8,7 @@ internal static partial class AdmissionBillReport
     {
         using var grouped=BuildFamilyData(institution.Name,institution.ContactNumber,institution.Address,parent,charges);
         bool family=charges.AsEnumerable().Select(row=>Convert.ToString(row["Reference"])).Distinct().Count()>1;
-        using var data=family?grouped.Copy():StudentBillData(grouped);
+        using var data=family?FamilyBillData(grouped):StudentBillData(grouped);
         string path=Path.Combine(AppContext.BaseDirectory,"Reports",family?"FamilyBill.rdlc":"StudentBill.rdlc");
         RdlcReportPreview.Show(owner,family?"Family Bill":"Student Bill",path,"FeeReceiptData",data,
             reportDefinition:ReceiptReportLayout.SizeToContent(path,data));
@@ -31,7 +31,6 @@ internal static partial class AdmissionBillReport
                 line.Amount, discount, total, 0m, "", "", discount > 0m, false,
                 institution.ContactNumber, institution.Address, campusName, fatherName, line.Period);
         foreach(DataRow row in data.Rows) row["DocumentKind"]="Bill";
-        ReceiptReportData.GroupPeriods(data);
         string path = Path.Combine(AppContext.BaseDirectory, "Reports", "StudentBill.rdlc");
         RdlcReportPreview.Show(owner, provisional?"Registration Bill":"Admission Bill", path, "FeeReceiptData", data,
             fitPageWidth: false, reportDefinition: ReceiptReportLayout.SizeToContent(path, data));

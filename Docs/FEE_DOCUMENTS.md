@@ -5,6 +5,12 @@ Each document has its own editable RDLC layout, based on the established
 `StudentReceipt.rdlc` and `FamilyReceipt.rdlc`. C# supplies report data and opens
 the existing preview. The shared helper sizes the roll-paper length; document
 labels, sections, columns, totals and grouping live in the RDLC files.
+
+Bills use a bordered Month / Fee / Due table. Family bills repeat a full-width
+student heading, grouped by admission/registration reference, above each child's
+fee rows. Each fee retains its own period, including one-time fees. Receipt
+templates remain independent. The focused Fee document rendering workflow exports
+fictional PNG/PDF previews without connecting to a database.
 | Document | Use |
 |---|---|
 | Student bill | Posted outstanding charges for one student |

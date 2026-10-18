@@ -22,6 +22,10 @@ internal static class RegistrationBillChecks
         Check(family.AsEnumerable().All(r=>r.Field<string>("DocumentTitle")=="FAMILY PAYMENT BILL"&&r.Field<string>("StudentName")=="Parent"),"Several child references use the family title and parent heading");
         Check(family.AsEnumerable().Count(r=>r.Field<string>("FamilyRowKind")=="Student")==2,"Same-name children keep separate reference-based headings");
         Check(family.AsEnumerable().Where(r=>r.Field<string>("FamilyRowKind")=="Fee").Sum(r=>r.Field<decimal>("Amount"))==2100m&&charges.Rows.Count==3,"Family bill retains every charge and leaves its source unchanged");
+        using var table=AdmissionBillReport.FamilyBillData(family);
+        Check(table.Rows.Count==3&&table.AsEnumerable().Sum(row=>row.Field<decimal>("Amount"))==2100m,"The bill table contains actual fee rows only, with no duplicated heading amounts");
+        Check(table.AsEnumerable().Select(row=>row.Field<string>("BillStudentKey")).Distinct().Count()==2,"Same-name children retain distinct table groups by reference");
+        Check(table.AsEnumerable().All(row=>!string.IsNullOrWhiteSpace(row.Field<string>("FeePeriod"))&&row.Field<string>("FeeDescription")==row.Field<string>("FeeDescription")!.Trim()),"Each table row has its own period and fee without indentation");
         using var members=new DataTable();
         members.Columns.Add("AdmissionId",typeof(int));members.Columns.Add("StudentName");members.Columns.Add("Status");
         members.Columns.Add("EnrollmentStatus");members.Columns.Add("BillingReady",typeof(bool));members.Columns.Add("PlacementConfirmedAt",typeof(DateTime));
