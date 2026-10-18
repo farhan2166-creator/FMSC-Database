@@ -1,5 +1,5 @@
 -- Align the optional communication module with the release's base schema, and
--- retire three unused role-read APIs. No school, payment or permission rows change.
+-- retire unused role-read and payment-list APIs. No school, payment or permission rows change.
 SET XACT_ABORT ON;
 SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
@@ -17,8 +17,9 @@ BEGIN
     SET @Definition=N'ALTER '+SUBSTRING(@Definition,@At,LEN(@Definition));
     EXEC sys.sp_executesql @Definition;
 END;
+DROP PROCEDURE IF EXISTS dbo.GetAdjustableFeePayments;
 DROP PROCEDURE IF EXISTS dbo.GetRolesAndPermissions;
 DROP PROCEDURE IF EXISTS dbo.GetUserRoles;
 DROP PROCEDURE IF EXISTS dbo.GetRoles;
 INSERT dbo.DatabaseVersion(VersionNumber,AppliedOn,AppliedBy,Notes)
-VALUES(N'20',SYSDATETIME(),SUSER_SNAME(),N'Align communication schema and retire unused role-read APIs');
+VALUES(N'20',SYSDATETIME(),SUSER_SNAME(),N'Align communication schema and retire unused read APIs');

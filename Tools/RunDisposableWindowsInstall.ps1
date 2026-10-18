@@ -228,7 +228,7 @@ try {
     }
     $checks.Add('Actual validated PortableRelease published with MSI, sqlcmd and migrations')
 
-    Stage 'Provision and detach synthetic schema-20 LocalDB'
+    Stage 'Provision and detach synthetic schema-19 LocalDB'
     $prior=@(Sql 'master' "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.databases WHERE name=N'FMSC_DB';")
     if (($prior -join '').Trim() -ne '0') { throw 'FMSC_DB already exists; refusing to overwrite it.' }
     $ownedDatabase=$true # Catalog absent on this explicitly isolated runner; covers partial publish failure too.
@@ -252,7 +252,7 @@ EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@
     Sql 'FMSC_DB' $seed | Out-Null
     # Upgrade only this owned, empty fixture before detaching it for the installer.
     # Retired fixture scripts never enter the release migration directory.
-    foreach ($migration in @(Get-ChildItem (Join-Path $project 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql'; Get-ChildItem (Join-Path $project 'Migrations') -Filter '*.sql') | Sort-Object {[int]$_.BaseName}) {
+    foreach ($migration in Get-ChildItem (Join-Path $project 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName}) {
         $scriptPath=Join-Path $root ('fixture-migration-'+$migration.BaseName+'.sql')
         "SET XACT_ABORT ON;`nBEGIN TRANSACTION;`n"+(Get-Content -LiteralPath $migration.FullName -Raw)+"`nCOMMIT TRANSACTION;" | Set-Content -LiteralPath $scriptPath -Encoding utf8
         & $sqlcmd -S $instance -E -d 'FMSC_DB' -b -i $scriptPath
@@ -267,7 +267,7 @@ EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@
     Sql 'master' "ALTER DATABASE [FMSC_DB] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; EXEC sys.sp_detach_db @dbname=N'FMSC_DB';" | Out-Null
     Copy-Item -LiteralPath $mdf -Destination (Join-Path $database 'FMSC_DB.mdf')
     Copy-Item -LiteralPath $ldf -Destination (Join-Path $database 'FMSC_DB_log.ldf')
-    $checks.Add('Generated a record-free schema-20 MDF/LDF pair from the reviewed SQL model')
+    $checks.Add('Generated a record-free schema-19 MDF/LDF pair from the reviewed SQL model')
 
     Stage 'Actual FMSC Windows installer execution'
     $exit=Invoke-ActualInstaller
