@@ -2,6 +2,7 @@ name: FMSC Complete Windows Installer ZIP
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -9,7 +10,7 @@ permissions:
 jobs:
   complete-installer:
     name: Verify and assemble full installer (add MDF/LDF later)
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
     runs-on: windows-2022
     timeout-minutes: 60
 
@@ -188,8 +189,8 @@ jobs:
             ''
             'APPLICATION UPDATE WITHOUT REPLACING A SCHOOL DATABASE'
             'Do not put a new MDF/LDF over an existing installed school database.'
-            'The installer verifies an existing schema-6 database before activating the app.'
-            'Applied scripts 2-7 are retired; future upgrades use numbered SQL files with the matching application release.'
+            'The installer verifies schema 21 before activating the app; schema 19/20 upgrades use a verified backup.'
+            'Historical upgrades are retired. Migrations 20/21 upgrade the supported schema-19/20 baselines.'
             ''
             'Includes the current self-contained .NET 8 app, SQL LocalDB 2022 MSI,'
             'pinned Microsoft sqlcmd tool and current installer core.ps1.'

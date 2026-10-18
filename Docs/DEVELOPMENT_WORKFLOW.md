@@ -4,7 +4,12 @@ These instructions are for maintainers and Codex working on FMSC_SMS.
 
 ## Owner-selected verification scope
 
-GitHub verification workflows are manual-only (`workflow_dispatch`), including desktop, security, SQL lifecycle, Level 2 and disposable installation checks. Pushes and pull requests do not start them automatically. Run them from Actions only when explicitly requested or as part of an agreed release verification.
+Desktop, SQL lifecycle, Level 2 and disposable installation workflows remain manually
+runnable. Security checks also run on main pushes and pull requests. Publishing a
+`release/*` branch explicitly starts the Release Readiness workflow, composing
+security, Windows component tests, real SQL scenarios and disposable installation.
+Ordinary feature branches do not start the full release matrix. No workflow uses
+production school data or deploys to a school PC.
 
 For small UI-only changes, inspect the affected code and use only a relevant focused check when needed. Do not repeat full regression, SQL, performance, installer or interactive desktop suites for a button visibility or spacing change. Choose broader checks for the affected behavior when a change touches data, payments, security, recovery or deployment. Record what actually ran; manual-only workflows do not imply passing verification. This owner-selected scope takes precedence over the generic check lists below.
 
@@ -63,11 +68,11 @@ The separate [Level 1 lifecycle workflow](../.github/workflows/fmsc-lifecycle-sq
 
 ## Security checks
 
-GitHub CI does not approve, refresh or audit DACPAC exports. Review any schema changes independently against a safe local copy. Keep the pinned record-free SQL test fixture under separate review when the tested schema changes.
+The SQL workflow publishes the current schema-only DACPAC into a separate owned catalog for school scenarios, and tests upgrades using the pinned record-free fixture. It does not refresh exports or certify the owner's MDF/LDF snapshot. Review schema changes independently and keep the pinned fixture under separate review when its tested baseline changes.
 
-[FMSC Security Checks](../.github/workflows/fmsc-security.yml) is a read-only, manually started workflow, separate from the existing Windows checks. It downloads **Gitleaks CLI 8.30.1** from its official release and verifies a pinned SHA-256 before running it. The CLI is MIT-licensed and works with private repositories without a Gitleaks action license, PAT or GitHub Advanced Security subscription. Normal Actions minutes/storage limits still apply.
+[FMSC Security Checks](../.github/workflows/fmsc-security.yml) is read-only and runs on main pushes, pull requests, manual dispatch and release verification. It downloads **Gitleaks CLI 8.30.1** from its official release and verifies a pinned SHA-256 before running it. The CLI is MIT-licensed and works with private repositories without a Gitleaks action license, PAT or GitHub Advanced Security subscription. Normal Actions minutes/storage limits still apply.
 
-`Tools/check_security.py` checks fetched Git history and staged edits, including secrets or forbidden files added and subsequently deleted. It blocks `.mdf`, `.ldf`, `.ndf`, `.bak`, private key containers, `.env` files, `secrets.json`, `credentials.json`, production/local appsettings and private publish settings. Safe `.env.example`, `.env.sample` and `.env.template` names are allowed, but their contents are still scanned. `.gitignore` helps prevent accidental additions; it cannot protect files already tracked or force-added.
+`Tools/check_security.py` checks fetched Git history, working source files and extracted historical DACPAC XML, including secrets or forbidden files added and subsequently deleted. It blocks `.mdf`, `.ldf`, `.ndf`, `.bak`, private key containers, `.env` files, `secrets.json`, `credentials.json`, production/local appsettings and private publish settings. Safe `.env.example`, `.env.sample` and `.env.template` names are allowed, but their contents are still scanned. `.gitignore` helps prevent accidental additions; it cannot protect files already tracked or force-added.
 
 The scanner's default token/private-key rules remain enabled. Additional rules catch literal passwords and SQL connection passwords. The only project fixture exceptions are the exact existing dummy values in the specific test files listed in [.gitleaks.toml](../.gitleaks.toml). Other contents of those files remain scanned. Inline allow comments and `.gitleaksignore` files cannot silence this workflow; any rule/exclusion change needs review.
 
@@ -78,7 +83,7 @@ python Tools/test_security.py --gitleaks C:\Tools\gitleaks.exe
 python Tools/check_security.py --gitleaks C:\Tools\gitleaks.exe
 ```
 
-The tests create harmless synthetic fixtures in temporary repositories and delete them afterwards. Do not commit a real secret to test detection. The local check scans committed/staged content, not all untracked or unstaged private files.
+The tests create harmless synthetic fixtures in temporary repositories and delete them afterwards. Do not commit a real secret to test detection. The local check scans history and tracked/unignored source files, including unstaged edits. Ignored local configuration and generated output are outside the working-source snapshot; any tracked ignored files remain scanned.
 
 **When a security check fails:**
 
@@ -100,4 +105,4 @@ For each update PR, read release/breaking-change notes, ensure the package still
 
 ## Communication module development
 
-See [COMMUNICATION_CENTER.md](COMMUNICATION_CENTER.md) before changing the optional SQL add-on, provider integration or queue. CI uses fake HTTP transports and a separately owned disposable SQL database; no live messaging or school data is permitted. Run `Tests/CommunicationChecks` and the Level 1 harness as well as Desktop CI and security checks. The applied communication setup is retired from deployment. Its embedded reference definition lives at `Services/Communication/Schema.sql`; only guarded disposable tests install it. The installer discovers numbered SQL files in `Migrations`, skips an empty folder or already-applied versions, backs up before pending migrations, and verifies the full database contract before activation. The required base version stays 6 and the runtime compatibility contract remains enforced. Provider registration, hosting and production schema deployment require separate owner acceptance.
+See [COMMUNICATION_CENTER.md](COMMUNICATION_CENTER.md) before changing the optional SQL add-on, provider integration or queue. CI uses fake HTTP transports and a separately owned disposable SQL database; no live messaging or school data is permitted. Run `Tests/CommunicationChecks` and the Level 1 harness as well as Desktop CI and security checks. The applied communication setup is retired from deployment. Its embedded reference definition lives at `Services/Communication/Schema.sql`; only guarded disposable tests install it. The installer discovers numbered SQL files in `Migrations`, skips an empty folder or already-applied versions, backs up before pending migrations, and verifies the full database contract before activation. The current runtime requires schema 21; migrations 20/21 support schema 19/20 and align the optional callback module. The runtime compatibility contract remains enforced. Provider registration, hosting and production schema deployment require separate owner acceptance.

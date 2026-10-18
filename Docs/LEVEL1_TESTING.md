@@ -60,3 +60,12 @@ Artifacts contain commit/run identity, engine/schema, outcomes/counts, expected 
 Classify failures as provisioning, fixture dependency, expectation, application/SQL defect or runner limitation. Check expectations against production contracts. Fix fixture/tooling errors here; propose production fixes separately. Never relax assertions, alter financial rules or edit the pinned test schema to hide a defect.
 
 Add bounded scenarios to `Lifecycle.cs` using existing writers/TVPs or real procedures, then assert persisted state. Seed only required reference records in `Fixture.cs`. Assert exact SQL refusal codes and preserve every disposable-target guard. Physical desktop, printer and deployment acceptance remain separate.
+
+## Current release target
+
+Runtime schema is 20. The retained record-free v6 fixture uses retired migrations
+7–19 under `Tests/LifecycleSqlChecks/Migrations`, then current release migration 20.
+The harness separately publishes the current root schema into another owned empty
+catalog and executes school admission/payment/credit scenarios against it. Neither
+fixture is a replacement for a school MDF/LDF. Optional communication is installed
+from the reviewed reference SQL only in its owned fixture and remains disabled.

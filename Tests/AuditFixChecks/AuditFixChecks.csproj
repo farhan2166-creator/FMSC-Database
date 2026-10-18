@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Pages/Finance/StudentAccounts/PaymentAdjustmentState.cs" Link="PaymentAdjustmentState.cs" />
+    <Compile Include="../../Core/AppTheme.Appearance.cs" Link="AppTheme.Appearance.cs" />
+    <Compile Include="../../Core/QuickRegistrationAccess.cs" Link="QuickRegistrationAccess.cs" />
+    <Compile Include="../../Core/DailyClosingSummary.cs" Link="DailyClosingSummary.cs" />
+    <Compile Include="../../Core/WholeRupees.cs" Link="WholeRupees.cs" />
+    <Compile Include="../../Core/QuickRegistrationQuote.cs" Link="QuickRegistrationQuote.cs" />
+    <Compile Include="../../Core/InputParse.cs" Link="InputParse.cs" />
+    <Compile Include="../../Core/Tvp.cs" Link="Tvp.cs" />
+    <Compile Include="../../Core/AdmissionReviewFilter.cs" Link="AdmissionReviewFilter.cs" />
+    <Compile Include="../../Core/AppScale.cs" Link="AppScale.cs" />
+    <Compile Include="../../Core/DpiLayout.cs" Link="DpiLayout.cs" />
+    <Compile Include="../../Core/WorkingAreaLayout.cs" Link="WorkingAreaLayout.cs" />
+    <Compile Include="../../Core/DatabaseCompatibilityFailure.cs" Link="DatabaseCompatibilityFailure.cs" />
+    <Compile Include="../../Core/DatabaseRecoveryException.cs" Link="DatabaseRecoveryException.cs" />
+    <Compile Include="../../Core/DatabaseConnectionGuidance.cs" Link="DatabaseConnectionGuidance.cs" />
+    <Compile Include="../../Core/AtomicTextFile.cs" Link="AtomicTextFile.cs" />
+    <Compile Include="../../Core/StudentPhotoInput.cs" Link="StudentPhotoInput.cs" />
+    <Compile Include="../../Core/DashboardData.cs" Link="DashboardData.cs" />
+    <Compile Include="../../Core/RecoverableMutation.cs" Link="RecoverableMutation.cs" />
+    <Compile Include="../../Core/QuickRegistrationRecovery.cs" Link="QuickRegistrationRecovery.cs" />
+    <Compile Include="../../Core/QuickRegistrationRecoveryJournal.cs" Link="QuickRegistrationRecoveryJournal.cs" />
+    <Compile Include="../../Core/QuickRegistrationView.cs" Link="QuickRegistrationView.cs" />
+    <Compile Include="../../Core/AdmissionBillReport.Data.cs" Link="AdmissionBillReport.Data.cs" />
+    <Compile Include="../../Core/FamilyBillingData.cs" Link="FamilyBillingData.cs" />
+    <Compile Include="../../Core/ReceiptReportData.cs" Link="ReceiptReportData.cs" />
+    <Compile Include="../../Core/StudentPhotoDraft.cs" Link="StudentPhotoDraft.cs" />
+    <Compile Include="../../Core/AdmissionSaveConfirmation.cs" Link="AdmissionSaveConfirmation.cs" />
+    <Compile Include="../../Core/StudentPhotoCompression.cs" Link="StudentPhotoCompression.cs" />
+    <Compile Include="../../Core/BoundedImageFile.cs" Link="BoundedImageFile.cs" />
+    <Compile Include="../../Core/ReportSettingsFile.cs" Link="ReportSettingsFile.cs" />
+    <Compile Include="../../Core/AtomicExportFile.cs" Link="AtomicExportFile.cs" />
+    <Compile Include="../../Core/CsvFileExporter.cs" Link="CsvFileExporter.cs" />
+    <Compile Include="../../Core/CsvSafety.cs" Link="CsvSafety.cs" />
+    <EmbeddedResource Include="../../Core/PermissionCatalog.json" LogicalName="FMSC_SMS.Core.PermissionCatalog.json" />
+    <Compile Include="../../Core/PermissionCatalog.cs" Link="PermissionCatalog.cs" />
+    <Compile Include="../../Core/AdministrativeAccess.cs" Link="AdministrativeAccess.cs" />
+    <Compile Include="../../Pages/Finance/Collection/CollectionRecoveryJournal.cs" Link="CollectionRecoveryJournal.cs" />
+    <Using Include="System.Drawing" />
+    <Using Include="System.Data" />
+  </ItemGroup>
+</Project>

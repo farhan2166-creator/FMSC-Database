@@ -14,7 +14,7 @@ public static class PageTitles
     public const string CampusAssignments = "Campus Classes / Sections";
     public const string ClassesSections = "Classes & Sections";
     public const string StudentFeeCorrections = "Student Fee Corrections";
-    public const string FeePosting = "Fee Posting";
+    public const string FeePosting = "Billing Center";
     public const string StudentPurchases = "Student Purchases";
     public const string FeeRateSetup = "Fee Rate Setup";
     public const string FeeRateMatrix = "Class Fee Rates";

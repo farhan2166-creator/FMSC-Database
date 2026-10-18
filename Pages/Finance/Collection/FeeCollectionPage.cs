@@ -6,7 +6,7 @@ namespace FMSC_SMS.Pages.Finance.Collection;
 public sealed class FeeCollectionPage : V2Page, IBusyPage
 {
     public bool IsBusy => transactionBusy || billBusy;
-    public string BusyMessage => billBusy ? "Finish the family bill or return workflow before leaving." : "Please wait for the fee collection to finish recording.";
+    public string BusyMessage => billBusy ? "Finish the bill, return, or fee-review workflow before leaving." : "Please wait for the fee collection to finish recording.";
     private bool billBusy;
     private readonly StudentPicker student = new();
     private readonly LookupBox enrollment = new();
@@ -1105,6 +1105,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         header.Enabled = false;
         chargeMenu.Items.Add(
             new ToolStripSeparator());
+        var terms=chargeMenu.Items.Add("Review bill terms...");
+        terms.Enabled=!IsBusy&&CurrentUser.HasPermission("Fees.Adjust");
+        terms.Click+=async(_,_)=>await ReviewBillTermsAsync(chargeId);
         var reverse =
             chargeMenu.Items.Add(
                 "Reverse this charge...");
@@ -3438,6 +3441,28 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         dialog.ShowDialog(FindForm());
     }
     /// <summary>Reverse one charge through dbo.ReverseBillingCharge; SQL decides eligibility, then dependent views reload.</summary>
+    private async Task ReviewBillTermsAsync(long chargeId)
+    {
+        if(IsBusy||!CurrentUser.HasPermission("Fees.Adjust"))return;
+        if(!charges.EndEdit())return;
+        if(HasDraftBillDiscounts()||HasEnteredAmount(paymentAmount.Text)||!string.IsNullOrWhiteSpace(reference.Text)||!string.IsNullOrWhiteSpace(remarks.Text))
+        {Warn("Finish or clear the current payment draft before reviewing bill terms. Your entered payment has been retained.");return;}
+        billBusy=true;
+        try
+        {
+            using var busy=BeginBusy("Reviewing bill terms…",this);
+            var context=FeeDiscountPeriod.BillContext(chargeId);
+            using var form=new ChangeFeeDiscountForm(Convert.ToInt32(context["StudentFeeAssignmentId"]),Convert.ToString(context["FeeTypeName"])??"Fee",
+                Convert.ToDecimal(context["StandardAmount"]),Convert.ToDecimal(context["DiscountAmount"]),context);
+            form.ShowDialog(FindForm());
+            if(!form.Changed)return;
+            int version=++loadVersion;
+            await Task.WhenAll(LoadChargesAsync(version),LoadSiblingsAsync(version));
+            SyncPaymentFieldToGrid();UpdateCollectionTotals();SetStatus("Reviewed bill terms saved. Balances and available credit have been refreshed.");
+        }
+        catch(Exception ex){if(!IsDisposed)Fail(ex);}
+        finally{billBusy=false;}
+    }
     private async Task ReverseChargeAsync(int rowIndex)
     {
         if (transactionBusy) return;

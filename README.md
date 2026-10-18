@@ -19,12 +19,15 @@ Browse the [documentation index](Docs/README.md) or the [audit index](Audit/READ
 | Everyone tracking changes | [Changelog](CHANGELOG.md) |
 | Audit findings | [Current master audit](Audit/FMSC_MASTER_AUDIT.md) and [historical evidence](Audit/Archive/FMSC_HISTORICAL_AUDITS.md) |
 
+The current daily operating routes are in [School operations](Docs/SCHOOL_OPERATIONS.md).
+Release validation and remaining school-PC checks are recorded in [Release readiness](Docs/RELEASE_READINESS.md).
+
 For detailed screen naming, see [project structure](Docs/Development/PROJECT_STRUCTURE.md). [Admission workflow decisions](Docs/Workflows/ADMISSION_WORKFLOW.md) contain historical process context and should be read with the current code and schema-version notes.
 
 ## Technical overview
 
 - **Platform:** Windows x64; WinForms on .NET 8. The complete installer publishes a self-contained Windows application.
-- **Database:** Local SQL Server database `FMSC_DB`, normally managed through the current Windows user's `(localdb)\MSSQLLocalDB` instance. The application expects **schema version 6** and checks structural compatibility.
+- **Database:** Local SQL Server database `FMSC_DB`, normally managed through the current Windows user's `(localdb)\MSSQLLocalDB` instance. The application expects **schema version 21** and checks structural compatibility.
 - **Database delivery:** Fresh installs require an owner-provided, verified, **detached matching MDF/LDF pair**. Real school database files, backup files and credentials must not be committed to GitHub or uploaded to Actions.
 - **Installer:** `Installer/core.ps1`, launched by `Install FMSC_SMS.bat` in the release bundle. Existing installation and migration behavior must be tested against a disposable copy before production.
 - **Reporting:** PDF/CSV and RDLC report components are included; physical printing and target-printer settings require Windows acceptance.
@@ -42,11 +45,11 @@ dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
 
 The Windows CI additionally builds and runs focused WinForms page/host tests and verifies the reviewed schema artifact. Tests which operate a real database require a disposable SQL fixture; never point them at school data.
 
-## Private GitHub Actions
+## GitHub Actions
 
 - [Desktop CI](.github/workflows/fmsc-desktop-ci.yml): manually started checks.
 - [Windows application-only ZIP](.github/workflows/fmsc-windows-download.yml): manual application bundle; **not** a complete installer.
-- [Complete Windows installer ZIP](.github/workflows/fmsc-complete-installer.yml): manual private package with installer scripts, migrations, and prerequisites; the owner adds the detached MDF/LDF **after download** for a fresh install.
+- [Complete Windows installer ZIP](.github/workflows/fmsc-complete-installer.yml): manual database-free package with installer scripts, migrations, and prerequisites; the owner adds the detached MDF/LDF **after download** for a fresh install.
 
 Run status, download availability and retention are shown in the [Actions tab](https://github.com/farhan2166-creator/FMSC-Database/actions). No GitHub workflow installs onto a school PC or publishes a public release.
 
@@ -54,7 +57,7 @@ Run status, download availability and retention are shown in the [Actions tab](h
 
 [Routine Dependabot version updates](.github/dependabot.yml) are paused for NuGet and GitHub Actions (`open-pull-requests-limit: 0`). Existing PRs remain available for review. Security-alert settings, security-update PRs (if enabled) and secret scanning are unchanged. To resume weekly Monday updates with grouped minor/patch proposals, restore both limits to `3`. Updates require human review and passing Windows CI; there is no automatic merge.
 
-[Security Checks](.github/workflows/fmsc-security.yml) runs only when started manually. It uses the free, MIT-licensed Gitleaks CLI to scan fetched history and staged changes, and blocks database snapshots/backups, private key containers and sensitive configuration file names. Failure output identifies files/rules without printing credential values or uploading scanner reports. No paid security service or additional token is required; ordinary private-repository Actions usage limits apply.
+[Security Checks](.github/workflows/fmsc-security.yml) runs on main pushes, pull requests and manual dispatch. It uses the free, MIT-licensed Gitleaks CLI to scan fetched history, working source files and extracted historical DACPAC XML, and blocks database snapshots/backups, private key containers and sensitive configuration file names. Failure output identifies files/rules without printing credential values or uploading scanner reports. No paid security service or additional token is required; standard public-repository hosted runners have free Actions usage.
 
 For handling failures, local commands, narrow fixture exceptions and reviewing update PRs, see [development workflow](Docs/DEVELOPMENT_WORKFLOW.md#security-checks). Dependabot configuration changes take effect after merging into `main`.
 
