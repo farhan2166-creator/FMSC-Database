@@ -1,3 +1,4 @@
+<?xml version='1.0' encoding='utf-8'?>
 <Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
   <Body>
     <ReportItems>
@@ -50,8 +51,8 @@
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
-                <TablixCell />
+                <TablixCell/>
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -88,8 +89,8 @@
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
-                <TablixCell />
+                <TablixCell/>
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -126,8 +127,8 @@
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
-                <TablixCell />
+                <TablixCell/>
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -164,8 +165,8 @@
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
-                <TablixCell />
+                <TablixCell/>
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -232,8 +233,8 @@
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
-                <TablixCell />
+                <TablixCell/>
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -301,7 +302,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -369,7 +370,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -437,7 +438,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -505,7 +506,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -573,7 +574,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -641,7 +642,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -709,7 +710,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -777,7 +778,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -785,14 +786,14 @@
               <TablixCells>
                 <TablixCell>
                   <CellContents>
-                    <Textbox Name="FeeHeader">
+                    <Textbox Name="PeriodHeader">
                       <CanGrow>true</CanGrow>
                       <CanShrink>true</CanShrink>
                       <Paragraphs>
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Student / Month / Fee</Value>
+                              <Value>Month</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -806,10 +807,11 @@
                         </Paragraph>
                       </Paragraphs>
                       <Style>
-                        <TopBorder>
+                        <Border>
+                          <Color>#909090</Color>
                           <Style>Solid</Style>
                           <Width>0.5pt</Width>
-                        </TopBorder>
+                        </Border>
                         <BackgroundColor>#f0f0f0</BackgroundColor>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
@@ -817,10 +819,45 @@
                         <PaddingBottom>1pt</PaddingBottom>
                       </Style>
                     </Textbox>
-                    <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="FeeHeader">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Fee</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <Border>
+                          <Color>#909090</Color>
+                          <Style>Solid</Style>
+                          <Width>0.5pt</Width>
+                        </Border>
+                        <BackgroundColor>#f0f0f0</BackgroundColor>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
                 <TablixCell>
                   <CellContents>
                     <Textbox Name="AmountHeader">
@@ -845,12 +882,10 @@
                       </Paragraphs>
                       <Style>
                         <Border>
-                          <Style>None</Style>
-                        </Border>
-                        <TopBorder>
+                          <Color>#909090</Color>
                           <Style>Solid</Style>
                           <Width>0.5pt</Width>
-                        </TopBorder>
+                        </Border>
                         <BackgroundColor>#f0f0f0</BackgroundColor>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
@@ -865,6 +900,88 @@
             <TablixRow>
               <Height>0.16in</Height>
               <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="BillStudentHeading">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Fields!BillStudentName.Value</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <Border>
+                          <Color>#909090</Color>
+                          <Style>Solid</Style>
+                          <Width>0.5pt</Width>
+                        </Border>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                        <TextAlign>Left</TextAlign>
+                        <BackgroundColor>#f0f0f0</BackgroundColor>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>3</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell/>
+                <TablixCell/>
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.16in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="FeePeriod">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Fields!FeePeriod.Value</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                                <FontWeight>=IIf(Fields!FamilyRowKind.Value = "Fee", "Normal", "Bold")</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <Border>
+                          <Color>#909090</Color>
+                          <Style>Solid</Style>
+                          <Width>0.5pt</Width>
+                        </Border>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
                 <TablixCell>
                   <CellContents>
                     <Textbox Name="FeeDescription">
@@ -888,16 +1005,19 @@
                         </Paragraph>
                       </Paragraphs>
                       <Style>
+                        <Border>
+                          <Color>#909090</Color>
+                          <Style>Solid</Style>
+                          <Width>0.5pt</Width>
+                        </Border>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
                         <PaddingTop>1pt</PaddingTop>
                         <PaddingBottom>1pt</PaddingBottom>
                       </Style>
                     </Textbox>
-                    <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
                 <TablixCell>
                   <CellContents>
                     <Textbox Name="LineAmount">
@@ -907,7 +1027,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Fields!FamilyAmountText.Value</Value>
+                              <Value>=Format(Fields!Amount.Value, "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -921,7 +1041,9 @@
                       </Paragraphs>
                       <Style>
                         <Border>
-                          <Style>None</Style>
+                          <Color>#909090</Color>
+                          <Style>Solid</Style>
+                          <Width>0.5pt</Width>
                         </Border>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
@@ -967,7 +1089,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
                 <TablixCell>
                   <CellContents>
                     <Textbox Name="DiscountApplied">
@@ -1042,7 +1164,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
                 <TablixCell>
                   <CellContents>
                     <Textbox Name="TotalPaid">
@@ -1117,7 +1239,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
                 <TablixCell>
                   <CellContents>
                     <Textbox Name="BalanceRemaining">
@@ -1218,7 +1340,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -1259,17 +1381,17 @@
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell />
-                <TablixCell />
+                <TablixCell/>
+                <TablixCell/>
               </TablixCells>
             </TablixRow>
           </TablixRows>
         </TablixBody>
         <TablixColumnHierarchy>
           <TablixMembers>
-            <TablixMember />
-            <TablixMember />
-            <TablixMember />
+            <TablixMember/>
+            <TablixMember/>
+            <TablixMember/>
           </TablixMembers>
         </TablixColumnHierarchy>
         <TablixRowHierarchy>
@@ -1284,7 +1406,7 @@
                 </PageBreak>
               </Group>
               <TablixMembers>
-                <TablixMember />
+                <TablixMember/>
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Len(First(Fields!ContactNumber.Value, "ReceiptPageGroup")) = 0</Hidden>
@@ -1300,10 +1422,10 @@
                     <Hidden>=Len(First(Fields!CampusName.Value, "ReceiptPageGroup")) = 0</Hidden>
                   </Visibility>
                 </TablixMember>
-                <TablixMember />
-                <TablixMember />
-                <TablixMember />
-                <TablixMember />
+                <TablixMember/>
+                <TablixMember/>
+                <TablixMember/>
+                <TablixMember/>
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Len(First(Fields!AdmissionNumberText.Value, "ReceiptPageGroup")) = 0</Hidden>
@@ -1329,16 +1451,26 @@
                     <Hidden>true</Hidden>
                   </Visibility>
                 </TablixMember>
-                <TablixMember />
+                <TablixMember/>
                 <TablixMember>
-                  <Group Name="ReceiptFeeDetail" />
+                  <Group Name="BillStudentGroup">
+                    <GroupExpressions>
+                      <GroupExpression>=Fields!BillStudentKey.Value</GroupExpression>
+                    </GroupExpressions>
+                  </Group>
+                  <TablixMembers>
+                    <TablixMember/>
+                    <TablixMember>
+                      <Group Name="ReceiptFeeDetail"/>
+                    </TablixMember>
+                  </TablixMembers>
                 </TablixMember>
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Not First(Fields!ShowDiscount.Value, "ReceiptPageGroup")</Hidden>
                   </Visibility>
                 </TablixMember>
-                <TablixMember />
+                <TablixMember/>
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Not First(Fields!ShowBalance.Value, "ReceiptPageGroup")</Hidden>
@@ -1349,7 +1481,7 @@
                     <Hidden>=Len(First(Fields!ReceiptStatus.Value, "ReceiptPageGroup")) = 0</Hidden>
                   </Visibility>
                 </TablixMember>
-                <TablixMember />
+                <TablixMember/>
               </TablixMembers>
               <KeepTogether>true</KeepTogether>
             </TablixMember>
@@ -1358,11 +1490,11 @@
         <DataSetName>FeeReceiptData</DataSetName>
         <Height>2.9in</Height>
         <Width>2.05in</Width>
-        <Style />
+        <Style/>
       </Tablix>
     </ReportItems>
     <Height>0.01in</Height>
-    <Style />
+    <Style/>
   </Body>
   <Width>2.05in</Width>
   <Page>
@@ -1372,14 +1504,14 @@
     <RightMargin>0.09in</RightMargin>
     <TopMargin>0.12in</TopMargin>
     <BottomMargin>0.08in</BottomMargin>
-    <Style />
+    <Style/>
   </Page>
   <AutoRefresh>0</AutoRefresh>
   <DataSources>
     <DataSource Name="FeeReceiptDataSource">
       <ConnectionProperties>
         <DataProvider>System.Data.DataSet</DataProvider>
-        <ConnectString />
+        <ConnectString/>
       </ConnectionProperties>
       <rd:DataSourceID>28d59cf1-1580-4a66-83cc-c2eb38b882e1</rd:DataSourceID>
     </DataSource>
@@ -1388,7 +1520,7 @@
     <DataSet Name="FeeReceiptData">
       <Query>
         <DataSourceName>FeeReceiptDataSource</DataSourceName>
-        <CommandText />
+        <CommandText/>
       </Query>
       <Fields>
         <Field Name="ReceiptPageKey">
@@ -1486,6 +1618,14 @@
         </Field>
         <Field Name="FamilyAmountText">
           <DataField>FamilyAmountText</DataField>
+        </Field>
+      <Field Name="BillStudentKey">
+          <DataField>BillStudentKey</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+        <Field Name="BillStudentName">
+          <DataField>BillStudentName</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
         </Field>
       </Fields>
     </DataSet>

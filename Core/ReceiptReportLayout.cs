@@ -92,7 +92,8 @@ internal static class ReceiptReportLayout
         var columns = table.Descendants(ns + "TablixColumn").Select(column => Inches(column.Element(ns + "Width")!.Value)).ToArray();
         var rows = table.Element(ns + "TablixBody")!.Element(ns + "TablixRows")!.Elements(ns + "TablixRow").ToArray();
         var members = table.Element(ns + "TablixRowHierarchy")!.Element(ns + "TablixMembers")!
-            .Element(ns + "TablixMember")!.Element(ns + "TablixMembers")!.Elements(ns + "TablixMember").ToArray();
+            .Element(ns + "TablixMember")!.Element(ns + "TablixMembers")!
+            .Descendants(ns + "TablixMember").Where(member=>member.Element(ns+"TablixMembers") is null).ToArray();
         using var bitmap = new Bitmap(1, 1);
         using var graphics = Graphics.FromImage(bitmap);
         graphics.PageUnit = GraphicsUnit.Pixel;
@@ -110,7 +111,16 @@ internal static class ReceiptReportLayout
                     ? string.IsNullOrWhiteSpace(Convert.ToString(first[field.Groups[1].Value]))
                     : !Convert.ToBoolean(first[field.Groups[1].Value]))) continue;
                 bool detail = members[index].Element(ns + "Group") is not null;
-                foreach (var record in detail ? receipt : new[] { first }.AsEnumerable())
+                // Static headings within a student group repeat once per child,
+                // whereas its detail member repeats for every actual fee.
+                string? headingKey=members[index].Ancestors(ns+"TablixMember")
+                    .Select(member=>member.Element(ns+"Group")?.Element(ns+"GroupExpressions")?.Element(ns+"GroupExpression")?.Value)
+                    .Where(expression=>expression is not null&&expression!="=Fields!ReceiptPageKey.Value")
+                    .Select(expression=>Regex.Match(expression!,@"^=Fields!(\w+)\.Value$").Groups[1].Value)
+                    .FirstOrDefault(key=>!string.IsNullOrEmpty(key));
+                var records=detail?receipt:headingKey is not null
+                    ?receipt.GroupBy(record=>record[headingKey]).Select(group=>group.First()):new[]{first}.AsEnumerable();
+                foreach (var record in records)
                 {
                     double rowHeight = Inches(rows[index].Element(ns + "Height")!.Value);
                     int columnIndex = 0;
