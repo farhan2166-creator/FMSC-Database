@@ -2,7 +2,7 @@
 
 Notable user-facing, database, installer, and operational changes will be tracked here. This file begins as a **forward-looking** changelog; it is not a fabricated complete history of previous builds.
 
-## [Unreleased]
+## [1.1.0-rc.1] - 2026-10-18
 
 ### Changed
 
@@ -12,6 +12,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 ### Fixed
 
 - Stop offering credit deposits/applications as ordinary payment corrections, and exclude amounts already released to credit from the adjustable balance.
+- Label Quick Registration fees as a plan, separating monthly and yearly/one-time amounts from actual posted dues.
+- Support release-candidate installer versions with downgrade protection and validate schema package checksums. Remove the revised callback’s audit insert while preserving inbox/delivery recovery records.
 - Restore deleted verification sources/tools, correct outdated test/schema assumptions, repair Help Center source links, and verify release branches through security, Windows, SQL, installation and database-free packaging checks.
 - Remove a date-prefixed maintenance patch from release migration discovery; its guard is already in the baseline.
 
@@ -28,7 +30,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Changed
 
-- Make GitHub verification workflows manual-only at the owner's request; pushes and pull requests no longer launch desktop, security, SQL, Level 2 or disposable installer checks. Use focused verification for small UI changes.
+- Keep direct desktop, SQL, Level 2 and disposable installer workflow triggers manual. Release branches run the coordinated security, desktop, SQL, installation and packaging checks; security also runs on main pushes and pull requests.
 
 - Temporarily hide Admission's Save & New button to leave more room for Print. Use Save followed by Clear / New for the next student.
 - Distinguish New Record from Clear Search in shared setup editors. Setup Readiness disables unavailable destinations and navigation during checks, with inline permission guidance.

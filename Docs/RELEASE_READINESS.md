@@ -2,8 +2,8 @@
 
 Candidate: 1.1.0-rc.1, database schema 20.
 
-Status: implementation and verification in progress. This file does not certify
-school-PC deployment until the acceptance evidence below is completed.
+Status: automated release acceptance and complete installer packaging PASS.
+Ready for school-PC acceptance; live rollout follows the checks below.
 
 ## Implemented
 
@@ -15,22 +15,43 @@ school-PC deployment until the acceptance evidence below is completed.
 - Removed unused GetRoles, GetUserRoles, GetRolesAndPermissions and GetAdjustableFeePayments procedures after checking C#, SQL module, report and validation callers; supported role administration uses the existing AdministrationStore paths.
 - Restored deleted verification sources and tools; retired fixture migrations stay outside release packages.
 - Repaired Help Center evidence links and explicit release checks for installation, security and packaging.
+- Registration displays monthly plans separately from yearly/one-time fees and directs actual dues to the posted bill.
+- Installer accepts release-candidate versions and prevents a final release from being replaced by an older RC; schema-package checksums are validated before SQL deployment.
 
 ## Verification
 
-Tested code: `073623f70750b633b109cfdb2347ba6877c80eef`.
-[Release verification](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/39112885814):
+Tested code: `bcd6d8ce049382e0f89d9f8a17464cb7e29839cd`.
+[Release verification](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/39114451824):
 
 - Security: PASS, including full available history and historical DACPAC contents.
 - Windows: PASS — Release build, 1,850 focused native control checks, 254 component checks with 240 dialog cycles and a 19-page PDF, 1,922 Help checks and 32,183 performance/state checks.
 - SQL Server 2022: PASS — 76 stages, zero failed/blocked stages. Includes admission, prospective discounts/cutoff, historical admission-fee acknowledgement, partial/family collection, credit/refunds, repeated rate corrections, promotion/return, real rollback and request recovery, concurrency, permissions, backup/restore, CHECKDB and optional communication using fake providers.
 - Installer/publishing regression: PASS — full PortableRelease validation, unsafe-target refusal, backup/version/activation-order checks.
-- Actual disposable Windows installation: exposed prerelease-version parsing failure; fixed in the installer and awaiting a new complete run. Final package remains pending.
+- Actual disposable Windows installation: PASS — schema-19 upgrade to 20, installed-app compatibility, update/reinstall without a replacement database, fictional record/database identity/theme preservation, unsafe prerequisite refusal, activation rollback and package integrity.
+- Additional LocalDB billing checks: PASS — 95 cases and production startup/restore compatibility.
+- Final complete-installer package: PASS — self-contained Windows x64 app, Microsoft-signed LocalDB MSI, checksum-pinned sqlcmd, migration 20 and checksum manifest; no school database or backup files.
 
-Earlier attempts exposed missing fixture fields and old schema-version assumptions;
-those were corrected. The linked run is the authoritative current-code result.
+The linked run is the authoritative result for the tested code. Evidence-only
+documentation may follow that commit without changing the application or installer.
 The revised callback also removes its audit insert, preserving inbox hashes and delivery recovery records.
 No physical printer, school Windows profile or live delivery acceptance is claimed.
+
+## Installer artifact
+
+[Download the complete Windows x64 installer](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/39114451824/artifacts/12131634176).
+
+Artifact: `FMSC_SMS-Complete-Windows-x64-Add-Database-Files` (161,001,881 bytes).
+GitHub ZIP SHA256:
+`df853be4c5bcbec700dcebfe3b25ec6dab599c3f91088a06c337849c5a49b45f`.
+This Actions artifact is retained until 2026-11-01; its source commit and
+`SHA256SUMS.txt` are included in the extracted package. Follow
+[INSTALLATION.md](INSTALLATION.md) and [SCHOOL_OPERATIONS.md](SCHOOL_OPERATIONS.md).
+
+Fresh installs use the established owner-supplied detached database pair locally.
+Existing installations preserve their database; schema 19 upgrades through the
+verified-backup migration. Historical test migrations never enter this package.
+The hosted image already had LocalDB, so pristine MSI installation, an interactive
+MSI wizard and a Windows reboot remain outside this run's coverage.
 
 ## Database changes and retirement evidence
 
