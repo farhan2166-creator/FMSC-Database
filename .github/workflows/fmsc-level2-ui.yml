@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       interactive:
-        description: Run on a dedicated unlocked desktop runner with the fmsc-level2-interactive label
+        description: Private repository only - run on a dedicated unlocked desktop runner
         type: boolean
         default: false
 permissions:
@@ -15,6 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          persist-credentials: false
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /*
@@ -38,12 +39,13 @@ jobs:
         shell: pwsh
   interactive-desktop:
     name: Real desktop scenarios (manual dedicated runner only)
-    if: github.event_name == 'workflow_dispatch' && inputs.interactive
+    if: github.event_name == 'workflow_dispatch' && inputs.interactive && github.event.repository.private == true && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Windows, X64, fmsc-level2-interactive]
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
         with:
+          persist-credentials: false
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /*

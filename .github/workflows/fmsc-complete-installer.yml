@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Record checked-out source revision
         shell: pwsh
@@ -204,7 +206,7 @@ jobs:
             ''
             "Source commit: $env:GITHUB_SHA"
             "GitHub Actions run: $env:GITHUB_RUN_NUMBER"
-            'This ZIP is a PRIVATE workflow artifact, not a public GitHub Release.'
+            'Artifact access follows repository visibility. Never include school data.'
           ) | Set-Content -LiteralPath (Join-Path $root 'READ_ME_FIRST.txt') -Encoding UTF8
           Copy-Item -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'Docs/COMMUNICATION_CENTER.md') -Destination (Join-Path $root 'COMMUNICATION_CENTER.md')
 
@@ -215,7 +217,7 @@ jobs:
           $checksumLines | Set-Content -LiteralPath (Join-Path $root 'SHA256SUMS.txt') -Encoding UTF8
           Write-Host "Full installer folder validated: $($required.Count) required files; no MDF/LDF/BAK."
 
-      - name: Upload private complete installer ZIP
+      - name: Upload database-free complete installer ZIP
         uses: actions/upload-artifact@v7
         with:
           name: FMSC_SMS-Complete-Windows-x64-Add-Database-Files
