@@ -13,12 +13,12 @@ internal static partial class AdmissionBillReport
         string references=string.Join(", ",charges.AsEnumerable().Select(r=>Convert.ToString(r["Reference"])).Distinct());
         bool multipleStudents=charges.AsEnumerable().Select(r=>Convert.ToString(r["Reference"])).Distinct().Count()>1;
         void AddLine(string description,decimal amount,string kind){
-            var line=data.Rows.Add(1,institutionName,multipleStudents?"FAMILY PAYMENT BILL":"STUDENT PAYMENT BILL","PARENT COPY",multipleStudents?"FAMILY":"BILL-"+references,
+            var line=data.Rows.Add(1,institutionName,multipleStudents?"FAMILY PAYMENT BILL":"STUDENT PAYMENT BILL","PARENT COPY","BILL-"+references.Replace(", ","/"),
                 multipleStudents?parent:Convert.ToString(charges.Rows[0]["StudentName"]),references,"",
                 DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt"),"",
                 description,amount,discount,total,0m,"","",discount>0m,false,
-                contactNumber,address,"",parent,"");
-            line["FamilyRowKind"]=kind;line["FamilyAmountText"]=kind=="Fee"?amount.ToString("N0"):"";
+                contactNumber,address,"",multipleStudents?"":parent,"");
+            line["DocumentKind"]="Bill";line["FamilyRowKind"]=kind;line["FamilyAmountText"]=kind=="Fee"?amount.ToString("N0"):"";
         }
         // Group by the reference, never by name: siblings can share a name.
         foreach(var student in charges.AsEnumerable().GroupBy(r=>Convert.ToString(r["Reference"]))){
@@ -32,4 +32,16 @@ internal static partial class AdmissionBillReport
         return data;
     }
 
-}
+    internal static DataTable StudentBillData(DataTable grouped)
+    {
+        var data=ReceiptReportData.Create();string month="";
+        foreach(DataRow source in grouped.Rows)
+        {
+            string kind=Convert.ToString(source["FamilyRowKind"])??"";
+            if(kind=="Month") {month=Convert.ToString(source["FeeDescription"])!.Trim();continue;}
+            if(kind!="Fee") continue;
+            var row=data.NewRow();foreach(DataColumn column in data.Columns) row[column.ColumnName]=source[column.ColumnName];
+            row["FeeDescription"]=Convert.ToString(source["FeeDescription"])!.Trim();row["FeePeriod"]=month;data.Rows.Add(row);
+        }
+        ReceiptReportData.GroupPeriods(data);return data;
+    }}

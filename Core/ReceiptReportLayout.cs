@@ -79,6 +79,16 @@ internal static class ReceiptReportLayout
             totalRow.Descendants(ns + "Value").First(value => value.Value == "TOTAL PAID").Value =
                 "=IIf(First(Fields!ShowAdjustments.Value, \"ReceiptPageGroup\"), \"NET PAID\", \"TOTAL PAID\")";
         }
+        return FitContent(document,data,annualSheet);
+    }
+
+    // The complete layout lives in RDLC. Only the roll-paper length follows its content.
+    internal static string SizeToContent(string path,DataTable data) => FitContent(XDocument.Load(path),data,false);
+
+    private static string FitContent(XDocument document,DataTable data,bool annualSheet)
+    {
+        XNamespace ns=document.Root!.Name.Namespace;
+        var table=document.Descendants(ns+"Tablix").First();
         var columns = table.Descendants(ns + "TablixColumn").Select(column => Inches(column.Element(ns + "Width")!.Value)).ToArray();
         var rows = table.Element(ns + "TablixBody")!.Element(ns + "TablixRows")!.Elements(ns + "TablixRow").ToArray();
         var members = table.Element(ns + "TablixRowHierarchy")!.Element(ns + "TablixMembers")!
@@ -94,6 +104,7 @@ internal static class ReceiptReportLayout
             for (int index = 0; index < rows.Length; index++)
             {
                 string hidden = members[index].Element(ns + "Visibility")?.Element(ns + "Hidden")?.Value ?? "";
+                if(hidden.Equals("true",StringComparison.OrdinalIgnoreCase)) continue;
                 var field = Regex.Match(hidden, @"Fields!(\w+)\.Value");
                 if (field.Success && (hidden.Contains("Len(")
                     ? string.IsNullOrWhiteSpace(Convert.ToString(first[field.Groups[1].Value]))
@@ -118,6 +129,10 @@ internal static class ReceiptReportLayout
                                 : Convert.ToString(record[key]) ?? "";
                             if (expression.StartsWith("=IIf(") && key == "ShowAdjustments")
                                 text = Convert.ToBoolean(record[key]) ? "NET PAID" : "TOTAL PAID";
+                            if((string?)textBox.Attribute("Name")=="TotalPaid" && key=="ShowSettlement")
+                                text=Convert.ToDecimal(record[Convert.ToBoolean(record["ShowSettlement"])?"TotalPaid":"NetPaid"]).ToString("N0");
+                            if((string?)textBox.Attribute("Name")=="TotalLabel" && key=="ShowSettlement")
+                                text=Convert.ToBoolean(record["ShowSettlement"])?"TOTAL SETTLED":Convert.ToBoolean(record["ShowAdjustments"])?"NET PAID":"TOTAL PAID";
                             if ((string?)textBox.Attribute("Name") == "AdmissionNumberTextLabel")
                                 text = (Convert.ToString(record["AdmissionNumberText"]) ?? "").Contains("QR-",StringComparison.OrdinalIgnoreCase)
                                     ? "Registration #" : "Admission #";

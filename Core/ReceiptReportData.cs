@@ -35,6 +35,11 @@ internal static class ReceiptReportData
             table.Columns.Add(field, typeof(decimal)).DefaultValue = 0m;
         table.Columns.Add("ShowAdjustments", typeof(bool)).DefaultValue = false;
         table.Columns.Add("PaymentEnrollmentId", typeof(int)).DefaultValue = 0;
+        table.Columns.Add("DocumentKind",typeof(string)).DefaultValue="Receipt";
+        foreach(string field in new[] {"FeesCovered","CashReceived","CreditApplied","CreditRemaining","CreditRetained"})
+            table.Columns.Add(field,typeof(decimal)).DefaultValue=0m;
+        table.Columns.Add("ShowSettlement",typeof(bool)).DefaultValue=false;
+        table.Columns.Add("ShowCreditRemaining",typeof(bool)).DefaultValue=false;
         return table;
     }
 

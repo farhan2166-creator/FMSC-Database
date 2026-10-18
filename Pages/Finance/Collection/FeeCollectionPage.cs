@@ -2228,12 +2228,32 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 WHERE P.EnrollmentId=@EnrollmentId AND P.RelatedFeePaymentId IS NULL;
                 """,DatabaseHelper.Int("@UserId",userId),DatabaseHelper.Int("@EnrollmentId",selectedEnrollment));
             if (IsDisposed || version != loadVersion) return;
+            using var issued=await DatabaseHelper.QueryUserSetAsync("GetStudentCollectionReceipts",DatabaseHelper.Int("@AdmissionId",admissionId));
+            if(IsDisposed || version!=loadVersion) return;
+            if(issued.Tables[0].Rows.Count>0 && lastCollectionReceipt is null && lastGroupReceiptNumber is null)
+            {
+                lastGroupReceiptNumber=GetText(issued.Tables[0].Rows[0],"ReceiptNumber");
+                if(printReceiptButton is not null) printReceiptButton.Enabled=true;
+            }
+            var linkedPayments=issued.Tables.Count>1?issued.Tables[1].AsEnumerable().Select(row=>GetInt(row,"FeePaymentId")).ToHashSet():new HashSet<int>();
+            foreach(DataRow receipt in issued.Tables[0].Rows)
+            {
+                decimal settled=GetDecimal(receipt,"CashApplied")+GetDecimal(receipt,"CreditApplied");
+                int index=recentPayments.Rows.Add(FormatDate(receipt,"TransactionDate"),GetText(receipt,"ReceiptNumber"),"Fees",
+                    GetInt(receipt,"StudentCount")>1?"Family payment":GetDecimal(receipt,"CreditApplied")>0 && GetDecimal(receipt,"CashApplied")==0?"Credit settlement":"Payment",
+                    settled,GetText(receipt,"PaymentMethod"),0);
+                recentPayments.Rows[index].Cells["Adjusted"].Value=GetDecimal(receipt,"Adjusted");
+                recentPayments.Rows[index].Cells["NetPaid"].Value=GetDecimal(receipt,"NetSettled");
+                recentPayments.Rows[index].Cells["ReceiptTotal"].Value=GetInt(receipt,"StudentCount")>1?receipt["TotalSettled"]:null;
+                recentPayments.Rows[index].Cells["Amount"].ToolTipText=$"New money applied: Rs. {GetDecimal(receipt,"CashApplied"):N0}; credit used: Rs. {GetDecimal(receipt,"CreditApplied"):N0}.";
+                recentPayments.Rows[index].Tag=true;
+            }
             var byPayment = summaries.AsEnumerable().ToDictionary(row => GetInt(row,"FeePaymentId"));
             var rows = raw.AsEnumerable()
                 .Where(row => GetInt(row, "EnrollmentId") == enrollmentId)
                 .Where(row => !string.Equals(GetText(row, "TransactionType"), "REVERSAL", StringComparison.OrdinalIgnoreCase))
                 .Where(row => GetInt(row, "FeePaymentId") > 0)
-                .Where(row => byPayment.ContainsKey(GetInt(row,"FeePaymentId")))
+                .Where(row => byPayment.ContainsKey(GetInt(row,"FeePaymentId")) && !linkedPayments.Contains(GetInt(row,"FeePaymentId")))
                 .GroupBy(row => GetInt(row,"FeePaymentId"))
                 .Select(group => group.First())
                 .OrderByDescending(row => row.Table.Columns.Contains("TransactionDate") && row["TransactionDate"] != DBNull.Value && DateTime.TryParse(Convert.ToString(row["TransactionDate"]), out DateTime date) ? date : DateTime.MinValue)
@@ -2299,7 +2319,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 recentPayments.Rows[index].Cells["Amount"].ToolTipText =
                     $"Student amount: Rs. {original:#,0.##}\nAdjustments: Rs. {original-net:#,0.##}\nNet amount: Rs. {net:#,0.##}\n" +
                     recentPayments.Rows[index].Cells["Adjusted"].ToolTipText;
-                recentPayments.Rows[index].Tag = !reversed && IsPrintablePayment(row);
+                recentPayments.Rows[index].Tag = !reversed && (IsPrintablePayment(row) || (creditKind=="Application" && !string.IsNullOrWhiteSpace(GetText(row,"ReceiptNumber"))));
             }
             UpdateReprintAvailability();
         }
@@ -3142,10 +3162,20 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     GetInt(r.Cells["AdmissionId"].Value),GetInt(r.Cells["EnrollmentId"].Value),
                     (decimal)r.Cells["GrossAmount"].Tag!,GetDecimal(r.Cells["AppliedDiscount"].Value),
                     GetDecimal(r.Cells["Balance"].Tag))).ToArray();
+            var receiptDiscounts=GetDiscountAllocations();
+            var receiptDraft=new CollectionDiscountWriter.ReceiptDraft(admissionId,SelectedBillStudents(),paymentDate.Value,
+                method.Text,remarks.Text.Trim(),amount,discount,charges.Rows.Cast<DataGridViewRow>()
+                    .Where(row=>!row.IsNewRow)
+                    .Select(row=>new CollectionDiscountWriter.ReceiptLine(GetLong(row.Cells["BillingChargeId"].Value),
+                        GetInt(row.Cells["AdmissionId"].Value),GetInt(row.Cells["EnrollmentId"].Value),GetDecimal(row.Cells["Balance"].Value),
+                        receiptDiscounts.GetValueOrDefault(GetLong(row.Cells["BillingChargeId"].Value)),
+                        row.Tag is true?GetDecimal(row.Cells["Amount"].Value):0m,
+                        creditMap.GetValueOrDefault(GetLong(row.Cells["BillingChargeId"].Value))))
+                    .Where(line=>line.Cash>0 || line.Credit>0 || line.Discount>0).ToArray());
             if (allocationLines.Count == 0 && amount == 0m)
             {
-                result = await CollectionDiscountWriter.CollectWithCreditAsync(null, billDiscountEdits, creditEdits,
-                    paymentDate.Value, recoverySummary);
+                result = await CollectionDiscountWriter.CollectWithReceiptAsync(null, billDiscountEdits, creditEdits,
+                    paymentDate.Value, recoverySummary, receiptDraft);
             }
             else if (allocationLines.Count == 1 && surplusCredit == 0m && SelectedBillStudents().Length == 1)
             {
@@ -3154,10 +3184,10 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     .Where(r => r.amount > 0m)
                     .Sum(r => r.amount);
                 result =
-                    await CollectionDiscountWriter.CollectWithCreditAsync(
+                    await CollectionDiscountWriter.CollectWithReceiptAsync(
                         "ProcessFeeTransaction",
                         billDiscountEdits, creditEdits, paymentDate.Value,
-                        recoverySummary,
+                        recoverySummary, receiptDraft,
                         DatabaseHelper.Int("@AdmissionId", single.Key.AdmissionId),
                         DatabaseHelper.Int(
                             "@EnrollmentId",
@@ -3182,10 +3212,10 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             else
             {
                 result =
-                    await CollectionDiscountWriter.CollectWithCreditAsync(
+                    await CollectionDiscountWriter.CollectWithReceiptAsync(
                         "ProcessFamilyFeeTransaction",
                         billDiscountEdits, creditEdits, paymentDate.Value,
-                        recoverySummary,
+                        recoverySummary, receiptDraft,
                         DatabaseHelper.P("@ReceivedAmount", amount),
                         DatabaseHelper.Int("@CreditAdmissionId", admissionId),
                         DatabaseHelper.P("@CreditRequestId", Guid.NewGuid()),
@@ -3318,6 +3348,11 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                         printReceiptButton.Enabled = true;
                     /* The automatic report opening was removed on the operator's instruction, so this flow only prepares the reprint. */
                 }
+            }
+            if(result.Columns.Contains("CollectionReceiptId") && !string.IsNullOrWhiteSpace(singleReceipt))
+            {
+                lastCollectionReceipt=null;lastGroupReceiptNumber=singleReceipt;
+                if(printReceiptButton is not null) printReceiptButton.Enabled=true;
             }
             collectionResult.Text = string.IsNullOrWhiteSpace(singleReceipt)
                 ? "Payment recorded. Check Recent Payments for receipt details."
@@ -4127,6 +4162,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         InstitutionProfile.PrintIdentity institution,
         string receiptNumber)
     {
+        if(await CollectionReceiptReport.TryShowAsync(FindForm(),institution,receiptNumber)) return;
         DataSet result =
             await DatabaseHelper.QueryUserSetAsync(
                 "GetFeeReceiptGroup",
@@ -4203,7 +4239,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     reportData,
                     receiptPageKey: childIndex + 1,
                     institution,
-                    documentTitle: "CASH RECEIPT",
+                    documentTitle: "STUDENT PAYMENT RECEIPT",
                     copyLabel: "STUDENT COPY",
                     receiptNumber,
                     studentName: first.StudentName,
@@ -4233,7 +4269,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             }
         }
         await FeeReceiptPlacement.ApplyCurrentBalanceAsync(reportData);
-        ShowReceiptReport(reportData);
+        using var combined=CollectionReceiptReport.CombineLegacyFamily(reportData);
+        ShowReceiptReport(combined);
     }
     private async Task PrintPaymentReceipt(
         InstitutionProfile.PrintIdentity institution,
@@ -4263,7 +4300,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 reportData,
                 receiptPageKey: 1,
                 institution,
-                documentTitle: showActualAmount ? "CASH RECEIPT" : "FEE BILL",
+                documentTitle: showActualAmount ? "STUDENT PAYMENT RECEIPT" : "STUDENT PAYMENT BILL",
                 copyLabel: showActualAmount ? "STUDENT COPY" : "CUSTOMER COPY",
                 receiptNumber,
                 studentName,
@@ -4351,11 +4388,11 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
 
     private void ShowReceiptReport(DataTable reportData)
     {
-        ReceiptReportData.GroupPeriods(reportData);
+        if(!reportData.Columns.Contains("FamilyRowKind")) ReceiptReportData.GroupPeriods(reportData);
         string reportPath = Path.Combine(
             AppContext.BaseDirectory,
             "Reports",
-            "FeePaymentReceipt.rdlc");
+            reportData.Columns.Contains("FamilyRowKind")?"FamilyReceipt.rdlc":"StudentReceipt.rdlc");
         if (!File.Exists(reportPath))
         {
             Alert("Fee receipt RDLC was not found, so nothing was printed.");
@@ -4368,7 +4405,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             "FeeReceiptData",
             reportData,
             fitPageWidth: false,
-            reportDefinition: ReceiptReportLayout.Definition(reportPath, reportData));
+            reportDefinition: ReceiptReportLayout.SizeToContent(reportPath, reportData));
     }
     protected override void Dispose(bool disposing)
     {

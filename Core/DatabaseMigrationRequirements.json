@@ -1,5 +1,10 @@
 {
   "objects": [
+    {"schema":"dbo","name":"CollectionReceipts","type":"U "},
+    {"schema":"dbo","name":"CollectionReceiptPayments","type":"U "},
+    {"schema":"dbo","name":"IssueCollectionReceipt","type":"P "},
+    {"schema":"dbo","name":"GetCollectionReceipt","type":"P "},
+    {"schema":"dbo","name":"GetStudentCollectionReceipts","type":"P "},
     {
       "schema": "dbo",
       "name": "RequireWholeMonthReversal",
