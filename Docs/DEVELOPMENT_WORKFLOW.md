@@ -68,7 +68,7 @@ The separate [Level 1 lifecycle workflow](../.github/workflows/fmsc-lifecycle-sq
 
 ## Security checks
 
-GitHub CI does not approve, refresh or audit DACPAC exports. Review any schema changes independently against a safe local copy. Keep the pinned record-free SQL test fixture under separate review when the tested schema changes.
+The SQL workflow publishes the current schema-only DACPAC into a separate owned catalog for school scenarios, and tests upgrades using the pinned record-free fixture. It does not refresh exports or certify the owner's MDF/LDF snapshot. Review schema changes independently and keep the pinned fixture under separate review when its tested baseline changes.
 
 [FMSC Security Checks](../.github/workflows/fmsc-security.yml) is read-only and runs on main pushes, pull requests, manual dispatch and release verification. It downloads **Gitleaks CLI 8.30.1** from its official release and verifies a pinned SHA-256 before running it. The CLI is MIT-licensed and works with private repositories without a Gitleaks action license, PAT or GitHub Advanced Security subscription. Normal Actions minutes/storage limits still apply.
 
