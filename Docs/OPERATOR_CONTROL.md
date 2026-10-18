@@ -23,8 +23,9 @@ are retained. No monthly bill is manufactured just to represent a concession.
 
 Annual fees and individual purchases use the same comparison. Fee Collection's
 bill menu opens a correction scoped to that one bill, including its earlier
-correction chain. The fee-assignment list also includes completed purchases, so
-fully paid bills remain accessible. A closed placement allows issued-bill
+correction chain. Review Issued Bill in the fee-assignment workspace lists fully
+settled and unpaid bills separately, so the operator can select one purchase
+without changing another purchase under the same assignment. A closed placement allows issued-bill
 corrections while retaining its historical agreement and closed status.
 
 Available credit is retained unless Use available credit is selected. The review

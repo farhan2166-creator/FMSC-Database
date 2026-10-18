@@ -3,6 +3,18 @@ namespace FMSC_SMS.Pages.Finance.StudentAccounts;
 
 internal static class FeeDiscountPeriod
 {
+    public static DataTable IssuedBills(int assignment) => DatabaseHelper.QuerySql("""
+        EXEC dbo.RequirePermission @UserId,N'Fees.View';
+        SELECT B.BillingChargeId,CONCAT(N'B-',B.BillingChargeId) [Charge Ref],B.ChargeDate [Issued],
+            X.NetAmount [Bill Total],X.NetAmount-X.Balance [Settled],X.Balance [Due],B.Remarks [Description]
+        FROM dbo.BillingCharges B
+        CROSS APPLY(SELECT SUM(Q.NetAmount) NetAmount,SUM(dbo.GetFeeChargeBalance(Q.BillingChargeId)) Balance
+            FROM dbo.BillingCharges Q WHERE (Q.BillingChargeId=B.BillingChargeId OR Q.CorrectionOfBillingChargeId=B.BillingChargeId)
+                AND Q.Status<>N'Cancelled') X
+        WHERE B.StudentFeeAssignmentId=@Assignment AND B.CorrectionOfBillingChargeId IS NULL AND B.Status<>N'Cancelled'
+        ORDER BY B.ChargeDate DESC,B.BillingChargeId DESC;
+        """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Assignment",assignment));
+
     public static DataRow Context(int id) => DatabaseHelper.QuerySql("""
         EXEC dbo.RequirePermission @UserId,N'Fees.View';
         SELECT S.ConcessionLabel, S.Frequency, S.EffectiveFrom, S.EffectiveTo, A.StartDate, A.EndDate, E.EnrollmentDate,E.Status,
