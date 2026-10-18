@@ -6,7 +6,14 @@ internal static class CollectionDiscountWriter
     internal sealed record Edit(long ChargeId, int AdmissionId, int EnrollmentId,
         decimal OriginalDiscount, decimal Discount, decimal OriginalBalance);
 
+    internal sealed record CreditEdit(long ChargeId, int AdmissionId, int EnrollmentId,
+        decimal Amount, decimal ExpectedBalance, decimal ExpectedCredit);
+
     public static Task<DataTable> CollectAsync(string procedure, IReadOnlyList<Edit> edits, string recoverySummary,
+        params SqlParameter[] parameters) => CollectWithCreditAsync(procedure, edits, Array.Empty<CreditEdit>(), DateTime.Today, recoverySummary, parameters);
+
+    public static Task<DataTable> CollectWithCreditAsync(string? procedure, IReadOnlyList<Edit> edits,
+        IReadOnlyList<CreditEdit> credits, DateTime paymentDate, string recoverySummary,
         params SqlParameter[] parameters) => Task.Run(() => {
         using var connection = DatabaseHelper.GetConnection();
         DatabaseHelper.OpenConnection(connection);
@@ -15,6 +22,8 @@ internal static class CollectionDiscountWriter
         bool commitAttempted = false;
         try
         {
+            using (var billingLock = new SqlCommand("DECLARE @L int; EXEC @L=sys.sp_getapplock @Resource=N'FMSC.MonthlyBilling',@LockMode=N'Exclusive',@LockOwner=N'Transaction',@LockTimeout=10000; IF @L<0 THROW 54901,'Billing is busy. Try again.',1;", connection, transaction))
+                billingLock.ExecuteNonQuery();
             foreach (var edit in edits)
             {
                 using var update = new SqlCommand("""
@@ -42,15 +51,29 @@ internal static class CollectionDiscountWriter
                 });
                 update.ExecuteNonQuery();
             }
-            using var collect = new SqlCommand(procedure, connection, transaction) {
-                CommandType=CommandType.StoredProcedure, CommandTimeout=120
-            };
-            collect.Parameters.AddRange(parameters);
-            collect.Parameters.Add(DatabaseHelper.Int("@UserId",CurrentUser.UserId));
-            using var reader = collect.ExecuteReader();
+            if (credits.Count > 0)
+            {
+                using var apply = new SqlCommand("dbo.ApplyCollectionCredit", connection, transaction) {
+                    CommandType = CommandType.StoredProcedure, CommandTimeout = 120
+                };
+                apply.Parameters.AddRange(new[] {
+                    DatabaseHelper.Int("@UserId", CurrentUser.UserId),
+                    DatabaseHelper.Date("@TransactionDate", paymentDate),
+                    DatabaseHelper.P("@CreditsJson", System.Text.Json.JsonSerializer.Serialize(credits))
+                });
+                apply.ExecuteNonQuery();
+            }
             var result = new DataTable();
-            result.Load(reader);
-            reader.Close();
+            if (procedure is not null)
+            {
+                using var collect = new SqlCommand(procedure, connection, transaction) {
+                    CommandType = CommandType.StoredProcedure, CommandTimeout = 120
+                };
+                collect.Parameters.AddRange(parameters);
+                collect.Parameters.Add(DatabaseHelper.Int("@UserId",CurrentUser.UserId));
+                using var reader = collect.ExecuteReader();
+                result.Load(reader);
+            }
             commitAttempted = true;
             transaction.Commit();
             // Keep confirmed receipts usable even if local recovery-file cleanup fails.

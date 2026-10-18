@@ -40,6 +40,7 @@ internal sealed partial class SchoolScenarios(Fixture f, Report r)
         await r.Stage("School: partial payment and remaining-balance waiver", PartialWaiver);
         await r.Stage("School: paid bill reductions, credit and repeated rate changes", PaidRateCorrection);
         await r.Stage("School: credit deposit replay, sibling transfer and cash refund", Credits);
+        await r.Stage("School: collection credit, future bills and atomic cash settlement", () => CollectionCreditChecks.Run(f,r));
         await r.Stage("School: pending registration confirmation preserves paid opening bill", PendingConfirmation);
         await r.Stage("School: automatic monthly posting excludes legacy and reversed fees", AutomaticBilling);
     }

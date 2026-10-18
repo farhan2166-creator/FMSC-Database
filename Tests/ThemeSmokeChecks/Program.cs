@@ -34,6 +34,18 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--collection-credit"))
+        {
+            CheckCollectionCredit();
+            Console.WriteLine($"PASS: {checks} collection credit checks (no database connection).");
+            return;
+        }
+        if (args.Contains("--largest-discount"))
+        {
+            CheckLargestDiscount();
+            Console.WriteLine($"PASS: {checks} discount allocation checks (no database connection).");
+            return;
+        }
         if (args.Contains("--family-panel"))
         {
             using var form = new Form { ClientSize = new Size(320, 600) };

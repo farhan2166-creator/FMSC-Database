@@ -89,6 +89,11 @@
       "schema": "dbo",
       "name": "GetMonthlyBillingStartDate",
       "type": "FN"
+    },
+    {
+      "schema": "dbo",
+      "name": "ApplyCollectionCredit",
+      "type": "P "
     }
   ],
   "columns": [
