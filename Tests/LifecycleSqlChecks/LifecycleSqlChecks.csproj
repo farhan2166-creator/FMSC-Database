@@ -11,6 +11,7 @@
     <Compile Include="../../Core/DatabaseCompatibility.cs" Link="DatabaseCompatibility.cs" />
     <Compile Include="../../Core/CommunicationInstallation.cs" Link="CommunicationInstallation.cs" />
     <Compile Include="../../Core/DatabaseCompatibilityFailure.cs" Link="DatabaseCompatibilityFailure.cs" />
+    <Compile Include="../../Pages/Finance/StudentAccounts/FeeDiscountPeriod.cs" Link="FeeDiscountPeriod.cs" />
     <Compile Include="../../Core/WholeRupees.cs" Link="WholeRupees.cs" />
     <Compile Include="../../Core/Tvp.cs" Link="Tvp.cs" />
     <Compile Include="../../Core/PermissionCatalog.cs" Link="PermissionCatalog.cs" />
