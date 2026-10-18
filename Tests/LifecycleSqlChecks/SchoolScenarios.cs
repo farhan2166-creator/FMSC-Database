@@ -27,7 +27,6 @@ internal sealed class SchoolScenarios(Fixture f, Report r)
 
     internal async Task Run()
     {
-        await r.Stage("School: schema upgrade preserves records and optional communication", Upgrade);
         await r.Stage("School: partial payment and remaining-balance waiver", PartialWaiver);
         await r.Stage("School: paid bill reductions, credit and repeated rate changes", PaidRateCorrection);
         await r.Stage("School: credit deposit replay, sibling transfer and cash refund", Credits);
@@ -35,7 +34,7 @@ internal sealed class SchoolScenarios(Fixture f, Report r)
         await r.Stage("School: automatic monthly posting excludes legacy and reversed fees", AutomaticBilling);
     }
 
-    private async Task Upgrade()
+    internal async Task Upgrade()
     {
         using var connection = DatabaseHelper.GetConnection(); connection.Open();
         using var stream = typeof(FMSC_SMS.Core.CommunicationInstallation).Assembly
@@ -64,8 +63,8 @@ internal sealed class SchoolScenarios(Fixture f, Report r)
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Students;") == students &&
             Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments;") == received && Due(charge) == 4000,
             "Migration preserves student count, receipts and the exact unpaid tuition balance.");
-        r.Check(Sql.Count("SELECT COUNT(*) FROM sys.procedures WHERE name IN(N'GetRoles',N'GetUserRoles',N'GetRolesAndPermissions');") == 0,
-            "The three retired role-read procedures are absent after the upgrade.");
+        r.Check(Sql.Count("SELECT COUNT(*) FROM sys.procedures WHERE name IN(N'GetRoles',N'GetUserRoles',N'GetRolesAndPermissions',N'GetAdjustableFeePayments');") == 0,
+            "The four retired read procedures are absent after the upgrade.");
     }
 
     private async Task PartialWaiver()

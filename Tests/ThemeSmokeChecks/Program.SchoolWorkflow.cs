@@ -33,6 +33,8 @@ internal static partial class Program
             using var status = new BillingStatusPage((_, _, title) => destination = title, () => Task.FromResult(data), false);
             typeof(BillingStatusPage).GetField("review", flags)!.SetValue(status, data);
             var view = (ModernComboBox)typeof(BillingStatusPage).GetField("view", flags)!.GetValue(status)!;
+            using var window = new Form { ClientSize = new Size(1100, 700) };
+            window.Controls.Add(status); window.Show(); Application.DoEvents();
             view.SelectedIndex = 1;
             var grid = (DataGridView)typeof(V2Page).GetField("Grid", flags)!.GetValue(status)!;
             status.BindingContext = new BindingContext(); grid.BindingContext = status.BindingContext;

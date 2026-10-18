@@ -7,7 +7,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 ### Changed
 
 - Group direct admission, pending registration and existing-student activation in Student Admissions. Billing Center exceptions now open the selected student's setup or collection account; remove duplicate navigation paths.
-- Align application, installer and optional communication runtimes on schema 20. The transactional 19→20 migration preserves school and financial rows and retires three unused role-read procedures.
+- Align application, installer and optional communication runtimes on schema 20. The transactional 19→20 migration preserves school and financial rows and retires four unused read procedures.
 
 ### Fixed
 

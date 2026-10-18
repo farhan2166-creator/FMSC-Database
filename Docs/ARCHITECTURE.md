@@ -92,7 +92,7 @@ student's setup or collection page with current permission checks.
 
 The app, installer, worker and webhook host require schema 20. Migration 20 upgrades
 the supported schema-19 baseline, fixes the optional communication callback version
-guard and retires unused GetRoles, GetUserRoles and GetRolesAndPermissions readers.
+guard and retires unused GetRoles, GetUserRoles, GetRolesAndPermissions and GetAdjustableFeePayments readers.
 No school/financial/permission rows are rewritten. Historical migrations 7–19 exist
 only under the isolated test fixture and are never copied into release packages.
 
