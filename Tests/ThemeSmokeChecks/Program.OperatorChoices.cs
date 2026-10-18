@@ -52,6 +52,35 @@ internal static partial class Program
             PumpUntil(()=>Field<ModernButton>("check").Enabled,"Unconfirmed concession save settles");
             Click(Field<ModernButton>("save"));
             Check(submissions==1&&!Field<ModernButton>("save").Enabled&&Field<Label>("impact").Text.Contains("Check Save Outcome"),"An unconfirmed concession directs the operator to recovery and blocks another financial write");
+            foreach(var choice in new[]{(Frequency:"Monthly",Status:"Left",Bill:false),(Frequency:"Yearly",Status:"Active",Bill:false),(Frequency:"As Needed",Status:"Active",Bill:true)})
+            {
+                var selected=context.Clone();selected.Columns.Add("Status");
+                if(choice.Bill){selected.Columns.Add("BillingChargeId",typeof(long));selected.Columns.Add("BillingMonth",typeof(DateTime));}
+                var selectedRow=selected.NewRow();selectedRow["Frequency"]=choice.Frequency;selectedRow["ConcessionLabel"]="Scholarship";
+                selectedRow["StartDate"]=selectedRow["EnrollmentDate"]=new DateTime(year,1,1);selectedRow["EndDate"]=new DateTime(year,12,31);selectedRow["Status"]=choice.Status;
+                if(choice.Bill){selectedRow["BillingChargeId"]=8421L;selectedRow["BillingMonth"]=new DateTime(year,5,1);}
+                selected.Rows.Add(selectedRow);Microsoft.Data.SqlClient.SqlParameter[]? captured=null;
+                Task<DataSet> TermsQuery(Microsoft.Data.SqlClient.SqlParameter[] args){captured=args;return Task.FromResult(Plan());}
+                using var terms=new ChangeFeeDiscountForm(41,"Fee example",5000,1000,selectedRow,TermsQuery,Save);
+                terms.StartPosition=FormStartPosition.Manual;terms.Location=new Point(-32000,-32000);terms.ShowInTaskbar=false;terms.Show();Application.DoEvents();
+                T Term<T>(string name)=>(T)typeof(ChangeFeeDiscountForm).GetField(name,flags)!.GetValue(terms)!;
+                var agreement=Term<CheckBox>("updateAgreement");
+                Check(agreement.Enabled==(choice.Status=="Active"&&!choice.Bill)&&agreement.Checked==agreement.Enabled,"Closed placements and individual bills retain their agreement history while annual agreements can be reviewed");
+                Term<CheckBox>("changeRate").Checked=true;Term<ModernTextBox>("newRate").Text="6000";
+                Term<ModernTextBox>("reason").Text="Approved revised fee";Term<CheckBox>("fullWaiver").Checked=true;
+                Term<CheckBox>("useCredit").Checked=true;Click(Term<ModernButton>("review"));Application.DoEvents();
+                Check(captured is not null&&(decimal)captured.Single(p=>p.ParameterName=="@NewAmount").Value==6000m&&
+                    (bool)captured.Single(p=>p.ParameterName=="@FullFeeWaiver").Value&&(bool)captured.Single(p=>p.ParameterName=="@ApplyAvailableCredit").Value,
+                    "Annual, purchase and closed-placement reviews carry explicit rate, full-waiver and credit-use decisions");
+                Check(!choice.Bill||(long)captured!.Single(p=>p.ParameterName=="@BillingChargeId").Value==8421L,"Individual bill review retains the selected bill identity");
+                Term<CheckBox>("useCredit").Checked=false;Check(!Term<ModernButton>("save").Enabled,"Changing credit use invalidates the reviewed financial decision");
+            }
+            using var promotion=new FMSC_SMS.Pages.Students.Enrollment.BulkPromotionPage(null,false);
+            var carry=(CheckBox)typeof(FMSC_SMS.Pages.Students.Enrollment.BulkPromotionPage).GetField("carryConcessions",flags)!.GetValue(promotion)!;
+            Check(carry.Enabled&&!carry.Checked,"Promotion exposes a deliberate carry-concession choice with the legacy reset default");
+            typeof(FMSC_SMS.Pages.Students.Enrollment.BulkPromotionPage).GetField("busyCount",flags)!.SetValue(promotion,1);
+            typeof(FMSC_SMS.Pages.Students.Enrollment.BulkPromotionPage).GetMethod("ApplyState",flags)!.Invoke(promotion,null);
+            Check(!carry.Enabled,"Promotion holds the concession policy while processing");
         }
         finally{CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Permissions);}
     }

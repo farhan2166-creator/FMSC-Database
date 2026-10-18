@@ -40,16 +40,9 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         ThemeRole = "Success",
         Enabled = false
     };
-    private readonly ModernButton changeAmountButton = new() {
-        Text = "Change Amount",
-        Width = AppScale.Scale(130),
-        Height = AppMetrics.ButtonHeight,
-        ThemeRole = "Secondary",
-        Enabled = false
-    };
     private readonly ModernButton discountButton = new() {
-        Text = "Fee Discount",
-        Width = AppScale.Scale(110),
+        Text = "Review Fee Terms",
+        Width = AppScale.Scale(160),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Secondary",
         Enabled = false
@@ -72,7 +65,6 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         addButton.Click += (_, _) => AddFee();
         discontinueButton.Click += (_, _) => Discontinue();
         startTransportButton.Click += (_, _) => StartTransport();
-        changeAmountButton.Click += (_, _) => ChangeAmount();
         discountButton.Click += (_, _) => ChangeDiscount();
         ShowNoStudent();
     }
@@ -129,7 +121,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             column.SortMode = DataGridViewColumnSortMode.NotSortable;
             if (column.Visible) column.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
         }
-        var actions = new[] { addButton, discontinueButton, startTransportButton, changeAmountButton, discountButton, reviewButton };
+        var actions = new[] { addButton, discontinueButton, startTransportButton, discountButton, reviewButton };
         var buttons = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = actions.Length, RowCount = 1,
             Margin = Padding.Empty, Padding = Padding.Empty
@@ -219,7 +211,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             enrollmentHasLeft=placement.Rows.Count>0 && Convert.ToString(placement.Rows[0]["Status"]) is not ("Active" or "Pending");
             var dt = DatabaseHelper.QueryUser(
                 "GetStudentFeeAssignments",
-                DatabaseHelper.Int("@EnrollmentId", enrollmentId));
+                DatabaseHelper.Int("@EnrollmentId", enrollmentId),DatabaseHelper.Bit("@IncludeCancelled",enrollmentHasLeft));
             assignments = dt;
             hasOpenTransport=dt.AsEnumerable().Any(row => Convert.ToBoolean(row["IsTransportLinked"]) && row["EffectiveTo"]==DBNull.Value);
             grid.Rows.Clear();
@@ -237,7 +229,6 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             ReferenceMonth = FeeAssignmentPresentation.PostingMonth(dt);
             foreach (DataRow row in dt.Rows)
             {
-                if(string.Equals(Convert.ToString(row["Frequency"]),"As Needed",StringComparison.OrdinalIgnoreCase)) continue;
                 object effectiveFrom = row.Table.Columns.Contains("EffectiveFrom") ? row["EffectiveFrom"] : DBNull.Value;
                 object effectiveTo = row.Table.Columns.Contains("EffectiveTo") ? row["EffectiveTo"] : DBNull.Value;
                 object lastBilledMonth = row.Table.Columns.Contains("LastBilledMonth") ? row["LastBilledMonth"] : DBNull.Value;
@@ -368,7 +359,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         {
             DateTime from = row.Cells["EffectiveFrom"].Tag is DateTime start ? start : DateTime.MinValue;
             DateTime to = row.Cells["EffectiveTo"].Tag is DateTime end ? end : DateTime.MaxValue;
-            bool overlaps = rows.Any(other => other != row &&
+            bool overlaps = Convert.ToString(row.Cells["Frequency"].Value)=="Monthly" && rows.Any(other => other != row &&
                 Equals(other.Cells["FeeTypeId"].Value, row.Cells["FeeTypeId"].Value) &&
                 (other.Cells["EffectiveFrom"].Tag is DateTime s ? s : DateTime.MinValue) <= to &&
                 (other.Cells["EffectiveTo"].Tag is DateTime e ? e : DateTime.MaxValue) >= from);
@@ -380,23 +371,22 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         row.Cells["IsTransportLinked"].Value is bool value && value;
     private void UpdateButtonStates()
     {
+        var row = SelectedRow;
         if(enrollmentHasLeft) {
-            addButton.Enabled=discontinueButton.Enabled=changeAmountButton.Enabled=discountButton.Enabled=startTransportButton.Enabled=reviewButton.Enabled=false;
+            addButton.Enabled=discontinueButton.Enabled=startTransportButton.Enabled=reviewButton.Enabled=false;
+            discountButton.Enabled=row is not null&&CurrentUser.HasPermission("Fees.Adjust");
             return;
         }
-        var row = SelectedRow;
         bool isOpenRowSelected = row != null && row.Tag is not true && row.Cells["IsOpen"].Value is bool b && b;
         discontinueButton.Enabled = isOpenRowSelected && IsTransport(row!);
-        changeAmountButton.Enabled = isOpenRowSelected;
-        discountButton.Enabled = row != null && row.Tag is not true &&
-            Convert.ToString(row.Cells["Frequency"].Value)=="Monthly" && CurrentUser.HasPermission("Fees.Adjust");
+        discountButton.Enabled = row != null && row.Tag is not true && CurrentUser.HasPermission("Fees.Adjust");
         startTransportButton.Enabled = enrollmentId>0 && addButton.Enabled && !hasOpenTransport;
     }
     /// <summary>Fills the fee row menu and says whether it should open at all. A historical row therefore opens the menu with everything greyed out rather than pretending the actions apply.</summary>
     private bool BuildRowMenu(DataGridViewRow? row)
     {
         rowMenu.Items.Clear();
-        if (row is null || enrollmentHasLeft)
+        if (row is null)
             return false;
         var header =
             rowMenu.Items.Add(
@@ -407,20 +397,15 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             new ToolStripSeparator());
         bool isOpenRowSelected =
             row.Tag is not true && row.Cells["IsOpen"].Value is bool open && open;
-        var change =
-            rowMenu.Items.Add(
-                "Change Amount...");
-        change.Enabled = isOpenRowSelected;
-        change.Click += (_, _) => ChangeAmount();
         var discount =
             rowMenu.Items.Add(
-                "Review Concession Period...");
-        discount.Enabled = row.Tag is not true && Convert.ToString(row.Cells["Frequency"].Value)=="Monthly" && CurrentUser.HasPermission("Fees.Adjust");
+                "Review Fee Terms...");
+        discount.Enabled = (enrollmentHasLeft||row.Tag is not true)&&CurrentUser.HasPermission("Fees.Adjust");
         discount.Click += (_, _) => ChangeDiscount();
         if(IsTransport(row))
         {
             var stop=rowMenu.Items.Add("Stop Transport...");
-            stop.Enabled=isOpenRowSelected;
+            stop.Enabled=!enrollmentHasLeft&&isOpenRowSelected;
             stop.Click += (_, _) => Discontinue();
         }
         return true;
@@ -485,43 +470,18 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             LoadGrid();
         }
     }
-    private void ChangeAmount()
-    {
-        var row = SelectedRow;
-        if (row == null) return;
-        int id = Convert.ToInt32(row.Cells["StudentFeeAssignmentId"].Value);
-        string feeTypeName = Convert.ToString(row.Cells["FeeTypeName"].Value) ?? "";
-        decimal currentAmount = Convert.ToDecimal(row.Cells["StandardAmount"].Value);
-        // pass the assignment's real last-billed month through so the dialog can set an accurate minimum date instead of blindly defaulting to "next month".
-        object lastBilledCell = row.Cells["LastBilledMonth"].Value;
-        DateTime? lastBilledMonth =
-            lastBilledCell == null || lastBilledCell == DBNull.Value
-                ? null
-                : Convert.ToDateTime(lastBilledCell);
-        // same reasoning as LastBilledMonth above - derive the real limit from the row's own data so the dialog can refuse an amount below the discount before a round…
-        decimal currentDiscount = Convert.ToDecimal(row.Cells["DiscountAmount"].Value);
-        using var form = new ChangeFeeAssignmentAmountForm(id, feeTypeName, currentAmount, lastBilledMonth, currentDiscount,
-            row.Cells["EffectiveFrom"].Tag is DateTime start ? start : null);
-        if (form.ShowDialog(this) == DialogResult.OK)
-        {
-            AnnounceChange();
-            LoadGrid();
-        }
-    }
     private void ChangeDiscount()
     {
-        var row = SelectedRow;
-        if (row == null) return;
-        int id = Convert.ToInt32(row.Cells["StudentFeeAssignmentId"].Value);
-        string feeTypeName = Convert.ToString(row.Cells["FeeTypeName"].Value) ?? "";
-        decimal standardAmount = Convert.ToDecimal(row.Cells["StandardAmount"].Value);
-        decimal currentDiscount = Convert.ToDecimal(row.Cells["DiscountAmount"].Value);
-        using var form = new ChangeFeeDiscountForm(id, feeTypeName, standardAmount, currentDiscount);
-        if (form.ShowDialog(this) == DialogResult.OK)
+        var row=SelectedRow;
+        if(row is null||!CurrentUser.HasPermission("Fees.Adjust"))return;
+        try
         {
-            AnnounceChange();
-            LoadGrid();
+            int id=Convert.ToInt32(row.Cells["StudentFeeAssignmentId"].Value);
+            using var form=new ChangeFeeDiscountForm(id,Convert.ToString(row.Cells["FeeTypeName"].Value)??"Fee",
+                Convert.ToDecimal(row.Cells["StandardAmount"].Value),Convert.ToDecimal(row.Cells["DiscountAmount"].Value));
+            if(form.ShowDialog(this)==DialogResult.OK){AnnounceChange();LoadGrid();}
         }
+        catch(Exception ex){ModernMessageDialog.Show(FindForm(),DbMessage.UserMessage(ex),"Review Fee Terms",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
     }
     /// <summary>The panel is added to whoever hosts it, so the ids it was last pointed at are the only state worth reporting.</summary>
     public bool HasStudent => enrollmentId > 0 && admissionId > 0;

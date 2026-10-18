@@ -7,12 +7,12 @@ internal static class MatchingSectionPromotion
 {
     internal static Task<DataTable> RunAsync(DataTable decisions, int sourceYear, int destinationYear,
         int campus, int sourceClass, int sourceSection, int destinationClass, DateTime effective, string remarks,
-        Dictionary<int,int> destinations, Dictionary<int,int> expectedSources) =>
-        Task.Run(() => Run(decisions, sourceYear, destinationYear, campus, sourceClass, sourceSection, destinationClass, effective, remarks, destinations, expectedSources));
+        Dictionary<int,int> destinations, Dictionary<int,int> expectedSources,bool carryConcessions=false) =>
+        Task.Run(() => Run(decisions, sourceYear, destinationYear, campus, sourceClass, sourceSection, destinationClass, effective, remarks, destinations, expectedSources,carryConcessions));
 
     private static DataTable Run(DataTable decisions, int sourceYear, int destinationYear,
         int campus, int sourceClass, int sourceSection, int destinationClass, DateTime effective, string remarks,
-        Dictionary<int,int> destinations, Dictionary<int,int> expectedSources)
+        Dictionary<int,int> destinations, Dictionary<int,int> expectedSources,bool carryConcessions)
     {
         using var connection = DatabaseHelper.GetConnection();
         DatabaseHelper.OpenConnection(connection);
@@ -71,7 +71,7 @@ internal static class MatchingSectionPromotion
                 DatabaseHelper.Int("@DestinationAcademicYearId",destinationYear),DatabaseHelper.Int("@SourceCampusId",campus),
                 DatabaseHelper.Int("@SourceClassId",sourceClass),DatabaseHelper.Int("@SourceSectionId",group.Key),
                 DatabaseHelper.Int("@DestinationClassSectionId",destination),DatabaseHelper.Date("@EffectiveDate",effective),
-                DatabaseHelper.P("@Remarks",remarks),new SqlParameter("@Decisions",SqlDbType.Structured) { TypeName="dbo.BulkPromotionDecisionType",Value=subset }
+                DatabaseHelper.P("@Remarks",remarks),DatabaseHelper.Bit("@CarryConcessions",carryConcessions),new SqlParameter("@Decisions",SqlDbType.Structured) { TypeName="dbo.BulkPromotionDecisionType",Value=subset }
             });
             using var reader=command.ExecuteReader();
             if(!reader.Read()) throw new InvalidOperationException("Promotion did not return a result. No students were processed.");
