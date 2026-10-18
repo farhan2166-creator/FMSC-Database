@@ -2,6 +2,7 @@ name: FMSC Complete Windows Installer ZIP
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

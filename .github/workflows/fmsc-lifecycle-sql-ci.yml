@@ -2,6 +2,7 @@ name: FMSC Level 1 lifecycle SQL
 
 on:
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 

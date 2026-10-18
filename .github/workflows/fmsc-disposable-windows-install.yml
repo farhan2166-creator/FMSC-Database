@@ -2,6 +2,7 @@ name: FMSC Disposable Windows Installation Acceptance
 
 on:
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 
@@ -13,7 +14,6 @@ jobs:
   clean-install:
     name: Real Windows installer with approved synthetic LocalDB
     runs-on: windows-2022
-    if: github.event_name == 'workflow_dispatch' || (!github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.repository)
     timeout-minutes: 55
     env:
       FMSC_DISPOSABLE_INSTALL: approved-synthetic-only
@@ -38,6 +38,11 @@ jobs:
         shell: pwsh
         timeout-minutes: 45
         run: .\Tools\RunDisposableWindowsInstall.ps1 -ProjectDirectory . -Level3
+
+      - name: Exercise automatic billing, concessions, credit and lifecycle cutoff cases
+        shell: pwsh
+        timeout-minutes: 10
+        run: .\Tools\TestAutomaticBilling.ps1
 
       - name: Publish sanitized acceptance summary
         if: always()

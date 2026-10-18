@@ -7,6 +7,7 @@ import io
 from pathlib import Path
 import re
 import subprocess
+import shutil
 import tempfile
 import zipfile
 import xml.etree.ElementTree as ET
@@ -67,22 +68,42 @@ def main():
         for oid, path in packages.items():
             try:
                 content = inspect_dacpac(git('cat-file', 'blob', oid))
-                folder = Path(temp) / oid
-                folder.mkdir()
+                folder = Path(temp) / 'packages' / oid
+                folder.mkdir(parents=True)
                 for name, data in content.items():
                     target = folder / name
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(data)
             except (ValueError, KeyError, zipfile.BadZipFile, ET.ParseError):
                 failures.append('DACPAC requires private review: ' + path)
-        # Redact all findings. No report with secret values is uploaded.
-        common = ['--config', '.gitleaks.toml', '--redact', '--no-banner']
+        # Scan source files, including untracked candidates, without generated build
+        # output/bytecode. Tracked ignored files are still included and history is
+        # scanned independently. Never follow a source symlink outside the repository.
+        source = Path(temp) / 'working-source'
+        source.mkdir()
+        for raw in git('ls-files', '--cached', '--others', '--exclude-standard', '-z').split(b'\0'):
+            if not raw:
+                continue
+            original = Path(raw.decode('utf-8'))
+            if original.is_symlink():
+                failures.append('Source symlink requires review: ' + str(original))
+                continue
+            if not original.is_file():
+                continue
+            if forbidden_path(str(original)):
+                failures.append('Forbidden working path: ' + str(original))
+            target = source / original
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(original, target)
+        # Redact findings; disallow inline/fingerprint suppression outside reviewed config.
+        common = ['--config', str(Path('.gitleaks.toml').resolve()), '--redact', '--no-banner', '--ignore-gitleaks-allow', '--gitleaks-ignore-path', str(Path(temp) / 'no-ignores')]
         for command in (
             [args.gitleaks, 'git', '.', '--log-opts=--all', *common],
             [args.gitleaks, 'dir', '.', *common],
-            [args.gitleaks, 'dir', temp, *common],
+            [args.gitleaks, 'dir', str(Path(temp) / 'packages'), *common],
         ):
-            result = subprocess.run(command, check=False)
+            result = subprocess.run(command, check=False,
+                cwd=source if command[1:3] == ['dir', '.'] else None)
             if result.returncode:
                 failures.append('Gitleaks scan failed or detected a secret (exit %s).' % result.returncode)
     for failure in sorted(set(failures)):

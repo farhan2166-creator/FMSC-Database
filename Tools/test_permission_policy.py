@@ -1,0 +1,64 @@
+"""Check the pinned data-free SQL test fixture, embedded catalog and access consumers."""
+import json
+from pathlib import Path
+import re
+import unittest
+import xml.etree.ElementTree as ET
+import zipfile
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class PermissionPolicyChecks(unittest.TestCase):
+    def setUp(self):
+        self.catalog = json.loads((ROOT/'Core/PermissionCatalog.json').read_text(encoding='utf-8'))
+        self.codes = {entry['Code'] for entry in self.catalog}
+
+    def test_unique_base_catalog(self):
+        self.assertEqual(28, len(self.codes))
+        self.assertEqual(len(self.codes), len(self.catalog))
+
+    def test_catalog_covers_actual_consumers_without_dead_options(self):
+        with zipfile.ZipFile(ROOT/'Tests/LifecycleSqlChecks/Baseline/schema.dacpac') as package:
+            root = ET.fromstring(package.read('model.xml'))
+        ns = {'d': root.tag.split('}')[0][1:]}
+        modules = {}
+        for element in root.find('d:Model', ns):
+            if element.get('Type') != 'SqlProcedure':
+                continue
+            body = element.find("d:Property[@Name='BodyScript']/d:Value", ns)
+            modules[element.get('Name')] = body.text or ''
+        sql_codes = set()
+        for body in modules.values():
+            for statement in re.findall(r'EXEC(?:UTE)?\s+dbo\.Require(?:Any)?Permission\b[^;]*;', body, re.I):
+                sql_codes.update(re.findall(r"N?'([A-Za-z]+\.[A-Za-z.]+)'", statement))
+        self.assertLessEqual(sql_codes, self.codes)
+        old_catalog = {'Students.Edit', 'Students.Photo.Manage', 'System.Permissions',
+                       'System.Roles.Deactivate', 'Students.Siblings'} | self.codes
+        cs_codes = set()
+        for path in ROOT.rglob('*.cs'):
+            if any(part in ('Tests', 'bin', 'obj', '.git', 'RecoveryBackups') for part in path.relative_to(ROOT).parts):
+                continue
+            cs_codes.update(set(re.findall(r'"([A-Za-z]+\.[A-Za-z.]+)"', path.read_text(encoding='utf-8'))) & old_catalog)
+        self.assertLessEqual(cs_codes, self.codes)
+        self.assertEqual(self.codes, sql_codes | cs_codes)
+
+    def test_application_and_installer_require_current_baseline(self):
+        application = re.search(r'RequiredDatabaseSchemaVersion = "(\d+)"', (ROOT/'DatabaseHelper.cs').read_text())
+        installer = re.search(r"\$DatabaseVersion = '(\d+)'", (ROOT/'Installer/core.ps1').read_text())
+        self.assertIsNotNone(application)
+        self.assertIsNotNone(installer)
+        required = int(application.group(1))
+        self.assertEqual(required, 19)
+        self.assertEqual(int(installer.group(1)), required)
+        self.assertEqual(set(), {path.name for path in (ROOT/'Migrations').glob('*.sql')})
+
+    def test_metadata_fits_sql_columns(self):
+        for entry in self.catalog:
+            self.assertTrue(entry['Code'] and len(entry['Code']) <= 100)
+            self.assertTrue(entry['Name'] and len(entry['Name']) <= 100)
+            self.assertTrue(entry['Description'] and len(entry['Description']) <= 250)
+
+
+if __name__ == '__main__':
+    unittest.main()
