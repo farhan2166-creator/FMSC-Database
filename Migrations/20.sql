@@ -12,6 +12,10 @@ BEGIN
     IF @Definition IS NULL OR CHARINDEX(N'FROM dbo.DatabaseVersion)<>6',@Definition)=0
         THROW 51000,'Unexpected communication callback definition. Review before upgrading.',1;
     SET @Definition=REPLACE(@Definition,N'FROM dbo.DatabaseVersion)<>6',N'FROM dbo.DatabaseVersion)<>20');
+    -- Retire audit writing only in this revised procedure. Inbox hashes,
+    -- pending receipts and delivery state remain authoritative recovery records.
+    SET @Definition=REPLACE(@Definition,NCHAR(13)+NCHAR(10),NCHAR(10));
+    SET @Definition=REPLACE(@Definition,N' INSERT comm.Audit(Actor,Operation,Detail) VALUES(@Actor,''SignedMetaCallback'',N''Validated external gateway callback persisted; duplicates are idempotent'');'+NCHAR(10),N'');
     DECLARE @At int=CHARINDEX(N'PROCEDURE',@Definition);
     IF @At=0 THROW 51000,'Cannot identify communication callback procedure.',1;
     SET @Definition=N'ALTER '+SUBSTRING(@Definition,@At,LEN(@Definition));

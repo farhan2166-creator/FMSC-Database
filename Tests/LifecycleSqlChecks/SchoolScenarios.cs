@@ -50,11 +50,13 @@ internal sealed class SchoolScenarios(Fixture f, Report r)
         await Pay(child.Student, child.Enrollment, 1000, (charge, 1000));
         int students = Sql.Count("SELECT COUNT(*) FROM dbo.Students;");
         decimal received = Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments;");
-        // Reconstruct only the known old module version check, then exercise the
+        // Reconstruct the old module version check and retiring audit insert, then exercise the
         // production migration. This owned database is never a school target.
         Sql.Query("""
             DECLARE @Definition nvarchar(max)=OBJECT_DEFINITION(OBJECT_ID(N'comm.IngestMeta'));
             SET @Definition=REPLACE(@Definition,N'FROM dbo.DatabaseVersion)<>20',N'FROM dbo.DatabaseVersion)<>6');
+            SET @Definition=REPLACE(@Definition,N' COMMIT;'+NCHAR(10)+N'END;',
+                N' INSERT comm.Audit(Actor,Operation,Detail) VALUES(@Actor,''SignedMetaCallback'',N''Validated external gateway callback persisted; duplicates are idempotent'');'+NCHAR(10)+N' COMMIT;'+NCHAR(10)+N'END;');
             SET @Definition=N'ALTER '+SUBSTRING(@Definition,CHARINDEX(N'PROCEDURE',@Definition),LEN(@Definition));
             EXEC sys.sp_executesql @Definition;
             UPDATE dbo.DatabaseVersion SET VersionNumber=N'19' WHERE VersionId=(SELECT MAX(VersionId) FROM dbo.DatabaseVersion);
@@ -62,6 +64,8 @@ internal sealed class SchoolScenarios(Fixture f, Report r)
         string migration = File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "Migrations", "20.sql"));
         Sql.Query("BEGIN TRANSACTION;\n" + migration + "\nCOMMIT TRANSACTION;");
         r.Check(await CommunicationSchemaContract.VerifyAsync(connection), "An existing callback module matches the runtime contract after migration 20.");
+        r.Check(Sql.Count("SELECT CASE WHEN OBJECT_DEFINITION(OBJECT_ID(N'comm.IngestMeta')) LIKE N'%INSERT comm.Audit%' THEN 1 ELSE 0 END;")==0,
+            "The revised callback retires audit writes while retaining its inbox and pending-receipt recovery records.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Students;") == students &&
             Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments;") == received && Due(charge) == 4000,
             "Migration preserves student count, receipts and the exact unpaid tuition balance.");

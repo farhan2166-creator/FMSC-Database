@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 $tokens = $null; $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseInput((Get-Content -LiteralPath $InstallerPath -Raw),[ref]$tokens,[ref]$errors)
 if ($errors.Count) { throw 'Installer PowerShell does not parse.' }
-foreach ($name in @('Convert-ToDbVersion','Invoke-PendingMigrations','Invoke-SqlMigration','Invoke-InstallationDatabaseCheck')) {
+foreach ($name in @('Convert-ToVersion','Compare-ApplicationVersion','Convert-ToDbVersion','Invoke-PendingMigrations','Invoke-SqlMigration','Invoke-InstallationDatabaseCheck')) {
     $functions = @($ast.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name },$true))
     if ($functions.Count -ne 1) { throw "Expected one $name helper." }
     Invoke-Expression $functions[0].Extent.Text
@@ -43,6 +43,23 @@ function Scenario($Files,$Current,$Required,$Expected,$ErrorText='',$Missing=$fa
     $script:checks++
 }
 try {
+    foreach ($case in @(
+        @('1.0.0','1.1.0-rc.1',-1), @('1.1.0-rc.1','1.1.0-rc.1',0),
+        @('1.1.0-rc.1','1.1.0',-1), @('1.1.0','1.1.0-rc.1',1),
+        @('1.1.0-rc.2','1.1.0-rc.10',-1), @('1.1.0-rc.1','1.1.0-rc.1.1',-1),
+        @('1.1.0-alpha','1.1.0-beta',-1), @('1.1.0-1','1.1.0-alpha',-1),
+        @('1.1.0+build.1','1.1.0+build.2',0), @('1.1.0.0','1.1.0',0),
+        @('1.1.0.1','1.1.0',1), @('1.2.0-rc.1','1.1.0',1)
+    )) {
+        if ([Math]::Sign((Compare-ApplicationVersion $case[0] $case[1])) -ne $case[2]) {
+            throw "Incorrect application version precedence: $($case[0]) / $($case[1])"
+        }
+    }
+    foreach ($invalid in @('1.1.0-','1.1.0+','unversioned')) {
+        $refused=$false
+        try { $null=Convert-ToVersion $invalid } catch { $refused=$true }
+        if (-not $refused) { throw 'Invalid application version was accepted.' }
+    }
     Scenario @() 6 6 '' '' $true
     Scenario @() 6 6 ''
     Scenario @('readme.txt') 6 6 ''
@@ -76,7 +93,7 @@ try {
     $script:sqlExit=1; $failure=''
     try{& $sqlRunner -FilePath (Join-Path $scratch '8.sql') -VersionBefore 6 -ExpectedVersion 8}catch{$failure=$_.Exception.Message}
     if(-not $failure.Contains('Migration 8 failed') -or (Test-Path -LiteralPath $script:wrapperPath)){throw 'SQL failure/cleanup must be reported.'}
-    Write-Output "PASS: $checks folder/version/backup scenarios plus SQL wrapper, failure cleanup and activation-order checks."
+    Write-Output "PASS: 15 application-version cases; $checks folder/version/backup scenarios plus SQL wrapper, failure cleanup and activation-order checks."
 } finally {
     $resolved=[IO.Path]::GetFullPath($scratch)
     if(-not $resolved.StartsWith([IO.Path]::GetFullPath([IO.Path]::GetTempPath()),[StringComparison]::OrdinalIgnoreCase)){throw 'Refusing cleanup outside test temp directory.'}

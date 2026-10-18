@@ -14,3 +14,11 @@ Assess database migration requirements against the intended deployment scenario
 and the supplied snapshot. An empty migration folder alone does not establish
 that a release is blocked. Installation, existing-database upgrades, and recovery
 testing are separate verification questions; report concrete findings about them.
+
+# Gradual audit retirement
+
+When revising a stored procedure, remove its writes to the retiring audit system
+and audit-only before/after JSON preparation. Do not make a separate sweep through
+unrelated procedures. Preserve operational student/lifecycle history, bills,
+payments, allocations, credit movements, migration versions, and request/recovery
+markers: these remain necessary business and recovery records.

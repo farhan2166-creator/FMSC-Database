@@ -616,7 +616,6 @@ BEGIN
   WHERE JSON_VALUE(M.value,'$.type')='text' AND UPPER(LTRIM(RTRIM(JSON_VALUE(M.value,'$.text.body')))) IN(N'STOP',N'UNSUBSCRIBE',N'بند')
  ) X ON X.Destination=CT.Destination
  WHERE CT.OptedOut=0 AND X.Stamp BETWEEN 1 AND 2147483647 AND CT.ConsentUtc<=DATEADD(SECOND,CONVERT(int,X.Stamp)+1,CONVERT(datetime2,'19700101'));
- INSERT comm.Audit(Actor,Operation,Detail) VALUES(@Actor,'SignedMetaCallback',N'Validated external gateway callback persisted; duplicates are idempotent');
  COMMIT;
 END;
 GO
