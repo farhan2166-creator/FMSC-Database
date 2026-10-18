@@ -13,12 +13,22 @@ internal static partial class Program
         int Render(string name,DataTable data)
         {
             bool bill=Convert.ToString(data.Rows[0]["DocumentKind"])=="Bill";
+            using var billRows=bill&&data.Columns.Contains("FamilyRowKind")?AdmissionBillReport.FamilyBillData(data):null;
+            if(billRows is not null)data=billRows;
             string file=data.Columns.Contains("FamilyRowKind")?(bill?"FamilyBill.rdlc":"FamilyReceipt.rdlc"):(bill?"StudentBill.rdlc":"StudentReceipt.rdlc");
             string path=Path.Combine(AppContext.BaseDirectory,"Reports",file);
             Check(File.Exists(path),"Each document loads its own RDLC file");
             string definition=ReceiptReportLayout.SizeToContent(path,data);
             var xml=XDocument.Parse(definition);XNamespace ns=xml.Root!.Name.Namespace;
             Check(xml.Descendants(ns+"TablixMember").Where(member=>member.Element(ns+"Group")?.Attribute("Name")?.Value=="ReceiptPageGroup").Count()==1,"One document group is retained");
+            if(bill)
+            {
+                foreach(string cell in new[]{"PeriodHeader","FeeHeader","AmountHeader","FeePeriod","FeeDescription","LineAmount"})
+                    Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")==cell)
+                        .Element(ns+"Style")?.Element(ns+"Border")?.Element(ns+"Style")?.Value=="Solid","Bill fee cells have a visible table grid");
+                if(billRows is not null)
+                    Check(xml.Descendants(ns+"Group").Any(group=>(string?)group.Attribute("Name")=="BillStudentGroup"),"Family bills group real fee rows under separate student headings");
+            }
             using var report=new LocalReport();report.LoadReportDefinition(new StringReader(definition));
             report.DataSources.Add(new ReportDataSource("FeeReceiptData",data));
             byte[] pdf=report.Render("PDF");File.WriteAllBytes(Path.Combine(folder,name+".pdf"),pdf);
@@ -80,6 +90,8 @@ internal static partial class Program
             Check(Render("individual-bill",studentBill)==1,"Individual bill uses the established receipt design");
         }
         charges.Rows.Add("1002","Sara Example","Tuition",new DateTime(2026,11,1),0m,500m);
+        charges.Rows.Add("1001","Ali Example","Transport",new DateTime(2026,12,1),0m,600m);
+        charges.Rows.Add("1002","Sara Example","Admission",DBNull.Value,0m,200m);
         using(var familyBill=AdmissionBillReport.BuildFamilyData(school.Name,school.ContactNumber,school.Address,"Example Parent",charges))
             Check(Render("family-bill",familyBill)==1,"Family bill is one combined document in the same design");
     }
