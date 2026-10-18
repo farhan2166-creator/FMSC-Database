@@ -75,6 +75,21 @@ internal static partial class Program
                 Check(!choice.Bill||(long)captured!.Single(p=>p.ParameterName=="@BillingChargeId").Value==8421L,"Individual bill review retains the selected bill identity");
                 Term<CheckBox>("useCredit").Checked=false;Check(!Term<ModernButton>("save").Enabled,"Changing credit use invalidates the reviewed financial decision");
             }
+            var issued=new DataTable();issued.Columns.Add("BillingChargeId",typeof(long));issued.Columns.Add("Charge Ref");issued.Columns.Add("Issued",typeof(DateTime));
+            foreach(string name in new[]{"Bill Total","Settled","Due"})issued.Columns.Add(name,typeof(decimal));
+            issued.Rows.Add(901L,"B-901",new DateTime(year,4,1),1200m,1200m,0m);issued.Rows.Add(902L,"B-902",new DateTime(year,5,1),1200m,0m,1200m);
+            using(var picker=new IssuedBillPicker(issued,"Workbook purchase"))
+            {
+                picker.StartPosition=FormStartPosition.Manual;picker.Location=new Point(-32000,-32000);picker.ShowInTaskbar=false;picker.Show();Application.DoEvents();
+                var grid=(DataGridView)typeof(IssuedBillPicker).GetField("grid",flags)!.GetValue(picker)!;
+                var reviewBill=(ModernButton)typeof(IssuedBillPicker).GetField("review",flags)!.GetValue(picker)!;
+                Check(grid.Rows.Count==2&&grid.ReadOnly&&!grid.Columns["BillingChargeId"].Visible,"Issued-bill review includes fully settled and unpaid purchases without allowing list edits");
+                grid.CurrentCell=grid.Rows[0].Cells["Charge Ref"];Application.DoEvents();
+                CurrentUser.SignIn(7782,"Read-only fixture","Accountant",false,new[]{"Fees.View"});Click(reviewBill);
+                Check(picker.SelectedBillId==0,"Issued-bill selection rechecks adjustment authority before opening the financial review");
+                CurrentUser.SignIn(7781,"Concession fixture","Administrator",false,Array.Empty<string>());Click(reviewBill);
+                Check(picker.SelectedBillId==901L&&picker.DialogResult==DialogResult.OK,"The operator can select exactly the fully paid purchase instead of changing another purchase under the same fee");
+            }
             using var promotion=new FMSC_SMS.Pages.Students.Enrollment.BulkPromotionPage(null,false);
             var carry=(CheckBox)typeof(FMSC_SMS.Pages.Students.Enrollment.BulkPromotionPage).GetField("carryConcessions",flags)!.GetValue(promotion)!;
             Check(carry.Enabled&&!carry.Checked,"Promotion exposes a deliberate carry-concession choice with the legacy reset default");

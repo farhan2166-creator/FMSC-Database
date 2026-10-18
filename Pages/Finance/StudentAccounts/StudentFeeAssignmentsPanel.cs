@@ -40,6 +40,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         ThemeRole = "Success",
         Enabled = false
     };
+    private readonly ModernButton issuedBillButton=new(){Text="Review Issued Bill",ThemeRole="Secondary",Enabled=false};
     private readonly ModernButton discountButton = new() {
         Text = "Review Fee Terms",
         Width = AppScale.Scale(160),
@@ -66,6 +67,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         discontinueButton.Click += (_, _) => Discontinue();
         startTransportButton.Click += (_, _) => StartTransport();
         discountButton.Click += (_, _) => ChangeDiscount();
+        issuedBillButton.Click+=(_,_)=>ReviewIssuedBill();
         ShowNoStudent();
     }
     private void BuildLayout()
@@ -121,7 +123,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             column.SortMode = DataGridViewColumnSortMode.NotSortable;
             if (column.Visible) column.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
         }
-        var actions = new[] { addButton, discontinueButton, startTransportButton, discountButton, reviewButton };
+        var actions = new[] { addButton, discontinueButton, startTransportButton, discountButton, issuedBillButton, reviewButton };
         var buttons = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = actions.Length, RowCount = 1,
             Margin = Padding.Empty, Padding = Padding.Empty
@@ -372,6 +374,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
     private void UpdateButtonStates()
     {
         var row = SelectedRow;
+        issuedBillButton.Enabled=row is not null&&CurrentUser.HasPermission("Fees.Adjust");
         if(enrollmentHasLeft) {
             addButton.Enabled=discontinueButton.Enabled=startTransportButton.Enabled=reviewButton.Enabled=false;
             discountButton.Enabled=row is not null&&CurrentUser.HasPermission("Fees.Adjust");
@@ -402,6 +405,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
                 "Review Fee Terms...");
         discount.Enabled = (enrollmentHasLeft||row.Tag is not true)&&CurrentUser.HasPermission("Fees.Adjust");
         discount.Click += (_, _) => ChangeDiscount();
+        var issued=rowMenu.Items.Add("Review an Issued Bill...");issued.Enabled=CurrentUser.HasPermission("Fees.Adjust");issued.Click+=(_,_)=>ReviewIssuedBill();
         if(IsTransport(row))
         {
             var stop=rowMenu.Items.Add("Stop Transport...");
@@ -474,6 +478,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
     {
         var row=SelectedRow;
         if(row is null||!CurrentUser.HasPermission("Fees.Adjust"))return;
+        if(Convert.ToString(row.Cells["Frequency"].Value)=="As Needed"){ReviewIssuedBill();return;}
         try
         {
             int id=Convert.ToInt32(row.Cells["StudentFeeAssignmentId"].Value);
@@ -482,6 +487,23 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             if(form.ShowDialog(this)==DialogResult.OK){AnnounceChange();LoadGrid();}
         }
         catch(Exception ex){ModernMessageDialog.Show(FindForm(),DbMessage.UserMessage(ex),"Review Fee Terms",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+    }
+    private void ReviewIssuedBill()
+    {
+        var row=SelectedRow;
+        if(row is null||!CurrentUser.HasPermission("Fees.Adjust"))return;
+        try
+        {
+            using var data=FeeDiscountPeriod.IssuedBills(Convert.ToInt32(row.Cells["StudentFeeAssignmentId"].Value));
+            using var picker=new IssuedBillPicker(data,Convert.ToString(row.Cells["FeeTypeName"].Value)??"Fee");
+            if(picker.ShowDialog(this)!=DialogResult.OK)return;
+            var context=FeeDiscountPeriod.BillContext(picker.SelectedBillId);
+            using var form=new ChangeFeeDiscountForm(Convert.ToInt32(context["StudentFeeAssignmentId"]),Convert.ToString(context["FeeTypeName"])??"Fee",
+                Convert.ToDecimal(context["StandardAmount"]),Convert.ToDecimal(context["DiscountAmount"]),context);
+            form.ShowDialog(this);
+            if(form.Changed){AnnounceChange();LoadGrid();}
+        }
+        catch(Exception ex){ModernMessageDialog.Show(FindForm(),DbMessage.UserMessage(ex),"Review Issued Bill",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
     }
     /// <summary>The panel is added to whoever hosts it, so the ids it was last pointed at are the only state worth reporting.</summary>
     public bool HasStudent => enrollmentId > 0 && admissionId > 0;
