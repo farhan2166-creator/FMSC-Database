@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../Level3Checks/ReliabilityChecks.cs" Link="ReliabilityChecks.cs" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+    <Compile Include="../../Services/Communication/*.cs" Exclude="../../Services/Communication/WindowsGatewayStore.cs" Link="Communication/%(Filename)%(Extension)" />
+    <Compile Include="../QuickRegistrationSqlChecks/DatabaseContext.cs" Link="DatabaseContext.cs" />
+    <Compile Include="../../Core/DatabaseCompatibility.cs" Link="DatabaseCompatibility.cs" />
+    <Compile Include="../../Core/CommunicationInstallation.cs" Link="CommunicationInstallation.cs" />
+    <Compile Include="../../Core/DatabaseCompatibilityFailure.cs" Link="DatabaseCompatibilityFailure.cs" />
+    <Compile Include="../../Pages/Finance/StudentAccounts/FeeDiscountPeriod.cs" Link="FeeDiscountPeriod.cs" />
+    <Compile Include="../../Core/WholeRupees.cs" Link="WholeRupees.cs" />
+    <Compile Include="../../Core/Tvp.cs" Link="Tvp.cs" />
+    <Compile Include="../../Core/PermissionCatalog.cs" Link="PermissionCatalog.cs" />
+    <Compile Include="../../Core/RecoverableMutation.cs" Link="RecoverableMutation.cs" />
+    <Compile Include="../../Core/RecoverableMutationWriter.cs" Link="RecoverableMutationWriter.cs" />
+    <Compile Include="../../Pages/Finance/Collection/CollectionDiscountWriter.cs" Link="CollectionDiscountWriter.cs" />
+    <Compile Include="../../Pages/Finance/Collection/CollectionRecoveryJournal.cs" Link="CollectionRecoveryJournal.cs" />
+    <EmbeddedResource Include="../../Core/DatabaseCompatibilityRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseCompatibilityRequirements.json" />
+    <EmbeddedResource Include="../../Core/DatabaseMigrationRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseMigrationRequirements.json" />
+    <EmbeddedResource Include="../../Core/PermissionCatalog.json" LogicalName="FMSC_SMS.Core.PermissionCatalog.json" />
+    <Using Include="System.Data" /><Using Include="FMSC_SMS" /><Using Include="FMSC_SMS.Core" />
+    <Using Include="FMSC_SMS.Pages.Security" /><Using Include="FMSC_SMS.Pages.Finance.Collection" />
+  </ItemGroup>
+<ItemGroup><EmbeddedResource Include="../../Services/Communication/Schema.sql" LogicalName="FMSC_SMS.Communication.Schema.sql" /></ItemGroup>
+</Project>

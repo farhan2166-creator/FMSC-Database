@@ -11,8 +11,8 @@ SET ARITHABORT ON;
 SET NUMERIC_ROUNDABORT OFF;
 IF TRY_CONVERT(int,SESSION_CONTEXT(N'FMSC_CommunicationInstall'))<>1 OR SESSION_CONTEXT(N'FMSC_CommunicationInstall') IS NULL
  THROW 51000,'Explicit communication installation context is required.',1;
-IF (SELECT MAX(TRY_CONVERT(int,VersionNumber)) FROM dbo.DatabaseVersion)<>6
- THROW 51000,'Communication add-on requires the reviewed schema-6 baseline.',1;
+IF (SELECT MAX(TRY_CONVERT(int,VersionNumber)) FROM dbo.DatabaseVersion)<>21
+ THROW 51000,'Communication add-on requires the reviewed schema-20 baseline.',1;
 IF SCHEMA_ID(N'comm') IS NOT NULL THROW 51000,'Communication schema already exists. Verify it; do not overwrite it.',1;
 BEGIN TRANSACTION;
 EXEC(N'CREATE SCHEMA comm AUTHORIZATION dbo');
@@ -583,7 +583,7 @@ BEGIN
  SET NOCOUNT ON; SET XACT_ABORT ON;
  IF ISNULL(IS_ROLEMEMBER(N'FMSC_CommunicationWebhook'),0)<>1 THROW 51003,'Only the restricted webhook principal may ingest callbacks.',1;
  EXEC dbo.RequirePermission @Actor,N'Communication.Send';
- IF (SELECT MAX(TRY_CONVERT(int,VersionNumber)) FROM dbo.DatabaseVersion)<>6 THROW 51000,'Incompatible base database version.',1;
+ IF (SELECT MAX(TRY_CONVERT(int,VersionNumber)) FROM dbo.DatabaseVersion)<>21 THROW 51000,'Incompatible base database version.',1;
  IF ISJSON(@Payload)<>1 OR DATALENGTH(@Payload)>131072 THROW 51001,'Invalid webhook envelope.',1;
  -- Only the independently signature-validated gateway may call this operation.
  -- Do not expose SQL credentials or SQL Server to the public internet.
@@ -616,7 +616,6 @@ BEGIN
   WHERE JSON_VALUE(M.value,'$.type')='text' AND UPPER(LTRIM(RTRIM(JSON_VALUE(M.value,'$.text.body')))) IN(N'STOP',N'UNSUBSCRIBE',N'بند')
  ) X ON X.Destination=CT.Destination
  WHERE CT.OptedOut=0 AND X.Stamp BETWEEN 1 AND 2147483647 AND CT.ConsentUtc<=DATEADD(SECOND,CONVERT(int,X.Stamp)+1,CONVERT(datetime2,'19700101'));
- INSERT comm.Audit(Actor,Operation,Detail) VALUES(@Actor,'SignedMetaCallback',N'Validated external gateway callback persisted; duplicates are idempotent');
  COMMIT;
 END;
 GO

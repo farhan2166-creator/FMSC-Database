@@ -1,5 +1,7 @@
 # Admission workflow (v1 baseline)
 
+> Historical design record. Current release routes and schema-20 deployment are described in [School operations](../SCHOOL_OPERATIONS.md) and [Release readiness](../RELEASE_READINESS.md).
+
 User decisions, updated 2026-10-13:
 
 - Admission is the single workspace for student details and legacy placement corrections.

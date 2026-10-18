@@ -391,3 +391,8 @@ Database/*.bak
 !/Tests/Level3Checks/*.py
 !/Tests/Level3Checks/catalog.json
 !/Tests/Level3Checks/*.ps1
+
+# Versioned SQL scripts are test-only fixtures; never package them as upgrades.
+!/Tests/LifecycleSqlChecks/Migrations/
+/Tests/LifecycleSqlChecks/Migrations/*
+!/Tests/LifecycleSqlChecks/Migrations/*.sql

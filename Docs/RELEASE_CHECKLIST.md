@@ -1,8 +1,8 @@
-# Release Checklist — Private Windows x64 Installer
+# Release Checklist — Windows x64 Installer
 
 **Release candidate commit:** `________________`  
 **Application version:** `________________`  
-**Required DB schema version:** `6` (confirm against current code)  
+**Required DB schema version:** `21` (confirm against current code)\
 **Reviewer and test date:** `________________`  
 **Windows account / OS / target hardware:** `________________`
 
@@ -24,11 +24,11 @@
 - [ ] If DB code changed, the SQL integration tests passed **against a disposable copy**; record connection, fixtures and schema.
 - [ ] Confirm known runner warnings are understood; no test was disabled to make an artifact appear.
 
-## 3. Private complete installer artifact
+## 3. Database-free complete installer artifact
 
 - [ ] [Complete installer workflow](../.github/workflows/fmsc-complete-installer.yml) finished **successfully** at the same SHA.
-- [ ] Downloaded private Actions artifact and recorded URL, run ID and checksum.
-- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, a `Migrations/` folder (empty when there are no pending scripts), required app resources, readme and communication deployment guide. Applied scripts 2–7 are retired. Future numbered scripts must record their versions and match the application release; the installer backs up before applying them.
+- [ ] Downloaded database-free Actions artifact and recorded URL, run ID and checksum.
+- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, a `Migrations/` folder (empty when there are no pending scripts), required app resources, readme and communication deployment guide. Historical migrations 7–19 are test fixtures only; migrations 20/21 support the schema-19/20 baselines. Future numbered scripts must record their versions and match the application release; the installer backs up before applying them.
 - [ ] Copied installer and any pending numbered SQL files match the source commit; copied-helper migration discovery/version tests passed. Start a new workflow run for new source rather than rerunning an older run.
 - [ ] Microsoft LocalDB MSI signature and pinned sqlcmd digest were verified by the workflow; double-check source of prerequisites if changed.
 - [ ] DB snapshot is **not** included in Actions. The owner locally supplies matching **detached** `FMSC_DB.mdf` and `FMSC_DB_log.ldf` only for fresh-install validation.
@@ -41,7 +41,7 @@
 - [ ] Existing schema version upgraded with correct migration order using a restored **disposable clone**; original data and recovery scope preserved.
 - [ ] Verified pre-migration backup and rollback/recovery scenario tested.
 - [ ] App startup and full schema compatibility check pass after install/upgrade.
-- [ ] Communication setup: decline skips SQL; approval creates a verified backup, applies and verifies the module before activation; repeat install preserves contacts/history/settings; partial/incompatible modules and failed backup/SQL refuse activation. Live messaging stays disabled on new installation.
+- [ ] Communication module: current installers preserve the supplied/installed module and verify its runtime contract; the migrations align the supported callback and retire its audit write. The retired optional setup is not offered again. Verify contacts/history/settings are preserved and sending remains disabled until explicitly configured.
 - [ ] Deliberately invalid, newer, missing and mismatched database/prerequisite scenarios refuse unsafe installation.
 
 ## 5. School workflow acceptance
@@ -64,4 +64,4 @@
 **Backup / rollback location:** `________________`  
 **Approver:** `________________`
 
-Keep the private artifact private. No public GitHub Release or automatic school deployment is required.
+Artifact visibility follows this public repository. Include no school database, backup, credentials or private logs. Broad school deployment requires the owner’s recorded acceptance above.

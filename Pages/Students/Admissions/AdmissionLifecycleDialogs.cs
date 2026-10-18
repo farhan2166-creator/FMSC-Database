@@ -4,29 +4,86 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 
 internal sealed class CloseAdmissionDialog : ApplicationWindowForm
 {
-    private readonly ModernDatePicker date=HumanUi.Date();
+    private readonly ModernDatePicker date=HumanUi.Date(),waiveFrom=HumanUi.Date();
+    private readonly ModernComboBox monthlyPolicy=HumanUi.Combo(),paidReduction=HumanUi.Combo();
     private readonly ModernTextBox reason=HumanUi.TextBox(true,500),impact=HumanUi.TextBox(true,0);
     private readonly ModernButton review=new(){Text="Review",ThemeRole="Secondary"},apply=new(){Text="Apply",ThemeRole="Warning"};
-    private readonly CheckBox reverseFuture=new(){Text="Apply the School Profile cutoff to monthly fees",AutoSize=true,Checked=true,Enabled=false};
+    private readonly TableLayoutPanel root=new(){Dock=DockStyle.Fill,ColumnCount=1,RowCount=7,Padding=new Padding(14)};
+    private readonly Func<string,SqlParameter[],Task<DataTable>> query;
+    private readonly int admission;
+    private readonly bool cancel;
     private DataRow? plan;
     private bool busy;
     private int reviewGeneration;
     internal bool Changed {get;private set;}
-    internal CloseAdmissionDialog(int admission,string student,bool cancel, Func<string,SqlParameter[],Task<DataTable>>? query = null)
+    internal CloseAdmissionDialog(int admission,string student,bool cancel,Func<string,SqlParameter[],Task<DataTable>>? query=null)
     {
-        query ??= (procedure, parameters) => DatabaseHelper.QueryUserAsync(procedure, parameters);
-        FormClosing += (_, e) => { if (busy && !Changed) e.Cancel = true; };
-        Text=cancel?"Cancel Registration":"Mark as Left";StartPosition=FormStartPosition.CenterParent;Size=new Size(AppScale.Scale(720),AppScale.Scale(530));MinimumSize=Size;
+        this.admission=admission;this.cancel=cancel;
+        this.query=query??((procedure,parameters)=>DatabaseHelper.QueryUserAsync(procedure,parameters));
+        Text=cancel?"Cancel Registration":"Mark as Left";StartPosition=FormStartPosition.CenterParent;
+        Size=new Size(AppScale.Scale(820),AppScale.Scale(680));MinimumSize=new Size(700,540);
         impact.ReadOnly=true;impact.Dock=DockStyle.Fill;
-        var paidReduction=HumanUi.Combo();paidReduction.Items.AddRange(new object[]{"Keep paid reductions as credit","Refund paid reductions"});paidReduction.SelectedIndex=0;
+        monthlyPolicy.Items.AddRange(new object[]{"Use the school cutoff","Keep all issued monthly bills","Waive monthly bills from a selected month"});monthlyPolicy.SelectedIndex=0;
+        paidReduction.Items.AddRange(new object[]{"Keep paid reductions as credit","Refund paid reductions"});paidReduction.SelectedIndex=0;
+        waiveFrom.Format=DateTimePickerFormat.Custom;waiveFrom.CustomFormat="MMMM yyyy";
+        waiveFrom.Value=new DateTime(date.Value.Year,date.Value.Month,1);waiveFrom.Enabled=false;
         var close=new ModernButton{Text="Close",DialogResult=DialogResult.Cancel};CancelButton=close;
-        var root=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Padding=new Padding(14)};
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight*2));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.Controls.Add(new Label{Text=student,AutoSize=true},0,0);root.Controls.Add(HumanUi.Field(cancel?"Cancellation date":"Leaving date",date,true),0,1);root.Controls.Add(HumanUi.Field("Reason",reason,true),0,2);reverseFuture.Visible=!cancel;var feeChoices=new FlowLayoutPanel{AutoSize=true,Dock=DockStyle.Fill};feeChoices.Controls.Add(reverseFuture);feeChoices.Controls.Add(paidReduction);paidReduction.Visible=!cancel;root.Controls.Add(feeChoices,0,3);root.Controls.Add(impact,0,4);root.Controls.Add(HumanUi.ButtonRow(review,apply,close),0,5);foreach(var row in root.Controls.OfType<TableLayoutPanel>().Where(row=>row.AutoSize))row.Dock=DockStyle.Fill;Controls.Add(root);apply.Enabled=false;
-        date.ValueChanged+=(_,_)=>Reset();reason.TextChanged+=(_,_)=>Reset();reverseFuture.CheckedChanged+=(_,_)=>Reset();paidReduction.SelectedIndexChanged+=(_,_)=>Reset();
-        async Task<DataTable> Run(bool preview)=>await query("CloseStudentAdmission",new[] {DatabaseHelper.Int("@AdmissionId",admission),DatabaseHelper.Date("@LeavingDate",date.Value.Date),DatabaseHelper.P("@Reason",reason.Text.Trim()),DatabaseHelper.Bit("@Cancel",cancel),DatabaseHelper.Bit("@ReverseFutureUnpaid",reverseFuture.Checked),DatabaseHelper.P("@PaidReductionAction",paidReduction.SelectedIndex==1?"Refund":"Credit"),DatabaseHelper.Bit("@Preview",preview),DatabaseHelper.P("@ExpectedSnapshot",preview?null:Convert.ToString(plan?["Snapshot"])) });
-        review.Click+=async(_,_)=>{if(busy)return;Reset();int generation=reviewGeneration;busy=true;root.Enabled=false;impact.Text="Please wait for the operation to finish before closing this window.";try{var result=await Run(true);if(generation!=reviewGeneration)return;plan=result.Rows[0];impact.Text=cancel?$"Cancel this record and reverse {plan["ChargeCount"]} unpaid charge(s). Outstanding: Rs. {Convert.ToDecimal(plan["Outstanding"]):N0}.\r\nThe registration and its history remain searchable. Siblings are unchanged.":$"Close this placement on {date.Value:dd MMM yyyy}. Future fee posting stops.\r\nOutstanding Rs. {Convert.ToDecimal(plan["Outstanding"]):N0} remains collectible. Review eligible unpaid charges in Fee Collection if they should be reversed.\r\nNo payment or leave certificate is required.\r\n\r\nMonthly fees excluded by the cutoff: {plan["FutureCount"]} · unpaid Rs. {Convert.ToDecimal(plan["FutureAmount"]):N0}.\r\nPaid amount to return as {(paidReduction.SelectedIndex==1?"refund":"credit")}: Rs. {Convert.ToDecimal(plan["PaidReturnAmount"]):N0}.\r\n{(Convert.ToInt32(plan["FuturePaid"])>0?"Paid amounts are returned using the selected credit/refund choice; original payments remain in history.":reverseFuture.Checked?"Listed unpaid monthly fees will be removed by a recorded correction.":"Choose reversal above if future unpaid charges should be cancelled.")}";apply.Enabled=Convert.ToInt32(plan["BlockedCount"])==0;}catch(Exception ex){impact.Text=DbMessage.UserMessage(ex);}finally{busy=false;root.Enabled=true;}};
-        apply.Click+=async(_,_)=>{if(busy || plan is null)return;busy=true;root.Enabled=false;impact.Text="Please wait for the operation to finish before closing this window.";try{await Run(false);Changed=true;StudentSearchCache.Invalidate();DialogResult=DialogResult.OK;Close();}catch(Exception ex){impact.Text=DbMessage.UserMessage(ex);Reset();}finally{busy=false;root.Enabled=true;}};
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight*2));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.Controls.Add(new Label{Text=student,AutoSize=true},0,0);root.Controls.Add(HumanUi.Field(cancel?"Cancellation date":"Leaving date",date,true),0,1);
+        root.Controls.Add(HumanUi.Field("Reason",reason,true),0,2);
+        var choices=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,RowCount=2,Visible=!cancel};
+        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,60));choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,40));
+        choices.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));choices.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
+        choices.Controls.Add(HumanUi.Field("Existing monthly fees",monthlyPolicy),0,0);choices.Controls.Add(HumanUi.Field("First month to waive",waiveFrom),1,0);
+        choices.Controls.Add(HumanUi.Field("If reduced fees have already been paid",paidReduction),0,1);choices.SetColumnSpan(choices.Controls[choices.Controls.Count-1],2);
+        root.Controls.Add(choices,0,3);
+        root.Controls.Add(new Label{AutoSize=true,Text=cancel?"The registration and its financial history remain searchable.":
+            "Choose the school's decision for this student. Annual fees and earlier placements stay as recorded. No new fees are posted by closing a placement."},0,4);
+        root.Controls.Add(impact,0,5);root.Controls.Add(HumanUi.ButtonRow(review,apply,close),0,6);Controls.Add(root);apply.Enabled=false;
+        date.ValueChanged+=(_,_)=>Reset();reason.TextChanged+=(_,_)=>Reset();waiveFrom.ValueChanged+=(_,_)=>Reset();
+        monthlyPolicy.SelectedIndexChanged+=(_,_)=>{waiveFrom.Enabled=monthlyPolicy.SelectedIndex==2;Reset();};paidReduction.SelectedIndexChanged+=(_,_)=>Reset();
+        review.Click+=async(_,_)=>await ReviewAsync();apply.Click+=async(_,_)=>await ApplyAsync();
+        FormClosing+=(_,e)=>{if(busy&&!Changed)e.Cancel=true;};
+    }
+    private string Policy=>monthlyPolicy.SelectedIndex switch {1=>"KeepIssued",2=>"FromMonth",_=>"SchoolCutoff"};
+    private Task<DataTable> Run(bool preview)=>query("CloseStudentAdmission",new[]{
+        DatabaseHelper.Int("@AdmissionId",admission),DatabaseHelper.Date("@LeavingDate",date.Value.Date),DatabaseHelper.P("@Reason",reason.Text.Trim()),
+        DatabaseHelper.Bit("@Cancel",cancel),DatabaseHelper.P("@MonthlyFeePolicy",Policy),
+        DatabaseHelper.P("@ReverseFromMonth",Policy=="FromMonth"?new DateTime(waiveFrom.Value.Year,waiveFrom.Value.Month,1):null),
+        DatabaseHelper.P("@PaidReductionAction",paidReduction.SelectedIndex==1?"Refund":"Credit"),DatabaseHelper.Bit("@Preview",preview),
+        DatabaseHelper.P("@ExpectedSnapshot",preview?null:Convert.ToString(plan?["Snapshot"]))});
+    private async Task ReviewAsync()
+    {
+        if(busy)return;Reset();int generation=reviewGeneration;busy=true;root.Enabled=false;
+        impact.Text="Reviewing the placement and financial effect…";
+        try
+        {
+            var result=await Run(true);if(IsDisposed||generation!=reviewGeneration)return;
+            plan=result.Rows[0];
+            if(cancel)impact.Text=$"Cancel this registration and reverse {plan["ChargeCount"]} unpaid charge(s). Outstanding: Rs. {Convert.ToDecimal(plan["Outstanding"]):N0}.\r\nHistory remains searchable; siblings are unchanged.";
+            else
+            {
+                decimal outstanding=Convert.ToDecimal(plan["Outstanding"]),reduction=Convert.ToDecimal(plan["FutureAmount"]),paid=Convert.ToDecimal(plan["PaidReturnAmount"]);
+                string policy=Policy=="KeepIssued"?"Keep all issued monthly fees collectible.":
+                    Policy=="FromMonth"?$"Waive monthly fees from {waiveFrom.Value:MMM yyyy}.":"Apply the school cutoff to this departure.";
+                impact.Text=$"Close this placement on {date.Value:dd MMM yyyy}. Future automatic posting stops.\r\n{policy}\r\n\r\n"+
+                    $"Current outstanding on this placement: Rs. {outstanding:N0}\r\nMonthly bill(s) reduced: {plan["FutureCount"]}\r\nUnpaid amount waived: Rs. {reduction:N0}\r\n"+
+                    $"Paid amount released as {(paidReduction.SelectedIndex==1?"refund":"credit")}: Rs. {paid:N0}\r\nRemaining outstanding on this placement: Rs. {outstanding-reduction:N0}\r\n\r\n"+
+                    "Earlier placement dues, annual/one-time fees and original receipts remain. No payment or leave certificate is required to record departure.";
+            }
+            apply.Enabled=Convert.ToInt32(plan["BlockedCount"])==0;
+        }
+        catch(Exception ex){impact.Text=DbMessage.UserMessage(ex);}
+        finally{busy=false;if(!IsDisposed)root.Enabled=true;}
+    }
+    private async Task ApplyAsync()
+    {
+        if(busy||plan is null)return;busy=true;root.Enabled=false;impact.Text="Saving the reviewed departure…";
+        try{await Run(false);Changed=true;StudentSearchCache.Invalidate();DialogResult=DialogResult.OK;Close();}
+        catch(Exception ex){impact.Text="Check the student's current status and account before repeating a departure after a connection failure.\r\n"+DbMessage.UserMessage(ex);Reset();}
+        finally{busy=false;if(!IsDisposed)root.Enabled=true;}
     }
     private void Reset(){reviewGeneration++;plan=null;apply.Enabled=false;}
 }

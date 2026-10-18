@@ -46,11 +46,11 @@ In Setup Readiness, select an issue and use **Open Selected Setup**. The action 
 | Work | Where to start | Operational caution |
 |---|---|---|
 | New student | **Daily Work → Student Admissions** | Check student, placement, guardian, date, and opening charges before saving |
-| Provisional registration | **Dashboard → Quick Registration** | Pending records have a temporary reference; an official admission/registration number is assigned only upon confirmation |
+| Provisional registration | **Student Admissions → Registration & Pending** | Pending records have a temporary reference; an official admission/registration number is assigned only upon confirmation |
 | Student history and family | **Student Profile / Student Management** | Verify the selected student before editing or printing |
 | Student leave/transfer/re-admission | **Student Management → Transfers / Re-Admission** | Preserve history; do not treat leaving as deleting the student |
 | Fee configuration | **Fees & Billing → Fee Rate Setup** | Rates affect future billing; use approved whole-rupee rules |
-| Post fees or corrections | **Fees & Billing → Fee Posting / Student Fee Corrections** | Verify class/academic year/student and review existing postings before repeating |
+| Post fees or corrections | **Daily Work → Billing Center / Fees & Billing → Student Fee Corrections** | Verify class/academic year/student and review existing postings before repeating |
 | Receive a payment | **Daily Work → Fee Collection** | Reconcile an uncertain save outcome before attempting another payment |
 | School or financial reports | **Reports** | Confirm student, time range, report filters and selected printer/export path |
 | Staff and certificates | **Staff / Student Certificates** | Finish or intentionally discard edits before switching records |
@@ -69,13 +69,18 @@ Screen naming and source mapping: [PROJECT_STRUCTURE.md](Development/PROJECT_STR
 
 ## Admissions and Quick Registration
 
+Student Admissions is the single intake workspace: **Admit / Edit Student**,
+**Registration & Pending**, and **Existing Student Setup**. Billing Center's
+student exception lists open the selected record directly for setup or collection.
+See [school operations](SCHOOL_OPERATIONS.md) for the complete daily sequence.
+
 **Direct admission:** Student details and placement are handled in Admissions. Valid opening fees are posted as part of the save operation. A legacy-record verification / Go Live sequence applies to historical data and has separate safety checks.
 
 **Quick Registration:** Creates a pending student with temporary reference and reviewed opening charges. The **Registration Form** supports editing pending details; **Pending Registrations** supports searching and reviewing. Confirmation allocates official admission and registration numbers. Pending students are excluded from normal monthly fee posting, promotion and official certificates. Existing paid charges must not be casually reversed or reposted.
 
 Admission saves hold the submitted details until saving and refresh finish. For **Mark as Left / Cancel Registration** or **Legacy Go Live**, Review holds the inputs; changing them after review requires another review. Wait for a pending operation to finish before closing.
 
-For business-rule context see [ADMISSION_WORKFLOW.md](Workflows/ADMISSION_WORKFLOW.md). The current runtime requires schema 6 even if historical text in that file refers to older database versions.
+For business-rule context see [ADMISSION_WORKFLOW.md](Workflows/ADMISSION_WORKFLOW.md). The current runtime requires schema 21 even if historical text in that file refers to older database versions.
 
 ## Find Student
 
