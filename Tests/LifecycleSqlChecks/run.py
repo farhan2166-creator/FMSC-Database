@@ -32,7 +32,7 @@ def verify_baseline():
     The real SQL scenarios and live runtime contract enforce their own behavior.
     """
     requirement = re.search(r'RequiredDatabaseSchemaVersion\s*=\s*"(\d+)"', (ROOT / "DatabaseHelper.cs").read_text())
-    if requirement is None or requirement.group(1) != "21":
+    if requirement is None or requirement.group(1) != "22":
         raise ValueError("Production schema requirement changed; review the SQL test fixture before running tests.")
 
     def provider_version(project):
@@ -229,6 +229,8 @@ def main():
         # The approved data-free fixture is v6; exercise numbered upgrades rather than changing its model.
         sql(catalog, "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'" + ("21" if current_schema else "6") + "');")
         if current_schema:
+            migration = ROOT / "Migrations" / "22.sql"
+            sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;")
             return catalog
         for migration in sorted((PROJECT / "Migrations").glob("*.sql"), key=lambda p: int(p.stem)):
             if 6 < int(migration.stem) <= 19:

@@ -106,6 +106,14 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     private ModernButton? paymentHistoryButton;
     private ModernButton? studentFeesMenuButton;
     private ModernButton? studentCreditButton;
+    private readonly Dictionary<int, decimal> availableCreditByStudent = new();
+    private readonly CheckBox useAvailableCredit = new() { Text = "Use available credit", Checked = true, AutoSize = true };
+    private readonly Label availableCredit = new();
+    private readonly Label remainingCredit = new();
+    private Control? outstandingSummary;
+    private Control? remainingBalanceSummary;
+    private Control? creditSummary;
+    private Control? remainingCreditSummary;
     /// <summary>Payment History receipt-reprint action.</summary>
     private ModernButton? reprintReceiptButton;
     /// <summary>Off-screen parent for the payment list.</summary>
@@ -668,44 +676,39 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             "Payment", "Enter the amount received.");
         var summary = new TableLayoutPanel {
             Dock = DockStyle.Top, AutoSize = true,
-            ColumnCount = 1, RowCount = 12,
+            ColumnCount = 1, RowCount = 13,
             Padding = new Padding(0), Margin = new Padding(0)
         };
         summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(40, AppScale.ControlSizeScale)));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight + 2));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(40, AppScale.ControlSizeScale)));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight + 2));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(40, AppScale.ControlSizeScale)));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight + 2));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight + 2));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 6));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 6));
-        summary.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 6));
-        summary.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        int valueHeight = AppScale.Scale(40, AppScale.ControlSizeScale);
+        foreach (int height in new[] { valueHeight, AppMetrics.FieldRowHeight + 2, 0, valueHeight,
+            AppMetrics.FieldRowHeight + 2, 0, valueHeight, 0, AppMetrics.FieldRowHeight + 2,
+            AppMetrics.FieldRowHeight + 2, AppMetrics.ButtonHeight + 6, AppMetrics.ButtonHeight + 6, AppMetrics.ButtonHeight + 6 })
+            summary.RowStyles.Add(new RowStyle(SizeType.Absolute, height));
         summary.SizeChanged += (_, _) => collectionResult.MaximumSize = new Size(Math.Max(1, summary.ClientSize.Width - 8), 0);
         totalDue.Text = balance.Text = "0.00";
         suppressPaymentEvents = true;
         try { paymentAmount.Text = "0"; }
         finally { suppressPaymentEvents = false; }
 
-        summary.Controls.Add(SummaryField("Outstanding (Rs.)", totalDue, AppTheme.HeadingText), 0, 0);
-        summary.Controls.Add(HumanUi.Field("Extra Discount (Rs.)", discountAmount), 0, 1);
-        summary.Controls.Add(SummaryField("Amount to Pay (Rs.)", amountToPay, AppTheme.HeadingText), 0, 2);
-        summary.Controls.Add(HumanUi.Field("Amount Received (Rs.)", paymentAmount, true), 0, 3);
+        outstandingSummary = SummaryField("Outstanding (Rs.)", totalDue, AppTheme.HeadingText);
+        summary.Controls.Add(outstandingSummary, 0, 0);
+        summary.Controls.Add(HumanUi.Field("Discount (Rs.)", discountAmount), 0, 1);
+        summary.Controls.Add(SummaryField("Amount to Pay (Rs.)", amountToPay, AppTheme.HeadingText), 0, 3);
+        summary.Controls.Add(HumanUi.Field("Amount Received (Rs.)", paymentAmount, true), 0, 4);
         var amountError = new Label {
             Dock = DockStyle.Fill, Margin = new Padding(8, 0, 8, 0),
             Font = AppTheme.SmallFont, ForeColor = AppTheme.Danger,
             TextAlign = ContentAlignment.TopLeft, AccessibleRole = AccessibleRole.Alert,
             Visible = false
         };
-        summary.Controls.Add(amountError, 0, 4);
+        summary.Controls.Add(amountError, 0, 5);
         amountError.VisibleChanged += (_, _) =>
-            summary.RowStyles[4].Height = amountError.Visible
+            summary.RowStyles[5].Height = amountError.Visible
                 ? AppMetrics.TextHeight(AppTheme.SmallFont) * 2 + 4 : 0;
         (collectionValidator ??= CreateValidator()).BindMessageLabel(paymentAmount, amountError);
-        summary.Controls.Add(SummaryField("Remaining Balance (Rs.)", balance, AppTheme.Text), 0, 5);
+        remainingBalanceSummary = SummaryField("Remaining Balance (Rs.)", balance, AppTheme.Text);
+        summary.Controls.Add(remainingBalanceSummary, 0, 6);
         var paymentDetails = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
             Margin = new Padding(0)
@@ -714,8 +717,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         paymentDetails.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
         paymentDetails.Controls.Add(HumanUi.Field("Method", method), 0, 0);
         paymentDetails.Controls.Add(HumanUi.Field("Reference No.", reference), 1, 0);
-        summary.Controls.Add(paymentDetails, 0, 6);
-        summary.Controls.Add(HumanUi.Field("Remarks", remarks), 0, 7);
+        summary.Controls.Add(paymentDetails, 0, 8);
+        summary.Controls.Add(HumanUi.Field("Remarks", remarks), 0, 9);
         fullAmountButton = AddAction("Use Full Amount", (_, _) => UseFullAmount(), "Secondary");
         var receiptActions = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
@@ -726,10 +729,31 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         receiptActions.Controls.Add(fullAmountButton, 0, 0);
         receiptActions.Controls.Add(printReceiptButton!, 1, 0);
 
-        summary.Controls.Add(executeButton!, 0, 8);
-        summary.Controls.Add(receiptActions, 0, 9);
-        summary.Controls.Add(clear, 0, 10);
-        summary.Controls.Add(collectionResult, 0, 11);
+        summary.Controls.Add(executeButton!, 0, 10);
+        summary.Controls.Add(receiptActions, 0, 11);
+        summary.Controls.Add(clear, 0, 12);
+        creditSummary = SummaryField("Available credit (Rs.)", availableCredit, Color.ForestGreen);
+        remainingCreditSummary = SummaryField("Remaining credit (Rs.)", remainingCredit, Color.ForestGreen);
+        ((TableLayoutPanel)remainingCreditSummary).ColumnStyles[0].Width = 70;
+        ((TableLayoutPanel)remainingCreditSummary).ColumnStyles[1].Width = 30;
+        // Keep credit with the balance figures, above the amount received.
+        summary.Controls.Add(creditSummary, 0, 2);
+        summary.Controls.Add(remainingCreditSummary, 0, 7);
+        var creditField = (TableLayoutPanel)creditSummary;
+        creditField.ColumnStyles[0].Width = 70;
+        creditField.ColumnStyles[1].Width = 30;
+        var oldCaption = creditField.GetControlFromPosition(0, 0)!;
+        creditField.Controls.Remove(oldCaption); oldCaption.Dispose();
+        useAvailableCredit.Dock = DockStyle.Fill;
+        useAvailableCredit.AutoSize = false;
+        useAvailableCredit.Font = new Font(AppTheme.SmallFont, FontStyle.Bold);
+        useAvailableCredit.ForeColor = Color.ForestGreen;
+        creditField.Controls.Add(useAvailableCredit, 0, 0);
+        useAvailableCredit.CheckedChanged += (_, _) => {
+            if (!suppressPaymentEvents) RefreshEnteredPaymentAllocation();
+        };
+        // Keep transaction feedback in the page status, not below Next Student.
+        Disposed += (_, _) => collectionResult.Dispose();
         foreach (ModernButton button in new[] { fullAmountButton!, printReceiptButton!, executeButton!, clear })
         {
             button.AutoSize = false;
@@ -951,7 +975,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 ReadOnly = true
             });
         charges.Columns.Add(new DataGridViewTextBoxColumn {
-            Name = "AppliedDiscount", HeaderText = UiText.Fees.Discount, ReadOnly = !CurrentUser.HasPermission("Fees.Adjust"),
+            Name = "AppliedDiscount", HeaderText = UiText.Fees.Discount, ReadOnly = true, Visible = false,
             DefaultCellStyle = new DataGridViewCellStyle {
                 Format = "0.##", Alignment = DataGridViewContentAlignment.MiddleCenter
             }
@@ -1615,6 +1639,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     private async Task LoadChargesAsync(int version)
     {
         charges.Rows.Clear();
+        availableCreditByStudent.Clear();
         if (admissionId <= 0 || enrollmentId <= 0)
             return;
         try
@@ -1651,7 +1676,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         // Same Fees.View permission as the former direct query; stable catalog
         // data can use the existing user-scoped cache across sibling accounts.
         var feeOrderTask = DatabaseHelper.QueryUserAsync("GetFeeTypes");
-        await Task.WhenAll(chargesTask, feeOrderTask);
+        var creditTask = DatabaseHelper.QueryUserAsync("GetStudentCredit", DatabaseHelper.Int("@AdmissionId", forAdmissionId));
+        await Task.WhenAll(chargesTask, feeOrderTask, creditTask);
         DataTable raw = await chargesTask;
         var feeOrderRows = await feeOrderTask;
         var feeOrder=feeOrderRows.AsEnumerable().ToDictionary(row=>GetInt(row,"FeeTypeId"),row=>GetInt(row,"DisplayOrder"));
@@ -1669,6 +1695,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         {
             return 0;
         }
+        var creditRows = await creditTask;
+        availableCreditByStudent[forAdmissionId] = creditRows.Rows.Count > 0 ? GetDecimal(creditRows.Rows[0], "AvailableCredit") : 0m;
         /* Oldest tuition first, then all other charges in date order. */
         List<DataRow> ordered =
             raw.Rows
@@ -1780,7 +1808,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         {
             /* The grid follows the Paid field. */
             ClearPayNowAmounts();
-            Warn("Enter an amount greater than zero.");
+            if (GetCreditAllocations().Count == 0) Warn("Enter an amount greater than zero.");
             return 0m;
         }
         var discountMap = GetDiscountAllocations();
@@ -1844,34 +1872,27 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     /// <summary>What the listed charges owe after the discount entered in the summary - the figure the "Amount to Pay" field shows.</summary>
     private decimal CurrentPayableAfterDiscount()
     {
-        var discountMap = GetDiscountAllocations();
-        decimal payable = 0m;
-        foreach (DataGridViewRow row in charges.Rows)
-        {
-            if (row.IsNewRow)
-                continue;
-            long chargeId =
-                GetLong(
-                    row.Cells["BillingChargeId"].Value);
-            if (chargeId <= 0)
-                continue;
-            decimal due =
-                GetDecimal(
-                    row.Cells["Balance"].Value);
-            decimal rowDiscount =
-                discountMap.TryGetValue(
-                    chargeId,
-                    out decimal d)
-                        ? d
-                        : 0m;
-            payable +=
-                Math.Max(
-                    0m,
-                    due -
-                    rowDiscount);
-        }
-        return payable;
+        var discounts = GetDiscountAllocations();
+        return SettlementRows().Sum(row => GetRowNetDue(row, discounts));
     }
+    private Dictionary<long, decimal> GetCreditAllocations(Dictionary<long, decimal>? discounts = null)
+    {
+        var result = new Dictionary<long, decimal>();
+        if (!useAvailableCredit.Checked) return result;
+        discounts ??= GetDiscountAllocations();
+        var remaining = availableCreditByStudent.ToDictionary(pair => pair.Key, pair => Math.Max(0m, pair.Value));
+        foreach (var row in SettlementRows())
+        {
+            int owner = GetInt(row.Cells["AdmissionId"].Value);
+            long id = GetLong(row.Cells["BillingChargeId"].Value);
+            if (id <= 0 || !remaining.TryGetValue(owner, out decimal credit) || credit <= 0) continue;
+            decimal due = Math.Max(0m, GetDecimal(row.Cells["Balance"].Value) - discounts.GetValueOrDefault(id));
+            decimal take = Math.Min(due, credit);
+            if (take > 0) { result[id] = take; remaining[owner] -= take; }
+        }
+        return result;
+    }
+    private decimal SelectedAvailableCredit() => SelectedBillStudents().Sum(id => availableCreditByStudent.GetValueOrDefault(id));
     /// <summary>Refresh allocation from the entered amount without assuming full payment.</summary>
     private void RefreshEnteredPaymentAllocation()
     {
@@ -2169,6 +2190,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         finally
         {
             siblingBusy = false;
+            SetSiblingHint("" );
         }
     }
     private async Task LoadRecentPayments() => await LoadRecentPaymentsAsync(++loadVersion);
@@ -2323,7 +2345,10 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     x =>
                         x.Id > 0 &&
                         x.Due > 0m)
-                /* Discounts and payments use the same priority, including sibling charges. */
+                // Discounts settle the largest remaining fee balance first,
+                // across all included students. Equal balances retain the
+                // existing settlement order; payment allocation is unchanged.
+                .OrderByDescending(x => x.Due)
                 .ToList();
         foreach (var item in rows)
         {
@@ -2360,9 +2385,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         {
             due -= discount;
         }
-        return Math.Max(
-            0m,
-            due);
+        return Math.Max(0m, due - GetCreditAllocations(discounts).GetValueOrDefault(id));
     }
     /// <summary>. The per-child columns: the child, what they owe after their share of the discount, and the amount the allocation proposes for them.</summary>
     private void ConfigureProposalGrid()
@@ -2665,6 +2688,22 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         balance.Text =
             remaining.ToString("N0");
         balance.ForeColor = remaining > 0 ? AppTheme.Danger : AppTheme.Text;
+        decimal credit = SelectedAvailableCredit();
+        decimal usedCredit = GetCreditAllocations(discountMap).Values.Sum();
+        availableCredit.Text = credit.ToString("N0");
+        remainingCredit.Text = (credit - usedCredit + Math.Max(0m, GetAmount(paymentAmount) - payment)).ToString("N0");
+        if (creditSummary is not null && remainingCreditSummary is not null)
+        {
+            var layout = (TableLayoutPanel)creditSummary.Parent!;
+            creditSummary.Visible = credit > 0;
+            layout.RowStyles[2].Height = credit > 0 ? AppScale.Scale(40, AppScale.ControlSizeScale) : 0;
+            remainingCreditSummary.Visible = credit > 0 || GetAmount(paymentAmount) > payment;
+            layout.RowStyles[7].Height = credit > 0 || GetAmount(paymentAmount) > payment ? AppScale.Scale(40, AppScale.ControlSizeScale) : 0;
+            outstandingSummary!.Visible = due > 0 || credit <= 0;
+            layout.RowStyles[0].Height = due > 0 || credit <= 0 ? AppScale.Scale(40, AppScale.ControlSizeScale) : 0;
+            remainingBalanceSummary!.Visible = remaining > 0 || credit <= 0;
+            layout.RowStyles[6].Height = remaining > 0 || credit <= 0 ? AppScale.Scale(40, AppScale.ControlSizeScale) : 0;
+        }
         /* Remembered so the next change can tell the untouched default from a figure the operator entered - see lastPayableShown. */
         lastPayableShown =
             payableAfterDiscount;
@@ -2754,7 +2793,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     return;
                 }
             }
-            if (!TryParseWholeCollectionAmount(paymentAmount.Text, out _))
+            if (!string.IsNullOrWhiteSpace(paymentAmount.Text) && !TryParseWholeCollectionAmount(paymentAmount.Text, out _))
             {
                 MarkCollectionField(paymentAmount, "Enter a whole amount using digits only; decimal points and fractions are not allowed.");
                 return;
@@ -2788,6 +2827,14 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     decimal nominalAmount,
                     decimal actualAmount)>();
             decimal amount;
+            var creditMap = GetCreditAllocations();
+            var creditEdits = charges.Rows.Cast<DataGridViewRow>()
+                .Where(row => !row.IsNewRow && creditMap.ContainsKey(GetLong(row.Cells["BillingChargeId"].Value)))
+                .Select(row => new CollectionDiscountWriter.CreditEdit(GetLong(row.Cells["BillingChargeId"].Value),
+                    GetInt(row.Cells["AdmissionId"].Value), GetInt(row.Cells["EnrollmentId"].Value),
+                    creditMap[GetLong(row.Cells["BillingChargeId"].Value)], GetDecimal(row.Cells["Balance"].Value),
+                    availableCreditByStudent.GetValueOrDefault(GetInt(row.Cells["AdmissionId"].Value)))).ToArray();
+            decimal creditUsed = creditEdits.Sum(edit => edit.Amount);
             decimal surplusCredit = 0m;
             decimal discount = 0m;
             // Populated inside the Collection branch below; used afterwards to work out the balance remaining for the receipt.
@@ -2854,12 +2901,12 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                         Math.Max(
                             0m,
                             due -
-                            rowDiscount);
+                            rowDiscount - creditMap.GetValueOrDefault(chargeId));
                     if (pay < 0m ||
                         pay > netDue)
                     {
                         Warn(
-                            "Pay Now cannot exceed the amount remaining after discount.");
+                            "Pay Now cannot exceed the amount remaining after discount and credit.");
                         return;
                     }
                     if (row.Cells["GrossAmount"].Tag is decimal originalDiscount)
@@ -2967,10 +3014,10 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 surplusCredit = GetAmount(paymentAmount) - amount;
                 amount += surplusCredit;
                 if (amount <= 0m &&
-                    discount <= 0m)
+                    discount <= 0m && creditUsed <= 0m)
                 {
                     Warn(
-                        "Enter a payment or a discount first.");
+                        "Enter a payment, discount or use available credit.");
                     return;
                 }
             }
@@ -2980,6 +3027,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 discount > 0m
                     ? $"Collect Rs. {amount:0.##} and apply a discount of Rs. {discount:0.##}."
                     : $"Collect Rs. {amount:0.##}.";
+            if (creditUsed > 0m) description += $"\r\nExisting credit applied: Rs. {creditUsed:N0}.";
             if (surplusCredit > 0m)
                 description += $"\r\nRs. {surplusCredit:N0} is retained as credit for {receiptStudentName}.";
             /* The payment date is stamped on the receipt and the ledger. */
@@ -2987,11 +3035,16 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 $"\r\nPayment date: {paymentDate.Value:dd-MMM-yyyy hh:mm tt}   Method: {method.Text}.";
             var confirmationFacts = new List<(string, string)> {
                 ("Student", student.Text.Trim()),
-                ("Payment", $"Rs. {amount:#,##0.##}"),
+                ("Cash / bank received", $"Rs. {amount:#,##0.##}"),
                 ("Discount", $"Rs. {discount:#,##0.##}"),
                 ("Payment date", paymentDate.Value.ToString("dd-MMM-yyyy hh:mm tt")),
                 ("Method", method.Text)
             };
+            if (creditUsed > 0m)
+            {
+                confirmationFacts.Add(("Credit applied", $"Rs. {creditUsed:N0}"));
+                confirmationFacts.Add(("Remaining credit", $"Rs. {SelectedAvailableCredit() - creditUsed + surplusCredit:N0}"));
+            }
             foreach (DataGridViewRow row in charges.Rows)
             {
                 if (row.Cells["GrossAmount"].Tag is decimal oldDiscount &&
@@ -3017,28 +3070,34 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     : payingFor.TryGetValue(groupAdmissionId, out var whoInfo)
                         ? whoInfo.Name
                         : $"Admission {AdmissionNumbers.ForId(groupAdmissionId)}";
-            int payingStudentCount = allocationLines.Select(group => group.Key.AdmissionId).Distinct().Count();
+            var settlingStudents = allocationLines.Select(group => group.Key.AdmissionId)
+                .Concat(creditEdits.Select(edit => edit.AdmissionId)).Distinct().OrderBy(id => id).ToArray();
+            int payingStudentCount = settlingStudents.Length;
             using var confirmationRows = new DataTable();
             confirmationRows.Columns.Add("Admission No.");
             confirmationRows.Columns.Add("Student");
             confirmationRows.Columns.Add("Payment (Rs.)", typeof(decimal));
             confirmationRows.Columns.Add("Discount (Rs.)", typeof(decimal));
+            if (creditUsed > 0m) confirmationRows.Columns.Add("Credit (Rs.)", typeof(decimal));
             if (payingStudentCount > 1)
             {
                 description +=
                     $"\r\n\r\nThis is ONE FAMILY COLLECTION: {payingStudentCount} students " +
                     "collected from in a single transaction, under ONE family receipt number " +
                     "that covers every child. Each child's fees stay attributed to that child.";
-                foreach (var group in allocationLines)
+                foreach (int settlingStudent in settlingStudents)
                 {
-                    decimal studentTotal = group.Value.Rows
+                    var studentRows = allocationLines.Where(group => group.Key.AdmissionId == settlingStudent).SelectMany(group => group.Value.Rows).ToArray();
+                    decimal studentTotal = studentRows
                         .Where(r => r.amount > 0m)
                         .Sum(r => r.amount);
-                    decimal studentDiscount = -group.Value.Rows
+                    decimal studentDiscount = -studentRows
                         .Where(r => r.amount < 0m)
                         .Sum(r => r.amount);
-                    string who = WhoIs(group.Key.AdmissionId);
-                    confirmationRows.Rows.Add(AdmissionNumbers.ForId(group.Key.AdmissionId), who, studentTotal, studentDiscount);
+                    string who = WhoIs(settlingStudent);
+                    var facts = new List<object> { AdmissionNumbers.ForId(settlingStudent), who, studentTotal, studentDiscount };
+                    if (creditUsed > 0m) facts.Add(creditEdits.Where(edit => edit.AdmissionId == settlingStudent).Sum(edit => edit.Amount));
+                    confirmationRows.Rows.Add(facts.ToArray());
                     /* What is left is each child's own payment, with the discount that goes with it so the figures on the receipt are recognisable. */
                     description += studentDiscount > 0m
                         ? $"\r\n    - {who}: Rs. {studentTotal:0.##} (discount Rs. {studentDiscount:0.##})"
@@ -3054,7 +3113,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             }
             var confirmMessage = new MessageDialogContent(
                 payingStudentCount > 1 ? $"Record payment for {payingStudentCount} students?" : "Record this payment?",
-                Explanation: payingStudentCount > 1 ? "One family receipt covers this payment. Each child's fees stay under their own record." : null,
+                Explanation: amount == 0m && creditUsed > 0m ? "Uses existing student credit. No new money is received." : payingStudentCount > 1 ? "One family receipt covers this payment. Each child's fees stay under their own record." : null,
                 Facts: confirmationFacts,
                 Records: payingStudentCount > 1 ? confirmationRows : null,
                 Notice: "This records the payment immediately and is final. Check every amount before choosing Yes.");
@@ -3083,16 +3142,21 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     GetInt(r.Cells["AdmissionId"].Value),GetInt(r.Cells["EnrollmentId"].Value),
                     (decimal)r.Cells["GrossAmount"].Tag!,GetDecimal(r.Cells["AppliedDiscount"].Value),
                     GetDecimal(r.Cells["Balance"].Tag))).ToArray();
-            if (allocationLines.Count == 1 && surplusCredit == 0m && SelectedBillStudents().Length == 1)
+            if (allocationLines.Count == 0 && amount == 0m)
+            {
+                result = await CollectionDiscountWriter.CollectWithCreditAsync(null, billDiscountEdits, creditEdits,
+                    paymentDate.Value, recoverySummary);
+            }
+            else if (allocationLines.Count == 1 && surplusCredit == 0m && SelectedBillStudents().Length == 1)
             {
                 var single = allocationLines[0];
                 decimal singleAmount = single.Value.Rows
                     .Where(r => r.amount > 0m)
                     .Sum(r => r.amount);
                 result =
-                    await CollectionDiscountWriter.CollectAsync(
+                    await CollectionDiscountWriter.CollectWithCreditAsync(
                         "ProcessFeeTransaction",
-                        billDiscountEdits,
+                        billDiscountEdits, creditEdits, paymentDate.Value,
                         recoverySummary,
                         DatabaseHelper.Int("@AdmissionId", single.Key.AdmissionId),
                         DatabaseHelper.Int(
@@ -3118,9 +3182,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             else
             {
                 result =
-                    await CollectionDiscountWriter.CollectAsync(
+                    await CollectionDiscountWriter.CollectWithCreditAsync(
                         "ProcessFamilyFeeTransaction",
-                        billDiscountEdits,
+                        billDiscountEdits, creditEdits, paymentDate.Value,
                         recoverySummary,
                         DatabaseHelper.P("@ReceivedAmount", amount),
                         DatabaseHelper.Int("@CreditAdmissionId", admissionId),
@@ -3160,8 +3224,10 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                         });
             }
             collectionCommitted = true;
+            totalDueBeforeThisTransaction -= creditUsed;
             lastCollectionReceipt = null;
             lastGroupReceiptNumber = null;
+            if (printReceiptButton is not null) printReceiptButton.Enabled = false;
             var receipts = new List<string>();
             foreach (DataRow row in result.Rows)
             {
@@ -3583,6 +3649,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     }
     private void ClearPayment(bool clearStudentBox = true)
     {
+        availableCreditByStudent.Clear();
+        useAvailableCredit.Checked = true;
         primaryPayer.Text="";
         focusAmountAfterSiblingLoad=false;
         ++loadVersion;
