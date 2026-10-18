@@ -6,6 +6,7 @@ namespace FMSC_SMS.Pages.Finance.Configuration;
 internal sealed class FeeRateCorrectionDialog : ApplicationWindowForm
 {
     private readonly int campusId, classId, feeTypeId;
+    private readonly string scopeLabel;
     private readonly ModernDatePicker from = HumanUi.Date(), through = HumanUi.Date();
     private readonly ModernComboBox disposition = HumanUi.Combo();
     private readonly ModernTextBox reason = HumanUi.TextBox(false, 500);
@@ -16,9 +17,10 @@ internal sealed class FeeRateCorrectionDialog : ApplicationWindowForm
     private bool busy;
     private int reviewGeneration;
 
-    internal FeeRateCorrectionDialog(int campus, int classNumber, int feeType)
+    internal FeeRateCorrectionDialog(int campus, int classNumber, int feeType, string scope)
     {
         campusId = campus; classId = classNumber; feeTypeId = feeType;
+        scopeLabel = scope;
         Text = "Apply Fee Matrix Rates to Existing Bills"; StartPosition = FormStartPosition.CenterParent;
         Size = new Size(AppScale.Scale(1050), AppScale.Scale(680)); MinimumSize = new Size(760, 500);
         from.Value = through.Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
@@ -39,9 +41,10 @@ internal sealed class FeeRateCorrectionDialog : ApplicationWindowForm
         fields.Controls.Add(HumanUi.Field("First bill month", from), 0, 0); fields.Controls.Add(HumanUi.Field("Last bill month", through), 1, 0);
         fields.Controls.Add(HumanUi.Field("Paid reductions", disposition), 0, 1); fields.Controls.Add(HumanUi.Field("Reason", reason), 1, 1);
         root.Controls.Add(fields, 0, 0);
-        impact.Text = "Preview the selected months, then select the bills to correct. Future assignment rates remain under Apply Saved Rates.";
+        impact.Text = $"Scope: {scopeLabel}\nPreview monthly bills for active enrollments. Admission and other annual fees are excluded. Future assignment rates remain under Apply Saved Rates.";
         impact.MaximumSize = new Size(AppScale.Scale(950), 0); root.Controls.Add(impact, 0, 1);
         grid.Dock = DockStyle.Fill; grid.MultiSelect = true; grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        UiHelper.SetGridEmptyMessage(grid, "Choose the bill months, then click Preview Bills.");
         root.Controls.Add(grid, 0, 2);
         var buttons = HumanUi.ButtonRow(review, apply, close); buttons.Dock = DockStyle.Fill;
         root.Controls.Add(buttons, 0, 3); Controls.Add(root);
@@ -61,7 +64,9 @@ internal sealed class FeeRateCorrectionDialog : ApplicationWindowForm
             if (IsDisposed || generation != reviewGeneration) { result.Dispose(); return; }
             reviewed = result;
             grid.DataSource = reviewed; grid.ClearSelection();
-            impact.Text = "Select the bills to correct. Positive Difference adds an amount owed. Negative Difference reduces unpaid fees first, then releases paid money as your chosen credit/refund.\n" +
+            UiHelper.SetGridEmptyMessage(grid, "No eligible monthly bills for this scope and period. Check the campus, class and fee type on the previous screen.");
+            impact.Text = $"Scope: {scopeLabel}\n{reviewed.Rows.Count} monthly bill(s) found. Admission and other annual fees are excluded.\n" +
+                "Select the bills to correct. Positive Difference adds an amount owed. Negative Difference reduces unpaid fees first, then releases paid money as your chosen credit/refund.\n" +
                 "Original payments remain. Future assignment rates are managed separately with Apply Saved Rates.";
             apply.Enabled = reviewed.Rows.Count > 0;
         }

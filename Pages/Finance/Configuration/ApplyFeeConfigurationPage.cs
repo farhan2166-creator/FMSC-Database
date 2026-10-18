@@ -57,7 +57,8 @@ public sealed class ApplyFeeConfigurationPage : V2Page
         applyButton.Enabled = false;
         AddAction("Correct Existing Bills", (_, _) => {
             if (!TryGetScope(out int campusId, out int classId, out int feeTypeId)) return;
-            using var dialog = new FeeRateCorrectionDialog(campusId, classId, feeTypeId);
+            using var dialog = new FeeRateCorrectionDialog(campusId, classId, feeTypeId,
+                $"{campus.Text} / {classBox.Text} / {feeType.Text}");
             dialog.ShowDialog(FindForm());
         }, "Warning");
         SetSaveShortcut(applyButton);
