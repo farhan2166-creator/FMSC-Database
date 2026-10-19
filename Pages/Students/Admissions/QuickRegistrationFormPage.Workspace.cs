@@ -7,13 +7,15 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 internal sealed partial class QuickRegistrationFormPage
 {
     internal event EventHandler? WorkspaceChanged;
-    private bool workspaceLoaded;
+    private bool workspaceLoaded,workspaceHosted;
     internal string WorkspaceName => name.Text.Trim();
     internal string WorkspaceParent => parent.Text.Trim();
     internal string WorkspaceContact => contact.Text.Trim();
     internal string WorkspaceAddress => address.Text.Trim();
     internal string WorkspacePlacement => placement.Text;
+    internal string WorkspaceStatus=>StatusLabel.Text;
     internal bool WorkspaceNeedsRefresh => needsRefresh;
+    internal bool CommitWorkspaceEdit()=>fees.EndEdit();
     internal decimal WorkspaceMonthly => PlanAmount(true);
     internal decimal WorkspaceOther => PlanAmount(false);
     private decimal PlanAmount(bool monthly) => rates.Columns.Contains("Include") ? rates.AsEnumerable()
@@ -22,8 +24,20 @@ internal sealed partial class QuickRegistrationFormPage
 
     internal void ConfigureFamilyWorkspace()
     {
-        PrepareForEmbedding(keepActions:true);
-        RelocateFromActions(save,next,bill,collect,newFamily,linkFamily,unlinkFamily);
+        workspaceHosted=true;
+        PrepareForEmbedding(keepActions:false);
+        RelocateFromActions(save,next,bill,collect,newFamily,linkFamily,unlinkFamily,checkSave,reload);
+        // Shared parent fields live in the family header. Keep their actual
+        // controls/values for the established admission validator and writer.
+        parent.Parent!.Visible=contact.Parent!.Visible=address.Parent!.Visible=false;
+        if(parent.Parent.Parent is TableLayoutPanel basics)
+        {basics.RowStyles[2].Height=0;basics.RowStyles[3].Height=0;}
+        root.RowStyles[0].Height=AppMetrics.FieldCardHeight(2);
+        foreach(var column in new[]{("Include",55),("Frequency",85),("Amount",90),("Discount",95),("NetAmount",100),("ConcessionLabel",105),("Remove",32)})
+            fees.Columns[column.Item1].Width=AppScale.Scale(column.Item2);
+        if(root.GetControlFromPosition(0,1) is HumanCard feePlan)
+            feePlan.SetHeaderText("Fees & Concessions","Choose included fees and each concession. Monthly concessions belong to this child's placement.");
+        SetStatus("Review this child, then use Process Selected above.");
         var waive = new ModernButton { Text="Waive All Included Fees",ThemeRole="Secondary",AutoSize=true };
         waive.Click += (_,_) => {
             if(savedStudent!=0 || IsBusy || recoveryBlocked || !CurrentUser.HasPermission("Fees.Adjust") || !fees.EndEdit())return;
@@ -36,6 +50,7 @@ internal sealed partial class QuickRegistrationFormPage
             fees.Refresh();UpdateTotal();UpdateActions();
         };
         addFee.Parent?.Controls.Add(waive);
+        addFee.Parent?.Controls.Add(checkSave);addFee.Parent?.Controls.Add(reload);
         WorkspaceChanged += (_,_) => waive.Enabled=savedStudent==0 && !IsBusy && !recoveryBlocked && feesLoaded && CurrentUser.HasPermission("Fees.Adjust");
         UpdateActions();
     }

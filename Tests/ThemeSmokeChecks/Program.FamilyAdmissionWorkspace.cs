@@ -1,0 +1,76 @@
+using System.Data;
+using System.Reflection;
+using FMSC_SMS.Core;
+using FMSC_SMS;
+using FMSC_SMS.Pages.Security;
+using FMSC_SMS.Pages.Students.Admissions;
+
+internal static partial class Program
+{
+    private static void CheckFamilyAdmissionWorkspace()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        var previous=(CurrentUser.UserId,CurrentUser.Username,CurrentUser.RoleName,CurrentUser.MustChangePassword,Permissions:CurrentUser.GetPermissions().ToArray());
+        CurrentUser.SignIn(988,"Workspace fixture","Administrator",false,Array.Empty<string>());
+        typeof(AdmissionNumbers).GetField("_numbers",BindingFlags.Static|BindingFlags.NonPublic)!.SetValue(null,new Dictionary<int,string>{{41,"41"},{42,"42"}});
+        typeof(AdmissionNumbers).GetField("_loadedAt",BindingFlags.Static|BindingFlags.NonPublic)!.SetValue(null,DateTime.UtcNow);
+        T Field<T>(object owner,string name)=>(T)owner.GetType().GetField(name,flags)!.GetValue(owner)!;
+        async Task Call(object owner,string name,params object[] args)=>await (Task)owner.GetType().GetMethod(name,flags)!.Invoke(owner,args)!;
+        void Run(Task task){PumpUntil(()=>task.IsCompleted,"Family workspace design action completes");task.GetAwaiter().GetResult();}
+        try
+        {
+            using var rows=new DataTable();
+            foreach(string name in new[]{"StudentName","FatherName","ContactNumber","Address","Status","Reference","EnrollmentStatus","AcademicYear","CampusName","ClassName","SectionName"})rows.Columns.Add(name);
+            rows.Columns.Add("AdmissionId",typeof(int));rows.Columns.Add("EnrollmentId",typeof(int));
+            rows.Columns.Add("BillingReady",typeof(bool));rows.Columns.Add("PlacementConfirmedAt",typeof(DateTime));rows.Columns.Add("Outstanding",typeof(decimal));
+            void Member(int id,string name,bool ready)
+            {
+                var row=rows.NewRow();row["AdmissionId"]=id;row["EnrollmentId"]=id+100;row["StudentName"]=name;
+                row["FatherName"]="Example Parent";row["ContactNumber"]="03001234567";row["Address"]="Example address";
+                row["Status"]="Active";row["EnrollmentStatus"]="Active";row["Reference"]=id.ToString();row["BillingReady"]=ready;
+                row["PlacementConfirmedAt"]=DateTime.Today;row["Outstanding"]=ready?2400m:0m;row["AcademicYear"]="2026-2027";
+                row["CampusName"]="Campus Boys";row["ClassName"]=ready?"Class 4":"Class 2";row["SectionName"]="A";rows.Rows.Add(row);
+            }
+            Member(41,"Example Older Child",true);Member(42,"Example Returning Child",false);
+            using var workspace=new FamilyAdmissionWorkspace((_,_,_)=>{},_=>Task.FromResult(rows.Copy()),false);
+            using var owner=new Form{ClientSize=new Size(1450,980),StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000),ShowInTaskbar=false};
+            owner.Controls.Add(workspace);owner.Show();Application.DoEvents();
+            Run(Call(workspace,"LoadFamilyAsync",41));
+            var list=Field<FamilyStudentList>(workspace,"children");
+            Check(list.Items.Count==2 && list.CheckedItems.Count==2,"Loading one student brings their established siblings into the workspace");
+            Check(!Field<ModernButton>(workspace,"print").Enabled,"An included unconfirmed return blocks premature family billing");
+            Run(Call(workspace,"AddNewChildAsync"));
+            var current=Field<object>(workspace,"current");
+            var draft=Field<Control>(current,"Editor");
+            Field<ModernTextBox>(draft,"name").Text="Example New Child";
+            Check(Field<ModernTextBox>(draft,"parent").Text=="Example Parent","A new child inherits the established family's parent details");
+            using var fees=new DataTable();
+            fees.Columns.Add("FeeTypeId",typeof(int));fees.Columns.Add("FeeTypeName");fees.Columns.Add("IsMandatory",typeof(bool));
+            fees.Columns.Add("IsTransportLinked",typeof(bool));fees.Columns.Add("Amount",typeof(decimal));fees.Columns.Add("Frequency");
+            fees.Columns.Add("Include",typeof(bool));fees.Columns.Add("Discount",typeof(decimal));
+            fees.Rows.Add(1,"Tuition",true,false,1200m,"Monthly",true,200m);fees.Rows.Add(2,"Admission",true,false,4000m,"OneTime",true,0m);
+            draft.GetType().GetMethod("SetRates",flags)!.Invoke(draft,new object[]{fees});
+            draft.GetType().GetMethod("UpdateTotal",flags)!.Invoke(draft,null);
+            var first=list.Items[0]!;
+            Run(Call(workspace,"ShowChildAsync",first));Run(Call(workspace,"ShowChildAsync",current));
+            Check(ReferenceEquals(Field<Control>(current,"Editor"),draft) && Field<ModernTextBox>(draft,"name").Text=="Example New Child",
+                "Switching siblings retains the original unsaved child editor and its inputs");
+            Check(list.Items.Count==3 && workspace.HasUnsavedChanges,"Existing and new children share one workspace with unsaved-change protection");
+            Check(!Field<ModernButton>(workspace,"print").Enabled,"Unsaved new children cannot be omitted silently from a selected bill");
+            list.SetItemChecked(1,false);list.SetItemChecked(2,false);Application.DoEvents();
+            Check(Field<ModernButton>(workspace,"print").Enabled,"Excluding unfinished children permits a bill for a ready selected child");
+            Check(Field<ModernButton>(workspace,"removeDraft").Enabled,"Only the current unsaved child can be removed as a draft");
+            list.SetItemChecked(1,true);list.SetItemChecked(2,true);Application.DoEvents();
+            Directory.CreateDirectory("artifacts/family-admission");
+            foreach(var size in new[]{new Size(1450,980),new Size(1100,800)})
+            {
+                owner.ClientSize=size;Application.DoEvents();
+                using var image=new Bitmap(owner.Width,owner.Height);owner.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
+                image.Save($"artifacts/family-admission/workspace-{size.Width}.png");
+            }
+            Check(FamilyAdmissionData.CanUse(p=>p is "Students.View" or "Students.Administer") &&
+                !FamilyAdmissionData.CanUse(p=>p=="Students.Admit"),"Workspace access retains separate viewing and admission/administration permissions");
+        }
+        finally{CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Permissions);}
+    }
+}
