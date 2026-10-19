@@ -12,6 +12,10 @@ internal static class ReceiptReportLayout
         var document = XDocument.Load(path);
         XNamespace ns = document.Root!.Name.Namespace;
         var table = document.Descendants(ns + "Tablix").First();
+        // Editable templates already contain their month and fee columns.
+        // Retain support for older external layouts without splitting twice.
+        splitFeePeriod = splitFeePeriod && !table.Descendants(ns + "Textbox")
+            .Any(box => (string?)box.Attribute("Name") == "FeePeriod");
         if(data.Columns.Contains("FamilyRowKind")){
             splitFeePeriod=false;
             var fields=document.Descendants(ns+"DataSet").First().Element(ns+"Fields")!;

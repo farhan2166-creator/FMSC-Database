@@ -732,14 +732,14 @@
               <TablixCells>
                 <TablixCell>
                   <CellContents>
-                    <Textbox Name="FeeHeader">
+                    <Textbox Name="PeriodHeader">
                       <CanGrow>true</CanGrow>
                       <CanShrink>true</CanShrink>
                       <Paragraphs>
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Fee / Period</Value>
+                              <Value>Month</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -764,10 +764,41 @@
                         <PaddingBottom>1pt</PaddingBottom>
                       </Style>
                     </Textbox>
-                    <ColSpan>2</ColSpan>
-                  </CellContents>
+                    </CellContents>
                 </TablixCell>
-                <TablixCell />
+                <TablixCell><CellContents><Textbox Name="FeeHeader">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Fee</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <TopBorder>
+                          <Style>Solid</Style>
+                          <Width>0.5pt</Width>
+                        </TopBorder>
+                        <BackgroundColor>#f0f0f0</BackgroundColor>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    </CellContents></TablixCell>
                 <TablixCell>
                   <CellContents>
                     <Textbox Name="AmountHeader">
@@ -814,7 +845,35 @@
               <TablixCells>
                 <TablixCell>
                   <CellContents>
-                    <Textbox Name="FeeDescription">
+                    <Textbox Name="FeePeriod">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=IIf(RowNumber("ReceiptPageGroup") = 1 Or Fields!FeePeriod.Value &lt;&gt; Previous(Fields!FeePeriod.Value, "ReceiptPageGroup"), Fields!FeePeriod.Value, "")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    </CellContents>
+                </TablixCell>
+                <TablixCell><CellContents><Textbox Name="FeeDescription">
                       <CanGrow>true</CanGrow>
                       <CanShrink>true</CanShrink>
                       <Paragraphs>
@@ -840,10 +899,7 @@
                         <PaddingBottom>1pt</PaddingBottom>
                       </Style>
                     </Textbox>
-                    <ColSpan>2</ColSpan>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell />
+                    </CellContents></TablixCell>
                 <TablixCell>
                   <CellContents>
                     <Textbox Name="LineAmount">
@@ -1423,7 +1479,7 @@
           <DataField>FatherName</DataField>
           <rd:TypeName>System.String</rd:TypeName>
         </Field>
-      </Fields>
+      <Field Name="FeePeriod"><DataField>FeePeriod</DataField></Field></Fields>
     </DataSet>
   </DataSets>
   <ConsumeContainerWhitespace>true</ConsumeContainerWhitespace>
