@@ -43,6 +43,46 @@ internal static partial class Program
             Check(pdf.Length>1000 && png.Length>1000,"Established RDLC renders a real PDF and PNG");
             return parsed.PageCount;
         }
+        void CheckCashOnly(string name,DataTable source)
+        {
+            using var cash=source.Copy();
+            foreach(DataRow row in cash.Rows)
+            {
+                row["CreditApplied"]=0m;row["CreditRemaining"]=0m;row["ShowCreditRemaining"]=false;
+                row["CashReceived"]=row["TotalPaid"];row["PaymentMethod"]="Cash";
+            }
+            string file=source.Columns.Contains("FamilyRowKind")?"FamilyReceipt.rdlc":"StudentReceipt.rdlc";
+            string path=Path.Combine(AppContext.BaseDirectory,"Reports",file);
+            XNamespace ns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";
+            var full=XDocument.Parse(ReceiptReportLayout.SizeToContent(path,source));
+            var compact=XDocument.Parse(ReceiptReportLayout.SizeToContent(path,cash));
+            double Height(XDocument document)=>double.Parse(document.Descendants(ns+"PageHeight").Single().Value.Replace("in",""),System.Globalization.CultureInfo.InvariantCulture);
+            Check(Height(compact)<Height(full),"Zero credit rows collapse completely, including their paper space");
+            var table=compact.Descendants(ns+"Tablix").First();
+            var rows=table.Descendants(ns+"TablixRow").ToArray();
+            var members=table.Element(ns+"TablixRowHierarchy")!.Descendants(ns+"TablixMember")
+                .Where(member=>member.Element(ns+"TablixMembers") is null).ToArray();
+            foreach(string textbox in new[]{"TotalPaidCreditApplied","TotalPaidCreditRemaining"})
+            {
+                int index=Array.FindIndex(rows,row=>row.Descendants(ns+"Textbox").Any(box=>(string?)box.Attribute("Name")==textbox));
+                string field=textbox=="TotalPaidCreditApplied"?"CreditApplied":"ShowCreditRemaining";
+                Check(members[index].Element(ns+"Visibility")!.Element(ns+"Hidden")!.Value.Contains(field),"Credit visibility is applied to the complete table row");
+            }
+            Check(Render(name,cash)==1,"A cash-only receipt renders with credit rows collapsed");
+            foreach(var (applied,remaining,label) in new[]{(0m,50m,"remaining-only"),(100m,0m,"fully-used"),(100m,50m,"used-and-remaining")})
+            {
+                foreach(DataRow row in cash.Rows)
+                {
+                    row["CreditApplied"]=applied;row["CreditRemaining"]=remaining;
+                    row["ShowCreditRemaining"]=applied!=0m||remaining!=0m;
+                    row["CashReceived"]=Convert.ToDecimal(row["TotalPaid"])-applied;
+                }
+                var visible=XDocument.Parse(ReceiptReportLayout.SizeToContent(path,cash));
+                Check(applied==0m?Height(visible)>Height(compact)&&Height(visible)<Height(full):Height(visible)==Height(full),
+                    "Remaining-only credit occupies one row; credit used occupies both rows even when exhausted");
+                Check(Render(name+"-"+label,cash)==1,"Credit visibility scenario prints on one page");
+            }
+        }
         using var header=new DataTable();
         foreach(string name in new[]{"ReceiptNumber","PaymentMethod","ReceiptStatus"})header.Columns.Add(name);
         header.Columns.Add("TransactionDate",typeof(DateTime));
@@ -66,6 +106,7 @@ internal static partial class Program
             Check(Convert.ToDecimal(credit.Rows[0]["TotalPaid"])==8700m && Convert.ToDecimal(credit.Rows[0]["CashReceived"])==0m
                 && Convert.ToDecimal(credit.Rows[0]["CreditRemaining"])==50m,"Credit-only receipt distinguishes settlement, new money and remaining credit");
             Check(Render("individual-credit-receipt",credit)==1,"A six-line credit settlement prints on one receipt page");
+            CheckCashOnly("individual-cash-only-receipt",credit);
             using var legacy=credit.Copy();foreach(DataRow row in legacy.Rows) row["ShowSettlement"]=false;
             Check(Render("legacy-individual-receipt",legacy)==1,"Original cash receipt fields remain printable through the RDLC template");
             Check(Render("annual-receipt-template",legacy,"FeePaymentReceipt.rdlc")==1,"The editable annual receipt template prints separate month and fee columns directly");
@@ -83,6 +124,7 @@ internal static partial class Program
             Check(family.AsEnumerable().Select(row=>row.Field<int>("ReceiptPageKey")).Distinct().Single()==1,"All children share one family document key");
             Check(family.AsEnumerable().Count(row=>row.Field<string>("FamilyRowKind")=="Student")==2,"Family receipt identifies both children");
             Check(Render("family-mixed-receipt",family)==1,"Family receipt has no forced page per child");
+            CheckCashOnly("family-cash-only-receipt",family);
             using var legacyFamily=family.Copy();foreach(DataRow row in legacyFamily.Rows) row["ShowSettlement"]=false;
             Check(Render("legacy-family-receipt",legacyFamily)==1,"Legacy family receipts use the same combined RDLC layout");
         }
