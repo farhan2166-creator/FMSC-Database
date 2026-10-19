@@ -110,6 +110,8 @@ internal static class ReceiptReportLayout
             {
                 string hidden = members[index].Element(ns + "Visibility")?.Element(ns + "Hidden")?.Value ?? "";
                 if(hidden.Equals("true",StringComparison.OrdinalIgnoreCase)) continue;
+                if(hidden.Contains(" Or ") && Regex.Matches(hidden,@"Not First\(Fields!(\w+)\.Value")
+                    .Any(match=>!Convert.ToBoolean(first[match.Groups[1].Value]))) continue;
                 var field = Regex.Match(hidden, @"Fields!(\w+)\.Value");
                 if (field.Success && (hidden.Contains("Len(")
                     ? string.IsNullOrWhiteSpace(Convert.ToString(first[field.Groups[1].Value]))
