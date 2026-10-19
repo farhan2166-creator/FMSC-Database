@@ -1,16 +1,18 @@
 # Apply the database changes later
 
-The application requires **schema 24**. SQL changes are checked in here;
+The application requires **schema 26**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 | Current database version | Files to apply, in order |
 |---|---|
-| 19 | `20.sql`, `21.sql`, `22.sql`, `23.sql`, then `24.sql` |
-| 20 | `21.sql`, `22.sql`, `23.sql`, then `24.sql` |
-| 21 | `22.sql`, `23.sql`, then `24.sql` |
-| 22 | `23.sql`, then `24.sql` |
-| 23 | `24.sql` |
-| 24 | None |
+| 19 | `20.sql`, `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, then `26.sql` |
+| 20 | `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, then `26.sql` |
+| 21 | `22.sql`, `23.sql`, `24.sql`, `25.sql`, then `26.sql` |
+| 22 | `23.sql`, `24.sql`, `25.sql`, then `26.sql` |
+| 23 | `24.sql`, `25.sql`, then `26.sql` |
+| 24 | `25.sql`, then `26.sql` |
+| 25 | `26.sql` |
+| 26 | None |
 
 Check your version first:
 
@@ -36,6 +38,16 @@ Migration 24 adds independent B/FB/R/FR calendar-year counters and saved bill
 documents. It preserves all previously issued receipt numbers. New documents
 use five-digit minimum sequences; larger sequences are never truncated.
 
+Migration 25 clarifies Outstanding & Aging: admission/QR references, class–section,
+open-charge settlement labels and a separate Due Today bucket. It changes report
+output only; financial records and balances remain unchanged.
+
+Migration 26 separates reused credit from money received in Collections & Receipts,
+uses saved receipt links and original participants for receipt identity, and adds
+campus and natural school/transaction ordering to both finance reports. Legacy
+credit applications without an issued receipt appear with a readable reference.
+Financial records and saved documents are not rewritten.
+
 ## Manual application with SQLCMD
 
 Close the application and make a verified backup first, as described in
@@ -43,9 +55,9 @@ Close the application and make a verified backup first, as described in
 transaction, which the installer normally provides.
 
 For a schema-19 database, save this wrapper **outside this directory**, change the
-five include paths to your checkout, and run it with SQLCMD. For schema 20, omit
+seven include paths to your checkout, and run it with SQLCMD. For schema 20, omit
 the `20.sql` include and its following `GO`. For schema 21, start at `22.sql`;
-for schema 22, start at `23.sql`; for schema 23, include only `24.sql`.
+for schema 22, start at `23.sql`; for schema 23, start at `24.sql`; for schema 24, start at `25.sql`; for schema 25, include only `26.sql`.
 
 ```sql
 :ON ERROR EXIT
@@ -62,11 +74,15 @@ GO
 GO
 :r "C:\FMSC-Database\Migrations\24.sql"
 GO
+:r "C:\FMSC-Database\Migrations\25.sql"
+GO
+:r "C:\FMSC-Database\Migrations\26.sql"
+GO
 IF XACT_STATE() <> 1
     THROW 51000, 'The upgrade transaction cannot be committed.', 1;
 IF ISNULL((SELECT TOP (1) TRY_CONVERT(int, VersionNumber)
-           FROM dbo.DatabaseVersion ORDER BY VersionId DESC), -1) <> 24
-    THROW 51000, 'The upgrade did not reach schema 24.', 1;
+           FROM dbo.DatabaseVersion ORDER BY VersionId DESC), -1) <> 26
+    THROW 51000, 'The upgrade did not reach schema 26.', 1;
 COMMIT TRANSACTION;
 GO
 ```

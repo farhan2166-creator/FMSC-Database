@@ -318,7 +318,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         var statementItem = studentFeesMenu.Items.Add("Account Statement", null, (_, _) => historyButton?.PerformClick());
         studentFeesMenu.Items.Add(new ToolStripSeparator());
         // Bills cover current unpaid charges. Paid transactions are reprinted as receipts.
-        printBillButton = AddBusyAction("Print Bill", PrintSelectedFamilyBillAsync, "Secondary");
+        printBillButton = AddBusyAction("Print Outstanding", PrintSelectedFamilyBillAsync, "Secondary");
         printBillButton.Enabled = false;
         historyButton.EnabledChanged += (_, _) => {
             printBillButton.Enabled = historyButton.Enabled && CurrentUser.HasPermission("Fees.View");

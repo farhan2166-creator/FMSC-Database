@@ -214,7 +214,10 @@ public abstract class CanonicalFinanceReportPage : V2Page
                 token.ThrowIfCancellationRequested();
                 captured = result.Tables.Count > 0 ? result.Tables[0] : new DataTable();
                 totals = result.Tables.Count > 1 ? result.Tables[1] : null;
-                AppendAuthoritativeTotalRow(captured, totals);
+                // Outstanding totals already appear above the grid. Keep its rows
+                // limited to actual records so pagination does not count a total.
+                if (_procedure != "GetOutstandingAndAgingReport" && _procedure != "GetCollectionsAndReceiptsReport")
+                    AppendAuthoritativeTotalRow(captured, totals);
                 return captured;
             });
             if (!ReportLanded || captured is null)
