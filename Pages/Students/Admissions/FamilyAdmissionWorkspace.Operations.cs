@@ -6,6 +6,29 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 
 public sealed partial class FamilyAdmissionWorkspace
 {
+    private async Task OpenPendingRegistrationsAsync()
+    {
+        if(IsBusy || !QuickRegistrationAccess.CanUse(CurrentUser.HasPermission) ||
+            members.Any(c=>c.Registration?.HasUnresolvedSave==true))return;
+        int selected=0;
+        busy=true;UpdateWorkspace();
+        try
+        {
+            using var dialog=new ApplicationWindowForm{Text="Pending Registrations",StartPosition=FormStartPosition.CenterParent,
+                ClientSize=new Size(AppScale.Scale(1200),AppScale.Scale(800)),MinimumSize=new Size(850,600)};
+            using var list=new FMSC_SMS.Pages.Students.Maintenance.AdmissionReviewListPage(navigate,true,id=>{
+                selected=id;dialog.DialogResult=DialogResult.OK;dialog.Close();return Task.CompletedTask;
+            }){Dock=DockStyle.Fill};
+            dialog.Controls.Add(list);dialog.ShowDialog(FindForm());
+            // Confirming a registration in the list can update the loaded family.
+            if(selected==0 && anchor>0)await RefreshSavedChildrenAsync();
+        }
+        catch(Exception ex){if(!IsDisposed)Fail(ex);}
+        finally{busy=false;if(!IsDisposed)UpdateWorkspace();}
+        if(selected>0 && !IsDisposed)await LoadFamilyAsync(selected);
+        else if(!IsDisposed && current is {Id:>0} child && !child.Dirty)await ReopenChildAsync(child);
+    }
+
     private bool DiscardAllowed()=>!HasUnsavedChanges || Confirm(UnsavedChangesMessage,UiText.Dialogs.UnsavedChanges);
     private void ClearWorkspace()
     {

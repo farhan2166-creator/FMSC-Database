@@ -36,7 +36,7 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
     private readonly Label familyContext=new(){AutoSize=true,Dock=DockStyle.Fill,Font=AppTheme.BodyBoldFont,Padding=new Padding(6),Text="Find a student to load their family, or start a new family."};
     private readonly Label summary=new(){Dock=DockStyle.Fill,AutoSize=true,Padding=new Padding(8),Font=AppTheme.NormalFont};
     private readonly List<Child> members=new();
-    private readonly ModernButton addChild,process,print,refresh,newFamily,removeDraft,reviewFees,reviewAdmission;
+    private readonly ModernButton addChild,process,print,refresh,newFamily,removeDraft,reviewFees,reviewAdmission,pendingRegistrations;
     private int anchor;
     private int familyVersion;
     private string father="",phone="",address="";
@@ -46,7 +46,10 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
     public string BusyMessage=>"Wait for this family's current operation to finish. Each child keeps their own saved outcome.";
     public bool HasUnsavedChanges=>members.Any(c=>c.Dirty);
     public string UnsavedChangesMessage=>"Leave this family workspace and discard its unsaved child drafts? Saved admissions, fee changes and returns remain recorded.";
-    public FamilyAdmissionWorkspace(Action<Func<Control>,string,string> navigate):this(navigate,FamilyAdmissionData.ReadAsync,true){ }
+    public FamilyAdmissionWorkspace(Action<Func<Control>,string,string> navigate,int preselectAdmissionId=0):this(navigate,FamilyAdmissionData.ReadAsync,true)
+    {
+        if(preselectAdmissionId>0)Load+=async(_,_)=>await LoadFamilyAsync(preselectAdmissionId);
+    }
     internal FamilyAdmissionWorkspace(Action<Func<Control>,string,string> navigate,Func<int,Task<DataTable>> readFamily,bool initialize)
         :base(PageTitles.FamilyAdmission,"Prepare siblings together, review each child's fees, then print their bill.")
     {
@@ -56,6 +59,7 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         process=AddAction("Process Selected",async(_,_)=>await ProcessSelectedAsync(),"Primary");
         print=AddAction("Print Selected Bill",async(_,_)=>await PrintSelectedAsync(),"Secondary");
         refresh=AddAction("Refresh Family",async(_,_)=>await ReloadFamilyAsync(),"Secondary");
+        pendingRegistrations=AddAction("Pending Registrations",async(_,_)=>await OpenPendingRegistrationsAsync(),"Secondary");
         removeDraft=AddAction("Remove Draft",(_,_)=>RemoveDraft(),"Secondary");
         reviewFees=AddAction("Review Fee Terms",async(_,_)=>await ReviewFeesAsync(),"Secondary");
         reviewAdmission=AddAction("Review Admission",async(_,_)=>await ReviewAdmissionAsync(),"Secondary");
@@ -153,6 +157,7 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         process.Enabled=idle && !unresolved && selected>0;
         print.Enabled=idle && selected>0 && !unresolved && members.Where(c=>c.Included).All(CanBill) && CurrentUser.HasPermission("Fees.View");
         refresh.Enabled=idle && anchor>0;
+        pendingRegistrations.Enabled=idle && !unresolved && QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);
         removeDraft.Enabled=idle && current is {Id:0} && current.Registration?.HasUnresolvedSave!=true;
         removeDraft.Visible=current is {Id:0};reviewFees.Visible=reviewAdmission.Visible=current is {Id:>0};
         reviewFees.Enabled=idle && current is {Id:>0,MembershipVerified:true} && !current.Dirty &&
