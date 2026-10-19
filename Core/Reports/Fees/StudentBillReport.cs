@@ -22,10 +22,10 @@ internal static partial class StudentBillReport
         await FeeBillDocuments.ShowAsync(owner,data,admissionId,new[]{admissionId});
     }
 
-    internal static void ShowData(Form? owner,DataTable data)
+    internal static void ShowData(Form? owner,DataTable data,bool a4=false)
     {
         string path=Path.Combine(AppContext.BaseDirectory,"Reports",TemplateFile);
         RdlcReportPreview.Show(owner,"Student Fee Bill",path,DataSetName,data,
-            reportDefinition:FeeDocumentLayout.SizeToContent(path,data));
+            fitPageWidth:a4,reportDefinition:FeeDocumentLayout.SizeToContent(path,data,a4));
     }
 }

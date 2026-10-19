@@ -163,7 +163,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     }
     private void BuildStatementLayout()
     {
-        var filters = HumanUi.Card("Student account", "Choose a student. Dates are optional; leave them unchecked for the complete account.");
+        var filters = HumanUi.Card("Student account", "Dates limit the statement balances. Leave dates unchecked for the complete account; Print Outstanding includes all unpaid bills.");
         var filterGrid = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Margin = Padding.Empty
         };
@@ -1164,7 +1164,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         table.Controls.Add(
             SummaryCard("Payments in Period", paymentsTotal), 2, 0);
         table.Controls.Add(
-            SummaryCard("Closing Balance", closingBalance), 3, 0);
+            SummaryCard("Period Closing Balance", closingBalance), 3, 0);
         return table;
     }
     private static Control SummaryCard(string title, Label value)
@@ -1325,6 +1325,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
                 if(IsDisposed||!statementReads.IsCurrent(request)||signature!=FilterSignature())return;
             }
             Bind(combined);
+            UiHelper.SetGridEmptyMessage(Grid, "No account entries for the selected students and dates.");
             ConfigureStatementGrid();
             FormatStatementAmounts();
             openingBalance.Text =
@@ -1675,6 +1676,8 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         SetReportActionsEnabled(false);
         UpdateSelectionActions();
         statementContext.Text = groupMode ? "Find students, then tick those to include." : "Select a student to view their account.";
+        UiHelper.SetGridPlaceholderMessage(Grid, groupMode ? "Find students, then select those to include." : "Select a student to view their account.");
+        UiHelper.SetGridEmptyMessage(Grid, groupMode ? "Find students, then select those to include." : "Select a student to view their account.");
         SetStatus(groupMode ? "All selections cleared. Use Find Students, then tick students or Include Family."
             : "Select a student above. The complete account is shown unless you choose dates.");
     }

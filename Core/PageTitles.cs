@@ -23,5 +23,6 @@ public static class PageTitles
     public const string UpdateStudentFeeRates = "Update Student Fee Rates";
     public const string StudentAccountStatement = "Student Account Statement";
     public const string AnnualFeeReceipts = "Annual Fee Receipts";
+    public const string OutstandingBills = "Print Outstanding Bills";
     public const string BackupRestore = "Backup / Restore";
 }

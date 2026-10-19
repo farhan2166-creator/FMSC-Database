@@ -7,14 +7,6 @@ namespace FMSC_SMS.Core;
 /// <summary>Sizes the receipt paper from its table content, keeping the configured paper width.</summary>
 internal static class FeeDocumentLayout
 {
-    internal static string ReminderDefinition(string path,DataTable data)
-    {
-        var document=XDocument.Load(path);
-        XNamespace ns=document.Root!.Name.Namespace;
-        foreach(var label in document.Descendants(ns+"Textbox").Where(box=>(string?)box.Attribute("Name")=="AdmissionNumberTextLabel"))
-            label.Descendants(ns+"Value").First().Value="=IIf(InStr(CStr(First(Fields!AdmissionNumberText.Value, \"ReceiptPageGroup\")), \"QR-\") > 0, \"Registration #\", \"Admission #\")";
-        return FitContent(document,data,false);
-    }
     // The complete layout lives in RDLC. Only the roll-paper length follows its content.
     internal static string SizeToContent(string path,DataTable data,bool annualSheet=false) => FitContent(XDocument.Load(path),data,annualSheet);
 

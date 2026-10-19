@@ -34,6 +34,18 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--finance-presentation"))
+        {
+            CheckFinancePresentation();
+            Console.WriteLine($"PASS: {checks} finance presentation and preserved interaction checks (no database connection).");
+            return;
+        }
+        if(args.Contains("--grid-pdf"))
+        {
+            CheckGridPdfReports();
+            Console.WriteLine($"PASS: {checks} shared PDF layout, field-preservation and pagination checks.");
+            return;
+        }
         if(args.Contains("--statement-actions"))
         {
             CheckStudentAccountFlow();
@@ -42,10 +54,10 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} statement action, mode and async safety checks (no database connection).");
             return;
         }
-        if(args.Contains("--reminder-layout"))
+        if(args.Contains("--outstanding-bills"))
         {
-            CheckFeeReminderLayout();
-            Console.WriteLine($"PASS: {checks} fee reminder layout and selection checks (no database connection).");
+            CheckOutstandingBills();
+            Console.WriteLine($"PASS: {checks} outstanding bill filters, layout and selection checks (no database connection).");
             return;
         }
         if (args.Contains("--latest-receipt"))
