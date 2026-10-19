@@ -178,6 +178,7 @@ internal static partial class Program
             Check(definition.Contains("TOTAL DUE") && definition.Contains("Bill No.") && !definition.Contains("TOTAL SETTLED"),"Bills contain bill-specific titles and totals");
             using var studentBill=StudentBillReport.FromGroupedData(bill);
             Check(Render("individual-bill",studentBill)==1,"Individual bill uses the established receipt design");
+            Check(Render("individual-bill-a4",studentBill,annual:true)>=1,"A4 bill printing reuses the approved bill RDLC on a sheet");
         }
         charges.Rows.Add("1002","Sara Example","Tuition",new DateTime(2026,11,1),0m,500m);
         charges.Rows.Add("1001","Ali Example","Transport",new DateTime(2026,12,1),0m,600m);

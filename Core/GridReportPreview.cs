@@ -6,77 +6,114 @@ namespace FMSC_SMS.Core;
 internal static class GridReportPreview
 {
     internal sealed record Report(string Definition, DataTable Data);
-    internal static Report Build(string institution, string title, string subtitle, DataTable source, string printedBy, string moneyFormat = "#,##0.##")
+    internal static Report Build(string institution,string title,string subtitle,DataTable source,string printedBy,string moneyFormat="#,##0.##")
     {
-        XNamespace ns = "http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";
-        XElement E(string name, params object[] content) => new(ns + name, content);
-        var data = new DataTable("ReportData");
-        for (int i = 0; i < source.Columns.Count; i++) data.Columns.Add("C" + i);
-        foreach (DataRow row in source.Rows)
-            data.Rows.Add(row.ItemArray.Select(value => value switch {
-                DBNull => "", decimal number => number.ToString(moneyFormat, CultureInfo.CurrentCulture),
-                DateTime date => date.ToString("dd-MMM-yyyy", CultureInfo.CurrentCulture),
-                _ => Convert.ToString(value, CultureInfo.CurrentCulture) ?? ""
-            }).ToArray());
-        bool landscape = source.Columns.Count > 6;
-        double width = landscape ? 10.67 : 7.25;
-        string Inch(double value) => value.ToString("0.####", CultureInfo.InvariantCulture) + "in";
-        var weights = source.Columns.Cast<DataColumn>().Select((column, index) =>
-            Math.Clamp(Math.Max(column.ColumnName.Length, data.AsEnumerable().Take(100)
-                .Select(row => row.Field<string>(index)?.Length ?? 0).DefaultIfEmpty(0).Max()), 8, 32)).ToArray();
-        double totalWeight = weights.Sum();
-        XElement Text(string name, string value, bool bold = false, string align = "Left", string size = "8pt") =>
-            E("Textbox", new XAttribute("Name", name), E("CanGrow", true), E("CanShrink", true),
-                E("Paragraphs", E("Paragraph", E("TextRuns", E("TextRun", E("Value", value),
-                    E("Style", E("FontFamily", "Segoe UI"), E("FontSize", size), E("FontWeight", bold ? "Bold" : "Normal"), E("Color", "#172B3A")))), E("Style", E("TextAlign", align)))),
-                E("Style", E("PaddingLeft", "3pt"), E("PaddingRight", "3pt"), E("PaddingTop", "2pt"), E("PaddingBottom", "2pt")));
-        var header = new List<XElement>(); var details = new List<XElement>();
-        for (int index = 0; index < source.Columns.Count; index++)
+        if(source.Columns.Count==0)throw new ArgumentException("Choose at least one report column.",nameof(source));
+        XNamespace ns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";
+        XElement E(string name,params object[] content)=>new(ns+name,content);
+        string Inch(double value)=>value.ToString("0.####",CultureInfo.InvariantCulture)+"in";
+        var columns=GridReportColumns.Create(source,moneyFormat);
+        bool landscape=columns.Count>6||columns.Sum(column=>column.Minimum)>7.25;
+        double width=landscape?10.67:7.25;
+        var bands=GridReportColumns.Bands(columns,width);
+        var data=new DataTable("ReportData");
+        for(int i=0;i<columns.Count;i++)data.Columns.Add("C"+i);
+        foreach(DataRow row in source.Rows)data.Rows.Add(columns.Select(column=>string.Join("\n",column.Fields
+            .Select(index=>GridReportColumns.Value(row,index,moneyFormat)).Where(value=>value.Length>0))).ToArray());
+
+        XElement Text(string name,string value,bool bold=false,string align="Left",string size="9pt",string color="#182C40")=>
+            E("Textbox",new XAttribute("Name",name),E("CanGrow",true),E("CanShrink",true),
+                E("Paragraphs",E("Paragraph",E("TextRuns",E("TextRun",E("Value",value),
+                    E("Style",E("FontFamily","Segoe UI"),E("FontSize",size),E("FontWeight",bold?"Bold":"Normal"),E("Color",color)))),E("Style",E("TextAlign",align)))),
+                E("Style",E("VerticalAlign","Middle"),E("PaddingLeft","4pt"),E("PaddingRight","4pt"),E("PaddingTop","3pt"),E("PaddingBottom","3pt")));
+        XElement Position(XElement text,double left,double top,double textWidth,double height)
+        {text.Add(E("Top",Inch(top)),E("Left",Inch(left)),E("Height",Inch(height)),E("Width",Inch(textWidth)));return text;}
+        var items=new List<XElement>();
+        for(int bandIndex=0;bandIndex<bands.Count;bandIndex++)
         {
-            bool numeric = Type.GetTypeCode(source.Columns[index].DataType) is
-                TypeCode.Byte or TypeCode.SByte or TypeCode.Int16 or TypeCode.UInt16 or
-                TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Int64 or TypeCode.UInt64 or
-                TypeCode.Single or TypeCode.Double or TypeCode.Decimal;
-            string alignment = numeric ? "Right" : source.Columns[index].DataType == typeof(DateTime) ? "Center" : "Left";
-            var heading = Text("Heading" + index, source.Columns[index].ColumnName, true, alignment);
-            heading.Element(ns + "Style")!.Add(E("BackgroundColor", "#E8F1EE"),
-                E("BottomBorder", E("Style", "Solid"), E("Width", "0.75pt"), E("Color", "#1F6F5F")));
-            header.Add(E("TablixCell", E("CellContents", heading)));
-            var detail = Text("Value" + index, "=Fields!C" + index + ".Value", false, alignment);
-            detail.Descendants(ns + "FontWeight").First().Value = "=IIf(Left(Fields!C0.Value, 5) = \"TOTAL\" Or Left(Fields!C0.Value, 3) = \"NET\", \"Bold\", \"Normal\")";
-            detail.Element(ns + "Style")!.Add(E("BottomBorder", E("Style", "Solid"), E("Width", "0.25pt"), E("Color", "#D8E2E7")),
-                E("BackgroundColor", "=IIf(RowNumber(Nothing) Mod 2 = 0, \"#F6F9FA\", \"White\")"));
-            details.Add(E("TablixCell", E("CellContents", detail)));
+            int[] indices=bands[bandIndex];double minimum=indices.Sum(i=>columns[i].Minimum),weight=indices.Sum(i=>columns[i].Weight);
+            double[] widths=indices.Select(i=>minimum<=width?columns[i].Minimum+(width-minimum)*columns[i].Weight/weight:width*columns[i].Minimum/minimum).ToArray();
+            var headings=new List<XElement>();var details=new List<XElement>();
+            foreach(int index in indices)
+            {
+                var column=columns[index];string alignment=column.Numeric?"Right":"Left";
+                var heading=Text($"Heading{bandIndex}_{index}",column.Caption,true,alignment,"8.5pt");
+                heading.Element(ns+"Style")!.Add(E("BackgroundColor","#EAF0F5"),E("BottomBorder",E("Style","Solid"),E("Width","0.8pt"),E("Color","#486780")));
+                headings.Add(E("TablixCell",E("CellContents",heading)));
+                var detail=Text($"Value{bandIndex}_{index}",$"=Fields!C{index}.Value",false,alignment);
+                detail.Descendants(ns+"FontWeight").First().Value="=IIf(Left(Fields!C0.Value, 5) = \"TOTAL\" Or Left(Fields!C0.Value, 3) = \"NET\", \"Bold\", \"Normal\")";
+                detail.Element(ns+"Style")!.Add(E("BottomBorder",E("Style","Solid"),E("Width","0.25pt"),E("Color","#DCE4EC")),
+                    E("BackgroundColor","=IIf(RowNumber(Nothing) Mod 2 = 0, \"#F5F7FA\", \"White\")"));
+                details.Add(E("TablixCell",E("CellContents",detail)));
+            }
+            var table=E("Tablix",new XAttribute("Name","ReportRows"+bandIndex),
+                E("TablixBody",E("TablixColumns",widths.Select(w=>E("TablixColumn",E("Width",Inch(w))))),
+                    E("TablixRows",E("TablixRow",E("Height","0.42in"),E("TablixCells",headings)),E("TablixRow",E("Height","0.26in"),E("TablixCells",details)))),
+                E("TablixColumnHierarchy",E("TablixMembers",indices.Select(_=>E("TablixMember")))),
+                E("TablixRowHierarchy",E("TablixMembers",E("TablixMember",E("KeepWithGroup","After"),E("RepeatOnNewPage",true)),
+                    E("TablixMember",E("Group",new XAttribute("Name","DetailRows"+bandIndex)),E("KeepTogether",true)))),
+                E("DataSetName","ReportData"),E("Top",bands.Count>1?"0.25in":"0in"),E("Left","0in"),E("Height","0.68in"),E("Width",Inch(width)),E("Style"));
+            if(bands.Count==1)items.Add(table);
+            else
+            {
+                var note=Position(Text("Section"+bandIndex,$"Details {bandIndex+1} of {bands.Count} - student/reference columns repeat for matching records",false,"Left","8pt","#536578"),0,0,width,.23);
+                var rectangle=E("Rectangle",new XAttribute("Name","SectionBlock"+bandIndex),E("ReportItems",note,table),
+                    E("KeepTogether",false),E("Top",Inch(bandIndex*.95)),E("Left","0in"),E("Height","0.93in"),E("Width",Inch(width)),E("Style"));
+                if(bandIndex>0)rectangle.Add(E("PageBreak",E("BreakLocation","Start")));
+                items.Add(rectangle);
+            }
         }
-        var tablix = E("Tablix", new XAttribute("Name", "ReportRows"),
-            E("TablixBody", E("TablixColumns", weights.Select(weight => E("TablixColumn", E("Width", Inch(width * weight / totalWeight))))),
-                E("TablixRows", E("TablixRow", E("Height", "0.22in"), E("TablixCells", header)), E("TablixRow", E("Height", "0.2in"), E("TablixCells", details)))),
-            E("TablixColumnHierarchy", E("TablixMembers", weights.Select(_ => E("TablixMember")))),
-            E("TablixRowHierarchy", E("TablixMembers", E("TablixMember", E("KeepWithGroup", "After"), E("RepeatOnNewPage", true)), E("TablixMember", E("Group", new XAttribute("Name", "DetailRows"))))),
-            E("DataSetName", "ReportData"), E("Top", "0in"), E("Left", "0in"), E("Height", "0.42in"), E("Width", Inch(width)), E("Style"));
-        XElement Positioned(string name, string value, string top, string height, string size, bool bold = false)
+        var summaryKeys=new HashSet<string>(StringComparer.OrdinalIgnoreCase){"Receipts","Money Received","Gross Received","Refunds","Corrections","Credit Applied","Adjusted Collection","Net Collection","Students Owing","Total Outstanding","Overdue","90+ Days","Gross Billed","Discounts","Net Billed","Charges","Students"};
+        var metrics=new List<(string Label,string Value)>();var filters=new List<string>();
+        foreach(string part in System.Text.RegularExpressions.Regex.Split(subtitle.Trim(),@"\s{3,}"))
         {
-            var text = Text(name, value, bold, "Left", size);
-            text.Descendants(ns + "Color").First().Value = name == "Institution" ? "#1F6F5F"
-                : name is "Filters" or "Stamp" ? "#58707E" : "#172B3A";
-            text.Add(E("Top", top), E("Left", "0in"), E("Height", height), E("Width", Inch(width)));
-            return text;
+            int colon=part.IndexOf(':');string key=colon>=0?part[..colon].Trim():"";
+            if(summaryKeys.Contains(key))metrics.Add((key,part[(colon+1)..].Trim()));
+            else if(part.Length>0)filters.Add(part.Replace("Period: Any start to Any end","Period: All dates",StringComparison.OrdinalIgnoreCase));
         }
-        var document = new XDocument(E("Report",
-            E("DataSources", E("DataSource", new XAttribute("Name", "Source"), E("ConnectionProperties", E("DataProvider", "System.Data.DataSet"), E("ConnectString", "")))),
-            E("DataSets", E("DataSet", new XAttribute("Name", "ReportData"), E("Query", E("DataSourceName", "Source"), E("CommandText", "")),
-                E("Fields", data.Columns.Cast<DataColumn>().Select(column => E("Field", new XAttribute("Name", column.ColumnName), E("DataField", column.ColumnName)))))),
-            E("Body", E("ReportItems", tablix), E("Height", "0.42in"), E("Style")), E("Width", Inch(width)),
-            E("Page", E("PageHeader", E("Height", "0.95in"), E("PrintOnFirstPage", true), E("PrintOnLastPage", true), E("ReportItems",
-                    Positioned("Institution", institution, "0in", "0.24in", "12pt", true),
-                    Positioned("ReportTitle", title, "0.25in", "0.24in", "11pt", true),
-                    Positioned("Filters", subtitle, "0.5in", "0.4in", "8pt")), E("Style")),
-                E("PageFooter", E("Height", "0.3in"), E("PrintOnFirstPage", true), E("PrintOnLastPage", true), E("ReportItems",
-                    Positioned("Stamp", "=\"Printed " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm") + " by " + printedBy.Replace("\"", "\"\"") + "  |  Page \" & Globals!PageNumber & \" of \" & Globals!TotalPages", "0in", "0.3in", "7pt")), E("Style")),
-                E("PageHeight", landscape ? "8.27in" : "11.69in"), E("PageWidth", landscape ? "11.69in" : "8.27in"),
-                E("LeftMargin", "0.5in"), E("RightMargin", "0.5in"), E("TopMargin", "0.4in"), E("BottomMargin", "0.4in"), E("Style")),
-            E("ConsumeContainerWhitespace", true)));
-        return new(document.ToString(), data);
+        string scope=string.Join("   |   ",filters);
+        using var bitmap=new Bitmap(1,1);using var graphics=Graphics.FromImage(bitmap);
+        double TextHeight(string text,float points)
+        {
+            if(text.Length==0)return 0;
+            using var font=new Font("Segoe UI",points);
+            var measured=graphics.MeasureString(text,font,new SizeF((float)(width*graphics.DpiX)-8,10000),StringFormat.GenericTypographic);
+            return Math.Max(points/72*1.3,measured.Height/graphics.DpiY)+.07;
+        }
+        double top=0;
+        var headerItems=new List<XElement>();
+        double schoolHeight=TextHeight(institution,14);
+        headerItems.Add(Position(Text("Institution",institution,true,"Left","14pt","#25465E"),0,top,width,schoolHeight));top+=schoolHeight+.02;
+        double titleHeight=TextHeight(title,12);
+        headerItems.Add(Position(Text("ReportTitle",title,true,"Left","12pt"),0,top,width,titleHeight));top+=titleHeight+.03;
+        if(scope.Length>0){double scopeHeight=TextHeight(scope,8.5f);headerItems.Add(Position(Text("Filters",scope,false,"Left","8.5pt","#536578"),0,top,width,scopeHeight));top+=scopeHeight+.08;}
+        if(metrics.Count>0)
+        {
+            int count=Math.Min(metrics.Count,landscape?6:3);double metricWidth=width/count;
+            for(int index=0;index<metrics.Count;index++)
+            {
+                double x=(index%count)*metricWidth,y=top+(index/count)*.53;
+                var label=Position(Text("MetricLabel"+index,metrics[index].Label,false,"Left","8pt","#536578"),x,y,metricWidth,.24);
+                var value=Position(Text("MetricValue"+index,metrics[index].Value,true,"Left","11pt"),x,y+.24,metricWidth,.26);
+                label.Element(ns+"Style")!.Add(E("BackgroundColor","#F0F4F8"));value.Element(ns+"Style")!.Add(E("BackgroundColor","#F0F4F8"));
+                headerItems.Add(label);headerItems.Add(value);
+            }
+            top+=Math.Ceiling(metrics.Count/(double)count)*.53+.08;
+        }
+        string safeBy=printedBy.Replace("\"","\"\"").Replace("\r"," ").Replace("\n"," ");
+        var footerItems=new[]{
+            Position(Text("Stamp","=\"Prepared \" & Format(Now(), \"dd-MMM-yyyy HH:mm\") & \"  |  Printed by: "+safeBy+"\"",false,"Left","7.5pt","#536578"),0,0,width*.75,.27),
+            Position(Text("PageNumber","=\"Page \" & Globals!PageNumber & \" of \" & Globals!TotalPages",false,"Right","7.5pt","#536578"),width*.75,0,width*.25,.27)};
+        var document=new XDocument(E("Report",
+            E("DataSources",E("DataSource",new XAttribute("Name","Source"),E("ConnectionProperties",E("DataProvider","System.Data.DataSet"),E("ConnectString","")))),
+            E("DataSets",E("DataSet",new XAttribute("Name","ReportData"),E("Query",E("DataSourceName","Source"),E("CommandText","")),
+                E("Fields",data.Columns.Cast<DataColumn>().Select(column=>E("Field",new XAttribute("Name",column.ColumnName),E("DataField",column.ColumnName)))))),
+            E("Body",E("ReportItems",items),E("Height",Inch(bands.Count==1?.68:bands.Count*.95)),E("Style")),E("Width",Inch(width)),
+            E("Page",E("PageHeader",E("Height",Inch(top)),E("PrintOnFirstPage",true),E("PrintOnLastPage",true),E("ReportItems",headerItems),E("Style")),
+                E("PageFooter",E("Height","0.30in"),E("PrintOnFirstPage",true),E("PrintOnLastPage",true),E("ReportItems",footerItems),E("Style")),
+                E("PageHeight",landscape?"8.27in":"11.69in"),E("PageWidth",landscape?"11.69in":"8.27in"),
+                E("LeftMargin","0.5in"),E("RightMargin","0.5in"),E("TopMargin","0.35in"),E("BottomMargin","0.35in"),E("Style")),E("ConsumeContainerWhitespace",true)));
+        return new(document.ToString(),data);
     }
     internal static void Show(IWin32Window? owner, string institution, string title, string subtitle, DataTable source, string printedBy, string moneyFormat = "#,##0.##")
     {

@@ -1,5 +1,893 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+  <Body>
+    <ReportItems>
+      <Textbox Name="Kicker">
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>FINANCE · RECEIVABLES</Value>
+                <Style>
+                  <FontFamily>Segoe UI</FontFamily>
+                  <FontSize>8pt</FontSize>
+                  <FontWeight>Bold</FontWeight>
+                  <Color>#1f6f5f</Color>
+                </Style>
+              </TextRun>
+            </TextRuns>
+            <Style />
+          </Paragraph>
+        </Paragraphs>
+        <Height>0.2in</Height>
+        <Width>7.27in</Width>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Textbox>
+      <Textbox Name="Title">
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>Outstanding/Aging Fee </Value>
+                <Style>
+                  <FontFamily>Segoe UI</FontFamily>
+                  <FontSize>20pt</FontSize>
+                  <FontWeight>Bold</FontWeight>
+                  <Color>#172b3a</Color>
+                </Style>
+              </TextRun>
+            </TextRuns>
+            <Style />
+          </Paragraph>
+        </Paragraphs>
+        <Top>0.22in</Top>
+        <Height>0.42in</Height>
+        <Width>7.27in</Width>
+        <ZIndex>1</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Textbox>
+      <Textbox Name="Subtitle">
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>Student balances organised by urgency and age</Value>
+                <Style>
+                  <FontFamily>Segoe UI</FontFamily>
+                  <FontSize>9.5pt</FontSize>
+                  <Color>#58707e</Color>
+                </Style>
+              </TextRun>
+            </TextRuns>
+            <Style />
+          </Paragraph>
+        </Paragraphs>
+        <Top>0.65in</Top>
+        <Height>0.22in</Height>
+        <Width>7.27in</Width>
+        <ZIndex>2</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Textbox>
+      <Rectangle Name="ContextPanel">
+        <ReportItems>
+          <Textbox Name="Scope">
+            <CanGrow>true</CanGrow>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>REPORT SCOPE</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>8.5pt</FontSize>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=vbCrLf</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>8.5pt</FontSize>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=First(Fields!FilterSummary.Value, "FeeAgingData")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>8.5pt</FontSize>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.09in</Top>
+            <Left>0.14in</Left>
+            <Height>0.38in</Height>
+            <Width>4.7in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+          <Textbox Name="Generated">
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>GENERATED</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>8.5pt</FontSize>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=vbCrLf</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>8.5pt</FontSize>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=Format(Globals!ExecutionTime, "dd MMM yyyy · hh:mm tt")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>8.5pt</FontSize>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Right</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.09in</Top>
+            <Left>4.95in</Left>
+            <Height>0.38in</Height>
+            <Width>2.15in</Width>
+            <ZIndex>1</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+        </ReportItems>
+        <Top>0.93in</Top>
+        <Height>0.57in</Height>
+        <Width>7.27in</Width>
+        <ZIndex>3</ZIndex>
+        <Style>
+          <Border>
+            <Color>#d8e2e7</Color>
+            <Style>Solid</Style>
+            <Width>0.75pt</Width>
+          </Border>
+          <BackgroundColor>#f6f9fa</BackgroundColor>
+        </Style>
+      </Rectangle>
+      <Rectangle Name="Summary">
+        <ReportItems>
+          <Textbox Name="Accounts">
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>ACCOUNTS</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=vbCrLf</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=CountRows("FeeAgingData")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.08in</Top>
+            <Left>0.1in</Left>
+            <Height>0.4in</Height>
+            <Width>1.55in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+          <Textbox Name="Outstanding">
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>TOTAL OUTSTANDING</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=vbCrLf</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>="Rs. "</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=Format(Sum(Fields!TotalOutstanding.Value, "FeeAgingData"), "N0")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.08in</Top>
+            <Left>1.7in</Left>
+            <Height>0.4in</Height>
+            <Width>2.15in</Width>
+            <ZIndex>1</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+          <Textbox Name="Critical">
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>OVER 90 DAYS</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#a33a32</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=vbCrLf</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#a33a32</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>="Rs. "</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#a33a32</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=Format(Sum(Fields!Overdue90Plus.Value, "FeeAgingData"), "N0")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#a33a32</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.08in</Top>
+            <Left>3.9in</Left>
+            <Height>0.4in</Height>
+            <Width>1.55in</Width>
+            <ZIndex>2</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+          <Textbox Name="Current">
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>NOT YET DUE</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#1f6f5f</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=vbCrLf</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#1f6f5f</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>="Rs. "</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#1f6f5f</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=Format(Sum(Fields!NotYetDue.Value, "FeeAgingData"), "N0")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#1f6f5f</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.08in</Top>
+            <Left>5.5in</Left>
+            <Height>0.4in</Height>
+            <Width>1.65in</Width>
+            <ZIndex>3</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+        </ReportItems>
+        <Top>1.64in</Top>
+        <Height>0.58in</Height>
+        <Width>7.27in</Width>
+        <ZIndex>4</ZIndex>
+        <Style>
+          <Border>
+            <Color>#d8e2e7</Color>
+            <Style>Solid</Style>
+            <Width>0.75pt</Width>
+          </Border>
+          <BackgroundColor>#ffffff</BackgroundColor>
+        </Style>
+      </Rectangle>
+      <Textbox Name="DetailHeading">
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>ACCOUNT DETAIL</Value>
+                <Style>
+                  <FontFamily>Segoe UI</FontFamily>
+                  <FontSize>8pt</FontSize>
+                  <FontWeight>Bold</FontWeight>
+                  <Color>#58707e</Color>
+                </Style>
+              </TextRun>
+            </TextRuns>
+            <Style />
+          </Paragraph>
+        </Paragraphs>
+        <Top>2.38in</Top>
+        <Height>0.2in</Height>
+        <Width>7.27in</Width>
+        <ZIndex>5</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Textbox>
+      <Tablix Name="AgingAccounts">
+        <TablixBody>
+          <TablixColumns>
+            <TablixColumn>
+              <Width>3.02in</Width>
+            </TablixColumn>
+            <TablixColumn>
+              <Width>2.85in</Width>
+            </TablixColumn>
+            <TablixColumn>
+              <Width>1.4in</Width>
+            </TablixColumn>
+          </TablixColumns>
+          <TablixRows>
+            <TablixRow>
+              <Height>0.78in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="StudentIdentity">
+                      <CanGrow>true</CanGrow>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Fields!AdmissionNumber.Value</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontWeight>Bold</FontWeight>
+                                <Color>#172b3a</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=" - "</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontWeight>Bold</FontWeight>
+                                <Color>#172b3a</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=Fields!StudentName.Value</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontWeight>Bold</FontWeight>
+                                <Color>#172b3a</Color>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style />
+                        </Paragraph>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Fields!RegistrationNumber.Value</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#58707e</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>="  ·  "</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#58707e</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=Fields!ClassName.Value</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#58707e</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=IIF(Len(Fields!SectionName.Value) &gt; 0, " / ", "")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#58707e</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=IIF(Len(Fields!SectionName.Value) &gt; 0, Fields!SectionName.Value, "")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#58707e</Color>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style />
+                        </Paragraph>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Fields!CampusName.Value</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#58707e</Color>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style />
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <BottomBorder>
+                          <Color>#d8e2e7</Color>
+                          <Style>Solid</Style>
+                          <Width>0.5pt</Width>
+                        </BottomBorder>
+                        <VerticalAlign>Middle</VerticalAlign>
+                        <PaddingLeft>6pt</PaddingLeft>
+                        <PaddingTop>5pt</PaddingTop>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="AgingBreakdown">
+                      <CanGrow>true</CanGrow>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>="CURRENT   Rs. "</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#1f6f5f</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=Format(Fields!NotYetDue.Value, "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#1f6f5f</Color>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style />
+                        </Paragraph>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>="1–30   "</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#425a68</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=Format(Fields!Overdue1To30.Value, "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#425a68</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>="     31–60   "</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#425a68</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=Format(Fields!Overdue31To60.Value, "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>#425a68</Color>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style />
+                        </Paragraph>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>="61–90   "</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>=IIf(Fields!Overdue90Plus.Value &gt; 0, "#A33A32", "#425A68")</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=Format(Fields!Overdue61To90.Value, "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>=IIf(Fields!Overdue90Plus.Value &gt; 0, "#A33A32", "#425A68")</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>="     90+   "</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>=IIf(Fields!Overdue90Plus.Value &gt; 0, "#A33A32", "#425A68")</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=Format(Fields!Overdue90Plus.Value, "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>8pt</FontSize>
+                                <Color>=IIf(Fields!Overdue90Plus.Value &gt; 0, "#A33A32", "#425A68")</Color>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style />
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <BottomBorder>
+                          <Color>#d8e2e7</Color>
+                          <Style>Solid</Style>
+                          <Width>0.5pt</Width>
+                        </BottomBorder>
+                        <VerticalAlign>Middle</VerticalAlign>
+                        <PaddingLeft>5pt</PaddingLeft>
+                        <PaddingTop>5pt</PaddingTop>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="AccountTotal">
+                      <CanGrow>true</CanGrow>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>="Rs. "</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>11pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                                <Color>#172b3a</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=Format(Fields!TotalOutstanding.Value, "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>11pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                                <Color>#172b3a</Color>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Right</TextAlign>
+                          </Style>
+                        </Paragraph>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=IIF(Fields!MaxDaysOverdue.Value &gt; 0, CStr(Fields!MaxDaysOverdue.Value), "Current")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7.5pt</FontSize>
+                                <Color>=IIf(Fields!MaxDaysOverdue.Value &gt; 90, "#A33A32", "#58707E")</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=IIF(Fields!MaxDaysOverdue.Value &gt; 0, " days overdue", "")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7.5pt</FontSize>
+                                <Color>=IIf(Fields!MaxDaysOverdue.Value &gt; 90, "#A33A32", "#58707E")</Color>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Right</TextAlign>
+                          </Style>
+                        </Paragraph>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=IIF(IsNothing(Fields!OldestDueDate.Value), "", "Since ")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7.5pt</FontSize>
+                                <Color>#58707e</Color>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=IIF(IsNothing(Fields!OldestDueDate.Value), "", Format(Fields!OldestDueDate.Value, "dd MMM yyyy"))</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7.5pt</FontSize>
+                                <Color>#58707e</Color>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Right</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <BottomBorder>
+                          <Color>#d8e2e7</Color>
+                          <Style>Solid</Style>
+                          <Width>0.5pt</Width>
+                        </BottomBorder>
+                        <VerticalAlign>Middle</VerticalAlign>
+                        <PaddingRight>6pt</PaddingRight>
+                        <PaddingTop>5pt</PaddingTop>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
+          </TablixRows>
+        </TablixBody>
+        <TablixColumnHierarchy>
+          <TablixMembers>
+            <TablixMember />
+            <TablixMember />
+            <TablixMember />
+          </TablixMembers>
+        </TablixColumnHierarchy>
+        <TablixRowHierarchy>
+          <TablixMembers>
+            <TablixMember>
+              <Group Name="AccountDetails">
+                <GroupExpressions>
+                  <GroupExpression>=Fields!AdmissionNumber.Value</GroupExpression>
+                </GroupExpressions>
+              </Group>
+              <SortExpressions>
+                <SortExpression>
+                  <Value>=Fields!MaxDaysOverdue.Value</Value>
+                  <Direction>Descending</Direction>
+                </SortExpression>
+                <SortExpression>
+                  <Value>=Fields!TotalOutstanding.Value</Value>
+                  <Direction>Descending</Direction>
+                </SortExpression>
+              </SortExpressions>
+            </TablixMember>
+          </TablixMembers>
+        </TablixRowHierarchy>
+        <DataSetName>FeeAgingData</DataSetName>
+        <Top>2.63in</Top>
+        <Height>0.78in</Height>
+        <Width>7.27in</Width>
+        <ZIndex>6</ZIndex>
+        <Style />
+      </Tablix>
+    </ReportItems>
+    <Height>3.5in</Height>
+    <Style />
+  </Body>
+  <Width>7.27in</Width>
+  <Page>
+    <PageFooter>
+      <Height>0.32in</Height>
+      <PrintOnFirstPage>true</PrintOnFirstPage>
+      <PrintOnLastPage>true</PrintOnLastPage>
+      <ReportItems>
+        <Textbox Name="Footer">
+          <Paragraphs>
+            <Paragraph>
+              <TextRuns>
+                <TextRun>
+                  <Value>="CONFIDENTIAL · Fee aging · Page "</Value>
+                  <Style>
+                    <FontFamily>Segoe UI</FontFamily>
+                    <FontSize>7.5pt</FontSize>
+                    <Color>#718590</Color>
+                  </Style>
+                </TextRun>
+                <TextRun>
+                  <Value>=Globals!PageNumber</Value>
+                  <Style>
+                    <FontFamily>Segoe UI</FontFamily>
+                    <FontSize>7.5pt</FontSize>
+                    <Color>#718590</Color>
+                  </Style>
+                </TextRun>
+                <TextRun>
+                  <Value>=" of "</Value>
+                  <Style>
+                    <FontFamily>Segoe UI</FontFamily>
+                    <FontSize>7.5pt</FontSize>
+                    <Color>#718590</Color>
+                  </Style>
+                </TextRun>
+                <TextRun>
+                  <Value>=Globals!TotalPages</Value>
+                  <Style>
+                    <FontFamily>Segoe UI</FontFamily>
+                    <FontSize>7.5pt</FontSize>
+                    <Color>#718590</Color>
+                  </Style>
+                </TextRun>
+              </TextRuns>
+              <Style>
+                <TextAlign>Right</TextAlign>
+              </Style>
+            </Paragraph>
+          </Paragraphs>
+          <Top>0.04in</Top>
+          <Height>0.2in</Height>
+          <Width>7.27in</Width>
+          <Style>
+            <TopBorder>
+              <Color>#d8e2e7</Color>
+              <Style>Solid</Style>
+              <Width>0.5pt</Width>
+            </TopBorder>
+            <PaddingTop>3pt</PaddingTop>
+          </Style>
+        </Textbox>
+      </ReportItems>
+      <Style />
+    </PageFooter>
+    <PageHeight>11.69in</PageHeight>
+    <PageWidth>8.27in</PageWidth>
+    <LeftMargin>0.5in</LeftMargin>
+    <RightMargin>0.5in</RightMargin>
+    <TopMargin>0.45in</TopMargin>
+    <BottomMargin>0.45in</BottomMargin>
+    <Style />
+  </Page>
+  <AutoRefresh>0</AutoRefresh>
   <DataSources>
     <DataSource Name="FeeAgingDataSource">
       <ConnectionProperties>
@@ -79,885 +967,6 @@
       </Fields>
     </DataSet>
   </DataSets>
-  <Body>
-    <ReportItems>
-      <Textbox Name="Kicker">
-        <Paragraphs>
-          <Paragraph>
-            <TextRuns>
-              <TextRun>
-                <Value>FINANCE · RECEIVABLES</Value>
-                <Style>
-                  <FontFamily>Segoe UI</FontFamily>
-                  <FontSize>8pt</FontSize>
-                  <FontWeight>Bold</FontWeight>
-                  <Color>#1F6F5F</Color>
-                </Style>
-              </TextRun>
-            </TextRuns>
-          </Paragraph>
-        </Paragraphs>
-        <Top>0in</Top>
-        <Left>0in</Left>
-        <Height>0.2in</Height>
-        <Width>7.27in</Width>
-        <Style>
-          <Border>
-            <Style>None</Style>
-          </Border>
-        </Style>
-      </Textbox>
-      <Textbox Name="Title">
-        <Paragraphs>
-          <Paragraph>
-            <TextRuns>
-              <TextRun>
-                <Value>Outstanding Fee Aging</Value>
-                <Style>
-                  <FontFamily>Segoe UI</FontFamily>
-                  <FontSize>20pt</FontSize>
-                  <FontWeight>Bold</FontWeight>
-                  <Color>#172B3A</Color>
-                </Style>
-              </TextRun>
-            </TextRuns>
-          </Paragraph>
-        </Paragraphs>
-        <Top>0.22in</Top>
-        <Left>0in</Left>
-        <Height>0.42in</Height>
-        <Width>7.27in</Width>
-        <Style>
-          <Border>
-            <Style>None</Style>
-          </Border>
-        </Style>
-      </Textbox>
-      <Textbox Name="Subtitle">
-        <Paragraphs>
-          <Paragraph>
-            <TextRuns>
-              <TextRun>
-                <Value>Student balances organised by urgency and age</Value>
-                <Style>
-                  <FontFamily>Segoe UI</FontFamily>
-                  <FontSize>9.5pt</FontSize>
-                  <Color>#58707E</Color>
-                </Style>
-              </TextRun>
-            </TextRuns>
-          </Paragraph>
-        </Paragraphs>
-        <Top>0.65in</Top>
-        <Left>0in</Left>
-        <Height>0.22in</Height>
-        <Width>7.27in</Width>
-        <Style>
-          <Border>
-            <Style>None</Style>
-          </Border>
-        </Style>
-      </Textbox>
-      <Rectangle Name="ContextPanel">
-        <ReportItems>
-          <Textbox Name="Scope">
-            <CanGrow>true</CanGrow>
-            <Paragraphs>
-              <Paragraph>
-                <TextRuns>
-                  <TextRun>
-                    <Value>REPORT SCOPE</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>8.5pt</FontSize>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>8.5pt</FontSize>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=First(Fields!FilterSummary.Value, "FeeAgingData")</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>8.5pt</FontSize>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                </TextRuns>
-              </Paragraph>
-            </Paragraphs>
-            <Top>0.09in</Top>
-            <Left>0.14in</Left>
-            <Height>0.38in</Height>
-            <Width>4.7in</Width>
-            <Style>
-              <Border>
-                <Style>None</Style>
-              </Border>
-            </Style>
-          </Textbox>
-          <Textbox Name="Generated">
-            <Paragraphs>
-              <Paragraph>
-                <TextRuns>
-                  <TextRun>
-                    <Value>GENERATED</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>8.5pt</FontSize>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>8.5pt</FontSize>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=Format(Globals!ExecutionTime, "dd MMM yyyy · hh:mm tt")</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>8.5pt</FontSize>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                </TextRuns>
-                <Style>
-                  <TextAlign>Right</TextAlign>
-                </Style>
-              </Paragraph>
-            </Paragraphs>
-            <Top>0.09in</Top>
-            <Left>4.95in</Left>
-            <Height>0.38in</Height>
-            <Width>2.15in</Width>
-            <Style>
-              <Border>
-                <Style>None</Style>
-              </Border>
-            </Style>
-          </Textbox>
-        </ReportItems>
-        <Top>0.93in</Top>
-        <Left>0in</Left>
-        <Height>0.57in</Height>
-        <Width>7.27in</Width>
-        <Style>
-          <Border>
-            <Color>#D8E2E7</Color>
-            <Style>Solid</Style>
-            <Width>0.75pt</Width>
-          </Border>
-          <BackgroundColor>#F6F9FA</BackgroundColor>
-        </Style>
-      </Rectangle>
-      <Rectangle Name="Summary">
-        <ReportItems>
-          <Textbox Name="Accounts">
-            <Paragraphs>
-              <Paragraph>
-                <TextRuns>
-                  <TextRun>
-                    <Value>ACCOUNTS</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=CountRows("FeeAgingData")</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                </TextRuns>
-                <Style>
-                  <TextAlign>Center</TextAlign>
-                </Style>
-              </Paragraph>
-            </Paragraphs>
-            <Top>0.08in</Top>
-            <Left>0.1in</Left>
-            <Height>0.4in</Height>
-            <Width>1.55in</Width>
-            <Style>
-              <Border>
-                <Style>None</Style>
-              </Border>
-            </Style>
-          </Textbox>
-          <Textbox Name="Outstanding">
-            <Paragraphs>
-              <Paragraph>
-                <TextRuns>
-                  <TextRun>
-                    <Value>TOTAL OUTSTANDING</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>="Rs. "</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=Format(Sum(Fields!TotalOutstanding.Value, "FeeAgingData"), "N0")</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#172B3A</Color>
-                    </Style>
-                  </TextRun>
-                </TextRuns>
-                <Style>
-                  <TextAlign>Center</TextAlign>
-                </Style>
-              </Paragraph>
-            </Paragraphs>
-            <Top>0.08in</Top>
-            <Left>1.7in</Left>
-            <Height>0.4in</Height>
-            <Width>2.15in</Width>
-            <Style>
-              <Border>
-                <Style>None</Style>
-              </Border>
-            </Style>
-          </Textbox>
-          <Textbox Name="Critical">
-            <Paragraphs>
-              <Paragraph>
-                <TextRuns>
-                  <TextRun>
-                    <Value>OVER 90 DAYS</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#A33A32</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#A33A32</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>="Rs. "</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#A33A32</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=Format(Sum(Fields!Overdue90Plus.Value, "FeeAgingData"), "N0")</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#A33A32</Color>
-                    </Style>
-                  </TextRun>
-                </TextRuns>
-                <Style>
-                  <TextAlign>Center</TextAlign>
-                </Style>
-              </Paragraph>
-            </Paragraphs>
-            <Top>0.08in</Top>
-            <Left>3.9in</Left>
-            <Height>0.4in</Height>
-            <Width>1.55in</Width>
-            <Style>
-              <Border>
-                <Style>None</Style>
-              </Border>
-            </Style>
-          </Textbox>
-          <Textbox Name="Current">
-            <Paragraphs>
-              <Paragraph>
-                <TextRuns>
-                  <TextRun>
-                    <Value>NOT YET DUE</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#1F6F5F</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#1F6F5F</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>="Rs. "</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#1F6F5F</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=Format(Sum(Fields!NotYetDue.Value, "FeeAgingData"), "N0")</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#1F6F5F</Color>
-                    </Style>
-                  </TextRun>
-                </TextRuns>
-                <Style>
-                  <TextAlign>Center</TextAlign>
-                </Style>
-              </Paragraph>
-            </Paragraphs>
-            <Top>0.08in</Top>
-            <Left>5.5in</Left>
-            <Height>0.4in</Height>
-            <Width>1.65in</Width>
-            <Style>
-              <Border>
-                <Style>None</Style>
-              </Border>
-            </Style>
-          </Textbox>
-        </ReportItems>
-        <Top>1.64in</Top>
-        <Left>0in</Left>
-        <Height>0.58in</Height>
-        <Width>7.27in</Width>
-        <Style>
-          <Border>
-            <Color>#D8E2E7</Color>
-            <Style>Solid</Style>
-            <Width>0.75pt</Width>
-          </Border>
-          <BackgroundColor>#FFFFFF</BackgroundColor>
-        </Style>
-      </Rectangle>
-      <Textbox Name="DetailHeading">
-        <Paragraphs>
-          <Paragraph>
-            <TextRuns>
-              <TextRun>
-                <Value>ACCOUNT DETAIL</Value>
-                <Style>
-                  <FontFamily>Segoe UI</FontFamily>
-                  <FontSize>8pt</FontSize>
-                  <FontWeight>Bold</FontWeight>
-                  <Color>#58707E</Color>
-                </Style>
-              </TextRun>
-            </TextRuns>
-          </Paragraph>
-        </Paragraphs>
-        <Top>2.38in</Top>
-        <Left>0in</Left>
-        <Height>0.2in</Height>
-        <Width>7.27in</Width>
-        <Style>
-          <Border>
-            <Style>None</Style>
-          </Border>
-        </Style>
-      </Textbox>
-      <Tablix Name="AgingAccounts">
-        <TablixBody>
-          <TablixColumns>
-            <TablixColumn>
-              <Width>3.02in</Width>
-            </TablixColumn>
-            <TablixColumn>
-              <Width>2.85in</Width>
-            </TablixColumn>
-            <TablixColumn>
-              <Width>1.4in</Width>
-            </TablixColumn>
-          </TablixColumns>
-          <TablixRows>
-            <TablixRow>
-              <Height>0.78in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="StudentIdentity">
-                      <CanGrow>true</CanGrow>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=Fields!AdmissionNumber.Value</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>10pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                                <Color>#172B3A</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=" - "</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>10pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                                <Color>#172B3A</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=Fields!StudentName.Value</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>10pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                                <Color>#172B3A</Color>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                        </Paragraph>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=Fields!RegistrationNumber.Value</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#58707E</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>="  ·  "</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#58707E</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=Fields!ClassName.Value</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#58707E</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=IIF(Len(Fields!SectionName.Value) &gt; 0, " / ", "")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#58707E</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=IIF(Len(Fields!SectionName.Value) &gt; 0, Fields!SectionName.Value, "")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#58707E</Color>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                        </Paragraph>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=Fields!CampusName.Value</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#58707E</Color>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <BottomBorder>
-                          <Color>#D8E2E7</Color>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </BottomBorder>
-                        <PaddingLeft>6pt</PaddingLeft>
-                        <PaddingTop>5pt</PaddingTop>
-                        <VerticalAlign>Middle</VerticalAlign>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="AgingBreakdown">
-                      <CanGrow>true</CanGrow>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>="CURRENT   Rs. "</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#1F6F5F</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=Format(Fields!NotYetDue.Value, "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#1F6F5F</Color>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                        </Paragraph>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>="1–30   "</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#425A68</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=Format(Fields!Overdue1To30.Value, "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#425A68</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>="     31–60   "</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#425A68</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=Format(Fields!Overdue31To60.Value, "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>#425A68</Color>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                        </Paragraph>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>="61–90   "</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>=IIf(Fields!Overdue90Plus.Value &gt; 0, "#A33A32", "#425A68")</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=Format(Fields!Overdue61To90.Value, "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>=IIf(Fields!Overdue90Plus.Value &gt; 0, "#A33A32", "#425A68")</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>="     90+   "</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>=IIf(Fields!Overdue90Plus.Value &gt; 0, "#A33A32", "#425A68")</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=Format(Fields!Overdue90Plus.Value, "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <Color>=IIf(Fields!Overdue90Plus.Value &gt; 0, "#A33A32", "#425A68")</Color>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <BottomBorder>
-                          <Color>#D8E2E7</Color>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </BottomBorder>
-                        <PaddingLeft>5pt</PaddingLeft>
-                        <PaddingTop>5pt</PaddingTop>
-                        <VerticalAlign>Middle</VerticalAlign>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="AccountTotal">
-                      <CanGrow>true</CanGrow>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>="Rs. "</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>11pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                                <Color>#172B3A</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=Format(Fields!TotalOutstanding.Value, "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>11pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                                <Color>#172B3A</Color>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Right</TextAlign>
-                          </Style>
-                        </Paragraph>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=IIF(Fields!MaxDaysOverdue.Value &gt; 0, CStr(Fields!MaxDaysOverdue.Value), "Current")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
-                                <Color>=IIf(Fields!MaxDaysOverdue.Value &gt; 90, "#A33A32", "#58707E")</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=IIF(Fields!MaxDaysOverdue.Value &gt; 0, " days overdue", "")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
-                                <Color>=IIf(Fields!MaxDaysOverdue.Value &gt; 90, "#A33A32", "#58707E")</Color>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Right</TextAlign>
-                          </Style>
-                        </Paragraph>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=IIF(IsNothing(Fields!OldestDueDate.Value), "", "Since ")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
-                                <Color>#58707E</Color>
-                              </Style>
-                            </TextRun>
-                            <TextRun>
-                              <Value>=IIF(IsNothing(Fields!OldestDueDate.Value), "", Format(Fields!OldestDueDate.Value, "dd MMM yyyy"))</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
-                                <Color>#58707E</Color>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Right</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <BottomBorder>
-                          <Color>#D8E2E7</Color>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </BottomBorder>
-                        <PaddingRight>6pt</PaddingRight>
-                        <PaddingTop>5pt</PaddingTop>
-                        <VerticalAlign>Middle</VerticalAlign>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-              </TablixCells>
-            </TablixRow>
-          </TablixRows>
-        </TablixBody>
-        <TablixColumnHierarchy>
-          <TablixMembers>
-            <TablixMember />
-            <TablixMember />
-            <TablixMember />
-          </TablixMembers>
-        </TablixColumnHierarchy>
-        <TablixRowHierarchy>
-          <TablixMembers>
-            <TablixMember>
-              <Group Name="AccountDetails">
-                <GroupExpressions>
-                  <GroupExpression>=Fields!AdmissionNumber.Value</GroupExpression>
-                </GroupExpressions>
-              </Group>
-              <SortExpressions>
-                <SortExpression>
-                  <Value>=Fields!MaxDaysOverdue.Value</Value>
-                  <Direction>Descending</Direction>
-                </SortExpression>
-                <SortExpression>
-                  <Value>=Fields!TotalOutstanding.Value</Value>
-                  <Direction>Descending</Direction>
-                </SortExpression>
-              </SortExpressions>
-            </TablixMember>
-          </TablixMembers>
-        </TablixRowHierarchy>
-        <DataSetName>FeeAgingData</DataSetName>
-        <Top>2.63in</Top>
-        <Left>0in</Left>
-        <Height>0.78in</Height>
-        <Width>7.27in</Width>
-        <Style />
-      </Tablix>
-    </ReportItems>
-    <Height>3.5in</Height>
-    <Style />
-  </Body>
-  <Width>7.27in</Width>
-  <Page>
-    <PageFooter>
-      <Height>0.32in</Height>
-      <PrintOnFirstPage>true</PrintOnFirstPage>
-      <PrintOnLastPage>true</PrintOnLastPage>
-      <ReportItems>
-        <Textbox Name="Footer">
-          <Paragraphs>
-            <Paragraph>
-              <TextRuns>
-                <TextRun>
-                  <Value>="CONFIDENTIAL · Fee aging · Page "</Value>
-                  <Style>
-                    <FontFamily>Segoe UI</FontFamily>
-                    <FontSize>7.5pt</FontSize>
-                    <Color>#718590</Color>
-                  </Style>
-                </TextRun>
-                <TextRun>
-                  <Value>=Globals!PageNumber</Value>
-                  <Style>
-                    <FontFamily>Segoe UI</FontFamily>
-                    <FontSize>7.5pt</FontSize>
-                    <Color>#718590</Color>
-                  </Style>
-                </TextRun>
-                <TextRun>
-                  <Value>=" of "</Value>
-                  <Style>
-                    <FontFamily>Segoe UI</FontFamily>
-                    <FontSize>7.5pt</FontSize>
-                    <Color>#718590</Color>
-                  </Style>
-                </TextRun>
-                <TextRun>
-                  <Value>=Globals!TotalPages</Value>
-                  <Style>
-                    <FontFamily>Segoe UI</FontFamily>
-                    <FontSize>7.5pt</FontSize>
-                    <Color>#718590</Color>
-                  </Style>
-                </TextRun>
-              </TextRuns>
-              <Style>
-                <TextAlign>Right</TextAlign>
-              </Style>
-            </Paragraph>
-          </Paragraphs>
-          <Top>0.04in</Top>
-          <Left>0in</Left>
-          <Height>0.2in</Height>
-          <Width>7.27in</Width>
-          <Style>
-            <TopBorder>
-              <Color>#D8E2E7</Color>
-              <Style>Solid</Style>
-              <Width>0.5pt</Width>
-            </TopBorder>
-            <PaddingTop>3pt</PaddingTop>
-          </Style>
-        </Textbox>
-      </ReportItems>
-      <Style />
-    </PageFooter>
-    <PageHeight>11.69in</PageHeight>
-    <PageWidth>8.27in</PageWidth>
-    <LeftMargin>0.5in</LeftMargin>
-    <RightMargin>0.5in</RightMargin>
-    <TopMargin>0.45in</TopMargin>
-    <BottomMargin>0.45in</BottomMargin>
-    <Style />
-  </Page>
-  <AutoRefresh>0</AutoRefresh>
   <rd:ReportUnitType>Inch</rd:ReportUnitType>
   <rd:ReportID>7b2e4c1a-9f3d-4a6e-8b2c-1d5f8a3e6c9b</rd:ReportID>
 </Report>

@@ -17,6 +17,8 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
     private DateTime loadedDay;
     private bool busy, loading, dirty;
     private readonly Label totals = new() { Dock = DockStyle.Fill, Font = AppTheme.BodyBoldFont, TextAlign = ContentAlignment.MiddleLeft };
+    private readonly Label closingState = new() { Dock = DockStyle.Fill, Font = AppTheme.BodyBoldFont,
+        TextAlign = ContentAlignment.MiddleRight, ForeColor = AppTheme.MutedText, AutoEllipsis = true };
     public bool IsBusy=>busy;
     public string BusyMessage=>"A daily closing operation is in progress. Wait for its result before leaving.";
     public bool HasUnsavedChanges => dirty;
@@ -40,10 +42,15 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.BodyBoldFont) + 12));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(115)));
-        layout.Controls.Add(HumanUi.Field("Closing Date", day), 0, 0);
+        var dayHeader = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
+        dayHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        dayHeader.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        dayHeader.Controls.Add(HumanUi.Field("Closing Date", day), 0, 0);
+        dayHeader.Controls.Add(closingState, 1, 0);
+        layout.Controls.Add(dayHeader, 0, 0);
         layout.Controls.Add(new Label {
             Dock = DockStyle.Fill, Font = AppTheme.NormalFont,
-            Text = "Enter net cash counted (exclude opening float) and confirmed net Bank, Card, Online and Other amounts. Blank = unchecked, not zero.\nRefund/Correction: leave actual amounts blank; explain cash/bank impact in Notes.\nPayment changes need a new closing revision; previous submissions are retained."
+            Text = "Enter counted cash excluding opening float, and confirmed net totals for other methods. Blank = unchecked; 0 = zero.\nFor Refund/Correction, leave Actual blank and explain the cash/bank effect in Notes.\nChanged payments require a new closing revision. Earlier revisions stay in Closing History."
         }, 0, 1);
         layout.Controls.Add(Grid, 0, 2);
         layout.Controls.Add(totals, 0, 3);
@@ -96,6 +103,11 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
         }, role);
     private void UpdateActions()
     {
+        // Mirror existing state for visibility; do not change submission eligibility.
+        closingState.Text = !Current ? "Load selected day" : dirty ? "Unsubmitted changes" :
+            $"{state!["ClosingStatus"]} · Revision {state["Revision"]}";
+        closingState.ForeColor = !Current ? AppTheme.MutedText : dirty ? AppTheme.Text :
+            Convert.ToString(state!["ClosingStatus"]) == "Approved" ? AppTheme.Success : AppTheme.HeadingText;
         submit.Enabled = !busy && Current && day.Value.Date <= DateTime.Today;
         approve.Enabled = !busy && Current && !dirty && Convert.ToString(state!["ClosingStatus"]) == "Submitted";
         print.Enabled = !busy && Current && !dirty;

@@ -625,6 +625,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     "Fee Collection",
                     "Fees.Collect"),
                 new(
+                    PageTitles.OutstandingBills,
+                    () => new OutstandingBillsPage(),
+                    "Finance",
+                    PageTitles.OutstandingBills,
+                    "Fees.View"),
+                new(
                     PageTitles.StudentPurchases,
                     () => new StudentPurchasesPage(),
                     "Finance",

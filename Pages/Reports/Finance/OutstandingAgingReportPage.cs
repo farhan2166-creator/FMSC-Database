@@ -18,47 +18,6 @@ public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
         yield return DatabaseHelper.Int("@SectionId", Section.SelectedId);
         yield return DatabaseHelper.Date("@AsOfDate", DateTime.Today);
     }
-    protected override async Task PreviewFeeRemindersAsync()
-    {
-        if (!CurrentUser.HasPermission("Reports.View")) return;
-        var scope = (Campus: Campus.SelectedId, Year: Year.SelectedId, Class: Class.SelectedId, Section: Section.SelectedId);
-        string Pick(LookupBox box) => box.SelectedId > 0 ? box.Text : "All";
-        string covers = $"Campus: {Pick(Campus)}; Academic year: {Pick(Year)}; Class: {Pick(Class)}; Section: {Pick(Section)}";
-        bool ScopeMatches() => scope == (Campus.SelectedId, Year.SelectedId, Class.SelectedId, Section.SelectedId);
-        Task<DataTable> ReadBalances() => Task.Run(() => DatabaseHelper.QuerySql(ClassOutstandingReportData.Query,
-            DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@CampusId", scope.Campus),
-            DatabaseHelper.Int("@AcademicYearId", scope.Year), DatabaseHelper.Int("@ClassId", scope.Class),
-            DatabaseHelper.Int("@SectionId", scope.Section)));
-        try
-        {
-            var balances = await ReadBalances();
-            if (IsDisposed) return;
-            if (!ScopeMatches()) { Warn("Filters changed. Open Fee Reminders again for the selected filters."); return; }
-            if (balances.Rows.Count == 0) { Warn("No outstanding charges were found for the selected filters."); return; }
-            using var selection = new FeeReminderSelectionDialog(balances, covers);
-            if (selection.ShowDialog(FindForm()) != DialogResult.OK) return;
-            var selected = selection.SelectedStudents;
-            var requestedDate = selection.RequestedDate;
-            string message = selection.Message;
-            bool printOnA4 = selection.PrintOnA4;
-            var currentBalances = await ReadBalances();
-            var school = await InstitutionProfile.GetPrintIdentityAsync();
-            if (IsDisposed) return;
-            if (!ScopeMatches()) { Warn("Filters changed. Open Fee Reminders again for the selected filters."); return; }
-            if (string.IsNullOrWhiteSpace(school.Name)) { Warn("Check School Profile before printing fee reminders."); return; }
-            var data = FeeReminderReportData.Create(currentBalances, selected, school.Name, school.ContactNumber,
-                school.Address, covers, DateTime.Now, requestedDate, message);
-            if (data.Rows.Count == 0) { Warn("The selected students no longer have outstanding charges for these filters."); return; }
-            Info(selected.Count == data.Rows.Count ? $"{data.Rows.Count} fee reminders ready with refreshed balances."
-                : $"{data.Rows.Count} fee reminders ready. Students with no remaining balance were excluded.");
-            string path = Path.Combine(AppContext.BaseDirectory, "Reports", "FeeReminder.rdlc");
-            RdlcReportPreview.Show(FindForm(), printOnA4 ? "Fee Reminders — A4" : "Fee Reminders — Thermal", path, "FeeReceiptData", data,
-                fitPageWidth: printOnA4, reportDefinition: printOnA4 ? FeeReminderPrintLayout.A4Definition(path)
-                    : FeeDocumentLayout.ReminderDefinition(path, data));
-        }
-        catch (Exception ex) { if (!IsDisposed) Fail(ex); }
-    }
-
     protected override async Task PreviewClassOutstandingAsync()
     {
         if (!CurrentUser.HasPermission("Reports.View")) return;

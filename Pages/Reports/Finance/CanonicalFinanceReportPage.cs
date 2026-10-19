@@ -70,7 +70,6 @@ public abstract class CanonicalFinanceReportPage : V2Page
         if (classOutstandingPrint)
         {
             reportActions.Add(AddBusyAction("Class / Section A4", PreviewClassOutstandingAsync, "Secondary"));
-            reportActions.Add(AddBusyAction("Fee Reminders", PreviewFeeRemindersAsync, "Secondary"));
         }
         reportActions.Add(_export);
         RelocateFromActions(reportActions.ToArray());
@@ -109,7 +108,6 @@ public abstract class CanonicalFinanceReportPage : V2Page
         UpdateViewControls();
     }
     protected virtual Task PreviewClassOutstandingAsync() => Task.CompletedTask;
-    protected virtual Task PreviewFeeRemindersAsync() => Task.CompletedTask;
     protected override void OnWorkspaceStateRestoring() => _scopeEdited = true;
     protected abstract IEnumerable<SqlParameter> BuildParameters();
     protected virtual bool IsSummaryView => false;

@@ -7,6 +7,7 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
 {
     private readonly int admissionId;
     private readonly Label balance = new() { AutoSize = true, Padding = new Padding(8) };
+    private readonly Label creditBalance = new() { AutoSize = true, Padding = new Padding(8, 0, 8, 6), Font = AppTheme.HeadingFont, ForeColor = AppTheme.Success, Text = "Available credit: loading…" };
     private readonly ModernComboBox action = HumanUi.Combo(), sibling = HumanUi.Combo();
     private readonly ModernTextBox amount = HumanUi.TextBox(false, 20), reason = HumanUi.TextBox(false, 500);
     private readonly DataGridView history = HumanUi.Grid(false);
@@ -23,23 +24,39 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
         action.Items.AddRange(new object[] { "Deposit", "Refund", "Transfer" }); action.SelectedIndex = 0;
         action.SelectedIndexChanged += (_, _) => { sibling.Enabled = action.Text == "Transfer"; if (action.Text == "Transfer" && sibling.Items.Count > 0) sibling.SelectedIndex = 0; else sibling.SelectedIndex = -1; };
         sibling.Enabled = false;
-        var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 1, RowCount = 4 };
+        var root = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 1, RowCount = 5 };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         balance.Text = "Available credit will load here. Deposits are money received; refunds return cash; transfers move credit to a sibling.";
         balance.MaximumSize = new Size(AppScale.Scale(780), 0);
         root.Controls.Add(balance, 0, 0);
+        root.Controls.Add(creditBalance, 0, 1);
         var fields = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, RowCount = 2 };
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         fields.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight)); fields.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
         fields.Controls.Add(HumanUi.Field("Action", action), 0, 0); fields.Controls.Add(HumanUi.Field("Amount (Rs.)", amount), 1, 0);
-        fields.Controls.Add(HumanUi.Field("Transfer to sibling", sibling), 0, 1); fields.Controls.Add(HumanUi.Field("Reason", reason), 1, 1);
-        root.Controls.Add(fields, 0, 1);
-        history.Dock = DockStyle.Fill; root.Controls.Add(history, 0, 2);
+        var siblingField = HumanUi.Field("Transfer to sibling", sibling);
+        var reasonField = HumanUi.Field("Reason", reason);
+        fields.Controls.Add(siblingField, 0, 1); fields.Controls.Add(reasonField, 1, 1);
+        void ArrangeCreditFields()
+        {
+            // Presentation only: retain the original action/recipient selection handler.
+            bool transfer = action.Text == "Transfer";
+            fields.SuspendLayout();
+            siblingField.Visible = transfer;
+            fields.SetColumn(reasonField, transfer ? 1 : 0);
+            fields.SetColumnSpan(reasonField, transfer ? 1 : 2);
+            fields.ResumeLayout(true);
+        }
+        action.SelectedIndexChanged += (_, _) => ArrangeCreditFields();
+        ArrangeCreditFields();
+        root.Controls.Add(fields, 0, 2);
+        history.Dock = DockStyle.Fill; root.Controls.Add(history, 0, 3);
         var close = new ModernButton { Text = "Close", DialogResult = DialogResult.Cancel };
         var buttons = HumanUi.ButtonRow(save, close); buttons.Dock = DockStyle.Fill;
-        root.Controls.Add(buttons, 0, 3); Controls.Add(root); CancelButton = close;
+        root.Controls.Add(buttons, 0, 4); Controls.Add(root); CancelButton = close;
         FormClosing += (_, e) => { if (busy) e.Cancel = true; };
         save.Click += async (_, _) => await SaveAsync();
         if (loadOnShow) Shown += async (_, _) => await RefreshAsync();
@@ -60,7 +77,8 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
             var owner = identities.AsEnumerable().FirstOrDefault(row => Convert.ToInt32(row["AdmissionId"]) == admissionId);
             string identity = owner is null ? "Student Credit" : $"{owner["AdmissionNumber"]} · {owner["StudentName"]}";
             Text = $"Student Credit — {identity}";
-            balance.Text = $"{identity}\nAvailable credit: Rs. {Convert.ToDecimal(data.Tables[0].Rows[0]["AvailableCredit"]):N0}\n" +
+            creditBalance.Text = $"Available credit: Rs. {Convert.ToDecimal(data.Tables[0].Rows[0]["AvailableCredit"]):N0}";
+            balance.Text = $"{identity}\n" +
                 "Positive entries add credit; negative entries reduce it. Transfers move credit between siblings without receiving new money.";
             var entries = data.Tables[1].Copy();
             entries.Columns.Add("TransferDetails", typeof(string));

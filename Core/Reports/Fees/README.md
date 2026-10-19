@@ -29,10 +29,11 @@ Shared files:
   Annual receipts use `StudentReceiptReport` and `StudentReceipt.rdlc` on a sheet.
 - `AnnualReceiptPreview`: the shared annual receipt loader/preview, used directly
   from Student Account Statement and from the standalone year selector.
-- `OutstandingBillsPreview`: issues individual outstanding bills for a statement
-  selection and previews them together with `StudentBill.rdlc`, keeping each
-  bill's number. Statement date filters do not limit current outstanding bills.
+- `OutstandingBillsPreview`: issues individual outstanding bills from Student
+  Account Statement or Daily Work → Print Outstanding Bills. Thermal and A4
+  previews reuse `StudentBill.rdlc`, keeping each bill's number. Placement and
+  balance filters select students; each bill covers their full posted balance.
 
-The older admission-bill and fee-payment receipt templates are retired. Build
+The older admission-bill, fee-payment receipt and fee-reminder templates are retired. Build
 and publish cleanup removes their stale output copies. Historical receipts and
 saved bills render through the four current templates without changing their numbers.

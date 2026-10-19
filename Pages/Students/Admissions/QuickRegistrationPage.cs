@@ -42,7 +42,7 @@ public sealed class QuickRegistrationPage : UserControl, IUnsavedChanges, IBusyP
     }
 }
 
-internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
+internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChanges
 {
     private readonly Action<Func<Control>, string, string> navigate;
     private readonly Func<int, Task<(DataTable Details, DataTable Fees, string Snapshot)>> loadRegistration;
@@ -391,7 +391,9 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
             bool paid=Convert.ToBoolean(data.Row["HasPayments"]);
             row.Cells["Discount"].ReadOnly=!editing||paid||!CurrentUser.HasPermission("Fees.Adjust")||(savedStudent>0&&Convert.ToString(data.Row["ConcessionLabel"])!="None")||Convert.ToString(data.Row["Frequency"])!="Monthly"&&savedStudent>0||Convert.ToString(data.Row["ConcessionLabel"]) is "Free" or "Waived";
             row.Cells["Discount"].ToolTipText=paid?"This fee has a payment. Use Fee Corrections to adjust it.":savedStudent>0?"Future monthly discounts use Fee Discount in Admission / Review. Existing bills are adjusted in Fee Collection.":"Use the selected start for monthly concessions.";
-        }}
+        }
+        WorkspaceChanged?.Invoke(this,EventArgs.Empty);
+    }
     private void UpdateTotal()
     {
         if(applyingRegistration)return;

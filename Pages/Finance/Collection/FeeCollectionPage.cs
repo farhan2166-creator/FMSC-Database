@@ -17,6 +17,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     private readonly ContextMenuStrip studentFeesMenu = new StyledContextMenu();
     private readonly DataGridView recentPayments =
         HumanUi.Grid();
+    private Label? paymentHistoryDetails;
     /* Show one proposal row per child only for family collections. */
     private readonly DataGridView familyProposal =
         HumanUi.Grid(true);
@@ -1275,14 +1276,50 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         recentPayments.Columns["ChargeType"].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
         recentPayments.Columns["TransactionType"].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
         /* Payment history is read-only context on this page. */
+        UiHelper.SetGridEmptyMessage(recentPayments, "No payments recorded for this student.");
         recentPayments.SelectionChanged -= OnPaymentHistorySelectionChanged;
         recentPayments.SelectionChanged += OnPaymentHistorySelectionChanged;
+        recentPayments.CurrentCellChanged -= OnPaymentHistoryCurrentCellChanged;
+        recentPayments.CurrentCellChanged += OnPaymentHistoryCurrentCellChanged;
     }
+    private void OnPaymentHistoryCurrentCellChanged(object? sender, EventArgs e) => UpdatePaymentHistoryDetails();
     /// <summary>One subscription for the page's lifetime.</summary>
     private void OnPaymentHistorySelectionChanged(
         object? sender,
-        EventArgs e) =>
+        EventArgs e)
+    {
         UpdateReprintAvailability();
+        UpdatePaymentHistoryDetails();
+    }
+    private void UpdatePaymentHistoryDetails()
+    {
+        if (paymentHistoryDetails is null || paymentHistoryDetails.IsDisposed) return;
+        var row = recentPayments.CurrentRow;
+        if (row is null)
+        {
+            paymentHistoryDetails.Text = "Select a payment to see its amounts and adjustments.";
+            return;
+        }
+        // Reuse values already loaded for the history grid. No extra financial reads
+        // or reconstructed discounts/balances belong in this presentation panel.
+        string reference = row.Cells["ReceiptNumber"].Tag as string ?? GetText(row.Cells["ReceiptNumber"].Value);
+        string Money(string column) => decimal.TryParse(Convert.ToString(row.Cells[column].Value), out decimal value)
+            ? value.ToString("#,0.##") : "—";
+        var lines = new List<string> {
+            $"Reference: {reference}",
+            $"Student amount: Rs. {Money("Amount")}   ·   Adjustments: Rs. {Money("Adjusted")}   ·   Net student amount: Rs. {Money("NetPaid")}" };
+        string split = row.Cells["Amount"].ToolTipText;
+        if (split.StartsWith("New money applied:", StringComparison.Ordinal)) lines.Add(split);
+        else
+        {
+            string adjustment = row.Cells["Adjusted"].ToolTipText;
+            if (adjustment.StartsWith("Refunds:", StringComparison.Ordinal) || adjustment.StartsWith("Reversed:", StringComparison.Ordinal))
+                lines.Add(adjustment);
+        }
+        if (row.Cells["ReceiptTotal"].Value is not null and not DBNull)
+            lines.Add($"Whole family receipt: Rs. {Money("ReceiptTotal")}");
+        paymentHistoryDetails.Text = string.Join(Environment.NewLine, lines);
+    }
     /// <summary>Only collected payment entries can be reprinted as receipts.</summary>
     private void UpdateReprintAvailability()
     {
@@ -3523,7 +3560,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         }
         using var dialog =
             new ApplicationWindowForm {
-                Text = $"Payment History — {StudentNameFor(admissionId)} · Admission {AdmissionNumbers.ForId(admissionId)}",
+                Text = $"Recent Payments — {StudentNameFor(admissionId)} · Admission {AdmissionNumbers.ForId(admissionId)}",
                 StartPosition = FormStartPosition.CenterParent,
                 ClientSize = new Size(AppScale.Scale(1180), AppScale.Scale(520)),
                 MinimumSize = new Size(AppScale.Scale(720), AppScale.Scale(420)),
@@ -3533,8 +3570,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             };
         var card =
             HumanUi.Card(
-                $"Payment History · {StudentNameFor(admissionId)} · Admission {AdmissionNumbers.ForId(admissionId)}",
-                "Student amounts are shown below. Family totals appear only for shared receipts. Hover over an amount for adjustments; negative amounts are money returned.");
+                $"Recent Payments · {StudentNameFor(admissionId)} · Admission {AdmissionNumbers.ForId(admissionId)}",
+                "Select a payment for its details below. Family totals cover all included students; negative amounts are money returned.");
         recentPayments.Dock =
             DockStyle.Fill;
         card.Content.Controls.Add(
@@ -3565,7 +3602,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
-                RowCount = 2,
+                RowCount = 3,
                 Padding = new Padding(12)
             };
         root.RowStyles.Add(
@@ -3575,14 +3612,23 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         root.RowStyles.Add(
             new RowStyle(
                 SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        paymentHistoryDetails = new Label {
+            AutoSize = true, Dock = DockStyle.Fill, Font = AppTheme.NormalFont,
+            ForeColor = AppTheme.Text, BackColor = AppTheme.SurfaceSecondary,
+            Padding = new Padding(8), Margin = new Padding(0, 6, 0, 6)
+        };
+        // Bound wrapping keeps the details readable without widening the dialog.
+        root.SizeChanged += (_, _) => {
+            if (paymentHistoryDetails is not null)
+                paymentHistoryDetails.MaximumSize = new Size(Math.Max(1, root.ClientSize.Width - root.Padding.Horizontal), 0);
+        };
         root.Controls.Add(
             card,
             0,
             0);
-        root.Controls.Add(
-            buttons,
-            0,
-            1);
+        root.Controls.Add(paymentHistoryDetails, 0, 1);
+        root.Controls.Add(buttons, 0, 2);
         dialog.Controls.Add(
             root);
         dialog.CancelButton =
@@ -3595,6 +3641,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         recentPayments.Enabled = true;
         /* The list is on screen before the button is offered, so its state is derived once here rather than waiting for the first click to set it. */
         UpdateReprintAvailability();
+        UpdatePaymentHistoryDetails();
         try
         {
             dialog.ShowDialog(
@@ -3612,6 +3659,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             }
             /* The button, unlike the grid, IS the dialog's - it is disposed with it, so the page must stop pointing at it. */
             reprintReceiptButton = null;
+            paymentHistoryDetails = null;
             recentPayments.Enabled = false;
         }
     }
