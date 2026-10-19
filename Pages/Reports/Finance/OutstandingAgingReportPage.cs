@@ -54,7 +54,7 @@ public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
             string path = Path.Combine(AppContext.BaseDirectory, "Reports", "FeeReminder.rdlc");
             RdlcReportPreview.Show(FindForm(), printOnA4 ? "Fee Reminders — A4" : "Fee Reminders — Thermal", path, "FeeReceiptData", data,
                 fitPageWidth: printOnA4, reportDefinition: printOnA4 ? FeeReminderPrintLayout.A4Definition(path)
-                    : ReceiptReportLayout.Definition(path, data, splitFeePeriod: false));
+                    : FeeDocumentLayout.ReminderDefinition(path, data));
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
     }

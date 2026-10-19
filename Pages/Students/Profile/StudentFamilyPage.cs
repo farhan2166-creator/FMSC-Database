@@ -42,7 +42,7 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
     public StudentFamilyPage() : this(0) { }
     public StudentFamilyPage(int preloadAdmissionId) : this(preloadAdmissionId,true) { }
     internal StudentFamilyPage(int preloadAdmissionId,bool initialize)
-        : this(preloadAdmissionId, initialize, FamilyBillPreview.ReadMembersAsync, null) { }
+        : this(preloadAdmissionId, initialize, FeeBillPreview.ReadMembersAsync, null) { }
     internal StudentFamilyPage(int preloadAdmissionId,bool initialize,Func<int,Task<DataTable>> readMembers,
         Func<int,Task<bool>>? confirmReturn) : base(
         "Family / Siblings",

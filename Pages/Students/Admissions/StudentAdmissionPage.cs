@@ -3525,8 +3525,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 Alert("Check School Profile before printing the admission bill.");
                 return;
             }
-            await AdmissionBillReport.Show(FindForm(), institution, name.Text.Trim(), currentAdmissionId,
-                classSectionText, billRows.Select(row => new AdmissionBillReport.Line(
+            await StudentBillReport.ShowAsync(FindForm(), institution, name.Text.Trim(), currentAdmissionId,
+                classSectionText, billRows.Select(row => new StudentBillReport.Line(
                     row.FeeName, row.BillingMonth, row.Amount, row.DiscountAmount)).ToList(), showActualAmount,
                 viewCampus.Text == "-" ? string.Empty : viewCampus.Text.Trim(), fatherName.Text.Trim(),
                 string.Join(",",raw.AsEnumerable().Where(row=>GetDecimalColumn(row,"Balance")>0)

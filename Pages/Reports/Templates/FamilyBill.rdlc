@@ -1470,7 +1470,7 @@
             </TablixMember>
           </TablixMembers>
         </TablixRowHierarchy>
-        <DataSetName>FeeReceiptData</DataSetName>
+        <DataSetName>FamilyBillData</DataSetName>
         <Height>2.9in</Height>
         <Width>2.05in</Width>
         <Style/>
@@ -1491,7 +1491,7 @@
   </Page>
   <AutoRefresh>0</AutoRefresh>
   <DataSources>
-    <DataSource Name="FeeReceiptDataSource">
+    <DataSource Name="FamilyBillDataSource">
       <ConnectionProperties>
         <DataProvider>System.Data.DataSet</DataProvider>
         <ConnectString/>
@@ -1500,9 +1500,9 @@
     </DataSource>
   </DataSources>
   <DataSets>
-    <DataSet Name="FeeReceiptData">
+    <DataSet Name="FamilyBillData">
       <Query>
-        <DataSourceName>FeeReceiptDataSource</DataSourceName>
+        <DataSourceName>FamilyBillDataSource</DataSourceName>
         <CommandText/>
       </Query>
       <Fields>

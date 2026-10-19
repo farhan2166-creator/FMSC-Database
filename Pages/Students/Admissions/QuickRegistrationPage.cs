@@ -664,7 +664,7 @@ internal sealed class QuickRegistrationFormPage : V2Page, IUnsavedChanges
         busy=true;UpdateActions();
         try{
             int id=savedStudent, version=registrationLoadVersion;
-            await FamilyBillPreview.ShowAsync(FindForm(),id,isCurrent:()=>!IsDisposed && savedStudent==id && registrationLoadVersion==version && !needsRefresh && !recoveryBlocked && !HasPendingChanges);
+            await FeeBillPreview.ShowAsync(FindForm(),id,isCurrent:()=>!IsDisposed && savedStudent==id && registrationLoadVersion==version && !needsRefresh && !recoveryBlocked && !HasPendingChanges);
         }catch(Exception ex){Fail(ex);}
         finally{busy=false;if(!IsDisposed)UpdateActions();}
     }

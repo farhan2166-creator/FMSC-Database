@@ -5,89 +5,18 @@ using System.Xml.Linq;
 namespace FMSC_SMS.Core;
 
 /// <summary>Sizes the receipt paper from its table content, keeping the configured paper width.</summary>
-internal static class ReceiptReportLayout
+internal static class FeeDocumentLayout
 {
-    internal static string Definition(string path, DataTable data, bool annualSheet = false, bool splitFeePeriod = true)
+    internal static string ReminderDefinition(string path,DataTable data)
     {
-        var document = XDocument.Load(path);
-        XNamespace ns = document.Root!.Name.Namespace;
-        var table = document.Descendants(ns + "Tablix").First();
-        // Editable templates already contain their month and fee columns.
-        // Retain support for older external layouts without splitting twice.
-        splitFeePeriod = splitFeePeriod && !table.Descendants(ns + "Textbox")
-            .Any(box => (string?)box.Attribute("Name") == "FeePeriod");
-        if(data.Columns.Contains("FamilyRowKind")){
-            splitFeePeriod=false;
-            var fields=document.Descendants(ns+"DataSet").First().Element(ns+"Fields")!;
-            foreach(string key in new[]{"FamilyRowKind","FamilyAmountText"})
-                fields.Add(new XElement(ns+"Field",new XAttribute("Name",key),new XElement(ns+"DataField",key)));
-            var description=table.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="FeeDescription");
-            description.Descendants(ns+"TextRun").First().Element(ns+"Style")!.Add(new XElement(ns+"FontWeight","=IIf(Fields!FamilyRowKind.Value = \"Fee\", \"Normal\", \"Bold\")"));
-            table.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="LineAmount").Descendants(ns+"Value").First().Value="=Fields!FamilyAmountText.Value";
-            table.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="FeeHeader").Descendants(ns+"Value").First().Value="Student / Month / Fee";
-            table.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="AmountHeader").Descendants(ns+"Value").First().Value="Due (Rs.)";
-            foreach(var value in table.Descendants(ns+"Value").Where(value=>value.Value is "TOTAL PAID" or "TOTAL SETTLED"))value.Value="TOTAL DUE";
-        }
-        foreach (var label in document.Descendants(ns + "Textbox").Where(box => (string?)box.Attribute("Name") == "AdmissionNumberTextLabel"))
-            label.Descendants(ns + "Value").First().Value = "=IIf(InStr(CStr(First(Fields!AdmissionNumberText.Value, \"ReceiptPageGroup\")), \"QR-\") > 0, \"Registration #\", \"Admission #\")";
-        // Split only the fee header and detail cells; all other receipt rows keep their spans.
-        foreach (string name in splitFeePeriod ? new[] { "FeeHeader", "FeeDescription" } : Array.Empty<string>())
-        {
-            var fee = table.Descendants(ns + "Textbox").Single(box => (string?)box.Attribute("Name") == name);
-            var contents = fee.Parent!;
-            var cell = contents.Parent!;
-            contents.Element(ns + "ColSpan")!.Remove();
-            var period = new XElement(fee);
-            period.SetAttributeValue("Name", name == "FeeHeader" ? "PeriodHeader" : "FeePeriod");
-            period.Descendants(ns + "Value").First().Value = name == "FeeHeader" ? "Month" : "=Fields!FeePeriod.Value";
-            fee.Descendants(ns + "Value").First().Value = name == "FeeHeader" ? "Fee" : "=Fields!FeeDescription.Value";
-            contents.ReplaceNodes(period);
-            cell.ElementsAfterSelf(ns + "TablixCell").First().Add(new XElement(ns + "CellContents", fee));
-        }
-        if (splitFeePeriod) document.Descendants(ns + "DataSet").First().Element(ns + "Fields")!.Add(
-            new XElement(ns + "Field", new XAttribute("Name", "FeePeriod"),
-                new XElement(ns + "DataField", "FeePeriod"),
-                new XElement(XName.Get("TypeName", "http://schemas.microsoft.com/SQLServer/reporting/reportdesigner"), "System.String")));
-        if (Path.GetFileName(path).Equals("FeePaymentReceipt.rdlc",StringComparison.OrdinalIgnoreCase))
-        {
-            var total = table.Descendants(ns + "Textbox").Single(box => (string?)box.Attribute("Name") == "TotalPaid");
-            var totalRow = total.Ancestors(ns + "TablixRow").First();
-            int totalIndex = totalRow.ElementsBeforeSelf(ns + "TablixRow").Count();
-            var rowMembers = table.Element(ns + "TablixRowHierarchy")!.Element(ns + "TablixMembers")!
-                .Element(ns + "TablixMember")!.Element(ns + "TablixMembers")!;
-            var totalMember = rowMembers.Elements(ns + "TablixMember").ElementAt(totalIndex);
-            var fields = document.Descendants(ns + "DataSet").First().Element(ns + "Fields")!;
-            foreach (var item in new[] { ("OriginalPaid","Originally settled"), ("RefundAmount","Refund"),
-                ("CorrectionAmount","Correction"), ("ReversedAmount","Reversed") })
-            {
-                fields.Add(new XElement(ns + "Field",new XAttribute("Name",item.Item1),new XElement(ns + "DataField",item.Item1)));
-                var summaryRow = new XElement(totalRow);
-                foreach (var box in summaryRow.Descendants(ns + "Textbox"))
-                {
-                    bool amount = (string?)box.Attribute("Name") == "TotalPaid";
-                    box.SetAttributeValue("Name",(string?)box.Attribute("Name") + item.Item1);
-                    box.Descendants(ns + "Value").First().Value = amount
-                        ? $"=Format({(item.Item1 == "OriginalPaid" ? "" : "-")}First(Fields!{item.Item1}.Value, \"ReceiptPageGroup\"), \"N0\")"
-                        : item.Item2;
-                    foreach (var weight in box.Descendants(ns + "FontWeight")) weight.Value = "Normal";
-                }
-                totalRow.AddBeforeSelf(summaryRow);
-                totalMember.AddBeforeSelf(new XElement(ns + "TablixMember",
-                    new XElement(ns + "Visibility",new XElement(ns + "Hidden",item.Item1 == "OriginalPaid"
-                        ? "=Not First(Fields!ShowAdjustments.Value, \"ReceiptPageGroup\")"
-                        : $"=Not CBool(First(Fields!{item.Item1}.Value, \"ReceiptPageGroup\"))"))));
-            }
-            foreach (string fieldName in new[] { "NetPaid", "ShowAdjustments" })
-                fields.Add(new XElement(ns + "Field",new XAttribute("Name",fieldName),new XElement(ns + "DataField",fieldName)));
-            total.Descendants(ns + "Value").First().Value = "=Format(First(Fields!NetPaid.Value, \"ReceiptPageGroup\"), \"N0\")";
-            totalRow.Descendants(ns + "Value").First(value => value.Value is "TOTAL PAID" or "TOTAL SETTLED").Value =
-                "=IIf(First(Fields!ShowAdjustments.Value, \"ReceiptPageGroup\"), \"NET SETTLED\", \"TOTAL SETTLED\")";
-        }
-        return FitContent(document,data,annualSheet);
+        var document=XDocument.Load(path);
+        XNamespace ns=document.Root!.Name.Namespace;
+        foreach(var label in document.Descendants(ns+"Textbox").Where(box=>(string?)box.Attribute("Name")=="AdmissionNumberTextLabel"))
+            label.Descendants(ns+"Value").First().Value="=IIf(InStr(CStr(First(Fields!AdmissionNumberText.Value, \"ReceiptPageGroup\")), \"QR-\") > 0, \"Registration #\", \"Admission #\")";
+        return FitContent(document,data,false);
     }
-
     // The complete layout lives in RDLC. Only the roll-paper length follows its content.
-    internal static string SizeToContent(string path,DataTable data) => FitContent(XDocument.Load(path),data,false);
+    internal static string SizeToContent(string path,DataTable data,bool annualSheet=false) => FitContent(XDocument.Load(path),data,annualSheet);
 
     private static string FitContent(XDocument document,DataTable data,bool annualSheet)
     {
@@ -186,7 +115,7 @@ internal static class ReceiptReportLayout
         {
             var footer = table.Descendants(ns + "Textbox").Last();
             footer.Element(ns + "Style")!.Element(ns + "PaddingBottom")!.Value = "8pt";
-            AnnualReceiptReportLayout.Apply(document);
+            FeeDocumentSheetLayout.Apply(document);
         }
         return document.ToString();
     }

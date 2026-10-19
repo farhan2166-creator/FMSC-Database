@@ -4,7 +4,7 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Core;
 
 // Shared read-only billing entry point for registration and the family counter.
-internal static class FamilyBillPreview
+internal static class FeeBillPreview
 {
     private const string MembersSql = """
         EXEC dbo.RequirePermission @UserId,@Permission;
@@ -104,7 +104,8 @@ internal static class FamilyBillPreview
         if (!Current()) return;
         string parent = Convert.ToString(members.AsEnumerable().First(row => Convert.ToInt32(row["AdmissionId"]) == admissionId)["FatherName"]) ?? "";
         int[] billedStudents=charges.AsEnumerable().Select(row=>Convert.ToInt32(row["AdmissionId"])).Distinct().OrderBy(id=>id).ToArray();
-        await AdmissionBillReport.ShowFamily(owner, institution, parent, charges,
-            billedStudents.Contains(admissionId)?admissionId:billedStudents[0],billedStudents);
+        int primary=billedStudents.Contains(admissionId)?admissionId:billedStudents[0];
+        if(billedStudents.Length>1)await FamilyBillReport.ShowAsync(owner,institution,parent,charges,primary,billedStudents);
+        else await StudentBillReport.ShowChargesAsync(owner,institution,parent,charges,primary);
     }
 }

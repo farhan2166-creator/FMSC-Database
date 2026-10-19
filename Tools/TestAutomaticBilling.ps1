@@ -184,7 +184,7 @@ try {
  $concessions=Query "EXEC dbo.GetBillingAndDiscountsReport @UserId=1,@View=N'Concession Assignments';"
  Check (($concessions.Tables[0].Rows | Where-Object {$_.'Admission Number' -eq '1005' -and $_.Concession -eq 'Free'}).Count -eq 1) 'A free assignment is reportable without manufacturing a zero-value bill.'
  Check ($concessions.Tables.Count -eq 2 -and $concessions.Tables[1].Rows[0]['Concession Assignments'] -gt 0) 'Concession reporting supplies an assignment count instead of misleading billed totals.'
- $familySource=Get-Content -LiteralPath (Join-Path $projectRoot 'Core/FamilyBillPreview.cs') -Raw
+ $familySource=Get-Content -LiteralPath (Join-Path $projectRoot 'Core/Reports/Fees/FeeBillPreview.cs') -Raw
  $familySql=[regex]::Match($familySource,'private const string ChargesSql = """\r?\n([\s\S]*?)\r?\n\s*""";').Groups[1].Value
  if(-not $familySql){throw 'Family bill SQL could not be located.'}
  $familyBill=Query $familySql @{'@UserId'=1;'@Admission'=1;'@Ids'='[1,5]';'@WholeFamily'=$false}

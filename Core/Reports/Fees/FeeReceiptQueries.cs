@@ -1,6 +1,6 @@
 namespace FMSC_SMS.Core;
 
-internal static class FeeReceiptPlacement
+internal static class FeeReceiptQueries
 {
     internal static async Task ApplyCurrentBalanceAsync(DataTable reportData, string readPermission = "Fees.View")
     {
@@ -11,7 +11,7 @@ internal static class FeeReceiptPlacement
             string admissionNumber = first.Field<string>("AdmissionNumberText") ?? "";
             var payments = await Task.Run(() => DatabaseHelper.QuerySql("""
                 EXEC dbo.RequirePermission @UserId,@ReadPermission;
-                SELECT P.AdmissionId,P.EnrollmentId,S.AdmissionNumber,P.ReceiptNumber,P.Status,P.TotalAmount,
+                SELECT P.AdmissionId,P.EnrollmentId,COALESCE(S.AdmissionNumber,S.QuickReference,N'') AdmissionNumber,P.ReceiptNumber,P.Status,P.TotalAmount,
                     ISNULL(A.Refunded,0) Refunded,ISNULL(A.Corrected,0) Corrected
                 FROM dbo.FeePayments P
                 JOIN dbo.Students S ON S.AdmissionId=P.AdmissionId

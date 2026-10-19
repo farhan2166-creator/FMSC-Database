@@ -181,7 +181,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
                 Warn("Check School Profile before printing receipts.");
                 return;
             }
-            var receipts = ReceiptReportData.Create();
+            var receipts = FeeDocumentData.Create();
             int pageKey = 0;
             foreach (var receipt in data.AsEnumerable().GroupBy(row => Convert.ToString(row["ReceiptNumber"]) ?? "")
                 .OrderBy(group => Convert.ToDateTime(group.First()["PaymentDate"]))
@@ -189,7 +189,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
             {
                 if (string.IsNullOrWhiteSpace(receipt.Key)) continue;
                 var header = receipt.First();
-                var lines = await FeeReceiptPlacement.QueryLinesAsync(receipt.Key,"Fees.Statement.View");
+                var lines = await FeeReceiptQueries.QueryLinesAsync(receipt.Key,"Fees.Statement.View");
                 if(!Current())return;
                 foreach (var enrollment in lines.AsEnumerable().Where(row => row.Field<int>("AdmissionId") == admissionId)
                     .GroupBy(row => row.Field<int>("EnrollmentId")))
@@ -216,27 +216,9 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
                 Warn("No printable receipts were found for this academic year.");
                 return;
             }
-            await FeeReceiptPlacement.ApplyCurrentBalanceAsync(receipts,"Fees.Statement.View");
+            await FeeReceiptQueries.ApplyCurrentBalanceAsync(receipts,"Fees.Statement.View");
             if(!Current())return;
-            ReceiptReportData.GroupPeriods(receipts);
-            string reportPath = Path.Combine(
-                AppContext.BaseDirectory,
-                "Reports",
-                "FeePaymentReceipt.rdlc");
-            if (!File.Exists(reportPath))
-            {
-                throw new FileNotFoundException(
-                    "The annual fee receipts report template was not found.",
-                    reportPath);
-            }
-            RdlcReportPreview.Show(
-                FindForm(),
-                "Student Annual Fee Receipts",
-                reportPath,
-                "FeeReceiptData",
-                receipts,
-                fitPageWidth: true,
-                reportDefinition: ReceiptReportLayout.Definition(reportPath,receipts,annualSheet: true));
+            StudentReceiptReport.Show(FindForm(),receipts,annualSheet:true);
         }
         catch (Exception ex) { if(!IsDisposed)Fail(ex); }
     }

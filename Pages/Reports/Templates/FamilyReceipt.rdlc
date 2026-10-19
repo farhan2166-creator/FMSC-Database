@@ -2388,7 +2388,7 @@
             </TablixMember>
           </TablixMembers>
         </TablixRowHierarchy>
-        <DataSetName>FeeReceiptData</DataSetName>
+        <DataSetName>FamilyReceiptData</DataSetName>
         <Height>2.9in</Height>
         <Width>2.05in</Width>
         <Style />
@@ -2409,7 +2409,7 @@
   </Page>
   <AutoRefresh>0</AutoRefresh>
   <DataSources>
-    <DataSource Name="FeeReceiptDataSource">
+    <DataSource Name="FamilyReceiptDataSource">
       <ConnectionProperties>
         <DataProvider>System.Data.DataSet</DataProvider>
         <ConnectString />
@@ -2418,9 +2418,9 @@
     </DataSource>
   </DataSources>
   <DataSets>
-    <DataSet Name="FeeReceiptData">
+    <DataSet Name="FamilyReceiptData">
       <Query>
-        <DataSourceName>FeeReceiptDataSource</DataSourceName>
+        <DataSourceName>FamilyReceiptDataSource</DataSourceName>
         <CommandText />
       </Query>
       <Fields>
