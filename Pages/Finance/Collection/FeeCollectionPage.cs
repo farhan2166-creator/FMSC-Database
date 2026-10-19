@@ -106,6 +106,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     private ModernButton? paymentHistoryButton;
     private ModernButton? studentFeesMenuButton;
     private ModernButton? studentCreditButton;
+    private ModernButton? printBillButton;
     private readonly Dictionary<int, decimal> availableCreditByStudent = new();
     private readonly CheckBox useAvailableCredit = new() { Text = "Use available credit", Checked = true, AutoSize = true };
     private readonly Label availableCredit = new();
@@ -270,7 +271,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 "Secondary");
         feeAssignmentsButton.Enabled = false;
         addChargeButton = AddAction(
-            "Add Charge", (_, _) => OpenAdditionalFee(), "Secondary");
+            "Additional Charge", (_, _) => OpenAdditionalFee(), "Secondary");
         addChargeButton.Enabled = false;
         studentCreditButton = AddAction("Student Credit", async (_, _) => {
             if (admissionId <= 0) { Warn("Select a student first."); return; }
@@ -313,39 +314,21 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             ThemeRole = "Secondary",
             AutoSize = true
         };
-        studentFeesMenu.Items.Add("Add One-Off Charge", null, (_, _) => addChargeButton?.PerformClick());
-        studentFeesMenu.Items.Add("Future Fees", null, (_, _) => futureFeesButton?.PerformClick());
+        var futureFeesItem = studentFeesMenu.Items.Add("Future Fees", null, (_, _) => futureFeesButton?.PerformClick());
+        var statementItem = studentFeesMenu.Items.Add("Account Statement", null, (_, _) => historyButton?.PerformClick());
         studentFeesMenu.Items.Add(new ToolStripSeparator());
-        studentFeesMenu.Items.Add("Account Statement", null, (_, _) => historyButton?.PerformClick());
-        studentFeesMenu.Items.Add("Payment History", null, (_, _) => paymentHistoryButton?.PerformClick());
-        studentFeesMenu.Items.Add(new ToolStripSeparator());
-        var printBillItem=new ToolStripMenuItem("Print Outstanding Bill") {
-            ToolTipText="Selected child and ticked siblings: all posted unpaid charges, including older years. This is not a payment receipt."
+        // Bills cover current unpaid charges. Paid transactions are reprinted as receipts.
+        printBillButton = AddBusyAction("Print Bill", PrintSelectedFamilyBillAsync, "Secondary");
+        printBillButton.Enabled = false;
+        historyButton.EnabledChanged += (_, _) => {
+            printBillButton.Enabled = historyButton.Enabled && CurrentUser.HasPermission("Fees.View");
         };
-        printBillItem.Click+=async(_,_)=>await PrintSelectedFamilyBillAsync();
-        studentFeesMenu.Items.Add(printBillItem);
-        var issuedBillsItem=new ToolStripMenuItem("Issued Fee Bills");
-        issuedBillsItem.Click+=async(_,_)=> {
-            if(transactionBusy || admissionId<=0)return;
-            int selected=admissionId,version=loadVersion;
-            try {await IssuedBillReport.ShowHistoryAsync(FindForm(),selected,StudentNameFor(selected),
-                ()=>!IsDisposed && admissionId==selected && loadVersion==version);}
-            catch(Exception ex) {if(!IsDisposed)Fail(ex);}
-        };
-        studentFeesMenu.Items.Add(issuedBillsItem);
         var familyReturnsItem=new ToolStripMenuItem("Family / Returns");
         familyReturnsItem.Click+=async(_,_)=>await OpenFamilyReturnsAsync();
         studentFeesMenu.Items.Add(familyReturnsItem);
         studentFeesMenu.Opening += (_, _) => {
-            if (studentFeesMenu.Items.Count < 5) return;
-            studentFeesMenu.Items[0].Enabled = addChargeButton?.Enabled == true;
-            studentFeesMenu.Items[1].Enabled = futureFeesButton?.Enabled == true;
-            studentFeesMenu.Items[3].Enabled = historyButton?.Enabled == true;
-            studentFeesMenu.Items[4].Enabled = paymentHistoryButton?.Enabled == true;
-            printBillItem.Available=CurrentUser.HasPermission("Fees.View");
-            printBillItem.Enabled=admissionId>0 && !IsBusy && !siblingBusy && CurrentUser.HasPermission("Fees.View");
-            issuedBillsItem.Available=CurrentUser.HasPermission("Fees.View");
-            issuedBillsItem.Enabled=admissionId>0 && !IsBusy && CurrentUser.HasPermission("Fees.View");
+            futureFeesItem.Enabled = futureFeesButton?.Enabled == true;
+            statementItem.Enabled = historyButton?.Enabled == true;
             familyReturnsItem.Available=CurrentUser.HasPermission("Students.Family");
             familyReturnsItem.Enabled=admissionId>0 && !IsBusy && !siblingBusy && CurrentUser.HasPermission("Students.Family") && CurrentUser.HasPermission("Students.View");
             familyReturnsItem.ToolTipText="Review family readiness and individual returns. Requires family and student-view access.";
@@ -362,6 +345,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             executeButton,
             printReceiptButton,
             feeAssignmentsButton,
+            printBillButton,
             addChargeButton,
             futureFeesButton,
             historyButton,
@@ -790,7 +774,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             Padding = Padding.Empty, Margin = Padding.Empty
         };
         paymentHistoryButton!.Text = "Recent Payments";
-        foreach (Control button in new Control[] { studentFeesMenuButton!, studentCreditButton!, paymentHistoryButton })
+        foreach (Control button in new Control[] { studentFeesMenuButton!, addChargeButton!, printBillButton!, studentCreditButton!, paymentHistoryButton })
         {
             button.AutoSize = false;
             button.Dock = DockStyle.None;
@@ -4099,7 +4083,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         try
         {
             using var busy=BeginBusy("Preparing outstanding bill…",this);
-            await FamilyBillPreview.ShowAsync(FindForm(),anchor,selected,()=>!IsDisposed && admissionId==anchor
+            await FeeBillPreview.ShowAsync(FindForm(),anchor,selected,()=>!IsDisposed && admissionId==anchor
                 && enrollmentId==placement && loadVersion==version && selected.SequenceEqual(SelectedBillStudents()));
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
@@ -4163,7 +4147,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             return;
         }
         var snapshot = receiptSnapshot;
-        var identity = await FeeReceiptPlacement.QueryStudentAsync(snapshot.AdmissionId);
+        var identity = await FeeReceiptQueries.QueryStudentAsync(snapshot.AdmissionId);
         if (IsDisposed || admissionId != receiptAdmission || loadVersion != receiptVersion) return;
         if (identity.Rows.Count == 0) { Alert("The student's details could not be read. Try printing again."); return; }
         await PrintPaymentReceipt(
@@ -4201,14 +4185,14 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         InstitutionProfile.PrintIdentity institution,
         string receiptNumber)
     {
-        if(await CollectionReceiptReport.TryShowAsync(FindForm(),institution,receiptNumber)) return;
+        if(await FeeReceiptDocuments.TryShowAsync(FindForm(),institution,receiptNumber)) return;
         DataSet result =
             await DatabaseHelper.QueryUserSetAsync(
                 "GetFeeReceiptGroup",
                 DatabaseHelper.P("@ReceiptNumber", receiptNumber));
         DataTable header =
             result.Tables.Count > 0 ? result.Tables[0] : new DataTable();
-        DataTable lines = await FeeReceiptPlacement.QueryLinesAsync(receiptNumber);
+        DataTable lines = await FeeReceiptQueries.QueryLinesAsync(receiptNumber);
         if (header.Rows.Count == 0)
         {
             /* Alert, not Warn: the operator asked for a print and the print did not happen. */
@@ -4307,8 +4291,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     paymentEnrollmentId: first.EnrollmentId);
             }
         }
-        await FeeReceiptPlacement.ApplyCurrentBalanceAsync(reportData);
-        using var combined=CollectionReceiptReport.CombineLegacyFamily(reportData);
+        await FeeReceiptQueries.ApplyCurrentBalanceAsync(reportData);
+        using var combined=FamilyReceiptReport.CombineLegacyData(reportData);
         ShowReceiptReport(combined);
     }
     private async Task PrintPaymentReceipt(
@@ -4361,11 +4345,11 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 feePeriod: row.billingMonth,
                 paymentEnrollmentId: paymentEnrollmentId);
         }
-        if (showActualAmount) await FeeReceiptPlacement.ApplyCurrentBalanceAsync(reportData);
+        if (showActualAmount) await FeeReceiptQueries.ApplyCurrentBalanceAsync(reportData);
         ShowReceiptReport(reportData);
     }
 
-    private static DataTable CreateReceiptReportTable() => ReceiptReportData.Create();
+    private static DataTable CreateReceiptReportTable() => FeeDocumentData.Create();
 
     private static void AddReceiptReportRow(
         DataTable table,
@@ -4427,26 +4411,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
 
     private void ShowReceiptReport(DataTable reportData)
     {
-        using var familyRows=reportData.Columns.Contains("FamilyRowKind")?CollectionReceiptReport.FamilyReceiptData(reportData):null;
-        if(familyRows is not null) reportData=familyRows;
-        if(!reportData.Columns.Contains("FamilyRowKind")) ReceiptReportData.GroupPeriods(reportData);
-        string reportPath = Path.Combine(
-            AppContext.BaseDirectory,
-            "Reports",
-            reportData.Columns.Contains("FamilyRowKind")?"FamilyReceipt.rdlc":"StudentReceipt.rdlc");
-        if (!File.Exists(reportPath))
-        {
-            Alert("Fee receipt RDLC was not found, so nothing was printed.");
-            return;
-        }
-        RdlcReportPreview.Show(
-            FindForm(),
-            "Fee Receipt",
-            reportPath,
-            "FeeReceiptData",
-            reportData,
-            fitPageWidth: false,
-            reportDefinition: ReceiptReportLayout.SizeToContent(reportPath, reportData));
+        FeeReceiptDocuments.Show(FindForm(),reportData);
     }
     protected override void Dispose(bool disposing)
     {

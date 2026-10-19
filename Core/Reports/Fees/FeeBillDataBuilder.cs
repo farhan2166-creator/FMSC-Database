@@ -1,11 +1,10 @@
 namespace FMSC_SMS.Core;
 
-// Pure report data is shared with the portable regression harness.
-internal static partial class AdmissionBillReport
+internal static partial class FeeBillDataBuilder
 {
-    internal static DataTable BuildFamilyData(string institutionName,string contactNumber,string address,string parent,DataTable charges)
+    internal static DataTable BuildGrouped(string institutionName,string contactNumber,string address,string parent,DataTable charges)
     {
-        var data=ReceiptReportData.Create();
+        var data=FeeDocumentData.Create();
         data.Columns.Add("FamilyRowKind",typeof(string));
         data.Columns.Add("FamilyAmountText",typeof(string));
         data.Columns.Add("BillStudentKey",typeof(string));
@@ -24,7 +23,7 @@ internal static partial class AdmissionBillReport
             line["DocumentKind"]="Bill";line["FamilyRowKind"]=kind;line["FamilyAmountText"]=kind=="Fee"?amount.ToString("N0"):"";
             line["BillSourceKey"]=charges.Columns.Contains("BillingChargeId")
                 ?string.Join(",",charges.AsEnumerable().Select(row=>Convert.ToString(row["BillingChargeId"])).OrderBy(value=>value)):"";
-            line["BillStudentKey"]=studentKey;line["BillStudentName"]=studentHeading;line["FeePeriod"]=ReceiptReportData.FormatPeriod(period);
+            line["BillStudentKey"]=studentKey;line["BillStudentName"]=studentHeading;line["FeePeriod"]=FeeDocumentData.FormatPeriod(period);
         }
         // Group by the reference, never by name: siblings can share a name.
         foreach(var student in charges.AsEnumerable().GroupBy(r=>Convert.ToString(r["Reference"]))){
@@ -39,33 +38,5 @@ internal static partial class AdmissionBillReport
         return data;
     }
 
-    internal static DataTable FamilyBillData(DataTable grouped)
-    {
-        var data=grouped.Clone();
-        string previousStudent="",previousPeriod="";
-        foreach(DataRow row in grouped.Rows)
-            if(Convert.ToString(row["FamilyRowKind"])=="Fee")
-            {
-                data.ImportRow(row);
-                string student=Convert.ToString(row["BillStudentKey"])??"",period=Convert.ToString(row["FeePeriod"])??"";
-                if(student==previousStudent && period==previousPeriod)data.Rows[^1]["FeePeriod"]="";
-                previousStudent=student;previousPeriod=period;
-            }
-        return data;
-    }
 
-    internal static DataTable StudentBillData(DataTable grouped)
-    {
-        var data=ReceiptReportData.Create();string month="",previousPeriod="";
-        foreach(DataRow source in grouped.Rows)
-        {
-            string kind=Convert.ToString(source["FamilyRowKind"])??"";
-            if(kind=="Month") {month=Convert.ToString(source["FeeDescription"])!.Trim();continue;}
-            if(kind!="Fee") continue;
-            var row=data.NewRow();foreach(DataColumn column in data.Columns) row[column.ColumnName]=source[column.ColumnName];
-            string period=ReceiptReportData.FormatPeriod(month);
-            row["FeeDescription"]=Convert.ToString(source["FeeDescription"])!.Trim();row["FeePeriod"]=period==previousPeriod?"":period;
-            previousPeriod=period;data.Rows.Add(row);
-        }
-        return data;
-    }}
+}

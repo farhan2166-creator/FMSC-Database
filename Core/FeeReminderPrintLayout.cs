@@ -10,7 +10,7 @@ internal static class FeeReminderPrintLayout
         XNamespace ns = document.Root!.Name.Namespace;
         var footer = document.Descendants(ns + "Tablix").First().Descendants(ns + "Textbox").Last();
         footer.Element(ns + "Style")!.SetElementValue(ns + "PaddingBottom", "8pt");
-        AnnualReceiptReportLayout.Apply(document);
+        FeeDocumentSheetLayout.Apply(document);
         return document.ToString();
     }
 }

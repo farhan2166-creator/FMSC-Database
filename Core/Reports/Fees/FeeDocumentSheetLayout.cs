@@ -3,7 +3,7 @@ using System.Xml.Linq;
 namespace FMSC_SMS.Core;
 
 /// <summary>Flows complete receipt blocks down the three columns of an A4 sheet.</summary>
-internal static class AnnualReceiptReportLayout
+internal static class FeeDocumentSheetLayout
 {
     internal static void Apply(XDocument document)
     {
@@ -20,6 +20,7 @@ internal static class AnnualReceiptReportLayout
         // One rectangle per receipt lets the print renderer move the entire block to the
         // next column when it fits there, while oversized receipts can still continue.
         rowHierarchy.ReplaceNodes(new XElement(receiptMember.Element(ns + "TablixMembers")!));
+        string dataSetName=table.Element(ns+"DataSetName")!.Value;
         table.Element(ns + "DataSetName")!.Remove();
         table.SetAttributeValue("Name", "AnnualReceiptContents");
         table.SetElementValue(ns + "KeepTogether", true);
@@ -38,7 +39,7 @@ internal static class AnnualReceiptReportLayout
             new XElement(ns + "TablixColumnHierarchy", new XElement(ns + "TablixMembers", new XElement(ns + "TablixMember"))),
             new XElement(ns + "TablixRowHierarchy", new XElement(ns + "TablixMembers", outerMember)),
             new XElement(ns + "KeepTogether", false),
-            new XElement(ns + "DataSetName", "FeeReceiptData"),
+            new XElement(ns + "DataSetName", dataSetName),
             new XElement(ns + "Height", height), new XElement(ns + "Width", "2.35in"), new XElement(ns + "Style"));
         table.ReplaceWith(outer);
         document.Root.Element(ns + "Width")!.Value = "2.35in";

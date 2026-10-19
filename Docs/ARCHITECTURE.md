@@ -47,7 +47,7 @@ Portable sizing checks and Windows native-control fixtures cover synthetic clien
 
 ## Data correctness and safety contracts
 
-- Family bills reuse `AdmissionBillReport` through the read-only `FamilyBillPreview` coordinator. Canonical membership is rechecked in SQL before printing; whole-family reads also refuse newly added members missing from their snapshot. Readiness is derived from actual student/enrollment state, separately from outstanding charges. `StudentFamilyPage` opens the existing guarded return dialog one child at a time. No bill print confirms a return, creates charges or records a payment.
+- `Core/Reports/Fees/FeeBillPreview.cs` routes bills to `StudentBillReport` or `FamilyBillReport`, each with a matching `.Data.cs`, RDLC and named dataset. Canonical membership is rechecked in SQL before printing; whole-family reads also refuse newly added members missing from their snapshot. `FeeBillDocuments` issues/reprints saved bills without creating charges or recording payments. `FeeReceiptDocuments` routes saved collections to `StudentReceiptReport` or `FamilyReceiptReport`. Annual sheets reuse the student receipt template. See `Docs/FEE_DOCUMENTS.md` for the complete file map.
 
 - **Use SQL-side transaction and permission enforcement** for financial/state-changing work. A button disabled in WinForms is not a substitute for server authorization.
 - **Unknown commit acknowledgment is not a failed transaction.** Several admission, fee and certificate flows use request IDs/reconciliation; preserve original IDs and payload identity when retrying, and explicitly expose unresolved outcomes.

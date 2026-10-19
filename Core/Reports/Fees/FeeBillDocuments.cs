@@ -2,7 +2,7 @@ using System.Xml;
 
 namespace FMSC_SMS.Core;
 
-internal static class IssuedBillReport
+internal static class FeeBillDocuments
 {
     internal static string Snapshot(DataTable source)
     {
@@ -39,10 +39,8 @@ internal static class IssuedBillReport
             row["ReceiptNumber"]=saved["BillNumber"];
             row["PaymentDateText"]=Convert.ToDateTime(saved["IssuedAt"]).ToString("dd-MMM-yyyy hh:mm tt");
         }
-        bool family=data.Columns.Contains("FamilyRowKind");
-        string path=Path.Combine(AppContext.BaseDirectory,"Reports",family?"FamilyBill.rdlc":"StudentBill.rdlc");
-        RdlcReportPreview.Show(owner,family?"Family Fee Bill":"Student Fee Bill",path,"FeeReceiptData",data,
-            reportDefinition:ReceiptReportLayout.SizeToContent(path,data));
+        if(data.Columns.Contains("FamilyRowKind"))FamilyBillReport.ShowData(owner,data);
+        else StudentBillReport.ShowData(owner,data);
     }
 
     internal static async Task ShowHistoryAsync(Form? owner,int admissionId,string studentName,Func<bool> isCurrent)

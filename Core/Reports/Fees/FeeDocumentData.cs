@@ -2,11 +2,13 @@ using System.Globalization;
 
 namespace FMSC_SMS.Core;
 
-internal static class ReceiptReportData
+internal static class FeeDocumentData
 {
+    // Stable XML table name for already saved bill snapshots; RDLC datasets have their own document names.
+    internal const string SnapshotTableName="FeeReceiptData";
     internal static DataTable Create()
     {
-        var table = new DataTable("FeeReceiptData");
+        var table = new DataTable(SnapshotTableName);
         table.Columns.Add("ReceiptPageKey", typeof(int));
         table.Columns.Add("InstitutionName", typeof(string));
         table.Columns.Add("DocumentTitle", typeof(string));

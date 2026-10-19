@@ -75,7 +75,7 @@ Follow real call paths across these components and their dependencies; this list
 - Credit helpers/UI, `StudentCreditEntries`, `FeePayments.IsCreditApplication`, original-payment links and receipts; cash dashboards, daily closing and collection reports.
 - Assignment/discount/configuration workspaces, `SaveStudentFeeDiscount`, amount-change helpers, matrix application, `AdjustBillingChargeRate`, batch previews/corrections and `FeeBillCorrections`.
 - Direct admission, Quick Registration and saved-pending edits, legacy setup/activation, billing-start edits, leaving/certificates, readmission, promotion/return and class/campus transfers.
-- Family membership/selection, `Core/FamilyBillPreview.cs`, `Core/FeeReceiptPlacement.cs`, zero-payable concession snapshots, assignment/billing/discount/outstanding/aging/account reports and printed/exported results.
+- Family membership/selection, `Core/Reports/Fees/FeeBillPreview.cs`, `Core/Reports/Fees/FeeReceiptQueries.cs`, zero-payable concession snapshots, assignment/billing/discount/outstanding/aging/account reports and printed/exported results.
 - `DatabaseHelper.RequiredDatabaseSchemaVersion`, both compatibility manifests, migration transaction/backup wrappers in `Installer/core.ps1`, DACPAC content and reference SQL synchronization.
 
 Trace adjacent pre-existing callers where the new behavior could break them: saved student details invoking discount procedures, pending status versus Active restrictions, future-effective assignments, correction/reversal screens, certificates/clearance and report SQL. A correct new procedure can still break an old caller's parameter/result contract.

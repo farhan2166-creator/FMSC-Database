@@ -28,9 +28,11 @@
     <Compile Include="../../Core/QuickRegistrationRecovery.cs" Link="QuickRegistrationRecovery.cs" />
     <Compile Include="../../Core/QuickRegistrationRecoveryJournal.cs" Link="QuickRegistrationRecoveryJournal.cs" />
     <Compile Include="../../Core/QuickRegistrationView.cs" Link="QuickRegistrationView.cs" />
-    <Compile Include="../../Core/AdmissionBillReport.Data.cs" Link="AdmissionBillReport.Data.cs" />
+    <Compile Include="../../Core/Reports/Fees/FeeBillDataBuilder.cs" Link="FeeBillDataBuilder.cs" />
+    <Compile Include="../../Core/Reports/Fees/StudentBillReport.Data.cs" Link="StudentBillReport.Data.cs" />
+    <Compile Include="../../Core/Reports/Fees/FamilyBillReport.Data.cs" Link="FamilyBillReport.Data.cs" />
     <Compile Include="../../Core/FamilyBillingData.cs" Link="FamilyBillingData.cs" />
-    <Compile Include="../../Core/ReceiptReportData.cs" Link="ReceiptReportData.cs" />
+    <Compile Include="../../Core/Reports/Fees/FeeDocumentData.cs" Link="FeeDocumentData.cs" />
     <Compile Include="../../Core/StudentPhotoDraft.cs" Link="StudentPhotoDraft.cs" />
     <Compile Include="../../Core/AdmissionSaveConfirmation.cs" Link="AdmissionSaveConfirmation.cs" />
     <Compile Include="../../Core/StudentPhotoCompression.cs" Link="StudentPhotoCompression.cs" />

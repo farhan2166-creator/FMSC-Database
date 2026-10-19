@@ -1,10 +1,20 @@
 # Bills and receipts
 
-Each document has its own editable RDLC layout, based on the established
-`FeePaymentReceipt.rdlc` design: `StudentBill.rdlc`, `FamilyBill.rdlc`,
-`StudentReceipt.rdlc` and `FamilyReceipt.rdlc`. C# supplies report data and opens
-the existing preview. The shared helper sizes the roll-paper length; document
-labels, sections, columns, totals and grouping live in the RDLC files.
+The four current fee documents have matching C# files in `Core/Reports/Fees`
+and editable layouts in `Pages/Reports/Templates`:
+
+| Preview and binding | Data builder | RDLC | RDLC dataset |
+|---|---|---|---|
+| StudentBillReport.cs | StudentBillReport.Data.cs | StudentBill.rdlc | StudentBillData |
+| FamilyBillReport.cs | FamilyBillReport.Data.cs | FamilyBill.rdlc | FamilyBillData |
+| StudentReceiptReport.cs | StudentReceiptReport.Data.cs | StudentReceipt.rdlc | StudentReceiptData |
+| FamilyReceiptReport.cs | FamilyReceiptReport.Data.cs | FamilyReceipt.rdlc | FamilyReceiptData |
+
+Each report class declares its template and dataset names together. Annual receipt
+sheets also use StudentReceipt.rdlc. The retired admission-bill and fee-payment
+templates have been removed, including stale copies in build/publish output.
+C# supplies report data and opens the preview; labels, sections, columns, totals
+and grouping remain editable in RDLC. See [the report-folder guide](../Core/Reports/Fees/README.md).
 
 Bills and receipts use the approved Month / Fee / Rs. table:
 a shaded header with a top rule, followed by borderless detail rows.
@@ -15,9 +25,8 @@ printed month appears only on the first fee row for that month and student.
 Family receipts use the same full-width student headings and three fee columns,
 followed by each child's settlement and outstanding figures. Months appear once
 per month and child. Bills use Bill No. and TOTAL DUE; receipts retain Receipt No.
-and their payment summaries. The older admission and annual receipt templates also
-contain editable Month / Fee / Amount columns directly in RDLC. Receipt
-templates remain independent. The focused Fee document rendering workflow exports
+and their payment summaries. Receipt templates remain independent.
+The focused fee-document rendering workflow exports
 fictional PNG/PDF previews without connecting to a database.
 | Document | Use |
 |---|---|

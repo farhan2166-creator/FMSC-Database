@@ -42,7 +42,7 @@ internal static class FeeReminderReportData
     internal static DataTable Create(DataTable balances, IReadOnlySet<int> selected, string school,
         string contact, string address, string scope, DateTime prepared, DateTime? requestedDate, string message)
     {
-        var data = ReceiptReportData.Create();
+        var data = FeeDocumentData.Create();
         int key = 0;
         foreach (DataRow student in CreateRoster(balances).Rows)
         {
