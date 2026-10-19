@@ -807,11 +807,10 @@
                         </Paragraph>
                       </Paragraphs>
                       <Style>
-                        <Border>
-                          <Color>#909090</Color>
+                        <TopBorder>
                           <Style>Solid</Style>
                           <Width>0.5pt</Width>
-                        </Border>
+                        </TopBorder>
                         <BackgroundColor>#f0f0f0</BackgroundColor>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
@@ -844,11 +843,10 @@
                         </Paragraph>
                       </Paragraphs>
                       <Style>
-                        <Border>
-                          <Color>#909090</Color>
+                        <TopBorder>
                           <Style>Solid</Style>
                           <Width>0.5pt</Width>
-                        </Border>
+                        </TopBorder>
                         <BackgroundColor>#f0f0f0</BackgroundColor>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
@@ -882,10 +880,12 @@
                       </Paragraphs>
                       <Style>
                         <Border>
-                          <Color>#909090</Color>
+                          <Style>None</Style>
+                        </Border>
+                        <TopBorder>
                           <Style>Solid</Style>
                           <Width>0.5pt</Width>
-                        </Border>
+                        </TopBorder>
                         <BackgroundColor>#f0f0f0</BackgroundColor>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
@@ -923,11 +923,6 @@
                         </Paragraph>
                       </Paragraphs>
                       <Style>
-                        <Border>
-                          <Color>#909090</Color>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </Border>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
                         <PaddingTop>0pt</PaddingTop>
@@ -955,7 +950,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Fields!FeePeriod.Value</Value>
+                              <Value>=IIf(RowNumber("BillStudentGroup") = 1 Or Fields!FeePeriod.Value &lt;&gt; Previous(Fields!FeePeriod.Value, "BillStudentGroup"), Fields!FeePeriod.Value, "")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -969,11 +964,6 @@
                         </Paragraph>
                       </Paragraphs>
                       <Style>
-                        <Border>
-                          <Color>#909090</Color>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </Border>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
                         <PaddingTop>1pt</PaddingTop>
@@ -1005,11 +995,6 @@
                         </Paragraph>
                       </Paragraphs>
                       <Style>
-                        <Border>
-                          <Color>#909090</Color>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </Border>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
                         <PaddingTop>1pt</PaddingTop>
@@ -1041,9 +1026,7 @@
                       </Paragraphs>
                       <Style>
                         <Border>
-                          <Color>#909090</Color>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
+                          <Style>None</Style>
                         </Border>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
