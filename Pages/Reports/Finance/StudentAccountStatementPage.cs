@@ -157,6 +157,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             (_, _) => OnFiltersChanged();
         if(initialize)Defer(BindContextLookups);
         ConfigureStudentGrid();
+        Grid.DataBindingComplete += (_, _) => { ConfigureStatementGrid(); FormatStatementAmounts(); };
         BuildStatementLayout();
         ClearForm();
     }
@@ -190,10 +191,12 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         find.Click += async (_, _) => await SearchStudents();
         generateStatementButton = CreateFilterButton("View Statement", AppTheme.Primary);
         generateStatementButton.Click += async (_, _) => await LoadStatement();
-        printAmountsDueButton = CreateFilterButton("Print Amounts Due", AppTheme.MutedText);
+        printAmountsDueButton = CreateFilterButton("Print Outstanding", AppTheme.MutedText);
         printAmountsDueButton.Click += async (_, _) => await PrintDueReport();
+        SetToolTip(printAmountsDueButton,"Print current outstanding bills in the approved format. Statement dates do not limit these bills. Requires fee-view access.");
         annualReceiptsButton = CreateFilterButton("Annual Receipts", AppTheme.MutedText);
-        annualReceiptsButton.Click += (_, _) => OpenAnnualReceipts();
+        annualReceiptsButton.Click += async (_, _) => await OpenAnnualReceipts();
+        SetToolTip(annualReceiptsButton,"Open annual receipts directly for this student: the chosen academic year in group mode, otherwise the current year.");
         var clear = CreateFilterButton("Clear", AppTheme.MutedText);
         clear.Click += (_, _) => { ClearForm(); _ = ReloadSections(); };
         SetToolTip(clear, "Clears all students, family selections, dates and the displayed statement.");
@@ -213,18 +216,20 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         modeBar.Controls.Add(groupModeToggle);
         modeBar.Controls.Add(find);
         find.Visible = false;
-        groupModeToggle.CheckedChanged += (_, _) => {
+        groupModeToggle.CheckedChanged += async (_, _) => {
             if (IsBusy) { groupModeToggle.Checked = groupMode; return; }
             if (groupMode == groupModeToggle.Checked) return;
             groupMode = groupModeToggle.Checked;
-            // A mode change never carries hidden students into a single-student account.
-            var start = from.Value; var end = to.Value;
-            bool hasStart = from.Checked, hasEnd = to.Checked;
-            ClearForm();
-            from.Value = start; to.Value = end; from.Checked = hasStart; to.Checked = hasEnd;
+            // Expanding selection retains the current account and dates. Returning
+            // to one student drops extra members without clearing the chosen child.
+            bool reload = !groupMode && !GetSelectedAdmissionIds().SequenceEqual(new[]{studentSearch.SelectedId});
+            if (!groupMode && reload) SelectSingleStudent();
             groupFilters.Visible = groupMode;
             find.Visible = groupMode;
             arrangeStatement?.Invoke();
+            OnFiltersChanged();
+            if (!groupMode) statementContext.Text = studentSearch.SelectedId>0 ? studentSearch.Text : "Select a student to view their account.";
+            if (reload && studentSearch.SelectedId>0) await LoadStatement();
         };
         var filterBody = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty
@@ -255,7 +260,10 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         selectionBody.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
         selectionBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         selectionBody.Controls.Add(selectionSummary, 0, 0);
-        selectionBody.Controls.Add(HumanUi.ButtonRow(selectAll, deselect), 0, 1);
+        var selectionActions = HumanUi.ButtonRow(selectAll, deselect);
+        selectionActions.Dock = DockStyle.Fill;
+        selectionActions.Margin = Padding.Empty;
+        selectionBody.Controls.Add(selectionActions, 0, 1);
         selectionBody.Controls.Add(students, 0, 2);
         studentCard.Content.Controls.Add(selectionBody);
         var statement = HumanUi.Card("Account details", "Fee charges with allocated payments and remaining amounts.", accessory: exportButton);
@@ -343,38 +351,33 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         SelectSingleStudent();
         SetStatus("Select a student to view their charges, payments and balance.");
     }
-    private void OpenAnnualReceipts()
+    private async Task OpenAnnualReceipts()
     {
-        if (IsBusy || IsDisposed) return;
-        if (!CurrentUser.HasPermission("Fees.Statement.View"))
-        {
-            SetStatus("Annual receipts require statement access.", PageStatusKind.Warning); return;
-        }
-        var ids = GetSelectedAdmissionIds();
-        if (ids.Count != 1) { SetStatus("Select exactly one student to open annual receipts.", PageStatusKind.Warning); return; }
+        if(IsBusy || IsDisposed)return;
+        if(!CurrentUser.HasPermission("Fees.Statement.View"))
+        { SetStatus("Annual receipts require statement access.",PageStatusKind.Warning);return; }
+        var ids=GetSelectedAdmissionIds();
+        if(ids.Count!=1){Warn("Select exactly one student for annual receipts.");return;}
+        int id=ids[0], selectedYear=groupMode?year.SelectedId:0;
+        string signature=FilterSignature();
+        int user=CurrentUser.UserId;
+        bool Current()=>!IsDisposed && CurrentUser.UserId==user && signature==FilterSignature();
+        printingDueReport=true;UpdateSelectionActions();
         try
         {
-            using var dialog = CreateAnnualReceiptsDialog(ids[0]);
-            dialog.ShowDialog(FindForm());
+            using var busy=BeginBusy("Preparing annual receipts…",this);
+            if(selectedYear<=0)
+            {
+                using var years=await DatabaseHelper.QueryUserAsync("GetAcademicYears");
+                if(!Current())return;
+                var current=years.AsEnumerable().FirstOrDefault(row=>row["IsCurrent"]!=DBNull.Value && Convert.ToBoolean(row["IsCurrent"]));
+                if(current is null){Warn("Set the current academic year in School Setup before printing annual receipts.");return;}
+                selectedYear=Convert.ToInt32(current["AcademicYearId"]);
+            }
+            await AnnualReceiptPreview.ShowAsync(FindForm(),id,selectedYear,Current,Warn);
         }
-        catch (Exception ex) { Fail(ex); }
-    }
-    private ApplicationWindowForm CreateAnnualReceiptsDialog(int admissionId)
-    {
-        var dialog = new ApplicationWindowForm {
-            Text = PageTitles.AnnualFeeReceipts, StartPosition = FormStartPosition.CenterParent,
-            ClientSize = new Size(AppScale.Scale(1100), AppScale.Scale(680)),
-            MinimumSize = new Size(AppScale.Scale(800), AppScale.Scale(480)), ShowInTaskbar = false,
-            BackColor = AppTheme.PageBackground
-        };
-        try
-        {
-            var page = new AnnualFeeReceiptsPage(admissionId, groupMode ? year.SelectedId : 0) { Dock = DockStyle.Fill };
-            dialog.Controls.Add(page);
-            ModalPageCloseGuard.Attach(dialog, page);
-            return dialog;
-        }
-        catch { dialog.Dispose(); throw; }
+        catch(Exception ex){if(!IsDisposed)Fail(ex);}
+        finally{printingDueReport=false;if(!IsDisposed)UpdateSelectionActions();}
     }
     // Retain existing group/family selection alongside single-student search.
     public StudentAccountStatementPage(int preloadAdmissionId)
@@ -1100,7 +1103,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     {
         bool hasStudents = GetSelectedAdmissionIds().Count > 0;
         if (generateStatementButton is not null) generateStatementButton.Enabled = hasStudents&&!BusyOperationRunning;
-        if (printAmountsDueButton is not null) printAmountsDueButton.Enabled = hasStudents && !IsBusy;
+        if (printAmountsDueButton is not null) printAmountsDueButton.Enabled = hasStudents && !IsBusy && CurrentUser.HasPermission("Fees.View");
         if (annualReceiptsButton is not null) annualReceiptsButton.Enabled = GetSelectedAdmissionIds().Count == 1
             && !IsBusy && CurrentUser.HasPermission("Fees.Statement.View");
         if (groupMode) statementContext.Text = $"Group statement · {GetSelectedAdmissionIds().Count:N0} student(s) included";
@@ -1516,7 +1519,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     }
     private static string FormatAmount(decimal value)
     {
-        return value.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        return value.ToString("N0", System.Globalization.CultureInfo.CurrentCulture);
     }
     private void ConfigureStatementGrid()
     {
@@ -1606,390 +1609,25 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             }
             Grid.Columns[columnName]
                 .DefaultCellStyle
-                .Format = "0";
+                .Format = "N0";
         }
     }
     /* One print at a time, and the page must still be alive when the institution name comes back. */
     private bool printingDueReport;
     private async Task PrintDueReport()
     {
-        /* Guard export re-entry and recheck disposal after reading the institution name. */
-        if (printingDueReport || IsDisposed)
-            return;
-        printingDueReport = true;
-        UpdateSelectionActions();
+        if(IsBusy || IsDisposed || !CurrentUser.HasPermission("Fees.View"))return;
+        var ids=GetSelectedAdmissionIds();
+        if(ids.Count==0){Warn("Select at least one student first.");return;}
+        string signature=FilterSignature();
+        printingDueReport=true;UpdateSelectionActions();
         try
         {
-            if (from.Checked && to.Checked && to.Value.Date < from.Value.Date)
-            {
-                Warn("To date cannot be earlier than From date.");
-                return;
-            }
-            var admissionIds = GetSelectedAdmissionIds();
-            if (admissionIds.Count == 0)
-            {
-                Warn("Select at least one student first.");
-                return;
-            }
-            var reportRows = new List<DueReportRow>();
-            foreach (int admissionId in admissionIds)
-            {
-                var table =
-                    LoadCurrentFeeStatement(admissionId, null, to.Checked ? to.Value.Date : null);
-                AddDueReportRows(reportRows, table, admissionId);
-            }
-            if (reportRows.Count == 0)
-            {
-                Warn("There are no outstanding fees for the selected student(s).");
-                return;
-            }
-            /* The statement printed a hard-coded institution name. */
-            string institutionName =
-                await Core.InstitutionProfile.GetNameAsync();
-            if (IsDisposed)
-                return;
-            if (string.IsNullOrWhiteSpace(institutionName))
-            {
-                Alert(
-                    "The school profile could not be read, so nothing was printed. " +
-                    "Check School Profile, then try again.");
-                return;
-            }
-            PrintThermalDueReport(institutionName, reportRows);
+            using var busy=BeginBusy("Preparing outstanding bills…",this);
+            await OutstandingBillsPreview.ShowAsync(FindForm(),ids,()=>!IsDisposed && signature==FilterSignature(),Warn);
         }
-        catch (Exception ex)
-        {
-            Fail(ex);
-        }
-        finally
-        {
-            printingDueReport = false;
-            UpdateSelectionActions();
-        }
-    }
-    private sealed class DueReportRow
-    {
-        public string StudentName { get; init; } =
-            string.Empty;
-        public string FeeName { get; init; } =
-            string.Empty;
-        public string BillingMonth { get; init; } =
-            string.Empty;
-        public decimal Amount { get; init; }
-        public decimal Paid { get; init; }
-        public decimal Due { get; init; }
-    }
-    private void AddDueReportRows(List<DueReportRow> result, DataTable table, int admissionId)
-    {
-        string studentName=GetStudentName(admissionId);
-        if (!table.Columns.Contains("TransactionType"))
-            return;
-        IEnumerable<DataRow> chargeRows =
-        table.AsEnumerable()
-            .Where(row =>
-                string.Equals(Convert.ToString(row["TransactionType"]), "CHARGE", StringComparison.OrdinalIgnoreCase));
-        if (table.Columns.Contains("TransactionId"))
-        {
-            chargeRows =
-                chargeRows
-                    .GroupBy(row =>
-                        row["TransactionId"] == DBNull.Value
-                            ? 0L
-                            : Convert.ToInt64(row["TransactionId"]))
-                    .Where(group => group.Key != 0)
-                    .Select(group => group.First());
-        }
-        foreach (DataRow row in chargeRows)
-        {
-            decimal charge =
-                GetDecimal(row, "DebitAmount");
-            decimal paid =
-                GetDecimal(row, "PaidAmount");
-            decimal due =
-                Math.Max(0m, charge - paid);
-            if (due <= 0m)
-                continue;
-            string feeName =
-                table.Columns.Contains("FeeTypeName")
-                    ? Convert.ToString(row["FeeTypeName"]) ?? "Fee"
-                    : "Fee";
-            string billingMonth =
-                table.Columns.Contains("BillingMonth")
-                    ? FormatBillingMonth(row["BillingMonth"])
-                    : string.Empty;
-            result.Add(
-                new DueReportRow {
-                    StudentName = studentName,
-                    FeeName = string.IsNullOrWhiteSpace(feeName)
-                        ? "Fee"
-                        : feeName,
-                    BillingMonth = billingMonth,
-                    Amount = charge,
-                    Paid = paid,
-                    Due = due
-                });
-        }
-    }
-    private sealed class DueCharge
-    {
-        public DataRow Row { get; init; } = null!;
-        public decimal Amount { get; init; }
-        public DateTime Date { get; init; }
-    }
-    private static DateTime GetTransactionDate(DataRow row)
-    {
-        string[] columns =
-        {
-            "TransactionDate",
-            "PaymentDate",
-            "ChargeDate",
-            "CreatedAt"
-        };
-        foreach (string column in columns)
-        {
-            if (!row.Table.Columns.Contains(column))
-                continue;
-            if (row[column] == DBNull.Value)
-                continue;
-            if (DateTime.TryParse(
-                    Convert.ToString(row[column]), out DateTime value))
-            {
-                return value;
-            }
-        }
-        return DateTime.MaxValue;
-    }
-    private static decimal GetDecimal(DataRow row, string column)
-    {
-        if (!row.Table.Columns.Contains(column))
-            return 0m;
-        if (row[column] == DBNull.Value)
-            return 0m;
-        return Convert.ToDecimal(row[column]);
-    }
-    private static string FormatBillingMonth(object value)
-    {
-        if (value == null ||
-            value == DBNull.Value)
-        {
-            return string.Empty;
-        }
-        if (DateTime.TryParse(Convert.ToString(value), out DateTime date))
-        {
-            return date.ToString("MMM-yyyy", System.Globalization.CultureInfo.InvariantCulture);
-        }
-        return Convert.ToString(value)!; // Null and DBNull were both rejected above, so this never yields null.
-    }
-    private void PrintThermalDueReport(string institutionName, List<DueReportRow> rows)
-    {
-        const int paperWidthHundredthsInch = 228;
-        const int margin = 5;
-        int studentCount =
-            rows
-                .GroupBy(r => r.StudentName)
-                .Count();
-        int feeCount =
-            rows.Count;
-        int lineCount = 4;
-        lineCount += studentCount * 2;
-        lineCount += feeCount;
-        lineCount += 3;
-        int paperHeightHundredthsInch =
-            Math.Max(170, 30 + (lineCount * 13));
-        using var document =
-            new System.Drawing.Printing.PrintDocument();
-        document.DefaultPageSettings.PaperSize =
-            new System.Drawing.Printing.PaperSize("Thermal 58mm", paperWidthHundredthsInch, paperHeightHundredthsInch);
-        document.DefaultPageSettings.Margins =
-            new System.Drawing.Printing.Margins(margin, margin, margin, margin);
-        document.PrintPage +=
-            (_, e) => {
-                using var titleFont =
-                    new Font("Arial", 9, FontStyle.Bold);
-                using var normalFont =
-                    new Font("Arial", 7.5f, FontStyle.Regular);
-                using var boldFont =
-                    new Font("Arial", 7.5f, FontStyle.Bold);
-                // WinForms supplies Graphics on every PrintPage event; it is never null here.
-                Graphics graphics =
-                    e.Graphics!;
-                float left =
-                    e.MarginBounds.Left;
-                float width =
-                    e.MarginBounds.Width;
-                float y =
-                    e.MarginBounds.Top;
-                float lineHeight =
-                    12f;
-                DrawCentered(graphics, institutionName, boldFont, left, width, ref y);
-                DrawCentered(graphics, "FEE DUE", titleFont, left, width, ref y);
-                DrawCentered(
-                    graphics,
-                    DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt"), normalFont, left, width, ref y);
-                DrawSeparator(graphics, normalFont, left, width, ref y);
-                decimal grandTotal = 0m;
-                foreach (var group in rows.GroupBy(row => row.StudentName))
-                {
-                    DrawWrappedText(graphics, group.Key, boldFont, Brushes.Black, left, width, ref y, lineHeight);
-                    foreach (DueReportRow row in group)
-                    {
-                        string feeText =
-                            row.FeeName;
-                        if (!string.IsNullOrWhiteSpace(row.BillingMonth))
-                        {
-                            feeText +=
-                                " " +
-                                row.BillingMonth;
-                        }
-                        DrawReceiptLine(graphics, feeText, FormatAmount(row.Due), normalFont, left, width, ref y, lineHeight);
-                        grandTotal +=
-                            row.Due;
-                    }
-                    y += 2;
-                }
-                DrawSeparator(graphics, normalFont, left, width, ref y);
-                DrawReceiptLine(graphics, "TOTAL DUE", FormatAmount(grandTotal), boldFont, left, width, ref y, lineHeight);
-                y += 3;
-                DrawCentered(graphics, "Thank you", normalFont, left, width, ref y);
-                e.HasMorePages =
-                    false;
-            };
-        using var preview =
-            new PrintPreviewDialog {
-                Document = document,
-                Width = AppScale.Scale(600),
-                Height = AppScale.Scale(700),
-                StartPosition =
-                    FormStartPosition.CenterScreen
-            };
-        preview.ShowDialog();
-    }
-    private static void DrawReceiptLine(
-        Graphics graphics,
-        string leftText,
-        string rightText,
-        Font font,
-        float x,
-        float width,
-        ref float y,
-        float lineHeight)
-    {
-        float rightWidth =
-            graphics.MeasureString(
-                rightText,
-                font).Width;
-        float rightX =
-            x +
-            width -
-            rightWidth;
-        float availableWidth =
-            Math.Max(
-                30,
-                rightX -
-                x -
-                4);
-        string display =
-            TrimToWidth(graphics, leftText, font, availableWidth);
-        graphics.DrawString(display, font, Brushes.Black, x, y);
-        graphics.DrawString(rightText, font, Brushes.Black, rightX, y);
-        y += lineHeight;
-    }
-    private static void DrawCentered(Graphics graphics, string text, Font font, float x, float width, ref float y)
-    {
-        SizeF size =
-            graphics.MeasureString(text, font);
-        graphics.DrawString(
-            text,
-            font,
-            Brushes.Black,
-            x +
-            Math.Max(0, (width - size.Width) / 2), y);
-        y += size.Height + 2;
-    }
-    private static void DrawSeparator(Graphics graphics, Font font, float x, float width, ref float y)
-    {
-        string separator =
-            "--------------------------------";
-        separator =
-            TrimToWidth(graphics, separator, font, width);
-        graphics.DrawString(separator, font, Brushes.Black, x, y);
-        y += 13;
-    }
-    private static void DrawWrappedText(
-        Graphics graphics,
-        string text,
-        Font font,
-        Brush brush,
-        float x,
-        float width,
-        ref float y,
-        float lineHeight)
-    {
-        string value =
-            string.IsNullOrWhiteSpace(text)
-                ? "Student"
-                : text.Trim();
-        foreach (string part
-                 in WrapText(graphics, value, font, width))
-        {
-            graphics.DrawString(part, font, brush, x, y);
-            y += lineHeight;
-        }
-    }
-    private static IEnumerable<string> WrapText(Graphics graphics, string text, Font font, float width)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            yield return string.Empty;
-            yield break;
-        }
-        string[] words =
-            text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        string line =
-            string.Empty;
-        foreach (string word in words)
-        {
-            string candidate =
-                string.IsNullOrEmpty(line)
-                    ? word
-                    : line + " " + word;
-            if (graphics.MeasureString(candidate, font).Width <= width)
-            {
-                line = candidate;
-                continue;
-            }
-            if (!string.IsNullOrEmpty(line))
-            {
-                yield return line;
-                line = word;
-            }
-            else
-            {
-                yield return
-                    TrimToWidth(graphics, word, font, width);
-                line = string.Empty;
-            }
-        }
-        if (!string.IsNullOrEmpty(line))
-            yield return line;
-    }
-    private static string TrimToWidth(Graphics graphics, string text, Font font, float width)
-    {
-        if (string.IsNullOrEmpty(text))
-            return string.Empty;
-        if (graphics.MeasureString(text, font).Width <= width)
-        {
-            return text;
-        }
-        const string suffix = "...";
-        string result = text;
-        while (result.Length > 1 &&
-               graphics.MeasureString(result + suffix, font).Width > width)
-        {
-            result =
-                result.Substring(0, result.Length - 1);
-        }
-        return result + suffix;
+        catch(Exception ex){if(!IsDisposed)Fail(ex);}
+        finally{printingDueReport=false;if(!IsDisposed)UpdateSelectionActions();}
     }
     private void ClearForm()
     {

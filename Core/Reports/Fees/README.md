@@ -27,6 +27,11 @@ Shared files:
   remain compatible with the database; each RDLC has its own dataset name above.
 - `FeeDocumentLayout`: paper sizing; `FeeDocumentSheetLayout`: A4 sheet flow.
   Annual receipts use `StudentReceiptReport` and `StudentReceipt.rdlc` on a sheet.
+- `AnnualReceiptPreview`: the shared annual receipt loader/preview, used directly
+  from Student Account Statement and from the standalone year selector.
+- `OutstandingBillsPreview`: issues individual outstanding bills for a statement
+  selection and previews them together with `StudentBill.rdlc`, keeping each
+  bill's number. Statement date filters do not limit current outstanding bills.
 
 The older admission-bill and fee-payment receipt templates are retired. Build
 and publish cleanup removes their stale output copies. Historical receipts and

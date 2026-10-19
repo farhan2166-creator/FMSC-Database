@@ -164,61 +164,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
             int admissionId = student.SelectedId;
             int academicYearId = year.SelectedId;
             bool Current()=>!IsDisposed&&student.SelectedId==admissionId&&year.SelectedId==academicYearId;
-            DataTable data = await DatabaseHelper.QueryUserAsync(
-                "GetStudentAnnualFeeReceipts",
-                DatabaseHelper.Int("@AdmissionId", admissionId),
-                DatabaseHelper.Int("@AcademicYearId", academicYearId));
-            if(!Current())return;
-            if (data.Rows.Count == 0)
-            {
-                Warn("No paid fee receipts were found for this student in the selected academic year.");
-                return;
-            }
-            var institution = await InstitutionProfile.GetPrintIdentityAsync();
-            if(!Current())return;
-            if (string.IsNullOrWhiteSpace(institution.Name))
-            {
-                Warn("Check School Profile before printing receipts.");
-                return;
-            }
-            var receipts = FeeDocumentData.Create();
-            int pageKey = 0;
-            foreach (var receipt in data.AsEnumerable().GroupBy(row => Convert.ToString(row["ReceiptNumber"]) ?? "")
-                .OrderBy(group => Convert.ToDateTime(group.First()["PaymentDate"]))
-                .ThenBy(group => Convert.ToInt32(group.First()["FeePaymentId"])))
-            {
-                if (string.IsNullOrWhiteSpace(receipt.Key)) continue;
-                var header = receipt.First();
-                var lines = await FeeReceiptQueries.QueryLinesAsync(receipt.Key,"Fees.Statement.View");
-                if(!Current())return;
-                foreach (var enrollment in lines.AsEnumerable().Where(row => row.Field<int>("AdmissionId") == admissionId)
-                    .GroupBy(row => row.Field<int>("EnrollmentId")))
-                {
-                    pageKey++;
-                    var first = enrollment.First();
-                    decimal total = enrollment.Sum(row => Convert.ToDecimal(row["Amount"]));
-                    foreach (var line in enrollment)
-                    {
-                        var row = receipts.Rows.Add(pageKey,institution.Name,"STUDENT PAYMENT RECEIPT","STUDENT COPY",
-                            receipt.Key,first["StudentName"],AdmissionNumbers.ForId(admissionId),
-                            $"{first["ClassName"]} - {first["SectionName"]}",
-                            Convert.ToDateTime(header["PaymentDate"]).ToString("dd-MMM-yyyy hh:mm tt"),
-                            "",line["FeeTypeName"],line["Amount"],0m,total,0m,header["PaymentMethod"],
-                            "",false,false,institution.ContactNumber,institution.Address,
-                            first["CampusName"],first["FatherName"],
-                            line["BillingMonth"] is DBNull ? "" : Convert.ToDateTime(line["BillingMonth"]).ToString("MMM-yyyy",System.Globalization.CultureInfo.InvariantCulture));
-                        row["PaymentEnrollmentId"] = enrollment.Key;
-                    }
-                }
-            }
-            if (receipts.Rows.Count == 0)
-            {
-                Warn("No printable receipts were found for this academic year.");
-                return;
-            }
-            await FeeReceiptQueries.ApplyCurrentBalanceAsync(receipts,"Fees.Statement.View");
-            if(!Current())return;
-            StudentReceiptReport.Show(FindForm(),receipts,annualSheet:true);
+            await AnnualReceiptPreview.ShowAsync(FindForm(),admissionId,academicYearId,Current,Warn);
         }
         catch (Exception ex) { if(!IsDisposed)Fail(ex); }
     }

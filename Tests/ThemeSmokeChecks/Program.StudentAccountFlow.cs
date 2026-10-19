@@ -89,33 +89,25 @@ internal static partial class Program
                 "The simplified view preserves opening balance, charges, payment totals and current-snapshot export");
             Check(Field<Label>("statementContext").Text.Contains("Synthetic Ava") && Field<ModernButton>("annualReceiptsButton").Enabled,
                 "The account identifies its student and enables contextual annual receipts");
-            using (var receipts = (ApplicationWindowForm)type.GetMethod("CreateAnnualReceiptsDialog", flags)!.Invoke(page, new object[] { 41 })!)
-            {
-                var receiptPage = (AnnualFeeReceiptsPage)receipts.Controls[0];
-                Check(!receipts.ShowInTaskbar && receiptPage.Dock == DockStyle.Fill && !receiptPage.IsHandleCreated,
-                    "Annual receipts use the existing page in an owned responsive window without eager SQL or preview");
-                var pending = new TaskCompletionSource();
-                Func<Task> prepare = () => pending.Task;
-                var task = (Task<bool>)typeof(V2Page).GetMethod("RunBusyAsync", flags)!.Invoke(receiptPage,
-                    new object[] { receiptPage.BusyMessage, prepare, new Control[] { receiptPage } })!;
-                var closing = new FormClosingEventArgs(CloseReason.UserClosing, false);
-                typeof(Form).GetMethod("OnFormClosing", flags)!.Invoke(receipts, new object[] { closing });
-                Check(closing.Cancel, "The receipts owner cannot close during pending report preparation");
-                pending.SetResult(); PumpUntil(() => task.IsCompleted, "Owned receipt preparation settles");
-            }
+            Check(type.GetMethod("CreateAnnualReceiptsDialog",flags) is null &&
+                type.GetMethod("OpenAnnualReceipts",flags)!.ReturnType==typeof(Task),
+                "Annual receipts dispatch directly to the shared asynchronous preview without another selector window");
+            Check(type.GetMethod("PrintThermalDueReport",flags) is null,
+                "Statement printing no longer uses the retired drawing-based fee-due report");
             var from = Field<ModernDatePicker>("from"); from.Value = new DateTime(2026, 10, 1); from.Checked = true;
             Console.WriteLine("ACCOUNT_FLOW: owned receipt guard verified");
             Check(!Field<ModernButton>("exportButton").Enabled, "Changing the period invalidates the previous financial snapshot");
             toggle.Checked = true;
-            Check(Field<bool>("groupMode") && Field<DataGridView>("students").Visible && selected.Count == 0,
-                "Group mode exposes the existing selection grid and clears the prior single account");
+            Check(Field<bool>("groupMode") && Field<DataGridView>("students").Visible && selected.SetEquals(new[]{41}) && picker.SelectedId==41,
+                "Group mode expands selection without clearing the chosen student or current account");
             Check(from.Checked && from.Value.Date == new DateTime(2026, 10, 1), "Mode changes preserve the intentionally chosen statement period");
             selected.UnionWith(new[] { 41, 42 }); Invoke("UpdateSelectionActions");
             Check(!Field<ModernButton>("annualReceiptsButton").Enabled, "A multi-student selection cannot open a misleading single-student receipt window");
             Field<Dictionary<int, HashSet<int>>>("familySelections")[41] = new HashSet<int> { 41, 42 };
             toggle.Checked = false;
-            Check(selected.Count == 0 && Field<Dictionary<int, HashSet<int>>>("familySelections").Count == 0 && !Field<ModernButton>("exportButton").Enabled,
-                "Returning to one student removes every hidden group/family selection and stale export");
+            PumpUntil(()=>!page.IsBusy,"Returning to the primary student refreshes its account");
+            Check(selected.SetEquals(new[]{41}) && picker.SelectedId==41 && Field<Dictionary<int, HashSet<int>>>("familySelections").Count == 0,
+                "Returning to one student preserves the primary child while removing extra group/family members");
             picker.SetStudent(42, "Synthetic Ben"); Invoke("SelectSingleStudent");
             CurrentUser.SignIn(921, "Restricted fixture", "Operator", false, new[] { "Reports.View", "Fees.View" });
             Invoke("UpdateSelectionActions"); Invoke("OpenAnnualReceipts");
