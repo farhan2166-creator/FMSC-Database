@@ -2066,7 +2066,7 @@
                 </TablixMember>
                 <TablixMember>
                   <Visibility>
-                    <Hidden>=Not First(Fields!ShowSettlement.Value, "ReceiptPageGroup")</Hidden>
+                    <Hidden>=Not CBool(First(Fields!CreditApplied.Value, "ReceiptPageGroup")) Or Not First(Fields!ShowSettlement.Value, "ReceiptPageGroup")</Hidden>
                   </Visibility>
                 </TablixMember>
                 <TablixMember>
