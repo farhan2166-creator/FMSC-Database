@@ -6,9 +6,15 @@ Each document has its own editable RDLC layout, based on the established
 the existing preview. The shared helper sizes the roll-paper length; document
 labels, sections, columns, totals and grouping live in the RDLC files.
 
-Bills use a bordered Month / Fee / Due table. Family bills repeat a full-width
+Bills use a Month / Fee / Due table styled like the finalized individual receipt:
+a shaded header with a top rule, followed by borderless detail rows.
+Family bills repeat a full-width
 student heading, grouped by admission/registration reference, above each child's
-fee rows. Each fee retains its own period, including one-time fees. Receipt
+fee rows. Each fee retains its own period, including one-time fees, while the
+printed month appears only on the first fee row for that month and student.
+Family receipts retain separate student and month headings above borderless fee
+and settlement columns. The older admission and annual receipt templates also
+contain editable Month / Fee / Amount columns directly in RDLC. Receipt
 templates remain independent. The focused Fee document rendering workflow exports
 fictional PNG/PDF previews without connecting to a database.
 | Document | Use |

@@ -792,7 +792,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Student / Month / Fee</Value>
+                              <Value>Fee</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>

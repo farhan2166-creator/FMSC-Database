@@ -7,6 +7,7 @@ on:
       - 'Core/AdmissionBillReport*.cs'
       - 'Core/ReceiptReportLayout.cs'
       - 'Pages/Reports/Templates/*Bill.rdlc'
+      - 'Pages/Reports/Templates/*Receipt.rdlc'
       - 'Tests/ThemeSmokeChecks/Program.FeeDocuments.cs'
       - '.github/workflows/fmsc-fee-documents.yml'
 

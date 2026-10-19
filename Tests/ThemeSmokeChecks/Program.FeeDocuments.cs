@@ -9,25 +9,30 @@ internal static partial class Program
     {
         var school=new InstitutionProfile.PrintIdentity("Fictional Meadow School","0300-1234567","Synthetic School Road");
         string folder=Path.GetFullPath("artifacts/fee-documents");Directory.CreateDirectory(folder);
-        string template=Path.Combine(AppContext.BaseDirectory,"Reports","FeePaymentReceipt.rdlc");
-        int Render(string name,DataTable data)
+        int Render(string name,DataTable data,string? templateName=null,bool annual=false)
         {
             bool bill=Convert.ToString(data.Rows[0]["DocumentKind"])=="Bill";
             using var billRows=bill&&data.Columns.Contains("FamilyRowKind")?AdmissionBillReport.FamilyBillData(data):null;
             if(billRows is not null)data=billRows;
             string file=data.Columns.Contains("FamilyRowKind")?(bill?"FamilyBill.rdlc":"FamilyReceipt.rdlc"):(bill?"StudentBill.rdlc":"StudentReceipt.rdlc");
+            file=templateName??file;
             string path=Path.Combine(AppContext.BaseDirectory,"Reports",file);
             Check(File.Exists(path),"Each document loads its own RDLC file");
-            string definition=ReceiptReportLayout.SizeToContent(path,data);
+            string definition=annual?ReceiptReportLayout.Definition(path,data,annualSheet:true):ReceiptReportLayout.SizeToContent(path,data);
             var xml=XDocument.Parse(definition);XNamespace ns=xml.Root!.Name.Namespace;
             Check(xml.Descendants(ns+"TablixMember").Where(member=>member.Element(ns+"Group")?.Attribute("Name")?.Value=="ReceiptPageGroup").Count()==1,"One document group is retained");
-            if(bill)
+            // The operator's finalized individual receipt is the visual reference:
+            // shaded header with a top rule, and borderless fee rows.
+            foreach(string cell in new[]{"FeeHeader","AmountHeader"})
+                Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")==cell)
+                    .Element(ns+"Style")?.Element(ns+"TopBorder")?.Element(ns+"Style")?.Value=="Solid","Fee tables retain the finalized receipt header rule");
+            foreach(string cell in new[]{"FeeDescription","LineAmount"})
+                Check(!xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")==cell)
+                    .Element(ns+"Style")!.Elements().Where(element=>element.Name.LocalName.EndsWith("Border"))
+                    .Any(border=>border.Element(ns+"Style")?.Value=="Solid"),"Fee detail rows remain borderless");
+            if(bill && file=="FamilyBill.rdlc")
             {
-                foreach(string cell in new[]{"PeriodHeader","FeeHeader","AmountHeader","FeePeriod","FeeDescription","LineAmount"})
-                    Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")==cell)
-                        .Element(ns+"Style")?.Element(ns+"Border")?.Element(ns+"Style")?.Value=="Solid","Bill fee cells have a visible table grid");
-                if(billRows is not null)
-                    Check(xml.Descendants(ns+"Group").Any(group=>(string?)group.Attribute("Name")=="BillStudentGroup"),"Family bills group real fee rows under separate student headings");
+                Check(xml.Descendants(ns+"Group").Any(group=>(string?)group.Attribute("Name")=="BillStudentGroup"),"Family bills group real fee rows under separate student headings");
             }
             using var report=new LocalReport();report.LoadReportDefinition(new StringReader(definition));
             report.DataSources.Add(new ReportDataSource("FeeReceiptData",data));
@@ -63,6 +68,8 @@ internal static partial class Program
             Check(Render("individual-credit-receipt",credit)==1,"A six-line credit settlement prints on one receipt page");
             using var legacy=credit.Copy();foreach(DataRow row in legacy.Rows) row["ShowSettlement"]=false;
             Check(Render("legacy-individual-receipt",legacy)==1,"Original cash receipt fields remain printable through the RDLC template");
+            Check(Render("annual-receipt-template",legacy,"FeePaymentReceipt.rdlc")==1,"The editable annual receipt template prints separate month and fee columns directly");
+            Check(Render("annual-receipt-sheet",legacy,"FeePaymentReceipt.rdlc",annual:true)==1,"Annual printing retains adjustment details without duplicating the fee columns");
         }
         h["CashReceived"]=1000m;h["CashApplied"]=1000m;h["CreditApplied"]=7700m;
         students.Rows[0]["CashApplied"]=1000m;students.Rows[0]["CreditApplied"]=7700m;
@@ -82,12 +89,15 @@ internal static partial class Program
         using var charges=new DataTable();foreach(string name in new[]{"Reference","StudentName","FeeTypeName"})charges.Columns.Add(name);
         charges.Columns.Add("BillingMonth",typeof(DateTime));charges.Columns.Add("DiscountAmount",typeof(decimal));charges.Columns.Add("Due",typeof(decimal));
         charges.Rows.Add("1001","Ali Example","Tuition",new DateTime(2026,11,1),0m,400m);
+        charges.Rows.Add("1001","Ali Example","Transport",new DateTime(2026,11,1),0m,600m);
+        charges.Rows.Add("1001","Ali Example","Tuition",new DateTime(2026,12,1),0m,400m);
         using(var bill=AdmissionBillReport.BuildFamilyData(school.Name,school.ContactNumber,school.Address,"Example Parent",charges))
         {
             string definition=File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"Reports","StudentBill.rdlc"));
             Check(definition.Contains("TOTAL DUE") && definition.Contains("Bill reference") && !definition.Contains("TOTAL SETTLED"),"Bills contain bill-specific titles and totals");
             using var studentBill=AdmissionBillReport.StudentBillData(bill);
             Check(Render("individual-bill",studentBill)==1,"Individual bill uses the established receipt design");
+            Check(Render("admission-bill-template",studentBill,"AdmissionBill.rdlc")==1,"The older admission template also prints month and fee columns directly");
         }
         charges.Rows.Add("1002","Sara Example","Tuition",new DateTime(2026,11,1),0m,500m);
         charges.Rows.Add("1001","Ali Example","Transport",new DateTime(2026,12,1),0m,600m);
