@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--family-admission-workspace"))
+        {
+            CheckFamilyAdmissionWorkspace();
+            Console.WriteLine($"PASS: {checks} focused family-workspace design and draft-retention checks (no database writes).");
+            return;
+        }
         if(args.Contains("--finance-presentation"))
         {
             CheckFinancePresentation();
