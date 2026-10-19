@@ -16,8 +16,10 @@ public static class ChargeBillPrinter
         var institution=await InstitutionProfile.GetPrintIdentityAsync();
         if(string.IsNullOrWhiteSpace(institution.Name)) return "Check School Profile before printing the bill.";
         var identity=await FeeReceiptPlacement.QueryStudentAsync(admissionId);
-        AdmissionBillReport.Show(null,institution,studentName,admissionId,classSectionText,lines,true,
-            fatherName:identity.Rows.Count>0?Convert.ToString(identity.Rows[0]["FatherName"])??"":"");
+        await AdmissionBillReport.Show(null,institution,studentName,admissionId,classSectionText,lines,true,
+            fatherName:identity.Rows.Count>0?Convert.ToString(identity.Rows[0]["FatherName"])??"":"",
+            sourceKey:string.Join(",",charges.AsEnumerable().Where(row=>Convert.ToDecimal(row["Balance"])>0)
+                .Select(row=>Convert.ToString(row["BillingChargeId"])).OrderBy(value=>value)));
         return null;
     }
 }
