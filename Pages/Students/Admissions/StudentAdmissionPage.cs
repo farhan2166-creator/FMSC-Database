@@ -3493,15 +3493,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     continue;
                 decimal grossAmount = GetDecimalColumn(row, "GrossAmount");
                 decimal netAmount = GetDecimalColumn(row, "NetAmount");
-                decimal paidAmount = GetDecimalColumn(row, "PaidAmount");
-                decimal nominalOutstanding =
-                    Math.Max(0m, grossAmount - paidAmount);
                 decimal discountAmount =
                     Math.Max(0m, grossAmount - netAmount);
-                decimal amountToPrint =
-                    showActualAmount
-                        ? outstanding
-                        : nominalOutstanding;
+                // An issued fee bill always states the saved unpaid balance.
+                // A pre-discount fee plan is not an amount currently due.
+                decimal amountToPrint = outstanding;
                 billRows.Add(
                     new BillLineItem {
                         FeeName = GetTextColumn(row, "FeeTypeName"),
@@ -3529,10 +3525,12 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 Alert("Check School Profile before printing the admission bill.");
                 return;
             }
-            AdmissionBillReport.Show(FindForm(), institution, name.Text.Trim(), currentAdmissionId,
+            await AdmissionBillReport.Show(FindForm(), institution, name.Text.Trim(), currentAdmissionId,
                 classSectionText, billRows.Select(row => new AdmissionBillReport.Line(
                     row.FeeName, row.BillingMonth, row.Amount, row.DiscountAmount)).ToList(), showActualAmount,
-                viewCampus.Text == "-" ? string.Empty : viewCampus.Text.Trim(), fatherName.Text.Trim());
+                viewCampus.Text == "-" ? string.Empty : viewCampus.Text.Trim(), fatherName.Text.Trim(),
+                string.Join(",",raw.AsEnumerable().Where(row=>GetDecimalColumn(row,"Balance")>0)
+                    .Select(row=>Convert.ToString(row["BillingChargeId"])).OrderBy(value=>value)));
         }
         catch (Exception ex)
         {

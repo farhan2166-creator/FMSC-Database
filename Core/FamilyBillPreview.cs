@@ -39,7 +39,7 @@ internal static class FamilyBillPreview
             THROW 51000,'The family has new members. Refresh before printing the whole family bill.',1;
         SELECT COALESCE(S.AdmissionNumber,S.QuickReference) Reference,S.StudentName,
             CASE WHEN A.ConcessionLabel IS NULL THEN F.FeeTypeName ELSE CONCAT(F.FeeTypeName,N' — ',A.ConcessionLabel) END FeeTypeName,F.DisplayOrder FeeDisplayOrder,B.BillingMonth,B.DiscountAmount,
-            dbo.GetFeeChargeBalance(B.BillingChargeId) Due
+            dbo.GetFeeChargeBalance(B.BillingChargeId) Due,B.BillingChargeId,S.AdmissionId
         FROM dbo.Students S JOIN dbo.BillingCharges B ON B.AdmissionId=S.AdmissionId
         JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
         LEFT JOIN dbo.StudentFeeAssignments A ON A.StudentFeeAssignmentId=B.StudentFeeAssignmentId
@@ -49,7 +49,7 @@ internal static class FamilyBillPreview
         UNION ALL
         SELECT COALESCE(S.AdmissionNumber,S.QuickReference),S.StudentName,
             CONCAT(F.FeeTypeName,N' — ',A.ConcessionLabel),F.DisplayOrder,
-            DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1),A.DiscountAmount,CONVERT(decimal(12,2),0)
+            DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1),A.DiscountAmount,CONVERT(decimal(12,2),0),-CONVERT(bigint,A.StudentFeeAssignmentId),S.AdmissionId
         FROM dbo.StudentFeeAssignments A JOIN dbo.FeeTypes F ON F.FeeTypeId=A.FeeTypeId
         JOIN dbo.Students S ON S.AdmissionId=A.AdmissionId
         JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId
@@ -103,6 +103,8 @@ internal static class FamilyBillPreview
         var institution = await InstitutionProfile.GetPrintIdentityAsync();
         if (!Current()) return;
         string parent = Convert.ToString(members.AsEnumerable().First(row => Convert.ToInt32(row["AdmissionId"]) == admissionId)["FatherName"]) ?? "";
-        AdmissionBillReport.ShowFamily(owner, institution, parent, charges);
+        int[] billedStudents=charges.AsEnumerable().Select(row=>Convert.ToInt32(row["AdmissionId"])).Distinct().OrderBy(id=>id).ToArray();
+        await AdmissionBillReport.ShowFamily(owner, institution, parent, charges,
+            billedStudents.Contains(admissionId)?admissionId:billedStudents[0],billedStudents);
     }
 }

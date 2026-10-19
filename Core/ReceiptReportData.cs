@@ -40,6 +40,7 @@ internal static class ReceiptReportData
             table.Columns.Add(field,typeof(decimal)).DefaultValue=0m;
         table.Columns.Add("ShowSettlement",typeof(bool)).DefaultValue=false;
         table.Columns.Add("ShowCreditRemaining",typeof(bool)).DefaultValue=false;
+        table.Columns.Add("BillSourceKey",typeof(string)).DefaultValue="";
         return table;
     }
 
@@ -57,7 +58,7 @@ internal static class ReceiptReportData
         foreach (var values in ordered) table.Rows.Add(values);
     }
 
-    private static string FormatPeriod(string period) =>
+    internal static string FormatPeriod(string period) =>
         DateTime.TryParseExact(period.Trim(),
             new[] { "MMMM-yyyy", "MMM-yyyy", "MMMM yyyy", "MMM yyyy", "yyyy-MM" },
             CultureInfo.InvariantCulture, DateTimeStyles.None, out var month)

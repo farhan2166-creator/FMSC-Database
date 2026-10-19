@@ -6,9 +6,14 @@ internal static partial class Program
 {
     private static void CheckCollectionCredit()
     {
-        Check(FMSC_SMS.DatabaseHelper.RequiredDatabaseSchemaVersion == "23", "Application expects the installed credit migration");
+        Check(FMSC_SMS.DatabaseHelper.RequiredDatabaseSchemaVersion == "24", "Application expects the installed credit migration");
         using var page = new FeeCollectionPage(false);
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        // Family summaries resolve official numbers; keep this UI check independent of SQL.
+        typeof(AdmissionNumbers).GetField("_numbers", BindingFlags.Static | BindingFlags.NonPublic)!
+            .SetValue(null, new Dictionary<int,string> { [6594]="6590", [6589]="6589" });
+        typeof(AdmissionNumbers).GetField("_loadedAt", BindingFlags.Static | BindingFlags.NonPublic)!
+            .SetValue(null, DateTime.UtcNow);
         var type = typeof(FeeCollectionPage);
         object Field(string name) => type.GetField(name, flags)!.GetValue(page)!;
         type.GetField("admissionId", flags)!.SetValue(page, 6594);
@@ -43,9 +48,31 @@ internal static partial class Program
         discount.Text="2000";
         plan=Plan();
         Check(plan[2]==500 && Payable()==300, "Largest-fee discount is applied before credit");
+        var received = (ModernTextBox)Field("paymentAmount");
+        var collect = (Button)Field("executeButton");
+        var validator = (FormValidator)Field("collectionValidator");
+        void RefreshTotals() => type.GetMethod("UpdateCollectionTotals", flags)!.Invoke(page,null);
+        received.Text="301"; RefreshTotals();
+        Check(!collect.Enabled && validator.IsMarked(received), "Family cash above the balance after credit is rejected inline");
+        received.Text="300"; RefreshTotals();
+        Check(collect.Enabled && !validator.IsMarked(received), "Exactly the remaining cash balance is accepted");
+        use.Checked=false; discount.Text="0"; received.Text="3300"; RefreshTotals();
+        Check(collect.Enabled, "Without credit the full family balance is accepted");
+        received.Text="3301"; RefreshTotals();
+        Check(!collect.Enabled && validator.IsMarked(received), "Overpayment is rejected even without credit");
+        received.Text="3300"; discount.Text="2000"; RefreshTotals();
+        Check(!collect.Enabled && validator.IsMarked(received), "Adding a discount revalidates the existing received amount");
+        discount.Text="0"; use.Checked=true; RefreshTotals();
+        Check(!collect.Enabled && validator.IsMarked(received), "Applying credit revalidates the existing received amount");
+        received.Text="0";
         grid.Rows.Clear(); credit.Clear(); Bill(4,6594,8700); credit[6594]=8750; discount.Text="0";
         type.GetMethod("UpdateCollectionTotals", flags)!.Invoke(page,null);
         Check(Payable()==0 && ((Label)Field("remainingCredit")).Text=="50", "Credit-only settlement previews the exact remaining credit");
+        received.Text="1"; RefreshTotals();
+        Check(!collect.Enabled && validator.IsMarked(received) && ((Label)Field("remainingCredit")).Text=="50",
+            "A fully credit-covered bill rejects cash and never previews an implicit credit deposit");
+        received.Text="0"; RefreshTotals();
+        Check(collect.Enabled && !validator.IsMarked(received), "Credit-only settlement remains available with zero cash");
         Check(((Label)Field("availableCredit")).Font.Bold && ((Label)Field("availableCredit")).ForeColor==Color.ForestGreen,
             "Available credit is bold green");
         var layout=(TableLayoutPanel)((Control)Field("creditSummary")).Parent!;

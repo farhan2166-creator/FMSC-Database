@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--latest-receipt"))
+        {
+            CheckLatestReceipt();
+            Console.WriteLine($"PASS: {checks} latest receipt checks (no database connection).");
+            return;
+        }
         if(args.Contains("--fee-documents"))
         {
             CheckFeeDocuments();

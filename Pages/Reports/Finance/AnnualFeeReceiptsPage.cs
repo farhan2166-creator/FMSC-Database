@@ -199,7 +199,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
                     decimal total = enrollment.Sum(row => Convert.ToDecimal(row["Amount"]));
                     foreach (var line in enrollment)
                     {
-                        var row = receipts.Rows.Add(pageKey,institution.Name,"CASH RECEIPT","STUDENT COPY",
+                        var row = receipts.Rows.Add(pageKey,institution.Name,"STUDENT PAYMENT RECEIPT","STUDENT COPY",
                             receipt.Key,first["StudentName"],AdmissionNumbers.ForId(admissionId),
                             $"{first["ClassName"]} - {first["SectionName"]}",
                             Convert.ToDateTime(header["PaymentDate"]).ToString("dd-MMM-yyyy hh:mm tt"),

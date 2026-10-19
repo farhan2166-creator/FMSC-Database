@@ -324,6 +324,15 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         };
         printBillItem.Click+=async(_,_)=>await PrintSelectedFamilyBillAsync();
         studentFeesMenu.Items.Add(printBillItem);
+        var issuedBillsItem=new ToolStripMenuItem("Issued Fee Bills");
+        issuedBillsItem.Click+=async(_,_)=> {
+            if(transactionBusy || admissionId<=0)return;
+            int selected=admissionId,version=loadVersion;
+            try {await IssuedBillReport.ShowHistoryAsync(FindForm(),selected,StudentNameFor(selected),
+                ()=>!IsDisposed && admissionId==selected && loadVersion==version);}
+            catch(Exception ex) {if(!IsDisposed)Fail(ex);}
+        };
+        studentFeesMenu.Items.Add(issuedBillsItem);
         var familyReturnsItem=new ToolStripMenuItem("Family / Returns");
         familyReturnsItem.Click+=async(_,_)=>await OpenFamilyReturnsAsync();
         studentFeesMenu.Items.Add(familyReturnsItem);
@@ -335,6 +344,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             studentFeesMenu.Items[4].Enabled = paymentHistoryButton?.Enabled == true;
             printBillItem.Available=CurrentUser.HasPermission("Fees.View");
             printBillItem.Enabled=admissionId>0 && !IsBusy && !siblingBusy && CurrentUser.HasPermission("Fees.View");
+            issuedBillsItem.Available=CurrentUser.HasPermission("Fees.View");
+            issuedBillsItem.Enabled=admissionId>0 && !IsBusy && CurrentUser.HasPermission("Fees.View");
             familyReturnsItem.Available=CurrentUser.HasPermission("Students.Family");
             familyReturnsItem.Enabled=admissionId>0 && !IsBusy && !siblingBusy && CurrentUser.HasPermission("Students.Family") && CurrentUser.HasPermission("Students.View");
             familyReturnsItem.ToolTipText="Review family readiness and individual returns. Requires family and student-view access.";
@@ -1430,6 +1441,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             student.SelectedId;
         admissionId =
             selectedAdmissionId;
+        lastCollectionReceipt = null;
+        lastGroupReceiptNumber = null;
+        if (printReceiptButton is not null) printReceiptButton.Enabled = false;
         primaryPayer.Text=selectedAdmissionId>0 ? $"☑ {AdmissionNumbers.ForId(selectedAdmissionId)} · {StudentNameFor(selectedAdmissionId)}\n    Current student · Always included" : "";
         enrollmentId = 0;
         enrollment.ClearLookup();
@@ -1557,6 +1571,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             {
                 enrollmentId = 0;
                 enrollment.Enabled = false;
+                await LoadRecentPaymentsAsync(version);
                 UpdateCollectionTotals();
                 SetStatus(
                     "The student has no outstanding charges.");
@@ -1893,6 +1908,16 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         return result;
     }
     private decimal SelectedAvailableCredit() => SelectedBillStudents().Sum(id => availableCreditByStudent.GetValueOrDefault(id));
+    // BUSINESS DECISION: Fee Collection receives only the payable fee balance,
+    // after discount and the credit checkbox selection. It must never turn an
+    // overpayment or an unallocated amount into a credit deposit. Intentional
+    // deposits belong exclusively to the Student Credit action.
+    private bool IsReceivedAmountWithinPayable() =>
+        GetAmount(paymentAmount) <= CurrentPayableAfterDiscount();
+
+    private string ReceivedAmountLimitMessage() =>
+        $"Maximum Rs. {CurrentPayableAfterDiscount():N0}. Deposit extra via Student Credit.";
+
     /// <summary>Refresh allocation from the entered amount without assuming full payment.</summary>
     private void RefreshEnteredPaymentAllocation()
     {
@@ -2197,7 +2222,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     private async Task LoadRecentPaymentsAsync(int version)
     {
         recentPayments.Rows.Clear();
-        if (admissionId <= 0 || enrollmentId <= 0)
+        if (admissionId <= 0)
             return;
         try
         {
@@ -2209,7 +2234,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             if (IsDisposed || version != loadVersion)
                 return;
             int userId = CurrentUser.UserId;
-            int selectedEnrollment = enrollmentId;
+            int selectedAdmission = admissionId;
             var summaries = await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Fees.View';
                 SELECT P.FeePaymentId,P.TotalAmount,P.Status,P.PaymentMethod,
@@ -2225,15 +2250,18 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     -SUM(CASE WHEN X.PaymentMethod=N'Correction' THEN X.TotalAmount ELSE 0 END) Corrected
                     FROM dbo.FeePayments X WHERE X.RelatedFeePaymentId=P.FeePaymentId
                     AND X.Status=N'Completed' AND X.TotalAmount<0) A
-                WHERE P.EnrollmentId=@EnrollmentId AND P.RelatedFeePaymentId IS NULL;
-                """,DatabaseHelper.Int("@UserId",userId),DatabaseHelper.Int("@EnrollmentId",selectedEnrollment));
+                WHERE P.AdmissionId=@AdmissionId AND P.RelatedFeePaymentId IS NULL;
+                """,DatabaseHelper.Int("@UserId",userId),DatabaseHelper.Int("@AdmissionId",selectedAdmission));
             if (IsDisposed || version != loadVersion) return;
             using var issued=await DatabaseHelper.QueryUserSetAsync("GetStudentCollectionReceipts",DatabaseHelper.Int("@AdmissionId",admissionId));
             if(IsDisposed || version!=loadVersion) return;
-            if(issued.Tables[0].Rows.Count>0 && lastCollectionReceipt is null && lastGroupReceiptNumber is null)
+            var byPayment = summaries.AsEnumerable().ToDictionary(row => GetInt(row,"FeePaymentId"));
+            if(lastCollectionReceipt is null && lastGroupReceiptNumber is null)
             {
-                lastGroupReceiptNumber=GetText(issued.Tables[0].Rows[0],"ReceiptNumber");
-                if(printReceiptButton is not null) printReceiptButton.Enabled=true;
+                // Print Receipt belongs to the selected student, independently of
+                // outstanding charges, placement, or a payment in this session.
+                lastGroupReceiptNumber = LatestPrintableReceipt(raw, issued.Tables[0], summaries);
+                if(printReceiptButton is not null) printReceiptButton.Enabled=lastGroupReceiptNumber is not null;
             }
             var linkedPayments=issued.Tables.Count>1?issued.Tables[1].AsEnumerable().Select(row=>GetInt(row,"FeePaymentId")).ToHashSet():new HashSet<int>();
             foreach(DataRow receipt in issued.Tables[0].Rows)
@@ -2248,7 +2276,6 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 recentPayments.Rows[index].Cells["Amount"].ToolTipText=$"New money applied: Rs. {GetDecimal(receipt,"CashApplied"):N0}; credit used: Rs. {GetDecimal(receipt,"CreditApplied"):N0}.";
                 recentPayments.Rows[index].Tag=true;
             }
-            var byPayment = summaries.AsEnumerable().ToDictionary(row => GetInt(row,"FeePaymentId"));
             var rows = raw.AsEnumerable()
                 .Where(row => GetInt(row, "EnrollmentId") == enrollmentId)
                 .Where(row => !string.Equals(GetText(row, "TransactionType"), "REVERSAL", StringComparison.OrdinalIgnoreCase))
@@ -2328,6 +2355,25 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             if (!IsDisposed && version == loadVersion)
                 Fail(ex);
         }
+    }
+    private static string? LatestPrintableReceipt(DataTable statement, DataTable issued, DataTable payments)
+    {
+        var byPayment = payments.AsEnumerable().ToDictionary(row => GetInt(row,"FeePaymentId"));
+        DateTime ReceiptDate(DataRow row) => DateTime.TryParse(GetText(row,"TransactionDate"), out var date)
+            ? date : DateTime.MinValue;
+        var candidates = issued.AsEnumerable()
+            .Where(row => !string.IsNullOrWhiteSpace(GetText(row,"ReceiptNumber")))
+            .Select(row => (Number:GetText(row,"ReceiptNumber"), Date:ReceiptDate(row),
+                Issued:true, Id:GetInt(row,"CollectionReceiptId")))
+            .Concat(statement.AsEnumerable()
+                .Where(row => byPayment.TryGetValue(GetInt(row,"FeePaymentId"), out var payment)
+                    && !string.Equals(GetText(payment,"Status"),"Reversed",StringComparison.OrdinalIgnoreCase)
+                    && (IsPrintablePayment(row) || GetText(payment,"CreditKind")=="Application")
+                    && !string.IsNullOrWhiteSpace(GetText(row,"ReceiptNumber")))
+                .Select(row => (Number:GetText(row,"ReceiptNumber"), Date:ReceiptDate(row),
+                    Issued:false, Id:GetInt(row,"FeePaymentId"))));
+        return candidates.OrderByDescending(row => row.Date).ThenByDescending(row => row.Issued)
+            .ThenByDescending(row => row.Id).Select(row => row.Number).FirstOrDefault();
     }
     private static bool IsPrintablePayment(DataRow row) =>
         string.Equals(GetText(row,"TransactionType"),"PAYMENT",StringComparison.OrdinalIgnoreCase)
@@ -2636,7 +2682,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         }
         executeButton.Enabled =
             !transactionBusy &&
-            HasOutstandingCharges();
+            HasOutstandingCharges() && IsReceivedAmountWithinPayable();
     }
     /// <summary>True when the grid holds a real charge with a balance left to collect.</summary>
     private bool HasOutstandingCharges()
@@ -2711,14 +2757,14 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         decimal credit = SelectedAvailableCredit();
         decimal usedCredit = GetCreditAllocations(discountMap).Values.Sum();
         availableCredit.Text = credit.ToString("N0");
-        remainingCredit.Text = (credit - usedCredit + Math.Max(0m, GetAmount(paymentAmount) - payment)).ToString("N0");
+        remainingCredit.Text = (credit - usedCredit).ToString("N0");
         if (creditSummary is not null && remainingCreditSummary is not null)
         {
             var layout = (TableLayoutPanel)creditSummary.Parent!;
             creditSummary.Visible = credit > 0;
             layout.RowStyles[2].Height = credit > 0 ? AppScale.Scale(40, AppScale.ControlSizeScale) : 0;
-            remainingCreditSummary.Visible = credit > 0 || GetAmount(paymentAmount) > payment;
-            layout.RowStyles[7].Height = credit > 0 || GetAmount(paymentAmount) > payment ? AppScale.Scale(40, AppScale.ControlSizeScale) : 0;
+            remainingCreditSummary.Visible = credit > 0;
+            layout.RowStyles[7].Height = credit > 0 ? AppScale.Scale(40, AppScale.ControlSizeScale) : 0;
             outstandingSummary!.Visible = due > 0 || credit <= 0;
             layout.RowStyles[0].Height = due > 0 || credit <= 0 ? AppScale.Scale(40, AppScale.ControlSizeScale) : 0;
             remainingBalanceSummary!.Visible = remaining > 0 || credit <= 0;
@@ -2727,19 +2773,10 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         /* Remembered so the next change can tell the untouched default from a figure the operator entered - see lastPayableShown. */
         lastPayableShown =
             payableAfterDiscount;
-        /* if more was handed over than could be applied, say so rather than quietly collecting less than the operator typed. */
-        decimal typed = GetAmount(paymentAmount);
-        if (typed > payment + 0.005m)
-        {
-            decimal payable =
-                remaining +
-                payment;
-            SetStatus(
-                $"Only Rs. {payment:N0} of Rs. {typed:N0} can be applied to the "
-                + $"Rs. {payable:N0} owed after the discount. "
-                + $"Rs. {typed - payment:N0} would be unapplied.",
-                true);
-        }
+        // Recheck when the amount, discount, credit choice or selected children
+        // change; an amount previously valid may now exceed the payable balance.
+        collectionValidator?.Check(paymentAmount, IsReceivedAmountWithinPayable(),
+            ReceivedAmountLimitMessage(), IsReceivedAmountWithinPayable);
         /* The per-child view is refreshed here, so it is always in step with the grid no matter which path changed the allocation. */
         ProposeFamilyAllocation();
         /* The grid is the only thing that knows whether there is anything to collect, and this method runs on every path that can change it. */
@@ -2855,7 +2892,6 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     creditMap[GetLong(row.Cells["BillingChargeId"].Value)], GetDecimal(row.Cells["Balance"].Value),
                     availableCreditByStudent.GetValueOrDefault(GetInt(row.Cells["AdmissionId"].Value)))).ToArray();
             decimal creditUsed = creditEdits.Sum(edit => edit.Amount);
-            decimal surplusCredit = 0m;
             decimal discount = 0m;
             // Populated inside the Collection branch below; used afterwards to work out the balance remaining for the receipt.
             decimal totalDueBeforeThisTransaction = 0m;
@@ -2888,6 +2924,11 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     totalDueValue)
                 {
                     MarkCollectionField(discountAmount, "More than is outstanding");
+                    return;
+                }
+                if (!IsReceivedAmountWithinPayable())
+                {
+                    MarkCollectionField(paymentAmount, ReceivedAmountLimitMessage());
                     return;
                 }
                 foreach (
@@ -3026,13 +3067,11 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                             x => x.amount > 0m)
                         .Sum(
                             x => x.amount);
-                if (GetAmount(paymentAmount) < amount)
+                if (GetAmount(paymentAmount) != amount)
                 {
-                    MarkCollectionField(paymentAmount, "Received amount cannot be less than the allocated payment.");
+                    MarkCollectionField(paymentAmount, "Allocate the full received amount. Use Student Credit for deposits.");
                     return;
                 }
-                surplusCredit = GetAmount(paymentAmount) - amount;
-                amount += surplusCredit;
                 if (amount <= 0m &&
                     discount <= 0m && creditUsed <= 0m)
                 {
@@ -3048,8 +3087,6 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     ? $"Collect Rs. {amount:0.##} and apply a discount of Rs. {discount:0.##}."
                     : $"Collect Rs. {amount:0.##}.";
             if (creditUsed > 0m) description += $"\r\nExisting credit applied: Rs. {creditUsed:N0}.";
-            if (surplusCredit > 0m)
-                description += $"\r\nRs. {surplusCredit:N0} is retained as credit for {receiptStudentName}.";
             /* The payment date is stamped on the receipt and the ledger. */
             description +=
                 $"\r\nPayment date: {paymentDate.Value:dd-MMM-yyyy hh:mm tt}   Method: {method.Text}.";
@@ -3063,7 +3100,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             if (creditUsed > 0m)
             {
                 confirmationFacts.Add(("Credit applied", $"Rs. {creditUsed:N0}"));
-                confirmationFacts.Add(("Remaining credit", $"Rs. {SelectedAvailableCredit() - creditUsed + surplusCredit:N0}"));
+                confirmationFacts.Add(("Remaining credit", $"Rs. {SelectedAvailableCredit() - creditUsed:N0}"));
             }
             foreach (DataGridViewRow row in charges.Rows)
             {
@@ -3177,7 +3214,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 result = await CollectionDiscountWriter.CollectWithReceiptAsync(null, billDiscountEdits, creditEdits,
                     paymentDate.Value, recoverySummary, receiptDraft);
             }
-            else if (allocationLines.Count == 1 && surplusCredit == 0m && SelectedBillStudents().Length == 1)
+            else if (allocationLines.Count == 1 && SelectedBillStudents().Length == 1)
             {
                 var single = allocationLines[0];
                 decimal singleAmount = single.Value.Rows
@@ -3306,7 +3343,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 !string.IsNullOrWhiteSpace(singleReceipt) &&
                 receiptLines.Count > 0)
             {
-                if (posted > 1 || allocationLines.Count > 1 || surplusCredit > 0m || SelectedBillStudents().Length > 1)
+                if (posted > 1 || allocationLines.Count > 1 || SelectedBillStudents().Length > 1)
                 {
                     lastCollectionReceipt = null;
                     lastGroupReceiptNumber = singleReceipt;
@@ -4086,23 +4123,24 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                     value)
                     ?? string.Empty;
     }
-    // Reprints the most recently completed Collection using the true, post-discount figures. See PrintPaymentReceipt's showActualAmount parameter, which still carries the parent path for when it is wanted again.
+    // Reprints the selected student's latest receipt, including a collection just completed.
     private async Task PrintReceiptAsync()
     {
         if (transactionBusy) return;
         if (lastCollectionReceipt is null && lastGroupReceiptNumber is null)
         {
             Warn(
-                "Process a Collection first - Print Receipt reprints " +
-                "the transaction just completed, with its real amounts.");
+                "No receipt is available for the selected student.");
             return;
         }
         /* both values are captured BEFORE the await below. */
         var receiptSnapshot = lastCollectionReceipt;
         string? groupReceiptNumber = lastGroupReceiptNumber;
+        int receiptAdmission = admissionId, receiptVersion = loadVersion;
         /* The receipt's institution name is read from School Profile. Nothing is printed when it cannot be read. */
         var institution =
             await Core.InstitutionProfile.GetPrintIdentityAsync();
+        if (IsDisposed || admissionId != receiptAdmission || loadVersion != receiptVersion) return;
         if (string.IsNullOrWhiteSpace(institution.Name))
         {
             Alert(
@@ -4126,6 +4164,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
         }
         var snapshot = receiptSnapshot;
         var identity = await FeeReceiptPlacement.QueryStudentAsync(snapshot.AdmissionId);
+        if (IsDisposed || admissionId != receiptAdmission || loadVersion != receiptVersion) return;
         if (identity.Rows.Count == 0) { Alert("The student's details could not be read. Try printing again."); return; }
         await PrintPaymentReceipt(
             institution,
@@ -4300,7 +4339,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 reportData,
                 receiptPageKey: 1,
                 institution,
-                documentTitle: showActualAmount ? "STUDENT PAYMENT RECEIPT" : "STUDENT PAYMENT BILL",
+                documentTitle: showActualAmount ? "STUDENT PAYMENT RECEIPT" : "STUDENT FEE BILL",
                 copyLabel: showActualAmount ? "STUDENT COPY" : "CUSTOMER COPY",
                 receiptNumber,
                 studentName,
@@ -4388,6 +4427,8 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
 
     private void ShowReceiptReport(DataTable reportData)
     {
+        using var familyRows=reportData.Columns.Contains("FamilyRowKind")?CollectionReceiptReport.FamilyReceiptData(reportData):null;
+        if(familyRows is not null) reportData=familyRows;
         if(!reportData.Columns.Contains("FamilyRowKind")) ReceiptReportData.GroupPeriods(reportData);
         string reportPath = Path.Combine(
             AppContext.BaseDirectory,

@@ -249,7 +249,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Bill reference</Value>
+                              <Value>Bill No.</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -865,7 +865,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Due (Rs.)</Value>
+                              <Value>Rs.</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>

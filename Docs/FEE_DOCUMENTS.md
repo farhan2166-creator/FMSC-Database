@@ -6,14 +6,16 @@ Each document has its own editable RDLC layout, based on the established
 the existing preview. The shared helper sizes the roll-paper length; document
 labels, sections, columns, totals and grouping live in the RDLC files.
 
-Bills use a Month / Fee / Due table styled like the finalized individual receipt:
+Bills and receipts use the approved Month / Fee / Rs. table:
 a shaded header with a top rule, followed by borderless detail rows.
 Family bills repeat a full-width
 student heading, grouped by admission/registration reference, above each child's
 fee rows. Each fee retains its own period, including one-time fees, while the
 printed month appears only on the first fee row for that month and student.
-Family receipts retain separate student and month headings above borderless fee
-and settlement columns. The older admission and annual receipt templates also
+Family receipts use the same full-width student headings and three fee columns,
+followed by each child's settlement and outstanding figures. Months appear once
+per month and child. Bills use Bill No. and TOTAL DUE; receipts retain Receipt No.
+and their payment summaries. The older admission and annual receipt templates also
 contain editable Month / Fee / Amount columns directly in RDLC. Receipt
 templates remain independent. The focused Fee document rendering workflow exports
 fictional PNG/PDF previews without connecting to a database.
@@ -24,22 +26,47 @@ fictional PNG/PDF previews without connecting to a database.
 | Student receipt | One saved collection covering one student |
 | Family receipt | One saved collection covering the selected siblings together |
 
+Titles are Student Fee Bill, Family Fee Bill, Student Payment Receipt and
+Family Payment Receipt. Bill summaries use Discount included and TOTAL DUE.
+Receipt summaries use Charges covered, Discount, Amount received, Credit used,
+TOTAL SETTLED, Outstanding balance and Credit remaining, hiding inapplicable rows.
+
+New numbers are B-2026-00001, FB-2026-00001, R-2026-00001 and FR-2026-00001.
+Each prefix has its own calendar-year sequence. The year follows the issue date
+for bills and the transaction date for receipts. Credit-only settlements use
+normal R/FR receipts. Existing numbers remain unchanged. Internal credit movement
+references remain internal; they do not replace the public collection number.
+
+Migration 24 stores each issued bill's report snapshot, source charge references,
+number and date. An unchanged bill reuses that record; changed charges or amounts
+create a new bill. Reprints from Fee Collection → Student Fees → Issued Fee Bills
+read the saved snapshot, even after payment changes the current balance.
+The database checks posted balances again before issuing a new bill. Numbering
+and bill creation are atomic and do not post fees or allocate money. Issued
+numbers are retained; a failed transaction never creates an issued document.
+
 Printing a bill reads posted charges without posting fees, reserving credit or
 recording money received. Registration and Fee Collection share the same bill
 preview. Returning admission uses the same bill template.
 
 A collection receipt identifies the money received, existing credit used,
-discount, total settled, outstanding balance and credit remaining. Money retained
-as additional credit is identified separately. Credit is never counted as new
+discount, total settled, outstanding balance and credit remaining. Fee Collection
+accepts no more than the payable balance after discount and
+selected credit. Intentional deposits must use Student Credit. Historical
+receipts retain their earlier excess-credit details. Credit is never counted as new
 cash received. A family document lists each child, fee periods, individual totals
 and one combined summary; it does not force a separate receipt page per child.
 
 `CollectionDiscountWriter` records the payment, credit movements, receipt links
 and receipt snapshot in one transaction. A receipt-validation failure rolls back
-the collection. Receipt numbers follow the existing receipt sequence; a credit-only
+the collection. New receipts use the R/FR sequences above; a credit-only
 collection receives a normal printable receipt number without creating a cash
 payment. Internal credit movement references remain unchanged.
 
+Print Receipt loads the selected student's latest printable receipt across
+placements, even when nothing is due or no payment was made in this session.
+Selecting another student clears the previous receipt immediately. A new
+collection makes its receipt available for printing.
 Print Receipt and Recent Payments use the same saved document. Reprinting reads
 the issue snapshot and does not apply credit again. Later refunds, corrections or
 reversals are identified on the original receipt; Payment History reflects the

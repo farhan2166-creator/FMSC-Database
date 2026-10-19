@@ -12,8 +12,11 @@ internal static partial class Program
         int Render(string name,DataTable data,string? templateName=null,bool annual=false)
         {
             bool bill=Convert.ToString(data.Rows[0]["DocumentKind"])=="Bill";
+            using var familyRows=!bill&&data.Columns.Contains("FamilyRowKind")?CollectionReceiptReport.FamilyReceiptData(data):null;
+            if(familyRows is not null)data=familyRows;
             using var billRows=bill&&data.Columns.Contains("FamilyRowKind")?AdmissionBillReport.FamilyBillData(data):null;
             if(billRows is not null)data=billRows;
+            if(bill) foreach(DataRow row in data.Rows)row["ReceiptNumber"]=data.Columns.Contains("FamilyRowKind")?"FB-2026-00001":"B-2026-00001";
             string file=data.Columns.Contains("FamilyRowKind")?(bill?"FamilyBill.rdlc":"FamilyReceipt.rdlc"):(bill?"StudentBill.rdlc":"StudentReceipt.rdlc");
             file=templateName??file;
             string path=Path.Combine(AppContext.BaseDirectory,"Reports",file);
@@ -26,6 +29,9 @@ internal static partial class Program
             foreach(string cell in new[]{"FeeHeader","AmountHeader"})
                 Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")==cell)
                     .Element(ns+"Style")?.Element(ns+"TopBorder")?.Element(ns+"Style")?.Value=="Solid","Fee tables retain the finalized receipt header rule");
+            Check(xml.Descendants(ns+"Textbox").Any(box=>(string?)box.Attribute("Name")=="PeriodHeader")
+                && xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="AmountHeader")
+                    .Descendants(ns+"Value").First().Value=="Rs.","Every bill and receipt uses the approved Month / Fee / Rs. table");
             foreach(string cell in new[]{"FeeDescription","LineAmount"})
                 Check(!xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")==cell)
                     .Element(ns+"Style")!.Elements().Where(element=>element.Name.LocalName.EndsWith("Border"))
@@ -45,6 +51,8 @@ internal static partial class Program
         }
         void CheckCashOnly(string name,DataTable source)
         {
+            using var familyRows=source.Columns.Contains("FamilyRowKind")?CollectionReceiptReport.FamilyReceiptData(source):null;
+            if(familyRows is not null)source=familyRows;
             using var cash=source.Copy();
             foreach(DataRow row in cash.Rows)
             {
@@ -87,7 +95,7 @@ internal static partial class Program
         foreach(string name in new[]{"ReceiptNumber","PaymentMethod","ReceiptStatus"})header.Columns.Add(name);
         header.Columns.Add("TransactionDate",typeof(DateTime));
         foreach(string name in new[]{"CashReceived","CashApplied","CreditApplied","DiscountApplied","BalanceRemaining","CreditRemaining"})header.Columns.Add(name,typeof(decimal));
-        var h=header.Rows.Add("FMSC-2026-0100","Account Credit","",new DateTime(2026,10,19,10,15,0),0m,0m,8700m,0m,0m,50m);
+        var h=header.Rows.Add("R-2026-00001","Account Credit","",new DateTime(2026,10,19,10,15,0),0m,0m,8700m,0m,0m,50m);
         using var students=new DataTable();
         students.Columns.Add("AdmissionId",typeof(int));foreach(string name in new[]{"AdmissionNumber","StudentName","FatherName"})students.Columns.Add(name);
         foreach(string name in new[]{"CashApplied","CreditApplied","BalanceRemaining"})students.Columns.Add(name,typeof(decimal));
@@ -107,7 +115,7 @@ internal static partial class Program
                 && Convert.ToDecimal(credit.Rows[0]["CreditRemaining"])==50m,"Credit-only receipt distinguishes settlement, new money and remaining credit");
             Check(Render("individual-credit-receipt",credit)==1,"A six-line credit settlement prints on one receipt page");
             CheckCashOnly("individual-cash-only-receipt",credit);
-            using var legacy=credit.Copy();foreach(DataRow row in legacy.Rows) row["ShowSettlement"]=false;
+            using var legacy=credit.Copy();foreach(DataRow row in legacy.Rows) {row["ShowSettlement"]=false;row["ReceiptNumber"]="FMSC-2026-0100";}
             Check(Render("legacy-individual-receipt",legacy)==1,"Original cash receipt fields remain printable through the RDLC template");
             Check(Render("annual-receipt-template",legacy,"FeePaymentReceipt.rdlc")==1,"The editable annual receipt template prints separate month and fee columns directly");
             Check(Render("annual-receipt-sheet",legacy,"FeePaymentReceipt.rdlc",annual:true)==1,"Annual printing retains adjustment details without duplicating the fee columns");
@@ -119,10 +127,21 @@ internal static partial class Program
         students.Rows.Add(2,"1002","Sara Example","Example Parent",300m,100m,600m);
         lines.Rows.Add(2,"Tuition","Class 2","B","Main Campus",new DateTime(2026,11,1),1000m,300m,100m);
         h["CashReceived"]=1300m;h["CashApplied"]=1300m;h["CreditApplied"]=7800m;h["BalanceRemaining"]=600m;
+        h["ReceiptNumber"]="FR-2026-00001";
         using(var family=CollectionReceiptReport.Build(school,h,students,lines))
         {
             Check(family.AsEnumerable().Select(row=>row.Field<int>("ReceiptPageKey")).Distinct().Single()==1,"All children share one family document key");
             Check(family.AsEnumerable().Count(row=>row.Field<string>("FamilyRowKind")=="Student")==2,"Family receipt identifies both children");
+            using(var displayed=CollectionReceiptReport.FamilyReceiptData(family))
+            {
+                Check(displayed.Rows.Count==lines.Rows.Count && displayed.AsEnumerable().Sum(row=>row.Field<decimal>("Amount"))==9100m,
+                    "Family layout keeps every fee and settlement amount without summing heading or subtotal rows");
+                Check(displayed.AsEnumerable().Select(row=>row.Field<int>("ReceiptStudentKey")).Distinct().Count()==2
+                    && displayed.AsEnumerable().Count(row=>!string.IsNullOrWhiteSpace(row.Field<string>("FeePeriod")))==4,
+                    "Family months appear once per month per child under separate student groups");
+                Check(displayed.Rows[^1].Field<decimal>("StudentOutstanding")==600m
+                    && displayed.Rows[0].Field<decimal>("StudentSettled")==8700m,"Per-child settlement and outstanding values remain unchanged");
+            }
             Check(Render("family-mixed-receipt",family)==1,"Family receipt has no forced page per child");
             CheckCashOnly("family-cash-only-receipt",family);
             using var legacyFamily=family.Copy();foreach(DataRow row in legacyFamily.Rows) row["ShowSettlement"]=false;
@@ -135,8 +154,18 @@ internal static partial class Program
         charges.Rows.Add("1001","Ali Example","Tuition",new DateTime(2026,12,1),0m,400m);
         using(var bill=AdmissionBillReport.BuildFamilyData(school.Name,school.ContactNumber,school.Address,"Example Parent",charges))
         {
+            using var original=AdmissionBillReport.StudentBillData(bill);
+            string snapshot=IssuedBillReport.Snapshot(original);
+            using var restored=IssuedBillReport.ReadSnapshot(snapshot);
+            Check(restored.Rows.Count==original.Rows.Count && restored.AsEnumerable().Sum(row=>row.Field<decimal>("Amount"))==1400m,
+                "Saved bill snapshots round-trip the complete report schema and every amount");
+            foreach(DataRow row in original.Rows) {row["ReceiptNumber"]="B-2026-00001";row["PaymentDateText"]="different print date";}
+            Check(IssuedBillReport.Snapshot(original)==snapshot,"Reprint date and number do not create a new issued bill");
+            foreach(DataRow row in original.Rows)row["BillSourceKey"]="new posted charge";
+            Check(IssuedBillReport.Snapshot(original)!=snapshot,"Replacement charges cannot reuse an older bill merely because amounts match");
+            File.WriteAllText(Path.Combine(folder,"bill-snapshot.xml"),snapshot);
             string definition=File.ReadAllText(Path.Combine(AppContext.BaseDirectory,"Reports","StudentBill.rdlc"));
-            Check(definition.Contains("TOTAL DUE") && definition.Contains("Bill reference") && !definition.Contains("TOTAL SETTLED"),"Bills contain bill-specific titles and totals");
+            Check(definition.Contains("TOTAL DUE") && definition.Contains("Bill No.") && !definition.Contains("TOTAL SETTLED"),"Bills contain bill-specific titles and totals");
             using var studentBill=AdmissionBillReport.StudentBillData(bill);
             Check(Render("individual-bill",studentBill)==1,"Individual bill uses the established receipt design");
             Check(Render("admission-bill-template",studentBill,"AdmissionBill.rdlc")==1,"The older admission template also prints month and fee columns directly");

@@ -91,8 +91,52 @@ internal static class CollectionReceiptReport
         }
         return data;
     }
+    // Presentation only: turn the existing child/month/summary rows into real
+    // fee rows for RDLC student groups. All settlement values stay unchanged.
+    internal static DataTable FamilyReceiptData(DataTable source)
+    {
+        if(source.Columns.Contains("ReceiptStudentKey")) return source.Copy();
+        var data=source.Clone();
+        data.Columns.Add("ReceiptStudentKey",typeof(int));
+        data.Columns.Add("ReceiptStudentName",typeof(string));
+        data.Columns.Add("StudentSettled",typeof(decimal));
+        data.Columns.Add("StudentOutstanding",typeof(decimal));
+        data.Columns.Add("ShowStudentSettlement",typeof(bool));
+        int key=0;string heading="",period="",lastPrintedPeriod="";
+        var childRows=new List<DataRow>();
+        foreach(DataRow sourceRow in source.Rows)
+        {
+            string kind=Convert.ToString(sourceRow["FamilyRowKind"])??"";
+            string description=Convert.ToString(sourceRow["FeeDescription"])?.Trim()??"";
+            if(kind=="Student") {key++;heading=description;period="";lastPrintedPeriod="";childRows.Clear();continue;}
+            if(kind=="Month") {period=description;continue;}
+            if(kind=="Summary")
+            {
+                foreach(var row in childRows)
+                {
+                    row["ShowStudentSettlement"]=true;
+                    row[description=="Outstanding"?"StudentOutstanding":"StudentSettled"]=sourceRow["Amount"];
+                }
+                continue;
+            }
+            if(kind!="Fee") continue;
+            var fee=data.NewRow();
+            foreach(DataColumn column in source.Columns) fee[column.ColumnName]=sourceRow[column];
+            fee["FeeDescription"]=description;
+            string printedPeriod=ReceiptReportData.FormatPeriod(string.IsNullOrWhiteSpace(Convert.ToString(sourceRow["FeePeriod"]))
+                ?period:Convert.ToString(sourceRow["FeePeriod"])!);
+            fee["FeePeriod"]=printedPeriod==lastPrintedPeriod?"":printedPeriod;lastPrintedPeriod=printedPeriod;
+            fee["ReceiptStudentKey"]=key;fee["ReceiptStudentName"]=heading;
+            fee["StudentSettled"]=0m;fee["StudentOutstanding"]=0m;fee["ShowStudentSettlement"]=false;
+            data.Rows.Add(fee);childRows.Add(fee);
+        }
+        return data;
+    }
+
     internal static void Show(Form? owner,DataTable data)
     {
+        using var familyRows=data.Columns.Contains("FamilyRowKind")?FamilyReceiptData(data):null;
+        if(familyRows is not null) data=familyRows;
         string path=Path.Combine(AppContext.BaseDirectory,"Reports",data.Columns.Contains("FamilyRowKind")?"FamilyReceipt.rdlc":"StudentReceipt.rdlc");
         if(!data.Columns.Contains("FamilyRowKind")) ReceiptReportData.GroupPeriods(data);
         RdlcReportPreview.Show(owner,"Payment Receipt",path,"FeeReceiptData",data,

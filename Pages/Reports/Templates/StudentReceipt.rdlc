@@ -1156,7 +1156,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Money received</Value>
+                              <Value>Amount received</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1396,7 +1396,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Originally Paid</Value>
+                              <Value>Originally settled</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1716,7 +1716,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=IIf(First(Fields!ShowSettlement.Value, "ReceiptPageGroup"), "TOTAL SETTLED", IIf(First(Fields!ShowAdjustments.Value, "ReceiptPageGroup"), "NET PAID", "TOTAL PAID"))</Value>
+                              <Value>=IIf(First(Fields!ShowSettlement.Value, "ReceiptPageGroup"), "TOTAL SETTLED", IIf(First(Fields!ShowAdjustments.Value, "ReceiptPageGroup"), "NET SETTLED", "TOTAL SETTLED"))</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>

@@ -26,7 +26,7 @@ internal static class ReceiptReportLayout
             table.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="LineAmount").Descendants(ns+"Value").First().Value="=Fields!FamilyAmountText.Value";
             table.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="FeeHeader").Descendants(ns+"Value").First().Value="Student / Month / Fee";
             table.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="AmountHeader").Descendants(ns+"Value").First().Value="Due (Rs.)";
-            foreach(var value in table.Descendants(ns+"Value").Where(value=>value.Value=="TOTAL PAID"))value.Value="TOTAL DUE";
+            foreach(var value in table.Descendants(ns+"Value").Where(value=>value.Value is "TOTAL PAID" or "TOTAL SETTLED"))value.Value="TOTAL DUE";
         }
         foreach (var label in document.Descendants(ns + "Textbox").Where(box => (string?)box.Attribute("Name") == "AdmissionNumberTextLabel"))
             label.Descendants(ns + "Value").First().Value = "=IIf(InStr(CStr(First(Fields!AdmissionNumberText.Value, \"ReceiptPageGroup\")), \"QR-\") > 0, \"Registration #\", \"Admission #\")";
@@ -57,7 +57,7 @@ internal static class ReceiptReportLayout
                 .Element(ns + "TablixMember")!.Element(ns + "TablixMembers")!;
             var totalMember = rowMembers.Elements(ns + "TablixMember").ElementAt(totalIndex);
             var fields = document.Descendants(ns + "DataSet").First().Element(ns + "Fields")!;
-            foreach (var item in new[] { ("OriginalPaid","Originally Paid"), ("RefundAmount","Refund"),
+            foreach (var item in new[] { ("OriginalPaid","Originally settled"), ("RefundAmount","Refund"),
                 ("CorrectionAmount","Correction"), ("ReversedAmount","Reversed") })
             {
                 fields.Add(new XElement(ns + "Field",new XAttribute("Name",item.Item1),new XElement(ns + "DataField",item.Item1)));
@@ -80,8 +80,8 @@ internal static class ReceiptReportLayout
             foreach (string fieldName in new[] { "NetPaid", "ShowAdjustments" })
                 fields.Add(new XElement(ns + "Field",new XAttribute("Name",fieldName),new XElement(ns + "DataField",fieldName)));
             total.Descendants(ns + "Value").First().Value = "=Format(First(Fields!NetPaid.Value, \"ReceiptPageGroup\"), \"N0\")";
-            totalRow.Descendants(ns + "Value").First(value => value.Value == "TOTAL PAID").Value =
-                "=IIf(First(Fields!ShowAdjustments.Value, \"ReceiptPageGroup\"), \"NET PAID\", \"TOTAL PAID\")";
+            totalRow.Descendants(ns + "Value").First(value => value.Value is "TOTAL PAID" or "TOTAL SETTLED").Value =
+                "=IIf(First(Fields!ShowAdjustments.Value, \"ReceiptPageGroup\"), \"NET SETTLED\", \"TOTAL SETTLED\")";
         }
         return FitContent(document,data,annualSheet);
     }
@@ -110,12 +110,6 @@ internal static class ReceiptReportLayout
             {
                 string hidden = members[index].Element(ns + "Visibility")?.Element(ns + "Hidden")?.Value ?? "";
                 if(hidden.Equals("true",StringComparison.OrdinalIgnoreCase)) continue;
-                if(hidden.Contains(" Or ") && Regex.Matches(hidden,@"Not First\(Fields!(\w+)\.Value")
-                    .Any(match=>!Convert.ToBoolean(first[match.Groups[1].Value]))) continue;
-                var field = Regex.Match(hidden, @"Fields!(\w+)\.Value");
-                if (field.Success && (hidden.Contains("Len(")
-                    ? string.IsNullOrWhiteSpace(Convert.ToString(first[field.Groups[1].Value]))
-                    : !Convert.ToBoolean(first[field.Groups[1].Value]))) continue;
                 bool detail = members[index].Element(ns + "Group") is not null;
                 // Static headings within a student group repeat once per child,
                 // whereas its detail member repeats for every actual fee.
@@ -128,6 +122,14 @@ internal static class ReceiptReportLayout
                     ?receipt.GroupBy(record=>record[headingKey]).Select(group=>group.First()):new[]{first}.AsEnumerable();
                 foreach (var record in records)
                 {
+                    // A child footer's visibility belongs to that child, not
+                    // necessarily the first child on the family document.
+                    if(hidden.Contains(" Or ") && Regex.Matches(hidden,@"Not First\(Fields!(\w+)\.Value")
+                        .Any(match=>!Convert.ToBoolean(record[match.Groups[1].Value]))) continue;
+                    var field = Regex.Match(hidden, @"Fields!(\w+)\.Value");
+                    if (field.Success && (hidden.Contains("Len(")
+                        ? string.IsNullOrWhiteSpace(Convert.ToString(record[field.Groups[1].Value]))
+                        : !Convert.ToBoolean(record[field.Groups[1].Value]))) continue;
                     double rowHeight = Inches(rows[index].Element(ns + "Height")!.Value);
                     int columnIndex = 0;
                     foreach (var cell in rows[index].Descendants(ns + "CellContents"))
@@ -144,11 +146,11 @@ internal static class ReceiptReportLayout
                                     expression.Contains("\"N2\"") ? "N2" : "N0", CultureInfo.CurrentCulture)
                                 : Convert.ToString(record[key]) ?? "";
                             if (expression.StartsWith("=IIf(") && key == "ShowAdjustments")
-                                text = Convert.ToBoolean(record[key]) ? "NET PAID" : "TOTAL PAID";
+                                text = Convert.ToBoolean(record[key]) ? "NET SETTLED" : "TOTAL SETTLED";
                             if((string?)textBox.Attribute("Name")=="TotalPaid" && key=="ShowSettlement")
                                 text=Convert.ToDecimal(record[Convert.ToBoolean(record["ShowSettlement"])?"TotalPaid":"NetPaid"]).ToString("N0");
                             if((string?)textBox.Attribute("Name")=="TotalLabel" && key=="ShowSettlement")
-                                text=Convert.ToBoolean(record["ShowSettlement"])?"TOTAL SETTLED":Convert.ToBoolean(record["ShowAdjustments"])?"NET PAID":"TOTAL PAID";
+                                text=Convert.ToBoolean(record["ShowSettlement"])?"TOTAL SETTLED":Convert.ToBoolean(record["ShowAdjustments"])?"NET SETTLED":"TOTAL SETTLED";
                             if ((string?)textBox.Attribute("Name") == "AdmissionNumberTextLabel")
                                 text = (Convert.ToString(record["AdmissionNumberText"]) ?? "").Contains("QR-",StringComparison.OrdinalIgnoreCase)
                                     ? "Registration #" : "Admission #";
