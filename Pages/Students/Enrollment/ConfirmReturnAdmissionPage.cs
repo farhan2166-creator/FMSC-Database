@@ -2,7 +2,7 @@ using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Enrollment;
 /// <summary>Confirms that a promoted student has returned before new-year billing starts.</summary>
-public sealed class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges, IBusyPage
+public sealed partial class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges, IBusyPage
 {
     /* A text box you can type into (name, admission or registration number), with a drop-down arrow that lists every promoted student still awaiting return. */
     private readonly StudentPicker pendingStudent = new() {
@@ -361,7 +361,7 @@ public sealed class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges, IBusyP
             using var busy = BeginBusy("Reviewing return admission...", pendingStudent, returnDate, transport, fees);
             await ConfirmReturnCoreAsync();
         }
-        finally { confirmingReturn = false; }
+        finally { confirmingReturn = false; if(familyWorkspace)WorkspaceChanged?.Invoke(this,EventArgs.Empty); }
     }
     private bool TryBuildFeeChoices(out List<(int feeTypeId, decimal amount, decimal discount)> choices)
     {
@@ -451,7 +451,7 @@ public sealed class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges, IBusyP
             returnDraftBaseline=null;
             Info("Return confirmed. Opening charges ready in Fee Collection." + billingFrom);
             StudentSearchCache.Invalidate();
-            if (compactDialog)
+            if (compactDialog || familyWorkspace)
             {
                 ReturnConfirmed?.Invoke(this, EventArgs.Empty);
                 return;

@@ -7,6 +7,7 @@ public static class PageTitles
     public const string SetupReadiness = "Setup Readiness";
     public const string BillingStartSetup = "Billing Start Setup";
     public const string Admissions = "Student Admissions";
+    public const string FamilyAdmission = "Family Admission & Fees";
     public const string StudentCertificates = "Student Certificates";
     public const string StudentTransfers = "Transfers / Re-Admission";
     public const string StudentPromotion = "Student Promotion";

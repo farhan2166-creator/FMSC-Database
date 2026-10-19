@@ -370,7 +370,7 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
         unlinkFamily.Enabled=canLink&&(savedStudent==0?familyAnchor>0:savedFamilyMemberId>0);
         name.ReadOnly=contact.ReadOnly=address.ReadOnly=!editing;
         parent.ReadOnly=!editing||familyAnchor>0||loadingFamily;
-        registrationCard.SetHeaderText("Registration Details",recoveryBlocked?"Save recovery pending · Use Check Save Outcome before continuing.":savedStudent>0
+        registrationCard.SetHeaderText(workspaceHosted?"Child Details":"Registration Details",recoveryBlocked?"Save recovery pending · Use Check Save Outcome before continuing.":workspaceHosted?"Parent details are shared above. Review this child's placement and fees.":savedStudent>0
             ? $"{familyReference} · "+(savedFamilyMemberCount>1?$"Family: {savedFamilyMemberCount} children · Link or unlink a parent above.":"One child · You can link an existing parent above.")
             : familyAnchor>0?$"Parent linked · {familyReference} · Use Unlink Parent to change it.":"Enter a child, or use Link Existing Parent above.");
         addFee.Enabled=editing&&feesLoaded&&(savedStudent==0||!HasPendingChanges&&CurrentUser.HasPermission("Fees.Adjust"));
@@ -403,7 +403,8 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
             .Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));
         decimal other=selected.Where(r=>Convert.ToString(r["Frequency"])!="Monthly")
             .Sum(r=>Convert.ToDecimal(r["Amount"])-Convert.ToDecimal(r["Discount"]));
-        total.Text=$"Monthly plan: Rs. {monthly:N0} · Yearly / one-time fees: Rs. {other:N0}";
+        total.Text=workspaceHosted?$"Monthly: Rs. {monthly:N0} · Yearly / once: Rs. {other:N0}":
+            $"Monthly plan: Rs. {monthly:N0} · Yearly / one-time fees: Rs. {other:N0}";
         PendingEditChanged();
     }
     private void StartNextDraft(bool startNewFamily)
