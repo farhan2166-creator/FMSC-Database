@@ -315,7 +315,7 @@ public sealed class WelcomePage : UserControl
         ("Fee Collection", "Finance", () => new FeeCollectionPage(), () => CurrentUser.HasPermission("Fees.Collect")),
         (PageTitles.FeePosting, "Finance", () => FeePostingWorkspace.Create(Navigate), () => CurrentUser.HasPermission("Fees.Collect")),
         ("Student Profile", "Students", () => new StudentProfilePage(Navigate), () => CurrentUser.HasPermission("Students.View")),
-        ("Quick Registration", "Students", () => new QuickRegistrationPage(Navigate), () => QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)),
+        (PageTitles.FamilyAdmission, "Students", () => new FamilyAdmissionWorkspace(Navigate), () => FamilyAdmissionData.CanUse(CurrentUser.HasPermission)),
         ("Student Reports", "Students", () => new StudentReportsPage(), () => CurrentUser.HasPermission("Students.View") && CurrentUser.HasPermission("Reports.View")),
         ("Reports", "Reports", () => new ReportsHomePage(Navigate), () => CurrentUser.HasPermission("Reports.View"))
         };
@@ -358,7 +358,7 @@ public sealed class WelcomePage : UserControl
             PageTitles.Admissions => "\uE8A5",
             "Fee Collection" => "\uE8C7",
             "Student Profile" => "\uE77B",
-            "Quick Registration" => "\uE8FA",
+            PageTitles.FamilyAdmission => "\uE8FA",
             "Student Reports" => "\uE9D5",
             "Reports" => "\uE9D9",
             _ => "\uE80F"

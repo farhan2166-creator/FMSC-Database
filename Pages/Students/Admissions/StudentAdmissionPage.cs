@@ -2834,8 +2834,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             if (!registrationReview && Convert.ToString(row["Status"]) == "Pending")
             {
                 if (!QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)) Warn("Your role needs admission and student-view access to edit or confirm this quick registration.");
-                else if (_navigate is not null) _navigate(() => new QuickRegistrationPage(_navigate, admissionId), "Students", "Quick Registration");
-                else Warn("This is a pending registration. Review and confirm it in Dashboard Quick Registration.");
+                else if (_navigate is not null) _navigate(() => new FamilyAdmissionWorkspace(_navigate, admissionId), "Students", PageTitles.FamilyAdmission);
+                else Warn("This is a pending registration. Review and confirm it in Family Admission & Fees.");
                 return false;
             }
             unconfirmedAdmission = null;

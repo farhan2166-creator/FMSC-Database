@@ -1,8 +1,11 @@
 # Family admission rollout audit — 19 October 2026
 
-Decision: retain Quick Registration during rollout. The family workspace is
-implemented, but replacement readiness has not been established. Do not remove
-the old entry points or the shared registration writer/recovery infrastructure.
+Initial decision: retain Quick Registration during rollout pending verification.
+Subsequent user decision: retire the standalone host now and test/refine the
+family workspace afterward. Its old navigation was removed, pending-registration
+discovery relocated to the family toolbar, and existing registration links routed
+to the family workspace. Shared writer/recovery infrastructure remains in use.
+This is the user's rollout decision, not a claim that the findings below passed.
 
 ## Checked
 
@@ -37,10 +40,10 @@ the old entry points or the shared registration writer/recovery infrastructure.
    monthly assignment that starts next month and has no posted charge is therefore
    absent. Verify an entirely free child alongside a paying sibling, using the
    actual saved bill snapshot and RDLC output, before claiming full waiver support.
-3. **Keep pending-registration discovery and completion accessible.** The old host
-   contains the searchable Pending Registrations tab. The family workspace can
-   review an already loaded pending child, but does not replace that discovery
-   list. Preserve or relocate it before retiring the old host and its navigation.
+3. **Pending-registration discovery relocated during retirement.** The family
+   toolbar now opens the established searchable Pending Registrations list,
+   retaining Review / Confirm. Open Registration loads the selected child's family
+   in the new workspace, with its existing unsaved-draft guard.
 4. **Exercise the new host against a disposable database.** UI fixtures do not prove
    saves or report rendering. Verify a new family, existing plus new siblings,
    promoted returns, partial/full waivers, a failure after the first child saves,

@@ -2,46 +2,8 @@ using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Admissions;
 
-public sealed class QuickRegistrationPage : UserControl, IUnsavedChanges, IBusyPage
-{
-    private readonly QuickRegistrationFormPage? form;
-    private readonly TabControl tabs=new(){Dock=DockStyle.Fill,Font=AppTheme.NormalFont};
-    private IEnumerable<IBusyPage> BusyChildren=>tabs.TabPages.Cast<TabPage>().SelectMany(t=>t.Controls.Cast<Control>()).OfType<IBusyPage>();
-    public bool HasUnsavedChanges=>form?.HasUnsavedChanges??false;
-    public string UnsavedChangesMessage=>form?.UnsavedChangesMessage??"";
-    public bool IsBusy=>form?.IsBusy==true||BusyChildren.Any(p=>p.IsBusy);
-    public string BusyMessage=>BusyChildren.FirstOrDefault(p=>p.IsBusy)?.BusyMessage??"Wait for the registration operation to finish.";
-    public QuickRegistrationPage(Action<Func<Control>,string,string> navigate,int preselectRegistrationId=0):this(navigate,preselectRegistrationId,true){ }
-    internal QuickRegistrationPage(Action<Func<Control>,string,string> navigate,int preselectRegistrationId,bool initialize)
-    {
-        Dock=DockStyle.Fill;
-        if(!QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)){
-            Controls.Add(new Label{Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,Padding=new Padding(24),
-                Text="Your role needs admission and student-view access to use Quick Registration."});
-            return;
-        }
-        var formTab=new TabPage("Registration Form"){BackColor=AppTheme.Surface};
-        var pendingTab=new TabPage("Pending Registrations"){BackColor=AppTheme.Surface};
-        form=new QuickRegistrationFormPage(navigate,preselectRegistrationId,initialize:initialize){Dock=DockStyle.Fill};
-        var pending=new FMSC_SMS.Pages.Students.Maintenance.AdmissionReviewListPage(navigate,true,async id=>{
-            if(await form.OpenRegistrationAsync(id))tabs.SelectedTab=formTab;
-        }){Dock=DockStyle.Fill};
-        pending.RegistrationReviewed+=async id=>{if(form.SavedRegistrationId==id)await form.OpenRegistrationAsync(id);};
-        formTab.Controls.Add(form);pendingTab.Controls.Add(pending);
-        tabs.TabPages.Add(formTab);tabs.TabPages.Add(pendingTab);
-        TabStrip.Apply(tabs,AppTheme.ModuleAccent("Students"));Controls.Add(TabStrip.CreateHost(tabs));
-        tabs.Selecting+=(_,e)=>
-        {
-            if(!IsBusy&&(!form.HasUnresolvedSave||e.TabPage==formTab))return;
-            e.Cancel=true;
-            string guidance=form.HasUnresolvedSave?"Use Check Save Outcome on Registration Form before opening another registration workflow. Your entries are retained.":BusyMessage;
-            if(tabs.SelectedTab==pendingTab)pending.ShowRegistrationContextWarning(guidance);
-            else form.ShowRegistrationContextWarning(guidance);
-        };
-        tabs.SelectedIndexChanged+=async(_,_)=>{if(initialize&&tabs.SelectedTab==pendingTab)await pending.RefreshRecordsAsync();};
-    }
-}
-
+// Shared child editor hosted by FamilyAdmissionWorkspace. The standalone
+// Quick Registration screen is retired; its protected writes/recovery remain.
 internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChanges
 {
     private readonly Action<Func<Control>, string, string> navigate;

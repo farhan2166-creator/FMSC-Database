@@ -606,12 +606,6 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     PageTitles.Admissions,
                     "Students.Admit"),
                 new(
-                    "Quick Registration",
-                    () => new QuickRegistrationPage((factory, module, title) => NavigateTo(factory, module, title)),
-                    "Students",
-                    "Quick Registration",
-                    "Students.Admit"),
-                new(
                     PageTitles.FamilyAdmission,
                     () => new FamilyAdmissionWorkspace((factory,module,title)=>NavigateTo(factory,module,title)),
                     "Students",
@@ -680,8 +674,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     "Certificates",
                     PageTitles.StudentCertificates,
                     "Certificates.Create")
-            }.Where(item => (item.Title != "Quick Registration" || QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)) &&
-                (item.Title != PageTitles.FamilyAdmission || FamilyAdmissionData.CanUse(CurrentUser.HasPermission))).ToArray(),
+            }.Where(item => item.Title != PageTitles.FamilyAdmission || FamilyAdmissionData.CanUse(CurrentUser.HasPermission)).ToArray(),
             expandInitially: true);
         AddModule(
             flow,

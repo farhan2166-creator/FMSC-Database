@@ -1,6 +1,8 @@
 # Family Admission & Fees
 
-New Daily Work workspace; Quick Registration stays available during rollout.
+Daily Work workspace replacing the retired standalone Quick Registration screen.
+Existing dashboard and pending-registration entry points open this workspace.
+Pending Registrations remains available from its toolbar for discovery and review.
 
 - Find any student to load the established family, or start a new family.
 - Check the children being processed or billed. Selection for editing is separate
@@ -28,3 +30,8 @@ New Daily Work workspace; Quick Registration stays available during rollout.
 
 No database schema/procedure changes are required by this workspace. Any later
 SQL changes must be delivered through versioned scripts in Migrations.
+
+The old tabbed host was retired at the user's request on 19 October 2026 so
+testing and refinement can continue in this workspace. Its internal child editor,
+writer and durable recovery records remain in use. This navigation retirement
+does not resolve the open functional findings in FamilyAdmissionWorkspace.Audit.md.
