@@ -67,7 +67,7 @@ internal static class FeeBillPreview
         """;
 
     internal static Task<DataTable> ReadMembersAsync(int admissionId) => ReadMembersAsync(admissionId, "Students.View");
-    private static Task<DataTable> ReadMembersAsync(int admissionId, string permission)
+    internal static Task<DataTable> ReadMembersAsync(int admissionId, string permission)
     {
         if (admissionId <= 0) throw new ArgumentOutOfRangeException(nameof(admissionId));
         return DatabaseHelper.QuerySqlAsync(MembersSql, DatabaseHelper.Int("@UserId", CurrentUser.UserId),

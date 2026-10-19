@@ -22,25 +22,37 @@ internal static class FeeBillDocuments
 
     internal static async Task ShowAsync(Form? owner,DataTable data,int primaryAdmission,int[] students)
     {
-        using var saved=await DatabaseHelper.QueryUserAsync("IssueFeeBill",
+        using var saved=await IssueAsync(data,primaryAdmission,students);
+        if(owner?.IsDisposed==true) return;
+        ShowSaved(owner,saved.Rows[0]);
+    }
+
+    internal static async Task<DataTable> IssueAsync(DataTable data,int primaryAdmission,int[] students)
+    {
+        var saved=await DatabaseHelper.QueryUserAsync("IssueFeeBill",
             DatabaseHelper.Int("@PrimaryAdmissionId",primaryAdmission),
             DatabaseHelper.P("@StudentIdsJson",System.Text.Json.JsonSerializer.Serialize(students.Distinct().OrderBy(id=>id))),
             DatabaseHelper.P("@SnapshotXml",Snapshot(data)));
-        if(owner?.IsDisposed==true) return;
-        if(saved.Rows.Count!=1)throw new InvalidOperationException("The issued bill could not be confirmed. Reload before printing.");
-        ShowSaved(owner,saved.Rows[0]);
+        if(saved.Rows.Count!=1){saved.Dispose();throw new InvalidOperationException("The issued bill could not be confirmed. Reload before printing.");}
+        return saved;
     }
 
     internal static void ShowSaved(Form? owner,DataRow saved)
     {
-        using var data=ReadSnapshot(Convert.ToString(saved["SnapshotXml"])!);
+        using var data=ReadSavedData(saved);
+        if(data.Columns.Contains("FamilyRowKind"))FamilyBillReport.ShowData(owner,data);
+        else StudentBillReport.ShowData(owner,data);
+    }
+
+    internal static DataTable ReadSavedData(DataRow saved)
+    {
+        var data=ReadSnapshot(Convert.ToString(saved["SnapshotXml"])!);
         foreach(DataRow row in data.Rows)
         {
             row["ReceiptNumber"]=saved["BillNumber"];
             row["PaymentDateText"]=Convert.ToDateTime(saved["IssuedAt"]).ToString("dd-MMM-yyyy hh:mm tt");
         }
-        if(data.Columns.Contains("FamilyRowKind"))FamilyBillReport.ShowData(owner,data);
-        else StudentBillReport.ShowData(owner,data);
+        return data;
     }
 
     internal static async Task ShowHistoryAsync(Form? owner,int admissionId,string studentName,Func<bool> isCurrent)

@@ -77,7 +77,7 @@ internal static partial class HelpCatalog
             new[] { HelpRule.System }, HelpOwner.CSharp,
             new[] { "Pages/Reports/Finance/StudentAccountStatementPage.cs#StudentAccountStatementPage" }, new[] { "FAQ-047", "FAQ-050", "FAQ-051" }, ""),
         new("FAQ-047", "Collection", "How do I produce a statement for a family or several students?",
-            "Turn on Group / family statements, choose placement filters, Find Students, select Include or Include Family, then View Statement. Changing to another mode clears selections, including selections from unseen result pages.",
+            "Turn on Group / family statements to add students while retaining the chosen child and dates. Use placement filters, Find Students, then Include or Include Family and View Statement. Turning group mode off returns to the chosen child and removes extra members. Annual Receipts opens its preview directly; Print Outstanding uses the approved bill format for current dues.",
             "family,group,include,statement,multiple", "Student Account Statement",
             new[] { HelpRule.System }, HelpOwner.CSharp,
             new[] { "Pages/Reports/Finance/StudentAccountStatementPage.cs#StudentAccountStatementPage" }, System.Array.Empty<string>(), ""),

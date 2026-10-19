@@ -34,6 +34,20 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--statement-actions"))
+        {
+            CheckStudentAccountFlow();
+            CheckStatementRegenerationFreshness();
+            CheckAsyncStatementAssembly();
+            Console.WriteLine($"PASS: {checks} statement action, mode and async safety checks (no database connection).");
+            return;
+        }
+        if(args.Contains("--reminder-layout"))
+        {
+            CheckFeeReminderLayout();
+            Console.WriteLine($"PASS: {checks} fee reminder layout and selection checks (no database connection).");
+            return;
+        }
         if (args.Contains("--latest-receipt"))
         {
             CheckLatestReceipt();
