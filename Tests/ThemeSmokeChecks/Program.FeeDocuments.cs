@@ -65,9 +65,23 @@ internal static partial class Program
             foreach(string textbox in new[]{"TotalPaidCreditApplied","TotalPaidCreditRemaining"})
             {
                 int index=Array.FindIndex(rows,row=>row.Descendants(ns+"Textbox").Any(box=>(string?)box.Attribute("Name")==textbox));
-                Check(members[index].Element(ns+"Visibility")!.Element(ns+"Hidden")!.Value.Contains("ShowCreditRemaining"),"Both credit rows hide at table-row level when no credit is applied or remaining");
+                string field=textbox=="TotalPaidCreditApplied"?"CreditApplied":"ShowCreditRemaining";
+                Check(members[index].Element(ns+"Visibility")!.Element(ns+"Hidden")!.Value.Contains(field),"Credit visibility is applied to the complete table row");
             }
             Check(Render(name,cash)==1,"A cash-only receipt renders with credit rows collapsed");
+            foreach(var (applied,remaining,label) in new[]{(0m,50m,"remaining-only"),(100m,0m,"fully-used"),(100m,50m,"used-and-remaining")})
+            {
+                foreach(DataRow row in cash.Rows)
+                {
+                    row["CreditApplied"]=applied;row["CreditRemaining"]=remaining;
+                    row["ShowCreditRemaining"]=applied!=0m||remaining!=0m;
+                    row["CashReceived"]=Convert.ToDecimal(row["TotalPaid"])-applied;
+                }
+                var visible=XDocument.Parse(ReceiptReportLayout.SizeToContent(path,cash));
+                Check(applied==0m?Height(visible)>Height(compact)&&Height(visible)<Height(full):Height(visible)==Height(full),
+                    "Remaining-only credit occupies one row; credit used occupies both rows even when exhausted");
+                Check(Render(name+"-"+label,cash)==1,"Credit visibility scenario prints on one page");
+            }
         }
         using var header=new DataTable();
         foreach(string name in new[]{"ReceiptNumber","PaymentMethod","ReceiptStatus"})header.Columns.Add(name);
