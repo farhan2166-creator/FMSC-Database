@@ -3,7 +3,7 @@ namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed class CollectionsReceiptsReportPage : CanonicalFinanceReportPage
 {
     public CollectionsReceiptsReportPage() : base(
-        "Collections & Receipts", "Review payments, refunds, corrections and receipt totals.",
+        "Collections & Receipts", "Money received, refunds and corrections. Credit applied is separate and is not new money.",
         "GetCollectionsAndReceiptsReport", "FMSC_Collections_Receipts",
         new[] { "Receipts", "Detailed Transactions", "Summary" },
         new[] { "Day", "Week", "Month", "Payment Method", "Class", "Campus", "Fee Type" },

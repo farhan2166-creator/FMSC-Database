@@ -541,6 +541,10 @@ namespace FMSC_SMS.Core
             name.Contains("Outstanding", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Refund", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Collection", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Received", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Correction", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Credit", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("Settled", StringComparison.OrdinalIgnoreCase) ||
             name.Contains("Payable", StringComparison.OrdinalIgnoreCase);
         /// <summary>UX - true when a grid is meant to be typed into: the grid is not read-only and at least one visible column accepts edits.</summary>
         private static bool IsEditableGrid(DataGridView grid)

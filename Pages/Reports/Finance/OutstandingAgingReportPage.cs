@@ -4,7 +4,7 @@ namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
 {
     public OutstandingAgingReportPage() : base(
-        "Outstanding & Aging", "Review unpaid charges, outstanding balances and how long they have been due.",
+        "Outstanding & Aging", "Open charges only. Settled amounts include cash and credit; fully settled charges are excluded.",
         "GetOutstandingAndAgingReport", "FMSC_Outstanding_Aging",
         new[] { "Students", "Charges", "Aging", "Families" },
         Array.Empty<string>(), false, true, false, false, classOutstandingPrint: true)
