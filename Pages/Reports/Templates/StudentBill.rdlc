@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
   <Body>
     <ReportItems>
@@ -44,19 +44,17 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
-                <TablixCell/>
+                <TablixCell />
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.10in</Height>
+              <Height>0.1in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -82,19 +80,17 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
-                <TablixCell/>
+                <TablixCell />
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.10in</Height>
+              <Height>0.1in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -120,19 +116,17 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
-                <TablixCell/>
+                <TablixCell />
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.10in</Height>
+              <Height>0.1in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -158,15 +152,13 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
-                <TablixCell/>
+                <TablixCell />
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -233,8 +225,8 @@
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
-                <TablixCell/>
+                <TablixCell />
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -302,7 +294,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -370,7 +362,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -438,7 +430,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -453,7 +445,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=IIf(InStr(CStr(First(Fields!AdmissionNumberText.Value, "ReceiptPageGroup")), "QR-") &gt; 0, "Registration #", "Admission #")</Value>
+                              <Value>=IIf(InStr(CStr(First(Fields!AdmissionNumberText.Value, "ReceiptPageGroup")), "QR-") &gt; 0, "Registration#", "Admission#")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -506,7 +498,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -574,7 +566,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -642,7 +634,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -710,7 +702,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -778,7 +770,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -1029,7 +1021,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
                 <TablixCell>
                   <CellContents>
                     <Textbox Name="DiscountApplied">
@@ -1104,7 +1096,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
                 <TablixCell>
                   <CellContents>
                     <Textbox Name="TotalPaid">
@@ -1179,7 +1171,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
                 <TablixCell>
                   <CellContents>
                     <Textbox Name="BalanceRemaining">
@@ -1280,7 +1272,7 @@
                     <ColSpan>2</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
+                <TablixCell />
               </TablixCells>
             </TablixRow>
             <TablixRow>
@@ -1321,17 +1313,17 @@
                     <ColSpan>3</ColSpan>
                   </CellContents>
                 </TablixCell>
-                <TablixCell/>
-                <TablixCell/>
+                <TablixCell />
+                <TablixCell />
               </TablixCells>
             </TablixRow>
           </TablixRows>
         </TablixBody>
         <TablixColumnHierarchy>
           <TablixMembers>
-            <TablixMember/>
-            <TablixMember/>
-            <TablixMember/>
+            <TablixMember />
+            <TablixMember />
+            <TablixMember />
           </TablixMembers>
         </TablixColumnHierarchy>
         <TablixRowHierarchy>
@@ -1346,7 +1338,7 @@
                 </PageBreak>
               </Group>
               <TablixMembers>
-                <TablixMember/>
+                <TablixMember />
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Len(First(Fields!ContactNumber.Value, "ReceiptPageGroup")) = 0</Hidden>
@@ -1362,10 +1354,10 @@
                     <Hidden>=Len(First(Fields!CampusName.Value, "ReceiptPageGroup")) = 0</Hidden>
                   </Visibility>
                 </TablixMember>
-                <TablixMember/>
-                <TablixMember/>
-                <TablixMember/>
-                <TablixMember/>
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
+                <TablixMember />
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Len(First(Fields!AdmissionNumberText.Value, "ReceiptPageGroup")) = 0</Hidden>
@@ -1391,16 +1383,16 @@
                     <Hidden>true</Hidden>
                   </Visibility>
                 </TablixMember>
-                <TablixMember/>
+                <TablixMember />
                 <TablixMember>
-                  <Group Name="ReceiptFeeDetail"/>
+                  <Group Name="ReceiptFeeDetail" />
                 </TablixMember>
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Not First(Fields!ShowDiscount.Value, "ReceiptPageGroup")</Hidden>
                   </Visibility>
                 </TablixMember>
-                <TablixMember/>
+                <TablixMember />
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Not First(Fields!ShowBalance.Value, "ReceiptPageGroup")</Hidden>
@@ -1411,20 +1403,20 @@
                     <Hidden>=Len(First(Fields!ReceiptStatus.Value, "ReceiptPageGroup")) = 0</Hidden>
                   </Visibility>
                 </TablixMember>
-                <TablixMember/>
+                <TablixMember />
               </TablixMembers>
               <KeepTogether>true</KeepTogether>
             </TablixMember>
           </TablixMembers>
         </TablixRowHierarchy>
         <DataSetName>StudentBillData</DataSetName>
-        <Height>2.9in</Height>
+        <Height>3.02in</Height>
         <Width>2.05in</Width>
-        <Style/>
+        <Style />
       </Tablix>
     </ReportItems>
-    <Height>0.01in</Height>
-    <Style/>
+    <Height>3.02in</Height>
+    <Style />
   </Body>
   <Width>2.05in</Width>
   <Page>
@@ -1434,14 +1426,14 @@
     <RightMargin>0.09in</RightMargin>
     <TopMargin>0.12in</TopMargin>
     <BottomMargin>0.08in</BottomMargin>
-    <Style/>
+    <Style />
   </Page>
   <AutoRefresh>0</AutoRefresh>
   <DataSources>
     <DataSource Name="StudentBillDataSource">
       <ConnectionProperties>
         <DataProvider>System.Data.DataSet</DataProvider>
-        <ConnectString/>
+        <ConnectString />
       </ConnectionProperties>
       <rd:DataSourceID>28d59cf1-1580-4a66-83cc-c2eb38b882e1</rd:DataSourceID>
     </DataSource>
@@ -1450,7 +1442,7 @@
     <DataSet Name="StudentBillData">
       <Query>
         <DataSourceName>StudentBillDataSource</DataSourceName>
-        <CommandText/>
+        <CommandText />
       </Query>
       <Fields>
         <Field Name="ReceiptPageKey">
