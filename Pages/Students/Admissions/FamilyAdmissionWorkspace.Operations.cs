@@ -15,7 +15,7 @@ public sealed partial class FamilyAdmissionWorkspace
         try
         {
             using var dialog=new ApplicationWindowForm{Text="Pending Registrations",StartPosition=FormStartPosition.CenterParent,
-                ClientSize=new Size(AppScale.Scale(1200),AppScale.Scale(800)),MinimumSize=new Size(850,600)};
+                ClientSize=new Size(AppScale.Scale(1300),AppScale.Scale(800)),MinimumSize=new Size(850,600)};
             using var list=new FMSC_SMS.Pages.Students.Maintenance.AdmissionReviewListPage(navigate,true,id=>{
                 selected=id;dialog.DialogResult=DialogResult.OK;dialog.Close();return Task.CompletedTask;
             }){Dock=DockStyle.Fill};
@@ -265,24 +265,7 @@ public sealed partial class FamilyAdmissionWorkspace
         finally{busy=false;UpdateWorkspace();}
         if(reload)await ReopenChildAsync(child);
     }
-    private async Task ReviewAdmissionAsync()
-    {
-        if(IsBusy || current is not {Id:>0} child || child.Dirty || !CurrentUser.HasPermission("Students.Admit"))return;
-        busy=true;UpdateWorkspace();
-        try
-        {
-            using var page=new StudentAdmissionPage(null,child.Id,registrationReview:FieldText(child.Record,"Status")=="Pending"){Dock=DockStyle.Fill};
-            using var dialog=new ApplicationWindowForm{Text="Review Admission — "+child.DisplayName,StartPosition=FormStartPosition.CenterParent,
-                ClientSize=new Size(AppScale.Scale(1200),AppScale.Scale(800)),MinimumSize=new Size(850,600)};
-            bool completed=false;
-            ModalPageCloseGuard.Attach(dialog,page,()=>completed);
-            page.RegistrationFinished+=()=>{completed=true;dialog.DialogResult=DialogResult.OK;dialog.Close();};
-            dialog.Controls.Add(page);dialog.ShowDialog(FindForm());await RefreshSavedChildrenAsync();
-        }
-        catch(Exception ex){Fail(ex);}
-        finally{busy=false;UpdateWorkspace();}
-        await ReopenChildAsync(child);
-    }
+    
     private async Task ReopenChildAsync(Child child)
     {
         if(IsDisposed || child.Dirty || child.Busy)return;
