@@ -34,6 +34,14 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--payment-adjustments"))
+        {
+            CheckPaymentAdjustmentContext();
+            CheckPaymentDetailGeneration();
+            CheckAdjustmentRecoveryGuard();
+            Console.WriteLine($"PASS: {checks} payment adjustment wording, selection and recovery checks (no database connection).");
+            return;
+        }
         if(args.Contains("--placement-cutoff"))
         {
             CheckPlacementCutoff();

@@ -22,6 +22,10 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
     private int paymentsLoadVersion;
     private readonly ModernDatePicker transactionDate = HumanUi.Date();
     private readonly ModernComboBox operation = new();
+    // Keep persisted transaction codes stable; describe the financial effect to the operator.
+    private string SelectedOperation => operation.SelectedItem as string == "Reduce Recorded Payment"
+        ? "Correction" : operation.SelectedItem as string ?? string.Empty;
+    private static string OperationLabel(string code) => code == "Correction" ? "Reduce Recorded Payment" : code;
     private readonly ModernTextBox actionAmount = new();
     private readonly ModernTextBox reason = new();
     /* Built from the shared HumanUi.Grid and styled with HumanUi.ApplyGridStyle once its columns exist (ConfigurePaymentsGrid). */
@@ -52,13 +56,13 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
     internal StudentFeeAdjustmentsPage(bool initialize,Func<int,int,int,Task<DataTable>>? readPaymentDetails,Action<DataTable>? showPaymentDetails)
         : base(
             PageTitles.StudentFeeCorrections,
-            "Review payments and record refunds or corrections.")
+            "Review payments, reduce recorded collections, or record refunds.")
     {
         this.readPaymentDetails=readPaymentDetails??ReadPaymentDetailsAsync;
         this.showPaymentDetails=showPaymentDetails;
         Disposed+=(_,_)=>detailReads.Dispose();
         transactionDate.Value = DateTime.Today;
-        operation.Items.AddRange(new object[] { "Correction", "Refund", "Reversal" });
+        operation.Items.AddRange(new object[] { OperationLabel("Correction"), "Refund", "Reversal" });
         operation.SelectedIndex = 0;
         operation.SelectedIndexChanged += (_, _) => { if(!updatingOperation) UpdateActionMode(); };
         actionAmount.Width = AppScale.Scale(120);
@@ -310,7 +314,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                     GetText(row,"ReceiptNumber"),GetText(row,"PaymentMethod"),
                     GetDecimal(row,"PaidAmount"),state.Remaining,state.Status,
                     state.Actions.Length==0 ? "None" : string.Join(", ",state.Actions.Select(action=>
-                        action=="Correction" ? "Correct" : action=="Reversal" ? "Reverse" : action)),
+                        action=="Reversal" ? "Reverse" : OperationLabel(action))),
                     GetText(row,"OriginalReceipt"));
                 payments.Rows[index].Tag=state;
                 payments.Rows[index].Cells["AvailableActions"].ToolTipText=state.Explanation;
@@ -350,27 +354,27 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
     private void UpdateActionMode()
     {
         var state=payments.CurrentRow?.Tag as PaymentAdjustmentState;
-        string previous=operation.Text;
+        string previous=SelectedOperation;
         updatingOperation=true;
         try {
             operation.Items.Clear();
-            operation.Items.AddRange(state?.Actions.Cast<object>().ToArray() ?? Array.Empty<object>());
-            if(operation.Items.Count>0) operation.SelectedIndex=Math.Max(0,operation.Items.IndexOf(previous));
+            operation.Items.AddRange(state?.Actions.Select(action=>(object)OperationLabel(action)).ToArray() ?? Array.Empty<object>());
+            if(operation.Items.Count>0) operation.SelectedIndex=Math.Max(0,operation.Items.IndexOf(OperationLabel(previous)));
         }
         finally { updatingOperation=false; }
         operation.Enabled=state?.Actions.Length>0;
-        bool available=state?.Actions.Contains(operation.Text)==true;
+        bool available=state?.Actions.Contains(SelectedOperation)==true;
         actionAmount.Enabled=reason.Enabled=transactionDate.Enabled=available;
-        bool reversal = operation.Text == "Reversal";
+        bool reversal = SelectedOperation == "Reversal";
         actionAmount.ReadOnly = reversal;
         if (reversal)
             actionAmount.Text = selectedPaymentAmount.ToString("0.##");
         else if (string.IsNullOrWhiteSpace(actionAmount.Text))
             actionAmount.Text = "0";
-        string hint = operation.Text switch {
+        string hint = SelectedOperation switch {
             "Correction" =>
-                "Correction sets the FINAL collected amount for the selected payment. " +
-                "Enter 0 to undo the collection entirely.",
+                "Enter the amount that should remain recorded as collected. The reduction is added back to outstanding dues. " +
+                "For example, reducing Rs. 1,000 to Rs. 800 increases outstanding by Rs. 200. Enter 0 to remove the whole collection.",
             "Refund" =>
                 "Refund gives back part of the selected payment. It must be more than 0 " +
                 "and less than the amount collected.",
@@ -384,7 +388,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
     /// <summary>The two preconditions ExecuteAsync checks at the top of its handler before it will do anything: a student must have been loaded (admissionId) and one recorded payment must be selected (selectedPaymentId).</summary>
     private bool ExecuteIsAvailable() =>
         !recoveryBlocked&&admissionId > 0 && selectedPaymentId > 0 && payments.CurrentRow?.Tag is PaymentAdjustmentState state &&
-        state.Actions.Contains(operation.Text);
+        state.Actions.Contains(SelectedOperation);
     /// <summary>derives the enabled state of Execute Adjustment from the current selection, so an unavailable action is not offered as a normal operation.</summary>
     private void ApplyActionAvailability()
     {
@@ -421,14 +425,14 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                 reason.Focus();
                 return;
             }
-            string transactionType = operation.Text;
+            string transactionType = SelectedOperation;
             decimal amount;
             if (transactionType == "Reversal")
             {
                 DataRow? selected = paymentRows.AsEnumerable().FirstOrDefault(row => GetInt(row, "FeePaymentId") == selectedPaymentId);
                 if (selected is not null && selectedPaymentAmount < GetDecimal(selected, "PaidAmount"))
                 {
-                    Warn("This payment has already been partially reduced. Use Correction with a final amount of 0 to undo the remaining collection.");
+                    Warn("This payment has already been partially reduced. Use Reduce Recorded Payment with a final amount of 0 to undo the remaining collection.");
                     return;
                 }
                 amount = selectedPaymentAmount;
@@ -455,7 +459,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                 if (transactionType == "Refund" && amount >= selectedPaymentAmount)
                 {
                     Warn($"A refund must be less than the Rs. {selectedPaymentAmount:N0} collected. " +
-                         "To remove the remaining collection, use Correction with a final amount of 0.");
+                         "To remove the remaining collection, use Reduce Recorded Payment with a final amount of 0.");
                     actionAmount.Focus();
                     return;
                 }
@@ -469,18 +473,18 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                 }
             }
             string question = transactionType switch {
-                "Correction" => $"Set the final collected amount to Rs. {amount:0.##}?",
+                "Correction" => $"Reduce the recorded payment to Rs. {amount:0.##}?",
                 "Refund" => $"Refund Rs. {amount:0.##}?",
                 _ => $"Reverse the full payment of Rs. {amount:0.##}?"
             };
             var confirmation = new MessageDialogContent(
                 question,
-                Explanation: transactionType == "Correction" && amount == 0m
-                    ? "A final amount of zero undoes the collection financially." : null,
+                Explanation: transactionType == "Correction"
+                    ? $"Outstanding dues will increase by Rs. {selectedPaymentAmount-amount:0.##}. No cash refund is recorded by this action." : null,
                 Facts: new (string, string)[] {
                     ("Student", selectedStudentName),
                     ("Payment", selectedPaymentId.ToString()),
-                    ("Originally collected", $"Rs. {selectedPaymentAmount:0.##}"),
+                    ("Currently recorded", $"Rs. {selectedPaymentAmount:0.##}"),
                     ("Date", transactionDate.Value.ToString("d")),
                     ("Reason", reason.Text.Trim())
                 },
@@ -488,7 +492,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
             if (ModernMessageDialog.Show(
                     FindForm(),
                     confirmation,
-                    $"Confirm {transactionType}",
+                    $"Confirm {OperationLabel(transactionType)}",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning,
                     MessageBoxDefaultButton.Button2) != DialogResult.Yes)
@@ -499,7 +503,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                 TypeName = "dbo.FeePaymentAllocationType",
                 Value = Tvp.FeeAllocations(Array.Empty<(long, decimal)>())
             };
-            DataTable? result = await SubmitAdjustmentAsync($"{transactionType} · Payment {selectedPaymentId} · Rs. {amount:N0} · {transactionDate.Value:dd MMM yyyy}",
+            DataTable? result = await SubmitAdjustmentAsync($"{OperationLabel(transactionType)} · Payment {selectedPaymentId} · Rs. {amount:N0} · {transactionDate.Value:dd MMM yyyy}",
                 DatabaseHelper.Int("@AdmissionId", admissionId),
                 DatabaseHelper.Int("@EnrollmentId", enrollmentId),
                 DatabaseHelper.P("@TransactionType", transactionType),
@@ -516,7 +520,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                 ? GetText(result.Rows[0], "ReceiptNumber")
                 : string.Empty;
             string completionMessage = transactionType switch {
-                "Correction" => $"Collection corrected to Rs. {amount:0.##}.",
+                "Correction" => $"Recorded payment reduced to Rs. {amount:0.##}. Outstanding increased by Rs. {selectedPaymentAmount-amount:0.##}.",
                 "Refund" => $"Refund of Rs. {amount:0.##} recorded.",
                 _ => $"Payment of Rs. {amount:0.##} reversed."
             };

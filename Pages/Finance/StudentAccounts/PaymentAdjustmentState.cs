@@ -12,7 +12,7 @@ internal sealed record PaymentAdjustmentState(string Status, decimal Remaining, 
         decimal remaining=Math.Max(0m,original-refunded-corrected-releasedToCredit);
         if(remaining<=0m || status!="Completed") return new("Fully Adjusted",0m,Array.Empty<string>(),"No collected amount remains to adjust.");
         if(refunded>0m || corrected>0m || releasedToCredit>0m) return new(releasedToCredit>0m ? "Released to Credit" : refunded>0m && corrected>0m ? "Refunded / Corrected" : refunded>0m ? "Partially Refunded" : "Corrected",
-            remaining,new[]{"Correction","Refund"},"Reversal is unavailable after a refund or correction. Correct to 0 to remove the remaining collection.");
+            remaining,new[]{"Correction","Refund"},"Reversal is unavailable after a refund or payment reduction. Use Reduce Recorded Payment with 0 to remove the remaining collection and restore it to outstanding dues.");
         return new("Collected",remaining,new[]{"Correction","Refund","Reversal"},string.Empty);
     }
 }

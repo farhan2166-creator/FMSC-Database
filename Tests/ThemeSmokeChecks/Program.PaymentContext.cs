@@ -16,6 +16,14 @@ internal static partial class Program
         for(int id=1;id<=2;id++){int index=grid.Rows.Add();grid.Rows[index].Cells["PaymentId"].Value=id;grid.Rows[index].Cells["Amount"].Value=1000m;grid.Rows[index].Tag=Activator.CreateInstance(stateType,new object[]{"Completed",1000m,new[]{"Correction","Refund","Reversal"},""});}
         void Select(int index){grid.CurrentCell=grid.Rows[index].Cells["Amount"];grid.Rows[index].Selected=true;type.GetMethod("OnPaymentSelected",flags)!.Invoke(page,null);}
         Select(0);Field<ModernTextBox>("actionAmount").Text="500";Field<ModernTextBox>("reason").Text="Payment A correction";Field<ModernDatePicker>("transactionDate").Value=DateTime.Today.AddDays(-1);
+        var operation=Field<ModernComboBox>("operation");
+        Check(operation.Text=="Reduce Recorded Payment",
+            "The payment reduction action is named by its financial effect");
+        Check((string?)type.GetProperty("SelectedOperation",flags)!.GetValue(page)=="Correction",
+            "The clearer label preserves the existing transaction code and eligibility rules");
+        Check(Field<Label>("eligibilityNote").Text.Contains("added back to outstanding")
+            && Field<Label>("eligibilityNote").Text.Contains("Rs. 200"),
+            "The payment reduction explains its effect on outstanding dues with an example");
         Select(0);Check(Field<ModernTextBox>("actionAmount").Text=="500"&&Field<ModernTextBox>("reason").Text=="Payment A correction","Revisiting the same payment preserves its in-progress adjustment draft");
         Select(1);Check(Field<ModernTextBox>("actionAmount").Text=="0"&&Field<ModernTextBox>("reason").Text==""&&Field<ModernDatePicker>("transactionDate").Value.Date==DateTime.Today,"A different payment cannot inherit amount, reason or date from the first payment");
         Select(0);Check(Field<ModernTextBox>("reason").Text==""&&Field<ModernTextBox>("actionAmount").Text=="0","A→B→A does not revive an obsolete command draft");
