@@ -20,6 +20,7 @@ internal static class ActionButtonStyle
         string label = Label(text);
         bool Any(params string[] words) => words.Any(word => Starts(label, word));
         if (Any("Delete", "Remove", "Reverse", "Restore", "Destroy")) return UiDesignSystem.Actions.Danger;
+        if (label.Equals("Save & Confirm", StringComparison.OrdinalIgnoreCase)) return UiDesignSystem.Actions.Success;
         if (label.StartsWith("Save &", StringComparison.OrdinalIgnoreCase)) return UiDesignSystem.Actions.Secondary;
         if (Any("Save", "Update", "Backup", "Back Up")) return UiDesignSystem.Actions.Success;
         if (Any("New", "Clear", "Reset", "Cancel", "Close", "Back", "Next Student"))

@@ -80,6 +80,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         Font = AppTheme.NormalFont;
         searchBox.PlaceholderText =
             "Admission Number (number) or Student Name / Father's Name";
+        searchBox.SelectAllOnFocus = true;
         searchStatus.Items.Clear();
         searchStatus.Items.AddRange(new object[] {
             /* this read "Active, Left & Withdrawn". The label named a state the system cannot represent. */

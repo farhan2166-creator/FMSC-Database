@@ -40,6 +40,28 @@ internal static partial class Program
             Check(list.Items.Count==2 && list.CheckedItems.Count==2,"Loading one student brings their established siblings into the workspace");
             Check(!Field<ModernButton>(workspace,"print").Enabled,"An included unconfirmed return blocks premature family billing");
             Check(!Field<ModernButton>(workspace,"collect").Enabled,"Unconfirmed returns also block premature family collection");
+            void ClickChild(int index, bool checkbox)
+            {
+                Rectangle bounds = checkbox ? list.CheckBoxBounds(index) : list.GetItemRectangle(index);
+                var point = checkbox ? new Point(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2)
+                    : new Point(100, bounds.Top + 15);
+                var position = new IntPtr((point.Y << 16) | point.X);
+                SearchInputMessage(list.Handle, 0x0201, new IntPtr(1), position);
+                SearchInputMessage(list.Handle, 0x0202, IntPtr.Zero, position);
+                Application.DoEvents();
+            }
+            ClickChild(1, false);
+            Check(ReferenceEquals(Field<object>(workspace,"current"), list.Items[1]) && list.CheckedItems.Count == 2 &&
+                Field<bool>(list.Items[1]!,"Included"),
+                "Clicking a child's row loads their editor without changing inclusion in the family workspace");
+            ClickChild(0, false);
+            Check(ReferenceEquals(Field<object>(workspace,"current"), list.Items[0]) && list.CheckedItems.Count == 2,
+                "Switching back to another child also preserves both checked children");
+            ClickChild(1, true);
+            Check(!Field<bool>(list.Items[1]!,"Included") && list.CheckedItems.Count == 1 &&
+                Field<ModernButton>(workspace,"print").Enabled && Field<ModernButton>(workspace,"collect").Enabled,
+                "Only an explicit checkbox click excludes a child and updates bill and payment availability");
+            list.SetItemChecked(1, true);
             Run(Call(workspace,"AddNewChildAsync"));
             var current=Field<object>(workspace,"current");
             var draft=Field<Control>(current,"Editor");

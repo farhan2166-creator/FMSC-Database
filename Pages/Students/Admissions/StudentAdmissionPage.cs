@@ -279,6 +279,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly ContextMenuStrip printMenu = new StyledContextMenu();
     private readonly ContextMenuStrip enrollmentActionsMenu = new StyledContextMenu();
     private ModernButton? confirmReturnButton;
+    private ModernButton? confirmAdmissionButton;
+    private int loadedAdmissionCampusId;
+    private bool registrationReadyToClose;
     private ModernButton? collectPaymentButton;
     private ModernButton? admissionPrintButton;
     private ModernButton? enrollmentActionsButton;
@@ -611,7 +614,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         Func<int, CancellationToken, Task<DataTable>> readPhoto)
     : base(
         registrationReview ? "Review Registration" : PageTitles.Admissions,
-        registrationReview ? "Complete the details, save, then confirm admission. Official numbers are assigned on confirmation." : AdmissionContextSubtitle)
+        registrationReview ? "Complete the details, then Confirm Admission to save and assign the official number. Save Draft is optional." : AdmissionContextSubtitle)
     {
         this.registrationReview = registrationReview;
         this.writePhoto = writePhoto;
@@ -656,8 +659,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         {
             quickStudent.Visible = findButton!.Visible = newAdmissionButton!.Visible = saveAndNewButton!.Visible = false;
             enrollmentActionsButton!.Visible = collectPaymentButton!.Visible = admissionPrintButton!.Visible = false;
-            var confirm = AddBusyAction("Confirm Admission", CompleteRegistrationAsync, "Success");
-            GateAction(confirm, "Students.Admit");
+            saveButton!.Text = "Save Draft";
+            confirmAdmissionButton = AddAction("Confirm Admission", async (_, _) => await CompleteRegistrationAsync(), "Success");
+            GateAction(confirmAdmissionButton, "Students.Admit");
+            UiAccessibility.Describe(confirmAdmissionButton, "Confirm Admission",
+                "Review the official admission number, then save the completed details and confirm admission together.");
             var cancel = AddBusyAction("Cancel Registration", () => CloseAdmissionAsync(true), "Warning");
             GateAction(cancel, "Students.Administer");
             admissionIdCaption.Text = "Temp Reference";
@@ -2098,7 +2104,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         findSiblingButton.Enabled = savedStudentReady && CurrentUser.HasPermission("Students.Administer");
         if (saveAndNewButton is not null)
             saveAndNewButton.Enabled = !IsBusy && currentAdmissionId <= 0 && unconfirmedAdmission is null;
-        if (saveButton is not null) saveButton.Enabled = !IsBusy && unconfirmedAdmission is null;
+        if (saveButton is not null) saveButton.Enabled = !IsBusy && unconfirmedAdmission is null && (!registrationReview || IsPendingRegistration);
+        if (confirmAdmissionButton is not null)
+            confirmAdmissionButton.Enabled = !IsBusy && unconfirmedAdmission is null && IsPendingRegistration &&
+                currentAdmissionId > 0 && CurrentUser.HasPermission("Students.Admit");
         if (checkAdmissionButton is not null)
         {
             checkAdmissionButton.Visible = unconfirmedAdmission is not null;
@@ -3003,6 +3012,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             {
                 gender.SelectedIndex = -1;
             }
+            loadedAdmissionCampusId = GetIntColumn(row, "AdmissionCampusId");
             _editCampusId =
                 GetIntColumn(
                     row,
@@ -3174,7 +3184,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         string loadedStudent = name.Text.Trim();
         SetPageHeaderText(
             registrationReview ? "Review Registration" : "Edit Student",
-            registrationReview ? $"{loadedStudent} · {AdmissionNumbers.ForId(admissionId)} · Save details, then confirm official admission."
+            registrationReview ? $"{loadedStudent} · {AdmissionNumbers.ForId(admissionId)} · Confirm Admission saves the completed details and assigns the official number."
                 : $"Student: {loadedStudent} (Admission Number {AdmissionNumbers.ForId(admissionId)}) - saving updates this student.");
         /* Capture the clean baseline after the record has settled. */
         CaptureAdmissionBaseline();
@@ -3737,19 +3747,61 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
 
     private async Task CompleteRegistrationAsync()
     {
-        if (!registrationReview || !IsPendingRegistration || currentAdmissionId <= 0 || saveBusy) return;
-        // Confirmation requires the full admission details, even though saving a
-        // pending registration allows the operator to complete them in stages.
+        if (!registrationReview || !IsPendingRegistration || currentAdmissionId <= 0 || IsBusy ||
+            unconfirmedAdmission is not null || !CurrentUser.HasPermission("Students.Admit")) return;
+        // Confirmation includes the current edits; saving a draft first is optional.
         if (!ValidateAdmissionInline(isNew: false, confirmingRegistration: true)) return;
-        if (HasUnsavedChanges) { SetStatus("Save the completed details first, then Confirm Admission."); return; }
-        string suggestion = await AdmissionNumberPolicy.PreviewNextAsync() ?? "";
-        using var dialog = new CompleteAdmissionDialog(suggestion, name.Text);
-        if (dialog.ShowDialog(FindForm()) != DialogResult.OK) return;
-        await RunBusyAsync("Completing admission…", async () => {
-            await DatabaseHelper.ExecuteUserAsync("CompleteQuickAdmission", DatabaseHelper.Int("@AdmissionId", currentAdmissionId), DatabaseHelper.P("@AdmissionNumber", dialog.AdmissionNumber));
-            StudentSearchCache.Invalidate(); await LoadStudentForEditAsync(currentAdmissionId);
-        });
-        if (!IsPendingRegistration) RegistrationFinished?.Invoke();
+        if (!TryBuildFeeDiscountPlan(out var feeDiscounts) || !ConfirmReasonableAge()) return;
+        registrationReadyToClose = false;
+        int admissionId = currentAdmissionId, version = admissionLoadVersion;
+        saveBusy = true;
+        UpdateStudentWorkspace();
+        try
+        {
+            await RunBusyAsync("Reviewing admission…", async () => {
+                string suggestion = await AdmissionNumberPolicy.PreviewNextAsync() ?? "";
+                if (IsDisposed || currentAdmissionId != admissionId || admissionLoadVersion != version) return;
+                using var dialog = new CompleteAdmissionDialog(suggestion, name.Text);
+                if (dialog.ShowDialog(FindForm()) != DialogResult.OK) return;
+                string studentName = name.Text.Trim();
+                var submitted = new AdmissionSubmission(dialog.AdmissionNumber, studentName, fatherName.Text.Trim(),
+                    admissionDate.Value.Date, loadedAdmissionCampusId, false, feeDiscounts.Count);
+                unconfirmedAdmission = submitted;
+                SetStatus("Saving details and confirming admission…");
+                var confirmation = await AdmissionSaveConfirmation.SubmitCompletionAsync(submitted, admissionId,
+                    () => SaveDetailsAndDiscountsAsync(admissionId, studentName,
+                        blood.SelectedIndex > 0 ? blood.Text.Trim() : null, feeDiscounts, dialog.AdmissionNumber),
+                    value => ReadCompletedRegistrationAsync(admissionId, value));
+                if (IsDisposed || currentAdmissionId != admissionId || admissionLoadVersion != version) return;
+                // The transactional procedure rolls back a definite business
+                // refusal. Keep the draft editable, including a number conflict.
+                if (confirmation.Admission is null && confirmation.ReadError is null &&
+                    confirmation.WriteError is { } refused && DbMessage.IsActionable(refused))
+                {
+                    unconfirmedAdmission = null;
+                    Warn("Admission was not confirmed. Your edits have been kept.\n\n" + DbMessage.UserMessage(refused));
+                    return;
+                }
+                await ApplyAdmissionConfirmationAsync(submitted, confirmation);
+            }, this);
+        }
+        catch (Exception ex)
+        {
+            if (unconfirmedAdmission is not null) ShowUnconfirmedAdmission();
+            else Fail(ex);
+        }
+        finally
+        {
+            saveBusy = false;
+            if (!IsDisposed) UpdateStudentWorkspace();
+        }
+        FinishRegistrationReview();
+    }
+    private void FinishRegistrationReview()
+    {
+        if (IsDisposed || IsBusy || !registrationReadyToClose) return;
+        registrationReadyToClose = false;
+        RegistrationFinished?.Invoke();
     }
     private async Task CloseAdmissionAsync(bool cancel)
     {
@@ -4407,6 +4459,14 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
             FROM dbo.Students WHERE AdmissionNumber=@AdmissionNumber;
             """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.P("@AdmissionNumber", submitted.Number));
 
+    private static Task<DataTable> ReadCompletedRegistrationAsync(int admissionId, AdmissionSubmission submitted) =>
+        DatabaseHelper.QuerySqlAsync("""
+            EXEC dbo.RequirePermission @UserId,N'Students.Admit';
+            SELECT AdmissionId,AdmissionNumber,RegistrationNumber,StudentName,FatherName,AdmissionDate,AdmissionCampusId
+            FROM dbo.Students WHERE AdmissionId=@AdmissionId AND AdmissionNumber=@AdmissionNumber AND Status=N'Active';
+            """, DatabaseHelper.Int("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@AdmissionId", admissionId),
+            DatabaseHelper.P("@AdmissionNumber", submitted.Number));
+
     private void ShowUnconfirmedAdmission()
     {
         if (unconfirmedAdmission is not { } submitted) return;
@@ -4424,11 +4484,13 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
         try
         {
             using var hold = BeginBusy("Checking the saved admission…", this);
-            var confirmation = await AdmissionSaveConfirmation.RecheckAsync(submitted, ReadSubmittedAdmissionAsync);
+            var confirmation = await AdmissionSaveConfirmation.RecheckAsync(submitted,
+                registrationReview ? value => ReadCompletedRegistrationAsync(currentAdmissionId, value) : ReadSubmittedAdmissionAsync);
             if (IsDisposed || version != admissionLoadVersion || !ReferenceEquals(unconfirmedAdmission, submitted)) return;
             await ApplyAdmissionConfirmationAsync(submitted, confirmation);
         }
         finally { saveBusy = false; if (!IsDisposed) UpdateStudentWorkspace(); }
+        FinishRegistrationReview();
     }
 
     private async Task ApplyAdmissionConfirmationAsync(AdmissionSubmission submitted, AdmissionConfirmation confirmation)
@@ -4463,7 +4525,8 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
         AddSuggestionIfNew(address, address.Text);
         AddSuggestionIfNew(placeOfBirthInput, placeOfBirthInput.Text);
         AddSuggestionIfNew(casteTribe, casteTribe.Text);
-        string message = submitted.Historical ? "Historical student saved for review. No fees generated."
+        string message = registrationReview ? "Admission confirmed. Completed details and discounts saved."
+            : submitted.Historical ? "Historical student saved for review. No fees generated."
             : "Admitted. Placement and opening fees ready.";
         if (submitted.DiscountCount > 0) message += " Discounts saved.";
         if (confirmation.Reconciled) message += " Save verified after an incomplete reply.";
@@ -4472,17 +4535,22 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
         if (!photoSaved) message += " Photo retained but not saved. Use Retry Photo Save.";
         SetStatus(message, photoSaved && reloaded ? PageStatusKind.Success : PageStatusKind.Warning);
         savedAdmissionReadyForNext = photoSaved && reloaded;
+        // Keep failed photo storage or refresh visible. Modal owners can close
+        // only after the full busy scope has released.
+        registrationReadyToClose = registrationReview && photoSaved && reloaded;
     }
     /// <summary>Save details, discounts and optional first enrollment in one SQL transaction.</summary>
     private async Task SaveDetailsAndDiscountsAsync(
         int admissionId,
         string studentName,
         string? bloodGroup,
-        List<(int assignmentId, decimal discount)> feeDiscounts)
+        List<(int assignmentId, decimal discount)> feeDiscounts,
+        string? completionNumber = null)
     {
         await DatabaseHelper.ExecuteUserAsync(
             "SaveStudentDetailsWithFirstEnrollment",
-            DatabaseHelper.P("@AdmissionNumber", IsPendingRegistration ? null : admissionIdValue.Text.Trim()),
+            DatabaseHelper.P("@AdmissionNumber", completionNumber ?? (IsPendingRegistration ? null : admissionIdValue.Text.Trim())),
+            DatabaseHelper.Bit("@CompleteRegistration", completionNumber is not null),
             DatabaseHelper.Int(
                 "@AdmissionId",
                 admissionId),

@@ -8,6 +8,9 @@ namespace FMSC_SMS.Core
         private LiveTextSuggestions? _liveSuggestions;
         private AutoCompleteMode _autoCompleteMode;
         private bool _invalid;
+        private bool _selectAllOnMouseUp;
+        /// <summary>Select existing search text on entry; subsequent clicks can position the caret.</summary>
+        public bool SelectAllOnFocus { get; set; }
         private bool _zeroAsPlaceholder;
         /// <summary>Show an empty numeric editor while retaining zero for existing text-based parsers.</summary>
         public bool ZeroAsPlaceholder
@@ -74,14 +77,25 @@ namespace FMSC_SMS.Core
                 ForeColor = AppTheme.Text,
                 BackColor = AppTheme.SurfaceElevated
             };
-            _inner.TextChanged += (_, _) => OnTextChanged(EventArgs.Empty);
-            _inner.GotFocus += (_, _) => { UpdateNumericPlaceholder(); OnGotFocus(EventArgs.Empty); Invalidate(); };
+            _inner.TextChanged += (_, _) => { _selectAllOnMouseUp = false; OnTextChanged(EventArgs.Empty); };
+            _inner.GotFocus += (_, _) => {
+                UpdateNumericPlaceholder();
+                OnGotFocus(EventArgs.Empty);
+                _selectAllOnMouseUp = SelectAllOnFocus;
+                if (SelectAllOnFocus) _inner.SelectAll();
+                Invalidate();
+            };
+            _inner.MouseUp += (_, e) => {
+                if (e.Button != MouseButtons.Left) return;
+                if (_selectAllOnMouseUp && SelectAllOnFocus) _inner.SelectAll();
+                _selectAllOnMouseUp = false;
+            };
             _inner.LostFocus += (_, _) => { if (_zeroAsPlaceholder) Text = Text; UpdateNumericPlaceholder(); OnLostFocus(EventArgs.Empty); Invalidate(); };
             _inner.MouseEnter += (_, _) => { _isHovered = true; Invalidate(); };
             _inner.MouseLeave += (_, _) => { _isHovered = false; Invalidate(); };
             _inner.Enter += (_, _) => OnEnter(EventArgs.Empty);
             _inner.Leave += (_, _) => OnLeave(EventArgs.Empty);
-            _inner.KeyDown += (_, e) => OnKeyDown(e);
+            _inner.KeyDown += (_, e) => { _selectAllOnMouseUp = false; OnKeyDown(e); };
             _inner.KeyPress += (_, e) => OnKeyPress(e);
             _inner.KeyUp += (_, e) => OnKeyUp(e);
             _inner.Click += (_, e) => OnClick(e);

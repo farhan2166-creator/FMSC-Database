@@ -33,7 +33,7 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
     private readonly bool initialize;
     private readonly StudentPicker find=new();
     private readonly ModernTextBox familyParent=HumanUi.TextBox(false,500),familyPhone=HumanUi.TextBox(false,30),familyAddress=HumanUi.TextBox(false,500);
-    private readonly FamilyStudentList children=new(){Dock=DockStyle.Fill,CheckOnClick=true,IntegralHeight=false,BorderStyle=BorderStyle.None,BackColor=AppTheme.Surface};
+    private readonly FamilyStudentList children=new(){Dock=DockStyle.Fill,CheckOnClick=true,CheckBoxOnly=true,IntegralHeight=false,BorderStyle=BorderStyle.None,BackColor=AppTheme.Surface};
     private readonly Panel editorHost=new(){Dock=DockStyle.Fill,AutoScroll=true};
     private readonly Label familyContext=new(){AutoSize=true,Dock=DockStyle.Fill,Font=AppTheme.BodyBoldFont,Padding=new Padding(6),Text="Find a student to load their family, or start a new family."};
     private readonly Label summary=new(){Dock=DockStyle.Fill,AutoSize=true,Padding=new Padding(8),Font=AppTheme.NormalFont};
