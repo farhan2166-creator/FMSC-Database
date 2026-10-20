@@ -47,7 +47,38 @@ public sealed partial class FeeCollectionPage
     {
         if(counterIds is null)return;
         student.Enabled=enrollment.Enabled=siblings.Enabled=selectAllSiblings.Enabled=false;
-        if(nextStudentButton is not null)nextStudentButton.Visible=false;
+        if(nextStudentButton is not null)
+        {
+            nextStudentButton.Visible=false;
+            // Hiding a control does not release an absolute TableLayoutPanel row.
+            // This visit returns to the family, so reserve no Next Student space.
+            if(nextStudentButton.Parent is TableLayoutPanel layout)
+            {
+                int row=layout.GetRow(nextStudentButton);
+                if(row>=0 && row<layout.RowStyles.Count)
+                {
+                    layout.RowStyles[row].SizeType=SizeType.Absolute;
+                    layout.RowStyles[row].Height=0;
+                }
+                // Use the actual caption, input and padding height for this
+                // compact dialog, rather than the general form's extra row gap.
+                static int FieldHeight(TableLayoutPanel field)
+                {
+                    var padding=field.Padding;
+                    field.Padding=new Padding(padding.Left,padding.Top,padding.Right,
+                        Math.Min(padding.Bottom,AppScale.Scale(UiDesignSystem.Spacing.Xs)));
+                    return (int)Math.Ceiling(field.RowStyles[0].Height) + AppMetrics.InputControlHeight +
+                        field.Padding.Vertical + field.Margin.Vertical;
+                }
+                foreach(int fieldRow in new[]{1,4,9})
+                    if(layout.GetControlFromPosition(0,fieldRow) is TableLayoutPanel field)
+                        layout.RowStyles[fieldRow].Height=FieldHeight(field);
+                if(layout.GetControlFromPosition(0,8) is TableLayoutPanel details)
+                    layout.RowStyles[8].Height=details.Controls.OfType<TableLayoutPanel>().Max(FieldHeight);
+                foreach(int actionRow in new[]{10,11})
+                    layout.RowStyles[actionRow].Height=AppMetrics.ButtonHeight+executeButton!.Margin.Vertical;
+            }
+        }
     }
 
     internal async Task InitializeCounterAsync()

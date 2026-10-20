@@ -4,6 +4,13 @@ An optional start-of-year counter workflow. It coordinates existing registration
 return confirmation, fee review, collection and RDLC documents; it does not replace
 full admission, student corrections or the normal finance screens.
 
+Family details and the children list stack in the left 40% of the workspace. The
+selected child's details and fees occupy the right 60%, spanning both left cards.
+The family fee overview combines frequency with the fee name, concession with the
+discount, and effective dates, status and last posting in one period column. Raw
+amounts and assignment identities are retained for the established fee actions;
+other fee screens keep their detailed columns. Fee actions wrap at smaller widths.
+
 ## One counter visit
 
 1. Find any child to load the family, or choose **New Family**. Check only the

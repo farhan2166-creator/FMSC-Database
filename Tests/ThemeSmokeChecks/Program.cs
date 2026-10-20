@@ -34,6 +34,13 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--collection-counter-layout"))
+        {
+            CheckCollectionCounterLayout();
+            CheckCollectionCredit();
+            Console.WriteLine($"PASS: {checks} counter payment layout and collection credit checks (no database connection).");
+            return;
+        }
         if(args.Contains("--family-list-selection"))
         {
             CheckFamilyListSelection();

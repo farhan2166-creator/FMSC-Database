@@ -51,6 +51,8 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
     private int enrollmentId;
     private int admissionId;
     private bool hasOpenTransport;
+    private TableLayoutPanel? actionLayout, panelLayout;
+    private bool familyView;
     /// <summary>True if any change (add / discontinue / amount change / discount / remove) was actually applied.</summary>
     public bool ChangesMade { get; private set; }
     /// <summary>Raised once per applied change, after <see cref="ChangesMade"/> is set. A host that shows something derived from these fees listens here instead of polling ChangesMade after the fact.</summary>
@@ -134,6 +136,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             Dock = DockStyle.Fill, ColumnCount = actions.Length, RowCount = 1,
             Margin = Padding.Empty, Padding = Padding.Empty
         };
+        actionLayout=buttons;
         buttons.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         for (int index = 0; index < actions.Length; index++) {
             buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / actions.Length));
@@ -150,6 +153,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             Margin = new Padding(0),
             Padding = new Padding(0)
         };
+        panelLayout=root;
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(48)));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
@@ -176,6 +180,87 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             row.Selected = true;
             grid.CurrentCell = row.Cells["FeeTypeName"];
         };
+    }
+    /// <summary>Compact presentation for the family counter; original values and fee actions are retained.</summary>
+    internal void ConfigureFamilyView()
+    {
+        if(familyView)return;
+        familyView=true;
+        grid.Name="FamilyFeeGrid";
+        grid.Columns.Add("FamilyPeriod","Period / posting");
+        grid.Columns["FamilyPeriod"].SortMode=DataGridViewColumnSortMode.NotSortable;
+        foreach(DataGridViewColumn column in grid.Columns)
+            column.Visible=column.Name is "FeeTypeName" or "StandardAmount" or "DiscountAmount" or "NetAmount" or "FamilyPeriod";
+        grid.Columns["FeeTypeName"].HeaderText="Fee";
+        grid.Columns["StandardAmount"].HeaderText="Rate (Rs.)";
+        grid.Columns["DiscountAmount"].HeaderText="Discount (Rs.)";
+        grid.Columns["NetAmount"].HeaderText="Net (Rs.)";
+        string[] columns={"FeeTypeName","StandardAmount","DiscountAmount","NetAmount","FamilyPeriod"};
+        int[] minimum={110,70,90,75,145};
+        float[] weights={26,13,16,14,31};
+        grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;
+        for(int index=0;index<columns.Length;index++)
+        {
+            var column=grid.Columns[columns[index]];
+            column.DisplayIndex=index;
+            column.MinimumWidth=AppScale.Scale(minimum[index]);
+            column.FillWeight=weights[index];
+            column.AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill;
+            column.DefaultCellStyle.WrapMode=DataGridViewTriState.True;
+        }
+        grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+        grid.ColumnHeadersDefaultCellStyle.WrapMode=DataGridViewTriState.True;
+        grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.AllCells;
+        grid.CellFormatting+=(_,e)=>{
+            if(e.RowIndex<0 || e.ColumnIndex<0)return;
+            var row=grid.Rows[e.RowIndex];
+            string Value(string name)=>Convert.ToString(row.Cells[name].Value)??"";
+            switch(grid.Columns[e.ColumnIndex].Name)
+            {
+                case "FeeTypeName":
+                    string frequency=Value("Frequency")=="OneTime"?"One-time":Value("Frequency");
+                    e.Value=Value("FeeTypeName")+(string.IsNullOrWhiteSpace(frequency)?"":" ("+frequency+")");break;
+                case "DiscountAmount":
+                    string concession=Value("ConcessionLabel");
+                    e.Value=Convert.ToDecimal(row.Cells["DiscountAmount"].Value??0).ToString("0.##")+
+                        (string.IsNullOrWhiteSpace(concession)||concession=="None"?"":"\n"+concession);break;
+                case "FamilyPeriod":
+                    e.Value=Value("EffectiveFrom")+" → "+Value("EffectiveTo")+"\n"+Value("Status")+
+                        "\n"+(Value("PostedThrough")=="Not posted"?"Not posted":"Last posted: "+Value("PostedThrough"));
+                    if(Value("Status")=="Needs Review" && e.CellStyle is { } style)style.ForeColor=AppTheme.Danger;
+                    break;
+                default:return;
+            }
+            e.FormattingApplied=true;
+        };
+        var actions=new[]{addButton,discountButton,issuedBillButton,discontinueButton,startTransportButton,reviewButton};
+        foreach(var button in actions)
+        {
+            button.Dock=DockStyle.None;button.Anchor=AnchorStyles.Top|AnchorStyles.Left;
+            button.MinimumSize=new Size(0,AppMetrics.ButtonHeight);button.Height=AppMetrics.ButtonHeight;
+        }
+        var wrappedActions=HumanUi.ButtonRow(actions);
+        wrappedActions.Dock=DockStyle.Fill;wrappedActions.Margin=Padding.Empty;
+        foreach(var button in actions)button.Margin=new Padding(AppScale.Scale(3),AppScale.Scale(4),AppScale.Scale(3),AppScale.Scale(4));
+        panelLayout!.Controls.Remove(actionLayout!);actionLayout!.Dispose();actionLayout=wrappedActions;
+        panelLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        panelLayout.Controls.Add(wrappedActions,0,2);
+        void FitActions()
+        {
+            int width=actions.Max(button=>button.Width+button.Margin.Horizontal);
+            int columns=Math.Max(1,wrappedActions.ClientSize.Width/Math.Max(1,width));
+            int rows=(actions.Length+columns-1)/columns;
+            float height=rows*(AppMetrics.ButtonHeight+actions.Max(button=>button.Margin.Vertical));
+            var style=panelLayout.RowStyles[2];
+            if(style.SizeType==SizeType.Absolute && Math.Abs(style.Height-height)<1)return;
+            style.SizeType=SizeType.Absolute;style.Height=height;
+            // SizeChanged can run inside the parent's current table layout.
+            // Finish that pass before applying the new wrapped-row height.
+            if(panelLayout.IsHandleCreated)
+                panelLayout.BeginInvoke((Action)(()=>{if(!IsDisposed)panelLayout.PerformLayout();}));
+        }
+        wrappedActions.SizeChanged+=(_,_)=>FitActions();
+        FitActions();
     }
     /// <summary>Points the panel at one enrollment and loads its fees.</summary>
     public void SetStudent(int enrollmentId, int admissionId)
