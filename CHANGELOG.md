@@ -155,3 +155,5 @@ For the original fixes, implementation passes, schema verification and historica
 - Correct the placement cutoff change with migration 29: use the selected billing start for the cutoff, preserve historical class placement independently, and use the billing date for opening one-time fees. Existing student charges are unchanged.
 
 - Align individual/family bill and receipt headers: show the school name followed by the address and campus on one line, widen detail labels slightly, and reduce document-title font to avoid wrapping. Preserve available campus names in grouped documents; mixed-campus families use an explicit summary. Financial amounts and records are unchanged.
+
+- Rename the payment Correction action to Reduce Recorded Payment. Explain that the entered amount is the amount to retain and show the resulting increase in outstanding dues in the confirmation and success message. Preserve transaction codes, calculations and recovery behavior.
