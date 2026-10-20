@@ -4,6 +4,7 @@ using FMSC_SMS.Core;
 using FMSC_SMS;
 using FMSC_SMS.Pages.Security;
 using FMSC_SMS.Pages.Students.Admissions;
+using FMSC_SMS.Pages.Finance.StudentAccounts;
 
 internal static partial class Program
 {
@@ -40,8 +41,57 @@ internal static partial class Program
             Check(list.Items.Count==2 && list.CheckedItems.Count==2,"Loading one student brings their established siblings into the workspace");
             Check(!Field<ModernButton>(workspace,"print").Enabled,"An included unconfirmed return blocks premature family billing");
             Check(!Field<ModernButton>(workspace,"collect").Enabled,"Unconfirmed returns also block premature family collection");
+            var feePanel=Field<StudentFeeAssignmentsPanel>(list.Items[0]!,"Assignments");
+            var feeGrid=Field<DataGridView>(feePanel,"grid");
+            int feeRow=feeGrid.Rows.Add("Tuition Fee",400m,100m,300m,"Monthly","Oct-2026","Ongoing","Active","Oct-2026",71,1,true,DateTime.Today,false,0);
+            feeGrid.Rows[feeRow].Cells["ConcessionLabel"].Value="Sibling";
+            Check(feeGrid.Columns.Cast<DataGridViewColumn>().Count(column=>column.Visible)==5,
+                "The family fee overview shows five combined columns");
+            Check(Convert.ToString(feeGrid.Rows[0].Cells["FeeTypeName"].FormattedValue)=="Tuition Fee (Monthly)" &&
+                Convert.ToString(feeGrid.Rows[0].Cells["DiscountAmount"].FormattedValue)!.Contains("Sibling") &&
+                Convert.ToString(feeGrid.Rows[0].Cells["FamilyPeriod"].FormattedValue)!.Contains("Active") &&
+                Convert.ToString(feeGrid.Rows[0].Cells["FamilyPeriod"].FormattedValue)!.Contains("Last posted: Oct-2026"),
+                "Merged cells retain frequency, concession, rate status and posting information");
+            Check(Equals(feeGrid.Rows[0].Cells["DiscountAmount"].Value,100m) && Equals(feeGrid.Rows[0].Cells["NetAmount"].Value,300m) &&
+                Equals(feeGrid.Rows[0].Cells["StudentFeeAssignmentId"].Value,71),
+                "Compact presentation preserves the monetary values and assignment identity used by fee actions");
+            using(var fullPanel=new StudentFeeAssignmentsPanel())
+                Check(fullPanel.Controls.Find("FamilyFeeGrid",true).Length==0,
+                    "Other student fee screens keep their established detailed presentation");
+            Directory.CreateDirectory("artifacts/family-admission");
+            foreach(var size in new[]{new Size(1600,900),new Size(1450,980),new Size(1100,800)})
+            {
+                owner.ClientSize=size;Application.DoEvents();
+                var family=workspace.Controls.Find("FamilyDetailsCard",true).Single();
+                var children=workspace.Controls.Find("FamilyChildrenCard",true).Single();
+                var editorSurface=workspace.Controls.Find("FamilyEditorCard",true).Single();
+                Rectangle Bounds(Control control)=>owner.RectangleToClient(control.RectangleToScreen(control.ClientRectangle));
+                Rectangle a=Bounds(family),b=Bounds(children),c=Bounds(editorSurface);
+                Check(a.Left==b.Left && a.Width==b.Width && b.Top>=a.Bottom && c.Top==a.Top && Math.Abs(c.Bottom-b.Bottom)<=1,
+                    "Family details and children stack on the left while fees span their full combined height");
+                Check((double)c.Width/(c.Width+a.Width) is >0.58 and <0.62,
+                    "The family workspace uses the requested forty/sixty width split");
+                Check(feeGrid.DisplayedColumnCount(false)==5 && !feeGrid.Controls.OfType<HScrollBar>().Any(bar=>bar.Visible),
+                    "All five fee columns fit without sideways scrolling at supported desktop widths");
+                var home=Field<ModernTextBox>(workspace,"familyAddress");
+                Check(home.Height>=AppMetrics.InputControlHeight && home.Bottom<=home.Parent!.ClientSize.Height,
+                    "The stacked family details retain a full-height address input");
+                Check(feeGrid.Right<=feePanel.ClientSize.Width,
+                    "The fee grid shrinks with its panel instead of extending beyond the visible area");
+                Check(Field<TableLayoutPanel>(feePanel,"actionLayout").Controls.OfType<FlowLayoutPanel>().Single().Controls.Cast<Control>().All(button=>button.Height>=AppMetrics.ButtonHeight),
+                    "Fee actions keep their full button height when wrapping into additional rows");
+                Check(Field<TableLayoutPanel>(feePanel,"actionLayout").Controls.OfType<FlowLayoutPanel>().Single().Controls.Cast<Control>()
+                    .All(button=>feePanel.RectangleToClient(button.RectangleToScreen(button.ClientRectangle)).Bottom<=feePanel.ClientSize.Height),
+                    "Every wrapped fee action remains visible inside the fee panel");
+                var phone=Field<ModernTextBox>(workspace,"familyPhone");
+                Check(phone.Right<=phone.Parent!.ClientSize.Width && phone.Height>=AppMetrics.InputControlHeight,
+                    "The optional phone input fits fully within the narrower family card");
+                using var image=new Bitmap(owner.Width,owner.Height);owner.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));
+                image.Save($"artifacts/family-admission/fees-{size.Width}.png");
+            }
             void ClickChild(int index, bool checkbox)
             {
+                list.TopIndex=index;
                 Rectangle bounds = checkbox ? list.CheckBoxBounds(index) : list.GetItemRectangle(index);
                 var point = checkbox ? new Point(bounds.Left + bounds.Width / 2, bounds.Top + bounds.Height / 2)
                     : new Point(100, bounds.Top + 15);

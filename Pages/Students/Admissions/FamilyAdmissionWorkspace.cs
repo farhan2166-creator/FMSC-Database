@@ -35,7 +35,7 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
     private readonly ModernTextBox familyParent=HumanUi.TextBox(false,500),familyPhone=HumanUi.TextBox(false,30),familyAddress=HumanUi.TextBox(false,500);
     private readonly FamilyStudentList children=new(){Dock=DockStyle.Fill,CheckOnClick=true,CheckBoxOnly=true,IntegralHeight=false,BorderStyle=BorderStyle.None,BackColor=AppTheme.Surface};
     private readonly Panel editorHost=new(){Dock=DockStyle.Fill,AutoScroll=true};
-    private readonly Label familyContext=new(){AutoSize=true,Dock=DockStyle.Fill,Font=AppTheme.BodyBoldFont,Padding=new Padding(6),Text="Find a student to load their family, or start a new family."};
+    private readonly Label familyContext=new(){AutoSize=false,Dock=DockStyle.Fill,Font=AppTheme.BodyBoldFont,Padding=new Padding(6),AutoEllipsis=true,Text="Find a student or start a new family."};
     private readonly Label summary=new(){Dock=DockStyle.Fill,AutoSize=true,Padding=new Padding(8),Font=AppTheme.NormalFont};
     private readonly List<Child> members=new();
     private readonly ModernButton addChild,process,print,collect,refresh,newFamily,removeDraft,reviewFees,reviewAdmission,pendingRegistrations,recover;
@@ -75,16 +75,22 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         find.SearchFailed+=ex=>Fail(ex);
         find.UserSelectionChanged+=async(_,_)=>{if(find.SelectedId>0)await LoadFamilyAsync(find.SelectedId);};
         var familyCard=HumanUi.Card("Family","Load one student to include their siblings. New children join the same family.");
+        familyCard.Name="FamilyDetailsCard";
         familyCard.Header.Visible=false;
-        var familyFields=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=2};
-        foreach(float width in new[]{27f,23f,23f,27f})familyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,width));
+        var familyFields=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=4,Margin=Padding.Empty};
+        familyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
+        familyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
+        familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
+        familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.TextHeight(AppTheme.NormalFont)+AppScale.Scale(12)));
         familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
         familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
         var searchField=HumanUi.Field("Find student / family",find);familyFields.Controls.Add(searchField,0,0);familyFields.SetColumnSpan(searchField,2);
-        familyFields.Controls.Add(familyContext,2,0);familyFields.SetColumnSpan(familyContext,2);
-        familyFields.Controls.Add(HumanUi.Field("Parent name",familyParent,true),0,1);
-        familyFields.Controls.Add(HumanUi.Field("Phone (optional)",familyPhone),1,1);
-        var homeField=HumanUi.Field("Address",familyAddress);familyFields.Controls.Add(homeField,2,1);familyFields.SetColumnSpan(homeField,2);
+        familyFields.Controls.Add(familyContext,0,1);familyFields.SetColumnSpan(familyContext,2);
+        familyFields.Controls.Add(HumanUi.Field("Parent name",familyParent,true),0,2);
+        familyFields.Controls.Add(HumanUi.Field("Phone (optional)",familyPhone),1,2);
+        var homeField=HumanUi.Field("Address",familyAddress);familyFields.Controls.Add(homeField,0,3);familyFields.SetColumnSpan(homeField,2);
+        foreach(var field in familyFields.Controls.OfType<TableLayoutPanel>())
+            field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         foreach(var input in new[]{familyParent,familyPhone,familyAddress})input.TextChanged+=(_,_)=>{
             if(syncingFamily || anchor>0 || IsBusy)return;
             father=familyParent.Text.Trim();phone=familyPhone.Text.Trim();address=familyAddress.Text.Trim();
@@ -93,6 +99,7 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         };
         familyCard.Content.Controls.Add(familyFields);
         var childCard=HumanUi.Card("Children","Check to include. Select to review.");
+        childCard.Name="FamilyChildrenCard";
         var childBody=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3};
         childBody.RowStyles.Add(new RowStyle(SizeType.Percent,100));childBody.RowStyles.Add(new RowStyle(SizeType.AutoSize));childBody.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var childActions=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,WrapContents=true};
@@ -100,14 +107,21 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         childActions.Controls.Add(reviewFees);childActions.Controls.Add(reviewAdmission);childActions.Controls.Add(removeDraft);
         childBody.Controls.Add(children,0,0);childBody.Controls.Add(summary,0,1);childBody.Controls.Add(childActions,0,2);childCard.Content.Controls.Add(childBody);
         var editorCard=HumanUi.Card("Child Details & Fees","Each child's draft is retained when you switch.");
+        editorCard.Name="FamilyEditorCard";
         editorCard.Header.Visible=false;
         editorCard.Content.Controls.Add(editorHost);
-        var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1};
-        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,27));body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,73));
-        body.Controls.Add(childCard,0,0);body.Controls.Add(editorCard,1,0);
-        var root=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight*2+AppScale.Scale(32)));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.Controls.Add(familyCard,0,0);root.Controls.Add(body,0,1);SetContent(root);
+        var left=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty};
+        left.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        left.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight*3+
+            AppMetrics.TextHeight(AppTheme.NormalFont)+AppScale.Scale(20)+familyCard.Padding.Vertical+familyCard.Content.Padding.Vertical));
+        left.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        familyCard.Margin=new Padding(0,0,0,AppScale.Scale(8));
+        left.Controls.Add(familyCard,0,0);left.Controls.Add(childCard,0,1);
+        var root=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,40));root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,60));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        left.Margin=new Padding(0,0,AppScale.Scale(10),0);
+        root.Controls.Add(left,0,0);root.Controls.Add(editorCard,1,0);SetContent(root);
         children.SelectedIndexChanged+=async(_,_)=>{
             if(!selecting && !IsBusy && children.SelectedIndex>=0)await ShowChildAsync(members[children.SelectedIndex]);
         };
@@ -178,8 +192,8 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         reviewFees.Enabled=idle && current is {Id:>0,MembershipVerified:true} && !current.Dirty &&
             int.TryParse(FieldText(current.Record,"EnrollmentId"),out int enrollment) && enrollment>0 && CurrentUser.HasPermission("Fees.View");
         reviewAdmission.Enabled=idle && current is {Id:>0,MembershipVerified:true} && !current.Dirty && CurrentUser.HasPermission("Students.Admit");
-        familyContext.Text=anchor>0?$"{father}\nFamily loaded from {AdmissionNumbers.ForId(anchor)} · {members.Count} children":
-            members.Count>0?"New family\nEnter shared parent details here, then review each child.":"Find a student to load their family, or start a new family.";
+        familyContext.Text=anchor>0?$"Family loaded from {AdmissionNumbers.ForId(anchor)} · {members.Count} children":
+            members.Count>0?"New family · Shared parent details":"Find a student or start a new family.";
     }
     private void SyncFamilyFields()
     {

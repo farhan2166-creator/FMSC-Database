@@ -130,7 +130,7 @@ public sealed partial class FamilyAdmissionWorkspace
                 else child.Editor = BuildExistingEditor(child);
             }
             int minimumHeight = child.Registration is not null ? 530 : child.Return is not null ? 650 : 450;
-            child.Viewport ??= new ResponsiveViewport(child.Editor, new Size(AppScale.Scale(620), AppScale.Scale(minimumHeight)));
+            child.Viewport ??= new ResponsiveViewport(child.Editor, new Size(AppScale.Scale(child.Assignments is null?620:480), AppScale.Scale(minimumHeight)));
             editorHost.Controls.Add(child.Viewport);
             if (!child.Initialized && initialize)
             {
@@ -162,6 +162,7 @@ public sealed partial class FamilyAdmissionWorkspace
     {
         var card = HumanUi.Card(child.DisplayName, $"{FieldText(child.Record, "AcademicYear")} · {FieldText(child.Record, "CampusName")} · {FieldText(child.Record, "ClassName")} - {FieldText(child.Record, "SectionName")} · {child.Status}");
         var panel = new StudentFeeAssignmentsPanel(); child.Assignments = panel;
+        panel.ConfigureFamilyView();
         panel.Changed += async (_, _) => { child.Outcome = "Fee changes saved"; await RefreshSavedChildrenAsync(); };
         card.Content.Controls.Add(panel);
         if (initialize && child.Record is not null && int.TryParse(FieldText(child.Record, "EnrollmentId"), out int enrollment)) panel.SetStudent(enrollment, child.Id);
