@@ -43,12 +43,12 @@ public sealed partial class FamilyAdmissionWorkspace
     }
     private async Task StartNewFamilyAsync()
     {
-        if (IsBusy || !CurrentUser.HasPermission("Students.Admit") || !DiscardAllowed()) return;
+        if (IsBusy || recoveryPending || !CurrentUser.HasPermission("Students.Admit") || !DiscardAllowed()) return;
         ClearWorkspace(); find.Clear(); await AddNewChildAsync();
     }
     private async Task AddNewChildAsync()
     {
-        if (IsBusy || !CurrentUser.HasPermission("Students.Admit") || members.Any(c => c.Registration?.HasUnresolvedSave == true)) return;
+        if (IsBusy || recoveryPending || !CurrentUser.HasPermission("Students.Admit") || members.Any(c => c.Registration?.HasUnresolvedSave == true)) return;
         if (members.Count > 0 && !CurrentUser.HasPermission("Students.Administer")) { Warn("Student-administration access is required to add siblings."); return; }
         var source = members.Select(c => c.Registration).FirstOrDefault(r => r is not null && r.WorkspaceParent.Length > 0);
         if (anchor == 0 && source is not null) { father = source.WorkspaceParent; phone = source.WorkspaceContact; address = source.WorkspaceAddress; }
@@ -109,6 +109,7 @@ public sealed partial class FamilyAdmissionWorkspace
                 if (child.Id == 0 || FieldText(child.Record, "Status") == "Pending")
                 {
                     var registration = new QuickRegistrationFormPage(navigate, 0, initialize: false);
+                    registration.WorkspaceRecoveryRequested=RecoverPreviousSaveAsync;
                     registration.ConfigureFamilyWorkspace(); child.Editor = registration;
                     registration.WorkspaceChanged += (_, _) => {
                         if (IsDisposed) return;
@@ -178,7 +179,8 @@ public sealed partial class FamilyAdmissionWorkspace
     {
         if (IsBusy || !FamilyAdmissionData.CanUse(CurrentUser.HasPermission)) return;
         if (current?.Registration?.CommitWorkspaceEdit() == false) return;
-        if (members.Any(c => c.Registration?.HasUnresolvedSave == true))
+        if (initialize)ReadWorkspaceRecovery();
+        if (recoveryPending || members.Any(c => c.Registration?.HasUnresolvedSave == true))
         { Warn("Use Check Save Outcome on the affected child before processing more children."); return; }
         var selected = members.Where(c => c.Included).ToArray();
         if (selected.Length == 0) return;
@@ -187,8 +189,9 @@ public sealed partial class FamilyAdmissionWorkspace
         if (selected.Any(c => c.Id == 0) && !PakistanPhoneNumber.IsValidOptional(familyPhone.Text))
         { Warn(PakistanPhoneNumber.ValidationMessage); familyPhone.Focus(); return; }
         if (!Confirm($"Process {selected.Length} selected children?\n\n" + string.Join("\n", selected.Select(c => $"{c.DisplayName} — {c.Status}")) +
-            "\n\nEach child uses their established save or return process. Completed children remain saved if a later child needs attention. Payment is collected separately.", "Process Family")) return;
+            "\n\nNew children remain pending for full admission later. Completed children stay saved if another child needs attention. No payment is taken by this step.", "Save & Prepare")) return;
         processing = true; UpdateWorkspace();
+        int completed=0;
         try
         {
             foreach (var child in selected)
@@ -213,13 +216,15 @@ public sealed partial class FamilyAdmissionWorkspace
                 if (!saved)
                 {
                     child.Outcome = "Needs attention";
-                    Warn(child.Registration?.WorkspaceStatus is { Length: > 0 } detail ? detail :
-                        "Processing stopped at this child. Review their inputs; earlier saved children are retained."); return;
+                    Warn($"{completed} of {selected.Length} prepared. Stopped at {child.DisplayName}. "+
+                        (child.Registration?.WorkspaceStatus is { Length: > 0 } detail ? detail :
+                        "Review this child's inputs. Earlier saved children are retained; retry continues without registering them again.")); return;
                 }
+                completed++;
                 if (!await RefreshSavedChildrenAsync())
                 { Warn("The saved result could not refresh. Processing stopped; refresh the family before continuing."); return; }
             }
-            SetStatus("Selected children processed. Review the family and print the selected bill.", PageStatusKind.Success);
+            SetStatus($"{completed} children prepared. Use Collect Payment / Receipt, or print a bill for payment later. New registrations can be confirmed later.", PageStatusKind.Success);
         }
         catch (Exception ex) { if (current is not null) current.Outcome = "Needs attention"; if (!IsDisposed) Fail(ex); }
         finally { processing = false; if (!IsDisposed) UpdateWorkspace(); }

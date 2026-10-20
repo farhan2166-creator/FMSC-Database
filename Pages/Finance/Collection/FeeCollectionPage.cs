@@ -3,9 +3,9 @@ using FMSC_SMS.Pages.Finance.Billing;
 using FMSC_SMS.Pages.Finance.StudentAccounts;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Collection;
-public sealed class FeeCollectionPage : V2Page, IBusyPage
+public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChanges
 {
-    public bool IsBusy => transactionBusy || billBusy;
+    public bool IsBusy => transactionBusy || billBusy || counterLoading || (counterIds is not null && siblingBusy);
     public string BusyMessage => billBusy ? "Finish the bill, return, or fee-review workflow before leaving." : "Please wait for the fee collection to finish recording.";
     private bool billBusy;
     private readonly StudentPicker student = new();
@@ -385,6 +385,9 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             }
         };
         enrollment.SelectedIndexChanged += async (_, _) => {
+            // The counter loads its fixed group explicitly after the primary account.
+            // An event-driven primary-only read must not overwrite that group's allocations later.
+            if(counterIds is not null && counterLoading)return;
             enrollmentId =
                 enrollment.SelectedId;
             charges.Rows.Clear();
@@ -463,6 +466,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 "Student & Collection Date",
                 "Choose the student once; the current academic placement and outstanding charges load automatically.");
         /* Keep method, reference and remarks beside the amount being collected. */
+        counterContextCard=context;
         var contextGrid =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -511,6 +515,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             Height = AppMetrics.ButtonHeight,
             Enabled = false
         };
+        counterReverseButton=reverseChargeButton;
         void UpdateReverseChargeButton() => reverseChargeButton.Enabled =
             !transactionBusy && charges.Enabled && charges.CurrentRow is { } row &&
             GetLong(row.Cells["BillingChargeId"].Value) > 0;
@@ -574,6 +579,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                 Padding = new Padding(0),
                 Margin = new Padding(0)
             };
+        counterSiblingCard=siblingsCard;counterSiblingPanel=siblingPanel;
         siblingPanel.RowStyles.Add(new RowStyle(SizeType.Absolute,AppScale.Scale(78)));
         siblingPanel.Controls.Add(primaryPayer,0,0);
         siblingPanel.RowStyles.Add(
@@ -2702,7 +2708,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
             return;
         }
         executeButton.Enabled =
-            !transactionBusy &&
+            !transactionBusy && !counterLoading && (counterIds is null || counterReady) &&
             HasOutstandingCharges() && IsReceivedAmountWithinPayable();
     }
     /// <summary>True when the grid holds a real charge with a balance left to collect.</summary>
@@ -2809,6 +2815,7 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
     {
         if (transactionBusy)
             return;
+        if(counterIds is not null && !await ValidateCounterPaymentAsync())return;
         try
         {
             var pending = CollectionRecoveryJournal.ReadPending();
@@ -3418,12 +3425,14 @@ public sealed class FeeCollectionPage : V2Page, IBusyPage
                   (lastCollectionReceipt is not null || lastGroupReceiptNumber is not null
                     ? "Print Receipt, or choose Next Student." : "Check Recent Payments to print, or choose Next Student.");
             collectionResult.Visible = true;
+            RememberCounterReceipt(result,singleReceipt);
             int refreshVersion = ++loadVersion;
             // These refreshes read independent views of the same committed transaction.
             await Task.WhenAll(
                 LoadChargesAsync(refreshVersion),
                 LoadRecentPaymentsAsync(refreshVersion),
                 LoadSiblingsAsync(refreshVersion));
+            if(counterIds is not null)await RestoreCounterSelectionAsync();
             charges.ClearSelection();
             recentPayments.ClearSelection();
             suppressDiscountEvents = true;

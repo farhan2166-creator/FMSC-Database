@@ -24,7 +24,9 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         internal bool Busy=>Registration?.IsBusy==true || (Editor as IBusyPage)?.IsBusy==true || Assignments?.IsBusy==true;
         internal bool Dirty=>(Editor as IUnsavedChanges)?.HasUnsavedChanges==true;
         internal string DisplayName=>Registration?.WorkspaceName is {Length:>0} value?value:Name;
-        public override string ToString()=> $"{(Id>0?FieldText(Record,"Reference"):"NEW")} · {DisplayName}\n{Status} · {Outcome}";
+        public override string ToString()=> $"{(Id>0?FieldText(Record,"Reference"):"NEW")} · {DisplayName}\n{Status}"+
+            (CurrentUser.HasPermission("Fees.View") && Record?.Table.Columns.Contains("Outstanding")==true && !Record.IsNull("Outstanding")
+                ?$" · Rs. {Convert.ToDecimal(Record["Outstanding"]):N0} due":"")+$" · {Outcome}";
     }
     private readonly Action<Func<Control>,string,string> navigate;
     private readonly Func<int,Task<DataTable>> readFamily;
@@ -36,7 +38,8 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
     private readonly Label familyContext=new(){AutoSize=true,Dock=DockStyle.Fill,Font=AppTheme.BodyBoldFont,Padding=new Padding(6),Text="Find a student to load their family, or start a new family."};
     private readonly Label summary=new(){Dock=DockStyle.Fill,AutoSize=true,Padding=new Padding(8),Font=AppTheme.NormalFont};
     private readonly List<Child> members=new();
-    private readonly ModernButton addChild,process,print,refresh,newFamily,removeDraft,reviewFees,reviewAdmission,pendingRegistrations;
+    private readonly ModernButton addChild,process,print,collect,refresh,newFamily,removeDraft,reviewFees,reviewAdmission,pendingRegistrations,recover;
+    private bool recoveryPending;
     private int anchor;
     private int familyVersion;
     private string father="",phone="",address="";
@@ -51,23 +54,28 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         if(preselectAdmissionId>0)Load+=async(_,_)=>await LoadFamilyAsync(preselectAdmissionId);
     }
     internal FamilyAdmissionWorkspace(Action<Func<Control>,string,string> navigate,Func<int,Task<DataTable>> readFamily,bool initialize)
-        :base(PageTitles.FamilyAdmission,"Prepare siblings together, review each child's fees, then print their bill.")
+        :base(PageTitles.FamilyAdmission,"1. Find or add children   2. Review and save   3. Collect payment and print receipt")
     {
         this.navigate=navigate;this.readFamily=readFamily;this.initialize=initialize;
         newFamily=AddAction("New Family",async(_,_)=>await StartNewFamilyAsync(),"Secondary");
         addChild=AddAction("Add New Child",async(_,_)=>await AddNewChildAsync(),"Secondary");
-        process=AddAction("Process Selected",async(_,_)=>await ProcessSelectedAsync(),"Primary");
+        process=AddAction("Save & Prepare Selected",async(_,_)=>await ProcessSelectedAsync(),"Primary");
+        collect=AddAction("Collect Payment / Receipt",async(_,_)=>await CollectSelectedAsync(),"Success");
         print=AddAction("Print Selected Bill",async(_,_)=>await PrintSelectedAsync(),"Secondary");
         refresh=AddAction("Refresh Family",async(_,_)=>await ReloadFamilyAsync(),"Secondary");
         pendingRegistrations=AddAction("Pending Registrations",async(_,_)=>await OpenPendingRegistrationsAsync(),"Secondary");
+        recover=AddAction("Check Previous Save",async(_,_)=>await RecoverPreviousSaveAsync(),"Secondary");
         removeDraft=AddAction("Remove Draft",(_,_)=>RemoveDraft(),"Secondary");
         reviewFees=AddAction("Review Fee Terms",async(_,_)=>await ReviewFeesAsync(),"Secondary");
         reviewAdmission=AddAction("Review Admission",async(_,_)=>await ReviewAdmissionAsync(),"Secondary");
         UseWrappingToolbar();
+        // This counter's sequence is deliberate; the shared toolbar puts collection ahead of Save & actions.
+        Load+=(_,_)=>{Actions.Controls.SetChildIndex(process,2);Actions.Controls.SetChildIndex(collect,3);};
         find.PlaceholderText="Admission number or student name — load their family";
         find.SearchFailed+=ex=>Fail(ex);
         find.UserSelectionChanged+=async(_,_)=>{if(find.SelectedId>0)await LoadFamilyAsync(find.SelectedId);};
         var familyCard=HumanUi.Card("Family","Load one student to include their siblings. New children join the same family.");
+        familyCard.Header.Visible=false;
         var familyFields=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=2};
         foreach(float width in new[]{27f,23f,23f,27f})familyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,width));
         familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
@@ -98,7 +106,7 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,27));body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,73));
         body.Controls.Add(childCard,0,0);body.Controls.Add(editorCard,1,0);
         var root=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2};
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(2)));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight*2+AppScale.Scale(32)));
         root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.Controls.Add(familyCard,0,0);root.Controls.Add(body,0,1);SetContent(root);
         children.SelectedIndexChanged+=async(_,_)=>{
             if(!selecting && !IsBusy && children.SelectedIndex>=0)await ShowChildAsync(members[children.SelectedIndex]);
@@ -109,6 +117,7 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
             members[e.Index].Included=e.NewValue==CheckState.Checked;UpdateWorkspace();
         };
         Disposed+=(_,_)=>{foreach(var child in members)(child.Viewport??child.Editor)?.Dispose();};
+        if(initialize)ReadWorkspaceRecovery();
         ShowEmptyEditor();UpdateWorkspace();
         if(!FamilyAdmissionData.CanUse(CurrentUser.HasPermission)){
             Enabled=false;SetStatus("Student-view access and admission or student-administration access are required.",PageStatusKind.Warning);
@@ -131,6 +140,8 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         foreach(var child in members)
             if(child.Registration is { } registration && registration.SavedRegistrationId>0)
             {
+                if(child.Id>0 && child.Id!=registration.SavedRegistrationId)
+                {child.MembershipVerified=false;child.Outcome="Recovery context changed · reload family";continue;}
                 child.Id=registration.SavedRegistrationId;
                 if(anchor==0 && !registration.HasUnresolvedSave && !registration.WorkspaceNeedsRefresh)
                 {anchor=child.Id;father=registration.WorkspaceParent;phone=registration.WorkspaceContact;address=registration.WorkspaceAddress;SyncFamilyFields();}
@@ -140,22 +151,26 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         decimal outstanding=members.Where(c=>c.Included && c.Record?.Table.Columns.Contains("Outstanding")==true && !c.Record.IsNull("Outstanding"))
             .Sum(c=>Convert.ToDecimal(c.Record!["Outstanding"]));
         var drafts=members.Where(c=>c.Included && c.Id==0).Select(c=>c.Registration).OfType<QuickRegistrationFormPage>().ToArray();
-        summary.Text=$"{selected} of {members.Count} children included\n"+
-            (CurrentUser.HasPermission("Fees.View")?$"Posted dues: Rs. {outstanding:N0}\n":"")+
-            $"New monthly plan: Rs. {drafts.Sum(c=>c.WorkspaceMonthly):N0}\nNew yearly / once: Rs. {drafts.Sum(c=>c.WorkspaceOther):N0}\n"+
-            $"Return opening plans: Rs. {members.Where(c=>c.Included).Sum(c=>c.Return?.WorkspaceOpeningPlan??0):N0}";
+        summary.Text=$"{selected} of {members.Count} children included"+
+            (CurrentUser.HasPermission("Fees.View")?$"\nPosted dues: Rs. {outstanding:N0}":"");
+        if(drafts.Length>0)summary.Text+=$"\nNew monthly plan: Rs. {drafts.Sum(c=>c.WorkspaceMonthly):N0}\nNew yearly / once: Rs. {drafts.Sum(c=>c.WorkspaceOther):N0}";
+        decimal returnPlan=members.Where(c=>c.Included).Sum(c=>c.Return?.WorkspaceOpeningPlan??0);
+        if(returnPlan>0)summary.Text+=$"\nReturn opening plans: Rs. {returnPlan:N0}";
+        if(current is not null)SetToolTip(children,$"{current.DisplayName}\n{current.Status}\n{current.Outcome}");
         int unreviewedReturns=members.Count(c=>c.Included && c.AwaitsReturn && c.Return is null);
         if(unreviewedReturns>0)summary.Text+=$"\n{unreviewedReturns} return(s) need fee review";
         bool idle=!IsBusy;
         editorHost.Enabled=!busy && !processing;
         find.Enabled=children.Enabled=idle;
-        newFamily.Enabled=idle && CurrentUser.HasPermission("Students.Admit");
+        newFamily.Enabled=idle && !recoveryPending && CurrentUser.HasPermission("Students.Admit");
         familyParent.ReadOnly=familyPhone.ReadOnly=familyAddress.ReadOnly=anchor>0 || !idle || members.Count==0;
-        bool unresolved=members.Any(c=>c.Registration?.HasUnresolvedSave==true);
+        bool unresolved=recoveryPending||members.Any(c=>c.Registration?.HasUnresolvedSave==true);
         addChild.Enabled=idle && !unresolved && CurrentUser.HasPermission("Students.Admit") &&
             (members.Count==0 || CurrentUser.HasPermission("Students.Administer"));
         process.Enabled=idle && !unresolved && selected>0;
         print.Enabled=idle && selected>0 && !unresolved && members.Where(c=>c.Included).All(CanBill) && CurrentUser.HasPermission("Fees.View");
+        collect.Enabled=print.Enabled && CurrentUser.HasPermission("Fees.Collect");
+        recover.Visible=recoveryPending;recover.Enabled=idle;
         refresh.Enabled=idle && anchor>0;
         pendingRegistrations.Enabled=idle && !unresolved && QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);
         removeDraft.Enabled=idle && current is {Id:0} && current.Registration?.HasUnresolvedSave!=true;

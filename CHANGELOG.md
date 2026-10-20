@@ -2,6 +2,14 @@
 
 Notable user-facing, database, installer, and operational changes will be tracked here. This file begins as a **forward-looking** changelog; it is not a fabricated complete history of previous builds.
 
+## [Unreleased]
+
+- Lock the academic year in Admission's placement/setup actions. New placements use the configured current year; existing placement history retains its recorded year.
+
+- Complete the optional quick counter journey with the existing Fee Collection screen opened over the retained family. Carry only selected children into payment, retain editable suggested allocations, print established receipts and refresh remaining dues without retaining submitted amounts.
+- Isolate registration recovery from loaded child editors, reject mismatched recovered identities and identify progress when preparation stops after earlier children have saved. New children remain pending for full admission later.
+- Add migration 27 for read-only current/future fully waived bill evidence. Preserve established admission, financial writes, receipt numbering and RDLC templates; no school or financial records are rewritten by the migration.
+
 ## [1.1.0-rc.2] - 2026-10-18
 
 - Make Billing Center titles and guidance concise and consistent; use posting/reversal labels instead of generic report instructions.
@@ -141,3 +149,9 @@ The application assembly version in `FMSC_SMS.csproj` and the database's require
 When a pull request changes behavior, add an Unreleased entry describing the operator-visible result and a PR link. Move entries to a dated version section only after an actual release approval.
 
 For the original fixes, implementation passes, schema verification and historical decisions, see the [historical audit index](Audit/Archive/FMSC_HISTORICAL_AUDITS.md) and commit history.
+
+- Legacy student setup applies the School Profile cutoff to the selected billing start and shows the resulting monthly fee period. Historical class placement stays independent. Migration 29 corrects the earlier placement-based rule in migration 28 without rewriting existing charges.
+
+- Correct the placement cutoff change with migration 29: use the selected billing start for the cutoff, preserve historical class placement independently, and use the billing date for opening one-time fees. Existing student charges are unchanged.
+
+- Align individual/family bill and receipt headers: show the school name followed by the address and campus on one line, widen detail labels slightly, and reduce document-title font to avoid wrapping. Preserve available campus names in grouped documents; mixed-campus families use an explicit summary. Financial amounts and records are unchanged.

@@ -4,11 +4,19 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Students.Admissions;
 
 /// <summary>Review one pending student's placement and opening bill before atomic activation.</summary>
+/// <remarks>
+/// Decision confirmed on 20 October 2026: placement start records when the student joined
+/// this class. Billing start is chosen independently to bring legacy students into billing
+/// one at a time. For both legacy and new students, apply the School Profile cutoff to the
+/// billing start date, never the placement start. With cutoff 16, an April placement and
+/// a 20 October billing start produce November monthly fees. Admission and selected
+/// one-time fees use the chosen billing date. See migration 29 for activation enforcement.
+/// </remarks>
 internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
 {
     private readonly int admission;
     private int enrollment;
-    private readonly LookupBox year = new();
+    private readonly LookupBox year = new() { Enabled = false };
     private readonly ModernComboBox admissionFeeHandling = HumanUi.Combo();
     private bool AdmissionFeeAlreadyPaid => admissionFeeHandling.SelectedIndex == 0;
     private readonly PlacementPicker placement = new();
@@ -72,7 +80,8 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
         year.SelectedIndexChanged += (_, _) => Reset();
         admissionFeeHandling.SelectedIndexChanged += (_, _) => { ApplyAdmissionFeeChoice(); Reset(); };
         placement.SelectedIndexChanged += (_, _) => { if (!loading) { feeRows.Clear(); Reset(); impact.Text = "Placement changed. Load Class Fees and review the amounts before activation."; } };
-        start.ValueChanged += (_, _) => Reset(); billing.ValueChanged += (_, _) => Reset();
+        start.ValueChanged += (_, _) => Reset();
+        billing.ValueChanged += (_, _) => Reset();
         fees.CellValueChanged += (_, _) => Reset();
         fees.CurrentCellDirtyStateChanged += (_, _) => { if (fees.IsCurrentCellDirty) fees.CommitEdit(DataGridViewDataErrorContexts.Commit); };
         fees.DataError += (_, e) => { e.ThrowException = false; Reset(); impact.Text = "Enter valid whole-rupee amounts and discounts."; };
@@ -110,7 +119,7 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
             }
             else
             {
-                var currentYear = years.AsEnumerable().FirstOrDefault(r => Convert.ToDateTime(r["StartDate"]) <= DateTime.Today && Convert.ToDateTime(r["EndDate"]) >= DateTime.Today);
+                var currentYear = years.AsEnumerable().FirstOrDefault(r => Convert.ToBoolean(r["IsCurrent"]));
                 year.SelectedValue = currentYear?["AcademicYearId"] ?? 0;
             }
             loading = false;
@@ -180,8 +189,12 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
         if (busy) return; Reset(); SetBusy(true);
         try
         {
+            // Keep the chosen billing date unchanged; SQL derives its monthly fee period.
+            // Preview and activation must use this same date, independently of class history.
+            var policy = await DatabaseHelper.QuerySqlAsync("SELECT dbo.GetMonthlyBillingStartDate(@Date) MonthlyStart;", DatabaseHelper.Date("@Date", billing.Value.Date));
+            var monthlyStart = Convert.ToDateTime(policy.Rows[0]["MonthlyStart"]);
             var row = (await RunAsync()).Rows[0]; snapshot = Convert.ToString(row["Snapshot"]);
-            impact.Text = $"{studentName.Text} · {year.Text}\r\n{placement.Text}\r\nActive from {start.Value:dd MMM yyyy}; billing from {billing.Value:dd MMM yyyy}.\r\nAdmission fee: {(AdmissionFeeAlreadyPaid ? "already paid before system — acknowledgement only, no charge or receipt" : "charge now")}.\r\nOpening charges: {row["ChargeCount"]} · Rs {Convert.ToDecimal(row["OpeningTotal"]):N0}.\r\nOnly this student will be activated. Existing unbilled fee assignments will be replaced by the reviewed selection. No earlier monthly charges are generated.\r\nConfirm with Confirm & Activate.";
+            impact.Text = $"{studentName.Text} · {year.Text}\r\n{placement.Text}\r\nIn this class from {start.Value:dd MMM yyyy}.\r\nBilling starts from {billing.Value:dd MMM yyyy}; monthly fees from {monthlyStart:MMMM yyyy} after applying the school cutoff.\r\nAdmission and selected one-time fees use the billing start date.\r\nAdmission fee: {(AdmissionFeeAlreadyPaid ? "already paid before system — acknowledgement only, no charge or receipt" : "charge now")}.\r\nOpening charges: {row["ChargeCount"]} · Rs {Convert.ToDecimal(row["OpeningTotal"]):N0}.\r\nOnly this student will be activated. Existing unbilled fee assignments will be replaced by the reviewed selection. No earlier monthly charges are generated.\r\nConfirm with Confirm & Activate.";
         }
         catch (Exception ex) { snapshot = null; impact.Text = DbMessage.UserMessage(ex); }
         finally { SetBusy(false); }

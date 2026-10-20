@@ -18,11 +18,21 @@ internal static partial class Program
             Check(definition.Descendants(ns+"DataSet").Single().Attribute("Name")!.Value==dataSet
                 && dataSet==Path.GetFileNameWithoutExtension(template)+"Data","Each C# report binds the matching RDLC dataset");
         }
-        var school=new InstitutionProfile.PrintIdentity("Fictional Meadow School","0300-1234567","Synthetic School Road");
+        var school=new InstitutionProfile.PrintIdentity("Fahim Model School & College","0300-1234567","Sarband Peshawar");
         string folder=Path.GetFullPath("artifacts/fee-documents");Directory.CreateDirectory(folder);
         int Render(string name,DataTable data,string? templateName=null,bool annual=false)
         {
             bool bill=Convert.ToString(data.Rows[0]["DocumentKind"])=="Bill";
+            // Match StudentReceiptReport.Show: group months before sizing or rendering.
+            using var individualRows=!bill&&!data.Columns.Contains("FamilyRowKind")?data.Copy():null;
+            if(individualRows is not null)
+            {
+                FeeDocumentData.GroupPeriods(individualRows);
+                data=individualRows;
+                Check(data.AsEnumerable().Where(row=>!string.IsNullOrWhiteSpace(row.Field<string>("FeePeriod")))
+                    .GroupBy(row=>(row.Field<int>("ReceiptPageKey"),row.Field<string>("FeePeriod"))).All(group=>group.Count()==1),
+                    "Individual receipt samples print each month once per receipt, as the application preview does");
+            }
             using var familyRows=!bill&&data.Columns.Contains("FamilyRowKind")?FamilyReceiptReport.PrepareData(data):null;
             if(familyRows is not null)data=familyRows;
             using var billRows=bill&&data.Columns.Contains("FamilyRowKind")?FamilyBillReport.PrepareData(data):null;
@@ -34,6 +44,12 @@ internal static partial class Program
             Check(File.Exists(path),"Each document loads its own RDLC file");
             string definition=annual?FeeDocumentLayout.SizeToContent(path,data,annualSheet:true):FeeDocumentLayout.SizeToContent(path,data);
             var xml=XDocument.Parse(definition);XNamespace ns=xml.Root!.Name.Namespace;
+            var address = xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="SchoolAddress");
+            Check(address.Descendants(ns+"Value").First().Value.Contains("Fields!CampusName.Value")
+                && !xml.Descendants(ns+"Textbox").Any(box=>(string?)box.Attribute("Name")=="CampusHeading"),
+                "School address and campus share one header line");
+            Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="ReceiptHeading")
+                .Descendants(ns+"FontSize").All(size=>size.Value=="6.25pt"),"The complete document title uses the smaller font");
             Check(xml.Descendants(ns+"TablixMember").Where(member=>member.Element(ns+"Group")?.Attribute("Name")?.Value=="ReceiptPageGroup").Count()==1,"One document group is retained");
             // The operator's finalized individual receipt is the visual reference:
             // shaded header with a top rule, and borderless fee rows.
@@ -117,8 +133,8 @@ internal static partial class Program
         for(int month=11;month<=13;month++)
         {
             var date=new DateTime(2026,11,1).AddMonths(month-11);
-            lines.Rows.Add(1,"Tuition","Class 1","A","Main Campus",date,400m,0m,400m);
-            lines.Rows.Add(1,"Transport","Class 1","A","Main Campus",date,2500m,0m,2500m);
+            lines.Rows.Add(1,"Tuition","Class 1","A","Campus Boys",date,400m,0m,400m);
+            lines.Rows.Add(1,"Transport","Class 1","A","Campus Boys",date,2500m,0m,2500m);
         }
         using(var credit=FeeReceiptDocuments.BuildData(school,h,students,lines))
         {
@@ -135,11 +151,16 @@ internal static partial class Program
         lines.Rows[1]["Cash"]=1000m;lines.Rows[1]["Credit"]=1500m;
         using(var mixed=FeeReceiptDocuments.BuildData(school,h,students,lines))Check(Render("individual-mixed-receipt",mixed)==1,"Mixed receipt uses the same layout");
         students.Rows.Add(2,"1002","Sara Example","Example Parent",300m,100m,600m);
-        lines.Rows.Add(2,"Tuition","Class 2","B","Main Campus",new DateTime(2026,11,1),1000m,300m,100m);
+        lines.Rows.Add(2,"Tuition","Class 2","B","Campus Boys",new DateTime(2026,11,1),1000m,300m,100m);
         h["CashReceived"]=1300m;h["CashApplied"]=1300m;h["CreditApplied"]=7800m;h["BalanceRemaining"]=600m;
         h["ReceiptNumber"]="FR-2026-00001";
         using(var family=FeeReceiptDocuments.BuildData(school,h,students,lines))
         {
+            Check(family.AsEnumerable().All(row=>row.Field<string>("CampusName")=="Campus Boys"),
+                "A family receipt retains the common campus in its header");
+            using var mixedCampuses=lines.Copy();mixedCampuses.Rows[^1]["CampusName"]="Campus Girls";
+            Check(FeeDocumentData.CampusHeading(mixedCampuses)=="Multiple campuses",
+                "A family spanning campuses does not claim one child's campus for everyone");
             Check(family.AsEnumerable().Select(row=>row.Field<int>("ReceiptPageKey")).Distinct().Single()==1,"All children share one family document key");
             Check(family.AsEnumerable().Select(row=>row.Field<int>("ReceiptStudentKey")).Distinct().Count()==2,"Family receipt identifies both children");
             using(var displayed=FamilyReceiptReport.PrepareData(family))
@@ -158,12 +179,14 @@ internal static partial class Program
             Check(Render("legacy-family-receipt",legacyFamily)==1,"Legacy family receipts use the same combined RDLC layout");
         }
         using var charges=new DataTable();foreach(string name in new[]{"Reference","StudentName","FeeTypeName"})charges.Columns.Add(name);
-        charges.Columns.Add("BillingMonth",typeof(DateTime));charges.Columns.Add("DiscountAmount",typeof(decimal));charges.Columns.Add("Due",typeof(decimal));
+        charges.Columns.Add("BillingMonth",typeof(DateTime));charges.Columns.Add("DiscountAmount",typeof(decimal));charges.Columns.Add("Due",typeof(decimal));charges.Columns.Add("CampusName").DefaultValue="Campus Boys";
         charges.Rows.Add("1001","Ali Example","Tuition",new DateTime(2026,11,1),0m,400m);
         charges.Rows.Add("1001","Ali Example","Transport",new DateTime(2026,11,1),0m,600m);
         charges.Rows.Add("1001","Ali Example","Tuition",new DateTime(2026,12,1),0m,400m);
         using(var bill=FeeBillDataBuilder.BuildGrouped(school.Name,school.ContactNumber,school.Address,"Example Parent",charges))
         {
+            Check(bill.AsEnumerable().All(row=>row.Field<string>("CampusName")=="Campus Boys"),
+                "Grouped bills retain the campus supplied by the posted charge placement");
             using var original=StudentBillReport.FromGroupedData(bill);
             string snapshot=FeeBillDocuments.Snapshot(original);
             using var restored=FeeBillDocuments.ReadSnapshot(snapshot);

@@ -7,6 +7,7 @@
 - [Installation](INSTALLATION.md), [manual SQL migrations](../Migrations/README.md), and [backup / recovery](BACKUP_RECOVERY.md)
 - [Help & FAQ Center](HELP_CENTER.md)
 - [Family counter billing](FAMILY_COUNTER_BILLING.md)
+- [Quick counter implementation and verification, 20 October 2026](QUICK_COUNTER_VERIFICATION_2026-10-20.md)
 - [Communication Center](COMMUNICATION_CENTER.md)
 - [Admission workflow decisions](Workflows/ADMISSION_WORKFLOW.md)
 

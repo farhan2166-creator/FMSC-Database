@@ -153,7 +153,7 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
     private void ShowFamilyPicker(bool visible){
         familyField.Visible=visible;
         registrationContent.RowStyles[0].Height=visible?AppMetrics.FieldRowHeight:0;
-        root.RowStyles[0].Height=AppMetrics.FieldCardHeight(4)+(visible?AppMetrics.FieldRowHeight:0);
+        root.RowStyles[0].Height=AppMetrics.FieldCardHeight(workspaceHosted?2:4)+(visible?AppMetrics.FieldRowHeight:0);
         linkFamily.Text=visible?"Hide Parent Search":"Link Existing Parent";
     }
     private void ToggleFamilySearch()
@@ -325,7 +325,7 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
     private void PendingEditChanged(){if(applyingRegistration)return;UpdateActions();if(!busy&&!recoveryBlocked&&HasPendingChanges)SetStatus("Save changes before printing, collecting payment or changing the parent link.");}
     private void UpdateActions(){save.Enabled=ReadyToSave&&QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&savedStudent>0&&CurrentUser.HasPermission("Students.Administer");newFamily.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh;bill.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.Collect");
         checkSave.Visible=recoveryBlocked;checkSave.Enabled=recoveryBlocked&&!IsBusy;
-        reload.Visible=savedStudent>0;reload.Enabled=!IsBusy&&!recoveryBlocked&&savedStudent>0;
+        reload.Visible=savedStudent>0 && (!workspaceHosted || needsRefresh);reload.Enabled=!IsBusy&&!recoveryBlocked&&savedStudent>0;
         bool editing=!busy&&!loadingFamily&&!recoveryBlocked&&!needsRefresh&&(savedStudent==0||savedStatus=="Pending"&&CurrentUser.HasPermission("Students.Administer"));year.Enabled=placement.Enabled=joining.Enabled=editing&&savedStudent==0;
         bool canLink=!IsBusy&&!recoveryBlocked&&!needsRefresh&&!HasPendingChanges&&(savedStudent==0||savedStatus is "Pending" or "Active")&&CurrentUser.HasPermission("Students.Administer");
         family.Enabled=linkFamily.Enabled=canLink;
@@ -353,6 +353,11 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
             bool paid=Convert.ToBoolean(data.Row["HasPayments"]);
             row.Cells["Discount"].ReadOnly=!editing||paid||!CurrentUser.HasPermission("Fees.Adjust")||(savedStudent>0&&Convert.ToString(data.Row["ConcessionLabel"])!="None")||Convert.ToString(data.Row["Frequency"])!="Monthly"&&savedStudent>0||Convert.ToString(data.Row["ConcessionLabel"]) is "Free" or "Waived";
             row.Cells["Discount"].ToolTipText=paid?"This fee has a payment. Use Fee Corrections to adjust it.":savedStudent>0?"Future monthly discounts use Fee Discount in Admission / Review. Existing bills are adjusted in Fee Collection.":"Use the selected start for monthly concessions.";
+        }
+        if(recoveryOnly)
+        {
+            foreach(var button in new[]{save,next,bill,collect,newFamily,linkFamily,unlinkFamily,reload})button.Visible=false;
+            registrationContent.Enabled=fees.Enabled=monthlyConcessionsFromAdmission.Enabled=addFee.Enabled=false;
         }
         WorkspaceChanged?.Invoke(this,EventArgs.Empty);
     }
@@ -449,6 +454,7 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
             QuickRegistrationWriter.PayloadHash(actor,placement.SelectedId,expectedQuote,parameters),
             $"{name.Text.Trim()} · Parent: {parent.Text.Trim()} · {joining.Value:dd MMM yyyy}");
         pendingSave=journal.Intent;recoveryBlocked=true;UpdateActions();
+        if(workspaceHosted)workspaceSaveRequest=journal.Intent.Id;
         SavedQuickRegistration? saved=null;
         try{saved=await QuickRegistrationWriter.SaveNewAsync(journal.Intent,placement.SelectedId,expectedQuote,parameters);}
         catch(QuickRegistrationOutcomeUnknownException ex){AppExceptionHandler.LogNonFatal(ex,"Unconfirmed Quick Registration save");}
@@ -469,6 +475,20 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
     private async Task CheckSaveOutcomeAsync(bool afterSave=false)
     {
         if(IsBusy&&!afterSave)return;
+        if(workspaceHosted)
+        {
+            try
+            {
+                var pending=QuickRegistrationRecoveryJournal.ReadPending()??pendingSave;
+                if(pending is not null && pending.Id!=workspaceSaveRequest)
+                {
+                    if(WorkspaceRecoveryRequested is not null)await WorkspaceRecoveryRequested();
+                    else Warn("Use Check Previous Save in the family workspace. This child's identity has been retained.");
+                    return;
+                }
+            }
+            catch(Exception ex){Fail(ex);return;}
+        }
         bool wasBusy=busy;busy=true;UpdateActions();int version=registrationLoadVersion;
         try
         {
