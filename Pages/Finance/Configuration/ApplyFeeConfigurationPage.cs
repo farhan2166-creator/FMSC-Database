@@ -55,6 +55,9 @@ public sealed class ApplyFeeConfigurationPage : V2Page
             if (applyButton.Enabled && !applying) await ApplyAsync();
         }, "Warning");
         applyButton.Enabled = false;
+        FinanceHelp.Attach(this,effectiveFrom,FinanceHelp.Topic.ApplyRates);
+        FinanceHelp.Attach(this,previewButton,FinanceHelp.Topic.Review);
+        FinanceHelp.Attach(this,applyButton,FinanceHelp.Topic.ApplyRates);
         AddAction("Correct Existing Bills", (_, _) => {
             if (!TryGetScope(out int campusId, out int classId, out int feeTypeId)) return;
             using var dialog = new FeeRateCorrectionDialog(campusId, classId, feeTypeId,

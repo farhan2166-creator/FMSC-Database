@@ -39,6 +39,8 @@ public sealed class BillingStatusPage : V2Page, IBusyPage
         }, "Primary");
         openStudent = AddAction("Open Student Setup", (_, _) => OpenStudent(false), "Secondary");
         collect = AddAction("Open Fee Collection", (_, _) => OpenStudent(true), "Secondary");
+        FinanceHelp.Attach(this,run,FinanceHelp.Topic.PostFees);
+        FinanceHelp.Attach(this,collect,FinanceHelp.Topic.ReceiveMoney);
         Grid.SelectionChanged += (_, _) => UpdateActions();
         Grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) OpenStudent(false); };
         RelocateFromActions(refresh, run, openStudent, collect);

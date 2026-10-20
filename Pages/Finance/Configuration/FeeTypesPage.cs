@@ -27,7 +27,7 @@ public sealed class FeeTypesPage : MasterPage
                     Required: true),
                 new FieldSpec(
                     "DefaultFrequency",
-                    "Default Frequency",
+                    "How often it is charged",
                     FieldKind.ComboString,
                     Required: true,
                     Options: Frequencies),

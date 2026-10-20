@@ -11,6 +11,7 @@ internal sealed class IssuedBillPicker : ApplicationWindowForm
     internal IssuedBillPicker(DataTable issuedBills,string fee)
     {
         Text=$"Posted Charges — {fee}";StartPosition=FormStartPosition.CenterParent;
+        FinanceHelp.Attach(this,review,FinanceHelp.Topic.ExistingBills);
         // Display a recognizable reference without issuing or changing database numbers.
         issuedBills = issuedBills.Copy();
         if (issuedBills.Columns.Contains("Charge Ref"))
@@ -38,6 +39,6 @@ internal sealed class IssuedBillPicker : ApplicationWindowForm
         var root=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(12)};
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.Controls.Add(note,0,0);root.Controls.Add(grid,0,1);root.Controls.Add(HumanUi.ButtonRow(review,close),0,2);Controls.Add(root);
-        UiHelper.SetGridEmptyMessage(grid,"No non-reversed issued bills exist for this fee assignment.");
+        UiHelper.SetGridEmptyMessage(grid,"No existing charges are available to review for this fee plan.");
     }
 }

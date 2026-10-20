@@ -196,6 +196,9 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         BuildLayout();
+        FinanceHelp.Attach(this,grid,FinanceHelp.Topic.FeeRate);
+        FinanceHelp.Attach(this,saveButton,"Save these class fee settings. This does not receive payments; applying settings to students is a separate reviewed step.","Save a class tuition rate of Rs. 500, then choose when to apply that rate to student fee plans.");
+        FinanceHelp.Attach(this,applyStudentsButton,FinanceHelp.Topic.ApplyRates);
 #if FMSC_LEVEL2
         grid.AccessibleName = "Class fee rate matrix";
 #endif

@@ -61,6 +61,9 @@ internal sealed class PendingStudentFeesDialog : ApplicationWindowForm
         root.Controls.Add(grid,0,3); root.Controls.Add(status,0,4);
         var actions=HumanUi.ButtonRow(refresh,post,close); actions.Dock=DockStyle.Fill; root.Controls.Add(actions,0,5);
         Controls.Add(root);
+        FinanceHelp.Attach(this,month,FinanceHelp.Topic.Period);
+        FinanceHelp.Attach(this,post,FinanceHelp.Topic.PostFees);
+        FinanceHelp.Attach(this,grid,FinanceHelp.Topic.PostFees);
         month.SelectedIndexChanged+=async(_,_)=> { if(!busy) await LoadMonthAsync(); };
         refresh.Click+=async(_,_)=>await LoadMonthsAsync();
         historicalReason.TextChanged+=(_,_)=>UpdateTotal();

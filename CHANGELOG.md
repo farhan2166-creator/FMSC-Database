@@ -157,3 +157,7 @@ For the original fixes, implementation passes, schema verification and historica
 - Align individual/family bill and receipt headers: show the school name followed by the address and campus on one line, widen detail labels slightly, and reduce document-title font to avoid wrapping. Preserve available campus names in grouped documents; mixed-campus families use an explicit summary. Financial amounts and records are unchanged.
 
 - Rename the payment Correction action to Reduce Recorded Payment. Explain that the entered amount is the amount to retain and show the resulting increase in outstanding dues in the confirmation and success message. Preserve transaction codes, calculations and recovery behavior.
+
+- Clarify the leaving-fee review: show each charge's reversal restriction, explain that kept dues remain payable and reversal decisions save with the certificate, name the Fee Collection destination, and count or disable the view-only settled/zero-amount history checkbox. Preserve financial eligibility and invalidate a reviewed decision when its placement changes.
+
+- Simplify financial screen wording and add practical rupee-example tooltips across collection, student advance balances, payment adjustments, fee/discount changes, posting, rate setup, transfers, readmission, leaving and reports. Explain new money versus existing advance, amounts to keep as paid, fee cancellation versus payment reversal, and excess paid money. Preserve financial calculations, permissions and transaction codes.

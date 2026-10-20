@@ -61,6 +61,12 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         BackColor = AppTheme.Surface;
         Font = AppTheme.NormalFont;
         BuildLayout();
+        FinanceHelp.Attach(this,addButton,FinanceHelp.Topic.FeeAgreement);
+        FinanceHelp.Attach(this,reviewButton,FinanceHelp.Topic.PostFees);
+        FinanceHelp.Attach(this,discountButton,FinanceHelp.Topic.FeeAgreement);
+        FinanceHelp.Attach(this,issuedBillButton,FinanceHelp.Topic.ExistingBills);
+        FinanceHelp.Attach(this,discontinueButton,FinanceHelp.Topic.StopFee);
+        FinanceHelp.Attach(this,startTransportButton,"Start or restart the student's transport fee plan using its reviewed dates.","A transport rate of Rs. 500 adds fees under the transport start rules. Payment is recorded separately.");
         reviewButton.Click += async (_, _) => await ReviewPendingFeesAsync();
         grid.SelectionChanged += (_, _) => UpdateButtonStates();
         addButton.Click += (_, _) => AddFee();

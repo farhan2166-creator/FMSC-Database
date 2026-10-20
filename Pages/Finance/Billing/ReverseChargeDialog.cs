@@ -6,8 +6,8 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
     private readonly long billingChargeId;
     private readonly ModernTextBox reason = HumanUi.TextBox(true, 500);
     private readonly ModernButton reverseButton = new() {
-        Text = "Reverse Charge",
-        Width = AppScale.Scale(140),
+        Text = "Cancel Unpaid Charge",
+        Width = AppScale.Scale(190),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Danger"
     };
@@ -35,7 +35,7 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
         string studentDisplay)
     {
         this.billingChargeId = billingChargeId;
-        Text = "Reverse Charge";
+        Text = "Cancel Unpaid Charge";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -91,7 +91,8 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
                 "The charge is marked Cancelled. It leaves the bill, the outstanding balance and the "
                 + "reports, and stays visible as history - nothing is deleted.\r\n\r\n"
                 + "Once a payment has been allocated to this charge the reversal is refused, because the "
-                + "money has to be dealt with first: use Correction, Refund or Reversal on Student Fees."
+                + "charge has payment history. Review the bill and payment separately; reducing or refunding "
+                + "a payment does not erase that history."
         };
         var fields = new TableLayoutPanel {
             Dock = DockStyle.Fill,
@@ -121,6 +122,8 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
         Controls.Add(root);
         AcceptButton = reverseButton;
         CancelButton = cancel;
+        FinanceHelp.Attach(this,reverseButton,FinanceHelp.Topic.CancelCharge);
+        FinanceHelp.Attach(this,reason,FinanceHelp.Topic.CancelCharge);
         Disposed += (_, _) => validator.Dispose();
     }
     private async Task SaveAsync()

@@ -27,6 +27,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         ? "Correction" : operation.SelectedItem as string ?? string.Empty;
     private static string OperationLabel(string code) => code == "Correction" ? "Reduce Recorded Payment" : code;
     private readonly ModernTextBox actionAmount = new();
+    private Label? actionAmountLabel;
     private readonly ModernTextBox reason = new();
     /* Built from the shared HumanUi.Grid and styled with HumanUi.ApplyGridStyle once its columns exist (ConfigurePaymentsGrid). */
     private readonly DataGridView payments = HumanUi.Grid(false);
@@ -135,7 +136,9 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         for(int i=0;i<4;i++) fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));
         fields.Controls.Add(HumanUi.Field("Transaction Date",transactionDate),0,0);
         fields.Controls.Add(HumanUi.Field("Operation",operation),1,0);
-        fields.Controls.Add(HumanUi.Field("Amount",actionAmount),2,0);
+        var amountField=HumanUi.Field("Amount",actionAmount);
+        actionAmountLabel=amountField.Controls.OfType<Label>().Single();
+        fields.Controls.Add(amountField,2,0);
         fields.Controls.Add(HumanUi.Field("Reason",reason,true),3,0);
         var adjustmentFields=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty };
         adjustmentFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
@@ -366,6 +369,8 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         bool available=state?.Actions.Contains(SelectedOperation)==true;
         actionAmount.Enabled=reason.Enabled=transactionDate.Enabled=available;
         bool reversal = SelectedOperation == "Reversal";
+        if(actionAmountLabel is not null)actionAmountLabel.Text=SelectedOperation switch
+        {"Correction"=>"Amount to keep as paid","Refund"=>"Amount to refund","Reversal"=>"Whole payment to undo",_=>"Amount"};
         actionAmount.ReadOnly = reversal;
         if (reversal)
             actionAmount.Text = selectedPaymentAmount.ToString("0.##");
@@ -383,6 +388,10 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         };
         eligibilityNote.Text=state is null ? "Select a recorded payment." : available
             ? $"Remaining collected: Rs. {state.Remaining:0.##}. {hint} {state.Explanation}" : state.Explanation;
+        var help=SelectedOperation switch {"Refund"=>FinanceHelp.Topic.RefundPayment,"Reversal"=>FinanceHelp.Topic.ReversePayment,_=>FinanceHelp.Topic.ReducePayment};
+        FinanceHelp.Attach(this,operation,help);
+        FinanceHelp.Attach(this,actionAmount,help);
+        FinanceHelp.Attach(this,executeButton,help);
         ApplyActionAvailability();
     }
     /// <summary>The two preconditions ExecuteAsync checks at the top of its handler before it will do anything: a student must have been loaded (admissionId) and one recorded payment must be selected (selectedPaymentId).</summary>

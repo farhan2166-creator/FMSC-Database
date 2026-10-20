@@ -62,6 +62,10 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         if (initialize) Defer(BindLookupsAsync);
         // The entries carry a count, so the open list is wider than the field.
         monthBox.DropDownWidth = AppScale.Scale(320);
+        FinanceHelp.Attach(this,monthBox,FinanceHelp.Topic.Period);
+        FinanceHelp.Attach(this,throughMonth,FinanceHelp.Topic.Period);
+        FinanceHelp.Attach(this,loadPreview,FinanceHelp.Topic.Review);
+        FinanceHelp.Attach(this,postButton,FinanceHelp.Topic.PostFees);
         var filters = ReportUi.Bar(4,
             ("Academic year", academicYear),
             ("From month", monthBox),

@@ -311,6 +311,8 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         BuildLayout(feeTypeName);
+        FinanceHelp.Attach(this,effectiveTo,FinanceHelp.Topic.StopFee);
+        FinanceHelp.Attach(this,discontinueButton,FinanceHelp.Topic.StopFee);
         initialEffectiveTo = discontinueButton.Enabled ? SelectedStopMonth : DateTime.MinValue;
         initialReason = reason.Text;
         UpdateEffectiveConsequence();
