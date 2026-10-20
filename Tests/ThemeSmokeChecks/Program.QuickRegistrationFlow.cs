@@ -53,40 +53,21 @@ internal static partial class Program
         {
             FMSC_SMS.Pages.Security.CurrentUser.SignIn(8881,"Fixture","Administrator",false,Array.Empty<string>());
             const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
-            var type=typeof(FMSC_SMS.Pages.Students.Admissions.QuickRegistrationPage);
-            using var page=new FMSC_SMS.Pages.Students.Admissions.QuickRegistrationPage((_,_,_)=>{},0,false);
-            var tabs=(TabControl)type.GetField("tabs",flags)!.GetValue(page)!;
-            var form=(Control)type.GetField("form",flags)!.GetValue(page)!;var formType=form.GetType();
-            TabControlCancelEventArgs Attempt(int target=1)
+            using var page=new FMSC_SMS.Pages.Students.Admissions.FamilyAdmissionWorkspace((_,_,_)=>{},_=>Task.FromResult(new DataTable()),false);
+            var type=page.GetType();
+            foreach(string operation in new[]{"busy","processing"})
             {
-                var args=new TabControlCancelEventArgs(tabs.TabPages[target],target,false,TabControlAction.Selecting);
-                typeof(TabControl).GetMethod("OnSelecting",flags)!.Invoke(tabs,new object[]{args});return args;
+                type.GetField(operation,flags)!.SetValue(page,true);
+                Check(page.IsBusy,"Family workspace holds navigation while loading or preparing children");
+                type.GetField(operation,flags)!.SetValue(page,false);
             }
-            foreach(int student in new[]{0,41})
-            {
-                formType.GetField("savedStudent",flags)!.SetValue(form,student);
-                formType.GetField("busy",flags)!.SetValue(form,true);
-                Check(page.IsBusy&&Attempt().Cancel&&tabs.SelectedIndex==0,"New and saved registration write states refuse internal tab selection without moving context");
-                formType.GetField("busy",flags)!.SetValue(form,false);
-                Check(!Attempt().Cancel,"A settled registration operation permits tab navigation again");
-            }
-            foreach(string loading in new[]{"loadingFees","loadingFamily"})
-            {
-                formType.GetField(loading,flags)!.SetValue(form,true);Check(Attempt().Cancel,"Fee/family reads retain their tab context until settled");formType.GetField(loading,flags)!.SetValue(form,false);
-            }
-            formType.GetField("recoveryBlocked",flags)!.SetValue(form,true);
-            Check(!page.IsBusy&&page.HasUnsavedChanges&&Attempt().Cancel,"Unknown save outcomes block sibling workflows while remaining a retained recovery draft for dashboard leave");
-            Check(!Attempt(0).Cancel,"An unresolved record still permits returning to Registration Form to check its exact outcome");
-            formType.GetField("recoveryBlocked",flags)!.SetValue(form,false);
-            using var child=new ReturnBusyFixture();tabs.TabPages[1].Controls.Add(child);child.Active=true;
-            Check(page.IsBusy&&Attempt().Cancel,"The registration host aggregates busy contracts from every loaded child");child.Active=false;
-            Check(!Attempt().Cancel&&!page.IsHandleCreated&&!form.IsHandleCreated,"Clean tab decisions require no SQL, profile recovery files or native page handle");
+            type.GetField("recoveryPending",flags)!.SetValue(page,true);
+            type.GetMethod("UpdateWorkspace",flags)!.Invoke(page,null);
+            Check(!((ModernButton)type.GetField("process",flags)!.GetValue(page)!).Enabled &&
+                !((ModernButton)type.GetField("collect",flags)!.GetValue(page)!).Enabled,
+                "A previous save blocks new processing and payment until its separate recovery is checked");
+            Check(!page.IsBusy&&!page.IsHandleCreated,"Recovery remains reviewable without claiming a write is in progress");
         }
         finally{FMSC_SMS.Pages.Security.CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Permissions);}
     }
-    private sealed class ReturnBusyFixture:UserControl,IBusyPage
-    {
-        internal bool Active;public bool IsBusy=>Active;public string BusyMessage=>"Wait for the pending registration operation.";
-    }
-
 }

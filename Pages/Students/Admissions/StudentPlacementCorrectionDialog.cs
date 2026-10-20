@@ -5,7 +5,7 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 /// <summary>One reviewed correction path for current and verified legacy placement.</summary>
 internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
 {
-    private readonly LookupBox record = new(), year = new();
+    private readonly LookupBox record = new(), year = new() { Enabled = false };
     private readonly PlacementPicker placement = new();
     private readonly ModernComboBox status = new();
     private readonly ModernDatePicker start = HumanUi.Date(), leave = HumanUi.Date(), billing = HumanUi.Date();
@@ -18,6 +18,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         close = new() { Text = "Close", DialogResult = DialogResult.Cancel };
     private readonly TableLayoutPanel fields;
     private readonly int admission;
+    private int currentAcademicYear;
     private DataTable enrollments = new();
     private DataRow? plan;
     private bool busy, loading;
@@ -112,6 +113,8 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             legacySetupPending = student.Rows.Count > 0 && Convert.ToBoolean(student.Rows[0]["LegacySetupPending"]);
             enrollments = await DatabaseHelper.QueryUserAsync("GetStudentEnrollmentsForLifecycle", DatabaseHelper.Int("@AdmissionId", admission));
             var years = await DatabaseHelper.QueryUserAsync("GetAcademicYears");
+            currentAcademicYear = years.AsEnumerable().FirstOrDefault(r => Convert.ToBoolean(r["IsCurrent"])) is DataRow currentYear
+                ? Convert.ToInt32(currentYear["AcademicYearId"]) : 0;
             var placements = await DatabaseHelper.QueryUserAsync("GetClassSections", DatabaseHelper.Int("@CampusId", 0), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0));
             year.Bind(years, "AcademicYearId", "YearName"); placement.Bind(placements);
             var choices = new DataTable(); choices.Columns.Add("Id", typeof(int)); choices.Columns.Add("Display");
@@ -132,7 +135,8 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         if (loading) return;
         loading = true;
         var current = SelectedRecord();
-        year.SelectedValue = current?["AcademicYearId"] ?? 0; placement.SelectedValue = current?["ClassSectionId"] ?? 0;
+        // Existing history keeps its recorded year; a new placement uses the configured current year.
+        year.SelectedValue = current?["AcademicYearId"] ?? currentAcademicYear; placement.SelectedValue = current?["ClassSectionId"] ?? 0;
         status.SelectedItem = current?["Status"] ?? "Active";
         start.Value = current is null ? DateTime.Today : Convert.ToDateTime(current["EnrollmentDate"]);
         leave.Checked = current?["LeavingDate"] is DateTime;

@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--placement-cutoff"))
+        {
+            CheckPlacementCutoff();
+            Console.WriteLine($"PASS: {checks} placement cutoff and billing-date control checks (no database connection).");
+            return;
+        }
         if(args.Contains("--family-admission-workspace"))
         {
             CheckFamilyAdmissionWorkspace();
@@ -164,8 +170,9 @@ internal static partial class Program
         }
         if(args.Contains("--family-counter-sql"))
         {
-            var task=CheckFamilyCounterSqlAsync();
-            PumpUntil(()=>task.IsCompleted,"Owned family-counter SQL scenarios complete",TimeSpan.FromSeconds(90));
+            async Task CounterChecks(){await CheckFamilyCounterSqlAsync();await CheckQuickCounterWorkspaceSqlAsync();}
+            var task=CounterChecks();
+            PumpUntil(()=>task.IsCompleted,"Owned family-counter SQL scenarios complete",TimeSpan.FromMinutes(5));
             task.GetAwaiter().GetResult();
             Console.WriteLine($"PASS: {checks} owned family-counter SQL assertions.");
             return;

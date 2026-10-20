@@ -48,7 +48,10 @@ internal static class FeeDocumentLayout
                     if(hidden.Contains(" Or ") && Regex.Matches(hidden,@"Not First\(Fields!(\w+)\.Value")
                         .Any(match=>!Convert.ToBoolean(record[match.Groups[1].Value]))) continue;
                     var field = Regex.Match(hidden, @"Fields!(\w+)\.Value");
-                    if (field.Success && (hidden.Contains("Len(")
+                    bool combinedLocation = hidden.Contains("Fields!SchoolAddress.Value") && hidden.Contains("Fields!CampusName.Value");
+                    if (combinedLocation && string.IsNullOrWhiteSpace(Convert.ToString(record["SchoolAddress"]))
+                        && string.IsNullOrWhiteSpace(Convert.ToString(record["CampusName"]))) continue;
+                    if (!combinedLocation && field.Success && (hidden.Contains("Len(")
                         ? string.IsNullOrWhiteSpace(Convert.ToString(record[field.Groups[1].Value]))
                         : !Convert.ToBoolean(record[field.Groups[1].Value]))) continue;
                     double rowHeight = Inches(rows[index].Element(ns + "Height")!.Value);
@@ -78,6 +81,11 @@ internal static class FeeDocumentLayout
                             if ((string?)textBox.Attribute("Name") == "ReceiptHeading")
                                 text += " (" + CultureInfo.InvariantCulture.TextInfo.ToTitleCase(Convert.ToString(record["CopyLabel"])!.ToLowerInvariant()) + ")";
                             if ((string?)textBox.Attribute("Name") == "CampusHeading") text = "(" + text + ")";
+                            if ((string?)textBox.Attribute("Name") == "SchoolAddress")
+                            {
+                                string campus = Convert.ToString(record["CampusName"]) ?? "";
+                                text = (text + (string.IsNullOrWhiteSpace(campus) ? "" : " (" + campus + ")")).Trim();
+                            }
                         }
                         float points = float.Parse(textBox.Descendants(ns + "FontSize").First().Value.Replace("pt", ""), CultureInfo.InvariantCulture);
                         bool bold=textBox.Descendants(ns + "FontWeight").Any(weight => weight.Value == "Bold")
