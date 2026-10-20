@@ -5,10 +5,10 @@
         <TablixBody>
           <TablixColumns>
             <TablixColumn>
-              <Width>0.65in</Width>
+              <Width>0.70in</Width>
             </TablixColumn>
             <TablixColumn>
-              <Width>0.75in</Width>
+              <Width>0.70in</Width>
             </TablixColumn>
             <TablixColumn>
               <Width>0.65in</Width>
@@ -32,6 +32,44 @@
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>9.5pt</FontSize>
                                 <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Center</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>3</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+                <TablixCell />
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.10in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="SchoolAddress">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Trim(First(Fields!SchoolAddress.Value, "ReceiptPageGroup") &amp; IIf(Len(First(Fields!CampusName.Value, "ReceiptPageGroup")) = 0, "", " (" &amp; First(Fields!CampusName.Value, "ReceiptPageGroup") &amp; ")"))</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
                               </Style>
                             </TextRun>
                           </TextRuns>
@@ -93,82 +131,6 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.10in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="SchoolAddress">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=First(Fields!SchoolAddress.Value, "ReceiptPageGroup")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>6.5pt</FontSize>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Center</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                    <ColSpan>3</ColSpan>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell />
-                <TablixCell />
-              </TablixCells>
-            </TablixRow>
-            <TablixRow>
-              <Height>0.10in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="CampusHeading">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>="(" &amp; First(Fields!CampusName.Value, "ReceiptPageGroup") &amp; ")"</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>6.5pt</FontSize>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Center</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                    <ColSpan>3</ColSpan>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell />
-                <TablixCell />
-              </TablixCells>
-            </TablixRow>
-            <TablixRow>
               <Height>0.16in</Height>
               <TablixCells>
                 <TablixCell>
@@ -183,7 +145,7 @@
                               <Value>=First(Fields!DocumentTitle.Value, "ReceiptPageGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
+                                <FontSize>6.25pt</FontSize>
                                 <FontWeight>Bold</FontWeight>
                               </Style>
                             </TextRun>
@@ -191,7 +153,7 @@
                               <Value>=" ("</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
+                                <FontSize>6.25pt</FontSize>
                                 <FontWeight>Bold</FontWeight>
                               </Style>
                             </TextRun>
@@ -199,7 +161,7 @@
                               <Value>=Replace(Replace(First(Fields!CopyLabel.Value, "ReceiptPageGroup"), "STUDENT COPY", "Student Copy"), "CUSTOMER COPY", "Customer Copy")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
+                                <FontSize>6.25pt</FontSize>
                                 <FontWeight>Bold</FontWeight>
                               </Style>
                             </TextRun>
@@ -207,7 +169,7 @@
                               <Value>)</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
+                                <FontSize>6.25pt</FontSize>
                                 <FontWeight>Bold</FontWeight>
                               </Style>
                             </TextRun>
@@ -2259,17 +2221,12 @@
                 <TablixMember />
                 <TablixMember>
                   <Visibility>
+                    <Hidden>=Len(First(Fields!SchoolAddress.Value, "ReceiptPageGroup") &amp; First(Fields!CampusName.Value, "ReceiptPageGroup")) = 0</Hidden>
+                  </Visibility>
+                </TablixMember>
+                <TablixMember>
+                  <Visibility>
                     <Hidden>=Len(First(Fields!ContactNumber.Value, "ReceiptPageGroup")) = 0</Hidden>
-                  </Visibility>
-                </TablixMember>
-                <TablixMember>
-                  <Visibility>
-                    <Hidden>=Len(First(Fields!SchoolAddress.Value, "ReceiptPageGroup")) = 0</Hidden>
-                  </Visibility>
-                </TablixMember>
-                <TablixMember>
-                  <Visibility>
-                    <Hidden>=Len(First(Fields!CampusName.Value, "ReceiptPageGroup")) = 0</Hidden>
                   </Visibility>
                 </TablixMember>
                 <TablixMember />

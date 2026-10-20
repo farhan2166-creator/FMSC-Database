@@ -1,5 +1,6 @@
 {
   "objects": [
+    {"schema":"dbo","name":"GetFamilyAdmissionBillWaivers","type":"P "},
     {"schema":"dbo","name":"CollectionReceipts","type":"U "},
     {"schema":"dbo","name":"CollectionReceiptPayments","type":"U "},
     {"schema":"dbo","name":"IssueCollectionReceipt","type":"P "},

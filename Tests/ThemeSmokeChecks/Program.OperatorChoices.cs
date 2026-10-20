@@ -84,7 +84,7 @@ internal static partial class Program
                 var grid=(DataGridView)typeof(IssuedBillPicker).GetField("grid",flags)!.GetValue(picker)!;
                 var reviewBill=(ModernButton)typeof(IssuedBillPicker).GetField("review",flags)!.GetValue(picker)!;
                 Check(grid.Rows.Count==2&&grid.ReadOnly&&!grid.Columns["BillingChargeId"].Visible,"Issued-bill review includes fully settled and unpaid purchases without allowing list edits");
-                grid.CurrentCell=grid.Rows[0].Cells["Charge Ref"];Application.DoEvents();
+                grid.CurrentCell=grid.Rows[0].Cells["Charge #"];Application.DoEvents();
                 CurrentUser.SignIn(7782,"Read-only fixture","Accountant",false,new[]{"Fees.View"});Click(reviewBill);
                 Check(picker.SelectedBillId==0,"Issued-bill selection rechecks adjustment authority before opening the financial review");
                 CurrentUser.SignIn(7781,"Concession fixture","Administrator",false,Array.Empty<string>());Click(reviewBill);

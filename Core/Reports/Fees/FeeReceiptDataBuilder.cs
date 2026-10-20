@@ -13,6 +13,7 @@ internal static partial class FeeReceiptDataBuilder
         decimal settled=Money(header,"CashApplied")+Money(header,"CreditApplied");
         string references=string.Join(", ",students.AsEnumerable().Select(row=>Text(row,"AdmissionNumber")));
         string parent=Text(first,"FatherName");
+        string campusHeading=FeeDocumentData.CampusHeading(lines);
         void Add(string description,string period,decimal amount,string kind,DataRow? detail=null)
         {
             var row=data.Rows.Add(1,institution.Name,family?"FAMILY PAYMENT RECEIPT":"STUDENT PAYMENT RECEIPT","PARENT COPY",
@@ -21,7 +22,7 @@ internal static partial class FeeReceiptDataBuilder
                 Convert.ToDateTime(header["TransactionDate"]).ToString("dd-MMM-yyyy hh:mm tt"),family?$"{students.Rows.Count} students":"",
                 description,amount,Money(header,"DiscountApplied"),settled,Money(header,"BalanceRemaining"),Text(header,"PaymentMethod"),
                 Text(header,"ReceiptStatus"),Money(header,"DiscountApplied")>0,true,institution.ContactNumber,institution.Address,
-                family || detail is null?"":Text(detail,"CampusName"),family?"":parent,period);
+                family?campusHeading:detail is null?"":Text(detail,"CampusName"),family?"":parent,period);
             row["NetPaid"]=settled;row["FeesCovered"]=lines.AsEnumerable().Sum(line=>Money(line,"AmountBefore"));
             row["ShowSettlement"]=true;row["CashReceived"]=Money(header,"CashReceived");row["CreditApplied"]=Money(header,"CreditApplied");
             row["CreditRemaining"]=Money(header,"CreditRemaining");row["CreditRetained"]=Money(header,"CashReceived")-Money(header,"CashApplied");

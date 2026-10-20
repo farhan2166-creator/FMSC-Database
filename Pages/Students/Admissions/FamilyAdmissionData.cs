@@ -36,32 +36,8 @@ internal static class FamilyAdmissionData
         using var members=await FeeBillPreview.ReadMembersAsync(anchor,"Fees.View");
         FamilyBillingData.SelectMembers(members,ids);
         var charges=await FeeBillPreview.ReadChargesAsync(anchor,ids);
-        using var zero=await DatabaseHelper.QuerySqlAsync("""
-            EXEC dbo.RequirePermission @UserId,N'Fees.View';
-            DECLARE @Family int=(SELECT FamilyId FROM dbo.FamilyMembers WHERE AdmissionId=@Anchor);
-            IF EXISTS(SELECT 1 FROM OPENJSON(@Ids) J WHERE CONVERT(int,J.value)<>@Anchor AND NOT EXISTS(
-              SELECT 1 FROM dbo.FamilyMembers FM WHERE FM.AdmissionId=CONVERT(int,J.value) AND FM.FamilyId=@Family))
-              THROW 51000,'The selected family changed. Refresh before printing.',1;
-            SELECT COALESCE(S.AdmissionNumber,S.QuickReference) Reference,S.StudentName,
-              CONCAT(F.FeeTypeName,N' — Waived') FeeTypeName,F.DisplayOrder FeeDisplayOrder,
-              B.BillingMonth,B.DiscountAmount,CONVERT(decimal(12,2),0) Due,B.BillingChargeId,S.AdmissionId
-            FROM dbo.BillingCharges B JOIN dbo.Students S ON S.AdmissionId=B.AdmissionId
-            JOIN dbo.Enrollments E ON E.EnrollmentId=B.EnrollmentId JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
-            WHERE B.AdmissionId IN(SELECT CONVERT(int,[value]) FROM OPENJSON(@Ids))
-              AND E.Status IN(N'Active',N'Pending') AND B.Status<>N'Cancelled' AND B.NetAmount=0 AND B.DiscountAmount>0
-              AND (B.ChargeKind<>N'Monthly' OR B.BillingMonth>=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1))
-            UNION ALL
-            SELECT COALESCE(S.AdmissionNumber,S.QuickReference),S.StudentName,CONCAT(F.FeeTypeName,N' — Waived'),F.DisplayOrder,
-              DATEFROMPARTS(YEAR(E.EnrollmentDate),MONTH(E.EnrollmentDate),1),A.DiscountAmount,
-              CONVERT(decimal(12,2),0),-CONVERT(bigint,A.StudentFeeAssignmentId),S.AdmissionId
-            FROM dbo.StudentFeeAssignments A JOIN dbo.Students S ON S.AdmissionId=A.AdmissionId
-            JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId JOIN dbo.FeeTypes F ON F.FeeTypeId=A.FeeTypeId
-            WHERE A.AdmissionId IN(SELECT CONVERT(int,[value]) FROM OPENJSON(@Ids))
-              AND E.Status IN(N'Active',N'Pending') AND S.LegacySetupPending=0
-              AND (E.Status=N'Pending' OR (E.BillingReady=1 AND E.PlacementConfirmedAt IS NOT NULL))
-              AND A.CancelledAt IS NULL AND A.Frequency<>N'Monthly' AND A.Amount>0 AND A.Amount=A.DiscountAmount
-              AND NOT EXISTS(SELECT 1 FROM dbo.BillingCharges B WHERE B.StudentFeeAssignmentId=A.StudentFeeAssignmentId AND B.Status<>N'Cancelled');
-            """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Anchor",anchor),DatabaseHelper.P("@Ids",System.Text.Json.JsonSerializer.Serialize(ids)));
+        using var zero=await DatabaseHelper.QueryUserAsync("GetFamilyAdmissionBillWaivers",
+            DatabaseHelper.Int("@Anchor",anchor),DatabaseHelper.P("@Ids",System.Text.Json.JsonSerializer.Serialize(ids)));
         var existing=charges.AsEnumerable().Select(r=>Convert.ToInt64(r["BillingChargeId"])).ToHashSet();
         foreach(DataRow row in zero.Rows)if(existing.Add(Convert.ToInt64(row["BillingChargeId"])))charges.ImportRow(row);
         return charges;

@@ -18,12 +18,13 @@ internal static partial class FamilyReceiptReport
         decimal total=Sum("NetPaid");
         bool showBalance=children.All(child=>Convert.ToBoolean(child.First()["ShowBalance"]));
         string references=string.Join(", ",children.Select(child=>Convert.ToString(child.First()["AdmissionNumberText"])));
+        string campusHeading=FeeDocumentData.CampusHeading(source);
         void Add(DataRow template,string description,decimal amount,string kind)
         {
             var row=data.NewRow();
             for(int index=0;index<source.Columns.Count;index++) row[index]=template[index];
             row["ReceiptPageKey"]=1;row["DocumentTitle"]="FAMILY PAYMENT RECEIPT";
-            row["StudentName"]=first["FatherName"];row["FatherName"]="";row["AdmissionNumberText"]=references;row["ClassSection"]="";row["CampusName"]="";
+            row["StudentName"]=first["FatherName"];row["FatherName"]="";row["AdmissionNumberText"]=references;row["ClassSection"]="";row["CampusName"]=campusHeading;
             row["ReceiptStatus"]=string.Join("; ",children.Select(child=>Convert.ToString(child.First()["ReceiptStatus"])).Where(text=>!string.IsNullOrWhiteSpace(text)).Distinct());
             row["FamilyBatch"]=$"{children.Length} students";row["FeeDescription"]=description;row["FeePeriod"]="";
             row["Amount"]=amount;row["TotalPaid"]=total;row["NetPaid"]=total;

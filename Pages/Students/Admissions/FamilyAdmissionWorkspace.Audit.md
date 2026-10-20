@@ -7,6 +7,18 @@ discovery relocated to the family toolbar, and existing registration links route
 to the family workspace. Shared writer/recovery infrastructure remains in use.
 This is the user's rollout decision, not a claim that the findings below passed.
 
+## Follow-up — 20 October 2026
+
+The counter implementation now isolates recovery from loaded child identities,
+includes future fully waived monthly plans and saves all-zero individual bills.
+Existing collection opens over the retained family with a fixed selection and an
+editable proposed split. The actual host saves, partial retry, return confirmation,
+collection, saved snapshots, recovery and RDLC paths passed the owned 45-check run.
+The detailed [current verification](../../../Docs/QUICK_COUNTER_VERIFICATION_2026-10-20.md)
+records native checks, migration 27, the verified live backup/upgrade and remaining
+operator/physical-printer acceptance. The initial findings below are retained as
+the historical rollout record, not a statement that the corrections remain undone.
+
 ## Checked
 
 - Application and focused UI fixture compile successfully.

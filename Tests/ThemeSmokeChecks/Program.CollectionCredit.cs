@@ -93,5 +93,11 @@ internal static partial class Program
         Check(layout.RowStyles[0].Height==0 && ((Label)Field("remainingCredit")).Text=="50",
             "After full settlement, remaining credit replaces the empty outstanding summary");
         Check(((Label)Field("collectionResult")).Parent is null, "Transaction text is absent below Next Student");
+        page.ConfigureCounter(new[]{6594,6589});
+        var split=(DataGridView)Field("familyProposal");
+        Check(split.Columns["Outstanding"].MinimumWidth>=90 && split.Columns["Proposed"].MinimumWidth>=90,
+            "Counter allocation reserves readable widths for owed and payable amounts");
+        Check(!((Control)Field("student")).Enabled && !((Control)Field("siblings")).Visible &&
+            !((Control)Field("studentFeesMenuButton")).Visible,"Counter keeps its selected group and leaves exceptional finance work outside this payment step");
     }
 }

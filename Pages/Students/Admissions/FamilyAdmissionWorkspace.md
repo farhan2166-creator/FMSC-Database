@@ -1,37 +1,58 @@
-# Family Admission & Fees
+# Family Admission & Fees — quick counter
 
-Daily Work workspace replacing the retired standalone Quick Registration screen.
-Existing dashboard and pending-registration entry points open this workspace.
-Pending Registrations remains available from its toolbar for discovery and review.
+An optional start-of-year counter workflow. It coordinates existing registration,
+return confirmation, fee review, collection and RDLC documents; it does not replace
+full admission, student corrections or the normal finance screens.
 
-- Find any student to load the established family, or start a new family.
-- Check the children being processed or billed. Selection for editing is separate
-  from inclusion. Each child retains their own editor when another is selected.
-- Add multiple new drafts. Parent details carry forward; the first saved child
-  becomes the family anchor. Further new children use the existing sibling-link
-  admission operation.
-- New/pending children use the original registration writer, quote/snapshot
-  checks and durable save-outcome recovery. New children remain pending until
-  the established admission review confirms them and assigns official numbers.
-- Promoted children awaiting return use the existing return-confirmation flow.
-- Existing children use the existing fee-assignment and fee-term review controls.
-  These reviews save through their normal explicit confirmation steps.
-- Discounts can cover selected fees partially or fully. A new child or a return
-  can have all included/opening fees waived. Standard amounts remain recorded.
-  Fee-term review retains existing period and paid-bill correction protections.
-- Process Selected operates per child, stops on the first unresolved outcome and
-  keeps prior successful outcomes. It is not represented as an atomic family
-  transaction. Retrying does not recreate an already saved child.
-- Printing rechecks selected family membership/readiness and reads posted unpaid
-  charges. Fully waived charges remain visible. Existing student/family RDLC
-  templates and B/FB numbering are used; printing does not register or collect.
-- Posted outstanding, new monthly plans and new one-time/yearly plans are shown
-  separately. A recurring plan is not mislabeled as a posted bill total.
+## One counter visit
 
-No database schema/procedure changes are required by this workspace. Any later
-SQL changes must be delivered through versioned scripts in Migrations.
+1. Find any child to load the family, or choose **New Family**. Check only the
+   children being handled in this visit. Selecting a row opens its editor;
+   checking a row includes it in preparation, billing and payment.
+2. Add new siblings with **Add New Child**. Shared parent details carry forward.
+   Enter each child's name, placement, joining date, fees and concessions. Each
+   draft stays in place when switching children. Existing families' shared details
+   are read-only here; detailed corrections use the existing admission screens.
+3. Use **Save & Prepare Selected**. New children remain pending registrations;
+   official admission numbers and full admission come later. Promoted children
+   use the existing reviewed return confirmation. Existing ready children need no
+   admission write. Fee-term changes retain their established explicit reviews.
+4. Use **Collect Payment / Receipt**. The established Fee Collection screen opens
+   over this workspace with exactly the selected children. Enter the amount
+   received, review or change the suggested per-child Pay amounts, confirm and
+   print the existing receipt. Close it to return to the retained family.
+5. If payment will happen later, use **Print Selected Bill** instead. A bill is
+   neither payment nor full admission. Fully waived plans remain visible, including
+   monthly concessions beginning in a future month, without creating money or
+   artificial charges. A child with no dues does not need a zero-value payment.
 
-The old tabbed host was retired at the user's request on 19 October 2026 so
-testing and refinement can continue in this workspace. Its internal child editor,
-writer and durable recovery records remain in use. This navigation retirement
-does not resolve the open functional findings in FamilyAdmissionWorkspace.Audit.md.
+## Progress and recovery
+
+Preparation saves children individually. If a child fails, earlier successful
+children stay saved; the status identifies how many completed and where to resume.
+Correct the remaining child and retry. Already saved registrations are not recreated.
+New drafts and excluded children remain in the workspace. Refresh retains drafts
+and invalidates members whose family membership can no longer be verified.
+
+**Check Previous Save** opens a separate recovery editor. An unrelated previous
+request cannot replace a loaded child's identity. Unknown outcomes must be checked
+before starting more registrations or payments. The established collection recovery
+notice, transaction boundary and saved receipt history remain authoritative for an
+interrupted payment. Never repeat a payment just because a refresh or print failed.
+
+Collection retains both children's remaining bills after a partial payment and
+clears the submitted amounts. Closing with unrecorded payment entries asks whether
+to discard them. Recorded money and receipt snapshots remain saved.
+
+## Delivery and verification
+
+Migration `27.sql` adds permission-checked, read-only waiver evidence for this bill
+path. It requires schema 26 and advances to 27; it does not rewrite student,
+financial or historical document records. Apply it through the existing verified
+backup/transaction deployment process. The application and installer require 27.
+
+Focused native checks: `ThemeSmokeChecks --family-admission-workspace`.
+Owned SQL/native/RDLC checks: `Tools/Run-Level2.ps1 -FamilyCounterOnly`.
+The latter creates fictional data in a unique owned instance and isolated profile;
+it does not accept a live database. Actual operator speed/comprehension and physical
+printer acceptance must be observed separately from automated tests.
