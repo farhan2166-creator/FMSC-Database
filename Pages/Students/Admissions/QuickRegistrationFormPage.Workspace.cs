@@ -7,7 +7,9 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 internal sealed partial class QuickRegistrationFormPage
 {
     internal event EventHandler? WorkspaceChanged;
-    private bool workspaceLoaded,workspaceHosted;
+    private bool workspaceLoaded,workspaceHosted,recoveryOnly;
+    private Guid? workspaceSaveRequest;
+    internal Func<Task>? WorkspaceRecoveryRequested;
     internal string WorkspaceName => name.Text.Trim();
     internal string WorkspaceParent => parent.Text.Trim();
     internal string WorkspaceContact => contact.Text.Trim();
@@ -37,7 +39,7 @@ internal sealed partial class QuickRegistrationFormPage
             fees.Columns[column.Item1].Width=AppScale.Scale(column.Item2);
         if(root.GetControlFromPosition(0,1) is HumanCard feePlan)
             feePlan.SetHeaderText("Fees & Concessions","Choose included fees and each concession. Monthly concessions belong to this child's placement.");
-        SetStatus("Review this child, then use Process Selected above.");
+        SetStatus("Review this child, then use Save & Prepare Selected above.");
         var waive = new ModernButton { Text="Waive All Included Fees",ThemeRole="Secondary",AutoSize=true };
         waive.Click += (_,_) => {
             if(savedStudent!=0 || IsBusy || recoveryBlocked || !CurrentUser.HasPermission("Fees.Adjust") || !fees.EndEdit())return;
@@ -51,7 +53,10 @@ internal sealed partial class QuickRegistrationFormPage
         };
         addFee.Parent?.Controls.Add(waive);
         addFee.Parent?.Controls.Add(checkSave);addFee.Parent?.Controls.Add(reload);
-        WorkspaceChanged += (_,_) => waive.Enabled=savedStudent==0 && !IsBusy && !recoveryBlocked && feesLoaded && CurrentUser.HasPermission("Fees.Adjust");
+        WorkspaceChanged += (_,_) => {
+            waive.Visible=savedStudent==0;
+            waive.Enabled=savedStudent==0 && !IsBusy && !recoveryBlocked && feesLoaded && CurrentUser.HasPermission("Fees.Adjust");
+        };
         UpdateActions();
     }
     internal async Task<bool> InitializeWorkspaceAsync(int admission=0)
@@ -59,7 +64,7 @@ internal sealed partial class QuickRegistrationFormPage
         if(!workspaceLoaded)
         {
             await LoadLookupsAsync();workspaceLoaded=true;
-            ReadRecoveryRecord();UpdateActions();
+            UpdateActions();
         }
         return admission<=0 || await OpenRegistrationAsync(admission);
     }
@@ -81,5 +86,16 @@ internal sealed partial class QuickRegistrationFormPage
         if(savedStudent>0 && !HasPendingChanges)return true;
         await SaveAsync();
         return savedStudent>0 && !recoveryBlocked && !needsRefresh && !HasPendingChanges;
+    }
+    internal void RefreshWorkspaceRecovery(){ReadRecoveryRecord();UpdateActions();}
+    internal async Task InitializeRecoveryAsync()
+    {
+        recoveryOnly=true;
+        PrepareForEmbedding(keepActions:true);
+        foreach(var button in new[]{save,next,bill,collect,newFamily,linkFamily,unlinkFamily,reload})button.Visible=false;
+        UpdateActions();
+        await LoadLookupsAsync();
+        ReadRecoveryRecord();UpdateActions();
+        await CheckSaveOutcomeAsync();
     }
 }

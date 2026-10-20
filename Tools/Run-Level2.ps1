@@ -164,7 +164,8 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
         Native 'Publish approved schema'
         Sql $catalog "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');" | Out-Null
         foreach($migration in @(Get-ChildItem (Join-Path $repo 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql'; Get-ChildItem (Join-Path $repo 'Migrations') -Filter '*.sql') | Sort-Object {[int]$_.BaseName}) {
-            if([int]$migration.BaseName -le 6 -or [int]$migration.BaseName -gt 20){continue}
+            $requiredSchema=[int]([regex]::Match((Get-Content (Join-Path $repo 'DatabaseHelper.cs') -Raw),'RequiredDatabaseSchemaVersion\s*=\s*"(\d+)"').Groups[1].Value)
+            if([int]$migration.BaseName -le 6 -or [int]$migration.BaseName -gt $requiredSchema){continue}
             VerifyTarget
             $migrationScript=Join-Path $run ('migration-'+$migration.BaseName+'.sql')
             "SET XACT_ABORT ON;`nBEGIN TRANSACTION;`n"+(Get-Content -LiteralPath $migration.FullName -Raw)+"`nCOMMIT TRANSACTION;" | Set-Content -LiteralPath $migrationScript -Encoding utf8
@@ -182,6 +183,11 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
         Stage 'Family counter SQL scenarios (no operator UI or physical printing)'
         & dotnet (Join-Path $run 'FamilyCounterChecks/ThemeSmokeChecks.dll') '--family-counter-sql'
         $exitCode=$LASTEXITCODE
+        # These explicitly named files contain only this owned fictional scenario.
+        foreach($artifact in @('family-bill.pdf','family-bill.png','free-student-bill.pdf','free-student-bill.png','family-receipt.pdf','family-receipt.png','workspace.png','collection.png')) {
+            $source=Join-Path $run ('counter-evidence/'+$artifact)
+            if(Test-Path -LiteralPath $source){Copy-Item -LiteralPath $source -Destination (Join-Path $evidence $artifact)}
+        }
         [ordered]@{sourceCommit=$env:FMSC_LEVEL2_COMMIT;status=if($exitCode -eq 0){'Pass'}else{'Fail'};
             scope='Owned fictional family SQL scenarios only; no Level 2 interactive acceptance claimed.'} |
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'family-counter-results.json') -Encoding utf8

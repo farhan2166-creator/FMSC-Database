@@ -39,6 +39,7 @@ internal static partial class Program
             var list=Field<FamilyStudentList>(workspace,"children");
             Check(list.Items.Count==2 && list.CheckedItems.Count==2,"Loading one student brings their established siblings into the workspace");
             Check(!Field<ModernButton>(workspace,"print").Enabled,"An included unconfirmed return blocks premature family billing");
+            Check(!Field<ModernButton>(workspace,"collect").Enabled,"Unconfirmed returns also block premature family collection");
             Run(Call(workspace,"AddNewChildAsync"));
             var current=Field<object>(workspace,"current");
             var draft=Field<Control>(current,"Editor");
@@ -59,6 +60,7 @@ internal static partial class Program
             Check(!Field<ModernButton>(workspace,"print").Enabled,"Unsaved new children cannot be omitted silently from a selected bill");
             list.SetItemChecked(1,false);list.SetItemChecked(2,false);Application.DoEvents();
             Check(Field<ModernButton>(workspace,"print").Enabled,"Excluding unfinished children permits a bill for a ready selected child");
+            Check(Field<ModernButton>(workspace,"collect").Enabled,"The same saved selection can proceed directly to existing collection");
             Check(Field<ModernButton>(workspace,"removeDraft").Enabled,"Only the current unsaved child can be removed as a draft");
             list.SetItemChecked(1,true);list.SetItemChecked(2,true);Application.DoEvents();
             Directory.CreateDirectory("artifacts/family-admission");
@@ -70,6 +72,14 @@ internal static partial class Program
             }
             Check(FamilyAdmissionData.CanUse(p=>p is "Students.View" or "Students.Administer") &&
                 !FamilyAdmissionData.CanUse(p=>p=="Students.Admit"),"Workspace access retains separate viewing and admission/administration permissions");
+            Run(Call(workspace,"ShowChildAsync",list.Items[0]!));
+            var retained=Field<object>(workspace,"current");
+            var editor=new QuickRegistrationFormPage((_,_,_)=>{},0,false);
+            retained.GetType().GetField("Editor",flags|BindingFlags.Public)!.SetValue(retained,editor);
+            typeof(QuickRegistrationFormPage).GetField("savedStudent",flags)!.SetValue(editor,9876);
+            workspace.GetType().GetMethod("UpdateWorkspace",flags)!.Invoke(workspace,null);
+            Check(Field<int>(retained,"Id")==41 && !Field<bool>(retained,"MembershipVerified"),
+                "A different recovered student cannot replace an already loaded family child");
         }
         finally{CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Permissions);}
     }

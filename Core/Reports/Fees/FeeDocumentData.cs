@@ -6,6 +6,13 @@ internal static class FeeDocumentData
 {
     // Stable XML table name for already saved bill snapshots; RDLC datasets have their own document names.
     internal const string SnapshotTableName="FeeReceiptData";
+    internal static string CampusHeading(DataTable source)
+    {
+        if (!source.Columns.Contains("CampusName")) return "";
+        var campuses = source.AsEnumerable().Select(row => Convert.ToString(row["CampusName"])?.Trim() ?? "")
+            .Where(name => name.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        return campuses.Length switch { 0 => "", 1 => campuses[0], _ => "Multiple campuses" };
+    }
     internal static DataTable Create()
     {
         var table = new DataTable(SnapshotTableName);
