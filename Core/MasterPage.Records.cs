@@ -931,6 +931,7 @@ public partial class MasterPage
     private Control BuildRecordsToolbar()
     {
         _recordSearchBox = HumanUi.TextBox();
+        _recordSearchBox.SelectAllOnFocus = true;
         WorkspaceState.Remember(_recordSearchBox, "Records:Search");
         _recordSearchBox.PlaceholderText = "Search records...";
         _recordSearchBox.Height = AppMetrics.InputControlHeight;

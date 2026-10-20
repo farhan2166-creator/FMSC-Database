@@ -22,7 +22,7 @@ internal static partial class HelpCatalog
             new[] { HelpRule.System }, HelpOwner.SQL | HelpOwner.CSharp,
             new[] { "Pages/Students/Admissions/QuickRegistrationPage.cs#QuickRegistrationPage", "fmsc.dacpac#ProcessFeeTransaction", "fmsc.dacpac#PreviewMonthlyFees" }, new[] { "FAQ-039", "FAQ-053" }, ""),
         new("FAQ-014", "Admissions", "How do I finish a pending registration?",
-            "Open Dashboard → Quick Registration → Pending Registrations. Find and review the record, save any outstanding edits, then select Review / Confirm. Confirmation allocates official numbers while retaining valid bills, payments and family links.",
+            "Open Family Admission & Fees → Pending Registrations and choose Review / Confirm. Complete the details, select Confirm Admission, review the proposed number, then Save & Confirm. This saves your edits and assigns official numbers together. Save Draft is optional when details are incomplete. Existing bills, payments and family links are retained.",
             "confirm,quick,pending,registration number", "Quick Registration → Pending Registrations",
             new[] { HelpRule.System }, HelpOwner.SQL | HelpOwner.CSharp,
             new[] { "Pages/Students/Admissions/QuickRegistrationPage.cs#QuickRegistrationPage", "fmsc.dacpac#CompleteQuickAdmission" }, new[] { "FAQ-021", "FAQ-086" }, ""),

@@ -94,16 +94,96 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
 
 internal sealed class CompleteAdmissionDialog : ApplicationWindowForm
 {
-    internal string AdmissionNumber {get;private set;}="";
-    internal CompleteAdmissionDialog(string suggested,string student)
+    internal string AdmissionNumber { get; private set; } = "";
+    internal CompleteAdmissionDialog(string suggested, string student)
     {
-        Text="Confirm Admission";StartPosition=FormStartPosition.CenterParent;Size=new Size(AppScale.Scale(540),AppScale.Scale(260));MinimumSize=Size;
-        var number=HumanUi.TextBox(false,40);number.Text=suggested;
-        var ok=new ModernButton{Text="Confirm Admission",ThemeRole="Success"};var cancel=new ModernButton{Text="Cancel",DialogResult=DialogResult.Cancel};CancelButton=cancel;
-        var root=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(14)};
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.Controls.Add(new Label{Text=student+"\nThe existing bill, payments and family links will be retained.",AutoSize=true},0,0);root.Controls.Add(HumanUi.Field("Official admission number",number,true),0,1);root.Controls.Add(HumanUi.ButtonRow(ok,cancel),0,2);foreach(var row in root.Controls.OfType<TableLayoutPanel>().Where(row=>row.AutoSize))row.Dock=DockStyle.Fill;Controls.Add(root);
-        ok.Click+=(_,_)=>{if(!AdmissionNumbers.TryNormalize(number.Text,out string normalized)){number.Focus();return;}AdmissionNumber=normalized;DialogResult=DialogResult.OK;Close();};
+        Text = "Confirm Admission";
+        StartPosition = FormStartPosition.CenterParent;
+        ClientSize = new Size(AppScale.Scale(600), AppScale.Scale(450));
+        MinimumSize = Size;
+        MaximizeBox = false;
+        MinimizeBox = false;
+        ShowInTaskbar = false;
+        BackColor = AppTheme.PageBackground;
+        Font = AppTheme.NormalFont;
+        var number = HumanUi.TextBox(false, 40);
+        number.Name = "OfficialAdmissionNumber";
+        number.Text = suggested;
+        number.Font = AppTheme.BodyBoldFont;
+        number.SelectAllOnFocus = true;
+        UiAccessibility.Describe(number, "Official admission number",
+            "Review or change this number. It is assigned when Save & Confirm succeeds.");
+        var error = new Label {
+            Name = "NumberValidation", AutoSize = true, Dock = DockStyle.Top,
+            ForeColor = AppTheme.Danger, Margin = new Padding(0, 6, 0, 0)
+        };
+        var ok = new ModernButton { Name = "SaveAndConfirm", Text = "Save & Confirm", ThemeRole = "Success" };
+        var cancel = new ModernButton { Text = "Go Back", ThemeRole = "Secondary", DialogResult = DialogResult.Cancel };
+        CancelButton = cancel;
+        AcceptButton = ok;
+        var root = new TableLayoutPanel {
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6,
+            Padding = new Padding(22), AutoScroll = true
+        };
+        for (int row = 0; row < 4; row++) root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.Controls.Add(new Label {
+            Text = "Review and confirm admission", AutoSize = true, Dock = DockStyle.Top,
+            Font = AppTheme.BodyBoldFont, ForeColor = AppTheme.Text, Margin = new Padding(0, 0, 0, 8)
+        }, 0, 0);
+        root.Controls.Add(new Label {
+            Name = "StudentName", Text = student, AutoSize = true, Dock = DockStyle.Top,
+            ForeColor = AppTheme.Text, Margin = new Padding(0, 0, 0, 16)
+        }, 0, 1);
+        var numberCard = new RoundedPanel {
+            Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(14),
+            BackColor = AppTheme.Surface, BorderColor = AppTheme.Border, Margin = Padding.Empty
+        };
+        var numberLayout = new TableLayoutPanel {
+            Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty
+        };
+        numberLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        numberLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
+        numberLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        numberLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        numberLayout.Controls.Add(HumanUi.Field("Official admission number", number, true), 0, 0);
+        numberLayout.Controls.Add(new Label {
+            Text = "Suggested number · You may change it before confirming.", AutoSize = true,
+            Dock = DockStyle.Top, ForeColor = AppTheme.MutedText, Margin = new Padding(0, 6, 0, 0)
+        }, 0, 1);
+        numberLayout.Controls.Add(error, 0, 2);
+        numberCard.Controls.Add(numberLayout);
+        root.Controls.Add(numberCard, 0, 2);
+        root.Controls.Add(new Label {
+            Name = "CompletionEffect",
+            Text = "Save & Confirm saves your completed details and assigns this admission number together.\nExisting bills, payments and family links stay with this student.",
+            AutoSize = true, Dock = DockStyle.Top, ForeColor = AppTheme.MutedText,
+            Margin = new Padding(0, 16, 0, 0), MaximumSize = new Size(AppScale.Scale(556), 0)
+        }, 0, 3);
+        root.SizeChanged += (_, _) => {
+            foreach (Label label in root.Controls.OfType<Label>())
+                label.MaximumSize = new Size(Math.Max(1, root.ClientSize.Width - root.Padding.Horizontal - label.Margin.Horizontal), 0);
+        };
+        var buttons = HumanUi.ButtonRow(ok, cancel);
+        buttons.Dock = DockStyle.Fill;
+        root.Controls.Add(buttons, 0, 5);
+        Controls.Add(root);
+        number.TextChanged += (_, _) => { error.Text = ""; number.IsInvalid = false; };
+        Shown += (_, _) => number.Focus();
+        ok.Click += (_, _) => {
+            if (!AdmissionNumbers.TryNormalize(number.Text, out string normalized))
+            {
+                error.Text = "Enter a valid number, for example 6590 or 6590a.";
+                number.IsInvalid = true;
+                number.Focus();
+                return;
+            }
+            AdmissionNumber = normalized;
+            DialogResult = DialogResult.OK;
+            Close();
+        };
     }
 }
 

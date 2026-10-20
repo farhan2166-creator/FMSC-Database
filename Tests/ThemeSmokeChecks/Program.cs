@@ -34,6 +34,28 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--family-list-selection"))
+        {
+            CheckFamilyListSelection();
+            CheckFamilyAdmissionWorkspace();
+            Console.WriteLine($"PASS: {checks} family checkbox, selection and workspace checks (no database writes).");
+            return;
+        }
+        if(args.Contains("--confirm-admission"))
+        {
+            CheckAdmissionCompletion();
+            CheckAdmissionPostSaveBaseline();
+            CheckAdmissionSharedBusy();
+            Console.WriteLine($"PASS: {checks} admission confirmation, recovery and review-layout checks (no database writes).");
+            return;
+        }
+        if(args.Contains("--search-selection"))
+        {
+            CheckSearchTextSelection();
+            CheckStudentSearchModes();
+            Console.WriteLine($"PASS: {checks} search selection and student search checks (no database connection).");
+            return;
+        }
         if(args.Contains("--finance-help"))
         {
             CheckFinanceHelp();

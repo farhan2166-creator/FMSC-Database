@@ -74,7 +74,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
     private string _committedText = string.Empty;
     private readonly StudentPickerSearchSession _searchSession = new();
     private System.Windows.Forms.Timer? _searchDebounce;
-    private bool _mouseDownAtFocus;
+    private bool _selectAllOnMouseUp;
     private DataTable? _source;
     private DataTable? _fixedSource;
     private bool _showDropDownButton;
@@ -126,8 +126,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
         /* Regaining focus selects everything, so typing replaces what was there. */
         _text.GotFocus += (_, _) => {
             Invalidate();
-            _mouseDownAtFocus =
-                Control.MouseButtons != MouseButtons.None;
+            _selectAllOnMouseUp = true;
             _text.SelectAll();
         };
         _text.LostFocus += (_, _) => {
@@ -148,10 +147,11 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
                     }));
             }
         };
-        _text.MouseUp += (_, _) => {
-            if (_mouseDownAtFocus)
+        _text.MouseUp += (_, e) => {
+            if (e.Button != MouseButtons.Left) return;
+            if (_selectAllOnMouseUp)
             {
-                _mouseDownAtFocus = false;
+                _selectAllOnMouseUp = false;
                 _text.SelectAll();
             }
         };
@@ -351,6 +351,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
             _committedText =
                 _text.Text;
             ShowTextStart();
+            _selectAllOnMouseUp = true;
         }
         finally
         {
@@ -402,6 +403,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
     {
         if (_suppress)
             return;
+        _selectAllOnMouseUp = false;
         if (_selectedId > 0 &&
             !string.Equals(
                 _text.Text,
@@ -565,6 +567,8 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
         if (!_text.Focused)
             _text.Focus();
         ShowTextStart();
+        // Choosing a result can retain focus. The next click starts a fresh search.
+        _selectAllOnMouseUp = true;
         Invalidate();
         UserSelectionChanged?.Invoke(
             this,
@@ -629,6 +633,7 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
         object? sender,
         KeyEventArgs e)
     {
+        _selectAllOnMouseUp = false;
         bool consumed = false;
         switch (e.KeyCode)
         {

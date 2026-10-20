@@ -56,6 +56,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
     {
         currentAdmissionId = admissionId;
         userId = CurrentUser.UserId;
+        searchBox.SelectAllOnFocus = true;
         Text = "Find Possible Sibling";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;

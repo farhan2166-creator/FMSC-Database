@@ -68,4 +68,19 @@ internal static class AdmissionSaveConfirmation
         }
         catch (Exception ex) { return new(null, true, writeError, ex); }
     }
+
+    // The existing completion procedure saves details and assigns the official
+    // number in one transaction. Its reply has no complete identity result set.
+    internal static async Task<AdmissionConfirmation> SubmitCompletionAsync(AdmissionSubmission submitted,
+        int admissionId, Func<Task> write, Func<AdmissionSubmission, Task<DataTable>> read)
+    {
+        Exception? writeError = null;
+        try { await write(); }
+        catch (Exception ex) { writeError = ex; }
+        var result = await RecheckAsync(submitted, read, writeError);
+        return result with {
+            Admission = result.Admission?.Id == admissionId ? result.Admission : null,
+            Reconciled = writeError is not null || result.ReadError is not null
+        };
+    }
 }
