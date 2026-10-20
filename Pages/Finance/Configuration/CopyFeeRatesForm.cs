@@ -109,6 +109,8 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
         Font = AppTheme.NormalFont;
         BuildLayout();
         SetSaveShortcut(applyButton);
+        FinanceHelp.Attach(this,applyButton,FinanceHelp.Topic.CopyRates);
+        FinanceHelp.Attach(this,preview,FinanceHelp.Topic.CopyRates);
         conflictMode.Items.AddRange(new object[] {
             "Keep existing fees",
             "Replace existing amounts"

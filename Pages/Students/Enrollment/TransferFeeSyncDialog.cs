@@ -71,8 +71,14 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         LoadComparison(enrollmentId, destinationCampusId, destinationClassId);
-        paidReduction.Items.AddRange(new object[] { "Keep paid reductions as credit", "Refund paid reductions" });
+        paidReduction.Items.AddRange(new object[] { "Keep excess payment as advance", "Refund the excess payment" });
         paidReduction.SelectedIndex = 0;
+        FinanceHelp.Attach(this,paidReduction,FinanceHelp.Topic.PaidReduction);
+        FinanceHelp.Attach(this,keepOption,FinanceHelp.Topic.TransferFees);
+        FinanceHelp.Attach(this,currentMonthOption,FinanceHelp.Topic.TransferFees);
+        FinanceHelp.Attach(this,nextMonthOption,FinanceHelp.Topic.TransferFees);
+        FinanceHelp.Attach(this,customMonthOption,FinanceHelp.Topic.TransferFees);
+        FinanceHelp.Attach(this,replaceSchedule,"Replace future rates or full discounts that have not yet been billed, starting in the chosen month.","An unbilled November discount may be replaced by the new class terms. Check the review before continuing.");
         var policy = DatabaseHelper.QuerySql("SELECT dbo.GetMonthlyBillingStartDate(@Date) StartDate;", DatabaseHelper.Date("@Date", transferDate));
         DateTime cutoffDate = Convert.ToDateTime(policy.Rows[0]["StartDate"]);
         currentMonthOption.Text = $"Use School Profile cutoff: new fees from {cutoffDate:MMMM yyyy}";
@@ -307,7 +313,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         customRow.Controls.Add(effectiveMonth);
         choicePanel.Controls.Add(customRow);
         choicePanel.Controls.Add(replaceSchedule);
-        choicePanel.Controls.Add(HumanUi.Field("Paid reductions", paidReduction));
+        choicePanel.Controls.Add(HumanUi.Field("If the reduced fee was already paid", paidReduction));
         // Radio buttons need one shared parent to remain mutually exclusive.
         customMonthOption.CheckedChanged += (_, _) => {
             if(customMonthOption.Checked) {

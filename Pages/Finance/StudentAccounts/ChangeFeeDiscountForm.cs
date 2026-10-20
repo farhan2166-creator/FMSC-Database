@@ -10,16 +10,16 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
     private readonly string identity;
     private readonly decimal standardAmount;
     private readonly ModernTextBox newRate=HumanUi.TextBox(false,20);
-    private readonly CheckBox changeRate=new(){Text="Change the agreed fee",AutoSize=true},
-        fullWaiver=new(){Text="Full concession at each agreed rate",AutoSize=true},
-        updateAgreement=new(){Text="Update the fee agreement",AutoSize=true,Checked=true};
+    private readonly CheckBox changeRate=new(){Text="Change the full fee before discount",AutoSize=true},
+        fullWaiver=new(){Text="Waive the full fee for this period",AutoSize=true},
+        updateAgreement=new(){Text="Change the student's saved fee plan",AutoSize=true,Checked=true};
     private readonly bool agreementAllowed;
     private readonly long? billId;
     private readonly ModernTextBox amount=HumanUi.TextBox(false,20),reason=HumanUi.TextBox(false,500);
     private readonly ModernComboBox concession=HumanUi.Combo(),paidReduction=HumanUi.Combo();
     private readonly ModernDatePicker fromMonth=HumanUi.Date(),throughMonth=HumanUi.Date();
-    private readonly CheckBox applyBills=new(){Text="Apply these terms to issued bills in the chosen period",AutoSize=true,Checked=true};
-    private readonly CheckBox useCredit=new(){Text="Use available credit for the oldest due tuition, then other due fees",AutoSize=true};
+    private readonly CheckBox applyBills=new(){Text="Also change existing bills in this period",AutoSize=true,Checked=true};
+    private readonly CheckBox useCredit=new(){Text="Use advance money for due tuition first, then other due fees",AutoSize=true};
     private readonly Label impact=new(){AutoSize=true,Dock=DockStyle.Fill,Padding=new Padding(6)};
     private readonly DataGridView bills=HumanUi.Grid(false),schedule=HumanUi.Grid(false);
     private readonly ModernButton review=new(){Text="Review Fee Change",ThemeRole="Secondary"},
@@ -49,7 +49,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         amount.ZeroAsPlaceholder = newRate.ZeroAsPlaceholder = true;
         amount.Text=discount.ToString("0.##");newRate.Text=rate.ToString("0.##");
         concession.Items.AddRange(new object[]{"None","Free","Scholarship","Waived"});concession.SelectedIndex=0;
-        paidReduction.Items.AddRange(new object[]{"Keep paid reductions as credit","Refund paid reductions"});paidReduction.SelectedIndex=0;
+        paidReduction.Items.AddRange(new object[]{"Keep excess payment as advance","Refund the excess payment"});paidReduction.SelectedIndex=0;
         context??=id>0?FeeDiscountPeriod.Context(id):null;
         monthly=context is not null&&Convert.ToString(context["Frequency"])=="Monthly";
         validContext=context is not null;
@@ -97,7 +97,7 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         };
         Disposed+=(_,_)=>reviewed?.Dispose();
         impact.Text=$"Current fee: Rs. {rate:N0}. Review the proposed agreement and bills before confirming. " +
-            (!agreementAllowed?"This placement is closed. Only issued bills can be corrected; its agreement remains historical.":
+            (!agreementAllowed?"This placement is closed. Only existing bills can be changed; its saved fee plan remains historical.":
              billId is not null?"Only the selected bill is reviewed. Its assignment and other bills stay unchanged.":"Choose the period and whether the agreement, issued bills, or both should change.");
         ReadPending();State();
     }
@@ -109,8 +109,8 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         for(int i=0;i<5;i++)fields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
         for(int i=0;i<4;i++)fields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         fields.Controls.Add(HumanUi.Field("Proposed fee (Rs.)",newRate,true),0,0);fields.Controls.Add(changeRate,1,0);
-        fields.Controls.Add(HumanUi.Field($"Concession for {fee} (Rs.)",amount,true),0,1);
-        fields.Controls.Add(HumanUi.Field("Concession",concession),1,1);
+        fields.Controls.Add(HumanUi.Field($"Discount on {fee} (Rs.)",amount,true),0,1);
+        fields.Controls.Add(HumanUi.Field("Discount reason / type",concession),1,1);
         fields.Controls.Add(HumanUi.Field("From month",fromMonth,true),0,2);fields.Controls.Add(HumanUi.Field("Through month",throughMonth,true),1,2);
         fields.Controls.Add(HumanUi.Field("Reason",reason,true),0,3);fields.SetColumnSpan(fields.Controls[fields.Controls.Count-1],2);
         fields.Controls.Add(HumanUi.Field("If a bill has already been paid",paidReduction),0,4);fields.SetColumnSpan(fields.Controls[fields.Controls.Count-1],2);
@@ -127,6 +127,17 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
         root.Controls.Add(new Label{Text=identity,AutoSize=true,Dock=DockStyle.Fill,Padding=new Padding(6)},0,0);root.Controls.Add(fields,0,1);root.Controls.Add(impact,0,2);root.Controls.Add(tabs,0,3);root.Controls.Add(HumanUi.ButtonRow(review,save,check,close),0,4);Controls.Add(root);
         UiHelper.SetGridEmptyMessage(bills,"Review to see current and proposed issued bills.");
         UiHelper.SetGridEmptyMessage(schedule,"Review to see concession periods, including scheduled fee rates.");
+        FinanceHelp.Attach(this,newRate,FinanceHelp.Topic.FeeRate);
+        FinanceHelp.Attach(this,changeRate,FinanceHelp.Topic.FeeRate);
+        FinanceHelp.Attach(this,amount,FinanceHelp.Topic.Discount);
+        FinanceHelp.Attach(this,concession,FinanceHelp.Topic.Discount);
+        FinanceHelp.Attach(this,fullWaiver,"Remove the whole fee at each agreed rate in the selected period.","A Rs. 400 fee becomes Rs. 0. If the agreed rate later becomes Rs. 500, the full discount covers Rs. 500.");
+        FinanceHelp.Attach(this,fromMonth,FinanceHelp.Topic.Period);FinanceHelp.Attach(this,throughMonth,FinanceHelp.Topic.Period);
+        FinanceHelp.Attach(this,updateAgreement,FinanceHelp.Topic.FeeAgreement);
+        FinanceHelp.Attach(this,applyBills,FinanceHelp.Topic.ExistingBills);
+        FinanceHelp.Attach(this,paidReduction,FinanceHelp.Topic.PaidReduction);
+        FinanceHelp.Attach(this,useCredit,FinanceHelp.Topic.UseAdvance);
+        FinanceHelp.Attach(this,review,FinanceHelp.Topic.Review);FinanceHelp.Attach(this,check,FinanceHelp.Topic.SaveOutcome);
     }
     private void State()
     {
@@ -178,9 +189,9 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
             var row=result.Tables[0].Rows[0];
             decimal delta=Convert.ToDecimal(row["Difference"]),released=Convert.ToDecimal(row["ReleasedPaidAmount"]);
             impact.Text=$"{First(fromMonth.Value):MMM yyyy} through {First(throughMonth.Value):MMM yyyy}: " +
-                (applyBills.Checked?$"{row["IssuedBills"]} issued bill(s) reviewed. Bill total change: Rs. {delta:N0}. Paid money released as {(paidReduction.SelectedIndex==1?"refund":"credit")}: Rs. {released:N0}.":"Issued bills and their payments stay as recorded. Only the agreed fee terms change.")+
-                (row.Table.Columns.Contains("CurrentCredit")?$" Available credit before: Rs. {row["CurrentCredit"]:N0}. Credit to use: Rs. {row["CreditToUse"]:N0}. Credit remaining: Rs. {row["RemainingCredit"]:N0}.":"")+
-                "\r\nThe read-only tables show the proposed terms. Values outside this scope are retained. Credit is kept unless its use is selected.";
+                (applyBills.Checked?$"{row["IssuedBills"]} existing bill(s) reviewed. Fees {(delta<0?"decrease by":delta>0?"increase by":"change by")} Rs. {Math.Abs(delta):N0}. Excess already paid, {(paidReduction.SelectedIndex==1?"to refund":"to keep as advance")}: Rs. {released:N0}.":"Existing bills and payments stay as recorded. Only the saved fee plan changes.")+
+                (row.Table.Columns.Contains("CurrentCredit")?$" Advance available before: Rs. {row["CurrentCredit"]:N0}. Advance to use: Rs. {row["CreditToUse"]:N0}. Advance left: Rs. {row["RemainingCredit"]:N0}.":"")+
+                "\r\nThe tables show the proposed changes. Other periods stay unchanged. Advance money stays available unless you choose to use it.";
         }
         catch(Exception ex){reviewed?.Dispose();reviewed=null;if(!IsDisposed)impact.Text=DbMessage.UserMessage(ex);}
         finally{busy=false;State();}

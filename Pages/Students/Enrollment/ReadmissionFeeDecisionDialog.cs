@@ -17,6 +17,9 @@ internal sealed class ReadmissionFeeDecisionDialog : ApplicationWindowForm
         months.DataSource=choices; months.SelectedIndex=-1;
         var charge=new RadioButton {Text="Charge yearly fees",AutoSize=true};
         var waive=new RadioButton {Text="Waive yearly fees for this placement",AutoSize=true};
+        FinanceHelp.Attach(this,months,FinanceHelp.Topic.ReadmissionFees);
+        FinanceHelp.Attach(this,charge,FinanceHelp.Topic.ReadmissionFees);
+        FinanceHelp.Attach(this,waive,"Do not add the yearly fees for this returning placement. Earlier bills and dues remain.","Waiving a new Rs. 1,000 yearly fee does not remove Rs. 500 still owed from the previous placement.");
         var annual=new FlowLayoutPanel {Dock=DockStyle.Fill,AutoSize=true}; annual.Controls.Add(charge); annual.Controls.Add(waive);
         var grid=HumanUi.Grid(true); grid.AutoGenerateColumns=false;
         foreach(var column in new[]{("FeeTypeName",UiText.Fees.FeeType),("Frequency",UiText.Fees.Frequency),("Amount",UiText.Fees.NewAmount)})

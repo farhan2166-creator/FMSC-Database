@@ -25,7 +25,10 @@ internal sealed class FeeRateCorrectionDialog : ApplicationWindowForm
         Size = new Size(AppScale.Scale(1050), AppScale.Scale(680)); MinimumSize = new Size(760, 500);
         from.Value = through.Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         from.Format = through.Format = DateTimePickerFormat.Custom; from.CustomFormat = through.CustomFormat = "MMMM yyyy";
-        disposition.Items.AddRange(new object[] { "Keep paid reductions as credit", "Refund paid reductions" }); disposition.SelectedIndex = 0;
+        disposition.Items.AddRange(new object[] { "Keep excess payment as advance", "Refund the excess payment" }); disposition.SelectedIndex = 0;
+        FinanceHelp.Attach(this,from,FinanceHelp.Topic.Period);FinanceHelp.Attach(this,through,FinanceHelp.Topic.Period);
+        FinanceHelp.Attach(this,disposition,FinanceHelp.Topic.PaidReduction);
+        FinanceHelp.Attach(this,apply,FinanceHelp.Topic.ExistingBills);
         void InvalidateReview() { reviewGeneration++; reviewed = null; apply.Enabled = false; }
         from.ValueChanged += (_, _) => InvalidateReview(); through.ValueChanged += (_, _) => InvalidateReview();
         var review = new ModernButton { Text = "Preview Bills", ThemeRole = "Secondary" };
@@ -39,7 +42,7 @@ internal sealed class FeeRateCorrectionDialog : ApplicationWindowForm
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         fields.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight)); fields.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
         fields.Controls.Add(HumanUi.Field("First bill month", from), 0, 0); fields.Controls.Add(HumanUi.Field("Last bill month", through), 1, 0);
-        fields.Controls.Add(HumanUi.Field("Paid reductions", disposition), 0, 1); fields.Controls.Add(HumanUi.Field("Reason", reason), 1, 1);
+        fields.Controls.Add(HumanUi.Field("If the reduced fee was already paid", disposition), 0, 1); fields.Controls.Add(HumanUi.Field("Reason", reason), 1, 1);
         root.Controls.Add(fields, 0, 0);
         impact.Text = $"Scope: {scopeLabel}\nPreview monthly bills for active enrollments. Admission and other annual fees are excluded. Future assignment rates remain under Apply Saved Rates.";
         impact.MaximumSize = new Size(AppScale.Scale(950), 0); root.Controls.Add(impact, 0, 1);
@@ -66,8 +69,8 @@ internal sealed class FeeRateCorrectionDialog : ApplicationWindowForm
             grid.DataSource = reviewed; grid.ClearSelection();
             UiHelper.SetGridEmptyMessage(grid, "No eligible monthly bills for this scope and period. Check the campus, class and fee type on the previous screen.");
             impact.Text = $"Scope: {scopeLabel}\n{reviewed.Rows.Count} monthly bill(s) found. Admission and other annual fees are excluded.\n" +
-                "Select the bills to correct. Positive Difference adds an amount owed. Negative Difference reduces unpaid fees first, then releases paid money as your chosen credit/refund.\n" +
-                "Original payments remain. Future assignment rates are managed separately with Apply Saved Rates.";
+                "Select the bills to change. A plus difference increases the fee. A minus difference reduces unpaid fees first; any excess already paid becomes advance money or a refund.\n" +
+                "Original payments remain recorded. Use Apply Saved Rates separately to change students' saved fee plans.";
             apply.Enabled = reviewed.Rows.Count > 0;
         }
         catch (Exception ex) { ModernMessageDialog.ShowError(this, DbMessage.UserMessage(ex)); }
@@ -81,7 +84,7 @@ internal sealed class FeeRateCorrectionDialog : ApplicationWindowForm
         if (selected.Length == 0 || string.IsNullOrWhiteSpace(reason.Text))
         { ModernMessageDialog.ShowInfo(this, "Select the bills and enter a reason."); return; }
         decimal difference = selected.Sum(row => Convert.ToDecimal(row["Difference"]));
-        if (!ModernMessageDialog.Confirm(this, $"Correct {selected.Length} selected bills?\nNet difference: Rs. {difference:N0}\n{disposition.Text}\nReason: {reason.Text.Trim()}", "Confirm Bill Corrections", defaultYes: false)) return;
+        if (!ModernMessageDialog.Confirm(this, $"Change {selected.Length} selected bills?\nTotal fees {(difference<0?"decrease by":difference>0?"increase by":"change by")} Rs. {Math.Abs(difference):N0}\n{disposition.Text}\nReason: {reason.Text.Trim()}", "Confirm Bill Changes", defaultYes: false)) return;
         var changes = selected.Select(row => new {
             BillingChargeId = Convert.ToInt64(row["BillingChargeId"]), NewAmount = Convert.ToDecimal(row["NewAmount"]),
             ExpectedNet = Convert.ToDecimal(row["ExpectedNet"]), ExpectedBalance = Convert.ToDecimal(row["ExpectedBalance"]), RequestId = Guid.NewGuid()

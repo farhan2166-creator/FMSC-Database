@@ -38,6 +38,9 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
         var load = AddBusyAction("Load Students", LoadAsync, "Secondary");
         selectAll = AddAction(UiText.Actions.SelectAll, (_, _) => SelectAll(), "Secondary");
         post = AddAction("Post Selected", async(_,_)=>await PostAsync(), "Success");
+        FinanceHelp.Attach(this,post,FinanceHelp.Topic.PostFees);
+        FinanceHelp.Attach(this,amount,FinanceHelp.Topic.FeeRate);
+        FinanceHelp.Attach(this,date,"Choose the date for the additional fee. Saving adds a fee due for each selected student; it does not collect payment.","Select three students and enter Rs. 100 per student: each student is charged Rs. 100, for Rs. 300 in total.");
         GateAction(post,"Fees.Collect");
         RelocateFromActions(load, selectAll, post);
         students.ReadOnly = false;

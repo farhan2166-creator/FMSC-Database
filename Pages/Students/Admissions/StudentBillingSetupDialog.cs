@@ -94,6 +94,10 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
             if (dialog.Changed) { Changed = true; await LoadAsync(); }
         };
         Shown += async (_, _) => await LoadAsync();
+        FinanceHelp.Attach(this,start,FinanceHelp.Topic.PlacementStart);
+        FinanceHelp.Attach(this,billing,FinanceHelp.Topic.BillingStart);
+        FinanceHelp.Attach(this,review,FinanceHelp.Topic.Review);
+        FinanceHelp.Attach(this,admissionFeeHandling,"Choose whether the admission fee was paid before system billing, or must be charged now.","Already paid records an acknowledgement only; it does not create a new charge or a new payment receipt.");
         FormClosing += (_, e) => { if (busy) e.Cancel = true; };
     }
     private void Reset() { snapshot = null; activate.Enabled = false; if (!loading) impact.Text = "Review the setup to see the opening charges. Monthly fees after the opening month use normal fee posting."; }

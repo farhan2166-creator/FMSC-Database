@@ -62,9 +62,11 @@ public abstract class CanonicalFinanceReportPage : V2Page
         if (GroupBy.Items.Count > 0) GroupBy.SelectedIndex = 0;
         PaymentMethod.Items.AddRange(new object[] { "All", "Cash", "Bank", "Card", "Online", "Other", "Refund", "Correction" });
         PaymentMethod.SelectedIndex = 0;
+        FinanceHelp.Attach(this,PaymentMethod,"Filter the recorded payment method or adjustment type. Correction means a reduction in the recorded payment, rather than a change to the original fee.","A Rs. 1,000 payment reduced to Rs. 800 has a Rs. 200 payment reduction. It is separate from changing the fee itself.");
         ReportUi.RegisterChoiceFilter(PaymentMethod);
         var run = AddBusyAction("Run Report", RunAsync, "Primary");
         _print = AddBusyAction(UiText.Actions.Print, PrintAsync, "Secondary");
+        FinanceHelp.Attach(this,_print,"Print the report already generated on screen. It does not receive money or change student fees.","Printing a report with Rs. 1,000 outstanding leaves the student's outstanding balance at Rs. 1,000.");
         _export = AddExportAction(exportName);
         var reportActions = new List<ModernButton> { run, _print };
         if (classOutstandingPrint)

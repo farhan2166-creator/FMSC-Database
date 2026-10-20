@@ -7,7 +7,7 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
 {
     private readonly int admissionId;
     private readonly Label balance = new() { AutoSize = true, Padding = new Padding(8) };
-    private readonly Label creditBalance = new() { AutoSize = true, Padding = new Padding(8, 0, 8, 6), Font = AppTheme.HeadingFont, ForeColor = AppTheme.Success, Text = "Available credit: loading…" };
+    private readonly Label creditBalance = new() { AutoSize = true, Padding = new Padding(8, 0, 8, 6), Font = AppTheme.HeadingFont, ForeColor = AppTheme.Success, Text = "Available advance: loading…" };
     private readonly ModernComboBox action = HumanUi.Combo(), sibling = HumanUi.Combo();
     private readonly ModernTextBox amount = HumanUi.TextBox(false, 20), reason = HumanUi.TextBox(false, 500);
     private readonly DataGridView history = HumanUi.Grid(false);
@@ -18,7 +18,7 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
     {
         admissionId = studentId;
         amount.ZeroAsPlaceholder = true;
-        Text = "Student Credit"; StartPosition = FormStartPosition.CenterParent;
+        Text = "Student Advance Balance"; StartPosition = FormStartPosition.CenterParent;
         Size = new Size(AppScale.Scale(1050), AppScale.Scale(700));
         MinimumSize = new Size(AppScale.Scale(850), AppScale.Scale(520));
         action.Items.AddRange(new object[] { "Deposit", "Refund", "Transfer" }); action.SelectedIndex = 0;
@@ -29,7 +29,7 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        balance.Text = "Available credit will load here. Deposits are money received; refunds return cash; transfers move credit to a sibling.";
+        balance.Text = "Unused advance money will load here. Deposit records new money; Refund returns unused money; Transfer moves it to a sibling.";
         balance.MaximumSize = new Size(AppScale.Scale(780), 0);
         root.Controls.Add(balance, 0, 0);
         root.Controls.Add(creditBalance, 0, 1);
@@ -59,6 +59,14 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
         root.Controls.Add(buttons, 0, 4); Controls.Add(root); CancelButton = close;
         FormClosing += (_, e) => { if (busy) e.Cancel = true; };
         save.Click += async (_, _) => await SaveAsync();
+        void ExplainAction()
+        {
+            var topic=action.Text switch {"Refund"=>FinanceHelp.Topic.RefundAdvance,"Transfer"=>FinanceHelp.Topic.TransferAdvance,_=>FinanceHelp.Topic.Deposit};
+            FinanceHelp.Attach(this,action,topic);FinanceHelp.Attach(this,amount,topic);FinanceHelp.Attach(this,save,topic);
+        }
+        action.SelectedIndexChanged+=(_,_)=>ExplainAction();ExplainAction();
+        FinanceHelp.Attach(this,sibling,FinanceHelp.Topic.TransferAdvance);
+        FinanceHelp.Attach(this,creditBalance,FinanceHelp.Topic.AdvanceBalance);
         if (loadOnShow) Shown += async (_, _) => await RefreshAsync();
     }
 
@@ -76,10 +84,10 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
             if (IsDisposed) return;
             var owner = identities.AsEnumerable().FirstOrDefault(row => Convert.ToInt32(row["AdmissionId"]) == admissionId);
             string identity = owner is null ? "Student Credit" : $"{owner["AdmissionNumber"]} · {owner["StudentName"]}";
-            Text = $"Student Credit — {identity}";
-            creditBalance.Text = $"Available credit: Rs. {Convert.ToDecimal(data.Tables[0].Rows[0]["AvailableCredit"]):N0}";
+            Text = $"Student Advance Balance — {identity}";
+            creditBalance.Text = $"Available advance: Rs. {Convert.ToDecimal(data.Tables[0].Rows[0]["AvailableCredit"]):N0}";
             balance.Text = $"{identity}\n" +
-                "Positive entries add credit; negative entries reduce it. Transfers move credit between siblings without receiving new money.";
+                "A plus amount adds to the advance balance; a minus amount reduces it. Transfers move advance money between siblings without receiving new money.";
             var entries = data.Tables[1].Copy();
             entries.Columns.Add("TransferDetails", typeof(string));
             foreach (DataRow entry in entries.Rows)
@@ -105,8 +113,8 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
             history.Columns["TransferDetails"].FillWeight = 220;
             history.Columns["EntryKind"].FillWeight = 110;
             history.Columns["Amount"].FillWeight = 100;
-            history.Columns["EntryKind"].HeaderText = "Credit Activity";
-            history.Columns["Amount"].HeaderText = "Credit Change (Rs.)";
+            history.Columns["EntryKind"].HeaderText = "Advance Activity";
+            history.Columns["Amount"].HeaderText = "Advance Change (Rs.)";
             history.Columns["Amount"].DefaultCellStyle.Format = "+#,0.##;-#,0.##;0";
             if (history.Columns.Contains("CreatedAt"))
             {
@@ -134,7 +142,7 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
         if (history.Columns[e.ColumnIndex].Name != "EntryKind") return;
         e.Value = Convert.ToString(e.Value) switch {
             "TransferIn" => "Transfer received", "TransferOut" => "Transfer sent",
-            "Deposit" => "Credit deposit", "Refund" => "Credit refund",
+            "Deposit" => "Advance received", "Refund" => "Unused advance refunded",
             "Apply" or "Application" => "Applied to fees", _ => e.Value
         };
         e.FormattingApplied = true;
@@ -150,9 +158,9 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
         string operation = action.Text;
         int? target = operation == "Transfer" ? Convert.ToInt32(sibling.SelectedValue) : null;
         string effect = operation switch {
-            "Deposit" => "Receive this money as credit toward fees. It remains available until used.",
-            "Refund" => "Return this amount in cash and reduce the student's available credit.",
-            _ => $"Move this credit to {sibling.Text}. Their future billing will use the credit automatically."
+            "Deposit" => $"Record Rs. {value:N0} new money received. The student's available advance increases by this amount.",
+            "Refund" => $"Return Rs. {value:N0} unused advance in cash. The student's available advance decreases by this amount.",
+            _ => $"Move Rs. {value:N0} advance to {sibling.Text}. The sender's available advance decreases and the sibling's increases. No new money is received."
         };
         if (!ModernMessageDialog.Confirm(this, $"{effect}\nAmount: Rs. {value:N0}\nReason: {reason.Text.Trim()}", "Confirm Credit " + operation)) return;
         busy = true; save.Enabled = false;

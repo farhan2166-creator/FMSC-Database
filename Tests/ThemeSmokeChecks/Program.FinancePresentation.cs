@@ -31,8 +31,8 @@ internal static partial class Program
             var amount = Field<ModernTextBox>(dialog, "amount");
             var history = Field<DataGridView>(dialog, "history");
             var available = Field<Label>(dialog, "creditBalance");
-            available.Text = "Available credit: Rs. 12,345";
-            Field<Label>(dialog,"balance").Text = "41 · Example Student\nPositive entries add credit; negative entries reduce it. Transfers move credit between siblings without receiving new money.";
+            available.Text = "Available advance: Rs. 12,345";
+            Field<Label>(dialog,"balance").Text = "41 · Example Student\nA plus amount adds to the advance balance; a minus amount reduces it. Transfers move advance money between siblings without receiving new money.";
             sibling.Items.Add("Example Sibling"); amount.Text="250"; reason.Text="Keep this draft";
             if(scale!=1f)dialog.Scale(new SizeF(scale,scale));
             foreach(var size in new[]{new Size(850,520),new Size(1050,700)})

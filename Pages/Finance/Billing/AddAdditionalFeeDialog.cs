@@ -93,6 +93,9 @@ public sealed class AdditionalFeeEntry : UserControl
         var dateField = HumanUi.Field("Date", chargeDate, true, fillHeight: false);
         var amountField = HumanUi.Field("Amount (Rs.)", amount, true, fillHeight: false);
         var discountField = HumanUi.Field("Discount (Rs.)", discount, fillHeight: false);
+        FinanceHelp.Attach(this,amount,FinanceHelp.Topic.FeeRate);
+        FinanceHelp.Attach(this,discount,FinanceHelp.Topic.Discount);
+        FinanceHelp.Attach(this,post,FinanceHelp.Topic.PostFees);
         fields.Controls.Add(feeTypeField, 0, 0);
         fields.Controls.Add(dateField, 1, 0);
         fields.Controls.Add(amountField, 0, 1);

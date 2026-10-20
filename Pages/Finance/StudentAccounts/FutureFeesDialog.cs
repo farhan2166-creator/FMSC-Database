@@ -21,6 +21,7 @@ public sealed class FutureFeesDialog : ApplicationWindowForm
     };
     public FutureFeesDialog(int enrollmentId, string studentDisplay)
     {
+        FinanceHelp.Attach(this,monthsAhead,"Choose how many coming months to estimate. This screen only previews fees; it creates no bills or payments.","Rs. 400 tuition for two coming months is an estimate of Rs. 800. The preview does not add Rs. 800 to outstanding.");
         this.enrollmentId = enrollmentId;
         this.studentDisplay = studentDisplay;
         Text = "Future Fees";

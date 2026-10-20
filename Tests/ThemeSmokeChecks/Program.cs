@@ -34,6 +34,22 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--finance-help"))
+        {
+            CheckFinanceHelp();
+            CheckPaymentAdjustmentContext();
+            CheckPaymentDetailGeneration();
+            CheckAdjustmentRecoveryGuard();
+            CheckOperatorConcessionChoices();
+            Console.WriteLine($"PASS: {checks} finance wording, examples, transaction-code and review-safety checks (no database connection).");
+            return;
+        }
+        if(args.Contains("--leave-fee-review"))
+        {
+            CheckLeaveFeeReview();
+            Console.WriteLine($"PASS: {checks} leaving-fee decision, eligibility and checkbox checks (no database writes).");
+            return;
+        }
         if(args.Contains("--payment-adjustments"))
         {
             CheckPaymentAdjustmentContext();

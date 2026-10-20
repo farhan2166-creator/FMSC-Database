@@ -26,6 +26,9 @@ public sealed class FeePostingReversalPage : V2Page, IBusyPage
         var refresh=AddBusyAction("Refresh Months",RefreshMonthsAsync,"Secondary");
         reverseButton=AddAction("Reverse Whole Month",async(_,_)=>await ReverseAsync(),"Danger");
         reverseButton.Enabled=false;
+        FinanceHelp.Attach(this,monthBox,FinanceHelp.Topic.CancelMonth);
+        FinanceHelp.Attach(this,preview,FinanceHelp.Topic.Review);
+        FinanceHelp.Attach(this,reverseButton,FinanceHelp.Topic.CancelMonth);
         RelocateFromActions(refresh,preview,reverseButton);
         var filters=ReportUi.Bar(("Latest reversible month",monthBox),("Reason (required)",reason));
         SetContent(ReportUi.WorkflowLayout(filters,Grid,"Reversal Scope",

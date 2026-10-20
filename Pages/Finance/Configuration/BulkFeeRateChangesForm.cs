@@ -143,6 +143,9 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         BuildLayout();
+        FinanceHelp.Attach(this,adjustmentValue,"Enter the rate change, choosing percentage or rupees and increase or decrease. Preview the new rates before saving.","A 10% increase on Rs. 1,000 gives Rs. 1,100; a flat Rs. 100 decrease gives Rs. 900 before any rounding choice.");
+        FinanceHelp.Attach(this,applyButton,FinanceHelp.Topic.FeeRate);
+        FinanceHelp.Attach(this,previewButton,FinanceHelp.Topic.Review);
         SetSaveShortcut(applyButton);
         if (initialize) LoadScopeSources(currentCampusId, currentClassId);
         campusScope.SelectedIndexChanged += (_, _) => ReloadClassScope();

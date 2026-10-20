@@ -109,7 +109,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private ModernButton? studentCreditButton;
     private ModernButton? printBillButton;
     private readonly Dictionary<int, decimal> availableCreditByStudent = new();
-    private readonly CheckBox useAvailableCredit = new() { Text = "Use available credit", Checked = true, AutoSize = true };
+    private readonly CheckBox useAvailableCredit = new() { Text = "Use student advance", Checked = true, AutoSize = true };
     private readonly Label availableCredit = new();
     private readonly Label remainingCredit = new();
     private Control? outstandingSummary;
@@ -274,7 +274,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         addChargeButton = AddAction(
             "Additional Charge", (_, _) => OpenAdditionalFee(), "Secondary");
         addChargeButton.Enabled = false;
-        studentCreditButton = AddAction("Student Credit", async (_, _) => {
+        studentCreditButton = AddAction("Advance Balance", async (_, _) => {
             if (admissionId <= 0) { Warn("Select a student first."); return; }
             using var dialog = new StudentCreditDialog(admissionId);
             dialog.ShowDialog(FindForm());
@@ -503,15 +503,15 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             0);
         context.Content.Controls.Add(contextGrid);
         var allocationButton = new ModernButton {
-            Text = "Adjust Allocation",
+            Text = "Choose Fees to Pay",
             ThemeRole = "Secondary",
             Width = AppScale.Scale(205),
             Height = AppMetrics.ButtonHeight
         };
         var reverseChargeButton = new ModernButton {
-            Text = "Reverse Charge",
+            Text = "Cancel Unpaid Charge",
             ThemeRole = "Danger",
-            Width = AppScale.Scale(150),
+            Width = AppScale.Scale(190),
             Height = AppMetrics.ButtonHeight,
             Enabled = false
         };
@@ -542,7 +542,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             manualAllocation = !manualAllocation;
             charges.Columns["Pay"].Visible = manualAllocation;
             UpdateOperationMode();
-            allocationButton.Text = manualAllocation ? "Automatic Allocation" : "Adjust Allocation";
+            allocationButton.Text = manualAllocation ? "Use Suggested Split" : "Choose Fees to Pay";
             UiHelper.FitColumnsToWidth(charges);
             if (!manualAllocation)
                 ApplyPaymentAcrossCharges();
@@ -550,7 +550,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var chargeCard =
             HumanUi.Card(
                 "Outstanding Charges",
-                "Select a charge to reverse it. Use Adjust Allocation to pay specific charges.", AppTheme.ModuleAccent("Finance"), chargeActions);
+                "Select a charge to review cancellation. Use Choose Fees to Pay to enter amounts against specific fees.", AppTheme.ModuleAccent("Finance"), chargeActions);
         chargeCard.Header.Controls.SetChildIndex(chargeActions, chargeCard.Header.Controls.Count - 1);
         chargeCard.Content.Controls.Add(
             charges);
@@ -735,7 +735,17 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         summary.Controls.Add(receiptActions, 0, 11);
         summary.Controls.Add(clear, 0, 12);
         creditSummary = SummaryField("Available credit (Rs.)", availableCredit, Color.ForestGreen);
-        remainingCreditSummary = SummaryField("Remaining credit (Rs.)", remainingCredit, Color.ForestGreen);
+        remainingCreditSummary = SummaryField("Advance left (Rs.)", remainingCredit, Color.ForestGreen);
+        FinanceHelp.Attach(this,paymentAmount,FinanceHelp.Topic.ReceiveMoney);
+        FinanceHelp.Attach(this,discountAmount,FinanceHelp.Topic.Discount);
+        FinanceHelp.Attach(this,useAvailableCredit,FinanceHelp.Topic.UseAdvance);
+        FinanceHelp.Attach(this,availableCredit,FinanceHelp.Topic.AdvanceBalance);
+        FinanceHelp.Attach(this,remainingCredit,FinanceHelp.Topic.AdvanceBalance);
+        FinanceHelp.Attach(this,allocationButton,FinanceHelp.Topic.FamilySplit);
+        FinanceHelp.Attach(this,studentCreditButton,FinanceHelp.Topic.AdvanceBalance);
+        FinanceHelp.Attach(this,printReceiptButton!,FinanceHelp.Topic.Receipt);
+        FinanceHelp.Attach(this,fullAmountButton!,"Fill Amount Received with the amount still needed after the entered discount and selected advance money. Nothing is saved until you confirm collection.","Rs. 1,000 due minus Rs. 300 advance fills Rs. 700 as new money to receive.");
+        FinanceHelp.Attach(this,executeButton!,"Save the reviewed payment using new money and any selected student advance. Check the split and remaining dues before confirming.","Rs. 1,000 due can be settled with Rs. 700 new money and Rs. 300 already held as advance.");
         ((TableLayoutPanel)remainingCreditSummary).ColumnStyles[0].Width = 70;
         ((TableLayoutPanel)remainingCreditSummary).ColumnStyles[1].Width = 30;
         // Keep credit with the balance figures, above the amount received.
@@ -1146,11 +1156,13 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         chargeMenu.Items.Add(
             new ToolStripSeparator());
         var terms=chargeMenu.Items.Add("Review bill terms...");
+        terms.ToolTipText="Change the fee or discount on this bill after reviewing its effect. Example: reducing a Rs. 1,000 fee to Rs. 800 is different from reducing its recorded payment.";
         terms.Enabled=!IsBusy&&CurrentUser.HasPermission("Fees.Adjust");
         terms.Click+=async(_,_)=>await ReviewBillTermsAsync(chargeId);
         var reverse =
             chargeMenu.Items.Add(
-                "Reverse this charge...");
+                "Cancel this unpaid charge...");
+        reverse.ToolTipText="Cancel an eligible unpaid fee, with no refund. Example: cancelling an unpaid Rs. 400 charge reduces dues by Rs. 400. Payment history can block cancellation.";
         /* Hold all charge inputs while their allocation is being submitted. */
         reverse.Enabled = !transactionBusy;
         reverse.Click += async (_, _) => await ReverseChargeAsync(rowIndex);
@@ -1943,7 +1955,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         GetAmount(paymentAmount) <= CurrentPayableAfterDiscount();
 
     private string ReceivedAmountLimitMessage() =>
-        $"Maximum Rs. {CurrentPayableAfterDiscount():N0}. Deposit extra via Student Credit.";
+        $"Maximum Rs. {CurrentPayableAfterDiscount():N0}. Record extra money in Advance Balance.";
 
     /// <summary>Refresh allocation from the entered amount without assuming full payment.</summary>
     private void RefreshEnteredPaymentAllocation()
@@ -3097,7 +3109,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                             x => x.amount);
                 if (GetAmount(paymentAmount) != amount)
                 {
-                    MarkCollectionField(paymentAmount, "Allocate the full received amount. Use Student Credit for deposits.");
+                    MarkCollectionField(paymentAmount, "Assign the full received amount to fees. Use Advance Balance to hold extra money.");
                     return;
                 }
                 if (amount <= 0m &&
@@ -3114,7 +3126,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 discount > 0m
                     ? $"Collect Rs. {amount:0.##} and apply a discount of Rs. {discount:0.##}."
                     : $"Collect Rs. {amount:0.##}.";
-            if (creditUsed > 0m) description += $"\r\nExisting credit applied: Rs. {creditUsed:N0}.";
+            if (creditUsed > 0m) description += $"\r\nStudent advance used: Rs. {creditUsed:N0}.";
             /* The payment date is stamped on the receipt and the ledger. */
             description +=
                 $"\r\nPayment date: {paymentDate.Value:dd-MMM-yyyy hh:mm tt}   Method: {method.Text}.";
@@ -3127,8 +3139,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             };
             if (creditUsed > 0m)
             {
-                confirmationFacts.Add(("Credit applied", $"Rs. {creditUsed:N0}"));
-                confirmationFacts.Add(("Remaining credit", $"Rs. {SelectedAvailableCredit() - creditUsed:N0}"));
+                confirmationFacts.Add(("Advance used", $"Rs. {creditUsed:N0}"));
+                confirmationFacts.Add(("Advance left", $"Rs. {SelectedAvailableCredit() - creditUsed:N0}"));
             }
             foreach (DataGridViewRow row in charges.Rows)
             {
@@ -3198,7 +3210,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             }
             var confirmMessage = new MessageDialogContent(
                 payingStudentCount > 1 ? $"Record payment for {payingStudentCount} students?" : "Record this payment?",
-                Explanation: amount == 0m && creditUsed > 0m ? "Uses existing student credit. No new money is received." : payingStudentCount > 1 ? "One family receipt covers this payment. Each child's fees stay under their own record." : null,
+                Explanation: amount == 0m && creditUsed > 0m ? "Uses the student's existing advance balance. No new money is received." : payingStudentCount > 1 ? "One family receipt covers this payment. Each child's fees stay under their own record." : null,
                 Facts: confirmationFacts,
                 Records: payingStudentCount > 1 ? confirmationRows : null,
                 Notice: "This records the payment immediately and is final. Check every amount before choosing Yes.");

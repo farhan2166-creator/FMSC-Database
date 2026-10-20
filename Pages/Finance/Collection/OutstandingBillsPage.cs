@@ -29,6 +29,8 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
         search.PlaceholderText="Admission / QR number, student or father name";
         var load=AddBusyAction("Load Students",LoadStudentsAsync,"Primary");
         preview=AddBusyAction("Preview Selected Bills",PreviewAsync,"Secondary");preview.Enabled=false;
+        FinanceHelp.Attach(this,preview,"Prepare bills for the selected students using their posted unpaid fees. This does not receive payment.","A bill showing Rs. 1,000 due is a request for payment; the student still owes it until money or advance is applied.");
+        FinanceHelp.Attach(this,comparison,"Choose which students to include by the size of their outstanding balance. This only filters the list.","At least Rs. 1,000 includes a student owing Rs. 1,000 or Rs. 1,500, but excludes one owing Rs. 500.");
         preview.EnabledChanged+=(_,_)=>{
             if(preview.Enabled && (Selected().Count==0 || loadedScope!=Scope() || !CurrentUser.HasPermission("Fees.View")))preview.Enabled=false;
         };

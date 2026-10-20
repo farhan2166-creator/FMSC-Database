@@ -24,7 +24,11 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
         Size=new Size(AppScale.Scale(820),AppScale.Scale(680));MinimumSize=new Size(700,540);
         impact.ReadOnly=true;impact.Dock=DockStyle.Fill;
         monthlyPolicy.Items.AddRange(new object[]{"Use the school cutoff","Keep all issued monthly bills","Waive monthly bills from a selected month"});monthlyPolicy.SelectedIndex=0;
-        paidReduction.Items.AddRange(new object[]{"Keep paid reductions as credit","Refund paid reductions"});paidReduction.SelectedIndex=0;
+        paidReduction.Items.AddRange(new object[]{"Keep excess payment as advance","Refund the excess payment"});paidReduction.SelectedIndex=0;
+        FinanceHelp.Attach(this,paidReduction,FinanceHelp.Topic.PaidReduction);
+        FinanceHelp.Attach(this,monthlyPolicy,"Choose which monthly fees remain due when the student leaves. Review waived dues and any paid money released before saving.","Keeping existing bills leaves Rs. 400 tuition due. Waiving that eligible unpaid fee reduces outstanding by Rs. 400.");
+        FinanceHelp.Attach(this,waiveFrom,FinanceHelp.Topic.Period);
+        FinanceHelp.Attach(this,review,FinanceHelp.Topic.Review);
         waiveFrom.Format=DateTimePickerFormat.Custom;waiveFrom.CustomFormat="MMMM yyyy";
         waiveFrom.Value=new DateTime(date.Value.Year,date.Value.Month,1);waiveFrom.Enabled=false;
         var close=new ModernButton{Text="Close",DialogResult=DialogResult.Cancel};CancelButton=close;

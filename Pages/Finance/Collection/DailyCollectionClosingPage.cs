@@ -28,10 +28,14 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
         "Reconcile daily cash and bank totals. Student payments stay unchanged.")
     {
         day.Value = DateTime.Today;
+        FinanceHelp.Attach(this,Grid,FinanceHelp.Topic.Closing);
+        FinanceHelp.Attach(this,notes,FinanceHelp.Topic.Closing);
         AddClosingAction("Load Day", LoadAsync, "Primary");
         submit = AddClosingAction("Submit Closing", SubmitAsync, "Success");
         approve = AddClosingAction("Approve", ApproveAsync, "Success");
         print = AddClosingAction("Print Summary", PrintAsync, "Secondary");
+        FinanceHelp.Attach(this,submit,FinanceHelp.Topic.Closing);
+        FinanceHelp.Attach(this,approve,"Approve the checked closing totals. This does not alter any student's payments or balance.","If counted cash matches the recorded Rs. 700, approve that closing after checking the other payment methods.");
         AddClosingAction("Closing History", HistoryAsync, "Secondary");
         UseWrappingToolbar();
         approve.Visible = CurrentUser.IsAdministrator;

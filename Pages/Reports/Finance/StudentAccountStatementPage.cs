@@ -79,6 +79,9 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         : base(PageTitles.StudentAccountStatement, "See what a student was charged, what was paid and what remains due.")
     {
         this.readStatement=readStatement??LoadStatementDataAsync;
+        FinanceHelp.Attach(this,openingBalance,"The amount already due before the selected statement period. It is carried into this statement, not newly charged.","Rs. 500 was unpaid before October. The October statement starts with Rs. 500 opening dues.");
+        FinanceHelp.Attach(this,closingBalance,"The amount still due after the statement's charges, payments and adjustments. This report does not change the student's account.","Opening dues Rs. 500 plus fees Rs. 400 minus payment Rs. 300 leaves Rs. 600 due.");
+        FinanceHelp.Attach(this,groupModeToggle,"View statements for the included students together. This does not move payments or advance money between their accounts.","Including two siblings shows both accounts in the report; each child's dues remain on that child's account.");
         Disposed+=(_,_)=>statementReads.Dispose();
         var export =
             AddExportAction("Student_Fee_Statement");
