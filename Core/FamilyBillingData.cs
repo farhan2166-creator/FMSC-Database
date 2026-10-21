@@ -7,12 +7,13 @@ internal static class FamilyBillingData
     private static bool Flag(DataRow row, string column) => row.Table.Columns.Contains(column)
         && !row.IsNull(column) && Convert.ToBoolean(row[column]);
 
-    internal static bool AwaitsReturn(DataRow row) => Text(row, "Status") == "Active"
+    internal static bool AwaitsReturn(DataRow row) => !Flag(row, "IsOnHold") && Text(row, "Status") == "Active"
         && Text(row, "EnrollmentStatus") == "Active" && !Flag(row, "BillingReady")
         && row.Table.Columns.Contains("PlacementConfirmedAt") && !row.IsNull("PlacementConfirmedAt");
 
     internal static string Readiness(DataRow row)
     {
+        if (Flag(row, "IsOnHold")) return "On Hold";
         if (Text(row, "Status") == "Pending") return "Pending Registration";
         if (AwaitsReturn(row)) return "Awaiting Return";
         if (Text(row, "Status") == "Active" && Text(row, "EnrollmentStatus") == "Active"

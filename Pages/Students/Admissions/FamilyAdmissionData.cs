@@ -12,6 +12,7 @@ internal static class FamilyAdmissionData
         IF @Fees=1 EXEC dbo.RequirePermission @UserId,N'Fees.View';
         DECLARE @Family int=(SELECT FamilyId FROM dbo.FamilyMembers WHERE AdmissionId=@Admission);
         SELECT S.AdmissionId,S.StudentName,S.FatherName,S.ContactNumber,S.Address,S.Status,
+          CONVERT(bit,CASE WHEN EXISTS(SELECT 1 FROM dbo.StudentPostingHolds H WHERE H.AdmissionId=S.AdmissionId AND H.ResumeDate IS NULL) THEN 1 ELSE 0 END) IsOnHold,
           COALESCE(S.AdmissionNumber,S.QuickReference) Reference,FM.FamilyId,
           E.EnrollmentId,E.Status EnrollmentStatus,E.BillingReady,E.PlacementConfirmedAt,
           Y.YearName AcademicYear,CP.CampusName,C.ClassName,SE.SectionName,

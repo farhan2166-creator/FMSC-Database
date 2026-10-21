@@ -1,11 +1,35 @@
 {
   "objects": [
-    {"schema":"dbo","name":"GetFamilyAdmissionBillWaivers","type":"P "},
-    {"schema":"dbo","name":"CollectionReceipts","type":"U "},
-    {"schema":"dbo","name":"CollectionReceiptPayments","type":"U "},
-    {"schema":"dbo","name":"IssueCollectionReceipt","type":"P "},
-    {"schema":"dbo","name":"GetCollectionReceipt","type":"P "},
-    {"schema":"dbo","name":"GetStudentCollectionReceipts","type":"P "},
+    {
+      "schema": "dbo",
+      "name": "GetFamilyAdmissionBillWaivers",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "CollectionReceipts",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "CollectionReceiptPayments",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "IssueCollectionReceipt",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "GetCollectionReceipt",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "GetStudentCollectionReceipts",
+      "type": "P "
+    },
     {
       "schema": "dbo",
       "name": "RequireWholeMonthReversal",
@@ -99,6 +123,41 @@
     {
       "schema": "dbo",
       "name": "ApplyCollectionCredit",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "StudentPostingHolds",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "StudentPostingHoldBills",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "StudentPostingDecisions",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "GetStudentPostingHoldContext",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "GetStudentPostingHoldBills",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "GetStudentPostingDecisionOutcome",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "SaveStudentPostingDecision",
       "type": "P "
     }
   ],
@@ -318,6 +377,390 @@
       "isNullable": false,
       "isIdentity": false,
       "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "name": "RequestId",
+      "type": "uniqueidentifier",
+      "maxLength": 16,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "name": "AdmissionId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "name": "HoldId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "name": "Action",
+      "type": "nvarchar",
+      "maxLength": 20,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "name": "UserId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "name": "PayloadHash",
+      "type": "varbinary",
+      "maxLength": 32,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "name": "ResultJson",
+      "type": "nvarchar",
+      "maxLength": -1,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "name": "CreatedAt",
+      "type": "datetime2",
+      "maxLength": 8,
+      "precision": 27,
+      "scale": 7,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHoldBills",
+      "name": "HoldId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHoldBills",
+      "name": "BillingChargeId",
+      "type": "bigint",
+      "maxLength": 8,
+      "precision": 19,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHoldBills",
+      "name": "OriginalGross",
+      "type": "decimal",
+      "maxLength": 9,
+      "precision": 12,
+      "scale": 2,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHoldBills",
+      "name": "OriginalDiscount",
+      "type": "decimal",
+      "maxLength": 9,
+      "precision": 12,
+      "scale": 2,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHoldBills",
+      "name": "CorrectionRequestId",
+      "type": "uniqueidentifier",
+      "maxLength": 16,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHoldBills",
+      "name": "RestoredRequestId",
+      "type": "uniqueidentifier",
+      "maxLength": 16,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "HoldId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": true,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "AdmissionId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "EnrollmentId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "HoldDate",
+      "type": "date",
+      "maxLength": 3,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "Reason",
+      "type": "nvarchar",
+      "maxLength": 1000,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "CreatedBy",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "CreatedAt",
+      "type": "datetime2",
+      "maxLength": 8,
+      "precision": 27,
+      "scale": 7,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "MonthlyFeePolicy",
+      "type": "nvarchar",
+      "maxLength": 40,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "WaiveFromMonth",
+      "type": "date",
+      "maxLength": 3,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "PaidReductionAction",
+      "type": "nvarchar",
+      "maxLength": 20,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "PreviousBillingReady",
+      "type": "bit",
+      "maxLength": 1,
+      "precision": 1,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "AdoptedLeft",
+      "type": "bit",
+      "maxLength": 1,
+      "precision": 1,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "ResumeDate",
+      "type": "date",
+      "maxLength": 3,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "BillingFromMonth",
+      "type": "date",
+      "maxLength": 3,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "ResumedEnrollmentId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "ResumeReason",
+      "type": "nvarchar",
+      "maxLength": 1000,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "ResumedBy",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "ResumedAt",
+      "type": "datetime2",
+      "maxLength": 8,
+      "precision": 27,
+      "scale": 7,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
     }
   ],
   "uniqueIndexes": [
@@ -348,6 +791,34 @@
       "name": "UX_StudentCreditEntries_Request",
       "filter": null,
       "keys": "RequestId,AdmissionId,EntryKind"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "UX_StudentPostingHolds_Active",
+      "filter": "([ResumeDate] IS NULL)",
+      "keys": "AdmissionId"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "PK_StudentPostingHolds",
+      "filter": null,
+      "keys": "HoldId"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHoldBills",
+      "name": "PK_StudentPostingHoldBills",
+      "filter": null,
+      "keys": "HoldId,BillingChargeId"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "name": "PK_StudentPostingDecisions",
+      "filter": null,
+      "keys": "RequestId"
     }
   ],
   "foreignKeys": [
@@ -400,6 +871,126 @@
       "referencedColumns": "BankAccountOpeningCertificateId",
       "deleteAction": 0,
       "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "referencedSchema": "dbo",
+      "referencedObject": "Students",
+      "columns": "AdmissionId",
+      "referencedColumns": "AdmissionId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "referencedSchema": "dbo",
+      "referencedObject": "Enrollments",
+      "columns": "EnrollmentId",
+      "referencedColumns": "EnrollmentId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "referencedSchema": "dbo",
+      "referencedObject": "Users",
+      "columns": "CreatedBy",
+      "referencedColumns": "UserId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "referencedSchema": "dbo",
+      "referencedObject": "Enrollments",
+      "columns": "ResumedEnrollmentId",
+      "referencedColumns": "EnrollmentId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "referencedSchema": "dbo",
+      "referencedObject": "Users",
+      "columns": "ResumedBy",
+      "referencedColumns": "UserId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHoldBills",
+      "referencedSchema": "dbo",
+      "referencedObject": "StudentPostingHolds",
+      "columns": "HoldId",
+      "referencedColumns": "HoldId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHoldBills",
+      "referencedSchema": "dbo",
+      "referencedObject": "BillingCharges",
+      "columns": "BillingChargeId",
+      "referencedColumns": "BillingChargeId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHoldBills",
+      "referencedSchema": "dbo",
+      "referencedObject": "FeeBillCorrections",
+      "columns": "CorrectionRequestId",
+      "referencedColumns": "RequestId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHoldBills",
+      "referencedSchema": "dbo",
+      "referencedObject": "FeeBillCorrections",
+      "columns": "RestoredRequestId",
+      "referencedColumns": "RequestId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "referencedSchema": "dbo",
+      "referencedObject": "Students",
+      "columns": "AdmissionId",
+      "referencedColumns": "AdmissionId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "referencedSchema": "dbo",
+      "referencedObject": "StudentPostingHolds",
+      "columns": "HoldId",
+      "referencedColumns": "HoldId",
+      "deleteAction": 0,
+      "updateAction": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "referencedSchema": "dbo",
+      "referencedObject": "Users",
+      "columns": "UserId",
+      "referencedColumns": "UserId",
+      "deleteAction": 0,
+      "updateAction": 0
     }
   ],
   "databaseProperties": [
@@ -418,6 +1009,273 @@
       "schema": "dbo",
       "objectName": "MutationRequests",
       "name": "CK_MutationRequests_Result"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingHolds",
+      "name": "CK_StudentPostingHolds_Dates"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "name": "CK_StudentPostingDecisions_Action"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "StudentPostingDecisions",
+      "name": "CK_StudentPostingDecisions_Json"
+    }
+  ],
+  "triggers": [
+    {
+      "schema": "dbo",
+      "name": "GuardStudentPostingHolds",
+      "parentSchema": "dbo",
+      "parentName": "BillingCharges",
+      "events": "INSERT,UPDATE",
+      "insteadOf": false
+    }
+  ],
+  "parameters": [
+    {
+      "schema": "dbo",
+      "objectName": "GetStudentPostingDecisionOutcome",
+      "name": "@UserId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "GetStudentPostingDecisionOutcome",
+      "name": "@AdmissionId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "GetStudentPostingDecisionOutcome",
+      "name": "@RequestId",
+      "type": "uniqueidentifier",
+      "maxLength": 16,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "GetStudentPostingHoldBills",
+      "name": "@UserId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "GetStudentPostingHoldBills",
+      "name": "@AdmissionId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "GetStudentPostingHoldContext",
+      "name": "@UserId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "GetStudentPostingHoldContext",
+      "name": "@AdmissionId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@UserId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@AdmissionId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@Action",
+      "type": "nvarchar",
+      "maxLength": 20,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@EffectiveDate",
+      "type": "date",
+      "maxLength": 3,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@Reason",
+      "type": "nvarchar",
+      "maxLength": 1000,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@RequestId",
+      "type": "uniqueidentifier",
+      "maxLength": 16,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@Preview",
+      "type": "bit",
+      "maxLength": 1,
+      "precision": 1,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@ExpectedSnapshot",
+      "type": "varchar",
+      "maxLength": 64,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@MonthlyFeePolicy",
+      "type": "nvarchar",
+      "maxLength": 40,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@WaiveFromMonth",
+      "type": "date",
+      "maxLength": 3,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@PaidReductionAction",
+      "type": "nvarchar",
+      "maxLength": 20,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@BillingFromMonth",
+      "type": "date",
+      "maxLength": 3,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@RestoreBills",
+      "type": "nvarchar",
+      "maxLength": -1,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@ApplyAvailableCredit",
+      "type": "bit",
+      "maxLength": 1,
+      "precision": 1,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@TargetEnrollmentId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@AdoptLeft",
+      "type": "bit",
+      "maxLength": 1,
+      "precision": 1,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveStudentPostingDecision",
+      "name": "@ChargeAnnualFees",
+      "type": "bit",
+      "maxLength": 1,
+      "precision": 1,
+      "scale": 0,
+      "isOutput": false
     }
   ]
 }

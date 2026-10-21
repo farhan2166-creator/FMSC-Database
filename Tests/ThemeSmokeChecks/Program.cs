@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--student-holds"))
+        {
+            CheckStudentPostingHolds();
+            Console.WriteLine($"PASS: {checks} hold/resume UI and recovery checks.");
+            return;
+        }
         if(args.Contains("--report-captions"))
         {
             CheckReportCaptions();

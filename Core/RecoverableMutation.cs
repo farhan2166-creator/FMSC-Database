@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace FMSC_SMS.Core;
 
-internal enum MutationKind { FeeAdjustment, BankCertificateCreate, FeeConcession }
+internal enum MutationKind { FeeAdjustment, BankCertificateCreate, FeeConcession, StudentHold, StudentResume }
 internal enum MutationOutcome { Saved, Rejected, Unconfirmed }
 internal sealed record MutationIntent(Guid Id,MutationKind Kind,int UserId,string Scope,string PayloadHash,string Summary,DateTime StartedUtc);
 internal sealed record MutationResult(MutationKind Kind,int SubjectId,int OriginId,int RecordId,string Receipt,string TransactionType,decimal Amount,decimal? Balance)
