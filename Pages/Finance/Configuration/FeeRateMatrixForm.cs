@@ -316,10 +316,10 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
             Font = AppTheme.NormalFont,
             ForeColor = AppTheme.MutedText
         };
-        summaryTip.SetToolTip(subtitle, subtitle.Text);
-        summaryTip.SetToolTip(saveButton, "Save class rates. Existing student fees and bills stay unchanged.");
-        summaryTip.SetToolTip(editFeeButton, "Change the frequency and remarks for one class. The Frequency column changes the whole row.");
-        summaryTip.SetToolTip(applyStudentsButton, "Review and update eligible existing student fee rates. This does not create bills.");
+        ControlToolTips.SetDescription(summaryTip,subtitle, subtitle.Text);
+        ControlToolTips.SetDescription(summaryTip,saveButton, "Save class rates. Existing student fees and bills stay unchanged.");
+        ControlToolTips.SetDescription(summaryTip,editFeeButton, "Change the frequency and remarks for one class. The Frequency column changes the whole row.");
+        ControlToolTips.SetDescription(summaryTip,applyStudentsButton, "Review and update eligible existing student fee rates. This does not create bills.");
         var campusLabel = new Label {
             Text = "Campus",
             AutoSize = true,
@@ -337,7 +337,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         summaryLabel.TextAlign = ContentAlignment.MiddleLeft;
         summaryLabel.Margin = new Padding(14, 0, 8, 0);
         // Long messages (errors, invalid-cell counts) are cut to one line here; hovering shows all of it.
-        summaryLabel.TextChanged += (_, _) => summaryTip.SetToolTip(summaryLabel, summaryLabel.Text);
+        summaryLabel.TextChanged += (_, _) => ControlToolTips.SetDescription(summaryTip,summaryLabel, summaryLabel.Text);
         var actions = new FlowLayoutPanel {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,

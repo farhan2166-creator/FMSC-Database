@@ -108,7 +108,7 @@ public sealed class FormValidator : IDisposable
         if (!control.IsDisposed && control is IValidationTarget target)
             target.IsInvalid = false;
         HideBadge(entry);
-        _tip.SetToolTip(control, null);
+        ControlToolTips.SetValidation(_tip,control, null);
         Changed?.Invoke(this, EventArgs.Empty);
         if (_entries.Count == 0)
             RaiseSummary();
@@ -128,7 +128,7 @@ public sealed class FormValidator : IDisposable
             if (!control.IsDisposed && control is IValidationTarget target)
                 target.IsInvalid = false;
             HideBadge(entry);
-            _tip.SetToolTip(control, null);
+            ControlToolTips.SetValidation(_tip,control, null);
         }
         _entries.Clear();
         Changed?.Invoke(this, EventArgs.Empty);
@@ -194,7 +194,11 @@ public sealed class FormValidator : IDisposable
             return;
         _disposed = true;
         foreach (Entry entry in _entries.Values)
+        {
             entry.Unsubscribe?.Invoke();
+            HideBadge(entry);
+            ControlToolTips.SetValidation(_tip, entry.Control, null);
+        }
         _entries.Clear();
         _tip.Dispose();
     }
@@ -407,15 +411,15 @@ public sealed class FormValidator : IDisposable
             entry.Badge = messageLabel;
             messageLabel.Text = entry.Message;
             messageLabel.Visible = true;
-            _tip.SetToolTip(messageLabel, entry.Message);
-            _tip.SetToolTip(entry.Control, entry.Message);
+            ControlToolTips.SetValidation(_tip,messageLabel, entry.Message);
+            ControlToolTips.SetValidation(_tip,entry.Control, entry.Message);
             return;
         }
         Label? caption = CaptionOf(entry.Control);
         if (caption is null || caption.IsDisposed)
         {
             entry.Badge = null;
-            _tip.SetToolTip(entry.Control, entry.Message);
+            ControlToolTips.SetValidation(_tip,entry.Control, entry.Message);
             return;
         }
         if (!Badges.TryGetValue(caption, out Label? badge) || badge.IsDisposed)
@@ -429,13 +433,14 @@ public sealed class FormValidator : IDisposable
         FitBadge(caption, badge);
         badge.Visible = true;
         badge.BringToFront();
-        _tip.SetToolTip(badge, entry.Message);
-        _tip.SetToolTip(entry.Control, entry.Message);
+        ControlToolTips.SetValidation(_tip,badge, entry.Message);
+        ControlToolTips.SetValidation(_tip,entry.Control, entry.Message);
     }
     private void HideBadge(Entry entry)
     {
         if (entry.Badge is { IsDisposed: false } badge)
         {
+            ControlToolTips.SetValidation(_tip, badge, null);
             badge.Visible = false;
             badge.Text = string.Empty;
         }

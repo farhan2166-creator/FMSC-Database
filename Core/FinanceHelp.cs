@@ -36,7 +36,7 @@ internal static class FinanceHelp
         var session=Sessions.GetValue(owner,key=>new Session(key));
         void Apply(Control control)
         {
-            session.Tips.SetToolTip(control,text);
+            ControlToolTips.SetDescription(session.Tips,control,text);
             UiAccessibility.Describe(control,null,text);
             // Wrapped inputs receive mouse events on their native child controls.
             foreach(Control child in control.Controls)Apply(child);

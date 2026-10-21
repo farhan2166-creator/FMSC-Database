@@ -1615,7 +1615,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     }
     protected void SetToolTip(Control control, string text)
     {
-        _statusToolTip.SetToolTip(control, _shortcutController.DecorateToolTip(control, text));
+        ControlToolTips.SetDescription(_statusToolTip, control, text);
     }
     /// <summary>Report an attempted operation that failed; retain the outcome after dismissing the dialog.</summary>
     protected void Alert(
