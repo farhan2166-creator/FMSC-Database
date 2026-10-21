@@ -1,23 +1,30 @@
 # Apply the database changes later
 
-The application requires **schema 31**. SQL changes are checked in here;
+The application requires **schema 38**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 | Current database version | Files to apply, in order |
 |---|---|
-| 19 | `20.sql`, `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
-| 20 | `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
-| 21 | `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
-| 22 | `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
-| 23 | `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
-| 24 | `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
-| 25 | `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
-| 26 | `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
-| 27 | `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
-| 28 | `29.sql`, `30.sql`, then `31.sql` |
-| 29 | `30.sql`, then `31.sql` |
-| 30 | `31.sql` |
-| 31 | None |
+| 19 | `20.sql`, `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 20 | `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 21 | `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 22 | `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 23 | `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 24 | `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 25 | `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 26 | `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 27 | `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 28 | `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 29 | `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 30 | `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 31 | `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 32 | `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 33 | `34.sql`, `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 34 | `35.sql`, `36.sql`, `37.sql`, then `38.sql` |
+| 35 | `36.sql`, `37.sql`, then `38.sql` |
+| 36 | `37.sql`, then `38.sql` |
+| 37 | `38.sql` |
+| 38 | None |
 
 Check your version first:
 
@@ -62,9 +69,9 @@ Close the application and make a verified backup first, as described in
 transaction, which the installer normally provides.
 
 For a schema-19 database, save this wrapper **outside this directory**, change the
-include paths to your checkout, and run it with SQLCMD. For schema 20, omit
-the `20.sql` include and its following `GO`. For schema 21, start at `22.sql`;
-for schema 22, start at `23.sql`; for schema 23, start at `24.sql`; for schema 24, start at `25.sql`; for schema 25, start at `26.sql`; for schema 26, start at `27.sql`; for schema 27, start at `28.sql`; for schema 28, include `29.sql`, `30.sql` then `31.sql`; for schema 29, include `30.sql` then `31.sql`; for schema 30, include only `31.sql`.
+include paths to your checkout, and run it with SQLCMD. For a newer supported
+database, omit every include up to and including its current version. For example,
+schema 36 needs `37.sql` and `38.sql`; schema 37 needs only `38.sql`.
 
 ```sql
 :ON ERROR EXIT
@@ -95,11 +102,25 @@ GO
 GO
 :r "C:\FMSC-Database\Migrations\31.sql"
 GO
+:r "C:\FMSC-Database\Migrations\32.sql"
+GO
+:r "C:\FMSC-Database\Migrations\33.sql"
+GO
+:r "C:\FMSC-Database\Migrations\34.sql"
+GO
+:r "C:\FMSC-Database\Migrations\35.sql"
+GO
+:r "C:\FMSC-Database\Migrations\36.sql"
+GO
+:r "C:\FMSC-Database\Migrations\37.sql"
+GO
+:r "C:\FMSC-Database\Migrations\38.sql"
+GO
 IF XACT_STATE() <> 1
     THROW 51000, 'The upgrade transaction cannot be committed.', 1;
 IF ISNULL((SELECT TOP (1) TRY_CONVERT(int, VersionNumber)
-           FROM dbo.DatabaseVersion ORDER BY VersionId DESC), -1) <> 31
-    THROW 51000, 'The upgrade did not reach schema 31.', 1;
+           FROM dbo.DatabaseVersion ORDER BY VersionId DESC), -1) <> 38
+    THROW 51000, 'The upgrade did not reach schema 38.', 1;
 COMMIT TRANSACTION;
 GO
 ```
@@ -128,3 +149,17 @@ Migration 29 corrects migration 28: class placement is historical and does not s
 Migration 30 adds reviewed student fee-posting holds and resume, with separate history, selective restoration, optional annual fees/advance, SQL posting safeguards and saved-request recovery. Existing Left records are not converted automatically. See [the operator and recovery policy](../Docs/STUDENT_POSTING_HOLDS.md).
 
 Migration 31 keeps held students out of Confirm Return and rejects stale return confirmations before changing fees or placement. Held students use the reviewed Lift Hold / Resume workflow. No existing records are rewritten.
+
+Migration 32 removes audit-only writes and snapshots from ChangeOwnPassword, RenameOwnUsername, CreateNoObjectionCertificate and UpdateNoObjectionCertificate. Permissions, validation, account changes, certificate snapshots and returned identifiers are preserved. Existing data and historical audit entries are unchanged.
+
+Migration 33 removes audit-only writes and snapshots from CreateRegularStudentCertificate, UpdateRegularStudentCertificate, CreateSportsCertificate and UpdateSportsCertificate. It preserves permissions, validation, certificate records, student snapshots and returned identifiers. Existing data and historical audit entries are unchanged.
+
+Migration 34 removes audit-only writes and snapshots from CreateRegularLecturerCertificate, UpdateRegularLecturerCertificate, CreateBankAccountOpeningCertificate and UpdateBankAccountOpeningCertificate. Permissions, validation, staff snapshots, certificate fields and returned IDs remain unchanged. Existing data and historical audit entries are preserved.
+
+Migration 35 removes audit-only writes and snapshots from CreateCharacterCertificate and CreateDateOfBirthCertificate. It preserves permissions, validation, original student details, certificate issuance history, duplicate protection and returned certificate/issue IDs. Existing data and historical audit entries remain unchanged.
+
+Migration 36 removes audit-only writes and snapshots from CreateProvisionalCertificate and UpdateProvisionalCertificate. It preserves permissions, validation, student snapshots, exam details, subject snapshots and saved subject ordering. Existing data and historical audit entries remain unchanged.
+
+Migration 37 removes audit-only work from VerifyLegacyStudent, CompleteQuickAdmission, DeleteStudentFeeAssignment, SetStudentAdmissionNumber, SetEnrollmentBillingStartDate, SaveRole, SaveSchoolProfile and SaveFeeConfiguration. Permissions, validation, role restrictions, number serialization, admission history, billing records and returned results remain intact. Existing data and historical audit entries remain unchanged.
+
+Migration 38 removes audit-only work from SaveDailyCollectionClosing, ApproveDailyCollectionClosing, ApplyFeeConfigurationToExistingAssignments and DiscontinueStudentFeeAssignment. Closing snapshots, revisions, approvals, concurrency protection, fee versions, effective-month checks and per-student results remain unchanged. Existing data and historical audit entries are preserved.
