@@ -107,7 +107,7 @@ internal sealed class StaffEmploymentOverview : UserControl
         {
             if (IsDisposed || request != generation) return;
             AppExceptionHandler.LogNonFatal(ex, "StaffEmploymentOverview: load");
-            SetDetailMessage("Employment could not be loaded. Use Employment above to refresh.");
+            SetDetailMessage("Employment could not be loaded. Select the staff member again to retry.");
             historyMessage.Text = "Employment could not be loaded.";
         }
     }
