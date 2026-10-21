@@ -74,9 +74,9 @@ a new review; checking never retries the write.
 
 ## Delivery and verification
 
-Apply `Migrations/30.sql` after schema 29, using the transaction and backup process
+Apply `Migrations/30.sql` then `Migrations/31.sql` after schema 29, using the transaction and backup process
 in [the migration instructions](../Migrations/README.md). Application and installer
-schema requirements are 30. No existing Left record, bill or payment is rewritten
+schema requirements are 31. No existing Left record, bill or payment is rewritten
 by installing this migration.
 
 `Tools/TestStudentPostingHolds.ps1` creates a separately owned schema-only LocalDB
@@ -102,3 +102,28 @@ all rows in the 12 checked student, placement, fee, bill, payment, credit, famil
 certificate and lifecycle tables were unchanged. No existing student was placed
 on hold or converted from Left. The verified backup and local application evidence
 are retained under ignored `artifacts/backups` and `artifacts/hold-live-migration.json`.
+
+Follow-up correction, 21 October 2026 (reviewed commit `63f19db`): an empty
+SQL JSON scalar fee list can be returned as NULL. The desktop previously tried
+to parse that empty value and displayed a generic error during Put on Hold.
+The renderer now accepts NULL, blank and empty-array lists without changing any
+financial calculations. The expanded 53 native hold/recovery checks passed,
+including a populated waiver list with a NULL new-fee list. Four further checks
+rendered the actual read-only SQL preview response through the asynchronous
+screen path. No hold or fee mutation was submitted. Unexpected hold-screen
+exceptions are now retained in the local diagnostic log.
+Confirm Return is for a promoted student awaiting ordinary return confirmation.
+It must not be used to lift a posting hold. Held students are excluded from that
+selection; Admission directs them to **Actions > Lift Hold / Resume**. Migration
+31 also rejects an old return confirmation before changing fee assignments or
+placement, including a return with no payable opening fee. The check shares the
+billing lock with hold/resume, so those decisions cannot pass each other.
+
+Verified on 21 October 2026: 62 isolated SQL checks and 55 native desktop checks
+passed, including rejection of a stale all-zero return and successful ordinary
+promoted return. Debug and Release builds succeeded. Migration 31 was applied
+after a COPY_ONLY checksum backup and RESTORE VERIFYONLY. SHA-256 comparisons
+confirmed all rows unchanged across the 12 existing business tables plus the
+three hold/decision tables and fee-correction records. The updated application's
+installation compatibility verifier returned success. Local backup/application
+evidence is retained under ignored `artifacts/hold-return-live-migration.json`.

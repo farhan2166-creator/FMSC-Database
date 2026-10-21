@@ -3736,7 +3736,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             {
                 var pending = await DatabaseHelper.QueryUserAsync("GetPendingReturnAdmissions");
                 if (IsDisposed || version != admissionLoadVersion || currentAdmissionId != admissionId) return;
-                confirmReturnButton.Visible = !legacySetupPending && !IsPendingRegistration && pending.AsEnumerable().Any(row => GetIntColumn(row, "AdmissionId") == admissionId);
+                confirmReturnButton.Visible = !studentPostingHeld && !legacySetupPending && !IsPendingRegistration && pending.AsEnumerable().Any(row => GetIntColumn(row, "AdmissionId") == admissionId);
             }
         }
         catch (Exception ex)
@@ -3836,6 +3836,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private async Task OpenConfirmReturnAsync()
     {
         if (currentAdmissionId <= 0 || saveBusy || !CurrentUser.HasPermission("Students.Administer")) return;
+        if (studentPostingHeld)
+        {
+            SetStatus("This student is on hold. Choose Actions > Lift Hold / Resume to review the return and fees.");
+            return;
+        }
         if (HasUnsavedChanges) { SetStatus("Save admission changes before confirming the student's return."); return; }
         int admissionId = currentAdmissionId;
         using var dialog = new ConfirmReturnAdmissionDialog(admissionId);

@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--student-hold-preview-response"))
+        {
+            CheckStudentPostingHoldSqlResponse();
+            Console.WriteLine($"PASS: {checks} read-only SQL response rendering checks (no database writes).");
+            return;
+        }
         if(args.Contains("--student-holds"))
         {
             CheckStudentPostingHolds();

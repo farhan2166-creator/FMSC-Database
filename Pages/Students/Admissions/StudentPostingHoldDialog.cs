@@ -171,7 +171,7 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
             if (pending is not null) impact.Text = $"A previous decision needs checking: {pending.Summary}. Use Check Save Outcome before saving again.";
             else impact.Text = "Choose the school's decision, then review the amounts before saving.";
         }
-        catch (Exception ex) { impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex, "Loading student posting hold context"); impact.Text = DbMessage.UserMessage(ex); }
         finally { busy = false; loading = false; body.Enabled = true; UpdatePending(); }
     }
     private void UpdatePending()
@@ -199,12 +199,17 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
                 (resume ? "No new admission number. Original receipts and recorded refunds remain.\r\n" : "New fee posting stops. Existing dues remain collectible.\r\n") + FeeLines(plan, "ChangedFees", resume ? "Restore" : "Waive") + FeeLines(plan, "AddedFees", "Charge");
             save.Enabled = true;
         }
-        catch (Exception ex) { impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { Reset(); AppExceptionHandler.LogNonFatal(ex, "Reviewing student posting hold decision"); impact.Text = DbMessage.UserMessage(ex); }
         finally { busy = false; body.Enabled = true; }
     }
     private static string FeeLines(DataRow row, string column, string verb)
     {
-        using var document = JsonDocument.Parse(Convert.ToString(row[column]) ?? "[]");
+        // An empty SQL FOR JSON scalar subquery can arrive as DBNull, rather
+        // than "[]". No fee rows is a valid review, including every Hold's
+        // empty AddedFees list; it must not prevent reviewing the decision.
+        string? fees = row.IsNull(column) ? null : Convert.ToString(row[column]);
+        if (string.IsNullOrWhiteSpace(fees)) return string.Empty;
+        using var document = JsonDocument.Parse(fees);
         return string.Join("", document.RootElement.EnumerateArray().Select(f => $"{verb}: {f.GetProperty("FeeTypeName").GetString()} / {DateTime.Parse(f.GetProperty("BillingMonth").GetString()!):MMM yyyy} / Rs. {Money(f.GetProperty("Amount").GetDecimal())}\r\n"));
     }
     private async Task SaveAsync()
@@ -221,6 +226,7 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
         }
         catch (Exception ex)
         {
+            AppExceptionHandler.LogNonFatal(ex, "Saving student posting hold decision");
             Reset(); impact.Text = (pending is null ? "The decision was not submitted.\r\n" : "Saving was not confirmed. Use Check Save Outcome before repeating this decision.\r\n") + DbMessage.UserMessage(ex);
         }
         finally { busy = false; if (!IsDisposed) { body.Enabled = true; UpdatePending(); } }
@@ -248,7 +254,7 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
             if (data.Rows.Count == 1) Complete(Convert.ToString(data.Rows[0]["ResultJson"]));
             else { MutationRecoveryJournal.ClearVerified(pending, JournalPath(pending.Kind)); pending = null; Reset(); impact.Text = "The database confirms that this decision was not saved. Review again before saving."; }
         }
-        catch (Exception ex) { impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex, "Checking student posting decision outcome"); impact.Text = DbMessage.UserMessage(ex); }
         finally { busy = false; if (!IsDisposed) { body.Enabled = true; UpdatePending(); } }
     }
 }

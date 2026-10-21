@@ -9,6 +9,39 @@ using Microsoft.Data.SqlClient;
 
 internal static partial class Program
 {
+    private static void CheckStudentPostingHoldSqlResponse()
+    {
+        const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
+        var previous = (CurrentUser.UserId, CurrentUser.Username, CurrentUser.RoleName, CurrentUser.MustChangePassword, CurrentUser.GetPermissions().ToArray());
+        CurrentUser.SignIn(901, "Read-only response fixture", "Administrator", false, Array.Empty<string>());
+        using var context = new DataTable(); context.ReadXml("artifacts/hold-diagnostic-context.xml");
+        using var plan = new DataTable(); plan.ReadXml("artifacts/hold-diagnostic-plan.xml");
+        int writes = 0;
+        async Task<DataTable> Query(string procedure, SqlParameter[] args)
+        {
+            await Task.Delay(10);
+            if (procedure == "GetStudentPostingHoldContext") return context.Copy();
+            if (procedure == "SaveStudentPostingDecision" && Convert.ToBoolean(args.Single(a => a.ParameterName == "@Preview").Value)) return plan.Copy();
+            writes++; throw new InvalidOperationException("This rendering check cannot submit a database write.");
+        }
+        try
+        {
+            using var dialog = new StudentPostingHoldDialog(6589, "Read-only review response", false, query: Query,
+                recoveryPath: Path.GetFullPath("artifacts/student-holds/response-" + Guid.NewGuid().ToString("N")));
+            T Field<T>(string name) => (T)dialog.GetType().GetField(name, flags)!.GetValue(dialog)!;
+            dialog.Show(); PumpUntil(() => Field<ModernButton>("review").Enabled, "Actual SQL context binds after an asynchronous response");
+            Field<ModernTextBox>("reason").Text = "Read-only response rendering check";
+            typeof(Control).GetMethod("OnClick", flags)!.Invoke(Field<ModernButton>("review"), new object[] { EventArgs.Empty });
+            PumpUntil(() => Field<ModernButton>("review").Enabled, "Actual SQL review response finishes rendering");
+            Check(Field<ModernButton>("save").Enabled && Field<ModernTextBox>("impact").Text.Contains("Outstanding after saving:"),
+                "The actual SQL preview renders fully and enables the reviewed save action");
+            Check(writes == 0, "Rendering the actual preview saves no hold and changes no fees");
+            using var picture = new Bitmap(dialog.Width, dialog.Height); dialog.DrawToBitmap(picture, new Rectangle(Point.Empty, picture.Size));
+            picture.Save("artifacts/student-holds/hold-read-only-review.png"); dialog.Close();
+        }
+        finally { CurrentUser.SignIn(previous.UserId, previous.Username, previous.RoleName, previous.MustChangePassword, previous.Item5); }
+    }
+
     private static void CheckStudentPostingHolds()
     {
         const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Instance;
@@ -62,6 +95,16 @@ internal static partial class Program
         }
         try
         {
+            using (var admission = new StudentAdmissionPage())
+            {
+                typeof(StudentAdmissionPage).GetField("currentAdmissionId", flags)!.SetValue(admission, 41);
+                typeof(StudentAdmissionPage).GetField("studentPostingHeld", flags)!.SetValue(admission, true);
+                var openReturn = (Task)typeof(StudentAdmissionPage).GetMethod("OpenConfirmReturnAsync", flags)!.Invoke(admission, null)!;
+                var status = (Label)typeof(V2Page).GetField("StatusLabel", flags)!.GetValue(admission)!;
+                Check(openReturn.IsCompletedSuccessfully && status.Text.Contains("Actions > Lift Hold / Resume"),
+                    "Admission directs a held student to reviewed resume instead of opening Confirm Return");
+                Check(!admission.IsHandleCreated, "Held return routing opens no window or database request");
+            }
             using (var dialog = new StudentPostingHoldDialog(41, "Fictional student", false, query: Query, scope: () => Task.FromResult(databaseScope), recoveryPath: path))
             {
                 dialog.Show(); PumpUntil(() => Field<ModernButton>(dialog, "review").Enabled, "Hold context loads");
@@ -77,6 +120,22 @@ internal static partial class Program
                 Check(!save.Enabled, "An obsolete hold review cannot be saved");
                 Click(review); reviewReply!.SetResult(Plan()); PumpUntil(() => save.Enabled, "Current hold review enables saving");
                 Check(Field<ModernTextBox>(dialog, "impact").Text.Contains("1,000.50"), "Review preserves legitimate historical fractional balances");
+                foreach (object emptyFees in new object[] { DBNull.Value, "", "  ", "[]" })
+                {
+                    // SQL's empty JSON scalar subquery is DBNull in production;
+                    // the earlier fixture used only a non-null empty JSON array.
+                    var empty = Plan(); empty.Rows[0]["ChangedFees"] = emptyFees; empty.Rows[0]["AddedFees"] = emptyFees;
+                    Click(review); reviewReply!.SetResult(empty);
+                    PumpUntil(() => review.Enabled, "Empty fee-list review settles");
+                    Check(save.Enabled && Field<ModernTextBox>(dialog, "impact").Text.Contains("Outstanding after saving:"),
+                        "Null, blank and empty JSON fee lists permit a complete hold review");
+                }
+                var populated = Plan();
+                populated.Rows[0]["ChangedFees"] = "[{\"BillingMonth\":\"2026-11-01\",\"FeeTypeName\":\"Tuition Fee\",\"Amount\":400.00,\"Due\":0.00}]";
+                populated.Rows[0]["AddedFees"] = DBNull.Value;
+                Click(review); reviewReply!.SetResult(populated); PumpUntil(() => review.Enabled, "Mixed populated/null fee-list review settles");
+                Check(save.Enabled && Field<ModernTextBox>(dialog, "impact").Text.Contains("Waive: Tuition Fee / Nov 2026 / Rs. 400"),
+                    "A real SQL-shaped hold review renders waived fees alongside an empty new-fee list");
                 using (var picture = new Bitmap(dialog.Width, dialog.Height)) { dialog.DrawToBitmap(picture, new Rectangle(Point.Empty, picture.Size)); picture.Save(Path.Combine(folder, "hold.png")); }
                 Click(save);
                 PumpUntil(() => saveReply is not null, "Hold save is submitted after durable intent");
