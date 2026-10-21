@@ -140,3 +140,13 @@ Open **Help & FAQ** on the dashboard. Search in ordinary words, combine Topic an
 In **Collections & Receipts**, choose the **Receipts** view and select **Group By**: **Whole School** for a combined list, **Campus**, **Class** (within campus), or **Section** (within campus and class). Click **Run Report** after changing the selection. Existing date, campus, class, section and payment-method filters still restrict the records included. Whole School combines those selected records; it does not clear the filters.
 
 The screen, printout and export include the same group headings, monetary subtotals and final total for the selected receipts. Credit applied remains separate from money received. A family receipt spanning several campuses or class/sections stays intact in a **Multiple** group. The **Summary** view retains its separate date, payment-method, class, campus and fee-type grouping choices.
+
+## Lecturer/teacher certificate defaults
+
+When selecting a staff member or starting a new Regular Lecturer/Teacher Certificate, Designation starts with their saved employment designation. Subject Taught uses the most recent nonblank subject in that staff member's saved certificates; it stays blank when none exists. Both fields remain editable. Selecting an existing certificate shows that certificate's saved wording.
+
+The Bank Account Opening Certificate also fills Designation from the selected staff member’s employment record when starting a new certificate. It remains editable; opening an existing certificate retains its saved designation.
+
+## Staff job actions
+
+Use **Edit Job** on the Job Details card to open the active job, **Edit** on a history row for that saved job, or **Add Job** to start a blank job. Each opens a direct job form without history tabs. Employment History stays on the staff page; the redundant top Employment button has been removed. Save or clear staff-profile edits before opening a job form.

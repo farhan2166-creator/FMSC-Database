@@ -200,6 +200,8 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
                 return;
             }
             LoadCertificates(staffId);
+            ClearCertificateFields();
+            ApplyWorkflowState();
         }
         catch (Exception ex)
         {
@@ -611,7 +613,23 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
         subjectTaught.Clear();
         certificateDate.Value =
             DateTime.Today;
+        ApplyStaffDefaults();
         CaptureBaseline();
+    }
+    private void ApplyStaffDefaults()
+    {
+        int staffId = staff.SelectedId;
+        if (staffId <= 0) return;
+        DataRow? employment = staff.SelectedRow;
+        // The result list is newest first. Never reuse a previous staff member's certificate.
+        var saved = certificateResults.AsEnumerable()
+            .Where(row => GetInt(row, "StaffId") == staffId).ToArray();
+        string designation = employment is null ? "" : GetString(employment, "Designation");
+        roleTitle.Text = string.IsNullOrWhiteSpace(designation)
+            ? saved.Select(row => GetString(row, "RoleTitle")).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? ""
+            : designation;
+        subjectTaught.Text = saved.Select(row => GetString(row, "SubjectTaught"))
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "";
     }
     private void ClearCertificateSelection()
     {
