@@ -34,6 +34,18 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--report-captions"))
+        {
+            CheckReportCaptions();
+            Console.WriteLine($"PASS: {checks} report caption and rendering checks.");
+            return;
+        }
+        if(args.Contains("--ui-guidance-review"))
+        {
+            CaptureUiGuidanceReview();
+            Console.WriteLine($"PASS: {checks} UI guidance rendering checks; captures in artifacts/ui-guidance-review.");
+            return;
+        }
         if(args.Contains("--payment-details"))
         {
             CheckPaymentDetailsGrid();

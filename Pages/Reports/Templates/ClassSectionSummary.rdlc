@@ -170,7 +170,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>Counts: active students. Balances: all unpaid charges, including former placements. All classes and sections; other Student Report filters are not applied. Other includes unspecified gender.</Value>
+                <Value>Counts: active students. Outstanding: all unpaid charges, including former placements. All classes and sections; other Student Report filters are not applied. Other includes unspecified gender.</Value>
                 <Style>
                   <FontFamily>Arial</FontFamily>
                   <FontSize>8pt</FontSize>
@@ -201,7 +201,13 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>="Prepared: " &amp; First(Fields!Generated.Value, "ClassSummaryData")</Value>
+                <Value>Prepared: </Value>
+                <Style>
+                  <FontFamily>Arial</FontFamily>
+                  <FontSize>8pt</FontSize>
+                </Style>
+              </TextRun><TextRun>
+                <Value>=First(Fields!Generated.Value, "ClassSummaryData")</Value>
                 <Style>
                   <FontFamily>Arial</FontFamily>
                   <FontSize>8pt</FontSize>
@@ -1262,7 +1268,25 @@
             <Paragraph>
               <TextRuns>
                 <TextRun>
-                  <Value>="Page " &amp; Globals!PageNumber &amp; " of " &amp; Globals!TotalPages</Value>
+                  <Value>Page </Value>
+                  <Style>
+                    <FontFamily>Arial</FontFamily>
+                    <FontSize>8pt</FontSize>
+                  </Style>
+                </TextRun><TextRun>
+                  <Value>=Globals!PageNumber</Value>
+                  <Style>
+                    <FontFamily>Arial</FontFamily>
+                    <FontSize>8pt</FontSize>
+                  </Style>
+                </TextRun><TextRun>
+                  <Value> of </Value>
+                  <Style>
+                    <FontFamily>Arial</FontFamily>
+                    <FontSize>8pt</FontSize>
+                  </Style>
+                </TextRun><TextRun>
+                  <Value>=Globals!TotalPages</Value>
                   <Style>
                     <FontFamily>Arial</FontFamily>
                     <FontSize>8pt</FontSize>
