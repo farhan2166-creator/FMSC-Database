@@ -18,6 +18,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Changed
 
+- Show saved pre-payment fee amounts on collection receipts, followed by Total, Received and Balance; retain credit/adjustment details and remove the duplicate settlement total for saved collection receipts.
 - Open staff Add Job and Edit Job directly in an editor-only dialog; keep employment history on the staff page.
 - Remove the redundant top Employment button from Staff Management; use the existing Edit Job, Add Job and employment-history Edit actions.
 - Prefill the bank account opening certificate’s editable Designation from the selected staff member’s employment record; preserve saved certificate wording when editing.
