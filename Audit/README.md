@@ -7,6 +7,7 @@ Start with the [master audit](FMSC_MASTER_AUDIT.md). Its findings retain the evi
 - [End-user flow audit — 14 October 2026](Reviews/FMSC_END_USER_FLOW_AUDIT_2026-10-14.md)
 - [Post-merge project audit — 14 October 2026](Reviews/FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md)
 - [UI improvements review](Reviews/UI_IMPROVEMENTS_REVIEW.md)
+- [UI wording, guidance & consistency audit — 20 October 2026](Reviews/FMSC_UI_Guidance_Audit_2026-10-20.md)
 
 ## Archive
 
