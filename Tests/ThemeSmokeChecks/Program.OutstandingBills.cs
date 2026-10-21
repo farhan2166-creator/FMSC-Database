@@ -40,32 +40,71 @@ internal static partial class Program
                 var commands=(List<NavigationCommand>)typeof(FMSC_SMS.MainDashboardForm).GetField("navigationCommands",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(shell)!;
                 Check(commands.Any(command=>command.Caption==PageTitles.OutstandingBills),"Bill printing is a standalone navigation destination");
             }
-            using var page=new OutstandingBillsPage(false,_=>Task.FromResult(balances.Copy()));
+            using var page=new OutstandingBillsPage(false,async _=>{await Task.Delay(20);return balances.Copy();});
             using var owner=new Form{ClientSize=new Size(1500,900),AutoScaleMode=AutoScaleMode.None};owner.Controls.Add(page);owner.Show();Application.DoEvents();
             var flags=BindingFlags.Instance|BindingFlags.NonPublic;
             T Field<T>(string name)=>(T)typeof(OutstandingBillsPage).GetField(name,flags)!.GetValue(page)!;
             IEnumerable<Control> Walk(Control root)=>root.Controls.Cast<Control>().SelectMany(c=>new[]{c}.Concat(Walk(c)));
             ModernButton Button(string caption)=>Walk(page).OfType<ModernButton>().Single(button=>button.Text==caption);
-            var load=(Task)typeof(OutstandingBillsPage).GetMethod("LoadStudentsAsync",flags)!.Invoke(page,null)!;
-            PumpUntil(()=>load.IsCompleted,"Bill selection loads the injected balances");
-            Check(load.IsCompletedSuccessfully&&Button("Preview Selected Bills").Enabled,"Loaded owing students can be previewed");
+            void ClickButton(ModernButton control)
+            {
+                control.Focus();control.PerformClick();
+                Application.DoEvents();
+            }
+            ClickButton(Button("Load Students"));
+            PumpUntil(()=>!page.IsBusy&&Button("Preview Selected Bills").Enabled,"Load Students click completes its asynchronous read");
+            Check(Button("Preview Selected Bills").Enabled,"Loaded owing students can be previewed");
             var grid=(DataGridView)typeof(V2Page).GetField("Grid",flags)!.GetValue(page)!;
             Check(grid.Rows.Count==3&&grid.Columns["CampusName"].Visible&&grid.Columns["ClassSection"].Visible,"Grid distinguishes campus and class/section");
+            ClickButton(Button("Clear Selection"));
+            Check(grid.Rows.Cast<DataGridViewRow>().All(row=>Equals(row.Cells["Include"].Value,false)),"Clear Selection unchecks every displayed row after an asynchronous load");
+            ClickButton(Button("Select All"));
+            Check(grid.Rows.Cast<DataGridViewRow>().All(row=>Equals(row.Cells["Include"].Value,true)),"Select All checks every displayed row after an asynchronous load");
+            grid.CurrentCell=grid.Rows[0].Cells["Include"];grid.Focus();grid.BeginEdit(false);
+            grid.CurrentCell.Value=false;grid.NotifyCurrentCellDirty(true);
+            ClickButton(Button("Select All"));
+            Check(grid.Rows.Cast<DataGridViewRow>().All(row=>Equals(row.Cells["Include"].Value,true)),"Select All replaces a current checkbox edit");
+            grid.CurrentCell=grid.Rows[1].Cells["Include"];grid.Focus();grid.BeginEdit(false);
+            grid.CurrentCell.Value=true;grid.NotifyCurrentCellDirty(true);
+            ClickButton(Button("Clear Selection"));
+            Check(grid.Rows.Cast<DataGridViewRow>().All(row=>Equals(row.Cells["Include"].Value,false))&&!Button("Preview Selected Bills").Enabled,
+                "Clear Selection finishes an active checkbox edit and clears the actual preview selection");
+            Field<ModernTextBox>("search").Text="No student matches this search";Application.DoEvents();
+            ClickButton(Button("Select All"));
+            Check(grid.Rows.Count==0&&Field<DataTable>("roster").AsEnumerable().All(row=>row.Field<bool>("Include"))&&Button("Preview Selected Bills").Enabled,
+                "Select All includes the loaded students even when search hides every row");
+            ClickButton(Button("Select Shown"));
+            Check(!Field<DataTable>("roster").AsEnumerable().Any(row=>row.Field<bool>("Include"))&&!Button("Preview Selected Bills").Enabled,
+                "Select Shown clears an existing selection when the search has no matching students");
+            Field<ModernTextBox>("search").Text="";ClickButton(Button("Select All"));
             Field<ModernTextBox>("search").Text="Bilal";Application.DoEvents();
             var roster=Field<DataTable>("roster");
             Check(grid.Rows.Count==1&&roster.AsEnumerable().Count(row=>row.Field<bool>("Include"))==3,"Search retains selected students outside the visible results");
+            ClickButton(Button("Select Shown"));
+            Check(roster.AsEnumerable().Where(row=>row.Field<bool>("Include")).Single().Field<int>("AdmissionId")==2&&Field<Label>("selectedSummary").Text.StartsWith("1 selected"),
+                "Select Shown replaces Select All with just the visible students and updates the count");
+            Field<ModernTextBox>("search").Text="";Application.DoEvents();
+            Check(grid.Rows.Cast<DataGridViewRow>().Count(row=>Equals(row.Cells["Include"].Value,true))==1,
+                "Clearing the search reveals that hidden students were unchecked by Select Shown");
+            Field<ModernTextBox>("search").Text="Bilal";Application.DoEvents();
             Button("Clear Selection").PerformClick();Check(!Button("Preview Selected Bills").Enabled,"Clearing all selection disables preview");
             Button("Select Shown").PerformClick();Check(roster.AsEnumerable().Where(row=>row.Field<bool>("Include")).Single().Field<int>("AdmissionId")==2,"Select Shown selects only matching students");
             Button("Select All").PerformClick();Check(roster.AsEnumerable().All(row=>row.Field<bool>("Include")),"Select All includes matches hidden by search");
             Field<ModernComboBox>("comparison").SelectedIndex=(int)BillBalanceComparison.AtLeast;
             Field<ModernNumericTextBox>("amount").Value=6900;
             Check(!Button("Preview Selected Bills").Enabled,"Changing amount filters invalidates preview until reload");
-            load=(Task)typeof(OutstandingBillsPage).GetMethod("LoadStudentsAsync",flags)!.Invoke(page,null)!;PumpUntil(()=>load.IsCompleted,"Changed balance filter reloads");
+            var load=(Task)typeof(OutstandingBillsPage).GetMethod("LoadStudentsAsync",flags)!.Invoke(page,null)!;PumpUntil(()=>load.IsCompleted,"Changed balance filter reloads");
             Check(Field<DataTable>("roster").Rows.Count==2,"Reload applies the requested threshold to the complete balances");
             Field<ModernTextBox>("search").Text="";
             foreach(var size in new[]{new Size(1500,900),new Size(1000,720)})
             {
                 owner.ClientSize=size;owner.PerformLayout();Application.DoEvents();
+                var sequence=new[]{"Select All","Select Shown","Clear Selection","Preview Selected Bills"};
+                var selectionButtons=Button("Select All").Parent!;
+                Check(selectionButtons.Controls.Cast<Control>().Select(control=>control.Text).SequenceEqual(sequence),
+                    "Selection tools appear before bill preview in natural order");
+                Check(sequence.Select(Button).Select(button=>button.TabIndex).SequenceEqual(Enumerable.Range(0,4)),
+                    "Keyboard navigation follows the selection then preview order");
                 foreach(string caption in new[]{"Load Students","Preview Selected Bills","Select All","Select Shown","Clear Selection"})
                 {
                     var button=Button(caption);Check(button.Visible,"All bill actions remain visible");

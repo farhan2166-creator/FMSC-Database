@@ -200,8 +200,12 @@ public static class HumanUi
         Dock = DockStyle.Fill
     };
     public static TableLayoutPanel ButtonRow(params Control[] buttons)
+        => BuildButtonRow(buttons, preserveOrder: false);
+    internal static TableLayoutPanel ButtonRowInOrder(params Control[] buttons)
+        => BuildButtonRow(buttons, preserveOrder: true);
+    private static TableLayoutPanel BuildButtonRow(Control[] buttons, bool preserveOrder)
     {
-        buttons = ActionButtonStyle.Ordered(buttons);
+        if (!preserveOrder) buttons = ActionButtonStyle.Ordered(buttons);
         var row = new TableLayoutPanel {
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
@@ -235,7 +239,8 @@ public static class HumanUi
                 button.Width = buttonWidth;
             flow.Controls.Add(button);
         }
-        ActionButtonStyle.Arrange(flow);
+        if (!preserveOrder) ActionButtonStyle.Arrange(flow);
+        else for (int i = 0; i < buttons.Length; i++) buttons[i].TabIndex = i;
         row.Controls.Add(flow, 1, 0);
         void FitButtons()
         {
