@@ -99,6 +99,10 @@ public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyP
             $"Submitted by: {state["SubmittedBy"]} · Approved by: {state["ApprovedBy"]}",
             Convert.ToString(state["ClosingStatus"])!.StartsWith("Needs review"));
     }
+    // Business invariant (UFA-07/08): refund/correction rows are reconciliation adjustments,
+    // not cash counted by the clerk. Their Actual Amount remains blank; ordinary methods
+    // require whole-rupee entries, while existing historical fractional totals retain precision.
+    // See Audit/OWNER_DECISIONS_AND_INVARIANTS.md. Changing this rule changes closing semantics.
     private static bool IsAdjustment(DataRow row) => DailyClosingSummary.IsAdjustment(row);
     private ModernButton AddClosingAction(string text, Func<Task> operation, string role) =>
         AddBusyAction(text, async () => {
