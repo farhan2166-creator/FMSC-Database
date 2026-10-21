@@ -1,4 +1,3 @@
-using System.Data;
 using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
 
@@ -6,11 +5,6 @@ namespace FMSC_SMS.Services.Communication;
 
 public static class CommunicationSchemaContract
 {
-    internal static string NormalizeDefinition(string definition) => Regex.Replace(
-        definition.Replace("\r\n", "\n").Trim(),
-        @"^(?:CREATE(?:\s+OR\s+ALTER)?|ALTER)\s+(PROCEDURE|FUNCTION)\b",
-        match => "CREATE " + match.Groups[1].Value.ToUpperInvariant(), RegexOptions.IgnoreCase);
-
     public static async Task<bool> VerifyAsync(SqlConnection connection,CancellationToken token=default)
     {
         using var stream=typeof(CommunicationSchemaContract).Assembly.GetManifestResourceStream("FMSC_SMS.Communication.Schema.sql")
@@ -19,15 +13,20 @@ public static class CommunicationSchemaContract
         var expected=new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
         foreach(string batch in Regex.Split(script,@"^\s*GO\s*$",RegexOptions.Multiline|RegexOptions.IgnoreCase))
         {
-            var match=Regex.Match(batch,@"^\s*CREATE (?:PROCEDURE|FUNCTION) comm\.\[?(\w+)\]?",RegexOptions.IgnoreCase);
-            if(match.Success)expected[match.Groups[1].Value]=NormalizeDefinition(batch);
+            var match=Regex.Match(batch,@"^\s*CREATE (PROCEDURE|FUNCTION) comm\.\[?(\w+)\]?",RegexOptions.IgnoreCase);
+            if(match.Success)expected[match.Groups[2].Value]=match.Groups[1].Value.Equals("PROCEDURE",StringComparison.OrdinalIgnoreCase)?"P":"FN";
         }
-        await using var command=new SqlCommand("SELECT O.name,M.definition FROM sys.objects O JOIN sys.sql_modules M ON M.object_id=O.object_id WHERE O.schema_id=SCHEMA_ID(N'comm');",connection);
+        // Migrations legitimately change procedure bodies. Require the runtime APIs,
+        // not an exact copy of the original installation script; allow additional APIs.
+        await using var command=new SqlCommand("SELECT name,type FROM sys.objects WHERE schema_id=SCHEMA_ID(N'comm');",connection);
         using(var result=await command.ExecuteReaderAsync(token).ConfigureAwait(false))
         {
             while(await result.ReadAsync(token).ConfigureAwait(false))
             {
-                if(!expected.Remove(result.GetString(0),out var definition) || result.IsDBNull(1) || definition!=NormalizeDefinition(result.GetString(1)))return false;
+                string actualType=result.GetString(1).Trim();
+                if(expected.TryGetValue(result.GetString(0),out var type) &&
+                    (type==actualType || type=="FN" && actualType is "IF" or "TF"))
+                    expected.Remove(result.GetString(0));
             }
         }
         if(expected.Count!=0)return false;
