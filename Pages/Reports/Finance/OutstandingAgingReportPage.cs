@@ -18,6 +18,19 @@ public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
         yield return DatabaseHelper.Int("@SectionId", Section.SelectedId);
         yield return DatabaseHelper.Date("@AsOfDate", DateTime.Today);
     }
+    protected override void PrepareReportData(DataTable data, SqlParameter[] parameters)
+    {
+        string? dueColumn = data.Columns.Contains("Oldest Due Date") ? "Oldest Due Date"
+            : data.Columns.Contains("Due Date") ? "Due Date" : null;
+        // The grouped Aging view combines dates into buckets, so it has no single day count.
+        if (dueColumn is null) return;
+        DateTime asOf = ((DateTime)parameters.Single(p => p.ParameterName == "@AsOfDate").Value).Date;
+        var days = data.Columns.Add("Days Overdue", typeof(int));
+        days.SetOrdinal(data.Columns[dueColumn]!.Ordinal + 1);
+        foreach (DataRow row in data.Rows)
+            if (row[dueColumn] is DateTime due)
+                row[days] = Math.Max(0, (asOf - due.Date).Days);
+    }
     protected override async Task PreviewClassOutstandingAsync()
     {
         if (!CurrentUser.HasPermission("Reports.View")) return;

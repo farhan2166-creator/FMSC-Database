@@ -10,6 +10,20 @@ Notable user-facing, database, installer, and operational changes will be tracke
 - Isolate registration recovery from loaded child editors, reject mismatched recovered identities and identify progress when preparation stops after earlier children have saved. New children remain pending for full admission later.
 - Add migration 27 for read-only current/future fully waived bill evidence. Preserve established admission, financial writes, receipt numbering and RDLC templates; no school or financial records are rewritten by the migration.
 
+
+### Fixed
+
+- Define payment-detail grid columns before binding so Student Fee Corrections can open View Details without accessing missing auto-generated columns.
+
+### Changed
+
+- Add Whole School, Campus, Class and Section grouping to Collections & Receipts receipt lists, with monetary subtotals and a grand total on screen, print and export; preserve mixed-location family receipts intact.
+- Give fee descriptions more width on student/family bills and receipts by narrowing the amount column, preserving paper width and month alignment.
+- Clarify Billing Summary headings with the selected charge-date/grouping label, Charge Count, Gross Billed, Discounts and Net Billed.
+- Show exact Days Overdue beside the stored due date in Outstanding & Aging student, charge and family views, while retaining aging buckets.
+- Center serial numbers, sections and student counts in the Class & Section Summary, including headers and totals; preserve left-aligned names and right-aligned balances.
+- Widen Update Student Fee Rates, align its fields in one row when space permits, and fit preview columns to the available width. Smaller windows retain a two-row field layout.
+
 ## [1.1.0-rc.2] - 2026-10-18
 
 - Make Billing Center titles and guidance concise and consistent; use posting/reversal labels instead of generic report instructions.

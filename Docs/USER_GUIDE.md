@@ -134,3 +134,9 @@ For installation and recovery issues, use [installation](INSTALLATION.md) and [b
 ## Help for rules and unexpected results
 
 Open **Help & FAQ** on the dashboard. Search in ordinary words, combine Topic and Rule type filters, and follow Where to go. System rules are protected; School settings have a supported authorized editor; User choices remain within permitted options. Help is offline and does not grant action access. Related questions clear the current filters to show their destination. See [Help Center instructions and acceptance limits](HELP_CENTER.md).
+
+## Collections & Receipts grouping
+
+In **Collections & Receipts**, choose the **Receipts** view and select **Group By**: **Whole School** for a combined list, **Campus**, **Class** (within campus), or **Section** (within campus and class). Click **Run Report** after changing the selection. Existing date, campus, class, section and payment-method filters still restrict the records included. Whole School combines those selected records; it does not clear the filters.
+
+The screen, printout and export include the same group headings, monetary subtotals and final total for the selected receipts. Credit applied remains separate from money received. A family receipt spanning several campuses or class/sections stays intact in a **Multiple** group. The **Summary** view retains its separate date, payment-method, class, campus and fee-type grouping choices.

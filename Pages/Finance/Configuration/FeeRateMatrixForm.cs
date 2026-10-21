@@ -756,7 +756,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         using var dialog = new ApplicationWindowForm {
             Text = PageTitles.UpdateStudentFeeRates,
             StartPosition = FormStartPosition.CenterParent,
-            ClientSize = new Size(AppScale.Scale(1250), AppScale.Scale(650)),
+            ClientSize = new Size(AppScale.Scale(1600), AppScale.Scale(650)),
             MinimumSize = new Size(AppScale.Scale(720), AppScale.Scale(440)),
             ShowInTaskbar = false, MinimizeBox = false,
             BackColor = AppTheme.PageBackground

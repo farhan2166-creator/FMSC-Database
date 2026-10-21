@@ -34,6 +34,13 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--payment-details"))
+        {
+            CheckPaymentDetailsGrid();
+            CheckPaymentDetailGeneration();
+            Console.WriteLine($"PASS: {checks} focused payment detail grid and stale-response checks (no database connection).");
+            return;
+        }
         if(args.Contains("--collection-counter-layout"))
         {
             CheckCollectionCounterLayout();
