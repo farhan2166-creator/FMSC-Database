@@ -7,9 +7,16 @@
 
 > **Release acceptance: PENDING.** A passing Windows CI build verifies automated tests, not a complete installer on a real school PC. Do not deploy as an unqualified production release until the deployment and operator checks below are recorded. This document is a consolidation of recorded evidence, not a new execution of all tests.
 
-## End-user-flow corrections under review
+## Consolidation index — 21 October 2026
 
-The merged [end-user-flow audit](Reviews/FMSC_END_USER_FLOW_AUDIT_2026-10-14.md) remains historical evidence at its reviewed source. [PR #8](https://github.com/farhan2166-creator/FMSC-Database/pull/8) proposes the corrections below on a separate branch; it is not an automatic merge or deployment approval.
+- [Audit index](README.md) identifies the canonical owner-decision record, immutable investigations and historical verification.
+- [Owner decisions and invariants](OWNER_DECISIONS_AND_INVARIANTS.md) is the cross-module locator for financial, admission, setup, data-preservation, access and UI safeguards. It does **not** replace current implementation or SQL checks.
+- [UI guidance audit](Reviews/FMSC_UI_Guidance_Audit_2026-10-20.md) is an unimplemented wording/design assessment. Its G01–G17 findings require visual review and explicit approval before changes.
+- This master preserves dated release evidence and outstanding gates. The 21 October consolidation organizes documentation and comments only; it did not rerun CI, installer, native GUI or database verification. In particular, the October 14 installer-policy observations must not be asserted as freshly reproduced against the October 21 source.
+
+## End-user-flow corrections (historical reviewed baseline)
+
+The merged [end-user-flow audit](Reviews/FMSC_END_USER_FLOW_AUDIT_2026-10-14.md) remains historical evidence at its reviewed source. [PR #8](https://github.com/farhan2166-creator/FMSC-Database/pull/8) was merged, as recorded by the later [post-merge audit](Reviews/FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md). The correction evidence below is pinned to its reviewed commits; a merge is not a production deployment approval.
 
 **Reviewed implementation:** [`5b664f3952feeef339a0af1b9ca4c39c553357a2`](https://github.com/farhan2166-creator/FMSC-Database/commit/5b664f3952feeef339a0af1b9ca4c39c553357a2). [Windows CI run 38554464212](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/38554464212) completed successfully: Release compilation (zero warnings/errors), 148 focused Windows control checks, 657 portable checks, 32,183 synthetic performance/state checks, 273 SQL-module fingerprints, 12 schema-artifact tests, Windows PowerShell verification, full disposable publication and altered-DACPAC rejection. These are focused automated checks, not an interactive deployment acceptance.
 
