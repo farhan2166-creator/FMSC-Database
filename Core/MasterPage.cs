@@ -195,7 +195,8 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
         string? savePermission = null,
         string? deleteBlockedProcedure = null,
         string? recordIdColumn = null,
-        bool separateEntryAndRecords = false)
+        bool separateEntryAndRecords = false,
+        bool editorOnly = false)
         : base(title, context)
     {
         _changeTracker = new MasterEditorChangeTracker(Values);
@@ -346,7 +347,20 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
         gridCard.Content.Controls.Add(Grid);
         gridCard.Content.Controls.Add(recordsToolbar);
         Control host;
-        if (separateEntryAndRecords)
+        if (editorOnly)
+        {
+            editorCard.Content.AutoScroll = true;
+            editor.Dock = DockStyle.Top;
+            editor.AutoSize = true;
+            editorCard.Dock = DockStyle.Fill;
+            // Keep the records grid alive for the existing load-by-ID and reload flow.
+            gridCard.Visible = false;
+            var editorHost = new Panel { Dock = DockStyle.Fill };
+            editorHost.Controls.Add(gridCard);
+            editorHost.Controls.Add(editorCard);
+            host = editorHost;
+        }
+        else if (separateEntryAndRecords)
         {
             editorCard.Content.AutoScroll = true;
             editor.Dock = DockStyle.Top;

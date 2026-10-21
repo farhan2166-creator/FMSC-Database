@@ -62,7 +62,13 @@ internal static class FeeDocumentLayout
                         var textBox = cell.Element(ns + "Textbox")!;
                         string expression = textBox.Descendants(ns + "Value").First().Value;
                         string text = expression;
-                        if (expression.StartsWith('='))
+                        if ((string?)textBox.Attribute("Name") == "DocumentDateFooter")
+                        {
+                            text = expression.Contains("Now()", StringComparison.Ordinal)
+                                ? $"Printed on {DateTime.Now:dd-MMM-yyyy hh:mm tt}"
+                                : "Payment Date: " + Convert.ToString(record["PaymentDateText"]);
+                        }
+                        else if (expression.StartsWith('='))
                         {
                             string key = Regex.Match(expression, @"Fields!(\w+)\.Value").Groups[1].Value;
                             text = expression.StartsWith("=Format(")
@@ -90,7 +96,10 @@ internal static class FeeDocumentLayout
                         float points = float.Parse(textBox.Descendants(ns + "FontSize").First().Value.Replace("pt", ""), CultureInfo.InvariantCulture);
                         bool bold=textBox.Descendants(ns + "FontWeight").Any(weight => weight.Value == "Bold")
                             || (data.Columns.Contains("FamilyRowKind")&&(string?)textBox.Attribute("Name")=="FeeDescription"&&Convert.ToString(record["FamilyRowKind"])!="Fee");
-                        using var font = new Font("Segoe UI", points, bold ? FontStyle.Bold : FontStyle.Regular);
+                        FontStyle fontStyle = bold ? FontStyle.Bold : FontStyle.Regular;
+                        if (textBox.Descendants(ns + "FontStyle").Any(style => style.Value == "Italic"))
+                            fontStyle |= FontStyle.Italic;
+                        using var font = new Font("Segoe UI", points, fontStyle);
                         var style = textBox.Element(ns + "Style");
                         double PaddingPoints(string name) => double.Parse(
                             (style?.Element(ns + name)?.Value ?? "0pt").Replace("pt", ""),CultureInfo.InvariantCulture);

@@ -766,7 +766,8 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     {
         bankName.Clear();
         branchName.Clear();
-        designation.Clear();
+        designation.Text = staff.SelectedRow is DataRow employment
+            ? GetString(employment, "Designation") : string.Empty;
         monthlyIncome.Value = 0;
         purpose.Text =
             "for his/her salary purpose";
