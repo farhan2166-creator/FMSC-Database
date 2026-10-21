@@ -73,28 +73,44 @@ public sealed class ApplyFeeConfigurationPage : V2Page
         effectiveFrom.SelectedIndexChanged += (_, _) => InvalidatePreview();
         var filters = new TableLayoutPanel {
             Dock = DockStyle.Top,
-            ColumnCount = 3,
+            ColumnCount = 5,
             RowCount = 1,
             Height = AppMetrics.FieldRowHeight,
             Margin = new Padding(0, 0, 0, 8)
         };
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 34f));
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33f));
-        filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33f));
-        filters.Controls.Add(HumanUi.Field("Campus", campus, true), 0, 0);
-        filters.Controls.Add(HumanUi.Field("Class", classBox, scopes is null), 1, 0);
-        filters.Controls.Add(HumanUi.Field("Fee Type", feeType, scopes is null), 2, 0);
-        var applyRow = new TableLayoutPanel {
-            Dock = DockStyle.Top,
-            ColumnCount = 2,
-            RowCount = 1,
-            Height = AppMetrics.FieldRowHeight,
-            Margin = new Padding(0, 8, 0, 8)
+        var fields = new Control[] {
+            HumanUi.Field("Campus", campus, true),
+            HumanUi.Field("Class", classBox, scopes is null),
+            HumanUi.Field("Fee Type", feeType, scopes is null),
+            HumanUi.Field("New Rates Start From", effectiveFrom, true),
+            HumanUi.Field("Remarks (optional)", reason)
         };
-        applyRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
-        applyRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 75f));
-        applyRow.Controls.Add(HumanUi.Field("New Rates Start From", effectiveFrom, true), 0, 0);
-        applyRow.Controls.Add(HumanUi.Field("Remarks (optional)", reason), 1, 0);
+        bool? singleRow = null;
+        void ArrangeFields()
+        {
+            bool wide = filters.ClientSize.Width >= AppScale.Scale(1100);
+            if (singleRow == wide) return;
+            singleRow = wide;
+            filters.SuspendLayout();
+            filters.Controls.Clear();
+            filters.ColumnStyles.Clear();
+            filters.RowStyles.Clear();
+            filters.ColumnCount = wide ? 5 : 3;
+            filters.RowCount = wide ? 1 : 2;
+            filters.Height = AppMetrics.FieldRowHeight * filters.RowCount;
+            foreach (float weight in wide ? new[] { 18f, 18f, 18f, 20f, 26f } : new[] { 34f, 33f, 33f })
+                filters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, weight));
+            for (int row = 0; row < filters.RowCount; row++)
+                filters.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
+            for (int i = 0; i < fields.Length; i++)
+            {
+                filters.SetColumnSpan(fields[i], !wide && i == 4 ? 2 : 1);
+                filters.Controls.Add(fields[i], wide ? i : i % 3, wide ? 0 : i / 3);
+            }
+            filters.ResumeLayout(true);
+        }
+        filters.SizeChanged += (_, _) => ArrangeFields();
+        ArrangeFields();
         /* Preview and Apply were removed from the action bar and never placed, so the page had no buttons. */
         var closeButton = new ModernButton {
             Text = UiText.Actions.Close, Width = AppScale.Scale(100), Height = AppMetrics.ButtonHeight, ThemeRole = "Secondary"
@@ -107,19 +123,17 @@ public sealed class ApplyFeeConfigurationPage : V2Page
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 5,
+            RowCount = 4,
             Padding = new Padding(0)
         };
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
         root.Controls.Add(filters, 0, 0);
-        root.Controls.Add(applyRow, 0, 1);
-        root.Controls.Add(applyOutcome, 0, 2);
-        root.Controls.Add(buttonRow, 0, 3);
-        root.Controls.Add(Grid, 0, 4);
+        root.Controls.Add(applyOutcome, 0, 1);
+        root.Controls.Add(buttonRow, 0, 2);
+        root.Controls.Add(Grid, 0, 3);
         root.SizeChanged += (_, _) => applyOutcome.MaximumSize = new Size(Math.Max(AppScale.Scale(300), root.ClientSize.Width - AppScale.Scale(16)), 0);
         SetContent(root, UiText.Fees.StudentRateScope);
         FeeTypeCatalog.Changed += OnFeeTypesChanged;
@@ -445,9 +459,9 @@ public sealed class ApplyFeeConfigurationPage : V2Page
             column.DisplayIndex = index++;
             column.MinimumWidth = name == "StudentDetails" ? 240 : name == "ClassSection" ? 100 : 90;
             column.FillWeight = column.Width;
-            column.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+            column.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
         }
-        Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+        Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
     }
     private void HideColumn(string columnName)
     {

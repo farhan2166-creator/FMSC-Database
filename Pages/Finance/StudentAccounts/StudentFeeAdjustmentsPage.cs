@@ -623,14 +623,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
             Text="Payment Details",StartPosition=FormStartPosition.CenterParent,
             ClientSize=new Size(AppScale.Scale(900),AppScale.Scale(420)),ShowInTaskbar=false
         };
-        var grid=HumanUi.Grid(false);
-        grid.Dock=DockStyle.Fill;grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.None;grid.DataSource=data;
-        grid.Columns["Fee"].HeaderText=UiText.Fees.FeeType;
-        grid.Columns["Amount (Rs.)"].HeaderText=UiText.Fees.Amount;
-        grid.Columns["Billing Month"].DefaultCellStyle.Format="MMM-yyyy";
-        grid.Columns["Amount (Rs.)"].DefaultCellStyle.Format="#,##0.##";
-        grid.Columns["Amount (Rs.)"].DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleCenter;
-        grid.Columns["Amount (Rs.)"].HeaderCell.Style.Alignment=DataGridViewContentAlignment.MiddleCenter;
+        var grid=CreatePaymentDetailsGrid(data);
         var card=HumanUi.Card(receipt,$"{state?.Status}. {state?.Explanation}",AppTheme.ModuleAccent("Finance"));
         card.Dock=DockStyle.Fill;card.Content.Controls.Add(grid);
         var close=new ModernButton { Text=UiText.Actions.Close,DialogResult=DialogResult.OK,ThemeRole="Secondary" };
@@ -639,6 +632,27 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         layout.Controls.Add(card,0,0);layout.Controls.Add(HumanUi.ButtonRow(close),0,1);
         dialog.Controls.Add(layout);dialog.CancelButton=close;
         dialog.ShowDialog(FindForm());
+    }
+    private static DataGridView CreatePaymentDetailsGrid(DataTable data)
+    {
+        var grid=HumanUi.Grid(false);
+        grid.Dock=DockStyle.Fill;
+        grid.AutoGenerateColumns=false;
+        grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;
+        // Define columns before binding: an unparented grid has no BindingContext
+        // yet, so auto-generated columns are not available for immediate styling.
+        foreach(var (name,header,weight) in new[] {
+            ("Fee",UiText.Fees.FeeType,30f), ("Billing Month","Billing Month",20f),
+            ("Amount (Rs.)",UiText.Fees.Amount,20f), ("Reason","Reason",30f) })
+            grid.Columns.Add(new DataGridViewTextBoxColumn {
+                Name=name,DataPropertyName=name,HeaderText=header,FillWeight=weight
+            });
+        grid.Columns["Billing Month"].DefaultCellStyle.Format="MMM-yyyy";
+        grid.Columns["Amount (Rs.)"].DefaultCellStyle.Format="#,##0.##";
+        grid.Columns["Amount (Rs.)"].DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleCenter;
+        grid.Columns["Amount (Rs.)"].HeaderCell.Style.Alignment=DataGridViewContentAlignment.MiddleCenter;
+        grid.DataSource=data;
+        return grid;
     }
     private static Task<DataTable> ReadPaymentDetailsAsync(int userId,int paymentId,int studentId)
     {

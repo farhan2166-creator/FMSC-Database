@@ -1,4 +1,5 @@
 using Microsoft.Data.SqlClient;
+using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed class CollectionsReceiptsReportPage : CanonicalFinanceReportPage
 {
@@ -8,7 +9,32 @@ public sealed class CollectionsReceiptsReportPage : CanonicalFinanceReportPage
         new[] { "Receipts", "Detailed Transactions", "Summary" },
         new[] { "Day", "Week", "Month", "Payment Method", "Class", "Campus", "Fee Type" },
         true, false, true, true)
-    { }
+    {
+        Grid.DataBindingComplete += (_, _) => {
+            if (ViewName == "Receipts") LockGridOrder();
+        };
+    }
+    protected override string GroupingCaption => "Group By";
+    protected override void UpdateViewControls()
+    {
+        base.UpdateViewControls();
+        bool receipts = ViewName == "Receipts";
+        string[] options = receipts ? new[] { "Whole School", "Campus", "Class", "Section" }
+            : new[] { "Day", "Week", "Month", "Payment Method", "Class", "Campus", "Fee Type" };
+        if (!GroupBy.Items.Cast<string>().SequenceEqual(options))
+        {
+            GroupBy.Items.Clear();
+            GroupBy.Items.AddRange(options);
+            GroupBy.SelectedIndex = 0;
+        }
+        GroupBy.Enabled = receipts || IsSummaryView;
+    }
+    protected override void PrepareReportData(DataTable data, SqlParameter[] parameters)
+    {
+        if (Equals(parameters.Single(p => p.ParameterName == "@View").Value, "Receipts"))
+            CollectionReceiptGrouping.Apply(data,
+                Convert.ToString(parameters.Single(p => p.ParameterName == "@GroupBy").Value) ?? "Whole School");
+    }
     protected override bool IsSummaryView => ViewName == "Summary";
     protected override IEnumerable<SqlParameter> BuildParameters()
     {
