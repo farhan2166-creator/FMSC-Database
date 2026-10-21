@@ -11,6 +11,7 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
     private readonly ModernTextBox search=HumanUi.TextBox(false,100);
     private readonly Label selectedSummary=new(){Dock=DockStyle.Fill,AutoSize=true,ForeColor=AppTheme.MutedText,Padding=new Padding(4,6,0,4)};
     private readonly ModernButton preview;
+    private readonly BindingSource selectionSource=new();
     private readonly Func<OutstandingBillScope,Task<DataTable>> readBalances;
     private DataTable? roster;
     private OutstandingBillScope? loadedScope;
@@ -37,6 +38,9 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
         var all=AddAction("Select All",(_,_)=>SetSelection(true,false),"Secondary");
         var shown=AddAction("Select Shown",(_,_)=>SetSelection(true,true),"Secondary");
         var none=AddAction("Clear Selection",(_,_)=>SetSelection(false,false),"Secondary");
+        FinanceHelp.Attach(this,all,"Check every student in the loaded list, including students hidden by the search.","Search shows one child from six loaded students. Select All checks all six.");
+        FinanceHelp.Attach(this,shown,"Check only the students shown by the current search. Clear the checks for students hidden by the search.","Search shows two children from six loaded students. Select Shown checks those two and unchecks the other four.");
+        FinanceHelp.Attach(this,none,"Uncheck every student in the loaded list, including students hidden by the search.","Clear Selection leaves no students selected for bill preview.");
         RelocateFromActions(load,preview,all,shown,none);
         Grid.AutoGenerateColumns=false;Grid.ReadOnly=false;Grid.AllowUserToAddRows=false;
         Grid.Columns.Add(new DataGridViewCheckBoxColumn{Name="Include",DataPropertyName="Include",HeaderText="Print",Width=65});
@@ -46,6 +50,7 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
             Grid.Columns.Add(new DataGridViewTextBoxColumn{Name=field,DataPropertyName=field,HeaderText=label,ReadOnly=true,MinimumWidth=width,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill});
         Grid.Columns["Outstanding"].DefaultCellStyle.Format="N0";
         Grid.Columns["Outstanding"].DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleRight;
+        Grid.DataSource=selectionSource;
         Grid.CurrentCellDirtyStateChanged+=(_,_)=>{if(Grid.IsCurrentCellDirty)Grid.CommitEdit(DataGridViewDataErrorContexts.Commit);};
         Grid.CellValueChanged+=(_,_)=>{if(!changingSelection)UpdateSummary();};
         search.TextChanged+=(_,_)=>{if(roster is not null){OutstandingBillSelection.Search(roster,search.Text);UpdateSummary();}};
@@ -63,12 +68,12 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
         filterBody.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var loadActions=HumanUi.ButtonRow(load);loadActions.Dock=DockStyle.Fill;loadActions.Margin=Padding.Empty;
         filterBody.Controls.Add(fields,0,0);filterBody.Controls.Add(amounts,0,1);filterBody.Controls.Add(loadActions,0,2);filters.Content.Controls.Add(filterBody);
-        var students=HumanUi.Card("Students to Bill","Search keeps checked students included. Review the selection before previewing.");
+        var students=HumanUi.Card("Students to Bill","Search keeps your checks. Select Shown checks only the search results. Review the selection before previewing.");
         var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Margin=Padding.Empty};
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         body.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
         body.RowStyles.Add(new RowStyle(SizeType.AutoSize));body.RowStyles.Add(new RowStyle(SizeType.Percent,100));body.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        var selectActions=HumanUi.ButtonRow(all,shown,none,preview);selectActions.Dock=DockStyle.Fill;selectActions.Margin=Padding.Empty;
+        var selectActions=HumanUi.ButtonRowInOrder(all,shown,none,preview);selectActions.Dock=DockStyle.Fill;selectActions.Margin=Padding.Empty;
         body.Controls.Add(HumanUi.Field("Find Student",search),0,0);body.Controls.Add(selectActions,0,1);body.Controls.Add(Grid,0,2);body.Controls.Add(selectedSummary,0,3);students.Content.Controls.Add(body);
         var root=new TableLayoutPanel{ColumnCount=1,RowCount=2,Margin=Padding.Empty};
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
@@ -79,14 +84,14 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
         viewport.SizeChanged+=(_,_)=>Arrange();SetContent(viewport);Arrange();
         UpdateAmountFields();UpdateSummary();
         if(initialize)Defer(BindFiltersAsync);
-        Disposed+=(_,_)=>roster?.Dispose();
+        Disposed+=(_,_)=>{selectionSource.Dispose();roster?.Dispose();};
     }
 
     private OutstandingBillScope Scope()=>new(campus.SelectedId,year.SelectedId,cls.SelectedId,section.SelectedId,
         (BillBalanceComparison)comparison.SelectedIndex,amount.Value,through.Value);
     private void UpdateAmountFields(){amount.Enabled=comparison.SelectedIndex>0;through.Enabled=comparison.SelectedIndex==(int)BillBalanceComparison.Between;}
     private void FiltersChanged(){preview.Enabled=false;if(loadedScope is not null)SetStatus("Filters changed. Load Students to refresh the list.",PageStatusKind.Warning);}
-    private void Commit(){Grid.EndEdit();if(roster is not null)(BindingContext?[roster.DefaultView] as CurrencyManager)?.EndCurrentEdit();}
+    private void Commit(){Grid.EndEdit();selectionSource.EndEdit();}
     private List<int> Selected()=>roster?.AsEnumerable().Where(row=>row.Field<bool>("Include")).Select(row=>row.Field<int>("AdmissionId")).ToList()??new();
     private void UpdateSummary()
     {
@@ -96,9 +101,24 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
     }
     private void SetSelection(bool value,bool shownOnly)
     {
-        if(roster is null)return;Commit();changingSelection=true;
-        try{foreach(DataRow row in shownOnly?roster.DefaultView.Cast<DataRowView>().Select(view=>view.Row):roster.AsEnumerable())row["Include"]=value;}
-        finally{changingSelection=false;}UpdateSummary();
+        if(roster is null||IsBusy)return;
+        Commit();
+        // Freeze the target rows before changing the bound view. Publish one
+        // completed selection so checkbox edits and repainting cannot lag behind it.
+        var shown=shownOnly?roster.DefaultView.Cast<DataRowView>().Select(view=>view.Row).ToHashSet():null;
+        changingSelection=true;
+        selectionSource.RaiseListChangedEvents=false;
+        try
+        {
+            foreach(DataRow row in roster.Rows){row["Include"]=value&&(shown is null||shown.Contains(row));row.EndEdit();}
+        }
+        finally
+        {
+            selectionSource.RaiseListChangedEvents=true;
+            selectionSource.ResetBindings(false);
+            changingSelection=false;
+            UpdateSummary();
+        }
     }
     private bool Valid(OutstandingBillScope scope)
     {
@@ -116,8 +136,8 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
             await RunBusyAsync("Loading students…",async()=>{
                 using var source=await readBalances(scope);
                 if(IsDisposed||scope!=Scope()||CurrentUser.UserId!=user||!CurrentUser.HasPermission("Fees.View"))return;
-                var next=OutstandingBillSelection.Select(source,scope);Grid.DataSource=null;roster?.Dispose();roster=next;loadedScope=scope;
-                OutstandingBillSelection.Search(roster,search.Text);Grid.DataSource=roster.DefaultView;
+                var next=OutstandingBillSelection.Select(source,scope);selectionSource.DataSource=null;roster?.Dispose();roster=next;loadedScope=scope;
+                OutstandingBillSelection.Search(roster,search.Text);selectionSource.DataSource=roster.DefaultView;
                 SetStatus($"{roster.Rows.Count} students match. Bills are refreshed before preview.");
             },this);
         }
