@@ -54,8 +54,10 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
             "e.g. Teacher, Lecturer";
         roleTitle.MaxLength = 30;
         subjectTaught.PlaceholderText =
-            "e.g. Chemistry, Biology";
+            "From staff specialization";
         subjectTaught.MaxLength = 100;
+        UiAccessibility.Describe(subjectTaught, "Subject taught",
+            "Filled from the selected staff member's Specialization. Review the wording before creating the certificate.");
         createCertificateButton.Click +=
             (_, _) => CreateCertificate();
         updateCertificateButton.Click +=
@@ -502,6 +504,12 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
             Warn("Enter the subject taught.");
             return false;
         }
+        if (subjectTaught.Text.Trim().Length > subjectTaught.MaxLength)
+        {
+            Warn("Keep the subject wording within 100 characters before saving the certificate.");
+            subjectTaught.Focus();
+            return false;
+        }
         if (certificateDate.Value.Date > DateTime.Today)
         {
             Warn(UiText.Certificates.FutureDateRefused);
@@ -628,8 +636,10 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
         roleTitle.Text = string.IsNullOrWhiteSpace(designation)
             ? saved.Select(row => GetString(row, "RoleTitle")).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? ""
             : designation;
-        subjectTaught.Text = saved.Select(row => GetString(row, "SubjectTaught"))
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? "";
+        string specialization = employment is null ? "" : GetString(employment, "Specialization");
+        subjectTaught.Text = string.IsNullOrWhiteSpace(specialization)
+            ? saved.Select(row => GetString(row, "SubjectTaught")).FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? ""
+            : specialization;
     }
     private void ClearCertificateSelection()
     {

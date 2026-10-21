@@ -3,6 +3,42 @@ using FMSC_SMS.Core;
 
 internal static partial class Program
 {
+    private static void CheckStaffCertificateSubjects()
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        using var page = new FMSC_SMS.Pages.Staff.Certificates.RegularLecturerCertificatePage();
+        var type = page.GetType();
+        T Field<T>(string name) => (T)type.GetField(name, flags)!.GetValue(page)!;
+        void Invoke(string method) => type.GetMethod(method, flags)!.Invoke(page, null);
+        using var staffRows = new System.Data.DataTable();
+        staffRows.Columns.Add("StaffId", typeof(int));
+        foreach (string column in new[] { "StaffNumber", "StaffName", "Designation", "Specialization" }) staffRows.Columns.Add(column);
+        staffRows.Rows.Add(1, "T-1", "Fictional Teacher", "Teacher", "Chemistry, Biology");
+        staffRows.Rows.Add(2, "T-2", "Fictional Lecturer", "Lecturer", "Mathematics");
+        staffRows.Rows.Add(3, "T-3", "Fictional New Teacher", "Teacher", "");
+        using var certificates = new System.Data.DataTable();
+        certificates.Columns.Add("RegularLecturerCertificateId", typeof(int)); certificates.Columns.Add("StaffId", typeof(int));
+        certificates.Columns.Add("RoleTitle"); certificates.Columns.Add("SubjectTaught"); certificates.Columns.Add("CertificateDate", typeof(DateTime));
+        certificates.Rows.Add(10, 1, "Teacher", "Previously certified subject", DateTime.Today.AddDays(-1));
+        type.GetField("certificateResults", flags)!.SetValue(page, certificates);
+        var picker = Field<StaffPicker>("staff"); var subject = Field<ModernTextBox>("subjectTaught");
+        picker.SetStaff(staffRows.Rows[0]); Invoke("ClearCertificateFields");
+        Check(subject.Text == "Chemistry, Biology", "New staff certificate uses Specialization from the selected staff record");
+        Check(Field<ModernTextBox>("roleTitle").Text == "Teacher" && !page.HasUnsavedChanges,
+            "Database designation and subjects form a clean new-certificate baseline");
+        subject.Text = "Reviewed wording";
+        Check(page.HasUnsavedChanges, "Reviewing the supplied subject wording remains an editable certificate draft");
+        type.GetMethod("ApplyCertificateRow", flags)!.Invoke(page, new object[] { certificates.Rows[0] });
+        Check(subject.Text == "Previously certified subject" && !page.HasUnsavedChanges,
+            "Opening an existing certificate preserves its issued wording instead of replacing it with current specialization");
+        Invoke("StartNewCertificate");
+        Check(subject.Text == "Chemistry, Biology", "New after an existing certificate returns to the current staff specialization");
+        picker.SetStaff(staffRows.Rows[1]); Invoke("ClearCertificateFields");
+        Check(subject.Text == "Mathematics", "Changing staff uses the new staff member's specialization");
+        picker.SetStaff(staffRows.Rows[2]); Invoke("ClearCertificateFields");
+        Check(subject.Text == "", "A blank specialization never reuses another staff member's subject");
+        Check(!page.IsHandleCreated, "Staff subject checks create no certificate or database connection");
+    }
     private static void CheckNewCertificateDrafts()
     {
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
