@@ -146,6 +146,23 @@ internal static partial class Program
             Check(Render("legacy-individual-receipt",legacy)==1,"Original cash receipt fields remain printable through the RDLC template");
             Check(Render("annual-receipt-sheet",legacy,StudentReceiptReport.TemplateFile,annual:true)==1,"Annual printing uses StudentReceipt.rdlc with its native adjustment rows");
         }
+        using(var partialHeader=header.Copy())
+        using(var partialStudents=students.Copy())
+        using(var partialLines=lines.Clone())
+        {
+            var payment=partialHeader.Rows[0];
+            payment["CashReceived"]=200m;payment["CashApplied"]=200m;payment["CreditApplied"]=0m;
+            payment["BalanceRemaining"]=2200m;payment["PaymentMethod"]="Cash";
+            partialStudents.Rows[0]["CashApplied"]=200m;partialStudents.Rows[0]["CreditApplied"]=0m;
+            partialStudents.Rows[0]["BalanceRemaining"]=2200m;
+            partialLines.Rows.Add(1,"Transport Fee","Class 1","A","Campus Boys",new DateTime(2026,11,1),2400m,200m,0m);
+            using var partial=FeeReceiptDocuments.BuildData(school,payment,partialStudents,partialLines);
+            Check(partial.Rows[0].Field<decimal>("Amount")==2400m && partial.Rows[0].Field<decimal>("FeesCovered")==2400m
+                && partial.Rows[0].Field<decimal>("CashReceived")==200m && partial.Rows[0].Field<decimal>("TotalPaid")==200m
+                && partial.Rows[0].Field<decimal>("BalanceRemaining")==2200m,
+                "A partial receipt shows the saved full fee, total, received and remaining balance independently");
+            Check(Render("individual-partial-payment",partial)==1,"A partial payment receipt renders with its full charge amount");
+        }
         h["CashReceived"]=1000m;h["CashApplied"]=1000m;h["CreditApplied"]=7700m;
         students.Rows[0]["CashApplied"]=1000m;students.Rows[0]["CreditApplied"]=7700m;
         lines.Rows[1]["Cash"]=1000m;lines.Rows[1]["Credit"]=1500m;
@@ -165,8 +182,8 @@ internal static partial class Program
             Check(family.AsEnumerable().Select(row=>row.Field<int>("ReceiptStudentKey")).Distinct().Count()==2,"Family receipt identifies both children");
             using(var displayed=FamilyReceiptReport.PrepareData(family))
             {
-                Check(displayed.Rows.Count==lines.Rows.Count && displayed.AsEnumerable().Sum(row=>row.Field<decimal>("Amount"))==9100m,
-                    "Family layout keeps every fee and settlement amount without summing heading or subtotal rows");
+                Check(displayed.Rows.Count==lines.Rows.Count && displayed.AsEnumerable().Sum(row=>row.Field<decimal>("Amount"))==9700m,
+                    "Family layout keeps full pre-payment fee amounts without summing heading or subtotal rows");
                 Check(displayed.AsEnumerable().Select(row=>row.Field<int>("ReceiptStudentKey")).Distinct().Count()==2
                     && displayed.AsEnumerable().Count(row=>!string.IsNullOrWhiteSpace(row.Field<string>("FeePeriod")))==4,
                     "Family months appear once per month per child under separate student groups");

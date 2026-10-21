@@ -150,3 +150,7 @@ The Bank Account Opening Certificate also fills Designation from the selected st
 ## Staff job actions
 
 Use **Edit Job** on the Job Details card to open the active job, **Edit** on a history row for that saved job, or **Add Job** to start a blank job. Each opens a direct job form without history tabs. Employment History stays on the staff page; the redundant top Employment button has been removed. Save or clear staff-profile edits before opening a job form.
+
+## Collection receipt amounts
+
+Saved collection receipts show each included fee's saved amount due before that payment, followed by **Total**, **Received** and **Balance**. Received is new money; credit applied, discounts and retained credit remain separate when applicable. Balance is the saved outstanding balance for the student or family, which can include dues outside the listed charges. Later adjustments remain identified; historical receipt/payment records are preserved.
