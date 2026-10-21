@@ -15,7 +15,7 @@ internal static class StudentPickerRowProjector
         string display = father.Length == 0
             ? $"{AdmissionNumbers.Read(row)} - {name}"
             : $"{AdmissionNumbers.Read(row)} - {name} {relation} {father}";
-        string status = ReadText(row, "Status");
+        string status = PostingStatus(row);
         if (IsLeaver(status))
             display += $" [{status}]";
         return display;
@@ -29,7 +29,7 @@ internal static class StudentPickerRowProjector
         string classSection = className.Length == 0
             ? string.Empty
             : section.Length == 0 ? className : $"{className} - {section}";
-        string status = ReadText(row, "Status");
+        string status = PostingStatus(row);
         return new[]
         {
             AdmissionNumbers.Read(row),
@@ -45,6 +45,10 @@ internal static class StudentPickerRowProjector
 
     private static bool IsLeaver(string status) =>
         status.Length > 0 && !string.Equals(status, "Active", StringComparison.OrdinalIgnoreCase);
+
+    private static string PostingStatus(DataRow row) =>
+        row.Table.Columns.Contains("IsOnHold") && row["IsOnHold"] is not DBNull && Convert.ToBoolean(row["IsOnHold"])
+            ? "On Hold" : ReadText(row, "Status");
 
     private static string ReadText(DataRow row, string column) =>
         row.Table.Columns.Contains(column) && row[column] != DBNull.Value

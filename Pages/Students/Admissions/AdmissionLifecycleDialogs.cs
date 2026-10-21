@@ -20,7 +20,7 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
     {
         this.admission=admission;this.cancel=cancel;
         this.query=query??((procedure,parameters)=>DatabaseHelper.QueryUserAsync(procedure,parameters));
-        Text=cancel?"Cancel Registration":"Mark as Left";StartPosition=FormStartPosition.CenterParent;
+        Text=cancel?"Cancel Registration":"Record Departure";StartPosition=FormStartPosition.CenterParent;
         Size=new Size(AppScale.Scale(820),AppScale.Scale(680));MinimumSize=new Size(700,540);
         impact.ReadOnly=true;impact.Dock=DockStyle.Fill;
         monthlyPolicy.Items.AddRange(new object[]{"Use the school cutoff","Keep all issued monthly bills","Waive monthly bills from a selected month"});monthlyPolicy.SelectedIndex=0;

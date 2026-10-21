@@ -55,7 +55,7 @@ public sealed partial class FamilyAdmissionWorkspace
             using var fresh=await readFamily(anchor);
             int[] ids=FamilyBillingData.SelectMembers(fresh,selected.Select(c=>c.Id));
             if(fresh.AsEnumerable().Where(r=>ids.Contains(Convert.ToInt32(r["AdmissionId"])))
-                .Any(r=>FieldText(r,"Status")!="Pending" && FamilyBillingData.Readiness(r)!="Ready for Billing"))
+                .Any(r=>FieldText(r,"Status")!="Pending" && FamilyBillingData.Readiness(r) is not ("Ready for Billing" or "On Hold")))
                 throw new InvalidOperationException("A selected child's readiness changed. Refresh this family before payment.");
             using var page=new FeeCollectionPage(initialize:false){Dock=DockStyle.Fill};
             page.ConfigureCounter(ids);

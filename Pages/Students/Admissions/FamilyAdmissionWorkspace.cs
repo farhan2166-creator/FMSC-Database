@@ -203,5 +203,5 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
     }
     private static bool CanBill(Child child)=>child.Id>0 && child.MembershipVerified && !child.Dirty && !child.AwaitsReturn &&
         child.Registration?.HasUnresolvedSave!=true && child.Registration?.WorkspaceNeedsRefresh!=true &&
-        (child.Record is null || FieldText(child.Record,"Status")=="Pending" || child.ReturnCompleted || FamilyBillingData.Readiness(child.Record)=="Ready for Billing");
+        (child.Record is null || FieldText(child.Record,"Status")=="Pending" || child.ReturnCompleted || FamilyBillingData.Readiness(child.Record) is "Ready for Billing" or "On Hold");
 }

@@ -325,7 +325,7 @@ public sealed partial class FamilyAdmissionWorkspace
             foreach (int id in ids)
             {
                 var row = fresh.AsEnumerable().FirstOrDefault(r => Convert.ToInt32(r["AdmissionId"]) == id);
-                if (row is null || (FieldText(row, "Status") != "Pending" && FamilyBillingData.Readiness(row) != "Ready for Billing"))
+                if (row is null || (FieldText(row, "Status") != "Pending" && FamilyBillingData.Readiness(row) is not ("Ready for Billing" or "On Hold")))
                     throw new InvalidOperationException("A selected child's family or billing readiness changed. Refresh the family before printing.");
             }
             using var charges = await FamilyAdmissionData.ReadBillAsync(anchor, ids);

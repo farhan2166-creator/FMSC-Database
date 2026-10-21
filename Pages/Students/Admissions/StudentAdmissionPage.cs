@@ -63,6 +63,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly BindingList<FeeSelectionRow> _selectedFees = new();
     private List<FeeConfigOption> _availableFeeOptions = new();
     private string _workspaceStudentStatus = string.Empty;
+    private bool studentPostingHeld;
     /* The student's status (Active, Left, New Admission ...). */
     private readonly Label studentStatusBadge = new() {
         Dock = DockStyle.Fill,
@@ -862,10 +863,20 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         var correctPlacement = enrollmentActionsMenu.Items.Add("Student Setup / Placement Corrections");
         correctPlacement.Click += async (_, _) => await OpenPlacementCorrectionAsync();
         enrollmentActionsMenu.Opening += (_, _) => correctPlacement.Enabled = currentAdmissionId > 0 && !IsPendingRegistration && !saveBusy && CurrentUser.HasPermission("Students.Administer");
-        var markLeft = enrollmentActionsMenu.Items.Add("Mark as Left");
+        var hold = enrollmentActionsMenu.Items.Add("Put on Hold");
+        hold.Click += async (_, _) => await OpenPostingHoldAsync(false);
+        var resumeHold = enrollmentActionsMenu.Items.Add("Lift Hold / Resume");
+        resumeHold.Click += async (_, _) => await OpenPostingHoldAsync(true);
+        var adoptLeft = enrollmentActionsMenu.Items.Add("Review Left Record as Temporary Hold");
+        adoptLeft.Click += async (_, _) => await OpenPostingHoldAsync(false, true);
+        var markLeft = enrollmentActionsMenu.Items.Add("Record Departure");
         markLeft.Click += async (_, _) => await CloseAdmissionAsync(false);
         enrollmentActionsMenu.Opening += (_, _) => {
-            markLeft.Visible = _workspaceStudentStatus == "Active" && currentAdmissionId > 0;
+            hold.Visible = _workspaceStudentStatus == "Active" && currentAdmissionId > 0 && !studentPostingHeld;
+            resumeHold.Visible = currentAdmissionId > 0 && studentPostingHeld;
+            adoptLeft.Visible = _workspaceStudentStatus == "Left" && currentAdmissionId > 0 && !studentPostingHeld;
+            hold.Enabled = resumeHold.Enabled = adoptLeft.Enabled = !saveBusy && CurrentUser.HasPermission("Students.Administer");
+            markLeft.Visible = _workspaceStudentStatus == "Active" && currentAdmissionId > 0 && !studentPostingHeld;
             markLeft.Enabled = !saveBusy && CurrentUser.HasPermission("Students.Administer");
         };
         confirmPlacementAction = enrollmentActionsMenu.Items.Add("Confirm Placement");
@@ -2127,11 +2138,11 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         else
         {
-            text = string.IsNullOrWhiteSpace(_workspaceStudentStatus)
+            text = studentPostingHeld ? "On Hold" : string.IsNullOrWhiteSpace(_workspaceStudentStatus)
                 ? "Loaded"
                 : _workspaceStudentStatus.Trim();
             string lower = text.ToLowerInvariant();
-            if (lower.Contains("inactive") ||
+            if (studentPostingHeld || lower.Contains("inactive") ||
                 lower.Contains("left") ||
                 lower.Contains("struck") ||
                 lower.Contains("withdraw") ||
@@ -2218,6 +2229,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         if (confirmPlacementAction is not null) confirmPlacementAction.Visible = false;
         currentAdmissionId = 0;
         _workspaceStudentStatus = string.Empty;
+        studentPostingHeld = false;
         _editEnrollmentId = 0;
         _editCampusId = 0;
         _editYearId = 0;
@@ -2851,6 +2863,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             legacySetupPending = row.Table.Columns.Contains("LegacySetupPending") && Convert.ToBoolean(row["LegacySetupPending"]);
             currentAdmissionId =
                 admissionId;
+            studentPostingHeld = row.Table.Columns.Contains("IsOnHold") && row["IsOnHold"] is not DBNull && Convert.ToBoolean(row["IsOnHold"]);
             _workspaceStudentStatus =
                 row.Table.Columns.Contains("Status") &&
                 row["Status"] != DBNull.Value
@@ -3810,6 +3823,15 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         using var dialog = new CloseAdmissionDialog(currentAdmissionId,name.Text,cancel);
         dialog.ShowDialog(FindForm());
         if (dialog.Changed){await LoadStudentForEditAsync(currentAdmissionId);if(cancel)RegistrationFinished?.Invoke();}
+    }
+    private async Task OpenPostingHoldAsync(bool resume, bool adoptLeft = false)
+    {
+        if (currentAdmissionId <= 0 || saveBusy || !CurrentUser.HasPermission("Students.Administer")) return;
+        if (HasUnsavedChanges) { SetStatus("Save admission changes before reviewing hold or resume."); return; }
+        int selected = currentAdmissionId;
+        using var dialog = new StudentPostingHoldDialog(selected, name.Text, resume, adoptLeft);
+        dialog.ShowDialog(FindForm());
+        if (!IsDisposed && selected == currentAdmissionId) await LoadStudentForEditAsync(selected);
     }
     private async Task OpenConfirmReturnAsync()
     {

@@ -84,7 +84,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         searchStatus.Items.Clear();
         searchStatus.Items.AddRange(new object[] {
             /* this read "Active, Left & Withdrawn". The label named a state the system cannot represent. */
-            "All Statuses (Active & Left)",
+            "All Students (including On Hold)",
             "Active Only"
         });
         searchStatus.SelectedIndex = 0;
@@ -586,7 +586,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
                 GetTextColumn(row, "YearName"),
                 GetTextColumn(row, "ClassName"),
                 GetTextColumn(row, "SectionName"),
-                GetTextColumn(row, "Status"));
+                row.Table.Columns.Contains("IsOnHold") && row["IsOnHold"] is not DBNull && Convert.ToBoolean(row["IsOnHold"]) ? "On Hold" : GetTextColumn(row, "Status"));
         }
         return display;
     }
