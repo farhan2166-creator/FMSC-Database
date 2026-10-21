@@ -123,6 +123,34 @@ internal static class ReportUi
     {
         box.Bind(table, id, text);
     }
+    internal static Panel CenteredBar(params (string Caption, Control Control)[] fields)
+    {
+        var bar = Bar(fields);
+        bar.Dock = DockStyle.None;
+        bar.Anchor = AnchorStyles.Top | AnchorStyles.Left;
+        var host = new Panel { Dock = DockStyle.Top, Height = bar.Height, Margin = Padding.Empty };
+        host.Controls.Add(bar);
+        // Match the normal input width and keep captions with their controls.
+        int fieldWidth = Math.Max(AppScale.Scale(150), fields.Max(field => field.Control.MaximumSize.Width));
+        int preferredWidth = fields.Length * (fieldWidth + 10);
+        bool arranging = false;
+        void Arrange()
+        {
+            if (arranging || host.IsDisposed) return;
+            arranging = true;
+            try
+            {
+                bar.Width = Math.Min(preferredWidth, host.ClientSize.Width);
+                bar.Left = Math.Max(0, (host.ClientSize.Width - bar.Width) / 2);
+                host.Height = bar.Height;
+            }
+            finally { arranging = false; }
+        }
+        host.SizeChanged += (_, _) => Arrange();
+        bar.SizeChanged += (_, _) => Arrange();
+        Arrange();
+        return host;
+    }
     /// <summary>The vertical chrome a filter card adds around its content - padding, the card header and the gaps.</summary>
     public static int FilterCardChromeHeight =>
         10 + 10 + AppMetrics.CardHeaderHeight() + 6 + 10;

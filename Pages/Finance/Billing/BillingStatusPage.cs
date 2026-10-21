@@ -44,7 +44,7 @@ public sealed class BillingStatusPage : V2Page, IBusyPage
         Grid.SelectionChanged += (_, _) => UpdateActions();
         Grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) OpenStudent(false); };
         RelocateFromActions(refresh, run, openStudent, collect);
-        var filter = ReportUi.Bar(("Show", view));
+        var filter = ReportUi.CenteredBar(("Show", view));
         var scope = new Panel { Dock = DockStyle.Top, Padding = new Padding(0, 0, 0, 8) };
         scope.Controls.Add(filter); scope.Controls.Add(summary);
         // Docked AutoSize labels include padding in their laid-out height.

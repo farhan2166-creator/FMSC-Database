@@ -30,7 +30,7 @@ public sealed class FeePostingReversalPage : V2Page, IBusyPage
         FinanceHelp.Attach(this,preview,FinanceHelp.Topic.Review);
         FinanceHelp.Attach(this,reverseButton,FinanceHelp.Topic.CancelMonth);
         RelocateFromActions(refresh,preview,reverseButton);
-        var filters=ReportUi.Bar(("Latest reversible month",monthBox),("Reason (required)",reason));
+        var filters=ReportUi.CenteredBar(("Latest reversible month",monthBox),("Reason (required)",reason));
         SetContent(ReportUi.WorkflowLayout(filters,Grid,"Reversal Scope",
             "Only the latest month in the current academic year is eligible. Payment history blocks reversal.",
             "Charges to Reverse", "Review the whole month and enter a reason before reversing.",refresh,preview,reverseButton));
