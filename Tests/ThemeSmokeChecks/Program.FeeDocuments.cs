@@ -44,6 +44,23 @@ internal static partial class Program
             Check(File.Exists(path),"Each document loads its own RDLC file");
             string definition=annual?FeeDocumentLayout.SizeToContent(path,data,annualSheet:true):FeeDocumentLayout.SizeToContent(path,data);
             var xml=XDocument.Parse(definition);XNamespace ns=xml.Root!.Name.Namespace;
+            var receiptTable=xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="FamilyBatch")
+                .Ancestors(ns+"Tablix").First();
+            var printedRows=receiptTable.Element(ns+"TablixBody")!.Element(ns+"TablixRows")!.Elements(ns+"TablixRow").ToArray();
+            var printedMembers=receiptTable.Element(ns+"TablixRowHierarchy")!.Descendants(ns+"TablixMember")
+                .Where(member=>member.Element(ns+"TablixMembers") is null).ToArray();
+            int familyDetail=Array.FindIndex(printedRows,row=>row.Descendants(ns+"Textbox")
+                .Any(box=>(string?)box.Attribute("Name")=="FamilyBatch"));
+            Check(printedMembers[familyDetail].Element(ns+"Visibility")?.Element(ns+"Hidden")?.Value=="true",
+                "Bills and receipts suppress the redundant family student-count detail, including older snapshots");
+            if(!bill)
+            {
+                string Caption(string name)=>xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")==name)
+                    .Descendants(ns+"Value").First().Value;
+                Check(new[]{"TotalLabelFeesCovered","TotalLabelCashReceived","BalanceLabel","TotalLabel"}
+                    .All(name=>!Caption(name).StartsWith('=')),
+                    "Receipt captions are editable plain text, separate from monetary formulas");
+            }
             var address = xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="SchoolAddress");
             Check(address.Descendants(ns+"Value").First().Value.Contains("Fields!CampusName.Value")
                 && !xml.Descendants(ns+"Textbox").Any(box=>(string?)box.Attribute("Name")=="CampusHeading"),
@@ -162,6 +179,40 @@ internal static partial class Program
                 && partial.Rows[0].Field<decimal>("BalanceRemaining")==2200m,
                 "A partial receipt shows the saved full fee, total, received and remaining balance independently");
             Check(Render("individual-partial-payment",partial)==1,"A partial payment receipt renders with its full charge amount");
+        }
+        // A family account can include debts beyond the fee lines on this
+        // receipt. Keep these scopes visible rather than suggesting that the
+        // account balance is simply this receipt's fee total minus its payment.
+        using(var familyHeader=header.Copy())
+        using(var familyStudents=students.Copy())
+        using(var familyLines=lines.Clone())
+        {
+            var payment=familyHeader.Rows[0];
+            payment["ReceiptNumber"]="FR-2026-00002";payment["PaymentMethod"]="Cash";
+            payment["CashReceived"]=3000m;payment["CashApplied"]=3000m;payment["CreditApplied"]=0m;
+            payment["BalanceRemaining"]=6500m;payment["CreditRemaining"]=0m;
+            familyStudents.Rows[0]["CashApplied"]=3000m;familyStudents.Rows[0]["CreditApplied"]=0m;
+            familyStudents.Rows[0]["BalanceRemaining"]=4300m;
+            familyStudents.Rows.Add(2,"1002","Sara Example","Example Parent",0m,0m,2200m);
+            familyLines.Rows.Add(1,"Tuition Fee","Class 1","A","Campus Boys",new DateTime(2026,10,1),400m,400m,0m);
+            familyLines.Rows.Add(1,"Admission Fee","Class 1","A","Campus Boys",new DateTime(2026,10,1),4000m,2600m,0m);
+            familyLines.Rows.Add(1,"Tuition Fee","Class 1","A","Campus Boys",new DateTime(2026,11,1),400m,0m,0m);
+            using var family=FeeReceiptDocuments.BuildData(school,payment,familyStudents,familyLines);
+            Check(family.Rows[0].Field<decimal>("FeesCovered")==4800m && family.Rows[0].Field<decimal>("CashReceived")==3000m
+                && family.Rows[0].Field<decimal>("StudentOutstanding")==4300m && family.Rows[0].Field<decimal>("BalanceRemaining")==6500m,
+                "Receipt fees, payment, child debt and family debt retain their separate financial scopes");
+            Check(Render("family-partial-payment",family)==1,"A partial family payment fits with explicit student and family balance labels");
+            string sourcePath=Path.Combine(AppContext.BaseDirectory,"Reports",FamilyReceiptReport.TemplateFile);
+            var editable=XDocument.Load(sourcePath);XNamespace editableNs=editable.Root!.Name.Namespace;
+            editable.Descendants(editableNs+"Textbox").Single(box=>(string?)box.Attribute("Name")=="DocumentDateFooter")
+                .Descendants(editableNs+"Value").First().Value=new string('W',150)+" ";
+            string editedPath=Path.Combine(folder,"edited-caption.rdlc");editable.Save(editedPath);
+            decimal PaperHeight(string path)=>decimal.Parse(XDocument.Parse(FeeDocumentLayout.SizeToContent(path,family))
+                .Descendants(editableNs+"PageHeight").Single().Value.Replace("in",""),System.Globalization.CultureInfo.InvariantCulture);
+            Check(PaperHeight(editedPath)>PaperHeight(sourcePath),
+                "Editing a literal date caption grows the receipt paper while its separate date formula remains intact");
+            Check(Render("edited-caption-receipt",family,editedPath)==1,
+                "An edited multi-run receipt caption renders without adding an unintended second page");
         }
         h["CashReceived"]=1000m;h["CashApplied"]=1000m;h["CreditApplied"]=7700m;
         students.Rows[0]["CashApplied"]=1000m;students.Rows[0]["CreditApplied"]=7700m;

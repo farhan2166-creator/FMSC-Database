@@ -372,7 +372,14 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>="Monthly Attendance Register · " &amp; First(Fields!ExamDate.Value, "PageGroup")</Value>
+                                  <Value>Monthly Attendance Register · </Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>10pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=First(Fields!ExamDate.Value, "PageGroup")</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>10pt</FontSize>
@@ -402,7 +409,43 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>=First(Fields!CampusName.Value, "PageGroup") &amp; " · Class " &amp; First(Fields!ClassName.Value, "PageGroup") &amp; " / " &amp; First(Fields!SectionName.Value, "PageGroup") &amp; " · " &amp; First(Fields!YearName.Value, "PageGroup")</Value>
+                                  <Value>=First(Fields!CampusName.Value, "PageGroup")</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value> · Class </Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=First(Fields!ClassName.Value, "PageGroup")</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value> / </Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=First(Fields!SectionName.Value, "PageGroup")</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value> · </Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=First(Fields!YearName.Value, "PageGroup")</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>9pt</FontSize>
@@ -2941,7 +2984,19 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>="Teacher: " &amp; First(Fields!Teacher.Value, "PageGroup") &amp; "                                     Signature: ____________________"</Value>
+                                  <Value>Teacher: </Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=First(Fields!Teacher.Value, "PageGroup")</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>                                     Signature: ____________________</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>8pt</FontSize>

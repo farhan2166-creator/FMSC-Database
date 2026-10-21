@@ -394,7 +394,21 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>=Fields!CampusName.Value &amp; "  |  " &amp; Fields!YearName.Value</Value>
+                                  <Value>=Fields!CampusName.Value</Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>  |  </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=Fields!YearName.Value</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>8pt</FontSize>
@@ -428,7 +442,28 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>= "Class: " &amp; Fields!ClassName.Value &amp; "    Section: " &amp; Fields!SectionName.Value</Value>
+                                  <Value>Class: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=Fields!ClassName.Value</Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>    Section: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=Fields!SectionName.Value</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>8pt</FontSize>
@@ -462,7 +497,14 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>= "Exam: " &amp; IIF(Fields!Exam.Value = "", "____________________", Fields!Exam.Value)</Value>
+                                  <Value>Exam: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=IIF(Fields!Exam.Value = "", "____________________", Fields!Exam.Value)</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>8pt</FontSize>
@@ -496,7 +538,14 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>= "Paper: " &amp; IIF(Fields!Subject.Value = "", "____________________", Fields!Subject.Value)</Value>
+                                  <Value>Paper: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=IIF(Fields!Subject.Value = "", "____________________", Fields!Subject.Value)</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>8pt</FontSize>
@@ -530,7 +579,14 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>= "Date: " &amp; IIF(Fields!ExamDate.Value = "", "____________", Fields!ExamDate.Value)</Value>
+                                  <Value>Date: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=IIF(Fields!ExamDate.Value = "", "____________", Fields!ExamDate.Value)</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>8pt</FontSize>
@@ -564,7 +620,14 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>= "Teacher: " &amp; IIF(Fields!Teacher.Value = "", "________________________", Fields!Teacher.Value)</Value>
+                                  <Value>Teacher: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=IIF(Fields!Teacher.Value = "", "________________________", Fields!Teacher.Value)</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>9pt</FontSize>
@@ -734,7 +797,21 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>=Fields!CampusName.Value &amp; "  |  " &amp; Fields!YearName.Value</Value>
+                                  <Value>=Fields!CampusName.Value</Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>  |  </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=Fields!YearName.Value</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>8pt</FontSize>
@@ -768,7 +845,28 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>= "Class: " &amp; Fields!ClassName.Value &amp; "    Section: " &amp; Fields!SectionName.Value</Value>
+                                  <Value>Class: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=Fields!ClassName.Value</Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>    Section: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=Fields!SectionName.Value</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>8pt</FontSize>
@@ -802,7 +900,14 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>= "Exam: " &amp; IIF(Fields!Exam.Value = "", "____________________", Fields!Exam.Value)</Value>
+                                  <Value>Exam: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=IIF(Fields!Exam.Value = "", "____________________", Fields!Exam.Value)</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>8pt</FontSize>
@@ -836,7 +941,14 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>= "Paper: " &amp; IIF(Fields!Subject.Value = "", "____________________", Fields!Subject.Value)</Value>
+                                  <Value>Paper: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=IIF(Fields!Subject.Value = "", "____________________", Fields!Subject.Value)</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>8pt</FontSize>
@@ -870,7 +982,14 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>= "Date: " &amp; IIF(Fields!ExamDate.Value = "", "____________", Fields!ExamDate.Value)</Value>
+                                  <Value>Date: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=IIF(Fields!ExamDate.Value = "", "____________", Fields!ExamDate.Value)</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>8pt</FontSize>
@@ -904,7 +1023,14 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>= "Teacher: " &amp; IIF(Fields!Teacher.Value = "", "________________________", Fields!Teacher.Value)</Value>
+                                  <Value>Teacher: </Value>
+                                  <Style>
+                                    <FontFamily>Arial</FontFamily>
+                                    <FontSize>9pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun><TextRun>
+                                  <Value>=IIF(Fields!Teacher.Value = "", "________________________", Fields!Teacher.Value)</Value>
                                   <Style>
                                     <FontFamily>Arial</FontFamily>
                                     <FontSize>9pt</FontSize>
