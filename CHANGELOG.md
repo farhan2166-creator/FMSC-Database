@@ -13,10 +13,17 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Fixed
 
+- Show staff employment validation messages below their inputs instead of squeezing them beside field captions, and reject a Hire Date later than today.
 - Define payment-detail grid columns before binding so Student Fee Corrections can open View Details without accessing missing auto-generated columns.
 
 ### Changed
 
+- Open staff Add Job and Edit Job directly in an editor-only dialog; keep employment history on the staff page.
+- Remove the redundant top Employment button from Staff Management; use the existing Edit Job, Add Job and employment-history Edit actions.
+- Prefill the bank account opening certificate’s editable Designation from the selected staff member’s employment record; preserve saved certificate wording when editing.
+- Remove the trailing “here.” after Subject Taught on lecturer/teacher certificates.
+- Prefill new lecturer/teacher certificates with the selected staff member’s employment designation and latest saved certificate subject, keeping both fields editable and existing certificate values intact.
+- Move bill/receipt dates below the closing footer in small italic text: bills show the current printed-on date/time; receipts retain their recorded payment date/time.
 - Add Whole School, Campus, Class and Section grouping to Collections & Receipts receipt lists, with monetary subtotals and a grand total on screen, print and export; preserve mixed-location family receipts intact.
 - Give fee descriptions more width on student/family bills and receipts by narrowing the amount column, preserving paper width and month alignment.
 - Clarify Billing Summary headings with the selected charge-date/grouping label, Charge Count, Gross Billed, Discounts and Net Billed.

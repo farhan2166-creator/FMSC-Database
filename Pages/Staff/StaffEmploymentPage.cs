@@ -7,6 +7,7 @@ public sealed class StaffEmploymentPage : MasterPage
     public event Action? EmploymentChanged;
     public Func<bool>? SaveGuard { get; set; }
     private FormValidator? _employmentValidator;
+    protected override bool ReserveEditorValidationSpace => true;
     protected override string NewRecordHeaderTitle => "Add Employment";
     protected override string NewRecordHeaderSubtitle => "Leave Leaving Date unchecked for an active job. Enter it for a past job.";
     protected override string EntryTabCaption => "Job Details";
@@ -19,13 +20,21 @@ public sealed class StaffEmploymentPage : MasterPage
             return false;
         }
         if (SaveGuard?.Invoke() == false) return false;
-        _employmentValidator ??= CreateValidator();
+        if (_employmentValidator is null)
+        {
+            _employmentValidator = CreateValidator();
+            BindEditorValidationMessages(_employmentValidator);
+        }
         _employmentValidator.Begin();
         _employmentValidator.RequiredFields(this);
         if (TryGetEditorControl("HireDate", out var hireControl) && hireControl is ModernDatePicker hire &&
             TryGetEditorControl("LeavingDate", out var leaveControl) && leaveControl is ModernDatePicker leave)
+        {
+            _employmentValidator.Rule(hire, () => hire.Value.Date <= DateTime.Today,
+                "Hire date cannot be in the future.");
             _employmentValidator.Rule(leave, () => !leave.Checked || leave.Value.Date >= hire.Value.Date,
                 "Leaving date cannot be earlier than hire date.");
+        }
         return _employmentValidator.Finish();
     }
     protected override void AfterSave(int id, Dictionary<string, object?> values)
@@ -41,6 +50,8 @@ public sealed class StaffEmploymentPage : MasterPage
     public StaffEmploymentPage() : base("Staff Employment", "Manage staff jobs and employment history.", "GetStaffEmployment", "SaveStaffEmployment", new[] { new FieldSpec("StaffId", "Staff", FieldKind.ComboInt, Required: true, LookupProcedure: "GetStaff", LookupIdColumn: "StaffId", LookupTextColumn: "StaffName"), new FieldSpec("Designation", "Designation", Required: true), new FieldSpec("Department", "Department"), new FieldSpec("EmploymentType", "Employment Type"), new FieldSpec("HireDate", "Hire Date", FieldKind.Date, Required: true), new FieldSpec("LeavingDate", "Leaving Date", FieldKind.Date), new FieldSpec("Remarks", "Remarks") }, v => new[] { DatabaseHelper.P("@UserId", CurrentUser.UserId), DatabaseHelper.Int("@StaffEmploymentId", Convert.ToInt32(v["Id"] ?? 0)), DatabaseHelper.Int("@StaffId", Convert.ToInt32(v["StaffId"] ?? 0)), DatabaseHelper.P("@Designation", v["Designation"]), DatabaseHelper.P("@Department", v["Department"]), DatabaseHelper.P("@EmploymentType", v["EmploymentType"]), DatabaseHelper.Date("@HireDate", (DateTime)v["HireDate"]!), DatabaseHelper.P("@LeavingDate", v["LeavingDate"]), DatabaseHelper.P("@Remarks", v["Remarks"]) }, savePermission: "Staff.Manage") { }
     // Constructor that binds the page to a selected StaffId provider so the records shown reflect the currently selected staff member in a parent page (e.g. StaffManagementPage).
     public StaffEmploymentPage(Func<int> staffIdProvider)
+        : this(staffIdProvider, false) { }
+    internal StaffEmploymentPage(Func<int> staffIdProvider, bool editorOnly)
         : base(
             "Employment",
             "Add a job or select a saved job to update its details.",
@@ -73,6 +84,7 @@ public sealed class StaffEmploymentPage : MasterPage
             // That override is gone. dbo.SaveStaffEmployment synchronizes Staff.Status in its own transaction, and dbo.EndStaffEmployment ends the newest ACTIVE record for the staff member.
             savePermission: "Staff.Manage",
             separateEntryAndRecords: true,
+            editorOnly: editorOnly,
             guidance: "Select a job to edit it. Set a Leaving Date when it ends. Each staff member can have one active job.")
     {
         _staffProvider = staffIdProvider;
