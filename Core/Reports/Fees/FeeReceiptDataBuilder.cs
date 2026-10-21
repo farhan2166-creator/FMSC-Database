@@ -36,7 +36,7 @@ internal static partial class FeeReceiptDataBuilder
             foreach(var month in child.GroupBy(row=>Convert.ToDateTime(row["FeePeriod"]).ToString("MMM yyyy")))
             {
                 if(family) Add("  "+month.Key,"",0,"Month");
-                foreach(var line in month) Add((family?"    ":"")+Text(line,"FeeTypeName"),month.Key,Money(line,"Cash")+Money(line,"Credit"),"Fee",line);
+                foreach(var line in month) Add((family?"    ":"")+Text(line,"FeeTypeName"),month.Key,Money(line,"AmountBefore"),"Fee",line);
             }
             if(family)
             {
@@ -44,7 +44,7 @@ internal static partial class FeeReceiptDataBuilder
                 if(Money(student,"BalanceRemaining")>0) Add("  Outstanding","",Money(student,"BalanceRemaining"),"Summary");
             }
         }
-        if(data.Rows.Count==0) Add("Advance retained as student credit","",Money(header,"CashReceived"),"Fee");
+        if(data.Rows.Count==0) Add("Advance retained as student credit","",0m,"Fee");
         return data;
     }
 
