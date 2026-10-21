@@ -34,6 +34,15 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--combined-tooltips"))
+        {
+            CheckCombinedTooltips();
+            CheckFinanceHelp();
+            CheckValidationBadges();
+            CheckShortcutPermissions();
+            Console.WriteLine($"PASS: {checks} combined tooltip, validation and shortcut checks (no database connection).");
+            return;
+        }
         if(args.Contains("--staff-certificate-subjects"))
         {
             CheckStaffCertificateSubjects();

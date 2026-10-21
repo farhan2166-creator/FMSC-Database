@@ -108,7 +108,7 @@ public static class TabStrip
                 ApplyButtonTheme(button, page == tabs.SelectedTab);
                 string direct = index < 9 ? $"Ctrl+{index + 1}; " : string.Empty;
                 page.ToolTipText = $"{page.Text} ({direct}Ctrl+Tab / Ctrl+PageUp)";
-                hints.SetToolTip(button, page.ToolTipText);
+                ControlToolTips.SetDescription(hints, button, page.ToolTipText);
             }
             ArrangeButtons();
             FitTabContent();

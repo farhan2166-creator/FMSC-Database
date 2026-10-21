@@ -345,7 +345,6 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         var shortcut=AppHotKeys.DashboardNavigation.FirstOrDefault(s=>s.Caption==caption.Replace("&&","&"));
         if(shortcut.Caption is null)return;
         navigationShortcutTargets[shortcut.Keys]=button;
-        sidebarToolTip.SetToolTip(button,$"{shortcut.Caption} ({shortcut.Hint})");
         ShortcutController.RegisterShortcut(button,shortcut.Keys,shortcut.Hint,()=>button.PerformClick());
     }
     private void ShowCommandPalette(string? query = null)
@@ -529,7 +528,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         string location = NavigationLocation.Format(module, title,
             (_currentPageControl as WorkspacePage)?.CurrentSection);
         _locationLabel.Text = location;
-        sidebarToolTip.SetToolTip(_locationLabel, location);
+        ControlToolTips.SetDescription(sidebarToolTip,_locationLabel, location);
     }
     private void OnCurrentSectionChanged(object? sender, EventArgs e) => UpdateTopBar(_currentModule, _currentTitle);
     internal void UpdateTopAcademicYearLabel(WelcomePage source, string text)
@@ -940,7 +939,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             var child = CreateChildNavButton(
                 item.Text,
                 moduleAccent);
-            sidebarToolTip.SetToolTip(child, item.Title switch
+            ControlToolTips.SetDescription(sidebarToolTip,child, item.Title switch
             {
                 PageTitles.Admissions => "Admissions, section/class/campus transfers and readmission. Confirm Return appears when a student is awaiting return.",
                 "Staff Management" => "Staff details and records. Open Employment for a selected staff member.",
@@ -1040,7 +1039,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 ? Padding.Empty
                 : new Padding(10, 0, 30, 0)
         };
-        sidebarToolTip.SetToolTip(button, text);
+        ControlToolTips.SetDescription(sidebarToolTip,button, text);
         return button;
     }
     private DashboardNavButton CreateChildNavButton(
@@ -1209,7 +1208,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 : "Collapse navigation"
         };
         toggle.FlatAppearance.BorderSize = 0;
-        sidebarToolTip.SetToolTip(toggle, toggle.AccessibleName);
+        ControlToolTips.SetDescription(sidebarToolTip,toggle, toggle.AccessibleName);
         toggle.Click += (_, _) =>
             SetSidebarCompact(!_sidebarCompact, manual: true);
         panel.Controls.Add(toggle);
@@ -1280,7 +1279,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             }, 0, 1);
             panel.Controls.Add(identity);
         }
-        sidebarToolTip.SetToolTip(avatar, $"{CurrentUser.Username} · {CurrentUser.RoleName}");
+        ControlToolTips.SetDescription(sidebarToolTip,avatar, $"{CurrentUser.Username} · {CurrentUser.RoleName}");
         return panel;
     }
     private Panel BuildAccountPanel()
@@ -1305,7 +1304,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         };
         button.Click += (_, _) =>
             ShowAccountMenu(button);
-        sidebarToolTip.SetToolTip(button, "Account menu");
+        ControlToolTips.SetDescription(sidebarToolTip,button, "Account menu");
         panel.Controls.Add(button);
         return panel;
     }

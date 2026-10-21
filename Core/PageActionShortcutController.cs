@@ -8,7 +8,8 @@ internal sealed class PageActionShortcutController
     private ModernButton? explicitSaveButton;
     private sealed record LocalShortcut(Control Target, Keys Keys, string Hint, Action Execute);
     private readonly List<LocalShortcut> _localShortcuts = new();
-    internal void ClearLocalShortcuts()=>_localShortcuts.Clear();
+    private readonly HashSet<Control> hintTargets = new();
+    internal void ClearLocalShortcuts(){_localShortcuts.Clear();RefreshHints();}
     internal void RegisterShortcut(Control target, Keys keys, string hint, Action execute)
     {
         if (!AppHotKeys.IsValidShortcut(keys))
@@ -16,8 +17,7 @@ internal sealed class PageActionShortcutController
         if (_localShortcuts.Any(shortcut => shortcut.Keys == keys))
             throw new ArgumentException("A shortcut is already registered in this scope.", nameof(keys));
         _localShortcuts.Add(new(target, keys, hint, execute));
-        string existing = _toolTip.GetToolTip(target) ?? string.Empty;
-        _toolTip.SetToolTip(target, string.IsNullOrEmpty(existing) ? hint : existing + " / " + hint);
+        RefreshHints();
     }
     internal void SetSaveButton(ModernButton button) => explicitSaveButton = button;
 
@@ -192,20 +192,20 @@ internal sealed class PageActionShortcutController
 
     internal void RefreshHints()
     {
+        if (_root.IsDisposed) return;
         var letters=new Dictionary<ModernButton,char>();
+        var hints=new Dictionary<Control,List<string>>();
+        void AddHint(Control target,string key)
+        {
+            if (!hints.TryGetValue(target,out var keys)) hints[target]=keys=new();
+            keys.Add(key);
+        }
         foreach (AppHotKeys.ActionShortcut shortcut in AppHotKeys.PageActions)
         {
             List<ModernButton> matches = Find(shortcut.ButtonPrefixes);
             foreach (ModernButton button in matches)
             {
-                string plain = (button.Text ?? string.Empty).Trim();
-                string existing = _toolTip.GetToolTip(button) ?? string.Empty;
-                string hint = string.IsNullOrWhiteSpace(existing)
-                    ? $"{plain} ({shortcut.DisplayKey})"
-                    : existing.Contains(shortcut.DisplayKey, StringComparison.OrdinalIgnoreCase)
-                        ? existing
-                        : $"{existing} ({shortcut.DisplayKey})";
-                _toolTip.SetToolTip(button, matches.Count == 1 ? hint : null);
+                if(matches.Count==1)AddHint(button,shortcut.DisplayKey);
                 if(matches.Count==1 && button.Enabled && !letters.ContainsKey(button) &&
                     !(shortcut.KeyData==(Keys.Control|Keys.F) && SearchTarget() is not null)) {
                     var code=shortcut.KeyData & Keys.KeyCode;
@@ -213,33 +213,23 @@ internal sealed class PageActionShortcutController
                 }
             }
         }
+        foreach(var local in _localShortcuts)
+            if(!local.Target.IsDisposed)AddHint(local.Target,local.Hint);
         foreach(var local in _localShortcuts)if(local.Target is ModernButton button && button.Visible && button.Enabled) {
             var code=local.Keys & Keys.KeyCode;
             if(code>=Keys.A && code<=Keys.Z)letters[button]=(char)code;
         }
         foreach(var button in AllButtons(_root))button.ShortcutLetter=letters.TryGetValue(button,out char letter)?letter:null;
+        foreach(var target in hintTargets.Union(hints.Keys).ToArray())
+            ControlToolTips.SetShortcuts(_toolTip,target,this,hints.TryGetValue(target,out var keys)?keys:Array.Empty<string>());
+        hintTargets.Clear();
+        hintTargets.UnionWith(hints.Keys);
     }
     private static IEnumerable<ModernButton> AllButtons(Control root) {
         foreach(Control child in root.Controls) {
             if(child is ModernButton button)yield return button;
             foreach(var nested in AllButtons(child))yield return nested;
         }
-    }
-
-    internal string DecorateToolTip(Control control, string text)
-    {
-        if (control is not ModernButton button)
-            return text;
-        foreach (AppHotKeys.ActionShortcut shortcut in AppHotKeys.PageActions)
-        {
-            List<ModernButton> matches = Find(shortcut.ButtonPrefixes);
-            if (matches.Count == 1 && ReferenceEquals(matches[0], button) &&
-                !text.Contains(shortcut.DisplayKey, StringComparison.OrdinalIgnoreCase))
-            {
-                return $"{text} ({shortcut.DisplayKey})";
-            }
-        }
-        return text;
     }
 
     private List<ModernButton> Find(IEnumerable<string> leadingWords)

@@ -55,8 +55,8 @@ namespace FMSC_SMS.Core
         public static int SidebarUserHeight => AppScale.Scale(68);
         public static int SidebarCompactUserHeight => AppScale.Scale(54);
         public static int SidebarAccountHeight => AppScale.Scale(72);
-        public static int SidebarModuleHeight => AppScale.Scale(46);
-        public static int SidebarChildHeight => AppScale.Scale(40);
+        public static int SidebarModuleHeight => AppScale.Scale(40);
+        public static int SidebarChildHeight => AppScale.Scale(34);
         public static int SidebarIconSize => AppScale.Scale(24);
         public static int SidebarLogoSize => AppScale.Scale(42);
         public static int SidebarAvatarSize => AppScale.Scale(38);
