@@ -6,13 +6,13 @@
         <TablixBody>
           <TablixColumns>
             <TablixColumn>
-              <Width>0.70in</Width>
+              <Width>0.7in</Width>
             </TablixColumn>
             <TablixColumn>
               <Width>0.85in</Width>
             </TablixColumn>
             <TablixColumn>
-              <Width>0.50in</Width>
+              <Width>0.5in</Width>
             </TablixColumn>
           </TablixColumns>
           <TablixRows>
@@ -895,7 +895,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Discount included</Value>
+                              <Value>Discount</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1213,7 +1213,7 @@
                 <TablixCell />
               </TablixCells>
             </TablixRow>
-          <TablixRow>
+            <TablixRow>
               <Height>0.12in</Height>
               <TablixCells>
                 <TablixCell>
@@ -1227,15 +1227,18 @@
                             <TextRun>
                               <Value>Printed on </Value>
                               <Style>
+                                <FontStyle>Italic</FontStyle>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6pt</FontSize>
-                              <FontStyle>Italic</FontStyle></Style>
-                            </TextRun><TextRun>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
                               <Value>=Format(Now(), "dd-MMM-yyyy hh:mm tt")</Value>
                               <Style>
+                                <FontStyle>Italic</FontStyle>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6pt</FontSize>
-                              <FontStyle>Italic</FontStyle></Style>
+                              </Style>
                             </TextRun>
                           </TextRuns>
                           <Style>
@@ -1338,14 +1341,14 @@
                   </Visibility>
                 </TablixMember>
                 <TablixMember />
-              <TablixMember />
-                </TablixMembers>
+                <TablixMember />
+              </TablixMembers>
               <KeepTogether>true</KeepTogether>
             </TablixMember>
           </TablixMembers>
         </TablixRowHierarchy>
         <DataSetName>StudentBillData</DataSetName>
-        <Height>3.02in</Height>
+        <Height>2.88in</Height>
         <Width>2.05in</Width>
         <Style />
       </Tablix>

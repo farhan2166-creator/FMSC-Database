@@ -559,7 +559,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>☐ Immunization Record (if applicable)</Value>
+                <Value />
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>9pt</FontSize>
@@ -1795,7 +1795,7 @@ Photograph</Value>
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>This is a computer-generated admission form. Please retain a copy for your records.  Printed: </Value>
+                <Value>This is a computer-generated admission form. Please retain a copy for your records.  Printed on </Value>
                 <Style>
                   <FontStyle>Italic</FontStyle>
                   <FontFamily>Segoe UI</FontFamily>

@@ -142,13 +142,15 @@
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>
                               </Style>
-                            </TextRun><TextRun>
+                            </TextRun>
+                            <TextRun>
                               <Value>=First(Fields!CampusName.Value, "ReceiptPageGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>
                               </Style>
-                            </TextRun><TextRun>
+                            </TextRun>
+                            <TextRun>
                               <Value>)</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
@@ -733,7 +735,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Please arrange payment of the amount shown. Contact the school office if you have already paid.</Value>
+                              <Value>Please contact the school office if you have already paid.</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>

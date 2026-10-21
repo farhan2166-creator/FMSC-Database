@@ -6,13 +6,13 @@
         <TablixBody>
           <TablixColumns>
             <TablixColumn>
-              <Width>0.70in</Width>
+              <Width>0.7in</Width>
             </TablixColumn>
             <TablixColumn>
               <Width>0.85in</Width>
             </TablixColumn>
             <TablixColumn>
-              <Width>0.50in</Width>
+              <Width>0.5in</Width>
             </TablixColumn>
           </TablixColumns>
           <TablixRows>
@@ -895,7 +895,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Total fees listed</Value>
+                              <Value>Total</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1605,7 +1605,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Net applied to fees</Value>
+                              <Value>Total</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1685,7 +1685,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Student outstanding</Value>
+                              <Value>Outstanding</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1933,7 +1933,7 @@
                 <TablixCell />
               </TablixCells>
             </TablixRow>
-          <TablixRow>
+            <TablixRow>
               <Height>0.12in</Height>
               <TablixCells>
                 <TablixCell>
@@ -1947,15 +1947,18 @@
                             <TextRun>
                               <Value>Payment Date: </Value>
                               <Style>
+                                <FontStyle>Italic</FontStyle>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6pt</FontSize>
-                              <FontStyle>Italic</FontStyle></Style>
-                            </TextRun><TextRun>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
                               <Value>=First(Fields!PaymentDateText.Value, "ReceiptPageGroup")</Value>
                               <Style>
+                                <FontStyle>Italic</FontStyle>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6pt</FontSize>
-                              <FontStyle>Italic</FontStyle></Style>
+                              </Style>
                             </TextRun>
                           </TextRuns>
                           <Style>
@@ -2082,7 +2085,11 @@
                     <Hidden>=Not CBool(First(Fields!ReversedAmount.Value, "ReceiptPageGroup"))</Hidden>
                   </Visibility>
                 </TablixMember>
-                <TablixMember><Visibility><Hidden>=First(Fields!ShowSettlement.Value, "ReceiptPageGroup")</Hidden></Visibility></TablixMember>
+                <TablixMember>
+                  <Visibility>
+                    <Hidden>=First(Fields!ShowSettlement.Value, "ReceiptPageGroup")</Hidden>
+                  </Visibility>
+                </TablixMember>
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Not First(Fields!ShowBalance.Value, "ReceiptPageGroup")</Hidden>
@@ -2099,14 +2106,14 @@
                   </Visibility>
                 </TablixMember>
                 <TablixMember />
-              <TablixMember />
-                </TablixMembers>
+                <TablixMember />
+              </TablixMembers>
               <KeepTogether>true</KeepTogether>
             </TablixMember>
           </TablixMembers>
         </TablixRowHierarchy>
         <DataSetName>StudentReceiptData</DataSetName>
-        <Height>4.46in</Height>
+        <Height>4.32in</Height>
         <Width>2.05in</Width>
         <Style />
       </Tablix>

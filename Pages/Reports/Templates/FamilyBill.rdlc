@@ -6,13 +6,13 @@
         <TablixBody>
           <TablixColumns>
             <TablixColumn>
-              <Width>0.70in</Width>
+              <Width>0.7in</Width>
             </TablixColumn>
             <TablixColumn>
               <Width>0.85in</Width>
             </TablixColumn>
             <TablixColumn>
-              <Width>0.50in</Width>
+              <Width>0.5in</Width>
             </TablixColumn>
           </TablixColumns>
           <TablixRows>
@@ -44,8 +44,6 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>3</ColSpan>
@@ -56,7 +54,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.10in</Height>
+              <Height>0.1in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -82,8 +80,6 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>3</ColSpan>
@@ -94,7 +90,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.10in</Height>
+              <Height>0.1in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -120,8 +116,6 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>3</ColSpan>
@@ -817,12 +811,10 @@
                         </Paragraph>
                       </Paragraphs>
                       <Style>
+                        <BackgroundColor>#f0f0f0</BackgroundColor>
+                        <TextAlign>Left</TextAlign>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
-                        <TextAlign>Left</TextAlign>
-                        <BackgroundColor>#f0f0f0</BackgroundColor>
                       </Style>
                     </Textbox>
                     <ColSpan>3</ColSpan>
@@ -944,7 +936,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Discount included</Value>
+                              <Value>Discount</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1262,7 +1254,7 @@
                 <TablixCell />
               </TablixCells>
             </TablixRow>
-          <TablixRow>
+            <TablixRow>
               <Height>0.12in</Height>
               <TablixCells>
                 <TablixCell>
@@ -1276,15 +1268,18 @@
                             <TextRun>
                               <Value>Printed on </Value>
                               <Style>
+                                <FontStyle>Italic</FontStyle>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6pt</FontSize>
-                              <FontStyle>Italic</FontStyle></Style>
-                            </TextRun><TextRun>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
                               <Value>=Format(Now(), "dd-MMM-yyyy hh:mm tt")</Value>
                               <Style>
+                                <FontStyle>Italic</FontStyle>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6pt</FontSize>
-                              <FontStyle>Italic</FontStyle></Style>
+                              </Style>
                             </TextRun>
                           </TextRuns>
                           <Style>
@@ -1397,19 +1392,19 @@
                   </Visibility>
                 </TablixMember>
                 <TablixMember />
-              <TablixMember />
-                </TablixMembers>
+                <TablixMember />
+              </TablixMembers>
               <KeepTogether>true</KeepTogether>
             </TablixMember>
           </TablixMembers>
         </TablixRowHierarchy>
         <DataSetName>FamilyBillData</DataSetName>
-        <Height>2.9in</Height>
+        <Height>3.04in</Height>
         <Width>2.05in</Width>
         <Style />
       </Tablix>
     </ReportItems>
-    <Height>0.01in</Height>
+    <Height>3.04in</Height>
     <Style />
   </Body>
   <Width>2.05in</Width>
