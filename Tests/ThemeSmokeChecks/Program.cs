@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--staff-certificate-subjects"))
+        {
+            CheckStaffCertificateSubjects();
+            Console.WriteLine($"PASS: {checks} staff certificate subject checks (no database connection).");
+            return;
+        }
         if(args.Contains("--student-hold-preview-response"))
         {
             CheckStudentPostingHoldSqlResponse();
