@@ -68,7 +68,7 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
         }
         recent.Columns["ChargeDate"].MinimumWidth =
             TextRenderer.MeasureText("30-Sep-2026", AppTheme.NormalFont).Width + 2 * AppMetrics.SpacingSm;
-        HumanUi.ApplyGridStyle(recent, AppTheme.ModuleAccent("Finance"));
+        HumanUi.ApplyGridStyle(recent, AppTheme.Primary);
         history.Content.Controls.Add(recent);
         var body = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty
