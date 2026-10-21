@@ -83,7 +83,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         fields.Add(("Class", Class));
         fields.Add(("Section", Section));
         if (paymentMethod) fields.Add(("Payment Method", PaymentMethod));
-        if (grouping) fields.Add(("Group Summary By", GroupBy));
+        if (grouping) fields.Add((GroupingCaption, GroupBy));
         UiHelper.SetGridPlaceholderMessage(Grid, UiText.EmptyGrid.RunReport);
         SetContent(ReportUi.CompactLayout(ReportUi.Bar(fields.ToArray()), Grid, title, () => {
             _scopeEdited = true;
@@ -157,7 +157,8 @@ public abstract class CanonicalFinanceReportPage : V2Page
         SetStatus(matches ? "Last location filters restored. Review them, then press Run Report."
             : "Some saved filters are unavailable. Review them before running the report.", !matches);
     }
-    private void UpdateViewControls()
+    protected virtual string GroupingCaption => "Group Summary By";
+    protected virtual void UpdateViewControls()
     {
         GroupBy.Enabled = IsSummaryView;
     }
@@ -191,9 +192,10 @@ public abstract class CanonicalFinanceReportPage : V2Page
         parts.Add(Pick(Class, "Class"));
         parts.Add(Pick(Section, "Section"));
         if (PaymentMethod.Enabled && MethodName.Length > 0) parts.Add($"Method: {MethodName}");
-        if (IsSummaryView) parts.Add($"Grouped by: {GroupName}");
+        if (GroupBy.Enabled) parts.Add($"Grouped by: {GroupName}");
         return string.Join("   ", parts);
     }
+    protected virtual void PrepareReportData(DataTable data, SqlParameter[] parameters) { }
     private async Task RunAsync()
     {
         _scopeEdited = true;
@@ -218,6 +220,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
                 // limited to actual records so pagination does not count a total.
                 if (_procedure != "GetOutstandingAndAgingReport" && _procedure != "GetCollectionsAndReceiptsReport")
                     AppendAuthoritativeTotalRow(captured, totals);
+                PrepareReportData(captured, parameters);
                 return captured;
             });
             if (!ReportLanded || captured is null)

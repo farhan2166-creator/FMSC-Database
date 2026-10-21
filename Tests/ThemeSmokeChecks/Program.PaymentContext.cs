@@ -5,6 +5,28 @@ using FMSC_SMS.Pages.Finance.StudentAccounts;
 
 internal static partial class Program
 {
+    private static void CheckPaymentDetailsGrid()
+    {
+        const BindingFlags flags=BindingFlags.Static|BindingFlags.NonPublic;
+        var create=typeof(StudentFeeAdjustmentsPage).GetMethod("CreatePaymentDetailsGrid",flags)!;
+        var data=new DataTable();
+        data.Columns.Add("Fee");data.Columns.Add("Billing Month",typeof(DateTime));
+        data.Columns.Add("Amount (Rs.)",typeof(decimal));data.Columns.Add("Reason");
+        data.Rows.Add("Tuition Fee",new DateTime(2026,10,1),1200m,"Test payment");
+        using var grid=(DataGridView)create.Invoke(null,new object[]{data})!;
+        Check(grid.Parent is null&&!grid.AutoGenerateColumns&&grid.Columns.Count==4,
+            "Payment details defines its columns before parenting or creating a binding context");
+        foreach(DataColumn column in data.Columns)
+            Check(grid.Columns[column.ColumnName]?.DataPropertyName==column.ColumnName,
+                "Payment detail column binds its returned SQL field: "+column.ColumnName);
+        using var owner=new Form();owner.Controls.Add(grid);_ = owner.Handle;_ = grid.Handle;
+        grid.BindingContext=new BindingContext();
+        Check(grid.Rows.Count==1&&Equals(grid.Rows[0].Cells["Fee"].Value,"Tuition Fee")
+            &&Equals(grid.Rows[0].Cells["Amount (Rs.)"].Value,1200m),
+            "Payment details binds the fee and amount after parenting without losing values");
+        using var empty=(DataGridView)create.Invoke(null,new object[]{data.Clone()})!;
+        Check(empty.Columns.Count==4,"Payments with no fee allocations still have a valid details grid");
+    }
     private static void CheckPaymentAdjustmentContext()
     {
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
