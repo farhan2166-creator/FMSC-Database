@@ -59,7 +59,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>Student balances organised by urgency and age</Value>
+                <Value>Student outstanding fees organised by urgency and age</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>9.5pt</FontSize>
@@ -256,7 +256,7 @@
                     </Style>
                   </TextRun>
                   <TextRun>
-                    <Value>="Rs. "</Value>
+                    <Value>Rs. </Value>
                     <Style>
                       <FontFamily>Segoe UI</FontFamily>
                       <FontSize>11pt</FontSize>
@@ -313,7 +313,7 @@
                     </Style>
                   </TextRun>
                   <TextRun>
-                    <Value>="Rs. "</Value>
+                    <Value>Rs. </Value>
                     <Style>
                       <FontFamily>Segoe UI</FontFamily>
                       <FontSize>11pt</FontSize>
@@ -370,7 +370,7 @@
                     </Style>
                   </TextRun>
                   <TextRun>
-                    <Value>="Rs. "</Value>
+                    <Value>Rs. </Value>
                     <Style>
                       <FontFamily>Segoe UI</FontFamily>
                       <FontSize>11pt</FontSize>
@@ -478,7 +478,7 @@
                               </Style>
                             </TextRun>
                             <TextRun>
-                              <Value>=" - "</Value>
+                              <Value> - </Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontWeight>Bold</FontWeight>
@@ -507,7 +507,7 @@
                               </Style>
                             </TextRun>
                             <TextRun>
-                              <Value>="  ·  "</Value>
+                              <Value>  ·  </Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>8pt</FontSize>
@@ -576,7 +576,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>="CURRENT   Rs. "</Value>
+                              <Value>CURRENT   Rs. </Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>8pt</FontSize>
@@ -597,7 +597,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>="1–30   "</Value>
+                              <Value>1–30   </Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>8pt</FontSize>
@@ -613,7 +613,7 @@
                               </Style>
                             </TextRun>
                             <TextRun>
-                              <Value>="     31–60   "</Value>
+                              <Value>     31–60   </Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>8pt</FontSize>
@@ -634,7 +634,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>="61–90   "</Value>
+                              <Value>61–90   </Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>8pt</FontSize>
@@ -650,7 +650,7 @@
                               </Style>
                             </TextRun>
                             <TextRun>
-                              <Value>="     90+   "</Value>
+                              <Value>     90+   </Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>8pt</FontSize>
@@ -690,7 +690,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>="Rs. "</Value>
+                              <Value>Rs. </Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>11pt</FontSize>
@@ -827,7 +827,7 @@
             <Paragraph>
               <TextRuns>
                 <TextRun>
-                  <Value>="CONFIDENTIAL · Fee aging · Page "</Value>
+                  <Value>CONFIDENTIAL · Fee aging · Page </Value>
                   <Style>
                     <FontFamily>Segoe UI</FontFamily>
                     <FontSize>7.5pt</FontSize>
@@ -843,7 +843,7 @@
                   </Style>
                 </TextRun>
                 <TextRun>
-                  <Value>=" of "</Value>
+                  <Value> of </Value>
                   <Style>
                     <FontFamily>Segoe UI</FontFamily>
                     <FontSize>7.5pt</FontSize>

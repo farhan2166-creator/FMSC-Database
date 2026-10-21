@@ -53,46 +53,19 @@ internal static class FeeDocumentLayout
                         && string.IsNullOrWhiteSpace(Convert.ToString(record["CampusName"]))) continue;
                     if (!combinedLocation && field.Success && (hidden.Contains("Len(")
                         ? string.IsNullOrWhiteSpace(Convert.ToString(record[field.Groups[1].Value]))
-                        : !Convert.ToBoolean(record[field.Groups[1].Value]))) continue;
+                        : hidden.StartsWith("=First(",StringComparison.Ordinal)
+                            ? Convert.ToBoolean(record[field.Groups[1].Value])
+                            : !Convert.ToBoolean(record[field.Groups[1].Value]))) continue;
                     double rowHeight = Inches(rows[index].Element(ns + "Height")!.Value);
                     int columnIndex = 0;
                     foreach (var cell in rows[index].Descendants(ns + "CellContents"))
                     {
                         int span = (int?)cell.Element(ns + "ColSpan") ?? 1;
                         var textBox = cell.Element(ns + "Textbox")!;
-                        string expression = textBox.Descendants(ns + "Value").First().Value;
-                        string text = expression;
-                        if ((string?)textBox.Attribute("Name") == "DocumentDateFooter")
-                        {
-                            text = expression.Contains("Now()", StringComparison.Ordinal)
-                                ? $"Printed on {DateTime.Now:dd-MMM-yyyy hh:mm tt}"
-                                : "Payment Date: " + Convert.ToString(record["PaymentDateText"]);
-                        }
-                        else if (expression.StartsWith('='))
-                        {
-                            string key = Regex.Match(expression, @"Fields!(\w+)\.Value").Groups[1].Value;
-                            text = expression.StartsWith("=Format(")
-                                ? (Convert.ToDecimal(record[key]) * (expression.StartsWith("=Format(-") ? -1 : 1)).ToString(
-                                    expression.Contains("\"N2\"") ? "N2" : "N0", CultureInfo.CurrentCulture)
-                                : Convert.ToString(record[key]) ?? "";
-                            if (expression.StartsWith("=IIf(") && key == "ShowAdjustments")
-                                text = Convert.ToBoolean(record[key]) ? "NET SETTLED" : "TOTAL SETTLED";
-                            if((string?)textBox.Attribute("Name")=="TotalPaid" && key=="ShowSettlement")
-                                text=Convert.ToDecimal(record[Convert.ToBoolean(record["ShowSettlement"])?"TotalPaid":"NetPaid"]).ToString("N0");
-                            if((string?)textBox.Attribute("Name")=="TotalLabel" && key=="ShowSettlement")
-                                text=Convert.ToBoolean(record["ShowSettlement"])?"TOTAL SETTLED":Convert.ToBoolean(record["ShowAdjustments"])?"NET SETTLED":"TOTAL SETTLED";
-                            if ((string?)textBox.Attribute("Name") == "AdmissionNumberTextLabel")
-                                text = (Convert.ToString(record["AdmissionNumberText"]) ?? "").Contains("QR-",StringComparison.OrdinalIgnoreCase)
-                                    ? "Registration #" : "Admission #";
-                            if ((string?)textBox.Attribute("Name") == "ReceiptHeading")
-                                text += " (" + CultureInfo.InvariantCulture.TextInfo.ToTitleCase(Convert.ToString(record["CopyLabel"])!.ToLowerInvariant()) + ")";
-                            if ((string?)textBox.Attribute("Name") == "CampusHeading") text = "(" + text + ")";
-                            if ((string?)textBox.Attribute("Name") == "SchoolAddress")
-                            {
-                                string campus = Convert.ToString(record["CampusName"]) ?? "";
-                                text = (text + (string.IsNullOrWhiteSpace(campus) ? "" : " (" + campus + ")")).Trim();
-                            }
-                        }
+                        // Captions live in literal RDLC text runs. Measure every
+                        // run so editing a label also updates the required paper length.
+                        string text=string.Concat(textBox.Descendants(ns+"TextRun").Select(run=>
+                            MeasureValue(run.Element(ns+"Value")!.Value,record,(string?)textBox.Attribute("Name"))));
                         float points = float.Parse(textBox.Descendants(ns + "FontSize").First().Value.Replace("pt", ""), CultureInfo.InvariantCulture);
                         bool bold=textBox.Descendants(ns + "FontWeight").Any(weight => weight.Value == "Bold")
                             || (data.Columns.Contains("FamilyRowKind")&&(string?)textBox.Attribute("Name")=="FeeDescription"&&Convert.ToString(record["FamilyRowKind"])!="Fee");
@@ -130,4 +103,25 @@ internal static class FeeDocumentLayout
     }
 
     private static double Inches(string value) => double.Parse(value.Replace("in", ""), CultureInfo.InvariantCulture);
+
+    private static string MeasureValue(string expression,DataRow record,string? name)
+    {
+        if(!expression.StartsWith('='))return expression;
+        if(expression.Contains("Now()",StringComparison.Ordinal))
+            return DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt",CultureInfo.CurrentCulture);
+        string key=Regex.Match(expression,@"Fields!(\w+)\.Value").Groups[1].Value;
+        if(string.IsNullOrEmpty(key))throw new InvalidOperationException("Unsupported fee-document measurement expression: "+name);
+        if(name=="TotalPaid" && key=="ShowSettlement")
+            return Convert.ToDecimal(record[Convert.ToBoolean(record[key])?"TotalPaid":"NetPaid"]).ToString("N0");
+        if(expression.StartsWith("=Format(",StringComparison.Ordinal))
+            return (Convert.ToDecimal(record[key])*(expression.StartsWith("=Format(-",StringComparison.Ordinal)?-1:1))
+                .ToString(expression.Contains("\"N2\"")?"N2":"N0",CultureInfo.CurrentCulture);
+        string text=Convert.ToString(record[key])??"";
+        if(name=="SchoolAddress")
+        {
+            string campus=Convert.ToString(record["CampusName"])??"";
+            text=(text+(string.IsNullOrWhiteSpace(campus)?"":" ("+campus+")")).Trim();
+        }
+        return text;
+    }
 }

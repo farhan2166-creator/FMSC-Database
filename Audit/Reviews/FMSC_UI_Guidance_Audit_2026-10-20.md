@@ -78,3 +78,30 @@ This is a **code-level wording and hierarchy audit**, not proof of pixel-space w
 **Do not redesign the app or immediately trim all subtitles.** First candidates for *copy-only* review are **Audit Logs**, **Communication Center**, **Quick Registration**, **Student Fee Adjustments**, and **Student Profile**. **Annual Fee Receipts** merits early visual inspection for a possible space problem but no layout change until approved. **Backup & Restore** and **Fee Collection** remain protected baselines.
 
 **Source audit outcome:** Enough concrete evidence exists to move to targeted visual validation and proposed wording comparisons. There is *not yet* evidence to authorize blanket removal of text or card headers.
+
+## 8. Implementation and verification follow-up — 21 October 2026
+
+The owner authorized applying confirmed copy findings and verifying the remaining candidates. The original review above is retained as the historical baseline.
+
+| Findings | Current outcome |
+|---|---|
+| G02 | Shortened routine Communication Center narration. Retained compose/configure permission guidance, consent and ownership requirements, immutable template approval, provider mapping, future-event scope, approval/dispatcher controls, and simulation/live warnings. |
+| G04 | Shortened Quick Registration's initial status. Retained its registration/confirmation context, parent-link guidance beside the fields, concession timing, and bill/payment instructions. |
+| G06 | Shortened Student Profile search, identity and sibling captions. The search caption fits the inspected 1000-pixel-wide capture; lifecycle and current-placement descriptions remain. |
+| G07 | Shortened routine student/payment selection captions. Financial consequences, eligibility and save-recovery messages are unchanged. |
+| G08 | Applied title case to Student Account, Choose Students / Families and Account Details. Date scope and cross-search family selection guidance are unchanged. |
+| G03 | Rendered at 1000×620 and 1280×720, actual Windows DPI 96, in OceanBlue and ProfessionalSimple. Confirmed that the empty Tip content occupies 152 and 252 pixels of height respectively. Layout remains a separate change candidate. |
+| G09 | Captures confirm the repeated Student Certificates title and introduction. At constrained height the certificate-card content also merits a dedicated live layout review. No card removed or resized. |
+| G05, G16, G17 | Source confirms deliberate compact/embedded headers and title-preserving context updates. No defect established; preserved. |
+| G10, G11 | Repeated Family / Siblings titles remain. Class Sheets instructions also explain meaningful all-class/all-section and hidden-checked-student behavior. Retained pending targeted visual review. |
+| G12, G13 | Eligibility, effective-date, school-document purpose, logo limits and fee-policy guidance remain useful. No demonstrated defect; preserved. |
+| G01 | Deferred with the audit system's gradual retirement. The current page also requests a 10,000-row retention cap; any later wording change must account for that as well as six-month detail retention. No pruning behavior changed. |
+| G14, G15 | Protected Backup & Restore and Fee Collection layouts and critical consequences are unchanged. |
+
+Reproducible offline captures: `dotnet run --project Tests/ThemeSmokeChecks -- --ui-guidance-review`. Output: `artifacts/ui-guidance-review/` (generated evidence, not committed). The fixture uses administrator permissions and disables database initialization; no school records, certificates, or reports are created. These captures are not a substitute for populated-data, keyboard/screen-reader, or actual enlarged-DPI review. Current selectable theme families were exercised; no distinct dark-mode verification is claimed.
+
+Validation: 299 communication layout/focus/workflow checks; 89 finance wording and recovery checks; 12 offline guidance render checks. Builds succeeded; NuGet vulnerability metadata lookup produced NU1900 because its service index was unavailable.
+
+During this work the owner separately requested clearer printed fee documents. All four bill/receipt templates now hide the redundant family-count detail, including historical snapshots. Following the owner's wording correction, debts are labelled **Student outstanding** and **Family outstanding** rather than balance. Receipts distinguish listed fee totals, payment received, existing credit used and outstanding fees. Existing monetary values, allocations and snapshots are unchanged. The 301 fee-document checks cover individual/family bills and receipts, partial payments, credit cases, legacy/A4 output, and a longer owner-edited caption, including a rendered example with 4,800 listed fees, 3,000 received, 4,300 student debt and 6,500 family debt. The PDF and PNG examples were visually inspected.
+
+Fixed captions were also separated from data expressions across bill/receipt, admission, class-sheet, outstanding, summary and aging templates. Receipt sizing now measures all text runs and respects the legacy total row's hide-when-true condition. Seven additional report templates were rendered with typed fixture data. Conditional grammar and genuinely data-dependent certificate wording remain dynamic. See `Docs/Design/EDITING_REPORT_LABELS.md` for owner editing instructions; literal captions are not tied to exact-English assertions in the receipt checks.

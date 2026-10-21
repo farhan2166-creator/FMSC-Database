@@ -143,7 +143,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=First(Fields!DocumentTitle.Value, "ReceiptPageGroup")</Value>
+                              <Value>FAMILY FEE BILL</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.25pt</FontSize>
@@ -151,7 +151,7 @@
                               </Style>
                             </TextRun>
                             <TextRun>
-                              <Value>=" ("</Value>
+                              <Value> (</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.25pt</FontSize>
@@ -1094,7 +1094,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Outstanding balance (Rs.)</Value>
+                              <Value>Outstanding (Rs.)</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1274,7 +1274,13 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>="Printed on " &amp; Format(Now(), "dd-MMM-yyyy hh:mm tt")</Value>
+                              <Value>Printed on </Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6pt</FontSize>
+                              <FontStyle>Italic</FontStyle></Style>
+                            </TextRun><TextRun>
+                              <Value>=Format(Now(), "dd-MMM-yyyy hh:mm tt")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6pt</FontSize>
@@ -1352,7 +1358,7 @@
                 </TablixMember>
                 <TablixMember>
                   <Visibility>
-                    <Hidden>=Len(First(Fields!FamilyBatch.Value, "ReceiptPageGroup")) = 0</Hidden>
+                    <Hidden>true</Hidden>
                   </Visibility>
                 </TablixMember>
                 <TablixMember>

@@ -143,7 +143,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=First(Fields!DocumentTitle.Value, "ReceiptPageGroup")</Value>
+                              <Value>FAMILY PAYMENT RECEIPT</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.25pt</FontSize>
@@ -151,7 +151,7 @@
                               </Style>
                             </TextRun>
                             <TextRun>
-                              <Value>=" ("</Value>
+                              <Value> (</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.25pt</FontSize>
@@ -942,7 +942,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Applied to fees</Value>
+                              <Value>Applied for student</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1022,7 +1022,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Outstanding</Value>
+                              <Value>Student outstanding</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1092,7 +1092,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Total</Value>
+                              <Value>Total fees listed</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1242,7 +1242,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Received</Value>
+                              <Value>Payment received</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1322,7 +1322,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Credit used</Value>
+                              <Value>Account credit used</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1802,7 +1802,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=IIf(First(Fields!ShowSettlement.Value, "ReceiptPageGroup"), "TOTAL SETTLED", IIf(First(Fields!ShowAdjustments.Value, "ReceiptPageGroup"), "NET SETTLED", "TOTAL SETTLED"))</Value>
+                              <Value>Net applied to fees</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1882,7 +1882,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Balance (Rs.)</Value>
+                              <Value>Family outstanding</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -2142,7 +2142,13 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>="Payment Date: " &amp; First(Fields!PaymentDateText.Value, "ReceiptPageGroup")</Value>
+                              <Value>Payment Date: </Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6pt</FontSize>
+                              <FontStyle>Italic</FontStyle></Style>
+                            </TextRun><TextRun>
+                              <Value>=First(Fields!PaymentDateText.Value, "ReceiptPageGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6pt</FontSize>
@@ -2220,7 +2226,7 @@
                 </TablixMember>
                 <TablixMember>
                   <Visibility>
-                    <Hidden>=Len(First(Fields!FamilyBatch.Value, "ReceiptPageGroup")) = 0</Hidden>
+                    <Hidden>true</Hidden>
                   </Visibility>
                 </TablixMember>
                 <TablixMember />

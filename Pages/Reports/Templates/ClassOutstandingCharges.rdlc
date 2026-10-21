@@ -205,7 +205,42 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>= "Campus: " &amp; First(Fields!CampusName.Value) &amp; "    Class: " &amp; First(Fields!ClassName.Value) &amp; "    Section: " &amp; First(Fields!SectionName.Value)</Value>
+                              <Value>Campus: </Value>
+                              <Style>
+                                <FontFamily>Arial</FontFamily>
+                                <FontSize>10pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun><TextRun>
+                              <Value>=First(Fields!CampusName.Value)</Value>
+                              <Style>
+                                <FontFamily>Arial</FontFamily>
+                                <FontSize>10pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun><TextRun>
+                              <Value>    Class: </Value>
+                              <Style>
+                                <FontFamily>Arial</FontFamily>
+                                <FontSize>10pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun><TextRun>
+                              <Value>=First(Fields!ClassName.Value)</Value>
+                              <Style>
+                                <FontFamily>Arial</FontFamily>
+                                <FontSize>10pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun><TextRun>
+                              <Value>    Section: </Value>
+                              <Style>
+                                <FontFamily>Arial</FontFamily>
+                                <FontSize>10pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun><TextRun>
+                              <Value>=First(Fields!SectionName.Value)</Value>
                               <Style>
                                 <FontFamily>Arial</FontFamily>
                                 <FontSize>10pt</FontSize>
@@ -254,7 +289,28 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>= "Academic Year: " &amp; First(Fields!YearSelection.Value) &amp; "    Generated: " &amp; First(Fields!Generated.Value)</Value>
+                              <Value>Academic Year: </Value>
+                              <Style>
+                                <FontFamily>Arial</FontFamily>
+                                <FontSize>9pt</FontSize>
+                                <FontWeight>Normal</FontWeight>
+                              </Style>
+                            </TextRun><TextRun>
+                              <Value>=First(Fields!YearSelection.Value)</Value>
+                              <Style>
+                                <FontFamily>Arial</FontFamily>
+                                <FontSize>9pt</FontSize>
+                                <FontWeight>Normal</FontWeight>
+                              </Style>
+                            </TextRun><TextRun>
+                              <Value>    Generated: </Value>
+                              <Style>
+                                <FontFamily>Arial</FontFamily>
+                                <FontSize>9pt</FontSize>
+                                <FontWeight>Normal</FontWeight>
+                              </Style>
+                            </TextRun><TextRun>
+                              <Value>=First(Fields!Generated.Value)</Value>
                               <Style>
                                 <FontFamily>Arial</FontFamily>
                                 <FontSize>9pt</FontSize>
@@ -770,7 +826,21 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>= "Class / Section Total (" &amp; CountRows("ClassSectionGroup") &amp; IIF(CountRows("ClassSectionGroup") = 1, " student)", " students)")</Value>
+                              <Value>Class / Section Total (</Value>
+                              <Style>
+                                <FontFamily>Arial</FontFamily>
+                                <FontSize>9pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun><TextRun>
+                              <Value>=CountRows("ClassSectionGroup")</Value>
+                              <Style>
+                                <FontFamily>Arial</FontFamily>
+                                <FontSize>9pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun><TextRun>
+                              <Value>=IIF(CountRows("ClassSectionGroup") = 1, " student)", " students)")</Value>
                               <Style>
                                 <FontFamily>Arial</FontFamily>
                                 <FontSize>9pt</FontSize>
@@ -961,7 +1031,28 @@
             <Paragraph>
               <TextRuns>
                 <TextRun>
-                  <Value>= "Page " &amp; Globals!PageNumber &amp; " of " &amp; Globals!TotalPages</Value>
+                  <Value>Page </Value>
+                  <Style>
+                    <FontFamily>Arial</FontFamily>
+                    <FontSize>8pt</FontSize>
+                    <FontWeight>Normal</FontWeight>
+                  </Style>
+                </TextRun><TextRun>
+                  <Value>=Globals!PageNumber</Value>
+                  <Style>
+                    <FontFamily>Arial</FontFamily>
+                    <FontSize>8pt</FontSize>
+                    <FontWeight>Normal</FontWeight>
+                  </Style>
+                </TextRun><TextRun>
+                  <Value> of </Value>
+                  <Style>
+                    <FontFamily>Arial</FontFamily>
+                    <FontSize>8pt</FontSize>
+                    <FontWeight>Normal</FontWeight>
+                  </Style>
+                </TextRun><TextRun>
+                  <Value>=Globals!TotalPages</Value>
                   <Style>
                     <FontFamily>Arial</FontFamily>
                     <FontSize>8pt</FontSize>

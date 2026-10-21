@@ -109,7 +109,7 @@ public sealed class StudentProfilePage : V2Page
         UiHelper.SetGridPlaceholderMessage(contextGrid, UiText.EmptyGrid.SelectStudent);
         UiHelper.SetGridPlaceholderMessage(familyGrid, UiText.EmptyGrid.SelectStudent);
         UiHelper.SetGridPlaceholderMessage(timelineGrid, UiText.EmptyGrid.SelectStudent);
-        var selector = HumanUi.Card("Student", "Search by name or admission number, then select a student.");
+        var selector = HumanUi.Card("Student", "Search by name or admission number.");
         selector.Content.Controls.Add(HumanUi.Field("Student", student, true));
         var header = BuildHeaderCard();
         var sections = BuildSectionsGrid();
