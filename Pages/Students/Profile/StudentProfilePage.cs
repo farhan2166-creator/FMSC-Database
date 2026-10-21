@@ -109,7 +109,7 @@ public sealed class StudentProfilePage : V2Page
         UiHelper.SetGridPlaceholderMessage(contextGrid, UiText.EmptyGrid.SelectStudent);
         UiHelper.SetGridPlaceholderMessage(familyGrid, UiText.EmptyGrid.SelectStudent);
         UiHelper.SetGridPlaceholderMessage(timelineGrid, UiText.EmptyGrid.SelectStudent);
-        var selector = HumanUi.Card("Student", "Type the student's Admission Number or name, then click the student in the list.");
+        var selector = HumanUi.Card("Student", "Search by name or admission number, then select a student.");
         selector.Content.Controls.Add(HumanUi.Field("Student", student, true));
         var header = BuildHeaderCard();
         var sections = BuildSectionsGrid();
@@ -153,7 +153,7 @@ public sealed class StudentProfilePage : V2Page
         .Sum(label => Math.Max(label.Height, AppMetrics.TextHeight(label.Font) + AppScale.Scale(4)));
     private HumanCard BuildHeaderCard()
     {
-        var card = HumanUi.Card("Identity & Standing", "Pulled from the student's current admission record.");
+        var card = HumanUi.Card("Identity & Standing", "Current admission details.");
         var layout = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
@@ -204,7 +204,7 @@ public sealed class StudentProfilePage : V2Page
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         // TOP LEFT: Family / Siblings
-        var familyCard = HumanUi.Card("Family / Siblings", "Other admitted children linked to this student's family.");
+        var familyCard = HumanUi.Card("Family / Siblings", "Admitted siblings linked to this family.");
         familyCard.Margin = new Padding(0, AppScale.Scale(4), AppScale.Scale(4), AppScale.Scale(4));
         var familyHost = new Panel {
             Dock = DockStyle.Fill
