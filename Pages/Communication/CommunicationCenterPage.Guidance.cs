@@ -38,11 +38,11 @@ public sealed partial class CommunicationCenterPage
     {
         SetPageHeaderText("Communication Center",tabs.SelectedTab?.Text??"");
         string text=tabs.SelectedIndex switch {
-            0=>CurrentUser.HasPermission("Communication.Compose")?"1. Choose channel and reviewed template. 2. Find and select saved contacts. 3. Preview, then Create Draft. Open Outbox to submit; creating a draft sends nothing.":"Your account can view communication records. Open Outbox / Schedule / History; composing requires Communication.Compose.",
-            1=>"Select a message to review its campaign. Submit a draft, approve when required, then run the dispatcher for queued work. Accepted by provider is not proof of delivery.",
-            2=>CurrentUser.HasPermission("Communication.Configure")?"Add a contact from school records or manually. Verify who controls the number and record channel/purpose consent. Saving a contact does not send a message.":"Contact and consent administration requires Communication.Configure. Ask an authorized administrator to add or update a contact.",
-            3=>"Select a template to review its text, language and recipient context. New Version / Review saves an immutable version; approve it before composing. WhatsApp also needs an approved provider mapping.",
-            4=>CurrentUser.HasPermission("Communication.Configure")?"Configure future-event rules only after contacts, consent and templates are ready. Evaluation prepares eligible campaigns; approval and dispatcher controls still apply.":"Automation configuration requires Communication.Configure. Ask an authorized administrator to review the rules.",
+            0=>CurrentUser.HasPermission("Communication.Compose")?"Choose a channel, reviewed template and saved contacts. Preview, then Create Draft. Drafts send nothing; submit from Outbox.":"View records in Outbox / Schedule / History. Composing requires Communication.Compose.",
+            1=>"Submit drafts, approve when required, then run the dispatcher. Provider acceptance is not proof of delivery.",
+            2=>CurrentUser.HasPermission("Communication.Configure")?"Verify number ownership and record channel/purpose consent. Saving a contact sends nothing.":"Contact and consent administration requires Communication.Configure. Ask an authorized administrator to add or update a contact.",
+            3=>"Review text, language and recipient context. New Version / Review saves an immutable version; approve before composing. WhatsApp requires an approved provider mapping.",
+            4=>CurrentUser.HasPermission("Communication.Configure")?"Rules apply to future events and require contacts, consent and reviewed templates. Evaluation prepares eligible campaigns; approval and dispatcher controls still apply.":"Automation configuration requires Communication.Configure. Ask an authorized administrator to review the rules.",
             _=>CurrentUser.HasPermission("Communication.Configure")?"Start with Simulation to rehearse without external delivery. Configure budgets, sender credentials and approved templates before explicitly enabling Live. Credentials are protected for this Windows user.":"Gateway configuration requires Communication.Configure. Ask an authorized administrator; no credentials are displayed here."
         };
         SetHeaderGuidance(text);

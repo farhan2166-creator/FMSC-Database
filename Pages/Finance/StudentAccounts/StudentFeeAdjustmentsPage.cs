@@ -109,7 +109,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         studentBar.Height=AppMetrics.FieldRowHeight;
         var studentCard = HumanUi.Card(
             "Student",
-            "Choose a student to review their recorded payments.",
+            "Select a student.",
             AppTheme.ModuleAccent("Finance"));
         var studentFields = new TableLayoutPanel {
             Dock = DockStyle.Fill,
@@ -149,7 +149,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         adjustmentButtons.Dock=DockStyle.Top;
         adjustmentFields.Controls.Add(adjustmentButtons,0,1);
         adjustmentCard.Content.Controls.Add(adjustmentFields);
-        var historyCard=HumanUi.Card("Recorded Payments","Select the payment you want to review or adjust.",AppTheme.ModuleAccent("Finance"));
+        var historyCard=HumanUi.Card("Recorded Payments","Select a payment to review or adjust.",AppTheme.ModuleAccent("Finance"));
         payments.Dock=DockStyle.Fill;
         historyCard.Content.Controls.Add(payments);
         paymentLayout.RowCount=3;

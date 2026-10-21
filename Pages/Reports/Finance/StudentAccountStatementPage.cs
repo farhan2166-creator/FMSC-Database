@@ -166,7 +166,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     }
     private void BuildStatementLayout()
     {
-        var filters = HumanUi.Card("Student account", "Dates limit the statement balances. Leave dates unchecked for the complete account; Print Outstanding includes all unpaid bills.");
+        var filters = HumanUi.Card("Student Account", "Dates limit the statement balances. Leave dates unchecked for the complete account; Print Outstanding includes all unpaid bills.");
         var filterGrid = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Margin = Padding.Empty
         };
@@ -250,7 +250,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         filterBody.Controls.Add(actions, 0, 3);
         filters.Content.Controls.Add(filterBody);
 
-        var studentCard = HumanUi.Card("Choose students / families", "Tick students or Include Family. Selections can span searches.");
+        var studentCard = HumanUi.Card("Choose Students / Families", "Tick students or Include Family. Selections can span searches.");
         var selectAll = CreateFilterButton("Select All Results", AppTheme.MutedText);
         var deselect = CreateFilterButton("Clear Selection", AppTheme.MutedText);
         selectAll.Click += (_, _) => { SelectAllStudents(); OnFiltersChanged(); };
@@ -269,7 +269,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         selectionBody.Controls.Add(selectionActions, 0, 1);
         selectionBody.Controls.Add(students, 0, 2);
         studentCard.Content.Controls.Add(selectionBody);
-        var statement = HumanUi.Card("Account details", "Fee charges with allocated payments and remaining amounts.", accessory: exportButton);
+        var statement = HumanUi.Card("Account Details", "Fee charges with allocated payments and remaining amounts.", accessory: exportButton);
         statement.Header.Controls.SetChildIndex(exportButton, statement.Header.Controls.Count - 1);
         statement.Content.Controls.Add(Grid);
         var summary = BuildSummary();
