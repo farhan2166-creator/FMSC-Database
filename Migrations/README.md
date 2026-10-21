@@ -1,22 +1,23 @@
 # Apply the database changes later
 
-The application requires **schema 30**. SQL changes are checked in here;
+The application requires **schema 31**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 | Current database version | Files to apply, in order |
 |---|---|
-| 19 | `20.sql`, `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, then `30.sql` |
-| 20 | `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, then `30.sql` |
-| 21 | `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, then `30.sql` |
-| 22 | `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, then `30.sql` |
-| 23 | `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, then `30.sql` |
-| 24 | `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, then `30.sql` |
-| 25 | `26.sql`, `27.sql`, `28.sql`, `29.sql`, then `30.sql` |
-| 26 | `27.sql`, `28.sql`, `29.sql`, then `30.sql` |
-| 27 | `28.sql`, `29.sql`, then `30.sql` |
-| 28 | `29.sql`, then `30.sql` |
-| 29 | `30.sql` |
-| 30 | None |
+| 19 | `20.sql`, `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
+| 20 | `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
+| 21 | `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
+| 22 | `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
+| 23 | `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
+| 24 | `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
+| 25 | `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
+| 26 | `27.sql`, `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
+| 27 | `28.sql`, `29.sql`, `30.sql`, then `31.sql` |
+| 28 | `29.sql`, `30.sql`, then `31.sql` |
+| 29 | `30.sql`, then `31.sql` |
+| 30 | `31.sql` |
+| 31 | None |
 
 Check your version first:
 
@@ -63,7 +64,7 @@ transaction, which the installer normally provides.
 For a schema-19 database, save this wrapper **outside this directory**, change the
 include paths to your checkout, and run it with SQLCMD. For schema 20, omit
 the `20.sql` include and its following `GO`. For schema 21, start at `22.sql`;
-for schema 22, start at `23.sql`; for schema 23, start at `24.sql`; for schema 24, start at `25.sql`; for schema 25, start at `26.sql`; for schema 26, start at `27.sql`; for schema 27, start at `28.sql`; for schema 28, include `29.sql` then `30.sql`; for schema 29, include only `30.sql`.
+for schema 22, start at `23.sql`; for schema 23, start at `24.sql`; for schema 24, start at `25.sql`; for schema 25, start at `26.sql`; for schema 26, start at `27.sql`; for schema 27, start at `28.sql`; for schema 28, include `29.sql`, `30.sql` then `31.sql`; for schema 29, include `30.sql` then `31.sql`; for schema 30, include only `31.sql`.
 
 ```sql
 :ON ERROR EXIT
@@ -92,11 +93,13 @@ GO
 GO
 :r "C:\FMSC-Database\Migrations\30.sql"
 GO
+:r "C:\FMSC-Database\Migrations\31.sql"
+GO
 IF XACT_STATE() <> 1
     THROW 51000, 'The upgrade transaction cannot be committed.', 1;
 IF ISNULL((SELECT TOP (1) TRY_CONVERT(int, VersionNumber)
-           FROM dbo.DatabaseVersion ORDER BY VersionId DESC), -1) <> 30
-    THROW 51000, 'The upgrade did not reach schema 30.', 1;
+           FROM dbo.DatabaseVersion ORDER BY VersionId DESC), -1) <> 31
+    THROW 51000, 'The upgrade did not reach schema 31.', 1;
 COMMIT TRANSACTION;
 GO
 ```
@@ -123,3 +126,5 @@ Migration 28 applies the School Profile cutoff to student placement activation. 
 Migration 29 corrects migration 28: class placement is historical and does not select the fee cutoff. The selected billing start determines monthly fees under School Profile cutoff rules; annual and selected one-time fees use that selected billing date. Existing records are not rewritten.
 
 Migration 30 adds reviewed student fee-posting holds and resume, with separate history, selective restoration, optional annual fees/advance, SQL posting safeguards and saved-request recovery. Existing Left records are not converted automatically. See [the operator and recovery policy](../Docs/STUDENT_POSTING_HOLDS.md).
+
+Migration 31 keeps held students out of Confirm Return and rejects stale return confirmations before changing fees or placement. Held students use the reviewed Lift Hold / Resume workflow. No existing records are rewritten.

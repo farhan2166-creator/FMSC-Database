@@ -94,6 +94,23 @@ try {
  [void](Decision 'Hold' $prior $keep $false $plan.Tables[0].Rows[0].Snapshot $request)
  Check ((Number 'SELECT COUNT(*) FROM dbo.StudentPostingHolds WHERE ResumeDate IS NULL;') -eq 1) 'One active hold is recorded.'
  Check ((Number "SELECT COUNT(*) FROM dbo.Students WHERE AdmissionId=1 AND Status=N'Active';") -eq 1) 'Hold does not mark the student Left.'
+ $pending=Query 'EXEC dbo.GetPendingReturnAdmissions @UserId=1;'
+ Check (@($pending.Tables[0].Rows | Where-Object { $_.AdmissionId -eq 1 }).Count -eq 0) 'A held placement is not offered as a promoted return.'
+ # A stale return screen must be refused even when its choices waive all opening
+ # fees and the posting trigger would have no new charge to inspect.
+ [void](Query 'UPDATE dbo.FeeTypes SET IsMandatory=1 WHERE FeeTypeId=1;')
+ $blockedReturn=Query @'
+DECLARE @Choices dbo.ReturnFeeChoiceType,@Today date=CONVERT(date,GETDATE());
+INSERT @Choices VALUES(1,0,0);
+BEGIN TRY
+ EXEC dbo.ConfirmPromotedAdmission @UserId=1,@EnrollmentId=1,@ReturnDate=@Today,@UsesTransport=0,@FeeChoices=@Choices;
+ SELECT 0 ErrorNumber,@@TRANCOUNT Transactions;
+END TRY
+BEGIN CATCH SELECT ERROR_NUMBER() ErrorNumber,@@TRANCOUNT Transactions; END CATCH;
+'@
+ Check ($blockedReturn.Tables[0].Rows[0].ErrorNumber -eq 53017 -and $blockedReturn.Tables[0].Rows[0].Transactions -eq 0) 'Stale all-zero return confirmation is clearly refused without leaking a transaction.'
+ Check ((Number 'SELECT COUNT(*) FROM dbo.Enrollments WHERE EnrollmentId=1 AND BillingReady=0 AND ReturnConfirmedAt IS NULL;') -eq 1 -and (Number 'SELECT SUM(Amount) FROM dbo.StudentFeeAssignments WHERE EnrollmentId=1;') -eq 12000 -and (Number "SELECT COUNT(*) FROM dbo.EnrollmentHistory WHERE EnrollmentId=1 AND ActionType=N'ReturnConfirmed';") -eq 0) 'Refused return changes no fee assignments, placement readiness or return history.'
+ [void](Query 'UPDATE dbo.FeeTypes SET IsMandatory=0 WHERE FeeTypeId=1;')
  Check ((Number 'SELECT COUNT(*) FROM dbo.fn_MonthlyBillingCandidates(DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1),1) WHERE EnrollmentId=1 AND BlockReason IS NULL;') -eq 0) 'Held students are not eligible for monthly posting.'
  Check ((Preview).Tables[0].Rows[0].CurrentCharges -eq 0) 'Automatic billing has no held-student charges.'
  $extra=Query 'EXEC dbo.GetAdditionalFeeCandidates @UserId=1,@AcademicYearId=1;'
@@ -202,9 +219,13 @@ try {
  [void](Decision 'Hold' $late @{} $false $latePlan.Tables[0].Rows[0].Snapshot -student 3)
  # A promotion prepares the next placement while the independently held identity
  # stays excluded from billing until the reviewed resume.
- [void](Query "DECLARE @M date=CONVERT(date,GETDATE()); UPDATE dbo.AcademicYears SET IsCurrent=0,EndDate=DATEADD(day,-1,@M) WHERE AcademicYearId=1; INSERT dbo.AcademicYears(YearName,StartDate,EndDate,IsCurrent) VALUES(N'Fixture return year',@M,DATEADD(day,-1,DATEADD(year,1,@M)),1); DECLARE @New int=SCOPE_IDENTITY(); UPDATE dbo.FeeTypes SET IsMandatory=1 WHERE FeeTypeId=1; INSERT dbo.FeeTypes(FeeTypeCode,FeeTypeName,DefaultFrequency,IsMandatory) VALUES(N'ANNUAL',N'Annual fee',N'Yearly',1); INSERT dbo.FeeConfigurations(CampusId,ClassId,FeeTypeId,Amount,Frequency) SELECT 1,1,FeeTypeId,1500,N'Yearly' FROM dbo.FeeTypes WHERE FeeTypeCode=N'ANNUAL'; INSERT dbo.FeeConfigurations(CampusId,ClassId,FeeTypeId,Amount,Frequency) VALUES(1,1,1,12000,N'Monthly'); DECLARE @Decisions dbo.BulkPromotionDecisionType; INSERT @Decisions VALUES(3,N'PROMOTE'); EXEC dbo.BulkPromoteStudents @UserId=1,@SourceAcademicYearId=1,@DestinationAcademicYearId=@New,@SourceCampusId=1,@SourceClassId=1,@SourceSectionId=1,@DestinationClassSectionId=1,@EffectiveDate=@M,@Remarks=N'Fictional held student promotion',@Decisions=@Decisions;")
+ [void](Query "DECLARE @M date=CONVERT(date,GETDATE()); UPDATE dbo.AcademicYears SET IsCurrent=0,EndDate=DATEADD(day,-1,@M) WHERE AcademicYearId=1; INSERT dbo.AcademicYears(YearName,StartDate,EndDate,IsCurrent) VALUES(N'Fixture return year',@M,DATEADD(day,-1,DATEADD(year,1,@M)),1); DECLARE @New int=SCOPE_IDENTITY(); UPDATE dbo.FeeTypes SET IsMandatory=1 WHERE FeeTypeId=1; INSERT dbo.FeeTypes(FeeTypeCode,FeeTypeName,DefaultFrequency,IsMandatory) VALUES(N'ANNUAL',N'Annual fee',N'Yearly',1); INSERT dbo.FeeConfigurations(CampusId,ClassId,FeeTypeId,Amount,Frequency) SELECT 1,1,FeeTypeId,1500,N'Yearly' FROM dbo.FeeTypes WHERE FeeTypeCode=N'ANNUAL'; INSERT dbo.FeeConfigurations(CampusId,ClassId,FeeTypeId,Amount,Frequency) VALUES(1,1,1,12000,N'Monthly'); DECLARE @Decisions dbo.BulkPromotionDecisionType; INSERT @Decisions VALUES(3,N'PROMOTE'),(2,N'PROMOTE'); EXEC dbo.BulkPromoteStudents @UserId=1,@SourceAcademicYearId=1,@DestinationAcademicYearId=@New,@SourceCampusId=1,@SourceClassId=1,@SourceSectionId=1,@DestinationClassSectionId=1,@EffectiveDate=@M,@Remarks=N'Fictional held student promotion',@Decisions=@Decisions;")
  $newPlacement=[int](Number "SELECT EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=3 AND Status=N'Active';")
  Check ((Number 'SELECT COUNT(*) FROM dbo.fn_MonthlyBillingCandidates(DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1),0) WHERE AdmissionId=3 AND BlockReason IS NULL;') -eq 0) 'A new academic-year placement does not bypass the student-level hold.'
+ $pending=Query 'EXEC dbo.GetPendingReturnAdmissions @UserId=1;'
+ Check (@($pending.Tables[0].Rows | Where-Object { $_.AdmissionId -eq 3 }).Count -eq 0 -and @($pending.Tables[0].Rows | Where-Object { $_.AdmissionId -eq 2 }).Count -eq 1) 'Only the non-held promoted sibling is offered for ordinary return confirmation.'
+ [void](Query "DECLARE @E int=(SELECT EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=2 AND Status=N'Active'),@Today date=CONVERT(date,GETDATE()),@Choices dbo.ReturnFeeChoiceType; INSERT @Choices SELECT A.FeeTypeId,A.Amount,A.DiscountAmount FROM dbo.StudentFeeAssignments A JOIN dbo.FeeTypes F ON F.FeeTypeId=A.FeeTypeId WHERE A.EnrollmentId=@E AND A.CancelledAt IS NULL AND F.IsMandatory=1; EXEC dbo.ConfirmPromotedAdmission @UserId=1,@EnrollmentId=@E,@ReturnDate=@Today,@UsesTransport=0,@FeeChoices=@Choices;")
+ Check ((Number "SELECT COUNT(*) FROM dbo.Enrollments WHERE AdmissionId=2 AND Status=N'Active' AND BillingReady=1 AND ReturnConfirmedAt IS NOT NULL;") -eq 1 -and (Number "SELECT COUNT(*) FROM dbo.EnrollmentHistory WHERE AdmissionId=2 AND ActionType=N'ReturnConfirmed';") -eq 1) 'Normal promoted return still confirms placement and preserves its return history.'
  $newReturn=@{'@TargetEnrollmentId'=$newPlacement;'@BillingFromMonth'=$month}
  $nextPlan=Decision 'Resume' $today $newReturn -student 3
  Check ($nextPlan.Tables[0].Rows[0].NewCharges -eq 12000 -and $nextPlan.Tables[0].Rows[0].Outstanding -eq 10000) 'Cross-year resume reviews the new placement fee and retains old-year arrears.'
