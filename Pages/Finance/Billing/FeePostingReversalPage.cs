@@ -114,6 +114,11 @@ public sealed class FeePostingReversalPage : V2Page, IBusyPage
         try {await RunBusyAsync(BusyMessage,ReverseCoreAsync,this);}
         finally {if(!IsDisposed)UpdateReverse();}
     }
+    // Business invariant: this action reverses one eligible latest monthly posting for
+    // the entire school, never selected students or individual fee types. The database
+    // must recheck payment history, chronology, and the captured snapshot before writing;
+    // a preview alone is not authorization. Preserve the reason and all-or-nothing rule.
+    // See Audit/OWNER_DECISIONS_AND_INVARIANTS.md.
     private async Task ReverseCoreAsync()
     {
         if(snapshot is null||previewRows is null||previewRows.Rows.Count==0||string.IsNullOrWhiteSpace(reason.Text))
