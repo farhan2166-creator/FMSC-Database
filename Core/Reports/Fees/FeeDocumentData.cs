@@ -50,6 +50,8 @@ internal static class FeeDocumentData
         table.Columns.Add("ShowSettlement",typeof(bool)).DefaultValue=false;
         table.Columns.Add("ShowCreditRemaining",typeof(bool)).DefaultValue=false;
         table.Columns.Add("BillSourceKey",typeof(string)).DefaultValue="";
+        table.Columns.Add("BillChargeId",typeof(long)).DefaultValue=0L;
+        table.Columns.Add("BillAdmissionId",typeof(int)).DefaultValue=0;
         return table;
     }
 

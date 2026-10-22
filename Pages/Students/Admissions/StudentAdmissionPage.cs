@@ -3542,6 +3542,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 decimal amountToPrint = outstanding;
                 billRows.Add(
                     new BillLineItem {
+                        ChargeId = Convert.ToInt64(row["BillingChargeId"]),
                         FeeName = GetTextColumn(row, "FeeTypeName"),
                         BillingMonth =
                             row.Table.Columns.Contains("BillingMonth")
@@ -3569,7 +3570,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             }
             await StudentBillReport.ShowAsync(FindForm(), institution, name.Text.Trim(), currentAdmissionId,
                 classSectionText, billRows.Select(row => new StudentBillReport.Line(
-                    row.FeeName, row.BillingMonth, row.Amount, row.DiscountAmount)).ToList(), showActualAmount,
+                    row.FeeName, row.BillingMonth, row.Amount, row.DiscountAmount,row.ChargeId,currentAdmissionId)).ToList(), showActualAmount,
                 viewCampus.Text == "-" ? string.Empty : viewCampus.Text.Trim(), fatherName.Text.Trim(),
                 string.Join(",",raw.AsEnumerable().Where(row=>GetDecimalColumn(row,"Balance")>0)
                     .Select(row=>Convert.ToString(row["BillingChargeId"])).OrderBy(value=>value)));
@@ -3731,6 +3732,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     }
     private sealed class BillLineItem
     {
+        public long ChargeId { get; init; }
         public string FeeName { get; init; } = string.Empty;
         public string BillingMonth { get; init; } = string.Empty;
         public decimal Amount { get; init; }

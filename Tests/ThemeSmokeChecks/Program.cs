@@ -201,6 +201,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} latest receipt checks (no database connection).");
             return;
         }
+        if(args.Contains("--bill-line-identity"))
+        {
+            CheckBillLineIdentity();
+            Console.WriteLine($"PASS: {checks} bill line identity checks (no database connection).");
+            return;
+        }
         if(args.Contains("--fee-documents"))
         {
             CheckFeeDocuments();

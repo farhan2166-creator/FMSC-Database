@@ -2,7 +2,7 @@ namespace FMSC_SMS.Core;
 
 internal static partial class StudentBillReport
 {
-    internal sealed record Line(string FeeName,string Period,decimal Amount,decimal Discount);
+    internal sealed record Line(string FeeName,string Period,decimal Amount,decimal Discount,long ChargeId=0,int AdmissionId=0);
 
     internal static DataTable BuildData(string institutionName,string contactNumber,string address,string parent,DataTable charges)
     {
@@ -21,6 +21,7 @@ internal static partial class StudentBillReport
                 DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt"),"",line.FeeName,line.Amount,discount,total,0m,"","",discount>0m,false,
                 contactNumber,address,campusName,fatherName,FeeDocumentData.FormatPeriod(line.Period));
             row["DocumentKind"]="Bill";row["BillSourceKey"]=sourceKey;
+            row["BillChargeId"]=line.ChargeId;row["BillAdmissionId"]=line.AdmissionId;
         }
         return data;
     }
