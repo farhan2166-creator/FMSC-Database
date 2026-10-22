@@ -34,6 +34,24 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--admission-fee-layout"))
+        {
+            CheckAdmissionFeeLayout();
+            Console.WriteLine($"PASS: {checks} admission fee layout checks; preview in artifacts/admission-fees.png.");
+            return;
+        }
+        if (args.Contains("--admission-header"))
+        {
+            CheckAdmissionHeader();
+            Console.WriteLine($"PASS: {checks} admission header layout checks; preview in artifacts/admission-header.png.");
+            return;
+        }
+        if (args.Contains("--admission-save-shortcut"))
+        {
+            CheckAdmissionSaveShortcut();
+            Console.WriteLine($"PASS: {checks} admission Save shortcut checks (no database connection).");
+            return;
+        }
         if(args.Contains("--admission-number-policy"))
         {
             CheckAdmissionNumberPolicy();
@@ -474,6 +492,7 @@ internal static partial class Program
             CheckPhotoViewer(form);
             CheckDashboard();
             CheckNavigationRecovery();
+            CheckAdmissionSaveShortcut();
             CheckRegistrationPhotoRecovery();
             CheckHiddenRegistrationToolbar();
             CheckQuickRegistrationTabGuard();

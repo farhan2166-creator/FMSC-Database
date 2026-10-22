@@ -142,8 +142,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
     private readonly ModernComboBox transport = HumanUi.Combo();
     private bool UsesTransport =>
         string.Equals(transport.Text, "Yes", StringComparison.OrdinalIgnoreCase);
-    private RowStyle placementCardRow = null!;
-    private float normalPlacementCardHeight;
     private TableLayoutPanel placementEditGrid = null!;
     private TableLayoutPanel placementViewGrid = null!;
     private readonly Panel placementHost = new() { Dock = DockStyle.Fill };
@@ -840,6 +838,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         // These actions own their enabled state; a generic busy action must not
         // re-enable Save after an unconfirmed admission reply.
         saveButton = AddAction(UiText.Actions.Save, async (_, _) => await Save(), "Success");
+        // Existing admissions also show Save Photo inside the editor. Ctrl+S
+        // must save the admission regardless of which field currently has focus.
+        SetSaveShortcut(saveButton);
         saveAndNewButton = AddAction("Save & New", async (_, _) => await SaveAndStartNextAsync(), "Success");
         // Temporarily hidden at the owner's request to leave more room for Print.
         saveAndNewButton.Visible = false;
@@ -980,33 +981,33 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         removePhotoButton.Click +=
             async (_, _) => await RemovePhoto();
         UpdatePhotoActions();
+        var identityRow = new TableLayoutPanel {
+            Tag = "ThemeHeaderContainer",
+            ColumnCount = 5, RowCount = 1,
+            Margin = Padding.Empty, Padding = Padding.Empty
+        };
         var studentGuardianCard = HumanUi.Card(
             "Student & Family Information",
             null,
-            Accent);
+            Accent,
+            identityRow);
         studentGuardianCard.Padding = new Padding(UiDesignSystem.Spacing.Sm, 3,
             UiDesignSystem.Spacing.Sm, 3);
         studentGuardianCard.Content.Padding = Padding.Empty;
-        studentGuardianCard.Header.Padding = new Padding(UiDesignSystem.Spacing.Md, 0,
-            UiDesignSystem.Spacing.Md, 0);
-        studentGuardianCard.Header.Height = Math.Max(studentGuardianCard.Header.Height,
-            AppMetrics.InputControlHeight + UiDesignSystem.Spacing.Sm * 2);
-        // Keep the title, status and generated numbers together in the original title strip.
+        // Retain the shared card header's typography, padding, accent stripe and
+        // accessory height. Identity details stay on the same title row.
         var headingLabel = studentGuardianCard.Header.Controls.OfType<Label>().First();
-        studentGuardianCard.Header.Controls.Clear();
+        studentGuardianCard.Header.Controls.Remove(headingLabel);
         headingLabel.Dock = DockStyle.Fill;
-        headingLabel.Font = AppTheme.BodyBoldFont;
-        headingLabel.TextAlign = ContentAlignment.MiddleLeft;
-        headingLabel.Margin = Padding.Empty;
-        headingLabel.Padding = Padding.Empty;
-        var identityRow = new TableLayoutPanel {
-            Tag = "ThemeHeaderContainer",
-            Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1,
-            Margin = Padding.Empty, Padding = Padding.Empty
-        };
-        foreach (float width in new[] { 30F, 12F, 32F, 26F })
-            identityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
-        identityRow.ColumnStyles[1].SizeType = SizeType.Absolute;
+        headingLabel.AutoSize = true;
+        headingLabel.Margin = new Padding(0, 0, UiDesignSystem.Spacing.Md, 0);
+        identityRow.Dock = DockStyle.Fill;
+        identityRow.SendToBack();
+        identityRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        identityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute));
+        identityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        identityRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        identityRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, AppScale.Scale(250)));
         identityRow.Controls.Add(headingLabel, 0, 0);
         identityRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var statusHost = new Panel {
@@ -1039,17 +1040,33 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         identityRow.Resize += (_, _) => FitStatusColumn();
         AlignStatusBadge();
         identityRow.Controls.Add(statusHost, 1, 0);
+        var registrationIdentity = new TableLayoutPanel {
+            Tag = "ThemeHeaderContainer", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
+            Margin = new Padding(UiDesignSystem.Spacing.Md, 0, UiDesignSystem.Spacing.Lg, 0),
+            Padding = Padding.Empty
+        };
+        registrationIdentity.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        registrationIdentity.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        registrationIdentity.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        registrationIdentity.Controls.Add(new Label {
+            AutoSize = true, Dock = DockStyle.Fill, Text = "Registration No.",
+            Font = AppTheme.NormalFont, ForeColor = AppTheme.MutedText,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 0, UiDesignSystem.Spacing.Sm, 0)
+        }, 0, 0);
         var registrationLabel = new Label {
-            Dock = DockStyle.Fill, AutoEllipsis = true, Font = AppTheme.BodyBoldFont,
+            AutoSize = true, Dock = DockStyle.Fill, AutoEllipsis = true, Font = AppTheme.BodyBoldFont,
             ForeColor = AppTheme.Text, TextAlign = ContentAlignment.MiddleLeft,
             Margin = Padding.Empty,
-            Padding = new Padding(UiDesignSystem.Spacing.Sm, 0, UiDesignSystem.Spacing.Sm, 0)
+            Padding = Padding.Empty
         };
-        void UpdateRegistrationLabel() => registrationLabel.Text = "Registration No.: " +
-            (string.IsNullOrWhiteSpace(registrationNo.Text) ? "Assigned after admission" : registrationNo.Text);
+        void UpdateRegistrationLabel() => registrationLabel.Text =
+            string.IsNullOrWhiteSpace(registrationNo.Text) ? "Assigned after admission" : registrationNo.Text;
         registrationNo.TextChanged += (_, _) => UpdateRegistrationLabel();
         UpdateRegistrationLabel();
-        identityRow.Controls.Add(registrationLabel, 2, 0);
+        registrationIdentity.Controls.Add(registrationLabel, 1, 0);
+        identityRow.Controls.Add(registrationIdentity, 3, 0);
         var admissionIdentity = new TableLayoutPanel {
             Tag = "ThemeHeaderContainer",
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
@@ -1073,7 +1090,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         admissionIdValue.MaximumSize = new Size(AppScale.Scale(140), 0);
         admissionIdValue.CornerRadius = 0;
         admissionIdValue.BlendWithParent = true;
-        admissionIdValue.TextAlign = HorizontalAlignment.Center;
+        admissionIdValue.TextAlign = HorizontalAlignment.Left;
         admissionIdValue.AccessibleName = "Admission Number";
         admissionIdValue.Margin = Padding.Empty;
         admissionIdentity.Controls.Add(admissionIdCaption, 0, 0);
@@ -1109,9 +1126,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 "Admission Number Review", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                 admissionIdValue.Text = suggestion;
         };
-        identityRow.Controls.Add(admissionIdentity, 3, 0);
+        identityRow.Controls.Add(admissionIdentity, 4, 0);
 
-        studentGuardianCard.Header.Controls.Add(identityRow);
         var studentGuardianContent = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
@@ -1338,12 +1354,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         studentGuardianCard.Content.Controls.Add(
             studentGuardianContent);
         var admissionCard = HumanUi.Card("Admission / Placement", null, Accent);
+        admissionCard.Header.Height = studentGuardianCard.Header.Height;
         admissionCard.Padding = new Padding(UiDesignSystem.Spacing.Sm, 3,
             UiDesignSystem.Spacing.Sm, 3);
         admissionCard.Content.Padding = Padding.Empty;
         var placementTitle = admissionCard.Header.Controls.OfType<Label>().First();
         admissionCard.Header.Controls.Remove(placementTitle);
         var placementTitleRow = new TableLayoutPanel {
+            Tag = "ThemeHeaderContainer",
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
             Margin = Padding.Empty, Padding = Padding.Empty
         };
@@ -1359,7 +1377,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         placementTitleRow.Controls.Add(placementTitle, 0, 0);
         placementTitleRow.Controls.Add(placementGuidance, 1, 0);
         admissionCard.Header.Controls.Add(placementTitleRow);
-        placementTitleRow.BringToFront();
+        placementTitleRow.SendToBack();
         placementEditGrid = AdmissionGrid(4, 3);
         placementEditGrid.ColumnStyles.Clear();
         foreach (float width in new[] { 25F, 25F, 25F, 25F })
@@ -1407,11 +1425,10 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         placementContent.Controls.Add(placementHelp, 0, 0);
         placementContent.Controls.Add(placementHost, 0, 1);
         admissionCard.Content.Controls.Add(placementContent);
-        // Keep the primary entry form compact; the secondary tab is built on demand.
+        // Both tabs use the available workspace height; small windows retain
+        // the minimum readable field layout through their scrollable viewports.
         var tab1Root = new TableLayoutPanel {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Dock = DockStyle.Fill,
             ColumnCount = 1,
             RowCount = 2,
             Padding = new Padding(0),
@@ -1433,8 +1450,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             new RowStyle(
                 SizeType.Absolute,
                 admissionCardHeight));
-        placementCardRow = tab1Root.RowStyles[1];
-        normalPlacementCardHeight = admissionCardHeight;
+        void ShareUnusedSpace()
+        {
+            int extra = Math.Max(0, tab1Root.ClientSize.Height - studentGuardianCardHeight - admissionCardHeight);
+            tab1Root.RowStyles[0].Height = studentGuardianCardHeight + extra / 2;
+            tab1Root.RowStyles[1].Height = admissionCardHeight + extra - extra / 2;
+        }
+        tab1Root.SizeChanged += (_, _) => ShareUnusedSpace();
+        ShareUnusedSpace();
         studentGuardianCard.Margin =
             Padding.Empty;
         admissionCard.Margin =
@@ -1447,18 +1470,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             admissionCard,
             0,
             1);
-        var tab1Scroll = new Panel {
-            Dock = DockStyle.Fill,
-            AutoScroll = true,
-            Padding = new Padding(
-                0,
-                0,
-                0,
-                0),
-            Margin = new Padding(0)
-        };
-        tab1Scroll.Controls.Add(
-            tab1Root);
+        var tab1Scroll = new ResponsiveViewport(tab1Root,
+            new Size(0, studentGuardianCardHeight + admissionCardHeight));
         tab1Panel.Controls.Add(
             tab1Scroll);
         // Build Fees & Siblings on first use to reduce initial layout work.
@@ -1958,7 +1971,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         try
         {
             ConfigureFeeGrid();
-            siblingsGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+            feeGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            foreach (DataGridViewColumn column in feeGrid.Columns)
+                if (column.Visible) column.MinimumWidth = column.Name == "Remove" ? AppScale.Scale(34) : AppScale.Scale(90);
+            feeGrid.Columns["FeeTypeName"].MinimumWidth = AppScale.Scale(170);
+            feeGrid.Columns["ConcessionLabel"].MinimumWidth = AppScale.Scale(120);
+            feeGrid.Columns["ConcessionLabel"].FillWeight = 18;
+            feeGrid.Columns["Remove"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
             feeGrid.DataSource = _selectedFees;
 
             var feeCard = HumanUi.Card(
@@ -1974,7 +1993,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 Padding = AdmissionDetailsCardPadding,
                 Margin = Padding.Empty
             };
-            feeLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
+            feeLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             feeLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             feeLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
             feePreviewMonth.Enabled=false;
@@ -1982,10 +2001,15 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 if(!settingFeePreviewMonth && _editEnrollmentId>0 && feePreviewMonth.SelectedItem is FeePreviewMonth selected)
                     await LoadStudentFeeAssignmentsAsync(_editEnrollmentId,selected.Month);
             };
-            feeStatus.AutoEllipsis=false;
-            feeStatus.Font = AppTheme.SmallFont;
-            var feeHeading=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2 };
-            feeHeading.RowStyles.Add(new RowStyle(SizeType.Percent,50));feeHeading.RowStyles.Add(new RowStyle(SizeType.Percent,50));
+            feeStatus.AutoSize = true;
+            feeStatus.MinimumSize = new Size(0, previewStatusRowHeight);
+            var feeHeading = new TableLayoutPanel {
+                Dock = DockStyle.Fill, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1, RowCount = 2, Margin = Padding.Empty, Padding = Padding.Empty
+            };
+            feeHeading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            feeHeading.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            feeHeading.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             feeHeading.Controls.Add(feeStatus,0,0);feeHeading.Controls.Add(monthlyConcessionsFromAdmission,0,1);
             monthlyConcessionsFromAdmission.Visible=currentAdmissionId<=0;
             monthlyConcessionsFromAdmission.Enabled=currentAdmissionId<=0&&CurrentUser.HasPermission("Fees.Adjust");
@@ -2043,21 +2067,15 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 Padding = Padding.Empty,
                 Margin = Padding.Empty
             };
+            tab2Root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             tab2Root.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             tab2Root.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
             tab2Root.Controls.Add(feeCard, 0, 0);
             tab2Root.Controls.Add(siblingsCard, 0, 1);
-            var tab2Scroll = new Panel {
-                Dock = DockStyle.Fill,
-                AutoScroll = true,
-                Padding = new Padding(
-                    0,
-                    0,
-                    SystemInformation.VerticalScrollBarWidth + AppMetrics.SpacingSm,
-                    AppMetrics.SpacingSm),
-                Margin = Padding.Empty
-            };
-            tab2Scroll.Controls.Add(tab2Root);
+            int siblingsMinimum = siblingsCard.Header.Height + siblingsCard.Padding.Vertical + siblingsCard.Content.Padding.Vertical
+                + siblingsLayout.Padding.Vertical + previewStatusRowHeight + AppMetrics.ButtonRowHeight
+                + siblingsGrid.ColumnHeadersHeight + siblingsGrid.RowTemplate.Height + SystemInformation.HorizontalScrollBarHeight;
+            var tab2Scroll = new ResponsiveViewport(tab2Root, new Size(0, siblingsMinimum * 2));
             tab2Panel.Controls.Add(tab2Scroll);
             FormFlow.OrderTableFields(tab2Panel);
         }
@@ -2079,7 +2097,6 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         registrationNo.Visible = !locked;
         viewRegistrationNo.Visible = locked;
         placementEditGrid.RowStyles[2].Height = 0;
-        if (placementCardRow is not null) placementCardRow.Height = normalPlacementCardHeight;
         admissionDate.Enabled = currentAdmissionId <= 0;
         monthlyConcessionsFromAdmission.Visible=currentAdmissionId<=0;
         monthlyConcessionsFromAdmission.Enabled=currentAdmissionId<=0&&!saveBusy&&CurrentUser.HasPermission("Fees.Adjust");
@@ -3424,7 +3441,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             for (int index = 0; index < visibleOrder.Length; index++)
                 siblingsGrid.Columns[visibleOrder[index]].DisplayIndex = index;
             siblingsGrid.Columns["AdmissionNumber"].HeaderText = "Adm. No.";
-            siblingsGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+            siblingsGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            foreach (DataGridViewColumn column in siblingsGrid.Columns)
+                if (column.Visible) column.MinimumWidth = AppScale.Scale(column.Name == "AdmissionNumber" ? 75 : 100);
             siblingsGrid.Columns["AdmissionNumber"].FillWeight = 65;
             siblingsGrid.Columns["Student Name"].FillWeight = 130;
             siblingsGrid.Columns["Father Name"].FillWeight = 120;

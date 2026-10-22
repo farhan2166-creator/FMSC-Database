@@ -242,7 +242,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                   "day(s) ago. It's a good idea to take a fresh backup regularly.";
             ModernMessageDialog.Show(
                 this,
-                message + "\n\nGo to System Maintenance > Backup / Restore to create one now.",
+                message + "\n\nGo to Backup / Restore at the bottom of the main navigation to create one now.",
                 "Backup Reminder",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
@@ -735,8 +735,6 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             "Reports.View");
         AddMainNav(flow, "reports.png", "Communication Center", AppTheme.Primary,
             () => new FMSC_SMS.Pages.Communication.CommunicationCenterPage(), "Communication", "Communication Center", "Communication.View");
-        AddMainNav(flow, "dashboard.png", "Help & FAQ", AppTheme.Primary,
-            () => new HelpCenterPage(), "Help", "Help & FAQ");
         // User and role administration lives in the permission-controlled Account menu.
         AddModule(
             flow,
@@ -799,26 +797,15 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 PageTitles.FeeRateSetup,
                 "Fees.Configuration.Manage"),
             });
-        AddModule(
+        AddMainNav(
             flow,
             "administration.png",
-            "System Maintenance",
+            PageTitles.BackupRestore,
             AppTheme.Primary,
-            new NavigationItem[]
-            {
-            new(
-                "Audit Logs",
-                () => new AuditLogsPage(),
-                "System Maintenance",
-                "Audit Logs",
-                "System.Audit"),
-            new(
-                PageTitles.BackupRestore,
-                () => new BackupRestorePage(),
-                "System Maintenance",
-                PageTitles.BackupRestore,
-                "Backup.Create")
-            });
+            () => new BackupRestorePage(),
+            "System Maintenance",
+            PageTitles.BackupRestore,
+            "Backup.Create");
         navigation.Controls.Add(flow);
         var account = BuildAccountPanel();
         sidebar.Controls.Add(navigation);
@@ -1349,6 +1336,8 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 });
             menu.Items.Add(new ToolStripSeparator());
         }
+        menu.Items.Add(new ToolStripMenuItem("Help && FAQ", null,
+            (_, _) => OpenHelpCenterAfterAccountMenuCloses()));
         menu.Items.Add(
             new ToolStripMenuItem(
                 "Hot Keys",
@@ -1430,6 +1419,15 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 NavigateTo(() => new UsersPage(), "Account", "Users");
             else if (kind == AccessEditorKind.Roles && access.CanReadRoles)
                 NavigateTo(() => new RolesPage(), "Account", "Roles & Permissions");
+        }));
+    }
+    private void OpenHelpCenterAfterAccountMenuCloses()
+    {
+        if (IsDisposed || Disposing || !IsHandleCreated)
+            return;
+        BeginInvoke(new MethodInvoker(() => {
+            if (!IsDisposed && !Disposing)
+                NavigateTo(() => new HelpCenterPage(), "Account", "Help & FAQ");
         }));
     }
     private void OpenHotKeysPageAfterAccountMenuCloses()
