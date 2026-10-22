@@ -13,6 +13,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Fixed
 
+- Validate each issued bill line against its saved charge balance and student, rejecting offsetting stale amounts even when the grand total matches (migration 40). Existing saved bills remain available for reprint.
 - Retain additional-fee posting intent across interrupted saves and reopening; both individual and bulk entry require a read-only outcome check before another posting can proceed.
 - Restrict bulk additional-fee posting to eligible As Needed fees, excluding admission, tuition and transport in both the picker and database writer (migration 39).
 - Allow the family payment counter to open for students on hold and collect retained posted dues while new fee posting remains paused.

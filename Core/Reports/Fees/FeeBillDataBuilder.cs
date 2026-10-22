@@ -15,7 +15,7 @@ internal static partial class FeeBillDataBuilder
         bool multipleStudents=charges.AsEnumerable().Select(r=>Convert.ToString(r["Reference"])).Distinct().Count()>1;
         string studentKey="",studentHeading="";
         string campusHeading=FeeDocumentData.CampusHeading(charges);
-        void AddLine(string description,decimal amount,string kind,string period=""){
+        void AddLine(string description,decimal amount,string kind,string period="",DataRow? charge=null){
             var line=data.Rows.Add(1,institutionName,multipleStudents?"FAMILY FEE BILL":"STUDENT FEE BILL","PARENT COPY","",
                 multipleStudents?parent:Convert.ToString(charges.Rows[0]["StudentName"]),references,"",
                 DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt"),"",
@@ -25,6 +25,11 @@ internal static partial class FeeBillDataBuilder
             line["BillSourceKey"]=charges.Columns.Contains("BillingChargeId")
                 ?string.Join(",",charges.AsEnumerable().Select(row=>Convert.ToString(row["BillingChargeId"])).OrderBy(value=>value)):"";
             line["BillStudentKey"]=studentKey;line["BillStudentName"]=studentHeading;line["FeePeriod"]=FeeDocumentData.FormatPeriod(period);
+            if(charge is not null)
+            {
+                if(charges.Columns.Contains("BillingChargeId"))line["BillChargeId"]=charge["BillingChargeId"];
+                if(charges.Columns.Contains("AdmissionId"))line["BillAdmissionId"]=charge["AdmissionId"];
+            }
         }
         // Group by the reference, never by name: siblings can share a name.
         foreach(var student in charges.AsEnumerable().GroupBy(r=>Convert.ToString(r["Reference"]))){
@@ -33,7 +38,7 @@ internal static partial class FeeBillDataBuilder
             foreach(var month in student.GroupBy(r=>r["BillingMonth"] is DateTime date?new DateTime(date.Year,date.Month,1):new DateTime(1,1,1)).OrderBy(g=>g.Key)){
                 AddLine("  "+(month.Key.Year==1?"One-time fees":month.Key.ToString("MMM yyyy")),0m,"Month");
                 foreach(var fee in month.OrderBy(r=>charges.Columns.Contains("FeeDisplayOrder")?Convert.ToInt32(r["FeeDisplayOrder"]):0).ThenBy(r=>Convert.ToString(r["FeeTypeName"])))
-                    AddLine(Convert.ToString(fee["FeeTypeName"])??"",Convert.ToDecimal(fee["Due"]),"Fee",month.Key.Year==1?"One-time fees":month.Key.ToString("MMM yyyy"));
+                    AddLine(Convert.ToString(fee["FeeTypeName"])??"",Convert.ToDecimal(fee["Due"]),"Fee",month.Key.Year==1?"One-time fees":month.Key.ToString("MMM yyyy"),fee);
             }
         }
         return data;
