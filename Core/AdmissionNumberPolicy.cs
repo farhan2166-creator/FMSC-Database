@@ -99,21 +99,33 @@ internal static class AdmissionNumberPolicy
             long maximum=used.Select(number=>long.Parse(new string(number.TakeWhile(char.IsDigit).ToArray()),CultureInfo.InvariantCulture)).DefaultIfEmpty(0).Max();
             if(maximum<long.MaxValue-1) suggestion=(maximum+1).ToString(CultureInfo.InvariantCulture);
         }
-        else if(anchor is not null)
+        else
         {
-            // Confirmed register policy: insert between known dated records with
-            // a suffix, even while legacy data is incomplete. For example, with
-            // 6570 dated 03-Apr-2025 and 6571..6589 dated 04-Apr-2025, another
-            // admission on 03-Apr correctly suggests 6570a. An admission after
-            // the last known date instead continues whole numbers (6590 above).
-            string main=new string(anchor.TakeWhile(char.IsDigit).ToArray());
-            string suffix=anchor[main.Length..];
-            for(int attempt=0;attempt<=used.Count;attempt++)
+            // Only original admission dates determine register order. Fill an
+            // available whole-number gap before inserting a letter suffix:
+            // an admission between 6589 and 6591 should suggest 6590.
+            string? after=anchor;
+            if(lower is not null && (after is null || AdmissionNumbers.Compare(lower,after)>0)) after=lower;
+            long next=after is null?1:long.Parse(new string(after.TakeWhile(char.IsDigit).ToArray()),CultureInfo.InvariantCulture)+1;
+            for(int attempt=0;attempt<=used.Count && next<long.MaxValue;attempt++,next++)
             {
-                suffix=suffix.Length==0 ? "a" : suffix[^1]=='z' ? suffix+"a" : suffix[..^1]+(char)(suffix[^1]+1);
-                string candidate=main+suffix;
-                if(candidate.Length>40 || upper is not null && AdmissionNumbers.Compare(candidate,upper)>=0) break;
-                if(!used.Contains(candidate) && (lower is null || AdmissionNumbers.Compare(candidate,lower)>0)) { suggestion=candidate; break; }
+                string candidate=next.ToString(CultureInfo.InvariantCulture);
+                if(AdmissionNumbers.Compare(candidate,upper)>=0) break;
+                if(!used.Contains(candidate)) { suggestion=candidate; break; }
+            }
+            if(suggestion is null && anchor is not null)
+            {
+                // Consecutive register numbers still need historical insertion,
+                // e.g. an admission between 6570 and 6571 can use 6570a.
+                string main=new string(anchor.TakeWhile(char.IsDigit).ToArray());
+                string suffix=anchor[main.Length..];
+                for(int attempt=0;attempt<=used.Count;attempt++)
+                {
+                    suffix=suffix.Length==0 ? "a" : suffix[^1]=='z' ? suffix+"a" : suffix[..^1]+(char)(suffix[^1]+1);
+                    string candidate=main+suffix;
+                    if(candidate.Length>40 || AdmissionNumbers.Compare(candidate,upper)>=0) break;
+                    if(!used.Contains(candidate) && (lower is null || AdmissionNumbers.Compare(candidate,lower)>0)) { suggestion=candidate; break; }
+                }
             }
         }
         var plan=new AdmissionNumberPlan(suggestion,lower,upper,used,null);
