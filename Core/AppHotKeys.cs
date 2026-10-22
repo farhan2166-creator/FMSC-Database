@@ -41,7 +41,7 @@ internal static class AppHotKeys
         ("Staff",Keys.Alt|Keys.D5,"Alt+5"),
         ("Reports",Keys.Alt|Keys.D6,"Alt+6"),
         ("School Setup",Keys.Alt|Keys.D7,"Alt+7"),
-        ("System Maintenance",Keys.Alt|Keys.D8,"Alt+8")
+        (PageTitles.BackupRestore,Keys.Alt|Keys.D8,"Alt+8")
     };
 
     internal static readonly (string Action, string Key)[] TabActions =
