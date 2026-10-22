@@ -191,6 +191,23 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     }
     private readonly bool initialize;
     private readonly int preloadFocusAdmissionId;
+    private sealed class DialogReturnFocus(FeeCollectionPage page) : IDisposable
+    {
+        private readonly int studentId = page.admissionId;
+        private readonly int placementId = page.enrollmentId;
+        public void Dispose()
+        {
+            if (page.IsDisposed || !page.IsHandleCreated) return;
+            // Run after modal teardown and busy-control restoration. Never take
+            // focus from another page, another dialog or a changed student.
+            page.BeginInvoke((Action)(() => {
+                if (!page.IsDisposed && page.Visible && page.Enabled && !page.IsBusy &&
+                    studentId > 0 && page.admissionId == studentId && page.enrollmentId == placementId &&
+                    page.FindForm()?.Enabled == true && page.paymentAmount.CanFocus)
+                    page.paymentAmount.Focus();
+            }));
+        }
+    }
     internal override bool FocusEntryField()
     {
         if (preloadFocusAdmissionId > 0 && admissionId == preloadFocusAdmissionId &&
@@ -276,6 +293,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         addChargeButton.Enabled = false;
         studentCreditButton = AddAction("Advance Balance", async (_, _) => {
             if (admissionId <= 0) { Warn("Select a student first."); return; }
+            using var returnFocus = new DialogReturnFocus(this);
             using var dialog = new StudentCreditDialog(admissionId);
             dialog.ShowDialog(FindForm());
             await LoadChargesAsync(loadVersion);
@@ -1377,6 +1395,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private async Task ReprintReceiptAsync(
         string receiptNumber)
     {
+        using var returnFocus = new DialogReturnFocus(this);
         var institution =
             await Core.InstitutionProfile.GetPrintIdentityAsync();
         if (string.IsNullOrWhiteSpace(institution.Name))
@@ -1866,6 +1885,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             return 0m;
         }
         var discountMap = GetDiscountAllocations();
+        var creditMap = GetCreditAllocations(discountMap);
         var open = SettlementRows()
             .Select(r => new {
                 Row = r,
@@ -1887,7 +1907,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             foreach (var item in open)
             {
                 decimal rowDiscount = discountMap.TryGetValue(item.ChargeId, out decimal d) ? d : 0m;
-                decimal payable = Math.Max(0m, item.Due - rowDiscount);
+                // Advance settles first; only the remaining balance can receive cash.
+                decimal payable = Math.Max(0m, item.Due - rowDiscount - creditMap.GetValueOrDefault(item.ChargeId));
                 decimal give = Math.Min(remaining, payable);
                 item.Row.Cells["Amount"].Value = give;
                 /* Every row is visited now, so the tick and the marker are always consistent with the amount - no stale "+" left on a row from a previous, larger payment. */
@@ -3522,6 +3543,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     // A contextual dialog on the currently selected enrollment - see FeeAssignmentsDialog.cs.
     private void OpenFeeAssignments()
     {
+        using var returnFocus = new DialogReturnFocus(this);
         if (admissionId <= 0 || enrollmentId <= 0)
         {
             Warn(UiText.Prompts.SelectStudentAndEnrollment);
@@ -3540,6 +3562,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     }
     private void OpenAdditionalFee()
     {
+        using var returnFocus = new DialogReturnFocus(this);
         if (admissionId <= 0 || enrollmentId <= 0)
         {
             Warn(UiText.Prompts.SelectStudentAndEnrollment);
@@ -3554,6 +3577,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     // (Fee Operations, scoped down). Read-only projection dialog - see FutureFeesDialog.cs. Never writes anything, so there is no "ChangesMade"/refresh step here unlike Fee Assignments.
     private void OpenFutureFees()
     {
+        using var returnFocus = new DialogReturnFocus(this);
         if (admissionId <= 0 || enrollmentId <= 0)
         {
             Warn(UiText.Prompts.SelectStudentAndEnrollment);
@@ -3568,6 +3592,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     /// <summary>It is the same grid with the same loader, moved into a dialog, so nothing about what it shows or how it loads has changed - only where it lives.</summary>
     private void OpenPaymentHistory()
     {
+        using var returnFocus = new DialogReturnFocus(this);
         if (admissionId <= 0 || enrollmentId <= 0)
         {
             Warn(UiText.Prompts.SelectStudentAndEnrollment);
@@ -3686,6 +3711,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     }
     private void OpenHistory()
     {
+        using var returnFocus = new DialogReturnFocus(this);
         if (admissionId <= 0 || enrollmentId <= 0)
         {
             Warn(UiText.Prompts.SelectStudentAndEnrollment);
@@ -3697,6 +3723,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     /// <summary>Reverse one charge through dbo.ReverseBillingCharge; SQL decides eligibility, then dependent views reload.</summary>
     private async Task ReviewBillTermsAsync(long chargeId)
     {
+        using var returnFocus = new DialogReturnFocus(this);
         if(IsBusy||!CurrentUser.HasPermission("Fees.Adjust"))return;
         if(!charges.EndEdit())return;
         if(HasDraftBillDiscounts()||HasEnteredAmount(paymentAmount.Text)||!string.IsNullOrWhiteSpace(reference.Text)||!string.IsNullOrWhiteSpace(remarks.Text))
@@ -3719,6 +3746,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     }
     private async Task ReverseChargeAsync(int rowIndex)
     {
+        using var returnFocus = new DialogReturnFocus(this);
         if (transactionBusy) return;
         if (rowIndex < 0 || rowIndex >= charges.Rows.Count)
             return;
@@ -4111,6 +4139,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
 
     private async Task OpenFamilyReturnsAsync()
     {
+        using var returnFocus = new DialogReturnFocus(this);
         if(IsBusy || siblingBusy || admissionId<=0 || !CurrentUser.HasPermission("Students.Family") || !CurrentUser.HasPermission("Students.View"))return;
         if(!charges.EndEdit())return;
         if(HasDraftBillDiscounts() || !string.IsNullOrWhiteSpace(reference.Text) || !string.IsNullOrWhiteSpace(remarks.Text)
@@ -4139,6 +4168,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
 
     private async Task PrintSelectedFamilyBillAsync()
     {
+        using var returnFocus = new DialogReturnFocus(this);
         if(IsBusy || siblingBusy || admissionId<=0 || !CurrentUser.HasPermission("Fees.View"))return;
         if(!charges.EndEdit())return;
         if(HasDraftBillDiscounts())
@@ -4179,6 +4209,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     // Reprints the selected student's latest receipt, including a collection just completed.
     private async Task PrintReceiptAsync()
     {
+        using var returnFocus = new DialogReturnFocus(this);
         if (transactionBusy) return;
         if (lastCollectionReceipt is null && lastGroupReceiptNumber is null)
         {

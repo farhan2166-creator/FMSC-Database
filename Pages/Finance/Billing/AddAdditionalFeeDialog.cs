@@ -39,7 +39,8 @@ public sealed class AddAdditionalFeeDialog : ApplicationWindowForm
 public sealed class AdditionalFeeEntry : UserControl
 {
     private int enrollmentId;
-    private Guid requestId = Guid.NewGuid();
+    private readonly AdditionalFeeRecovery recovery;
+    private readonly ModernButton checkSave = new() { Text="Check Save Outcome", Width=AppScale.Scale(180), Height=AppMetrics.ButtonHeight, ThemeRole="Secondary", Visible=false };
     private readonly LookupBox feeType = new();
     private readonly ModernNumericTextBox amount = new() {
         Minimum = 0, Maximum = 100000000, WholeRupeesOnly = true, DecimalPlaces = 2,
@@ -74,8 +75,10 @@ public sealed class AdditionalFeeEntry : UserControl
     public ModernButton PostButton => post;
     public event EventHandler? ChargePosted;
     public event EventHandler? PostingChanged;
-    public AdditionalFeeEntry(ModernButton? secondaryAction = null)
+    public AdditionalFeeEntry(ModernButton? secondaryAction = null) : this(secondaryAction,new AdditionalFeeRecovery()) { }
+    internal AdditionalFeeEntry(ModernButton? secondaryAction,AdditionalFeeRecovery recovery)
     {
+        this.recovery=recovery;
         Dock = DockStyle.Fill;
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
@@ -114,12 +117,13 @@ public sealed class AdditionalFeeEntry : UserControl
             Font = AppTheme.NormalFont, Dock = DockStyle.Fill
         };
         post.Click += async (_, _) => await PostAsync();
+        checkSave.Click += async (_, _) => await CheckSaveAsync();
         post.TabIndex = 0;
         validator.BindSummary(guidance);
         Disposed += (_, _) => validator.Dispose();
         var buttons = secondaryAction is null
-            ? HumanUi.ButtonRow(post)
-            : HumanUi.ButtonRow(post, secondaryAction);
+            ? HumanUi.ButtonRow(post, checkSave)
+            : HumanUi.ButtonRow(post, checkSave, secondaryAction);
         buttons.Dock = DockStyle.Fill;
         buttons.Margin = Padding.Empty;
         var root = new TableLayoutPanel {
@@ -163,7 +167,6 @@ public sealed class AdditionalFeeEntry : UserControl
         validator.Begin();
         post.Enabled = false;
         SetEntryEnabled(false);
-        requestId = Guid.NewGuid();
     }
     public async Task LoadStudentAsync(int selectedEnrollmentId)
     {
@@ -174,6 +177,7 @@ public sealed class AdditionalFeeEntry : UserControl
         try
         {
             post.Enabled = false;
+            recovery.Load();
             int userId = FMSC_SMS.Pages.Security.CurrentUser.UserId;
             var dates = await Task.Run(() => DatabaseHelper.QuerySql("""
                 EXEC dbo.RequirePermission @UserId, N'Fees.View';
@@ -194,11 +198,13 @@ public sealed class AdditionalFeeEntry : UserControl
             SetEntryEnabled(post.Enabled);
             if (options.Rows.Count == 0)
                 dateNote.Text = "This placement is not ready for additional charges.";
+            if(recovery.Blocked)dateNote.Text="An earlier additional-fee save needs checking. Use Check Save Outcome before adding another charge.";
         }
         catch (Exception ex)
         {
             if (IsDisposed || version != loadVersion) return;
             post.Enabled = false;
+            SetEntryEnabled(false);
             ModernMessageDialog.Show(this, DbMessage.UserMessage(ex),
                 "Add Charge", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
@@ -213,12 +219,13 @@ public sealed class AdditionalFeeEntry : UserControl
     }
     private void SetEntryEnabled(bool enabled)
     {
-        inputs.Enabled = enabled;
-        post.Enabled = enabled;
+        inputs.Enabled = enabled && !recovery.Blocked;
+        post.Enabled = enabled && !recovery.Blocked;
+        checkSave.Visible=recovery.Blocked;checkSave.Enabled=!busy;
     }
     private async Task PostAsync()
     {
-        if (busy || !post.Enabled || enrollmentId <= 0) return;
+        if (busy || recovery.Blocked || !post.Enabled || enrollmentId <= 0) return;
         validator.Begin();
         validator.Required(feeType, "Choose a fee");
         validator.Rule(amount, () => amount.Value > 0 && WholeRupees.IsWhole(amount.Value), "Enter a positive whole-rupee amount");
@@ -238,30 +245,18 @@ public sealed class AdditionalFeeEntry : UserControl
         PostingChanged?.Invoke(this, EventArgs.Empty);
         try
         {
-            await DatabaseHelper.QueryUserAsync(
-                "PostAdditionalFee",
-                DatabaseHelper.P("@RequestId", requestId),
-                DatabaseHelper.Int("@FeeTypeId", feeType.SelectedId),
-                DatabaseHelper.Date("@ChargeDate", chargeDate.Value),
-                DatabaseHelper.P("@Amount", amount.Value),
-                DatabaseHelper.P("@DiscountAmount", discount.Value),
-                DatabaseHelper.P("@Reason", string.IsNullOrWhiteSpace(reason.Text) ? $"Additional fee: {feeType.Text}" : reason.Text.Trim()),
-                new SqlParameter("@Selection", SqlDbType.Structured) {
-                    TypeName = "dbo.ManualChargeSelectionType",
-                    Value = Tvp.ManualChargeSelection(new[] { enrollmentId })
-                });
+            var args=AdditionalFeePostingWriter.Parameters(feeType.SelectedId,chargeDate.Value,amount.Value,discount.Value,
+                string.IsNullOrWhiteSpace(reason.Text)?$"Additional fee: {feeType.Text}":reason.Text.Trim(),new[]{enrollmentId});
+            await recovery.SaveAsync(args,$"Enrollment {enrollmentId}: {feeType.Text}, Rs. {amount.Value:N0}, {chargeDate.Value:dd MMM yyyy}");
             posted = true;
-            requestId = Guid.NewGuid();
-            amount.Value = 0;
-            discount.Value = 0;
-            reason.Clear();
-            feeType.SelectedIndex = 0;
+            ClearPostedDraft();
         }
         catch (Exception ex)
         {
             if (IsDisposed) return;
             ModernMessageDialog.Show(this, DbMessage.UserMessage(ex),
                 "Add Charge", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            if(recovery.Blocked)dateNote.Text="The save needs checking. Use Check Save Outcome before adding another charge.";
         }
         finally
         {
@@ -274,6 +269,30 @@ public sealed class AdditionalFeeEntry : UserControl
             ChargePosted?.Invoke(this, EventArgs.Empty);
             if (!IsDisposed) feeType.Focus();
         }
+    }
+    private async Task CheckSaveAsync()
+    {
+        if(busy)return;
+        busy=true;SetEntryEnabled(false);PostingChanged?.Invoke(this,EventArgs.Empty);
+        int? count=null;
+        try
+        {
+            count=await recovery.CheckAsync();
+            if(IsDisposed)return;
+            dateNote.Text=count>0?$"The earlier posting was saved for {count} student(s). No additional charges were posted.":
+                "No saved posting was found. Review the details before adding the charge again.";
+        }
+        catch(Exception ex){if(!IsDisposed)ModernMessageDialog.Show(this,DbMessage.UserMessage(ex),"Check Save Outcome",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+        finally
+        {
+            busy=false;if(!IsDisposed)SetEntryEnabled(options?.Rows.Count>0 && earliestChargeDate<=DateTime.Today);
+            PostingChanged?.Invoke(this,EventArgs.Empty);
+        }
+        if(!IsDisposed && count>0){ClearPostedDraft();ChargePosted?.Invoke(this,EventArgs.Empty);}
+    }
+    private void ClearPostedDraft()
+    {
+        feeType.SelectedIndex=0;amount.Value=0;discount.Value=0;reason.Clear();
     }
 }
 

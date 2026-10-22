@@ -285,6 +285,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} monthly repost click checks.");
             return;
         }
+        if(args.Contains("--additional-fee-recovery"))
+        {
+            CheckAdditionalFeeRecovery();
+            Console.WriteLine($"PASS: {checks} additional-fee recovery checks (no database connection).");
+            return;
+        }
         if(args.Contains("--additional-fee-scope"))
         {
             CheckAdditionalFeeScope();
@@ -497,6 +503,7 @@ internal static partial class Program
             CheckHiddenRegistrationToolbar();
             CheckQuickRegistrationTabGuard();
             CheckAdditionalFeeScope();
+            CheckAdditionalFeeRecovery();
             CheckFeeMatrixHostBusy();
             CheckFeeMatrixCampusDraft();
             CheckAdmissionSharedBusy();

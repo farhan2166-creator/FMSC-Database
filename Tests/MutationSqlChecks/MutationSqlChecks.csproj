@@ -3,6 +3,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
     <Compile Include="../../Core/RecoverableMutation.cs" Link="RecoverableMutation.cs" />
+    <Compile Include="../../Core/AdditionalFeeRecovery.cs" Link="AdditionalFeeRecovery.cs" />
     <Compile Include="../../Core/RecoverableMutationWriter.cs" Link="RecoverableMutationWriter.cs" />
     <Compile Include="../../Core/WholeRupees.cs" Link="WholeRupees.cs" />
     <Compile Include="../../Core/Tvp.cs" Link="Tvp.cs" />

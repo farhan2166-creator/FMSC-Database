@@ -14,23 +14,27 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
     private readonly DataGridView students = HumanUi.Grid(true);
     private readonly HashSet<int> selected = new();
     private DataTable? candidates;
-    private Guid requestId = Guid.NewGuid();
+    private readonly AdditionalFeeRecovery recovery;
     private bool loading;
     private readonly LatestReadScope candidateReads=new();
     private (int Year,int Campus,int Class,int Section,DateTime ChargeDate)? loadedScope;
     private readonly Func<int,int,int,int,Task<DataTable>> loadCandidates;
-    private readonly ModernButton selectAll,post;
+    private readonly ModernButton selectAll,post,checkSave;
     private (int Year,int Campus,int Class,int Section,DateTime ChargeDate) CurrentScope=>(year.SelectedId,campus.SelectedId,klass.SelectedId,section.SelectedId,date.Value.Date);
     private bool CurrentCandidates=>candidates is not null&&loadedScope==CurrentScope;
     private void UpdateSelectionActions()
     {
         selectAll.Enabled=!posting&&CurrentCandidates&&candidates!.Rows.Count>0;
-        post.Enabled=!posting&&CurrentCandidates&&selected.Count>0&&CurrentUser.HasPermission("Fees.Collect");
+        post.Enabled=!posting&&!recovery.Blocked&&CurrentCandidates&&selected.Count>0&&CurrentUser.HasPermission("Fees.Collect");
+        checkSave.Visible=recovery.Blocked;checkSave.Enabled=!posting;
     }
     public AdditionalFeePostingPage() : this(null) { }
-    internal AdditionalFeePostingPage(Func<int,int,int,int,Task<DataTable>>? loadCandidates,bool initialize=true) : base("Post Additional Fee",
+    internal AdditionalFeePostingPage(Func<int,int,int,int,Task<DataTable>>? loadCandidates,bool initialize=true)
+        : this(loadCandidates,initialize,new AdditionalFeeRecovery()) { }
+    internal AdditionalFeePostingPage(Func<int,int,int,int,Task<DataTable>>? loadCandidates,bool initialize,AdditionalFeeRecovery recovery) : base("Post Additional Fee",
         "Choose a fee and amount, load students, then select who to charge.")
     {
+        this.recovery=recovery;
         this.loadCandidates=loadCandidates ?? ((y,c,k,s)=>DatabaseHelper.QueryUserAsync("GetAdditionalFeeCandidates",
             DatabaseHelper.Int("@AcademicYearId",y),DatabaseHelper.Int("@CampusId",c),DatabaseHelper.Int("@ClassId",k),
             DatabaseHelper.Int("@SectionId",s),DatabaseHelper.Date("@ChargeDate",date.Value.Date)));
@@ -38,6 +42,7 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
         var load = AddBusyAction("Load Students", LoadAsync, "Secondary");
         selectAll = AddAction(UiText.Actions.SelectAll, (_, _) => SelectAll(), "Secondary");
         post = AddAction("Post Selected", async(_,_)=>await PostAsync(), "Success");
+        checkSave = AddAction("Check Save Outcome", async(_,_)=>await CheckSaveAsync(), "Secondary");
         FinanceHelp.Attach(this,post,FinanceHelp.Topic.PostFees);
         FinanceHelp.Attach(this,amount,FinanceHelp.Topic.FeeRate);
         FinanceHelp.Attach(this,date,"Choose the date for the additional fee. Saving adds a fee due for each selected student; it does not collect payment.","Select three students and enter Rs. 100 per student: each student is charged Rs. 100, for Rs. 300 in total.");
@@ -105,6 +110,8 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
     {
         try
         {
+            recovery.Load();
+            if(recovery.Blocked)SetStatus("An earlier additional-fee posting needs checking. Use Check Save Outcome before posting again.",PageStatusKind.Warning);
             Task<DataTable> yearsTask = DatabaseHelper.QueryUserAsync("GetAcademicYears");
             Task<DataTable> campusesTask = DatabaseHelper.QueryUserAsync("GetCampuses");
             Task<DataTable> classesTask = DatabaseHelper.QueryUserAsync("GetClasses");
@@ -118,9 +125,12 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
             campus.Bind(await campusesTask, "CampusId", "CampusName", "All campuses");
             klass.Bind(await classesTask, "ClassId", "ClassName", "All classes");
             section.Bind(await sectionsTask, "SectionId", "SectionName", "All sections");
-            fee.Bind(await feeTypesTask, "FeeTypeId", "FeeTypeName");
+            DataTable feeTypes = await feeTypesTask;
+            feeTypes.DefaultView.RowFilter = "DefaultFrequency = 'As Needed' AND FeeTypeCode NOT IN ('ADMISSION','TUITION','TRANSPORT')";
+            fee.Bind(feeTypes.DefaultView.ToTable(), "FeeTypeId", "FeeTypeName");
         }
         catch (Exception ex) { if(!IsDisposed)Fail(ex); }
+        finally { if(!IsDisposed)UpdateSelectionActions(); }
     }
     private void ClearCandidates()
     {
@@ -178,7 +188,7 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
     }
     private async Task PostAsync()
     {
-        if (posting) return;
+        if (posting || recovery.Blocked) return;
         if(!CurrentCandidates){SetStatus("Filters changed or students have not been loaded. Load students again before posting.",PageStatusKind.Warning);return;}
         if (!ValidateRequiredInputs())
             return;
@@ -207,19 +217,29 @@ public sealed class AdditionalFeePostingPage : V2Page, IBusyPage
         try
         {
             using var busy = BeginBusy(BusyMessage, this);
-            await DatabaseHelper.QueryUserAsync("PostAdditionalFee",
-                DatabaseHelper.P("@RequestId", requestId),
-                DatabaseHelper.Int("@FeeTypeId", fee.SelectedId),
-                DatabaseHelper.Date("@ChargeDate", date.Value),
-                DatabaseHelper.P("@Amount", amount.Value),
-                DatabaseHelper.P("@DiscountAmount", 0m),
-                DatabaseHelper.P("@Reason", string.IsNullOrWhiteSpace(reason.Text) ? $"Additional fee: {fee.Text}" : reason.Text.Trim()),
-                new SqlParameter("@Selection", SqlDbType.Structured) { TypeName = "dbo.ManualChargeSelectionType", Value = Tvp.ManualChargeSelection(ids) });
-            requestId = Guid.NewGuid();
+            var args=AdditionalFeePostingWriter.Parameters(fee.SelectedId,date.Value,amount.Value,0m,
+                string.IsNullOrWhiteSpace(reason.Text)?$"Additional fee: {fee.Text}":reason.Text.Trim(),ids);
+            await recovery.SaveAsync(args,$"{postedFeeName}: {count} student(s), Rs. {postedAmount:N0} each, {postedDate:dd MMM yyyy}");
             Info($"{postedFeeName} posted to {count} student(s): Rs. {postedAmount:0.##} each, dated {postedDate:dd MMM yyyy}.");
             ClearCandidates();
         }
-        catch (Exception ex) { if(!IsDisposed)Fail(ex); }
+        catch (Exception ex) { if(!IsDisposed){Fail(ex);if(recovery.Blocked)SetStatus("The save needs checking. Use Check Save Outcome before posting again.",PageStatusKind.Warning);} }
         finally { posting = false;if(!IsDisposed)UpdateSelectionActions(); }
+    }
+    private async Task CheckSaveAsync()
+    {
+        if(posting)return;
+        posting=true;UpdateSelectionActions();
+        try
+        {
+            using var busy=BeginBusy("Checking the earlier posting…",this);
+            int? count=await recovery.CheckAsync();
+            if(IsDisposed)return;
+            ClearCandidates();
+            Info(count>0?$"The earlier posting was saved for {count} student(s). No additional charges were posted.":
+                "No saved posting was found. Load students and review the details before posting again.");
+        }
+        catch(Exception ex){if(!IsDisposed)Fail(ex);}
+        finally{posting=false;if(!IsDisposed)UpdateSelectionActions();}
     }
 }

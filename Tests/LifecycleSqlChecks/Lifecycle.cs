@@ -81,6 +81,22 @@ internal sealed class Lifecycle(Fixture f, Report r)
         SqlParameter[] Args(decimal discount = 200) => new[] { Sql.P("@UserId", f.Admin), Sql.P("@RequestId", request), Sql.P("@FeeTypeId", f.Purchase),
             Sql.P("@ChargeDate", paidDate), Sql.P("@Amount", 1200m), Sql.P("@DiscountAmount", discount), Sql.P("@Reason", "Fictional workbook"),
             Sql.TvpParameter("@Selection", "ManualChargeSelectionType", Tvp.ManualChargeSelection(new[] { originalEnrollment })) };
+        int before = Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@Id;", Sql.P("@Id", originalEnrollment));
+        foreach (int excluded in new[] { f.AdmissionFee, f.Tuition })
+            await r.Refused("Bulk additional posting refuses admission and tuition fees", () => {
+                var args = Args(); args.Single(p => p.ParameterName == "@FeeTypeId").Value = excluded;
+                Sql.Proc("PostAdditionalFee", args); return Task.CompletedTask;
+            }, 53024);
+        Sql.Query("UPDATE dbo.FeeTypes SET DefaultFrequency=N'Monthly' WHERE FeeTypeId=@Id;", Sql.P("@Id", f.Purchase));
+        try
+        {
+            await r.Refused("Bulk additional posting refuses other recurring fee types", () => {
+                Sql.Proc("PostAdditionalFee", Args()); return Task.CompletedTask;
+            }, 53024);
+        }
+        finally { Sql.Query("UPDATE dbo.FeeTypes SET DefaultFrequency=N'As Needed' WHERE FeeTypeId=@Id;", Sql.P("@Id", f.Purchase)); }
+        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@Id;", Sql.P("@Id", originalEnrollment)) == before,
+            "Rejected fee types leave existing charges unchanged");
         var posted = Sql.Proc("PostAdditionalFee", Args()); long charge = Convert.ToInt64(posted.Rows[0]["BillingChargeId"]);
         r.Check(Sql.Money("SELECT NetAmount FROM dbo.BillingCharges WHERE BillingChargeId=@Id AND AdmissionId=@Student AND EnrollmentId=@Enrollment;",
             Sql.P("@Id", charge), Sql.P("@Student", student), Sql.P("@Enrollment", originalEnrollment)) == 1000, "Manual charge persists gross 1200 less discount 200 against the intended enrollment.");

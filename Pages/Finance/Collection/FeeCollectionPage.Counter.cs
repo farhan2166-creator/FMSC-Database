@@ -112,7 +112,7 @@ public sealed partial class FeeCollectionPage
         {
             FamilyBillingData.SelectMembers(members,counterIds);
             foreach(var row in members.AsEnumerable().Where(r=>counterIds.Contains(Convert.ToInt32(r["AdmissionId"]))))
-                if(Convert.ToString(row["Status"])!="Pending" && FamilyBillingData.Readiness(row)!="Ready for Billing")
+                if(!FamilyBillingData.CanCollectPostedFees(row))
                     throw new InvalidOperationException("A selected child's return or billing readiness changed. Return to the family and review.");
             return members;
         }

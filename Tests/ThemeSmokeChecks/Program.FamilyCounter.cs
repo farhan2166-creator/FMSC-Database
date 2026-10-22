@@ -25,6 +25,22 @@ internal static partial class Program
                 if(id==43)row["QuickReference"]="QR-43";else {row["AdmissionNumber"]="ADM-"+id;row["PlacementConfirmedAt"]=new DateTime(2026,4,1);}
                 members.Rows.Add(row);
             }
+            members.Columns.Add("IsOnHold",typeof(bool));
+            var held=members.Rows[0];
+            Check(!FamilyBillingData.CanCollectPostedFees(held),"An unconfirmed return remains blocked from the counter");
+            held["IsOnHold"]=true;
+            Check(FamilyBillingData.CanCollectPostedFees(held) && !FamilyBillingData.AwaitsReturn(held),
+                "A held student with billing paused may pay retained posted dues");
+            held["IsOnHold"]=false;held["BillingReady"]=true;
+            Check(FamilyBillingData.CanCollectPostedFees(held),"An active billing-ready student may collect posted fees");
+            held["BillingReady"]=false;
+            Check(FamilyBillingData.CanCollectPostedFees(members.Rows[2]),"Pending registration retains counter access for posted fees");
+            held["Status"]="Left";
+            Check(!FamilyBillingData.CanCollectPostedFees(held),"A left student without a hold remains blocked from the family counter");
+            held["Status"]="Active";
+            string membersSql=(string)typeof(FeeBillPreview).GetField("MembersSql",BindingFlags.Static|BindingFlags.NonPublic)!.GetRawConstantValue()!;
+            Check(membersSql.Contains("StudentPostingHolds") && membersSql.Contains("H.ResumeDate IS NULL") && membersSql.Contains("IsOnHold"),
+                "The counter member query carries the current hold flag into readiness checks");
             int reads=0,confirmations=0,confirmedId=0;
             var reply=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             using var page=new StudentFamilyPage(0,false,id=>{reads++;return Task.FromResult(members.Copy());},id=>{confirmations++;confirmedId=id;return reply.Task;});

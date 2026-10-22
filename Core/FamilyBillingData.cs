@@ -21,6 +21,10 @@ internal static class FamilyBillingData
         return Text(row, "Status") == "Active" ? "Review Placement" : Text(row, "Status");
     }
 
+    // A hold stops new posting; retained charges can still be collected.
+    internal static bool CanCollectPostedFees(DataRow row) => Text(row, "Status") == "Pending"
+        || Readiness(row) is "Ready for Billing" or "On Hold";
+
     internal static int[] SelectMembers(DataTable members, IEnumerable<int>? selected)
     {
         int[] family = members.AsEnumerable().Select(row => Convert.ToInt32(row["AdmissionId"])).Distinct().ToArray();

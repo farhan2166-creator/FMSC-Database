@@ -2,7 +2,7 @@ using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Security;
 using Microsoft.Data.SqlClient;
 
-if(args.Any(arg=>arg is not ("--compatibility" or "--additional-fee" or "--bank" or "--adjustment-types")))
+if(args.Any(arg=>arg is not ("--compatibility" or "--additional-fee" or "--additional-fee-recovery" or "--bank" or "--adjustment-types")))
     throw new ArgumentException("Use a disposable schema-6 baseline; legacy upgrade modes have been retired.");
 string connectionText=Environment.GetEnvironmentVariable("FMSC_AUDIT_CONNECTION")??throw new Exception("Set the disposable audit connection.");
 var builder=new SqlConnectionStringBuilder(connectionText);
@@ -17,6 +17,7 @@ using(var compatible=DatabaseHelper.GetConnection()){
 if(args.Contains("--compatibility")) return;
 CurrentUser.UserId=Convert.ToInt32(Query("SELECT TOP(1) U.UserId FROM dbo.Users U JOIN dbo.Roles R ON R.RoleId=U.RoleId WHERE R.RoleName=N'Administrator'").Rows[0][0]);
 int admin=CurrentUser.UserId;
+if(args.Contains("--additional-fee-recovery")){await AdditionalFeeRecoverySqlChecks.RunAsync(admin);return;}
 if(args.Contains("--additional-fee")){await AdditionalFeeChecks.RunAsync(admin);return;}
 var original=Query("SELECT TOP(1) FeePaymentId,AdmissionId,EnrollmentId FROM dbo.FeePayments WHERE Remarks=N'Audit initial collection' AND Status=N'Completed' ORDER BY FeePaymentId DESC").Rows[0];
 int payment=(int)original["FeePaymentId"],admission=(int)original["AdmissionId"],enrollment=(int)original["EnrollmentId"];
