@@ -37,6 +37,25 @@ internal static partial class Program
         }
         decimal Payable() => (decimal)type.GetMethod("CurrentPayableAfterDiscount", flags)!.Invoke(page, null)!;
         Dictionary<long,decimal> Plan() => (Dictionary<long,decimal>)type.GetMethod("GetCreditAllocations", flags)!.Invoke(page, new object?[] { null })!;
+        void Allocate(decimal cash) => type.GetMethod("FillFromReceivedAmount", flags)!.Invoke(page, new object[] { cash });
+        decimal Cash(int index) => Convert.ToDecimal(grid.Rows[index].Cells["Amount"].Value);
+        Bill(16,6594,300); Bill(17,6594,400); credit[6594]=400;
+        Allocate(300);
+        Check(Cash(0)==0 && Cash(1)==300 && grid.Rows[0].Tag is false,
+            "Mixed settlement skips the bill covered by advance and assigns cash to the remaining bill");
+        Allocate(100);
+        Check(Cash(0)==0 && Cash(1)==100, "Partial cash also skips advance-covered bills");
+        discount.Text="100"; Allocate(200);
+        Check(Payable()==200 && Cash(0)==0 && Cash(1)==200,
+            "Mixed settlement allocates cash after both the largest-fee discount and advance");
+        discount.Text="0"; use.Checked=false; Allocate(700);
+        Check(Cash(0)==300 && Cash(1)==400, "Opting out of advance restores ordinary cash allocation");
+        use.Checked=true; grid.Rows.Clear(); credit.Clear();
+        Bill(16,6594,300); Bill(17,6589,400); credit[6594]=400; credit[6589]=100;
+        Allocate(300);
+        Check(Cash(0)==0 && Cash(1)==300 && Plan()[17]==100,
+            "Family cash respects each child's own advance without moving unused sibling credit");
+        grid.Rows.Clear(); credit.Clear();
         Bill(1,6594,400); Bill(2,6594,2500); Bill(3,6589,400);
         credit[6594]=8750; credit[6589]=100;
         Check(use.Checked, "Credit use is checked by default");

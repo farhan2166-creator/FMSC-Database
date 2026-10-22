@@ -13,6 +13,11 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Fixed
 
+- Retain additional-fee posting intent across interrupted saves and reopening; both individual and bulk entry require a read-only outcome check before another posting can proceed.
+- Restrict bulk additional-fee posting to eligible As Needed fees, excluding admission, tuition and transport in both the picker and database writer (migration 39).
+- Allow the family payment counter to open for students on hold and collect retained posted dues while new fee posting remains paused.
+- Return Fee Collection focus to Amount Received after closing its student fee, advance, history, family or print dialogs.
+- Allocate received cash after each bill's discount and selected student advance, so mixed advance/cash collections do not assign cash to already covered fees.
 - Show staff employment validation messages below their inputs instead of squeezing them beside field captions, and reject a Hire Date later than today.
 - Define payment-detail grid columns before binding so Student Fee Corrections can open View Details without accessing missing auto-generated columns.
 
