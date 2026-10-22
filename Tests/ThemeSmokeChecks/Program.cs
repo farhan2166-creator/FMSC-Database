@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--admission-number-policy"))
+        {
+            CheckAdmissionNumberPolicy();
+            Console.WriteLine($"PASS: {checks} admission-number chronology checks (no database connection).");
+            return;
+        }
         if(args.Contains("--combined-tooltips"))
         {
             CheckCombinedTooltips();
