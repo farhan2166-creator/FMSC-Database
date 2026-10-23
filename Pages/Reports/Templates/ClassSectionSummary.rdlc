@@ -130,7 +130,7 @@
           <PaddingBottom>3pt</PaddingBottom>
         </Style>
       </Textbox>
-      <Textbox Name="Prepared">
+      <Textbox Name="PreparedLabel">
         <CanGrow>true</CanGrow>
         <KeepTogether>true</KeepTogether>
         <Paragraphs>
@@ -142,6 +142,31 @@
                   <FontSize>8pt</FontSize>
                 </Style>
               </TextRun>
+            </TextRuns>
+            <Style>
+              <TextAlign>Left</TextAlign>
+            </Style>
+          </Paragraph>
+        </Paragraphs>
+        <Top>1.1811in</Top>
+        <Left>0in</Left>
+        <Height>0.19685in</Height>
+        <Width>0.59055in</Width>
+        <ZIndex>4</ZIndex>
+        <Style>
+          <VerticalAlign>Middle</VerticalAlign>
+          <PaddingLeft>3pt</PaddingLeft>
+          <PaddingRight>3pt</PaddingRight>
+          <PaddingTop>3pt</PaddingTop>
+          <PaddingBottom>3pt</PaddingBottom>
+        </Style>
+      </Textbox>
+      <Textbox Name="Prepared">
+        <CanGrow>true</CanGrow>
+        <KeepTogether>true</KeepTogether>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
               <TextRun>
                 <Value>=First(Fields!Generated.Value, "ClassSummaryData")</Value>
                 <Style>
@@ -154,14 +179,14 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>3cm</Top>
-        <Left>0cm</Left>
-        <Height>0.5cm</Height>
-        <Width>19.4cm</Width>
+        <Top>1.1811in</Top>
+        <Left>0.59055in</Left>
+        <Height>0.19685in</Height>
+        <Width>7.04724in</Width>
         <ZIndex>4</ZIndex>
         <Style>
           <VerticalAlign>Middle</VerticalAlign>
-          <PaddingLeft>3pt</PaddingLeft>
+          <PaddingLeft>0pt</PaddingLeft>
           <PaddingRight>3pt</PaddingRight>
           <PaddingTop>3pt</PaddingTop>
           <PaddingBottom>3pt</PaddingBottom>

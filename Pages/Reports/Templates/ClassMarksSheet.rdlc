@@ -115,7 +115,7 @@
                             <PaddingRight>2pt</PaddingRight>
                           </Style>
                         </Textbox>
-                        <Textbox Name="Copy2Teacher">
+                        <Textbox Name="Copy2TeacherLabel">
                           <CanGrow>true</CanGrow>
                           <KeepTogether>true</KeepTogether>
                           <Paragraphs>
@@ -128,6 +128,33 @@
                                     <FontWeight>Normal</FontWeight>
                                   </Style>
                                 </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>9.84252in</Top>
+                          <Left>3.93701in</Left>
+                          <Height>0.27559in</Height>
+                          <Width>0.66929in</Width>
+                          <ZIndex>3</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy2Teacher">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
                                 <TextRun>
                                   <Value>=IIF(Fields!Teacher.Value = "", "________________________", Fields!Teacher.Value)</Value>
                                   <Style>
@@ -141,11 +168,45 @@
                               </Style>
                             </Paragraph>
                           </Paragraphs>
-                          <Top>25cm</Top>
-                          <Left>10cm</Left>
-                          <Height>0.7cm</Height>
-                          <Width>9.4cm</Width>
+                          <Top>9.84252in</Top>
+                          <Left>4.6063in</Left>
+                          <Height>0.27559in</Height>
+                          <Width>3.0315in</Width>
                           <ZIndex>3</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy2ExamDateLabel">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Date: </Value>
+                                  <Style>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.96457in</Top>
+                          <Left>6.22047in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>0.33465in</Width>
+                          <ZIndex>4</ZIndex>
                           <Style>
                             <Border>
                               <Style>None</Style>
@@ -163,13 +224,6 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>Date: </Value>
-                                  <Style>
-                                    <FontSize>8pt</FontSize>
-                                    <FontWeight>Normal</FontWeight>
-                                  </Style>
-                                </TextRun>
-                                <TextRun>
                                   <Value>=IIF(Fields!ExamDate.Value = "", "____________", Fields!ExamDate.Value)</Value>
                                   <Style>
                                     <FontSize>8pt</FontSize>
@@ -182,11 +236,45 @@
                               </Style>
                             </Paragraph>
                           </Paragraphs>
-                          <Top>2.45cm</Top>
-                          <Left>15.8cm</Left>
-                          <Height>0.45cm</Height>
-                          <Width>3.6cm</Width>
+                          <Top>0.96457in</Top>
+                          <Left>6.55512in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>1.08268in</Width>
                           <ZIndex>4</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy2SubjectLabel">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Paper: </Value>
+                                  <Style>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.96457in</Top>
+                          <Left>3.93701in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>0.41339in</Width>
+                          <ZIndex>5</ZIndex>
                           <Style>
                             <Border>
                               <Style>None</Style>
@@ -204,13 +292,6 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>Paper: </Value>
-                                  <Style>
-                                    <FontSize>8pt</FontSize>
-                                    <FontWeight>Normal</FontWeight>
-                                  </Style>
-                                </TextRun>
-                                <TextRun>
                                   <Value>=IIF(Fields!Subject.Value = "", "____________________", Fields!Subject.Value)</Value>
                                   <Style>
                                     <FontSize>8pt</FontSize>
@@ -223,11 +304,45 @@
                               </Style>
                             </Paragraph>
                           </Paragraphs>
-                          <Top>2.45cm</Top>
-                          <Left>10cm</Left>
-                          <Height>0.45cm</Height>
-                          <Width>5.8cm</Width>
+                          <Top>0.96457in</Top>
+                          <Left>4.35039in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>1.87008in</Width>
                           <ZIndex>5</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy2ExamLabel">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Exam: </Value>
+                                  <Style>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.7874in</Top>
+                          <Left>3.93701in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>0.41339in</Width>
+                          <ZIndex>6</ZIndex>
                           <Style>
                             <Border>
                               <Style>None</Style>
@@ -245,13 +360,6 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>Exam: </Value>
-                                  <Style>
-                                    <FontSize>8pt</FontSize>
-                                    <FontWeight>Normal</FontWeight>
-                                  </Style>
-                                </TextRun>
-                                <TextRun>
                                   <Value>=IIF(Fields!Exam.Value = "", "____________________", Fields!Exam.Value)</Value>
                                   <Style>
                                     <FontSize>8pt</FontSize>
@@ -264,11 +372,45 @@
                               </Style>
                             </Paragraph>
                           </Paragraphs>
-                          <Top>2cm</Top>
-                          <Left>10cm</Left>
-                          <Height>0.45cm</Height>
-                          <Width>9.4cm</Width>
+                          <Top>0.7874in</Top>
+                          <Left>4.35039in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>3.2874in</Width>
                           <ZIndex>6</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy2ClassLabel">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Class: </Value>
+                                  <Style>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.61024in</Top>
+                          <Left>3.93701in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>0.41339in</Width>
+                          <ZIndex>7</ZIndex>
                           <Style>
                             <Border>
                               <Style>None</Style>
@@ -286,26 +428,73 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>Class: </Value>
-                                  <Style>
-                                    <FontSize>8pt</FontSize>
-                                    <FontWeight>Bold</FontWeight>
-                                  </Style>
-                                </TextRun>
-                                <TextRun>
                                   <Value>=Fields!ClassName.Value</Value>
                                   <Style>
                                     <FontSize>8pt</FontSize>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.61024in</Top>
+                          <Left>4.35039in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>1.67323in</Width>
+                          <ZIndex>7</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy2SectionLabel">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
                                 <TextRun>
-                                  <Value>                                      Section: </Value>
+                                  <Value>Section:</Value>
                                   <Style>
                                     <FontSize>8pt</FontSize>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.61024in</Top>
+                          <Left>6.02362in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>0.5315in</Width>
+                          <ZIndex>7</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy2Section">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
                                 <TextRun>
                                   <Value>=Fields!SectionName.Value</Value>
                                   <Style>
@@ -319,10 +508,10 @@
                               </Style>
                             </Paragraph>
                           </Paragraphs>
-                          <Top>1.55cm</Top>
-                          <Left>10cm</Left>
-                          <Height>0.45cm</Height>
-                          <Width>9.4cm</Width>
+                          <Top>0.61024in</Top>
+                          <Left>6.55512in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>1.08268in</Width>
                           <ZIndex>7</ZIndex>
                           <Style>
                             <Border>
@@ -330,7 +519,7 @@
                               <Width>0.5pt</Width>
                             </Border>
                             <VerticalAlign>Middle</VerticalAlign>
-                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingLeft>0pt</PaddingLeft>
                             <PaddingRight>2pt</PaddingRight>
                           </Style>
                         </Textbox>
@@ -513,7 +702,7 @@
                             <PaddingRight>2pt</PaddingRight>
                           </Style>
                         </Textbox>
-                        <Textbox Name="Copy1Teacher">
+                        <Textbox Name="Copy1TeacherLabel">
                           <CanGrow>true</CanGrow>
                           <KeepTogether>true</KeepTogether>
                           <Paragraphs>
@@ -526,6 +715,33 @@
                                     <FontWeight>Normal</FontWeight>
                                   </Style>
                                 </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>9.84252in</Top>
+                          <Left>0in</Left>
+                          <Height>0.27559in</Height>
+                          <Width>0.66929in</Width>
+                          <ZIndex>13</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy1Teacher">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
                                 <TextRun>
                                   <Value>=IIF(Fields!Teacher.Value = "", "________________________", Fields!Teacher.Value)</Value>
                                   <Style>
@@ -539,11 +755,45 @@
                               </Style>
                             </Paragraph>
                           </Paragraphs>
-                          <Top>25cm</Top>
-                          <Left>0cm</Left>
-                          <Height>0.7cm</Height>
-                          <Width>9.4cm</Width>
+                          <Top>9.84252in</Top>
+                          <Left>0.66929in</Left>
+                          <Height>0.27559in</Height>
+                          <Width>3.0315in</Width>
                           <ZIndex>13</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy1ExamDateLabel">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Date: </Value>
+                                  <Style>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.96457in</Top>
+                          <Left>2.28346in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>0.33465in</Width>
+                          <ZIndex>14</ZIndex>
                           <Style>
                             <Border>
                               <Style>None</Style>
@@ -561,13 +811,6 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>Date: </Value>
-                                  <Style>
-                                    <FontSize>8pt</FontSize>
-                                    <FontWeight>Normal</FontWeight>
-                                  </Style>
-                                </TextRun>
-                                <TextRun>
                                   <Value>=IIF(Fields!ExamDate.Value = "", "____________", Fields!ExamDate.Value)</Value>
                                   <Style>
                                     <FontSize>8pt</FontSize>
@@ -580,11 +823,45 @@
                               </Style>
                             </Paragraph>
                           </Paragraphs>
-                          <Top>2.45cm</Top>
-                          <Left>5.8cm</Left>
-                          <Height>0.45cm</Height>
-                          <Width>3.6cm</Width>
+                          <Top>0.96457in</Top>
+                          <Left>2.61811in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>1.08268in</Width>
                           <ZIndex>14</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy1SubjectLabel">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Paper: </Value>
+                                  <Style>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.96457in</Top>
+                          <Left>0in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>0.41339in</Width>
+                          <ZIndex>15</ZIndex>
                           <Style>
                             <Border>
                               <Style>None</Style>
@@ -602,13 +879,6 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>Paper: </Value>
-                                  <Style>
-                                    <FontSize>8pt</FontSize>
-                                    <FontWeight>Normal</FontWeight>
-                                  </Style>
-                                </TextRun>
-                                <TextRun>
                                   <Value>=IIF(Fields!Subject.Value = "", "____________________", Fields!Subject.Value)</Value>
                                   <Style>
                                     <FontSize>8pt</FontSize>
@@ -621,11 +891,45 @@
                               </Style>
                             </Paragraph>
                           </Paragraphs>
-                          <Top>2.45cm</Top>
-                          <Left>0cm</Left>
-                          <Height>0.45cm</Height>
-                          <Width>5.8cm</Width>
+                          <Top>0.96457in</Top>
+                          <Left>0.41339in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>1.87008in</Width>
                           <ZIndex>15</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy1ExamLabel">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Exam: </Value>
+                                  <Style>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Normal</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.7874in</Top>
+                          <Left>0in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>0.41339in</Width>
+                          <ZIndex>16</ZIndex>
                           <Style>
                             <Border>
                               <Style>None</Style>
@@ -643,13 +947,6 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>Exam: </Value>
-                                  <Style>
-                                    <FontSize>8pt</FontSize>
-                                    <FontWeight>Normal</FontWeight>
-                                  </Style>
-                                </TextRun>
-                                <TextRun>
                                   <Value>=IIF(Fields!Exam.Value = "", "____________________", Fields!Exam.Value)</Value>
                                   <Style>
                                     <FontSize>8pt</FontSize>
@@ -662,11 +959,45 @@
                               </Style>
                             </Paragraph>
                           </Paragraphs>
-                          <Top>2cm</Top>
-                          <Left>0cm</Left>
-                          <Height>0.45cm</Height>
-                          <Width>9.4cm</Width>
+                          <Top>0.7874in</Top>
+                          <Left>0.41339in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>3.2874in</Width>
                           <ZIndex>16</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy1ClassLabel">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Class: </Value>
+                                  <Style>
+                                    <FontSize>8pt</FontSize>
+                                    <FontWeight>Bold</FontWeight>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.61024in</Top>
+                          <Left>0in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>0.41339in</Width>
+                          <ZIndex>17</ZIndex>
                           <Style>
                             <Border>
                               <Style>None</Style>
@@ -684,26 +1015,73 @@
                             <Paragraph>
                               <TextRuns>
                                 <TextRun>
-                                  <Value>Class: </Value>
-                                  <Style>
-                                    <FontSize>8pt</FontSize>
-                                    <FontWeight>Bold</FontWeight>
-                                  </Style>
-                                </TextRun>
-                                <TextRun>
                                   <Value>=Fields!ClassName.Value</Value>
                                   <Style>
                                     <FontSize>8pt</FontSize>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.61024in</Top>
+                          <Left>0.41339in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>1.67323in</Width>
+                          <ZIndex>17</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy1SectionLabel">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
                                 <TextRun>
-                                  <Value>                                      Section: </Value>
+                                  <Value>Section:</Value>
                                   <Style>
                                     <FontSize>8pt</FontSize>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
                                 </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Top>0.61024in</Top>
+                          <Left>2.08661in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>0.5315in</Width>
+                          <ZIndex>17</ZIndex>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                              <Width>0.5pt</Width>
+                            </Border>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                          </Style>
+                        </Textbox>
+                        <Textbox Name="Copy1Section">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
                                 <TextRun>
                                   <Value>=Fields!SectionName.Value</Value>
                                   <Style>
@@ -717,10 +1095,10 @@
                               </Style>
                             </Paragraph>
                           </Paragraphs>
-                          <Top>1.55cm</Top>
-                          <Left>0cm</Left>
-                          <Height>0.45cm</Height>
-                          <Width>9.4cm</Width>
+                          <Top>0.61024in</Top>
+                          <Left>2.61811in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>1.08268in</Width>
                           <ZIndex>17</ZIndex>
                           <Style>
                             <Border>
@@ -728,7 +1106,7 @@
                               <Width>0.5pt</Width>
                             </Border>
                             <VerticalAlign>Middle</VerticalAlign>
-                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingLeft>0pt</PaddingLeft>
                             <PaddingRight>2pt</PaddingRight>
                           </Style>
                         </Textbox>
