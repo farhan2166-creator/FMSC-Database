@@ -33,7 +33,13 @@ namespace FMSC_SMS.Core
         public bool BlendWithParent
         {
             get => _blendWithParent;
-            set { _blendWithParent = value; UpdateBlendedBackground(); Invalidate(); }
+            set { _blendWithParent = value; UpdateBlendedBackground(); UpdateInputBackground(); Invalidate(); }
+        }
+        private void UpdateInputBackground()
+        {
+            if(_inner is null)return;
+            Color color=!_blendWithParent&&(!Enabled||ReadOnly)?AppTheme.ButtonDisabledBackground:BackColor;
+            if(_inner.BackColor!=color)_inner.BackColor=color;
         }
         private void UpdateBlendedBackground()
         {
@@ -128,6 +134,7 @@ namespace FMSC_SMS.Core
             _inner.BackColor = AppTheme.SurfaceElevated;
             UiTheme.ApplyControl(this);
             UpdateBlendedBackground();
+            UpdateInputBackground();
             Reposition();
             Invalidate();
             _inner.Invalidate();
@@ -190,6 +197,7 @@ namespace FMSC_SMS.Core
             set
             {
                 _inner.ReadOnly = value;
+                UpdateInputBackground();
                 Invalidate();
             }
         }
@@ -296,14 +304,14 @@ namespace FMSC_SMS.Core
         protected override void OnBackColorChanged(EventArgs e)
         {
             base.OnBackColorChanged(e);
-            if (_inner != null)
-                _inner.BackColor = BackColor;
             UpdateBlendedBackground();
+            UpdateInputBackground();
             Invalidate();
         }
         protected override void OnEnabledChanged(EventArgs e)
         {
             base.OnEnabledChanged(e);
+            UpdateInputBackground();
             Invalidate();
         }
         protected override void OnResize(EventArgs e)
