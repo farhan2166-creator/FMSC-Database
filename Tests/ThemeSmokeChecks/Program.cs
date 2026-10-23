@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--placement-history-flow"))
+        {
+            CheckPlacementHistoryFlow();
+            Console.WriteLine($"PASS: {checks} placement history flow checks (no database writes); previews in artifacts/placement-history.");
+            return;
+        }
         if (args.Contains("--admission-fee-layout"))
         {
             CheckAdmissionFeeLayout();
