@@ -125,7 +125,7 @@ public class ModernComboBox : Panel, IValidationTarget, IAccessibleInput
             _inner.ForeColor =
                 AppTheme.Text;
             _inner.BackColor =
-                AppTheme.SurfaceElevated;
+                Enabled?AppTheme.SurfaceElevated:AppTheme.ButtonDisabledBackground;
             UiTheme.ApplyControl(this);
             Reposition();
             Invalidate();
@@ -345,13 +345,14 @@ public class ModernComboBox : Panel, IValidationTarget, IAccessibleInput
         if (_inner != null)
         {
             _inner.BackColor =
-                BackColor;
+                Enabled?AppTheme.SurfaceElevated:AppTheme.ButtonDisabledBackground;
         }
         Invalidate();
     }
     protected override void OnEnabledChanged(EventArgs e)
     {
         base.OnEnabledChanged(e);
+        if(_inner is not null)_inner.BackColor=Enabled?AppTheme.SurfaceElevated:AppTheme.ButtonDisabledBackground;
         if (_inner is not null) UpdateBorderMotion(animate: false);
     }
     protected override void OnResize(EventArgs e)
