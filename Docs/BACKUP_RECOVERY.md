@@ -1,6 +1,6 @@
 # Database Backup and Recovery Runbook
 
-**Applies to:** FMSC_SMS schema-41 SQL Server LocalDB database `FMSC_DB`. This guide prioritizes **keeping existing school records intact**. It is not an authorization to operate on real data without an approved maintenance window and verified backup.
+**Applies to:** FMSC_SMS schema-42 SQL Server LocalDB database `FMSC_DB`. This guide prioritizes **keeping existing school records intact**. It is not an authorization to operate on real data without an approved maintenance window and verified backup.
 
 ## Back up from the application
 

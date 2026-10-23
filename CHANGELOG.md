@@ -24,6 +24,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Fixed
 
+- Let Delete clear selected Fee Matrix amounts and persist cleared class-rate templates alongside other edits in one atomic save; distinguish blank from zero and reject stale clear requests (migration 42).
 - Align certificate inputs directly beneath their labels, let certificate grids size date/dropdown fields consistently, and use compact wide-screen layouts for student certificate details. Match disabled/read-only editors to their surrounding input background.
 - Separate student account statements from the family/group statement workflow; expose annual receipts and outstanding bills as related reports, and leave balances unshown until a statement loads.
 - Let the school issue student character certificates based on current or earlier Class 10/12 placement, without a passed-exam checkbox or an extra print-wording acknowledgement.

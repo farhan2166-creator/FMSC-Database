@@ -32,7 +32,7 @@ def verify_baseline():
     The real SQL scenarios and live runtime contract enforce their own behavior.
     """
     requirement = re.search(r'RequiredDatabaseSchemaVersion\s*=\s*"(\d+)"', (ROOT / "DatabaseHelper.cs").read_text())
-    if requirement is None or requirement.group(1) != "41":
+    if requirement is None or requirement.group(1) != "42":
         raise ValueError("Production schema requirement changed; review the SQL test fixture before running tests.")
 
     def provider_version(project):
