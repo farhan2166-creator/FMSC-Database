@@ -396,3 +396,13 @@ Database/*.bak
 !/Tests/LifecycleSqlChecks/Migrations/
 /Tests/LifecycleSqlChecks/Migrations/*
 !/Tests/LifecycleSqlChecks/Migrations/*.sql
+
+# Focused read-only report regression sources; build outputs stay ignored.
+!/Tests/ReportReadChecks/
+/Tests/ReportReadChecks/*
+!/Tests/ReportReadChecks/*.cs
+!/Tests/ReportReadChecks/*.csproj
+!/Tests/ReportRdlcChecks/
+/Tests/ReportRdlcChecks/*
+!/Tests/ReportRdlcChecks/*.cs
+!/Tests/ReportRdlcChecks/*.csproj

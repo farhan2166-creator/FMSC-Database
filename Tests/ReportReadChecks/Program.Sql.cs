@@ -1,0 +1,76 @@
+using Microsoft.Data.SqlClient;
+using FMSC_SMS.Pages.Reports.Finance;
+
+internal static partial class Program
+{
+    private static DataTable Read(SqlConnection connection,string query,int user=1,int campus=0)
+    {
+        using var command=new SqlCommand(query,connection);
+        command.Parameters.AddWithValue("@UserId",user); command.Parameters.AddWithValue("@CampusId",campus);
+        command.Parameters.AddWithValue("@ClassId",0);command.Parameters.AddWithValue("@SectionId",0);
+        command.Parameters.Add("@FromDate",SqlDbType.Date).Value=new DateTime(2026,1,1);
+        command.Parameters.Add("@ToDate",SqlDbType.Date).Value=new DateTime(2026,12,31);
+        var data=new DataTable();using var adapter=new SqlDataAdapter(command);adapter.Fill(data);return data;
+    }
+    private static void Execute(SqlConnection connection,string sql)
+    { using var command=new SqlCommand(sql,connection);command.ExecuteNonQuery(); }
+    private static void CheckSql()
+    {
+        var supplied=Environment.GetEnvironmentVariable("FMSC_REPORT_TEST_CONNECTION")
+            ??throw new InvalidOperationException("SQL checks need FMSC_REPORT_TEST_CONNECTION for a local disposable SQL Server, with Initial Catalog=master.");
+        var builder=new SqlConnectionStringBuilder(supplied);
+        if (builder.InitialCatalog!="master" || !(builder.DataSource.StartsWith("127.0.0.1",StringComparison.OrdinalIgnoreCase)
+            ||builder.DataSource.StartsWith("localhost",StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidOperationException("SQL fixture refuses non-local servers and any catalog other than master.");
+        string database="Fmsc_ReportReadChecks_"+Guid.NewGuid().ToString("N");
+        using var master=new SqlConnection(builder.ConnectionString);master.Open();Execute(master,$"CREATE DATABASE [{database}];");
+        try
+        {
+            builder.InitialCatalog=database;
+            using var connection=new SqlConnection(builder.ConnectionString);connection.Open();
+            Execute(connection,"""
+                CREATE TABLE dbo.Students(AdmissionId int PRIMARY KEY,AdmissionNumber nvarchar(50),QuickReference nvarchar(50),StudentName nvarchar(100),FatherName nvarchar(100),Status nvarchar(30));
+                CREATE TABLE dbo.Families(FamilyId int PRIMARY KEY,FamilyCode nvarchar(50));
+                CREATE TABLE dbo.FamilyMembers(AdmissionId int UNIQUE,FamilyId int);
+                CREATE TABLE dbo.StudentCreditEntries(AdmissionId int,Amount decimal(12,2),CreatedAt datetime2);
+                CREATE TABLE dbo.Campuses(CampusId int PRIMARY KEY,CampusName nvarchar(100),DisplayOrder int);
+                CREATE TABLE dbo.Classes(ClassId int PRIMARY KEY,ClassName nvarchar(100),DisplayOrder int);
+                CREATE TABLE dbo.Sections(SectionId int PRIMARY KEY,SectionName nvarchar(100),DisplayOrder int);
+                CREATE TABLE dbo.CampusClassSections(ClassSectionId int PRIMARY KEY,CampusId int,ClassId int,SectionId int);
+                CREATE TABLE dbo.Enrollments(EnrollmentId int PRIMARY KEY,AdmissionId int,AcademicYearId int,ClassSectionId int,Status nvarchar(30),EnrollmentDate date,BillingStartDate date);
+                CREATE TABLE dbo.AcademicYears(AcademicYearId int PRIMARY KEY,EndDate date);
+                CREATE TABLE dbo.FeeTypes(FeeTypeId int PRIMARY KEY,FeeTypeName nvarchar(100));
+                CREATE TABLE dbo.StudentFeeAssignments(AdmissionId int,EnrollmentId int,FeeTypeId int,Frequency nvarchar(30),ConcessionLabel nvarchar(100),DiscountAmount decimal(12,2),CancelledAt datetime2,EffectiveFrom date,EffectiveTo date);
+                INSERT dbo.Students VALUES(1,N'1001',NULL,N'One',N'Parent',N'Active'),(2,N'1002',NULL,N'Two',N'Parent',N'Active'),(3,NULL,N'QR-3',N'Three',N'Parent',N'Pending'),(4,N'1004',NULL,N'Four',N'Parent',N'Active'),(5,N'1005',NULL,N'Five',N'Parent',N'Active'),(6,N'1006',NULL,N'Six',N'Parent',N'Active');
+                INSERT dbo.Families VALUES(10,N'FAM-10'),(20,N'FAM-20');INSERT dbo.FamilyMembers VALUES(1,10),(2,10),(6,20);
+                INSERT dbo.StudentCreditEntries VALUES(1,1000,'2026-10-01'),(1,-200,'2026-10-02'),(1,-100,'2026-10-03'),(2,100,'2026-10-03'),(2,50,'2026-10-04'),(3,100,'2026-10-03'),(4,500,'2026-10-01'),(4,-500,'2026-10-02'),(5,-20,'2026-10-01'),(6,250,'2026-10-01');
+                INSERT dbo.Campuses VALUES(1,N'Boys',1),(2,N'Girls',2);INSERT dbo.Classes VALUES(1,N'Class 1',1);INSERT dbo.Sections VALUES(1,N'A',1);
+                INSERT dbo.CampusClassSections VALUES(1,1,1,1),(2,2,1,1);
+                INSERT dbo.Enrollments VALUES(1,1,1,2,N'Ended','2025-01-01','2025-01-01'),(2,1,1,1,N'Active','2026-01-01','2026-01-01'),(3,2,1,1,N'Active','2026-01-01','2026-01-01'),(4,6,1,2,N'Active','2026-01-01','2026-01-01');
+                INSERT dbo.AcademicYears VALUES(1,'2026-12-31');INSERT dbo.FeeTypes VALUES(1,N'Tuition');
+                INSERT dbo.StudentFeeAssignments VALUES(1,2,1,N'Monthly',N'Sibling',100,NULL,'2026-01-01',NULL),(2,3,1,N'Monthly',N'Sibling',50,NULL,'2026-01-01',NULL),(1,2,1,N'Yearly',N'Sibling',1000,NULL,'2026-01-01',NULL),(1,2,1,N'Monthly',N'Cancelled',900,'2026-01-02','2026-01-01',NULL),(1,1,1,N'Monthly',N'Old',700,NULL,'2025-01-01','2025-12-31'),(1,2,1,N'Monthly',N'Future',800,NULL,'2027-01-01','2027-12-31');
+                """);
+            Execute(connection,"""
+                CREATE PROCEDURE dbo.RequirePermission @UserId int,@Permission nvarchar(100) AS
+                BEGIN
+                    IF @UserId NOT IN(1,2) THROW 51000,'Permission denied in synthetic fixture.',1;
+                    IF @UserId=2 AND @Permission=N'Fees.View' THROW 51000,'Fee viewing denied in synthetic fixture.',1;
+                END;
+                """);
+            using var credit=Read(connection,CreditBalanceReportData.Query);
+            Check(credit.Rows.Count==4&&credit.AsEnumerable().Sum(r=>r.Field<decimal>("Available Credit"))==1200m,"SQL ledger sum includes signed activity and excludes zero/negative balances");
+            Check(credit.AsEnumerable().Single(r=>r.Field<int>("AdmissionId")==1).Field<string>("Campus")=="Boys","SQL chooses current placement instead of multiplying historic enrollments");
+            using var scoped=Read(connection,CreditBalanceReportData.Query,campus:1);
+            Check(scoped.Rows.Count==2&&scoped.AsEnumerable().Sum(r=>r.Field<decimal>("Available Credit"))==850m,"SQL campus scope reconciles exactly");
+            Check(CreditBalanceReportData.Create(credit,true,0).Rows.Rows.Count==3,"SQL family and unassigned groups remain distinct");
+            using var concessions=Read(connection,ConcessionSummaryData.Query);
+            Check(concessions.Rows.Count==3,"SQL concession scope excludes cancelled, expired and future assignments");
+            Check(ConcessionSummaryData.Create(concessions).Rows.Rows.Count==2,"SQL concession cycles stay separate");
+            bool denied=false;try{Read(connection,CreditBalanceReportData.Query,user:2);}catch(SqlException){denied=true;}
+            Check(denied,"Credit query enforces fee viewing in addition to report viewing");
+            denied=false;try{Read(connection,ConcessionSummaryData.Query,user:0);}catch(SqlException){denied=true;}
+            Check(denied,"Concession query enforces report permission");
+        }
+        finally { SqlConnection.ClearAllPools();Execute(master,$"ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{database}];"); }
+    }
+}

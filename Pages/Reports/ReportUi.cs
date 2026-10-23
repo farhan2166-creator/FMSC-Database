@@ -207,11 +207,16 @@ internal static class ReportUi
             int count = 0;
             foreach (Control control in Descendants(filters))
             {
+                if (!control.Enabled) continue;
                 if (control is LookupBox lookup && lookup.SelectedId > 0)
                     count++;
                 else if (control is ModernComboBox choice && ChoiceFilters.TryGetValue(choice, out var filter) &&
                          choice.SelectedIndex >= 0 && choice.SelectedIndex != filter.DefaultIndex)
                     count++;
+                else if (control is ModernNumericTextBox number)
+                {
+                    if (!string.IsNullOrWhiteSpace(number.Text) && (!decimal.TryParse(number.Text,out decimal value) || value != 0)) count++;
+                }
                 else if (control is ModernTextBox textBox && !string.IsNullOrWhiteSpace(textBox.Text))
                     count++;
                 else if (control is CheckBox checkBox && checkBox.Checked)
@@ -250,6 +255,7 @@ internal static class ReportUi
         };
         foreach (Control control in Descendants(filters))
         {
+            control.EnabledChanged += (_, _) => RefreshFilterState();
             if (control is LookupBox lookup)
                 lookup.SelectedIndexChanged += (_, _) => RefreshFilterState();
             else if (control is ModernComboBox choice && ChoiceFilters.TryGetValue(choice, out _))

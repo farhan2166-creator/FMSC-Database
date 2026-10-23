@@ -47,6 +47,8 @@ internal static class ReportExportBuilder
             }
             export.Rows.Add(row);
         }
+        if (source.ExtendedProperties[CollectionReceiptGrouping.LayoutKey] is CollectionReceiptGrouping.RowLayout[] layout)
+            export.ExtendedProperties[CollectionReceiptGrouping.LayoutKey] = layout;
         return export;
     }
 

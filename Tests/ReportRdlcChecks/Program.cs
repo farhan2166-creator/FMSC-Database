@@ -1,0 +1,24 @@
+using System.Data;
+using System.Xml.Linq;
+using Microsoft.Reporting.NETCore;
+using FMSC_SMS.Core;
+XNamespace ns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";
+XElement E(string name,params object[] content)=>new(ns+name,content);
+XElement Box(string name,string value)=>E("Textbox",new XAttribute("Name",name),E("CanGrow",true),E("Paragraphs",E("Paragraph",E("TextRuns",E("TextRun",E("Value",value),E("Style",E("FontFamily","Arial"),E("FontSize","9pt"),E("FontWeight","Normal")))),E("Style",E("TextAlign","Left")))),E("Style"));
+XElement Row(string name,string first,string second)=>E("TablixRow",E("Height",".25in"),E("TablixCells",E("TablixCell",E("CellContents",Box(name+"0",first))),E("TablixCell",E("CellContents",Box(name+"1",second)))));
+var table=E("Tablix",new XAttribute("Name","ReportRows0"),E("TablixBody",E("TablixColumns",E("TablixColumn",E("Width","3in")),E("TablixColumn",E("Width","2in"))),E("TablixRows",Row("Heading","Receipt","Amount"),Row("Detail","=Fields!C0.Value","=Fields!C1.Value"))),E("TablixColumnHierarchy",E("TablixMembers",E("TablixMember"),E("TablixMember"))),E("TablixRowHierarchy",E("TablixMembers",E("TablixMember",E("KeepWithGroup","After"),E("RepeatOnNewPage",true)),E("TablixMember",E("Group",new XAttribute("Name","DetailRows0")),E("KeepTogether",true)))),E("DataSetName","ReportData"),E("Top","0in"),E("Left","0in"),E("Height",".5in"),E("Width","5in"),E("Style"));
+CollectionReceiptRdlc.Apply(table,new[]{0,1},new[]{false,true},0);
+var data=new DataTable();foreach(string c in new[]{"C0","C1","GroupKey","GroupLabel"})data.Columns.Add(c);data.Columns.Add("N1",typeof(decimal));data.Rows.Add("R1","100","A","Campus Boys",100m);data.Rows.Add("R2","200","A","Campus Boys",200m);data.Rows.Add("R3","-30","B","Campus Girls",-30m);
+var doc=new XDocument(E("Report",E("DataSources",E("DataSource",new XAttribute("Name","Source"),E("ConnectionProperties",E("DataProvider","System.Data.DataSet"),E("ConnectString","")))),E("DataSets",E("DataSet",new XAttribute("Name","ReportData"),E("Query",E("DataSourceName","Source"),E("CommandText","")),E("Fields",data.Columns.Cast<DataColumn>().Select(c=>E("Field",new XAttribute("Name",c.ColumnName),E("DataField",c.ColumnName)))))),E("Body",E("ReportItems",table),E("Height",".5in"),E("Style")),E("Width","5in"),E("Page",E("PageHeight","11.69in"),E("PageWidth","8.27in"),E("LeftMargin",".5in"),E("RightMargin",".5in"),E("TopMargin",".5in"),E("BottomMargin",".5in"),E("Style"))));
+using var report=new LocalReport();report.LoadReportDefinition(new StringReader(doc.ToString()));report.DataSources.Add(new ReportDataSource("ReportData",data));
+_ = report.GetParameters();
+Console.WriteLine("PASS: grouped RDLC compiles in the reporting engine");
+byte[] xml=report.Render("XML");
+var output=XDocument.Load(new MemoryStream(xml));
+var printed=output.Descendants("ReportRows0").Single();
+if((string?)printed.Attribute("ReceiptTotal0_1_True")!="270")throw new Exception("Grand total must use each receipt once.");
+var groups=printed.Descendants("ReceiptGroup0").ToArray();
+if(groups.Length!=2 || (string?)groups[0].Attribute("ReceiptTotal0_1_False")!="300" || (string?)groups[1].Attribute("ReceiptTotal0_1_False")!="-30")
+    throw new Exception("Group subtotals must preserve signed corrections.");
+if(printed.Descendants("DetailRows0").Count()!=3)throw new Exception("All three original receipts must remain.");
+Console.WriteLine("PASS: grouped report processes original receipts and subtotal/grand-total expressions to XML");
