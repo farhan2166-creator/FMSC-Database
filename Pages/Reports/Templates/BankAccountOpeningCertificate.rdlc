@@ -2,7 +2,7 @@
 <Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
   <Body>
     <ReportItems>
-      <Textbox Name="txtRefNo">
+      <Textbox Name="txtRefNoLabel">
         <CanGrow>true</CanGrow>
         <KeepTogether>true</KeepTogether>
         <Paragraphs>
@@ -16,6 +16,30 @@
                   <FontSize>12pt</FontSize>
                 </Style>
               </TextRun>
+            </TextRuns>
+            <Style>
+              <TextAlign>Left</TextAlign>
+            </Style>
+          </Paragraph>
+        </Paragraphs>
+        <rd:DefaultName>txtRefNoLabel</rd:DefaultName>
+        <Top>0.25in</Top>
+        <Left>4.41042in</Left>
+        <Height>0.25in</Height>
+        <Width>1.35in</Width>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+          <VerticalAlign>Middle</VerticalAlign>
+        </Style>
+      </Textbox>
+      <Textbox Name="txtRefNo">
+        <CanGrow>true</CanGrow>
+        <KeepTogether>true</KeepTogether>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
               <TextRun>
                 <Value>=First(Fields!CertificateNumber.Value, "BankAccountOpeningCertificateData")</Value>
                 <Style>
@@ -32,14 +56,15 @@
         </Paragraphs>
         <rd:DefaultName>txtRefNo</rd:DefaultName>
         <Top>0.25in</Top>
-        <Left>4.41042in</Left>
+        <Left>5.76042in</Left>
         <Height>0.25in</Height>
-        <Width>3.03958in</Width>
+        <Width>1.68958in</Width>
         <Style>
           <Border>
             <Style>None</Style>
           </Border>
           <VerticalAlign>Middle</VerticalAlign>
+          <PaddingLeft>0pt</PaddingLeft>
         </Style>
       </Textbox>
       <Textbox Name="lblTo">
@@ -417,7 +442,7 @@
           <VerticalAlign>Middle</VerticalAlign>
         </Style>
       </Textbox>
-      <Textbox Name="txtDated">
+      <Textbox Name="txtDatedLabel">
         <CanGrow>true</CanGrow>
         <KeepTogether>true</KeepTogether>
         <Paragraphs>
@@ -430,6 +455,30 @@
                   <FontSize>12pt</FontSize>
                 </Style>
               </TextRun>
+            </TextRuns>
+            <Style>
+              <TextAlign>Left</TextAlign>
+            </Style>
+          </Paragraph>
+        </Paragraphs>
+        <Top>4.7in</Top>
+        <Height>0.25in</Height>
+        <Width>0.62in</Width>
+        <ZIndex>9</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+          <VerticalAlign>Middle</VerticalAlign>
+        </Style>
+        <Left>0in</Left>
+      </Textbox>
+      <Textbox Name="txtDated">
+        <CanGrow>true</CanGrow>
+        <KeepTogether>true</KeepTogether>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
               <TextRun>
                 <Value>=Format(First(Fields!CertificateDate.Value, "BankAccountOpeningCertificateData"), "dd MMMM yyyy")</Value>
                 <Style>
@@ -438,19 +487,23 @@
                 </Style>
               </TextRun>
             </TextRuns>
-            <Style />
+            <Style>
+              <TextAlign>Left</TextAlign>
+            </Style>
           </Paragraph>
         </Paragraphs>
         <Top>4.7in</Top>
         <Height>0.25in</Height>
-        <Width>2.5in</Width>
+        <Width>1.88in</Width>
         <ZIndex>9</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
           </Border>
           <VerticalAlign>Middle</VerticalAlign>
+          <PaddingLeft>0pt</PaddingLeft>
         </Style>
+        <Left>0.62in</Left>
       </Textbox>
       <Line Name="lnPrincipal">
         <Top>5.55in</Top>

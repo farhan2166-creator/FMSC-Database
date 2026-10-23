@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
 <Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
   <DataSources>
     <DataSource Name="ClassSheetSource">
@@ -2977,7 +2977,7 @@
                           <Width>28.1cm</Width>
                           <Style />
                         </Tablix>
-                        <Textbox Name="TeacherLine">
+                        <Textbox Name="TeacherLabel">
                           <CanGrow>true</CanGrow>
                           <KeepTogether>true</KeepTogether>
                           <Paragraphs>
@@ -2985,18 +2985,6 @@
                               <TextRuns>
                                 <TextRun>
                                   <Value>Teacher: </Value>
-                                  <Style>
-                                    <FontFamily>Segoe UI</FontFamily>
-                                    <FontSize>8pt</FontSize>
-                                  </Style>
-                                </TextRun><TextRun>
-                                  <Value>=First(Fields!Teacher.Value, "PageGroup")</Value>
-                                  <Style>
-                                    <FontFamily>Segoe UI</FontFamily>
-                                    <FontSize>8pt</FontSize>
-                                  </Style>
-                                </TextRun><TextRun>
-                                  <Value>                                     Signature: ____________________</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>8pt</FontSize>
@@ -3013,10 +3001,68 @@
                             <PaddingLeft>1pt</PaddingLeft>
                             <PaddingRight>1pt</PaddingRight>
                           </Style>
-                          <Top>3.08cm</Top>
-                          <Left>0cm</Left>
-                          <Height>0.45cm</Height>
-                          <Width>28.1cm</Width>
+                          <Top>1.2126in</Top>
+                          <Left>0in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>0.49213in</Width>
+                        </Textbox>
+                        <Textbox Name="TeacherLine">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=First(Fields!Teacher.Value, "PageGroup")</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>1pt</PaddingRight>
+                          </Style>
+                          <Top>1.2126in</Top>
+                          <Left>0.49213in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>4.03543in</Width>
+                        </Textbox>
+                        <Textbox Name="SignatureLabel">
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>Signature: ____________________</Value>
+                                  <Style>
+                                    <FontFamily>Segoe UI</FontFamily>
+                                    <FontSize>8pt</FontSize>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style>
+                                <TextAlign>Left</TextAlign>
+                              </Style>
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <VerticalAlign>Middle</VerticalAlign>
+                            <PaddingLeft>0pt</PaddingLeft>
+                            <PaddingRight>1pt</PaddingRight>
+                          </Style>
+                          <Top>1.2126in</Top>
+                          <Left>4.52756in</Left>
+                          <Height>0.17717in</Height>
+                          <Width>6.53543in</Width>
                         </Textbox>
                         <Textbox Name="PageLabel">
                           <CanGrow>true</CanGrow>

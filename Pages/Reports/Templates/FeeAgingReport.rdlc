@@ -88,7 +88,7 @@
       </Textbox>
       <Rectangle Name="ContextPanel">
         <ReportItems>
-          <Textbox Name="Scope">
+          <Textbox Name="ScopeLabel">
             <CanGrow>true</CanGrow>
             <Paragraphs>
               <Paragraph>
@@ -101,14 +101,27 @@
                       <Color>#172b3a</Color>
                     </Style>
                   </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>8.5pt</FontSize>
-                      <Color>#172b3a</Color>
-                    </Style>
-                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Left</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.09in</Top>
+            <Left>0.14in</Left>
+            <Height>0.17in</Height>
+            <Width>4.7in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+          <Textbox Name="Scope">
+            <CanGrow>true</CanGrow>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
                   <TextRun>
                     <Value>=First(Fields!FilterSummary.Value, "FeeAgingData")</Value>
                     <Style>
@@ -118,12 +131,14 @@
                     </Style>
                   </TextRun>
                 </TextRuns>
-                <Style />
+                <Style>
+                  <TextAlign>Left</TextAlign>
+                </Style>
               </Paragraph>
             </Paragraphs>
-            <Top>0.09in</Top>
+            <Top>0.26in</Top>
             <Left>0.14in</Left>
-            <Height>0.38in</Height>
+            <Height>0.21in</Height>
             <Width>4.7in</Width>
             <Style>
               <Border>
@@ -131,28 +146,12 @@
               </Border>
             </Style>
           </Textbox>
-          <Textbox Name="Generated">
+          <Textbox Name="GeneratedLabel">
             <Paragraphs>
               <Paragraph>
                 <TextRuns>
                   <TextRun>
                     <Value>GENERATED</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>8.5pt</FontSize>
-                      <Color>#172b3a</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>8.5pt</FontSize>
-                      <Color>#172b3a</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=Format(Globals!ExecutionTime, "dd MMM yyyy · hh:mm tt")</Value>
                     <Style>
                       <FontFamily>Segoe UI</FontFamily>
                       <FontSize>8.5pt</FontSize>
@@ -167,7 +166,36 @@
             </Paragraphs>
             <Top>0.09in</Top>
             <Left>4.95in</Left>
-            <Height>0.38in</Height>
+            <Height>0.17in</Height>
+            <Width>2.15in</Width>
+            <ZIndex>1</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+          <Textbox Name="Generated">
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>=Format(Globals!ExecutionTime, "dd MMM yyyy · hh:mm tt")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>8.5pt</FontSize>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Right</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.26in</Top>
+            <Left>4.95in</Left>
+            <Height>0.21in</Height>
             <Width>2.15in</Width>
             <ZIndex>1</ZIndex>
             <Style>
@@ -192,30 +220,12 @@
       </Rectangle>
       <Rectangle Name="Summary">
         <ReportItems>
-          <Textbox Name="Accounts">
+          <Textbox Name="AccountsLabel">
             <Paragraphs>
               <Paragraph>
                 <TextRuns>
                   <TextRun>
                     <Value>ACCOUNTS</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#172b3a</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#172b3a</Color>
-                    </Style>
-                  </TextRun>
-                  <TextRun>
-                    <Value>=CountRows("FeeAgingData")</Value>
                     <Style>
                       <FontFamily>Segoe UI</FontFamily>
                       <FontSize>11pt</FontSize>
@@ -231,7 +241,7 @@
             </Paragraphs>
             <Top>0.08in</Top>
             <Left>0.1in</Left>
-            <Height>0.4in</Height>
+            <Height>0.2in</Height>
             <Width>1.55in</Width>
             <Style>
               <Border>
@@ -239,7 +249,36 @@
               </Border>
             </Style>
           </Textbox>
-          <Textbox Name="Outstanding">
+          <Textbox Name="Accounts">
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>=CountRows("FeeAgingData")</Value>
+                    <Style>
+                      <FontFamily>Segoe UI</FontFamily>
+                      <FontSize>11pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>#172b3a</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.28in</Top>
+            <Left>0.1in</Left>
+            <Height>0.2in</Height>
+            <Width>1.55in</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+          <Textbox Name="OutstandingLabel">
             <Paragraphs>
               <Paragraph>
                 <TextRuns>
@@ -252,15 +291,27 @@
                       <Color>#172b3a</Color>
                     </Style>
                   </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#172b3a</Color>
-                    </Style>
-                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.08in</Top>
+            <Left>1.7in</Left>
+            <Height>0.2in</Height>
+            <Width>2.15in</Width>
+            <ZIndex>1</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+          <Textbox Name="Outstanding">
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
                   <TextRun>
                     <Value>Rs. </Value>
                     <Style>
@@ -285,9 +336,9 @@
                 </Style>
               </Paragraph>
             </Paragraphs>
-            <Top>0.08in</Top>
+            <Top>0.28in</Top>
             <Left>1.7in</Left>
-            <Height>0.4in</Height>
+            <Height>0.2in</Height>
             <Width>2.15in</Width>
             <ZIndex>1</ZIndex>
             <Style>
@@ -296,7 +347,7 @@
               </Border>
             </Style>
           </Textbox>
-          <Textbox Name="Critical">
+          <Textbox Name="CriticalLabel">
             <Paragraphs>
               <Paragraph>
                 <TextRuns>
@@ -309,15 +360,27 @@
                       <Color>#a33a32</Color>
                     </Style>
                   </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#a33a32</Color>
-                    </Style>
-                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.08in</Top>
+            <Left>3.9in</Left>
+            <Height>0.2in</Height>
+            <Width>1.55in</Width>
+            <ZIndex>2</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+          <Textbox Name="Critical">
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
                   <TextRun>
                     <Value>Rs. </Value>
                     <Style>
@@ -342,9 +405,9 @@
                 </Style>
               </Paragraph>
             </Paragraphs>
-            <Top>0.08in</Top>
+            <Top>0.28in</Top>
             <Left>3.9in</Left>
-            <Height>0.4in</Height>
+            <Height>0.2in</Height>
             <Width>1.55in</Width>
             <ZIndex>2</ZIndex>
             <Style>
@@ -353,7 +416,7 @@
               </Border>
             </Style>
           </Textbox>
-          <Textbox Name="Current">
+          <Textbox Name="CurrentLabel">
             <Paragraphs>
               <Paragraph>
                 <TextRuns>
@@ -366,15 +429,27 @@
                       <Color>#1f6f5f</Color>
                     </Style>
                   </TextRun>
-                  <TextRun>
-                    <Value>=vbCrLf</Value>
-                    <Style>
-                      <FontFamily>Segoe UI</FontFamily>
-                      <FontSize>11pt</FontSize>
-                      <FontWeight>Bold</FontWeight>
-                      <Color>#1f6f5f</Color>
-                    </Style>
-                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>0.08in</Top>
+            <Left>5.5in</Left>
+            <Height>0.2in</Height>
+            <Width>1.65in</Width>
+            <ZIndex>3</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Textbox>
+          <Textbox Name="Current">
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
                   <TextRun>
                     <Value>Rs. </Value>
                     <Style>
@@ -399,9 +474,9 @@
                 </Style>
               </Paragraph>
             </Paragraphs>
-            <Top>0.08in</Top>
+            <Top>0.28in</Top>
             <Left>5.5in</Left>
-            <Height>0.4in</Height>
+            <Height>0.2in</Height>
             <Width>1.65in</Width>
             <ZIndex>3</ZIndex>
             <Style>

@@ -951,7 +951,7 @@
           </Border>
         </Style>
       </Textbox>
-      <Textbox Name="txtRegAndDate">
+      <Textbox Name="lblAdmissionNumber">
         <CanGrow>true</CanGrow>
         <Paragraphs>
           <Paragraph>
@@ -963,6 +963,28 @@
                   <FontSize>9pt</FontSize>
                 </Style>
               </TextRun>
+            </TextRuns>
+            <Style>
+              <TextAlign>Left</TextAlign>
+            </Style>
+          </Paragraph>
+        </Paragraphs>
+        <Top>1.005in</Top>
+        <Height>0.2in</Height>
+        <Width>0.82in</Width>
+        <ZIndex>33</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+        <Left>0in</Left>
+      </Textbox>
+      <Textbox Name="txtAdmissionNumber">
+        <CanGrow>true</CanGrow>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
               <TextRun>
                 <Value>=First(Fields!AdmissionNumber.Value, "AdmissionFormData")</Value>
                 <Style>
@@ -970,13 +992,59 @@
                   <FontSize>9pt</FontSize>
                 </Style>
               </TextRun>
+            </TextRuns>
+            <Style>
+              <TextAlign>Left</TextAlign>
+            </Style>
+          </Paragraph>
+        </Paragraphs>
+        <Top>1.005in</Top>
+        <Height>0.2in</Height>
+        <Width>0.48in</Width>
+        <ZIndex>33</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+          <PaddingLeft>0pt</PaddingLeft>
+        </Style>
+        <Left>0.82in</Left>
+      </Textbox>
+      <Textbox Name="lblRegistrationNumber">
+        <CanGrow>true</CanGrow>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
               <TextRun>
-                <Value>     |     Reg # </Value>
+                <Value>|   Reg #</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>9pt</FontSize>
                 </Style>
               </TextRun>
+            </TextRuns>
+            <Style>
+              <TextAlign>Left</TextAlign>
+            </Style>
+          </Paragraph>
+        </Paragraphs>
+        <Top>1.005in</Top>
+        <Height>0.2in</Height>
+        <Width>0.62in</Width>
+        <ZIndex>33</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+          <PaddingLeft>0pt</PaddingLeft>
+        </Style>
+        <Left>1.3in</Left>
+      </Textbox>
+      <Textbox Name="txtRegistrationNumber">
+        <CanGrow>true</CanGrow>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
               <TextRun>
                 <Value>=First(Fields!RegistrationNumber.Value, "AdmissionFormData")</Value>
                 <Style>
@@ -984,13 +1052,59 @@
                   <FontSize>9pt</FontSize>
                 </Style>
               </TextRun>
+            </TextRuns>
+            <Style>
+              <TextAlign>Left</TextAlign>
+            </Style>
+          </Paragraph>
+        </Paragraphs>
+        <Top>1.005in</Top>
+        <Height>0.2in</Height>
+        <Width>1.28in</Width>
+        <ZIndex>33</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+          <PaddingLeft>0pt</PaddingLeft>
+        </Style>
+        <Left>1.92in</Left>
+      </Textbox>
+      <Textbox Name="lblAdmissionDate">
+        <CanGrow>true</CanGrow>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
               <TextRun>
-                <Value>     |     Admission Date: </Value>
+                <Value>|   Admission Date:</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>9pt</FontSize>
                 </Style>
               </TextRun>
+            </TextRuns>
+            <Style>
+              <TextAlign>Left</TextAlign>
+            </Style>
+          </Paragraph>
+        </Paragraphs>
+        <Top>1.005in</Top>
+        <Height>0.2in</Height>
+        <Width>1.24in</Width>
+        <ZIndex>33</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+          <PaddingLeft>0pt</PaddingLeft>
+        </Style>
+        <Left>3.2in</Left>
+      </Textbox>
+      <Textbox Name="txtAdmissionDate">
+        <CanGrow>true</CanGrow>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
               <TextRun>
                 <Value>=First(Fields!AdmissionDateText.Value, "AdmissionFormData")</Value>
                 <Style>
@@ -1000,19 +1114,21 @@
               </TextRun>
             </TextRuns>
             <Style>
-              <TextAlign>Center</TextAlign>
+              <TextAlign>Left</TextAlign>
             </Style>
           </Paragraph>
         </Paragraphs>
         <Top>1.005in</Top>
         <Height>0.2in</Height>
-        <Width>6in</Width>
+        <Width>1.56in</Width>
         <ZIndex>33</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
           </Border>
+          <PaddingLeft>0pt</PaddingLeft>
         </Style>
+        <Left>4.44in</Left>
       </Textbox>
       <Textbox Name="boxPhoto">
         <Paragraphs>
