@@ -4,6 +4,7 @@ using FMSC_SMS.Core;
 using FMSC_SMS;
 using FMSC_SMS.Pages.Security;
 using FMSC_SMS.Pages.Reports.Finance;
+using FMSC_SMS.Pages.Reports;
 using FMSC_SMS.Pages.Students.Profile;
 
 internal static partial class Program
@@ -30,6 +31,9 @@ internal static partial class Program
                     "Family navigation is consolidated while preserving accounts that have only family access");
             }
             CurrentUser.SignIn(920, "Account fixture", "Administrator", false, Array.Empty<string>());
+            using(var reports=new ReportsHomePage((Action<Func<Control>,string,string>)((_,_,_)=>{})))
+                foreach(string title in new[]{PageTitles.FamilyGroupStatements,PageTitles.AnnualFeeReceipts,PageTitles.OutstandingBills})
+                    Check(Descendants(reports).Any(control=>control.Text==title),"Reports provides a dedicated entry for "+title);
             int calls = 0, readId = 0;
             var reply = new TaskCompletionSource<(DataTable, decimal)>();
             Func<int, DateTime?, DateTime?, Task<(DataTable Transactions, decimal OpeningBalance)>> read = (id, _, _) => {
@@ -43,13 +47,13 @@ internal static partial class Program
             owner.Controls.Add(page); owner.Show(); Application.DoEvents();
             Console.WriteLine("ACCOUNT_FLOW: SQL-free statement is visible");
             var grid = (DataGridView)typeof(V2Page).GetField("Grid", flags)!.GetValue(page)!;
-            var toggle = Field<CheckBox>("groupModeToggle");
             var picker = Field<StudentPicker>("studentSearch");
             var selected = Field<HashSet<int>>("manuallySelectedAdmissionIds");
-            Check(!toggle.Checked && !Field<bool>("groupMode"), "Accounts begin with one student rather than a group-selection workflow");
+            Check(!Field<bool>("groupMode")&&!Descendants(page).OfType<CheckBox>().Any(), "The student statement has no group-mode switch");
+            Check(Field<Label>("closingBalance").Text=="—","An unloaded account does not imply a zero balance");
             Check(!Field<ModernButton>("generateStatementButton").Enabled && !Field<ModernButton>("annualReceiptsButton").Enabled,
                 "Statement and receipts require a confirmed student");
-            Check(!Descendants(page).OfType<ModernButton>().Single(b => b.Text == "Find Students").Visible && !Field<DataGridView>("students").Visible,
+            Check(!Descendants(page).OfType<ModernButton>().Any(b => b.Text == "Find Students"&&b.Visible) && !Field<DataGridView>("students").Visible,
                 "The normal account view hides group search and Include checkboxes");
             foreach (var size in new[] { new Size(1200, 720), new Size(1000, 650), new Size(850, 580) })
             {
@@ -76,7 +80,7 @@ internal static partial class Program
                 .Invoke(picker, EventArgs.Empty);
             Check(calls == 1 && readId == 41 && page.IsBusy && selected.SetEquals(new[] { 41 }),
                 "Choosing one student loads exactly that account without an Include checkbox or extra Find step");
-            Check(!toggle.Enabled && !picker.Enabled, "Account loading holds the selected identity and mode stable");
+            Check(!picker.Enabled, "Account loading holds the selected identity stable");
             var data = new DataTable();
             data.Columns.Add("StudentName"); data.Columns.Add("TransactionType"); data.Columns.Add("TransactionId", typeof(long));
             data.Columns.Add("TransactionDate", typeof(DateTime)); data.Columns.Add("DebitAmount", typeof(decimal)); data.Columns.Add("PaidAmount", typeof(decimal));
@@ -89,33 +93,55 @@ internal static partial class Program
                 "The simplified view preserves opening balance, charges, payment totals and current-snapshot export");
             Check(Field<Label>("statementContext").Text.Contains("Synthetic Ava") && Field<ModernButton>("annualReceiptsButton").Enabled,
                 "The account identifies its student and enables contextual annual receipts");
-            Check(type.GetMethod("CreateAnnualReceiptsDialog",flags) is null &&
-                type.GetMethod("OpenAnnualReceipts",flags)!.ReturnType==typeof(Task),
-                "Annual receipts dispatch directly to the shared asynchronous preview without another selector window");
+            Check(Field<ModernButton>("annualReceiptsButton").Parent!=Field<ModernButton>("generateStatementButton").Parent,
+                "Related reports are separate from statement generation actions");
+            Directory.CreateDirectory("artifacts/student-account");
+            owner.ClientSize=new Size(1200,800);Application.DoEvents();
+            using(var bitmap=new Bitmap(page.Width,page.Height))
+            {page.DrawToBitmap(bitmap,page.ClientRectangle);bitmap.Save(Path.GetFullPath("artifacts/student-account/single.png"));}
             Check(type.GetMethod("PrintThermalDueReport",flags) is null,
                 "Statement printing no longer uses the retired drawing-based fee-due report");
             var from = Field<ModernDatePicker>("from"); from.Value = new DateTime(2026, 10, 1); from.Checked = true;
             Console.WriteLine("ACCOUNT_FLOW: owned receipt guard verified");
             Check(!Field<ModernButton>("exportButton").Enabled, "Changing the period invalidates the previous financial snapshot");
-            toggle.Checked = true;
-            Check(Field<bool>("groupMode") && Field<DataGridView>("students").Visible && selected.SetEquals(new[]{41}) && picker.SelectedId==41,
-                "Group mode expands selection without clearing the chosen student or current account");
-            Check(from.Checked && from.Value.Date == new DateTime(2026, 10, 1), "Mode changes preserve the intentionally chosen statement period");
-            selected.UnionWith(new[] { 41, 42 }); Invoke("UpdateSelectionActions");
-            Check(!Field<ModernButton>("annualReceiptsButton").Enabled, "A multi-student selection cannot open a misleading single-student receipt window");
-            Field<Dictionary<int, HashSet<int>>>("familySelections")[41] = new HashSet<int> { 41, 42 };
-            toggle.Checked = false;
-            PumpUntil(()=>!page.IsBusy,"Returning to the primary student refreshes its account");
-            Check(selected.SetEquals(new[]{41}) && picker.SelectedId==41 && Field<Dictionary<int, HashSet<int>>>("familySelections").Count == 0,
-                "Returning to one student preserves the primary child while removing extra group/family members");
+            using(var group=(StudentAccountStatementPage)Activator.CreateInstance(type,flags,null,new object[]{false,read,true},null)!)
+            {
+                owner.Controls.Remove(page);owner.Controls.Add(group);Application.DoEvents();
+                T GroupField<T>(string name)=>(T)type.GetField(name,flags)!.GetValue(group)!;
+                Check(GroupField<bool>("groupMode")&&GroupField<DataGridView>("students").Visible,
+                    "Family/group selection opens in its own dedicated report");
+                Check(GroupField<ModernButton?>("annualReceiptsButton") is null&&GroupField<ModernButton?>("printAmountsDueButton") is null,
+                    "The group workflow contains only statement actions");
+                Check(GroupField<HashSet<int>>("manuallySelectedAdmissionIds").Count==0&&selected.SetEquals(new[]{41}),
+                    "Separate reports do not share or silently change selections");
+                GroupField<HashSet<int>>("manuallySelectedAdmissionIds").UnionWith(new[]{41,42});
+                GroupField<DataGridView>("students").Rows.Add(true,false,41,"Synthetic Ava","Class 10","A");
+                GroupField<DataGridView>("students").Rows.Add(true,false,42,"Synthetic Ben","Class 8","A");
+                GroupField<Dictionary<int,HashSet<int>>>("familySelections")[41]=new HashSet<int>{41,42};
+                type.GetMethod("UpdateSelectionActions",flags)!.Invoke(group,null);
+                type.GetMethod("SelectionCountText",flags)!.Invoke(group,null);
+                Application.DoEvents();
+                Check(GroupField<Label>("statementContext").Text.Contains("2 student(s)")&&GroupField<ModernButton>("generateStatementButton").Enabled,
+                    "The group statement counts unique included students and enables generation");
+                Check(GroupField<ModernButton>("generateStatementButton").PointToScreen(Point.Empty).Y>=GroupField<DataGridView>("students").PointToScreen(new Point(0,GroupField<DataGridView>("students").Height)).Y,
+                    "Group statement generation follows student selection in the visible flow");
+                using(var bitmap=new Bitmap(group.Width,group.Height))
+                {group.DrawToBitmap(bitmap,group.ClientRectangle);bitmap.Save(Path.GetFullPath("artifacts/student-account/group.png"));}
+                owner.Controls.Remove(group);owner.Controls.Add(page);Application.DoEvents();
+            }
+            Check(selected.SetEquals(new[]{41})&&picker.SelectedId==41&&from.Checked&&from.Value.Date==new DateTime(2026,10,1),
+                "Returning from a separate report retains the student account and its dates");
             picker.SetStudent(42, "Synthetic Ben"); Invoke("SelectSingleStudent");
             CurrentUser.SignIn(921, "Restricted fixture", "Operator", false, new[] { "Reports.View", "Fees.View" });
+            using(var reports=new ReportsHomePage((Action<Func<Control>,string,string>)((_,_,_)=>{})))
+                Check(!Descendants(reports).Any(control=>control.Text==PageTitles.FamilyGroupStatements||control.Text==PageTitles.AnnualFeeReceipts),
+                    "Statement report entries respect statement permission");
             Invoke("UpdateSelectionActions"); Invoke("OpenAnnualReceipts");
             Check(!Field<ModernButton>("annualReceiptsButton").Enabled && Application.OpenForms.Count == 1,
                 "Direct receipt dispatch cannot bypass its existing statement permission");
             CurrentUser.SignIn(920, "Account fixture", "Administrator", false, Array.Empty<string>());
             using var profile = new StudentProfilePage((_, _, _) => throw new Exception("Family must not replace the profile"), false);
-            Console.WriteLine("ACCOUNT_FLOW: group transitions and receipt permission verified");
+            Console.WriteLine("ACCOUNT_FLOW: separate reports and receipt permission verified");
             var profilePicker = (StudentPicker)typeof(StudentProfilePage).GetField("student", flags)!.GetValue(profile)!;
             profilePicker.SetStudent(41, "Synthetic Ava");
             using var family = (Control)Activator.CreateInstance(typeof(StudentFamilyPage), flags, null, new object[] { 41, false }, null)!;

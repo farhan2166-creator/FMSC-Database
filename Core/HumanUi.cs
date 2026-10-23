@@ -265,7 +265,13 @@ public static class HumanUi
             int index = root.GetRow(card);
             if (index < 0 || index >= root.RowStyles.Count || root.RowStyles[index].SizeType != SizeType.Absolute) return;
             baselineHeight ??= root.RowStyles[index].Height;
-            float needed = baselineHeight.Value + Math.Max(0, row.Height + row.Margin.Vertical - AppMetrics.ButtonRowHeight);
+            // Certificate editors can change their number of field rows when
+            // resized. Do not restore the initial, taller editor height afterward.
+            var certificateFields=card.Content.Controls.OfType<TableLayoutPanel>()
+                .FirstOrDefault(table=>Equals(table.Tag,CertificateUi.FieldGridTag));
+            float baseline=certificateFields is null?baselineHeight.Value:
+                AppMetrics.FieldCardHeight(certificateFields.RowCount)+AppMetrics.ButtonRowHeight;
+            float needed = baseline + Math.Max(0, row.Height + row.Margin.Vertical - AppMetrics.ButtonRowHeight);
             if (Math.Abs(root.RowStyles[index].Height - needed) < 1) return;
             adjusting = true;
             try { root.RowStyles[index].Height = needed; }

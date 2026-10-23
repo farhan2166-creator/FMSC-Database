@@ -2,6 +2,7 @@ namespace FMSC_SMS.Core;
 /// <summary>Small shared mechanics used by the certificate screens; certificate-specific business rules stay on their pages.</summary>
 internal static class CertificateUi
 {
+    internal const string FieldGridTag="CertificateFieldGrid";
     internal static bool ConfirmCertificateSelection(IWin32Window? owner, DataGridView grid,
         string idColumn, int currentId, int requestedId, bool hasEdits,Func<bool>? confirmDiscard=null)
     {
@@ -32,16 +33,58 @@ internal static class CertificateUi
 
     public static Panel Field(string caption, Control control, bool required = false, bool fillHeight = true)
     {
-        Panel field = HumanUi.Field(caption, control, required, fillHeight);
+        Size requestedMaximum=control.MaximumSize;
+        var field = (TableLayoutPanel)HumanUi.Field(caption, control, required, fillHeight);
+        field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         if (control is ModernTextBox { Multiline: false } || control is ModernComboBox ||
             control is ModernDatePicker || control is StudentPicker || control is NumericUpDown)
         {
-            control.Dock = DockStyle.None;
-            control.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            // The certificate's field grid owns widths; keep each input directly
+            // below its caption instead of vertically centring it in spare space.
+            control.MaximumSize=requestedMaximum;
             control.Height = AppMetrics.InputControlHeight;
+            control.Dock = DockStyle.Top;
             control.Margin = new Padding(0);
         }
         return field;
+    }
+
+    internal static void CompactFields(HumanCard details,TableLayoutPanel fields,TableLayoutPanel root,
+        float[] wideWidths,(int Column,int Row,int Span)[] widePositions,int minimumWidth=1200)
+    {
+        fields.Tag=FieldGridTag;
+        var controls=fields.Controls.Cast<Control>().ToArray();
+        var original=controls.Select(control=>(Column:fields.GetColumn(control),Row:fields.GetRow(control),Span:fields.GetColumnSpan(control))).ToArray();
+        var originalWidths=fields.ColumnStyles.Cast<ColumnStyle>().Select(style=>style.Width).ToArray();
+        bool? wideLayout=null;
+        void Arrange()
+        {
+            bool wide=details.Content.ClientSize.Width>=AppScale.Scale(minimumWidth);
+            if(wideLayout==wide)return;
+            wideLayout=wide;
+            var positions=wide?widePositions:original;
+            var widths=wide?wideWidths:originalWidths;
+            fields.SuspendLayout();root.SuspendLayout();
+            try
+            {
+                foreach(Control control in controls)fields.SetColumnSpan(control,1);
+                fields.ColumnCount=widths.Length;fields.RowCount=positions.Max(position=>position.Row)+1;
+                fields.ColumnStyles.Clear();fields.RowStyles.Clear();
+                foreach(float width in widths)fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,width));
+                for(int row=0;row<fields.RowCount;row++)fields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
+                for(int index=0;index<controls.Length;index++)
+                {
+                    var position=positions[index];
+                    fields.SetCellPosition(controls[index],new TableLayoutPanelCellPosition(position.Column,position.Row));
+                    fields.SetColumnSpan(controls[index],position.Span);
+                    controls[index].TabIndex=position.Row*fields.ColumnCount+position.Column;
+                }
+                root.RowStyles[0].Height=AppMetrics.FieldCardHeight(fields.RowCount)+AppMetrics.ButtonRowHeight;
+            }
+            finally{fields.ResumeLayout(true);root.ResumeLayout(true);}
+        }
+        details.Content.SizeChanged+=(_,_)=>Arrange();
+        Arrange();
     }
 
     public static int GetInt(DataRow row, string column)

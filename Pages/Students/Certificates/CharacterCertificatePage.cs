@@ -5,21 +5,20 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
 {
     private readonly StudentPicker student = new();
     private string? draftBaseline;
-    private string DraftSnapshot()=>System.Text.Json.JsonSerializer.Serialize(new {Exam=examType.SelectedIndex,Passed=passedExam.Checked,Roll=rollNumber.Text.Trim(),Remarks=remarks.Text.Trim(),Date=certificateDate.Value.Date});
+    private string DraftSnapshot()=>System.Text.Json.JsonSerializer.Serialize(new {Exam=examType.SelectedIndex,Roll=rollNumber.Text.Trim(),Remarks=remarks.Text.Trim(),Date=certificateDate.Value.Date});
     private void CaptureDraftBaseline()=>draftBaseline=DraftSnapshot();
     // Short certificate details can be retyped without a discard warning.
     public bool HasUnsavedChanges => false;
     public string UnsavedChangesMessage=>"The new certificate has unsaved details. Discard this draft?";
     private bool ConfirmDraftDiscard()=>!HasUnsavedChanges||Confirm(UnsavedChangesMessage,UiText.Dialogs.UnsavedChanges);
-    private readonly CheckBox passedExam = new() { Text = "Passed", AutoSize = true, Font = AppTheme.NormalFont,
-        AccessibleName = "Student has passed the selected board examination" };
+    private readonly HashSet<int> eligibleSchoolClasses = new();
 
     private readonly ModernComboBox examType =
         HumanUi.Combo();
     private readonly ModernTextBox rollNumber =
         HumanUi.TextBox(false, 200);
     private readonly ModernTextBox remarks =
-        HumanUi.TextBox(true, 500);
+        HumanUi.TextBox(false, 500);
     private readonly ModernDatePicker certificateDate =
         HumanUi.Date();
     private DataTable studentResults => student.Source;
@@ -57,8 +56,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     /* Business rule (V20 audit F-01, confirmed by the owner): exam type is operator-selected
        wording for each print, not persisted certificate history. Keep this fixed combo;
        do not introduce an exam-type table/column or per-exam-type certificate uniqueness.
-       Require an explicit selection and confirmation for every print; never default to SSC.
-       See Docs/AUDIT_DECISIONS.md for the scope and accepted reprint limitation. */
+       The school chooses issuance; require a wording selection without a pass acknowledgement. */
     private static readonly string[] ExamTypeLabels =
     {
         "S.S.C (Matric)",
@@ -72,7 +70,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             ComboBoxStyle.DropDownList;
         examType.Items.AddRange(ExamTypeLabels);
         ConfigureFieldSuggestions();
-        passedExam.CheckedChanged += (_, _) => ApplyWorkflowState();
         createCertificateButton.Click +=
             (_, _) => CreateCertificate();
         clearButton.Click +=
@@ -105,7 +102,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
                 StudentChanged();
             };
         examType.SelectedIndexChanged +=
-            (_, _) => { passedExam.Checked = false; ApplyWorkflowState(); };
+            (_, _) => ApplyWorkflowState();
         Grid.CellMouseClick +=
             Grid_CellMouseClick;
         Defer(
@@ -116,12 +113,13 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
-                "Character certificates are for students who have passed Class 10 (SSC) or Class 12 (HSSC).");
+                "For current or former Class 10 (SSC) and Class 12 (HSSC) students. The school decides whether to issue.");
         var fields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
                 RowCount = 3,
+                Tag=CertificateUi.FieldGridTag,
                 TabIndex = 0,
                 Margin = new Padding(0),
                 Padding = new Padding(0)
@@ -135,34 +133,24 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             fields.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
         }
-        fields.Controls.Add(
-            CertificateUi.Field("Student", student, true), 0, 0);
-        fields.Controls.Add(
-            CertificateUi.Field(UiText.Certificates.Date, certificateDate, true), 1, 0);
-        HumanUi.ApplyFieldInputLayout(examType);
-        examType.Dock = DockStyle.Fill;
-        examType.TabIndex = 0;
-        passedExam.TabIndex = 1;
-        passedExam.Anchor = AnchorStyles.Left;
-        passedExam.Margin = new Padding(AppScale.Scale(12), 0, 0, 0);
-        var examInputs = new TableLayoutPanel {
-            ColumnCount = 2, RowCount = 1, Margin = Padding.Empty, Padding = Padding.Empty,
-            MaximumSize = new Size(examType.MaximumSize.Width + passedExam.PreferredSize.Width + passedExam.Margin.Horizontal, 0),
-            Height = AppMetrics.InputControlHeight, TabIndex = 0
-        };
-        examInputs.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        examInputs.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        examInputs.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        examInputs.Controls.Add(examType, 0, 0);
-        examInputs.Controls.Add(passedExam, 1, 0);
-        fields.Controls.Add(
-            CertificateUi.Field("Board Examination", examInputs, true, false), 0, 1);
-        fields.Controls.Add(
-            CertificateUi.Field("BISE Roll No.", rollNumber, true), 1, 1);
+        var studentField=CertificateUi.Field("Student", student, true);
+        var dateField=CertificateUi.Field(UiText.Certificates.Date, certificateDate, true);
+        var examField=CertificateUi.Field("Board Examination", examType, true);
+        var rollField=CertificateUi.Field("BISE Roll No.", rollNumber, true);
+        fields.Controls.Add(studentField,0,0);
+        fields.Controls.Add(dateField,1,0);
+        fields.Controls.Add(examField,0,1);
+        fields.Controls.Add(rollField,1,1);
         var remarksField = CertificateUi.Field("Remarks", remarks, true);
         fields.Controls.Add(remarksField, 0, 2);
         fields.SetColumnSpan(remarksField, 2);
-        // Row-major keyboard flow, with the pass confirmation immediately after its exam.
+        foreach(var field in fields.Controls.OfType<TableLayoutPanel>())
+            field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        certificateDate.MaximumSize=Size.Empty;
+        examType.MaximumSize=Size.Empty;
+        foreach(Control input in new Control[]{student,certificateDate,examType,rollNumber,remarks})
+            input.Dock=DockStyle.Top;
+        // Row-major keyboard flow follows the visible certificate fields.
         foreach (Control field in fields.Controls)
             field.TabIndex = fields.GetRow(field) * fields.ColumnCount + fields.GetColumn(field);
         details.Content.Controls.Add(fields);
@@ -206,6 +194,35 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(details, 0, 0);
         root.Controls.Add(records, 0, 1);
+        bool? wideFields=null;
+        void ArrangeFields()
+        {
+            bool wide=details.Content.ClientSize.Width>=AppScale.Scale(1050);
+            if(wideFields==wide)return;
+            wideFields=wide;
+            fields.SuspendLayout();root.SuspendLayout();
+            try
+            {
+                fields.SetColumnSpan(remarksField,1);
+                fields.ColumnCount=wide?4:2;fields.RowCount=wide?2:3;
+                fields.ColumnStyles.Clear();fields.RowStyles.Clear();
+                foreach(float width in wide?new[]{40f,20f,20f,20f}:new[]{50f,50f})
+                    fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,width));
+                for(int row=0;row<fields.RowCount;row++)fields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
+                fields.SetCellPosition(studentField,new TableLayoutPanelCellPosition(0,0));
+                fields.SetCellPosition(dateField,new TableLayoutPanelCellPosition(1,0));
+                fields.SetCellPosition(examField,new TableLayoutPanelCellPosition(wide?2:0,wide?0:1));
+                fields.SetCellPosition(rollField,new TableLayoutPanelCellPosition(wide?3:1,wide?0:1));
+                fields.SetCellPosition(remarksField,new TableLayoutPanelCellPosition(0,wide?1:2));
+                fields.SetColumnSpan(remarksField,fields.ColumnCount);
+                foreach(Control field in fields.Controls)
+                    field.TabIndex=fields.GetRow(field)*fields.ColumnCount+fields.GetColumn(field);
+                root.RowStyles[0].Height=AppMetrics.FieldCardHeight(fields.RowCount)+AppMetrics.ButtonRowHeight;
+            }
+            finally{fields.ResumeLayout(true);root.ResumeLayout(true);}
+        }
+        details.Content.SizeChanged+=(_,_)=>ArrangeFields();
+        ArrangeFields();
         details.TabIndex = 0;
         records.TabIndex = 1;
         SetContent(
@@ -219,7 +236,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             return;
         try
         {
-            passedExam.Checked = false;
+            eligibleSchoolClasses.Clear();
             ClearCertificateSelection();
             ClearCertificateFields();
             int admissionId =
@@ -239,6 +256,19 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             {
                 ApplyWorkflowState();
                 return;
+            }
+            var placements = DatabaseHelper.QuerySql("""
+                EXEC dbo.RequirePermission @UserId,N'Certificates.Create';
+                SELECT DISTINCT C.ClassName
+                FROM dbo.Enrollments E
+                JOIN dbo.CampusClassSections CCS ON CCS.ClassSectionId=E.ClassSectionId
+                JOIN dbo.Classes C ON C.ClassId=CCS.ClassId
+                WHERE E.AdmissionId=@AdmissionId AND E.Status<>N'Cancelled';
+                """, DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@AdmissionId",admissionId));
+            foreach(DataRow placement in placements.Rows)
+            {
+                int schoolClass=SchoolClassNumber(GetString(placement,"ClassName"));
+                if(schoolClass is 10 or 12)eligibleSchoolClasses.Add(schoolClass);
             }
             LoadCertificates(admissionId);
         }
@@ -400,9 +430,8 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             selectedIssueId > 0 &&
             selectedCertificateRecordId > 0;
         bool examTypeChosen = examType.SelectedIndex >= 0;
-        bool eligibleClass = SelectedSchoolClass() is 10 or 12;
-        bool canIssue = eligibleClass && ExamMatchesClass() && passedExam.Checked;
-        passedExam.Enabled = hasStudent && eligibleClass && examTypeChosen;
+        bool eligibleClass = HasSchoolClass(10) || HasSchoolClass(12);
+        bool canIssue = eligibleClass && ExamMatchesClass();
         student.Enabled = true;
         examType.Enabled =
             hasStudent;
@@ -440,7 +469,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         }
         if (!eligibleClass)
         {
-            SetStatus("Requires passing Class 10 (SSC) or Class 12 (HSSC).");
+            SetStatus("Requires a current or earlier Class 10 (SSC) or Class 12 (HSSC) placement.");
             return;
         }
         if (!examTypeChosen)
@@ -453,9 +482,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         }
         if (!canIssue)
         {
-            SetStatus(ExamMatchesClass()
-                ? "Confirm that the student has passed the selected board examination."
-                : "Choose SSC for Class 10 or HSSC for Class 12.");
+            SetStatus("Choose SSC for a Class 10 placement or HSSC for a Class 12 placement.");
             return;
         }
         if (!hasCertificate)
@@ -537,13 +564,15 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         var row = studentResults.AsEnumerable().FirstOrDefault(row => GetInt(row, "AdmissionId") == student.SelectedId);
         return row is null ? 0 : SchoolClassNumber(GetString(row, "ClassName"));
     }
+    private bool HasSchoolClass(int schoolClass) =>
+        eligibleSchoolClasses.Contains(schoolClass) || SelectedSchoolClass()==schoolClass;
     private bool ExamMatchesClass() =>
-        (SelectedSchoolClass() == 10 && examType.SelectedIndex == 0) ||
-        (SelectedSchoolClass() == 12 && examType.SelectedIndex == 1);
+        (HasSchoolClass(10) && examType.SelectedIndex == 0) ||
+        (HasSchoolClass(12) && examType.SelectedIndex == 1);
     private bool ValidateEligibility()
     {
-        if (ExamMatchesClass() && passedExam.Checked) return true;
-        Warn("Character certificates require a Class 10 (SSC) or Class 12 (HSSC) student who has passed that examination.");
+        if (ExamMatchesClass()) return true;
+        Warn("Choose SSC for a current or earlier Class 10 placement, or HSSC for a current or earlier Class 12 placement.");
         return false;
     }
     private void CreateCertificate()
@@ -798,18 +827,9 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
                 Warn("Choose SSC or HSSC wording before printing this certificate.");
                 return;
             }
-            // Capture the choice before opening a modal: report data must use this confirmed value.
+            // Use the operator's selected wording directly for this print.
             string examWording = ExamTypeLabels[examTypeIndex];
             int certificateRecordId = selectedCertificateRecordId;
-            if (ModernMessageDialog.Show(
-                    FindForm(),
-                    $"Print this character certificate with {examWording} wording?\n\n" +
-                    "Exam wording is chosen for this print and is not saved with the certificate. " +
-                    "Check that it matches the wording required for this student.",
-                    "Confirm Exam Wording",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question) != DialogResult.Yes)
-                return;
             PrintCertificate(certificateRecordId, examWording);
         }
         catch (Exception ex)
@@ -1044,7 +1064,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     }
     private void ClearCertificateFields()
     {
-        passedExam.Checked = false;
         examType.SelectedIndex = -1;
         rollNumber.Clear();
         remarks.Clear();
@@ -1060,6 +1079,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     }
     private void ResetToStart()
     {
+        eligibleSchoolClasses.Clear();
         suppressStudentChanged = true;
         try
         {
@@ -1080,6 +1100,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     private void ClearForm()
     {
         if(!ConfirmDraftDiscard())return;
+        eligibleSchoolClasses.Clear();
         suppressStudentChanged = true;
         try
         {

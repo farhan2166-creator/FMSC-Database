@@ -11,7 +11,6 @@ internal static partial class Program
         T Field<T>(string name)=>(T)typeof(CharacterCertificatePage).GetField(name,flags)!.GetValue(page)!;
         var student=Field<StudentPicker>("student");
         var exam=Field<ModernComboBox>("examType");
-        var passed=Field<CheckBox>("passedExam");
         var date=Field<ModernDatePicker>("certificateDate");
         var roll=Field<ModernTextBox>("rollNumber");
         var remarks=Field<ModernTextBox>("remarks");
@@ -24,8 +23,8 @@ internal static partial class Program
         using var form=new Form { ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,
             Location=new Point(-20000,-20000),ClientSize=new Size(1000,430),AutoScaleMode=AutoScaleMode.None };
         details.Dock=DockStyle.Fill;form.Controls.Add(details);
-        exam.SelectedIndex=1;passed.Checked=true;
-        var sequence=new Control[]{student,date,exam,passed,roll,remarks,create,next};
+        exam.SelectedIndex=1;
+        var sequence=new Control[]{student,date,exam,roll,remarks,create,next};
         foreach(var control in sequence)control.Enabled=true;
         form.Show();Application.DoEvents();
         Directory.CreateDirectory("artifacts/character-certificate");
@@ -33,18 +32,15 @@ internal static partial class Program
         {
             form.ClientSize=new Size(width,430);form.PerformLayout();Application.DoEvents();
             var combo=exam.RectangleToScreen(exam.ClientRectangle);
-            var check=passed.RectangleToScreen(passed.ClientRectangle);
-            Check(exam.Parent==passed.Parent&&Math.Abs((combo.Top+combo.Height/2)-(check.Top+check.Height/2))<=3,
-                $"Passed checkbox sits beside and aligns with the exam combo at {width}px.");
-            Check(check.Left>=combo.Right&&check.Left-combo.Right<=AppScale.Scale(16),
-                $"Checkbox stays immediately beside the combo at {width}px.");
-            Check(exam.Parent!.ClientRectangle.Contains(exam.Bounds)&&passed.Parent!.ClientRectangle.Contains(passed.Bounds),
-                $"Exam and confirmation fit without clipping at {width}px.");
+            Check(exam.Parent!.ClientRectangle.Contains(exam.Bounds),
+                $"Exam choice fits without clipping at {width}px.");
+            Check(!Descendants(form).OfType<CheckBox>().Any(),"Certificate details have no pass acknowledgement.");
             using var bitmap=new Bitmap(form.Width,form.Height);
             form.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
             bitmap.Save(Path.GetFullPath($"artifacts/character-certificate/details-{width}.png"));
         }
-        Check(form.SelectNextControl(null,true,true,true,true)&&student.ContainsFocus,"Tab starts in the student picker.");
+        student.Focus();
+        Check(student.ContainsFocus,"The student picker accepts initial focus.");
         for(int index=1;index<sequence.Length;index++)
         {
             var focused=Descendants(form).Single(control=>control.Focused);
@@ -57,10 +53,22 @@ internal static partial class Program
             Check(form.SelectNextControl(focused,false,true,true,true)&&sequence[index].ContainsFocus,
                 $"Shift+Tab returns to position {index+1}.");
         }
-        passed.Enabled=false;
-        exam.SelectNextControl(null,true,true,true,false);
-        var examFocus=Descendants(form).Single(control=>control.Focused);
-        Check(form.SelectNextControl(examFocus,true,true,true,true)&&roll.ContainsFocus,"Tab skips the pass confirmation when eligibility disables it.");
+        var eligible=Field<HashSet<int>>("eligibleSchoolClasses");
+        typeof(StudentPicker).GetField("_selectedId",flags)!.SetValue(student,41);
+        void Refresh()=>typeof(CharacterCertificatePage).GetMethod("ApplyWorkflowState",flags)!.Invoke(page,null);
+        eligible.Add(10);exam.SelectedIndex=0;Refresh();
+        Check(create.Enabled,"A former Class 10 student can create SSC without a pass acknowledgement.");
+        typeof(CharacterCertificatePage).GetMethod("ClearCertificateFields",flags)!.Invoke(page,null);
+        exam.SelectedIndex=0;Refresh();
+        Check(create.Enabled,"Clearing saved certificate inputs retains this student's placement eligibility.");
+        exam.SelectedIndex=1;Refresh();
+        Check(!create.Enabled,"Class 10 history alone does not qualify for HSSC.");
+        eligible.Add(12);Refresh();
+        Check(create.Enabled,"Class 12 history qualifies for HSSC without a pass acknowledgement.");
+        exam.SelectedIndex=-1;Refresh();
+        Check(!create.Enabled,"The operator still chooses the exam wording.");
+        eligible.Clear();exam.SelectedIndex=0;Refresh();
+        Check(!create.Enabled,"A student without Class 10 or 12 history cannot create a certificate.");
         Check(!page.IsHandleCreated,"Layout and keyboard checks never start the certificate page's SQL loaders.");
     }
 }
