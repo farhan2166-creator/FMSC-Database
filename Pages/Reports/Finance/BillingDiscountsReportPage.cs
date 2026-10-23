@@ -5,10 +5,26 @@ public sealed class BillingDiscountsReportPage : CanonicalFinanceReportPage
     public BillingDiscountsReportPage() : base(
         "Billing & Discounts", "Review billed fees, discounts and net amounts payable.",
         "GetBillingAndDiscountsReport", "FMSC_Billing_Discounts",
-        new[] { "Billing Summary", "Billing Detail", "Discount Detail", "Concession Assignments" },
+        new[] { "Billing Summary", "Billing Detail", "Discount Detail", "Concession Assignments", "Concession Summary" },
         new[] { "Day", "Week", "Month", "Class", "Campus", "Fee Type" },
         true, false, false, true)
     { }
+    protected override string AdditionalFilterDescription => ViewName == "Concession Summary"
+        ? "Assigned discounts per billing cycle; monthly and yearly rates stay separate. These are not discounts already posted to bills." : "";
+    protected override bool AppendReportTotals => ViewName != "Concession Summary" && base.AppendReportTotals;
+    protected override async Task<DataSet> ReadReportAsync(SqlParameter[] parameters, CancellationToken token)
+    {
+        if (!Equals(parameters.Single(p=>p.ParameterName=="@View").Value,"Concession Summary"))
+            return await base.ReadReportAsync(parameters,token);
+        var queryParameters=parameters.Concat(new[] { DatabaseHelper.Int("@UserId",CurrentUser.UserId) }).ToArray();
+        var rows=await Task.Run(()=>DatabaseHelper.QuerySql(ConcessionSummaryData.Query,queryParameters),token);
+        var result=new DataSet();result.Tables.Add(rows);return result;
+    }
+    protected override Func<DataTable, DataTable?, (DataTable Rows, DataTable? Totals)> CaptureResultTransform(SqlParameter[] parameters)
+    {
+        if (ViewName != "Concession Summary") return base.CaptureResultTransform(parameters);
+        return (rows,_) => { var summary=ConcessionSummaryData.Create(rows);return (summary.Rows,summary.Totals); };
+    }
     protected override bool IsSummaryView => ViewName == "Billing Summary";
     protected override void PrepareReportData(DataTable data, SqlParameter[] parameters)
     {

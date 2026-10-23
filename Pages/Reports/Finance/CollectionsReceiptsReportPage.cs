@@ -14,6 +14,22 @@ public sealed class CollectionsReceiptsReportPage : CanonicalFinanceReportPage
             if (ViewName == "Receipts") LockGridOrder();
         };
     }
+    private protected override ReportPaginator.Page CreateReportPage(DataTable source, int index, int pageSize) =>
+        CollectionReceiptGrouping.Page(source, index, pageSize);
+    protected override DataTable SelectExportRows(DataTable source, bool asCsv) =>
+        asCsv ? CollectionReceiptGrouping.DetailsOnly(source) : source;
+    protected override int ExportRecordCount(DataTable source) => CollectionReceiptGrouping.Layout(source)?.Count(r=>r.Kind=="Detail") ?? source.Rows.Count;
+    protected override string CsvExportLabel => "CSV data rows only (*.csv)";
+    protected override void WritePdfExport(string path, string title, string subtitle, DataTable table, Color accent)
+    {
+        if (CollectionReceiptGrouping.Layout(table) is null) { base.WritePdfExport(path, title, subtitle, table, accent); return; }
+        var report = GridReportPreview.Build("", title, subtitle, table, CurrentUser.Username);
+        using var local = new Microsoft.Reporting.WinForms.LocalReport();
+        local.LoadReportDefinition(new StringReader(report.Definition));
+        local.DataSources.Add(new Microsoft.Reporting.WinForms.ReportDataSource("ReportData", report.Data));
+        byte[] bytes = local.Render("PDF");
+        AtomicExportFile.Publish(path, temp => File.WriteAllBytes(temp, bytes), PdfTableExporter.ValidatePdf);
+    }
     protected override string GroupingCaption => "Group By";
     protected override void UpdateViewControls()
     {
