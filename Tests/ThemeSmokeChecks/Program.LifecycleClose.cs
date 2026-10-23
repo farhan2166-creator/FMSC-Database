@@ -6,6 +6,41 @@ using Microsoft.Data.SqlClient;
 
 internal static partial class Program
 {
+    private static void CheckDepartureLayout()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        using var dialog=new CloseAdmissionDialog(41,"Synthetic student",false,(_,_)=>throw new Exception("Layout must not query SQL"));
+        T Field<T>(string name)=>(T)typeof(CloseAdmissionDialog).GetField(name,flags)!.GetValue(dialog)!;
+        var root=Field<TableLayoutPanel>("root");
+        var policy=Field<ModernComboBox>("monthlyPolicy");
+        var month=Field<ModernDatePicker>("waiveFrom");
+        var payment=Field<ModernComboBox>("paidReduction");
+        using var host=new Form { AutoScaleMode=AutoScaleMode.None,ShowInTaskbar=false,
+            StartPosition=FormStartPosition.Manual,Location=new Point(-20000,-20000),ClientSize=new Size(820,740) };
+        host.Controls.Add(root);host.Show();Application.DoEvents();
+        Directory.CreateDirectory("artifacts/departure");
+        foreach(int width in new[]{680,820,1100})
+        foreach(int choice in new[]{0,1,2})
+        {
+            host.ClientSize=new Size(width,740);policy.SelectedIndex=choice;Application.DoEvents();
+            Check(month.Visible==(choice==2),"Waiver month appears only for the chosen-month policy");
+            Check(payment.Enabled==(choice!=1),"Retaining issued bills disables the unused payment-release choice");
+            foreach(var control in new Control[]{policy,payment,Field<ModernTextBox>("reason"),Field<ModernTextBox>("impact")})
+            {
+                var bounds=host.RectangleToClient(control.RectangleToScreen(control.ClientRectangle));
+                Check(host.ClientRectangle.Contains(bounds),$"Departure {control.GetType().Name} fits at {width}px, choice {choice}");
+            }
+            Check(Field<ModernTextBox>("impact").Height>=150,"Review retains readable space below the fee choices");
+            Check(!Field<ModernButton>("apply").Enabled,"Changing fee choices requires a fresh review");
+            if(width==820&&choice!=1)
+            {
+                using var bitmap=new Bitmap(root.Width,root.Height);root.DrawToBitmap(bitmap,root.ClientRectangle);
+                bitmap.Save(Path.GetFullPath($"artifacts/departure/{(choice==0?"school-cutoff":"selected-month")}.png"));
+            }
+        }
+        host.Close();
+    }
+
     private static void CheckLifecycleCloseGuard()
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;

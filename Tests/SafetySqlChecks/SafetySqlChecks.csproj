@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><NuGetAudit>false</NuGetAudit>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Apps/Worker/Worker.csproj" />
+    <Compile Include="../../Core/RestoreIdentity.cs" Link="RestoreIdentity.cs" />
+    <Using Include="System.Data" />
+  </ItemGroup>
+</Project>
