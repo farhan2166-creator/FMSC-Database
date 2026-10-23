@@ -24,6 +24,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
     private bool busy, loading;
     private bool legacySetupPending;
     private bool Confirmed => !legacySetupPending && SelectedRecord()?["PlacementConfirmedAt"] is DateTime;
+    private bool CanReviewPlacement => record.SelectedId == -1 || SelectedRecord() is not null && !Confirmed;
     private bool HasPlacementEdits => SelectedRecord() is DataRow current &&
         (year.SelectedId != Convert.ToInt32(current["AcademicYearId"]) || placement.SelectedId != Convert.ToInt32(current["ClassSectionId"]) ||
          status.Text != Convert.ToString(current["Status"]) || start.Value.Date != Convert.ToDateTime(current["EnrollmentDate"]).Date ||
@@ -99,7 +100,8 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
     }
     private void SetBusy(bool value)
     {
-        busy = value; fields.Enabled = legacy.Enabled = review.Enabled = close.Enabled = !value;
+        busy = value; fields.Enabled = close.Enabled = !value;
+        legacy.Enabled = review.Enabled = !value && CanReviewPlacement;
         dates.Enabled = !value && record.SelectedId > 0;
         confirm.Enabled = !value && record.SelectedId > 0 && !Confirmed && !HasPlacementEdits;
         apply.Enabled = !value && !Confirmed && plan is not null && Convert.ToInt32(plan["BlockedCount"]) == 0;
@@ -145,12 +147,13 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         if (current?["BillingStartDate"] is DateTime billed) billing.Value = billed;
         reason.Clear(); legacy.Checked = false; dates.Enabled = current is not null;
         loading = false; ResetReview();
-        foreach (Control field in fields.Controls) field.Visible = !Confirmed || field.Contains(record);
-        fields.SetColumnSpan(record.Parent!, Confirmed ? 2 : 1);
-        legacy.Visible = review.Visible = apply.Visible = !Confirmed;
+        foreach (Control field in fields.Controls) field.Visible = CanReviewPlacement || field.Contains(record);
+        fields.SetColumnSpan(record.Parent!, CanReviewPlacement ? 1 : 2);
+        legacy.Visible = review.Visible = apply.Visible = CanReviewPlacement;
         confirm.Visible = false;
         dates.Visible = Confirmed;
-        Text = Confirmed ? "Placement History / Dates" : "Review Student Placement";
+        Text = CanReviewPlacement ? "Review Student Placement" : "Placement History / Dates";
+        if (record.SelectedId == 0) impact.Text = "Select a placement record to view its available corrections. To record verified missing history, choose Add verified missing placement explicitly.";
         if (Confirmed) impact.Text = $"Confirmed placement\r\n{record.Text}\r\n\r\nUse Promotion to move to another academic year, Transfer to change campus/class/section, or Re-admission when returning after leaving.\r\n\r\nFor a genuine date error, use Correct Dates below.";
     }
     private Task<DataTable> RunAsync(string? snapshot = null) => PlacementCorrection.ReviewAsync(admission,
@@ -159,7 +162,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         Convert.ToString(status.SelectedItem) ?? "", reason.Text.Trim(), legacy.Checked, snapshot);
     private async Task ReviewAsync()
     {
-        if (busy) return;
+        if (busy || !CanReviewPlacement) return;
         if (record.SelectedId == 0) { impact.Text = "Choose an existing record or Add verified missing placement."; return; }
         ResetReview(); SetBusy(true);
         try
