@@ -15,6 +15,15 @@ BEGIN TRY
  SELECT @Locked=COUNT(*) FROM dbo.FeePayments WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@AdmissionId;
  SELECT @Locked=COUNT(*) FROM dbo.FeePaymentAllocations WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@AdmissionId;
  SELECT @Locked=COUNT(*) FROM dbo.LeaveCertificates WITH(UPDLOCK,HOLDLOCK) WHERE AdmissionId=@AdmissionId;
+ -- MISSING_PLACEMENT_POLICY
+ IF @EnrollmentId=0 AND @BillingStartDate IS NOT NULL
+  THROW 59623,'Missing historical placements do not have a billing start date.',1;
+ IF @EnrollmentId=0 AND NOT EXISTS
+  (SELECT 1 FROM @MissingWindows W JOIN @MissingPlacements P ON P.WindowId=W.WindowId
+   WHERE AcademicYearId=@YearId AND P.ClassSectionId=@PlacementId AND @StartDate>=GapStart AND @StartDate<=GapEnd
+   AND ((@Status=N'Left' AND @LeaveDate BETWEEN @StartDate AND GapEnd)
+    OR (@Status=N'Promoted' AND P.CanPromote=1 AND @LeaveDate=PromotionDate)))
+  THROW 59622,'The dates or class sequence do not fit an available historical gap. Reload Placement History. Use Re-admission, Transfer or Promotion for a new placement.',1;
  DECLARE @YearStart date,@YearEnd date;
  SELECT @YearStart=StartDate,@YearEnd=EndDate FROM dbo.AcademicYears WITH(HOLDLOCK) WHERE AcademicYearId=@YearId;
  IF @YearStart IS NULL THROW 59603,'Choose a valid academic year.',1;
@@ -35,7 +44,7 @@ BEGIN TRY
  IF @Status<>N'Active' AND @LeaveDate IS NULL THROW 59611,'Enter the leaving or promotion date for a closed enrollment.',1;
  IF @Status=N'Active' AND EXISTS(SELECT 1 FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId AND EnrollmentId<>@EnrollmentId AND Status=N'Active')
   THROW 59612,'An active enrollment already exists. Correct that record, or close it with its verified leaving date first.',1;
- IF @Status=N'Promoted' AND NOT EXISTS(SELECT 1 FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId AND EnrollmentId<>@EnrollmentId AND Status=N'Active')
+ IF @EnrollmentId>0 AND @Status=N'Promoted' AND NOT EXISTS(SELECT 1 FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId AND EnrollmentId<>@EnrollmentId AND Status=N'Active')
   THROW 59613,'Promoted requires an active destination enrollment. Use Promotion for an actual move to the next year.',1;
  IF EXISTS(SELECT 1 FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId AND EnrollmentId<>@EnrollmentId AND AcademicYearId=@YearId
   AND ClassSectionId=@PlacementId AND EnrollmentDate=@StartDate)
@@ -43,6 +52,7 @@ BEGIN TRY
  IF EXISTS(SELECT 1 FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId AND EnrollmentId<>@EnrollmentId
   AND EnrollmentDate<COALESCE(@LeaveDate,CONVERT(date,'99991231')) AND @StartDate<COALESCE(LeavingDate,CONVERT(date,'99991231')))
   AND @Legacy=0 THROW 59615,'These dates overlap another enrollment. Correct the dates, or acknowledge verified legacy history.',1;
+ DECLARE @CreatingHistory bit=CASE WHEN @EnrollmentId=0 THEN 1 ELSE 0 END;
  DECLARE @OldYear int,@OldPlacement int,@OldStatus nvarchar(30),@OldStart date,@OldLeave date,@OldBilling date,@Ready bit;
  IF @EnrollmentId>0
  BEGIN
@@ -66,7 +76,9 @@ BEGIN TRY
   (SELECT * FROM dbo.LeaveCertificates WHERE AdmissionId=@AdmissionId ORDER BY LeaveRecordId FOR JSON PATH,INCLUDE_NULL_VALUES),
   (SELECT * FROM dbo.Students WHERE AdmissionId=@AdmissionId FOR JSON PATH,INCLUDE_NULL_VALUES),
   (SELECT * FROM dbo.AcademicYears WHERE AcademicYearId=@YearId FOR JSON PATH,INCLUDE_NULL_VALUES),
-  (SELECT * FROM dbo.CampusClassSections WHERE ClassSectionId=@PlacementId FOR JSON PATH,INCLUDE_NULL_VALUES));
+  (SELECT * FROM dbo.CampusClassSections WHERE ClassSectionId=@PlacementId FOR JSON PATH,INCLUDE_NULL_VALUES),
+  (SELECT * FROM dbo.Classes ORDER BY ClassId FOR JSON PATH,INCLUDE_NULL_VALUES),
+  (SELECT * FROM dbo.AcademicPrograms ORDER BY AcademicProgramId FOR JSON PATH,INCLUDE_NULL_VALUES));
  SET @Snapshot=CONVERT(varchar(64),HASHBYTES('SHA2_256',@Current),2);
  DECLARE @BillingFrom date=COALESCE(@BillingStartDate,@StartDate);
  DECLARE @FromMonth date=DATEFROMPARTS(YEAR(@BillingFrom),MONTH(@BillingFrom),1),@ThroughMonth date;
@@ -104,8 +116,6 @@ BEGIN TRY
   FETCH NEXT FROM charges INTO @Charge;
  END;
  CLOSE charges; DEALLOCATE charges;
- DECLARE @Operation uniqueidentifier=NEWID(),@Record nvarchar(200),@Old nvarchar(max),@New nvarchar(max);
- INSERT dbo.AuditOperations(OperationId,UserId,OperationType,CorrelationNote) VALUES(@Operation,@UserId,N'ADMISSION_CORRECTION',@Reason);
  IF @EnrollmentId=0
  BEGIN
   INSERT dbo.Enrollments(AdmissionId,AcademicYearId,ClassSectionId,EnrollmentDate,LeavingDate,BillingStartDate,Status,BillingReady,UsesTransport,Remarks)
@@ -114,26 +124,17 @@ BEGIN TRY
  END
  ELSE
  BEGIN
-  SET @Old=(SELECT * FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId FOR JSON PATH,WITHOUT_ARRAY_WRAPPER,INCLUDE_NULL_VALUES);
   UPDATE dbo.Enrollments SET AcademicYearId=@YearId,ClassSectionId=@PlacementId,EnrollmentDate=@StartDate,
    LeavingDate=@LeaveDate,BillingStartDate=@BillingStartDate,Status=@Status,UpdatedAt=SYSDATETIME(),Remarks=@Reason
   WHERE EnrollmentId=@EnrollmentId;
  END;
- SET @Record=CONVERT(nvarchar(200),@EnrollmentId);
- SET @New=(SELECT *,@Reason CorrectionReason FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId FOR JSON PATH,WITHOUT_ARRAY_WRAPPER,INCLUDE_NULL_VALUES);
- DECLARE @AuditAction nvarchar(30)=CASE WHEN @Old IS NULL THEN N'INSERT' ELSE N'UPDATE' END;
- EXEC dbo.WriteAuditLog @Operation,@UserId,N'Enrollments',@Record,@AuditAction,@Old,@New;
  INSERT dbo.EnrollmentHistory(EnrollmentId,AdmissionId,ActionType,ActionDate,OldClassSectionId,NewClassSectionId,OldStatus,NewStatus,Remarks,UserId)
  VALUES(@EnrollmentId,@AdmissionId,N'CORRECTION',@StartDate,@OldPlacement,@PlacementId,@OldStatus,@Status,@Reason,@UserId);
  -- Synchronize student status only when this is their latest enrollment.
- IF NOT EXISTS(SELECT 1 FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId AND EnrollmentId<>@EnrollmentId AND EnrollmentDate>@StartDate)
+ IF @CreatingHistory=0 AND NOT EXISTS(SELECT 1 FROM dbo.Enrollments WHERE AdmissionId=@AdmissionId AND EnrollmentId<>@EnrollmentId AND EnrollmentDate>@StartDate)
   AND @Status IN(N'Active',N'Left')
  BEGIN
-  SET @Old=(SELECT Status,WithdrawalDate FROM dbo.Students WHERE AdmissionId=@AdmissionId FOR JSON PATH,WITHOUT_ARRAY_WRAPPER,INCLUDE_NULL_VALUES);
   UPDATE dbo.Students SET Status=@Status,WithdrawalDate=CASE WHEN @Status=N'Left' THEN @LeaveDate ELSE NULL END WHERE AdmissionId=@AdmissionId;
-  SET @New=(SELECT Status,WithdrawalDate FROM dbo.Students WHERE AdmissionId=@AdmissionId FOR JSON PATH,WITHOUT_ARRAY_WRAPPER,INCLUDE_NULL_VALUES);
-  SET @Record=CONVERT(nvarchar(200),@AdmissionId);
-  EXEC dbo.WriteAuditLog @Operation,@UserId,N'Students',@Record,N'UPDATE',@Old,@New;
  END;
  COMMIT;
  SELECT @EnrollmentId EnrollmentId,@Cancelled CancelledCharges;

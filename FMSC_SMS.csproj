@@ -77,6 +77,7 @@
 		<EmbeddedResource Include="Core\DatabaseMigrationRequirements.json" />
 		<EmbeddedResource Include="Core\PermissionCatalog.json" LogicalName="FMSC_SMS.Core.PermissionCatalog.json" />
 		<EmbeddedResource Include="Pages\Students\Admissions\PlacementCorrection.sql" />
+		<EmbeddedResource Include="Pages\Students\Admissions\MissingPlacementWindows.sql" />
 	</ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
