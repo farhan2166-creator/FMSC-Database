@@ -6,7 +6,8 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
     private readonly StaffPicker staff = new();
     private string? _baseline;
     private string Snapshot() => string.Join("\u001f", roleTitle.Text, subjectTaught.Text, certificateDate.Value.Date.ToString("yyyy-MM-dd"));
-    public bool HasUnsavedChanges => _baseline is not null && _baseline != Snapshot();
+    // Short certificate details can be retyped without a discard warning.
+    public bool HasUnsavedChanges => false;
     public string UnsavedChangesMessage => "This staff certificate has unsaved changes. Leaving will discard them.";
     private bool ConfirmDiscard() => ModernMessageDialog.ConfirmDiscardIfDirty(FindForm(), () => HasUnsavedChanges, UnsavedChangesMessage);
     private void CaptureBaseline() => _baseline = Snapshot();

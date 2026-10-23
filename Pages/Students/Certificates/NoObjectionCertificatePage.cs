@@ -4,7 +4,8 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
-    public bool HasUnsavedChanges => HasCertificateEdits;
+    // Short certificate details can be retyped without a discard warning.
+    public bool HasUnsavedChanges => false;
     public string UnsavedChangesMessage => "Discard the unsaved certificate changes?";
     public bool IsBusy => creatingCertificate;
     public string BusyMessage => "Please wait for the certificate to finish saving.";
@@ -71,8 +72,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         TrackStudentSearchStatus(student);
         /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
         if (initialize) StudentSearchCache.Warm();
-        student.SelectionChangeGuard = _ => !creatingCertificate &&
-            (!HasCertificateEdits || Confirm("Discard the unsaved certificate changes and choose another student?", UiText.Dialogs.UnsavedChanges));
+        student.SelectionChangeGuard = _ => !creatingCertificate;
         student.UserSelectionChanged +=
             (_, _) => {
                 if (suppressStudentChanged)
@@ -281,7 +281,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 return;
             }
             if (!ConfirmCertificateSelection(FindForm(), Grid, "NoObjectionCertificateId",
-                selectedNoObjectionCertificateId, noObjectionCertificateId, HasCertificateEdits)) return;
+                selectedNoObjectionCertificateId, noObjectionCertificateId, false)) return;
             selectedNoObjectionCertificateId =
                 noObjectionCertificateId;
             DateTime? certDate =
@@ -533,7 +533,6 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     private void RefreshCertificates()
     {
         if (creatingCertificate) return;
-        if (HasCertificateEdits && !Confirm("Discard the unsaved changes and refresh certificates?", "Refresh Certificates")) return;
         if (student.SelectedId <= 0) return;
         int selectedId = selectedNoObjectionCertificateId;
         LoadCertificates(student.SelectedId);
@@ -570,7 +569,6 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     private void ClearForm()
     {
         if (creatingCertificate) return;
-        if (HasCertificateEdits && !Confirm("Discard the unsaved changes and choose another student?", "Next Student")) return;
         suppressStudentChanged = true;
         try
         {

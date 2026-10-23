@@ -796,43 +796,7 @@ public sealed class DateOfBirthCertificatePage : V2Page
             ok;
         form.CancelButton =
             cancel;
-        /* The collector's name is the only value this prompt takes from the operator, and the field starts empty, so a close could throw typed input away. */
-        string initialText =
-            text.Text;
-        /* Set the moment Collect is clicked, so that path closes without the unsaved-changes prompt. */
-        bool savedSuccessfully =
-            false;
-        /* One confirmation per close gesture. */
-        bool discardConfirmed =
-            false;
-        bool IsDirty() =>
-            !savedSuccessfully &&
-            form.DialogResult != DialogResult.OK &&
-            text.Text != initialText;
-        bool ConfirmDiscard()
-        {
-            return ModernMessageDialog.ConfirmDiscardOnce(form, IsDirty, ref discardConfirmed);
-        }
-        ok.Click +=
-            (_, _) =>
-                savedSuccessfully = true;
-        /* The guard runs here rather than from the button's own DialogResult, because a button that assigns DialogResult dismisses the modal form before the confirmation can keep it open. */
-        cancel.Click +=
-            (_, _) => {
-                if (!ConfirmDiscard())
-                    return;
-                form.DialogResult =
-                    DialogResult.Cancel;
-            };
-        /* The window's own close (X, Alt+F4, Esc) is guarded the same way; programmatic closes are left alone. */
-        form.FormClosing +=
-            (_, e) => {
-                if (e.CloseReason == CloseReason.UserClosing)
-                {
-                    e.Cancel =
-                        !ConfirmDiscard();
-                }
-            };
+        cancel.Click += (_, _) => form.DialogResult = DialogResult.Cancel;
         form.Shown +=
             (_, _) =>
                 text.Focus();

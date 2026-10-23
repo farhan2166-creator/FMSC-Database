@@ -13,7 +13,8 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     private readonly ModernButton checkOutcome=new(){Text="Check Save Outcome",Width=AppScale.Scale(170)};
     private string? _baseline;
     private string Snapshot() => string.Join("\u001f", bankName.Text, branchName.Text, designation.Text, monthlyIncome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture), purpose.Text, certificateDate.Value.Date.ToString("yyyy-MM-dd"));
-    public bool HasUnsavedChanges => recoveryBlocked || _baseline is not null && _baseline != Snapshot();
+    // Short certificate details can be retyped; unresolved saves still require recovery checks.
+    public bool HasUnsavedChanges => recoveryBlocked;
     public string UnsavedChangesMessage => recoveryBlocked?"This certificate creation needs outcome checking. Its recovery record is retained when you leave. Do not create it again before checking.":"This staff certificate has unsaved changes. Leaving will discard them.";
     private bool ConfirmDiscard()=>!HasUnsavedChanges||
         (discardConfirmation?.Invoke(UnsavedChangesMessage)??ModernMessageDialog.ConfirmDiscardIfDirty(FindForm(),()=>HasUnsavedChanges,UnsavedChangesMessage));

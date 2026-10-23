@@ -7,9 +7,8 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     private int newDraftStudent;
     private readonly Func<string,bool>? discardConfirmation;
     private readonly Func<int,DataTable> readCertificates;
-    public bool HasUnsavedChanges => HasCertificateEdits ||
-        student.SelectedId>0 && student.SelectedId==newDraftStudent && selectedRegularStudentCertificateId==0 &&
-        newCertificateDateBaseline.HasValue && certificateDate.Value.Date!=newCertificateDateBaseline.Value;
+    // Short certificate details can be retyped without a discard warning.
+    public bool HasUnsavedChanges => false;
     private bool ConfirmDraftDiscard(string message)=>!HasUnsavedChanges||
         (discardConfirmation?.Invoke(message)??Confirm(message,UiText.Dialogs.UnsavedChanges));
     private void CaptureNewCertificateBaseline()

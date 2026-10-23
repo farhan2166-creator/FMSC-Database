@@ -4,7 +4,8 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
-    public bool HasUnsavedChanges => HasCertificateEdits;
+    // Short certificate details can be retyped without a discard warning.
+    public bool HasUnsavedChanges => false;
     public string UnsavedChangesMessage => "Discard the unsaved certificate changes?";
     public bool IsBusy => creatingCertificate;
     public string BusyMessage => "Please wait for the certificate to finish saving.";
@@ -82,8 +83,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         TrackStudentSearchStatus(student);
         /* Filter as the operator types; load only after a committed student selection. */
         if (initialize) StudentSearchCache.Warm();
-        student.SelectionChangeGuard = _ => !creatingCertificate &&
-            (!HasCertificateEdits || Confirm("Discard the unsaved certificate changes and choose another student?", UiText.Dialogs.UnsavedChanges));
+        student.SelectionChangeGuard = _ => !creatingCertificate;
         student.UserSelectionChanged +=
             (_, _) => {
                 if (suppressStudentChanged)
@@ -301,7 +301,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
                 return;
             }
             if (!ConfirmCertificateSelection(FindForm(), Grid, "SportsCertificateId",
-                selectedSportsCertificateId, sportsCertificateId, HasCertificateEdits)) return;
+                selectedSportsCertificateId, sportsCertificateId, false)) return;
             selectedSportsCertificateId =
                 sportsCertificateId;
             sportName.Text =
@@ -635,7 +635,6 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     private void RefreshCertificates()
     {
         if (creatingCertificate) return;
-        if (HasCertificateEdits && !Confirm("Discard the unsaved changes and refresh certificates?", "Refresh Certificates")) return;
         if (student.SelectedId <= 0) return;
         int selectedId = selectedSportsCertificateId;
         LoadCertificates(student.SelectedId);
@@ -674,7 +673,6 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     private void ClearForm()
     {
         if (creatingCertificate) return;
-        if (HasCertificateEdits && !Confirm("Discard the unsaved changes and choose another student?", "Next Student")) return;
         suppressStudentChanged = true;
         try
         {
