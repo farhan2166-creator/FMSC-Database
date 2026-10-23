@@ -4,6 +4,15 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ## [Unreleased]
 
+### Report improvements
+
+- Add Account Credit filtering and data-only CSV exports for Collections & Receipts; count receipt entries separately from headings/totals and repeat printed group context with numeric subtotals.
+- Add overdue/balance/day-range filters and permission-checked Open Statement to Outstanding & Aging; keep filtered output distinct from the full-location A4 report.
+- Add a read-only Student Credit Balance Register with student/family views and current/latest placement filters; preserve signed ledger sums and avoid duplicate balances.
+- Add a Concession Summary separating assigned discount rates by billing frequency, with no mixed-cycle money grand total.
+- Capture finance report generation/aging dates separately from print time. Preserve financial writers, saved documents, database versions and migrations.
+
+
 - Lock the academic year in Admission's placement/setup actions. New placements use the configured current year; existing placement history retains its recorded year.
 
 - Complete the optional quick counter journey with the existing Fee Collection screen opened over the retained family. Carry only selected children into payment, retain editable suggested allocations, print established receipts and refresh remaining dues without retaining submitted amounts.

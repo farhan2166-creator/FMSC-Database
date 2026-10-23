@@ -154,3 +154,26 @@ Use **Edit Job** on the Job Details card to open the active job, **Edit** on a h
 ## Collection receipt amounts
 
 Saved collection receipts show each included fee's saved amount due before that payment, followed by **Total**, **Received** and **Balance**. Received is new money; credit applied, discounts and retained credit remain separate when applicable. Balance is the saved outstanding balance for the student or family, which can include dues outside the listed charges. Later adjustments remain identified; historical receipt/payment records are preserved.
+
+## Report review and advance credit
+
+Collections & Receipts now offers **Account Credit** as a payment-method filter.
+Choose CSV in Export for data rows only; formatted PDF/Print retain subtotals.
+Receipt page counts exclude headings and totals.
+
+Outstanding & Aging offers **Overdue Only**, **Minimum Outstanding** and optional
+**Days Overdue From/To** for student, charge and family views. Blank limits mean
+any value. Click **Run Report** after edits, then **Print** for those filtered
+rows. **Class / Section A4** prints the full location scope and is disabled while
+these extra filters apply. **Open Statement** opens a selected student's account
+when your permissions allow it.
+
+In Billing & Discounts, **Concession Summary** shows assigned discount rates per
+billing cycle. Monthly and yearly rows remain separate; these are not amounts
+already deducted on posted bills.
+
+**Student Credit Balance Register**, under Reports > Finance, lists current
+positive advance credit by student or family, with latest credit activity. It
+requires report-view and fee-view access. Location filters use current/latest
+placement; the minimum credit filter applies to each student before family totals.
+Credit held is separate from fees owed to the school and money received today.

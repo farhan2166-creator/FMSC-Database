@@ -18,8 +18,30 @@ internal static class GridReportPreview
         var bands=GridReportColumns.Bands(columns,width);
         var data=new DataTable("ReportData");
         for(int i=0;i<columns.Count;i++)data.Columns.Add("C"+i);
-        foreach(DataRow row in source.Rows)data.Rows.Add(columns.Select(column=>string.Join("\n",column.Fields
-            .Select(index=>GridReportColumns.Value(row,index,moneyFormat)).Where(value=>value.Length>0))).ToArray());
+        var receiptLayout = CollectionReceiptGrouping.Layout(source);
+        if (receiptLayout is not null)
+        {
+            data.Columns.Add("GroupKey"); data.Columns.Add("GroupLabel");
+            for (int i = 0; i < columns.Count; i++) if (columns[i].Numeric) data.Columns.Add("N" + i, typeof(decimal));
+        }
+        for (int rowIndex = 0; rowIndex < source.Rows.Count; rowIndex++)
+        {
+            if (receiptLayout is not null && receiptLayout[rowIndex].Kind != "Detail") continue;
+            DataRow row = source.Rows[rowIndex], printed = data.NewRow();
+            for (int i = 0; i < columns.Count; i++)
+            {
+                var column = columns[i];
+                printed["C" + i] = string.Join("\n", column.Fields.Select(index => GridReportColumns.Value(row, index, moneyFormat)).Where(value => value.Length > 0));
+                if (receiptLayout is not null && column.Numeric)
+                    printed["N" + i] = row.IsNull(column.Fields[0]) ? 0m : Convert.ToDecimal(row[column.Fields[0]]);
+            }
+            if (receiptLayout is not null)
+            {
+                printed["GroupKey"] = receiptLayout[rowIndex].GroupKey;
+                printed["GroupLabel"] = receiptLayout[rowIndex].Label;
+            }
+            data.Rows.Add(printed);
+        }
 
         XElement Text(string name,string value,bool bold=false,string align="Left",string size="9pt",string color="#182C40")=>
             E("Textbox",new XAttribute("Name",name),E("CanGrow",true),E("CanShrink",true),
@@ -53,6 +75,7 @@ internal static class GridReportPreview
                 E("TablixRowHierarchy",E("TablixMembers",E("TablixMember",E("KeepWithGroup","After"),E("RepeatOnNewPage",true)),
                     E("TablixMember",E("Group",new XAttribute("Name","DetailRows"+bandIndex)),E("KeepTogether",true)))),
                 E("DataSetName","ReportData"),E("Top",bands.Count>1?"0.25in":"0in"),E("Left","0in"),E("Height","0.68in"),E("Width",Inch(width)),E("Style"));
+            if (receiptLayout is not null) CollectionReceiptRdlc.Apply(table, indices, columns.Select(column => column.Numeric).ToArray(), bandIndex);
             if(bands.Count==1)items.Add(table);
             else
             {
@@ -63,7 +86,7 @@ internal static class GridReportPreview
                 items.Add(rectangle);
             }
         }
-        var summaryKeys=new HashSet<string>(StringComparer.OrdinalIgnoreCase){"Receipts","Money Received","Gross Received","Refunds","Corrections","Credit Applied","Adjusted Collection","Net Collection","Students Owing","Total Outstanding","Overdue","90+ Days","Gross Billed","Discounts","Net Billed","Charges","Students"};
+        var summaryKeys=new HashSet<string>(StringComparer.OrdinalIgnoreCase){"Receipts","Money Received","Gross Received","Refunds","Corrections","Credit Applied","Adjusted Collection","Net Collection","Students Owing","Total Outstanding","Overdue","90+ Days","Gross Billed","Discounts","Net Billed","Charges","Students","Rows shown","Outstanding shown","Students holding credit","Credit held","Assignments"};
         var metrics=new List<(string Label,string Value)>();var filters=new List<string>();
         foreach(string part in System.Text.RegularExpressions.Regex.Split(subtitle.Trim(),@"\s{3,}"))
         {
@@ -102,7 +125,7 @@ internal static class GridReportPreview
         }
         string safeBy=printedBy.Replace("\"","\"\"").Replace("\r"," ").Replace("\n"," ");
         var footerItems=new[]{
-            Position(Text("Stamp","=\"Prepared \" & Format(Now(), \"dd-MMM-yyyy HH:mm\") & \"  |  Printed by: "+safeBy+"\"",false,"Left","7.5pt","#536578"),0,0,width*.75,.27),
+            Position(Text("Stamp","=\"Printed \" & Format(Now(), \"dd-MMM-yyyy HH:mm\") & \"  |  Printed by: "+safeBy+"\"",false,"Left","7.5pt","#536578"),0,0,width*.75,.27),
             Position(Text("PageNumber","=\"Page \" & Globals!PageNumber & \" of \" & Globals!TotalPages",false,"Right","7.5pt","#536578"),width*.75,0,width*.25,.27)};
         var document=new XDocument(E("Report",
             E("DataSources",E("DataSource",new XAttribute("Name","Source"),E("ConnectionProperties",E("DataProvider","System.Data.DataSet"),E("ConnectString","")))),
