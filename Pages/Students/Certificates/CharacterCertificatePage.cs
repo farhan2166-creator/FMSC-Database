@@ -11,7 +11,8 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     public bool HasUnsavedChanges => false;
     public string UnsavedChangesMessage=>"The new certificate has unsaved details. Discard this draft?";
     private bool ConfirmDraftDiscard()=>!HasUnsavedChanges||Confirm(UnsavedChangesMessage,UiText.Dialogs.UnsavedChanges);
-    private readonly CheckBox passedExam = new() { Text = "Student has passed the selected board examination", AutoSize = true };
+    private readonly CheckBox passedExam = new() { Text = "Passed", AutoSize = true, Font = AppTheme.NormalFont,
+        AccessibleName = "Student has passed the selected board examination" };
 
     private readonly ModernComboBox examType =
         HumanUi.Combo();
@@ -121,6 +122,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
                 RowCount = 3,
+                TabIndex = 0,
                 Margin = new Padding(0),
                 Padding = new Padding(0)
             };
@@ -137,18 +139,40 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             CertificateUi.Field("Student", student, true), 0, 0);
         fields.Controls.Add(
             CertificateUi.Field(UiText.Certificates.Date, certificateDate, true), 1, 0);
+        HumanUi.ApplyFieldInputLayout(examType);
+        examType.Dock = DockStyle.Fill;
+        examType.TabIndex = 0;
+        passedExam.TabIndex = 1;
+        passedExam.Anchor = AnchorStyles.Left;
+        passedExam.Margin = new Padding(AppScale.Scale(12), 0, 0, 0);
+        var examInputs = new TableLayoutPanel {
+            ColumnCount = 2, RowCount = 1, Margin = Padding.Empty, Padding = Padding.Empty,
+            MaximumSize = new Size(examType.MaximumSize.Width + passedExam.PreferredSize.Width + passedExam.Margin.Horizontal, 0),
+            Height = AppMetrics.InputControlHeight, TabIndex = 0
+        };
+        examInputs.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        examInputs.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        examInputs.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        examInputs.Controls.Add(examType, 0, 0);
+        examInputs.Controls.Add(passedExam, 1, 0);
         fields.Controls.Add(
-            CertificateUi.Field("Board Examination", examType, true), 0, 1);
+            CertificateUi.Field("Board Examination", examInputs, true, false), 0, 1);
         fields.Controls.Add(
             CertificateUi.Field("BISE Roll No.", rollNumber, true), 1, 1);
-        fields.Controls.Add(
-            CertificateUi.Field("Remarks", remarks, true), 0, 2);
-        fields.Controls.Add(passedExam, 1, 2);
+        var remarksField = CertificateUi.Field("Remarks", remarks, true);
+        fields.Controls.Add(remarksField, 0, 2);
+        fields.SetColumnSpan(remarksField, 2);
+        // Row-major keyboard flow, with the pass confirmation immediately after its exam.
+        foreach (Control field in fields.Controls)
+            field.TabIndex = fields.GetRow(field) * fields.ColumnCount + fields.GetColumn(field);
         details.Content.Controls.Add(fields);
         var certButtonRow =
             CertificateButtonRow.Create(createCertificateButton, clearButton);
         certButtonRow.Dock =
             DockStyle.Bottom;
+        certButtonRow.TabIndex = 1;
+        createCertificateButton.TabIndex = 0;
+        clearButton.TabIndex = 1;
         details.Content.Controls.Add(certButtonRow);
         var records =
             HumanUi.Card(
@@ -158,6 +182,12 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             CertificateButtonRow.Create(issueAgainButton, collectButton, printButton, refreshButton);
         certificateActions.Dock =
             DockStyle.Bottom;
+        Grid.TabIndex = 0;
+        certificateActions.TabIndex = 1;
+        issueAgainButton.TabIndex = 0;
+        collectButton.TabIndex = 1;
+        printButton.TabIndex = 2;
+        refreshButton.TabIndex = 3;
         records.Content.Controls.Add(certificateActions);
         records.Content.Controls.Add(Grid);
         Grid.BringToFront();
@@ -176,6 +206,8 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(details, 0, 0);
         root.Controls.Add(records, 0, 1);
+        details.TabIndex = 0;
+        records.TabIndex = 1;
         SetContent(
             root,
             UiText.Certificates.IssueGuidance + " Current academic year only.");

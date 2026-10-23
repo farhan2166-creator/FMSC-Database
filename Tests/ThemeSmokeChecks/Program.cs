@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--character-certificate-layout"))
+        {
+            CheckCharacterCertificateLayout();
+            Console.WriteLine($"PASS: {checks} character certificate alignment and keyboard checks (no database connection); previews in artifacts/character-certificate.");
+            return;
+        }
         if (args.Contains("--fee-tasks"))
         {
             CheckOperatorConcessionChoices();
