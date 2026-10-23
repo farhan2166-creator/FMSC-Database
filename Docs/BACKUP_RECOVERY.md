@@ -1,6 +1,6 @@
 # Database Backup and Recovery Runbook
 
-**Applies to:** FMSC_SMS schema-21 SQL Server LocalDB database `FMSC_DB`. This guide prioritizes **keeping existing school records intact**. It is not an authorization to operate on real data without an approved maintenance window and verified backup.
+**Applies to:** FMSC_SMS schema-41 SQL Server LocalDB database `FMSC_DB`. This guide prioritizes **keeping existing school records intact**. It is not an authorization to operate on real data without an approved maintenance window and verified backup.
 
 ## Back up from the application
 
@@ -27,7 +27,7 @@ The installer creates a checksum-verified recovery backup before applying any pe
 1. Open **System Maintenance → Backup / Restore** using an account with `Backup.Restore`.
 2. Choose **Choose Backup File…**. The UI checks whether the selected `.bak` has a readable, FMSC-compatible header and warns when it is old; wrong-database and unverified files are refused.
 3. Read the displayed age/warning and confirm that losing records newer than this backup is acceptable.
-4. Select **Restore Data** and follow confirmations. The implementation validates the backup, **requires a successful verified pre-restore safety backup**, switches to single-user mode, performs SQL restore with checksum, returns to multi-user mode, and validates the restored database structure.
+4. Select **Restore Data** and follow confirmations. The implementation locks the selected backup against replacement, restores a temporary copy to separate files, and checks its recovery identity and application compatibility before touching live records. A different or missing identity is refused. It then **requires a successful verified pre-restore safety backup**, switches to single-user mode, performs SQL restore with checksum, returns to multi-user mode, and validates the restored identity and structure. Temporary validation needs enough free space for the database files and is cleaned up before live restore.
 5. Wait for explicit success. Reopen/reconnect and verify representative student, billing, fees, permissions and reporting data. Record the backup path, selected restore point, operator, and outcome.
 
 The safety copy is named like `FMSC_DB_PreRestore_YYYY-MM-DD_HHmmss.bak`. If restore fails after it began, the application attempts to recover from this backup; **automatic recovery itself can fail**. Retain all paths in the message/log and escalate rather than trying repeated manual replacements.

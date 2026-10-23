@@ -3,8 +3,6 @@
 <ItemGroup><PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1"/><PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0"/>
 <Compile Include="../../Services/Communication/*.cs" Link="Communication/%(Filename)%(Extension)" />
 <Compile Include="../../Core/AtomicTextFile.cs" Link="AtomicTextFile.cs"/>
-<Compile Include="../../Core/DatabaseCompatibility.cs" Link="DatabaseCompatibility.cs"/><Compile Include="../../Core/DatabaseCompatibilityFailure.cs" Link="DatabaseCompatibilityFailure.cs"/>
-<EmbeddedResource Include="../../Core/DatabaseCompatibilityRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseCompatibilityRequirements.json"/><EmbeddedResource Include="../../Core/DatabaseMigrationRequirements.json" LogicalName="FMSC_SMS.Core.DatabaseMigrationRequirements.json"/>
 <EmbeddedResource Include="../../Services/Communication/Schema.sql" LogicalName="FMSC_SMS.Communication.Schema.sql" /></ItemGroup>
 <ItemGroup><Using Include="System.Data"/></ItemGroup>
 </Project>

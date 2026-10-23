@@ -1,4 +1,3 @@
-using FMSC_SMS.Core;
 using FMSC_SMS.Services.Communication;
 using Microsoft.Data.SqlClient;
 
@@ -9,7 +8,6 @@ try
     var connection=new SqlConnectionStringBuilder(Environment.GetEnvironmentVariable("FMSC_COMMUNICATION_CONNECTION")??throw new InvalidOperationException());
     if(connection.AttachDBFilename.Length>0 || string.IsNullOrWhiteSpace(connection.InitialCatalog))throw new InvalidOperationException();
     int actor=int.Parse(Environment.GetEnvironmentVariable("FMSC_COMMUNICATION_ACTOR")??throw new InvalidOperationException());
-    using(var c=new SqlConnection(connection.ConnectionString)){c.Open();DatabaseCompatibility.Validate(c);}
     var store=new SqlCommunicationStore(()=>new SqlConnection(connection.ConnectionString),actor);
     if(!await store.IsInstalledAsync())throw new InvalidOperationException();
     var gateways=new WindowsGatewayStore();using var http=new HttpClient(new HttpClientHandler{AllowAutoRedirect=false}){Timeout=TimeSpan.FromSeconds(30)};
