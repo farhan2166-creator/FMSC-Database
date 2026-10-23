@@ -10,5 +10,7 @@
     <Compile Include="../../Core/OutstandingReportFilter.cs" Link="OutstandingReportFilter.cs" />
     <Compile Include="../../Pages/Reports/Finance/CreditBalanceReportData.cs" Link="CreditBalanceReportData.cs" />
     <Compile Include="../../Pages/Reports/Finance/ConcessionSummaryData.cs" Link="ConcessionSummaryData.cs" />
+    <Compile Include="../../Pages/Reports/Finance/MonthlyFeeReconciliationData.cs" Link="MonthlyFeeReconciliationData.cs" />
+    <Compile Include="../../Pages/Reports/Certificates/CertificateIssueRegisterData.cs" Link="CertificateIssueRegisterData.cs" />
   </ItemGroup>
 </Project>

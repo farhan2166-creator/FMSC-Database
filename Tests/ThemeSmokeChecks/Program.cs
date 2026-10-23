@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--new-reports"))
+        {
+            CheckNewReportForms();
+            Console.WriteLine($"PASS: {checks} focused new report choices, permissions, CSV and RDLC/PDF checks (no database connection).");
+            return;
+        }
         if(args.Contains("--release-reports"))
         {
             CheckReleaseReports();
