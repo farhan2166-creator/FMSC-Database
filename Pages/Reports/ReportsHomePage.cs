@@ -1,5 +1,6 @@
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Reports.Finance;
+using FMSC_SMS.Pages.Reports.Certificates;
 using FMSC_SMS.Pages.Reports.Students;
 namespace FMSC_SMS.Pages.Reports;
 public sealed class ReportsHomePage : V2Page
@@ -26,7 +27,7 @@ public sealed class ReportsHomePage : V2Page
         return (factory, module, title) => navigate(factory(), module, title);
     }
     public ReportsHomePage(Action<Func<Control>, string, string> navigate)
-        : base("Reports", "Choose a student or finance report.")
+        : base("Reports", "Choose a student, finance or certificate report.")
     {
         _navigate =
             navigate ??
@@ -100,6 +101,11 @@ public sealed class ReportsHomePage : V2Page
                         "Charges created and discounts actually applied, kept separate from cash received.",
                         "Finance",
                         () => new BillingDiscountsReportPage()),
+                    new(
+                        "Monthly Fee Reconciliation",
+                        "Billing months reconciled with current money allocations, credit applied and outstanding fees.",
+                        "Finance",
+                        () => new MonthlyFeeReconciliationPage()),
                     ..(CurrentUser.HasPermission("Fees.View") ? new ReportDefinition[] {
                         new("Student Credit Balance Register", "Current advance balances by student or family, with latest credit activity.",
                             "Finance", () => new CreditBalanceReportPage())
@@ -111,6 +117,16 @@ public sealed class ReportsHomePage : V2Page
                         () => new StudentAccountStatementPage())
                 ]);
             hasReports = true;
+        }
+        if (CurrentUser.HasPermission("Reports.View") &&
+            (CurrentUser.HasPermission("Certificates.Create") || CurrentUser.HasPermission("Students.Leave")))
+        {
+            AddCategory(root,"Certificates","Recorded certificate issues and saved records.",AppTheme.ModuleAccent("Students"),
+                new ReportDefinition[] {
+                    new("Certificate Issue Register","Student and staff certificates, recorded issues and collection status. Sources follow your certificate permissions.",
+                        "Reports",() => new CertificateIssueRegisterPage())
+                });
+            hasReports=true;
         }
         if (!hasReports)
         {

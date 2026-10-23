@@ -177,3 +177,29 @@ positive advance credit by student or family, with latest credit activity. It
 requires report-view and fee-view access. Location filters use current/latest
 placement; the minimum credit filter applies to each student before family totals.
 Credit held is separate from fees owed to the school and money received today.
+
+**Monthly Fee Reconciliation**, under Reports > Finance, groups posted fees by
+billing month, optionally by campus, class, section or fee type. From/To select
+whole months. A missing billing month uses the charge month. Academic year and
+location follow each charge's enrollment. Money Allocated includes signed refunds
+and payment corrections; Credit Applied is separate. Settlements are current,
+including later payments on older fees. This is not cash received during the
+selected months or a historical closing balance. Cancelled charges and reversed
+payments are excluded. Check the equation:
+**Net Fees + Excess Settlement = Money Allocated + Credit Applied + Outstanding**.
+Excess Settlement identifies amounts allocated above a charge's net fee; review
+those accounts separately. Unallocated advance deposits appear in the Credit
+Balance Register rather than being counted as settled fees here.
+
+**Certificate Issue Register**, under Reports > Certificates, combines student
+and staff certificate records. Report access is required, plus existing general
+certificate access or student-leaving access for the relevant sources. Filter by
+type, recipient, recorded date, entry kind, collection status or name/reference.
+Character, Date of Birth and Leaving certificates have recorded issue entries;
+repeated issues remain separate rows. Other types show **Saved record only** and
+**Not tracked** for collection. Saving a record does not confirm that a certificate
+was printed or handed over. Recorded On is the issue timestamp where available,
+otherwise the record creation timestamp. Certificate Date is shown separately
+(Leaving certificates use Leave Date). Recorded names come from the saved
+certificate; student admission/QR references use the current student record.
+Printing/exporting this register does not issue, reissue or collect certificates.
