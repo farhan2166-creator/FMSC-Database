@@ -81,6 +81,16 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
     private readonly ContextMenuStrip selectionMenu = new StyledContextMenu();
     private IEnumerable<DataGridViewCell> SelectedAmountCells() => grid.SelectedCells.Cast<DataGridViewCell>()
         .Where(cell => !cell.ReadOnly && cell.OwningColumn.Name.StartsWith("CL_", StringComparison.Ordinal));
+    private void ClearSelectedAmounts()
+    {
+        if(savingGrid)return;
+        grid.CancelEdit();
+        foreach(var cell in SelectedAmountCells().ToArray())
+        {
+            cell.Value=null;cell.ErrorText="";
+        }
+        RefreshEditSummary();
+    }
     private void FillSelectedAmounts()
     {
         if (savingGrid || grid.CurrentCell is not { } source || !source.OwningColumn.Name.StartsWith("CL_", StringComparison.Ordinal)) return;
@@ -382,14 +392,18 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         selectionMenu.Items.Add("Fill selected amounts from current cell (Ctrl+D)", null, (_, _) => FillSelectedAmounts());
         selectionMenu.Items.Add("Restore selected cells", null, (_, _) => RestoreSelectedCells());
         selectionMenu.Items.Add("Edit selected fee details…", null, (_, _) => EditSelectedFee());
+        selectionMenu.Items.Add("Clear selected amounts (Delete)",null,(_,_)=>ClearSelectedAmounts());
         selectionMenu.Opening += (_, _) => {
             selectionMenu.Items[0].Enabled = !savingGrid && SelectedAmountCells().Any() && grid.CurrentCell?.OwningColumn.Name.StartsWith("CL_", StringComparison.Ordinal) == true;
             selectionMenu.Items[1].Enabled = !savingGrid && grid.SelectedCells.Cast<DataGridViewCell>().Any(cell => !cell.ReadOnly && loadedCellValues.ContainsKey(cell));
             selectionMenu.Items[2].Enabled = !savingGrid && grid.CurrentCell?.OwningColumn.Name.StartsWith("CL_", StringComparison.Ordinal) == true;
+            selectionMenu.Items[3].Enabled=!savingGrid&&SelectedAmountCells().Any();
         };
         grid.ContextMenuStrip = selectionMenu;
         grid.KeyDown += (_, e) => {
             if (e.Control && e.KeyCode == Keys.D) { FillSelectedAmounts(); e.Handled = true; e.SuppressKeyPress = true; }
+            else if(e.KeyCode==Keys.Delete&&e.Modifiers==Keys.None&&!grid.IsCurrentCellInEditMode&&SelectedAmountCells().Any())
+            {ClearSelectedAmounts();e.Handled=true;e.SuppressKeyPress=true;}
         };
         grid.CellValueChanged += (_, _) => RefreshEditSummary();
         Disposed += (_, _) => selectionMenu.Dispose();
@@ -554,7 +568,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
             summaryLabel.Text = savedMessage is not null && savedCampusId == campusId
                 ? savedMessage
                 : $"{feeTypeRows.Count} fee type(s) × {classes.Count} class(es). " +
-                    "Save Grid stores class rates. Blank cells are left unconfigured.";
+                    "Save Grid stores class rates. Clear a cell to remove its class rate; 0 keeps an explicit zero rate.";
             saveButton.Enabled = true;
         }
         catch (Exception ex)
@@ -802,13 +816,14 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         public string Remarks = "";
         public bool IsNew;
     }
-    private async Task SaveGridAsync()
+    private sealed record ClearedCell(int FeeConfigurationId,int CampusId,int ClassId,int FeeTypeId,
+        decimal ExpectedAmount,string ExpectedFrequency,string ExpectedRemarks);
+    private (List<ChangeRow> Changes,List<ClearedCell> Cleared,int InvalidCount,DataGridViewCell? FirstInvalidCell) BuildSavePlan(int campusId)
     {
-        int campusId = Convert.ToInt32(campus.SelectedValue);
         var changes = new List<ChangeRow>();
         int invalidCount = 0;
         DataGridViewCell? firstInvalidCell = null;
-        int unchangedCleared = 0;
+        var cleared=new List<ClearedCell>();
         for (int r = 0; r < feeTypeRows.Count; r++)
         {
             var feeType = feeTypeRows[r];
@@ -826,7 +841,8 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
                 if (text.Length == 0)
                 {
                     if (existingCell != null)
-                        unchangedCleared++;
+                        cleared.Add(new ClearedCell(existingCell.FeeConfigurationId,campusId,classColumn.ClassId,feeType.FeeTypeId,
+                            existingCell.Amount,existingCell.Frequency,existingCell.Remarks));
                     continue;
                 }
                 if (!decimal.TryParse(
@@ -866,6 +882,12 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
                 });
             }
         }
+        return (changes,cleared,invalidCount,firstInvalidCell);
+    }
+    private async Task SaveGridAsync()
+    {
+        int campusId=Convert.ToInt32(campus.SelectedValue);
+        var (changes,cleared,invalidCount,firstInvalidCell)=BuildSavePlan(campusId);
         if (invalidCount > 0)
         {
             summaryLabel.Text = $"{invalidCount} cell(s) have an invalid amount - fix the highlighted cells and try again.";
@@ -874,11 +896,9 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
                 grid.CurrentCell = firstInvalidCell;
             return;
         }
-        if (changes.Count == 0)
+        if (changes.Count == 0 && cleared.Count == 0)
         {
-            summaryLabel.Text = unchangedCleared > 0
-                ? $"Nothing to save ({unchangedCleared} cleared cell(s) were left unchanged, not deleted)."
-                : "Nothing to save.";
+            summaryLabel.Text = "Nothing to save.";
             return;
         }
         int newCount = changes.Count(c => c.IsNew);
@@ -888,6 +908,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
             confirmParts.Add($"{newCount} new");
         if (updateCount > 0)
             confirmParts.Add($"{updateCount} updated");
+        if(cleared.Count>0)confirmParts.Add($"{cleared.Count} cleared");
         try
         {
             /* ONE atomic call instead of one SaveFeeConfiguration per cell. dbo.ApplyFeeConfigurationPlan validates the whole plan, then applies every row inside a single transaction and commits only if all of them succeed. */
@@ -905,11 +926,11 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
                             change.Amount,
                             (string?)change.Frequency,
                             (string?)change.Remarks)))
-                });
+                },
+                DatabaseHelper.P("@ClearedConfigurations",cleared.Count==0?null:System.Text.Json.JsonSerializer.Serialize(cleared)));
             Applied = true;
             string savedMessage = UiText.Fees.MatrixSaved +
-                $" {string.Join(" and ", confirmParts)}." +
-                (unchangedCleared > 0 ? $" {unchangedCleared} cleared cell(s) were left unchanged." : "");
+                $" {string.Join(" and ", confirmParts)}.";
             await LoadGridAsync(savedMessage, campusId);
         }
         catch (Exception ex)

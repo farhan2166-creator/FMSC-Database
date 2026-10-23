@@ -1,5 +1,5 @@
 # Own a fresh LocalDB instance. Read an existing local recovery backup only to
-# create an isolated communication fixture; never connect to the live database.
+# create isolated communication and fee-matrix fixtures; never connect to the live database.
 param([string]$Snapshot)
 $ErrorActionPreference='Stop'
 $project=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -53,7 +53,7 @@ try{
  $env:FMSC_SAFETY_CONNECTION="Server=$endpoint;Database=master;Integrated Security=True;TrustServerCertificate=True;Connect Timeout=5;Pooling=False"
  $env:FMSC_SAFETY_OWNER=$owner;$env:FMSC_SAFETY_ROOT=$run
  & dotnet (Join-Path $project 'Tests/SafetySqlChecks/bin/Release/net8.0-windows/SafetySqlChecks.dll')
- Native 'Communication/restore SQL checks failed.'
+ Native 'Communication/matrix/restore SQL checks failed.'
 }finally{
  if($connection){$connection.Dispose()}
  Remove-Item Env:FMSC_SAFETY_CONNECTION,Env:FMSC_SAFETY_OWNER,Env:FMSC_SAFETY_ROOT -ErrorAction SilentlyContinue

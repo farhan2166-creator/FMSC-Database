@@ -1276,6 +1276,16 @@
       "precision": 1,
       "scale": 0,
       "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "ApplyFeeConfigurationPlan",
+      "name": "@ClearedConfigurations",
+      "type": "nvarchar",
+      "maxLength": -1,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
     }
   ]
 }

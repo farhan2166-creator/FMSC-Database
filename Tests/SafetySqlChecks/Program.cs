@@ -10,4 +10,5 @@ using(var c=new SqlConnection(connection))
     if(Convert.ToString(q.ExecuteScalar())!=owner)throw new Exception("Only the freshly owned test instance is accepted.");
 }
 await CommunicationChecks.RunAsync(connection);
+FeeMatrixChecks.Run(connection);
 RestoreChecks.Run(connection,root);

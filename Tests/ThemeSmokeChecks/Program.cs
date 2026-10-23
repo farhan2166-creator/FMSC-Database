@@ -34,6 +34,14 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--fee-matrix-clearing"))
+        {
+            CheckFeeMatrixClearing();
+            CheckFeeMatrixHostBusy();
+            CheckFeeMatrixCampusDraft();
+            Console.WriteLine($"PASS: {checks} matrix clearing, save-plan and operation-guard checks (no database connection).");
+            return;
+        }
         if(args.Contains("--student-certificate-layouts"))
         {
             CheckStudentCertificateLayouts();

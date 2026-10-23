@@ -4,6 +4,66 @@ using FMSC_SMS.Pages.Finance.Configuration;
 
 internal static partial class Program
 {
+    private static void CheckFeeMatrixClearing()
+    {
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        var type=typeof(FeeRateMatrixForm);
+        using var matrix=new FeeRateMatrixForm(null,false,()=>true,()=>Task.CompletedTask);
+        matrix.BindingContext=new BindingContext();
+        T Field<T>(string name)=>(T)type.GetField(name,flags)!.GetValue(matrix)!;
+        object Item(string nested,params (string Name,object Value)[] values)
+        {
+            var item=Activator.CreateInstance(type.GetNestedType(nested,BindingFlags.NonPublic)!)!;
+            foreach(var value in values)item.GetType().GetField(value.Name)!.SetValue(item,value.Value);
+            return item;
+        }
+        var classes=Field<System.Collections.IList>("classes");
+        classes.Add(Item("ClassColumn",("ClassId",1),("ClassName","Class 1")));
+        classes.Add(Item("ClassColumn",("ClassId",2),("ClassName","Class 2")));
+        Field<System.Collections.IList>("feeTypeRows").Add(Item("FeeTypeRow",("FeeTypeId",3),("FeeTypeName","Tuition"),("DefaultFrequency","Monthly")));
+        var existing=Field<System.Collections.IDictionary>("existing");
+        existing.Add((1,3),Item("ExistingCell",("FeeConfigurationId",11),("Amount",500m),("Frequency","Monthly"),("Remarks","Original")));
+        var grid=Field<DataGridView>("grid");
+        type.GetMethod("BuildGridColumns",flags)!.Invoke(matrix,null);
+        type.GetMethod("BuildGridRows",flags)!.Invoke(matrix,null);
+        type.GetMethod("CaptureGridSnapshot",flags)!.Invoke(matrix,null);
+        System.Runtime.CompilerServices.ITuple Plan()=>(System.Runtime.CompilerServices.ITuple)type.GetMethod("BuildSavePlan",flags)!.Invoke(matrix,new object[]{7})!;
+        int Count(System.Runtime.CompilerServices.ITuple plan,int index)=>((System.Collections.IList)plan[index]!).Count;
+        var saved=grid.Rows[0].Cells["CL_1"];var blank=grid.Rows[0].Cells["CL_2"];
+        saved.Value="";var plan=Plan();
+        Check(Count(plan,0)==0&&Count(plan,1)==1,"A manually cleared saved amount becomes a removal instead of being skipped");
+        var clear=((System.Collections.IList)plan[1]!)[0]!;
+        string json=System.Text.Json.JsonSerializer.Serialize(clear,clear.GetType());
+        Check(json.Contains("\"FeeConfigurationId\":11")&&json.Contains("\"ExpectedAmount\":500")&&json.Contains("\"CampusId\":7"),
+            "The clear payload retains the loaded rate and its identity for stale-save protection");
+        saved.Value="0";plan=Plan();
+        Check(Count(plan,0)==1&&Count(plan,1)==0,"An explicit zero remains an upsert, distinct from an unconfigured cell");
+        saved.Value="500";blank.Value="";plan=Plan();
+        Check(Count(plan,0)==0&&Count(plan,1)==0,"An unchanged amount and an already empty cell require no write");
+        blank.Value="250";saved.Value=null;plan=Plan();
+        Check(Count(plan,0)==1&&Count(plan,1)==1,"A removal and a new rate are assembled into one save plan");
+        using var host=new Form { ClientSize=new Size(900,500),ShowInTaskbar=false,
+            StartPosition=FormStartPosition.Manual,Location=new Point(-20000,-20000) };
+        // Host only the grid so no deferred campus/SQL loader can run.
+        grid.Parent!.Controls.Remove(grid);grid.Dock=DockStyle.Fill;host.Controls.Add(grid);host.Show();Application.DoEvents();
+        saved.Value="500";blank.Value="250";grid.CurrentCell=saved;grid.ClearSelection();
+        saved.Selected=true;blank.Selected=true;grid.Rows[0].Cells["FeeType"].Selected=true;
+        var key=new KeyEventArgs(Keys.Delete);
+        typeof(Control).GetMethod("OnKeyDown",flags)!.Invoke(grid,new object[]{key});
+        Check(key.Handled&&key.SuppressKeyPress&&saved.Value is null&&blank.Value is null,"Delete clears selected amount cells and consumes the key");
+        Check(Convert.ToString(grid.Rows[0].Cells["FeeType"].Value)=="Tuition"&&Convert.ToString(grid.Rows[0].Cells["Frequency"].Value)=="Monthly",
+            "Delete leaves fee labels and frequency intact");
+        Check(matrix.HasUnsavedChanges,"A cleared amount remains dirty until it is saved");
+        type.GetMethod("RestoreSelectedCells",flags)!.Invoke(matrix,null);
+        Check(Convert.ToString(saved.Value)=="500"&&blank.Value is null,"Restore selected cells undoes clearing");
+        type.GetField("savingGrid",flags)!.SetValue(matrix,true);saved.Value="500";
+        type.GetMethod("ClearSelectedAmounts",flags)!.Invoke(matrix,null);
+        Check(Convert.ToString(saved.Value)=="500","An in-flight save refuses a conflicting clear");
+        type.GetField("savingGrid",flags)!.SetValue(matrix,false);
+        Check(!matrix.IsHandleCreated,"Matrix edit checks never start a campus or database load");
+        host.Close();
+    }
+
     private static void CheckFeeMatrixHostBusy()
     {
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
