@@ -5,6 +5,7 @@ using FMSC_SMS.Pages.Reports;
 using FMSC_SMS.Pages.Reports.Students;
 using FMSC_SMS.Pages.Setup;
 using FMSC_SMS.Pages.Students.Admissions;
+using FMSC_SMS.Pages.Students.Certificates;
 using FMSC_SMS.Pages.Students.Profile;
 namespace FMSC_SMS.Pages.Dashboard;
 public sealed class WelcomePage : UserControl
@@ -317,6 +318,7 @@ public sealed class WelcomePage : UserControl
         ("Student Profile", "Students", () => new StudentProfilePage(Navigate), () => CurrentUser.HasPermission("Students.View")),
         (PageTitles.FamilyAdmission, "Students", () => new FamilyAdmissionWorkspace(Navigate), () => FamilyAdmissionData.CanUse(CurrentUser.HasPermission)),
         ("Student Reports", "Students", () => new StudentReportsPage(), () => CurrentUser.HasPermission("Students.View") && CurrentUser.HasPermission("Reports.View")),
+        (PageTitles.StudentCertificates, "Certificates", () => new StudentCertificatesPage(Navigate), () => CurrentUser.HasPermission("Certificates.Create")),
         ("Reports", "Reports", () => new ReportsHomePage(Navigate), () => CurrentUser.HasPermission("Reports.View"))
         };
         var visibleActions = actions
@@ -360,6 +362,7 @@ public sealed class WelcomePage : UserControl
             "Student Profile" => "\uE77B",
             PageTitles.FamilyAdmission => "\uE8FA",
             "Student Reports" => "\uE9D5",
+            PageTitles.StudentCertificates => "\uE8D7",
             "Reports" => "\uE9D9",
             _ => "\uE80F"
         };

@@ -931,7 +931,7 @@
                 <Value>STUDENT ADMISSION FORM</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
-                  <FontSize>13pt</FontSize>
+                  <FontSize>14pt</FontSize>
                   <FontWeight>Bold</FontWeight>
                 </Style>
               </TextRun>
@@ -941,8 +941,8 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>0.725in</Top>
-        <Height>0.26in</Height>
+        <Top>0.69278in</Top>
+        <Height>0.29222in</Height>
         <Width>6in</Width>
         <ZIndex>32</ZIndex>
         <Style>
