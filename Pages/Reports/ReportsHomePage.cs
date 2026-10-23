@@ -114,7 +114,17 @@ public sealed class ReportsHomePage : V2Page
                         PageTitles.StudentAccountStatement,
                         "A student's charges, payments and balance.",
                         "Finance",
-                        () => new StudentAccountStatementPage())
+                        () => new StudentAccountStatementPage()),
+                    ..(CurrentUser.HasPermission("Fees.Statement.View") ? new ReportDefinition[] {
+                        new(PageTitles.FamilyGroupStatements,"Choose students or families and view their statements together.",
+                            "Finance",() => StudentAccountStatementPage.CreateFamilyGroupStatements()),
+                        new(PageTitles.AnnualFeeReceipts,"Choose one student and an academic year to view their receipts.",
+                            "Finance",() => new AnnualFeeReceiptsPage())
+                    } : Array.Empty<ReportDefinition>()),
+                    ..(CurrentUser.HasPermission("Fees.View") ? new ReportDefinition[] {
+                        new(PageTitles.OutstandingBills,"Choose students and print their current unpaid bills.",
+                            "Finance",() => new FMSC_SMS.Pages.Finance.Collection.OutstandingBillsPage())
+                    } : Array.Empty<ReportDefinition>())
                 ]);
             hasReports = true;
         }

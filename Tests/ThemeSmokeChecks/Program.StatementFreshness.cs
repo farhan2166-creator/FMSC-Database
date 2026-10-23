@@ -23,12 +23,16 @@ internal static partial class Program
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(StudentAccountStatementPage);
         var pending=new Queue<TaskCompletionSource<(DataTable,decimal)>>();
         Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>> read=(id,_,_)=>{var reply=new TaskCompletionSource<(DataTable,decimal)>();pending.Enqueue(reply);return reply.Task;};
-        using var page=(StudentAccountStatementPage)Activator.CreateInstance(type,flags,null,new object[]{false,read},null)!;page.BindingContext=new BindingContext();
-        ((CheckBox)type.GetField("groupModeToggle",flags)!.GetValue(page)!).Checked=true;
+        using var page=(StudentAccountStatementPage)Activator.CreateInstance(type,flags,null,new object[]{false,read,true},null)!;page.BindingContext=new BindingContext();
+        using var dialog=(ApplicationWindowForm)type.GetMethod("CreateRelatedReportDialog",BindingFlags.Static|BindingFlags.NonPublic)!
+            .Invoke(null,new object[]{PageTitles.FamilyGroupStatements,page})!;
         var selected=(HashSet<int>)type.GetField("manuallySelectedAdmissionIds",flags)!.GetValue(page)!;selected.UnionWith(new[]{1,2});
         DataTable Rows(int id){var rows=new DataTable();rows.Columns.Add("StudentName");rows.Columns.Add("TransactionType");rows.Columns.Add("TransactionId",typeof(long));rows.Columns.Add("TransactionDate",typeof(DateTime));rows.Columns.Add("DebitAmount",typeof(decimal));rows.Columns.Add("PaidAmount",typeof(decimal));rows.Rows.Add("Student "+id,"CHARGE",id,DateTime.Today,100m,0m);rows.Rows.Add("Student "+id,"PAYMENT",id+10,DateTime.Today,0m,40m);return rows;}
         var task=(Task)type.GetMethod("LoadStatement",flags)!.Invoke(page,null)!;
         Check(!task.IsCompleted&&page.IsBusy&&!page.Enabled,"Statement generation returns while SQL is pending and holds a stable selection");
+        var closing=new FormClosingEventArgs(CloseReason.UserClosing,false);
+        typeof(Form).GetMethod("OnFormClosing",flags)!.Invoke(dialog,new object[]{closing});
+        Check(closing.Cancel,"A related statement window cannot close while its report is being assembled");
         pending.Dequeue().SetResult((Rows(1),10m));PumpUntil(()=>pending.Count==1,"Second statement read begins only after first assembly");
         pending.Dequeue().SetResult((Rows(2),10m));PumpUntil(()=>task.IsCompleted,"Complete multi-student statement binds");
         Check(task.IsCompletedSuccessfully&&!page.IsBusy&&page.Enabled,"Async statement releases its operation guard after complete binding");

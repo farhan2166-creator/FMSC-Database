@@ -6,6 +6,64 @@ using FMSC_SMS.Pages.Security;
 
 internal static partial class Program
 {
+    private static void CheckStudentCertificateLayouts()
+    {
+        string output=Path.GetFullPath("artifacts/student-certificate-layouts");Directory.CreateDirectory(output);
+        var originalTheme=AppTheme.CurrentTheme;
+        var previous=(CurrentUser.UserId,CurrentUser.Username,CurrentUser.RoleName,CurrentUser.MustChangePassword,CurrentUser.GetPermissions().ToArray());
+        try
+        {
+            CurrentUser.SignIn(919,"Certificate layout fixture","Administrator",false,Array.Empty<string>());
+            foreach(var theme in new[]{AppThemeType.OceanBlue,AppThemeType.ProfessionalSimple})
+            foreach(var example in new (string Name,Func<Control> Create)[]{
+                ("regular",()=>new RegularStudentCertificatePage(false)),
+                ("school-leaving",()=>new LeaveCertificatePage(null,false)),
+                ("college-leaving",()=>new CollegeLeaveCertificatePage(false)),
+                ("birth-date",()=>new DateOfBirthCertificatePage(false)),
+                ("sports",()=>new SportsCertificatePage(false)),
+                ("no-objection",()=>new NoObjectionCertificatePage(false)),
+                ("character",()=>new CharacterCertificatePage(false)) })
+            {
+                AppTheme.SetTheme(theme);
+                using var page=example.Create();
+                var picker=Descendants(page).OfType<StudentPicker>().Single();
+                Control card=picker;while(card is not HumanCard)card=card.Parent!;
+                var root=(TableLayoutPanel)card.Parent!;root.Parent!.Controls.Remove(root);
+                using var form=new Form { AutoScaleMode=AutoScaleMode.None,ShowInTaskbar=false,
+                    StartPosition=FormStartPosition.Manual,Location=new Point(-20000,-20000),ClientSize=new Size(850,620) };
+                root.Dock=DockStyle.Fill;form.Controls.Add(root);form.Show();Application.DoEvents();
+                foreach(var input in Descendants(card))input.Enabled=true;
+                foreach(int width in new[]{850,1600,850})
+                {
+                    form.ClientSize=new Size(width,620);Application.DoEvents();
+                    form.ClientSize=new Size(width,(int)root.RowStyles[0].Height);Application.DoEvents();
+                    var fields=((HumanCard)card).Content.Controls.OfType<TableLayoutPanel>()
+                        .Single(table=>Equals(table.Tag,CertificateUi.FieldGridTag));
+                    Check(Math.Abs(root.RowStyles[0].Height-(AppMetrics.FieldCardHeight(fields.RowCount)+AppMetrics.ButtonRowHeight))<=1,
+                        $"{example.Name}/{theme}/{width}: editor height follows its visible field rows");
+                    foreach(var input in Descendants(card).Where(control=>
+                        control is StudentPicker or ModernDatePicker or ModernComboBox or ModernTextBox &&
+                        control.Parent is TableLayoutPanel parent&&parent.Controls.OfType<Label>().Any()))
+                    {
+                        var label=input.Parent!.Controls.OfType<Label>().Single();
+                        Check(input.Parent.ClientRectangle.Contains(input.Bounds),$"{example.Name}/{theme}/{width}: input fits its field");
+                        Check(!input.Bounds.IntersectsWith(label.Bounds),$"{example.Name}/{theme}/{width}: input clears its caption");
+                        Check(input.Top-label.Bottom<=AppScale.Scale(4),$"{example.Name}/{theme}/{width}: input remains next to its caption");
+                    }
+                    using var bitmap=new Bitmap(card.Width,card.Height);card.DrawToBitmap(bitmap,card.ClientRectangle);
+                    bitmap.Save(Path.Combine(output,$"{example.Name}-{theme}-{width}.png"));
+                }
+                Check(!page.IsHandleCreated,"Certificate layout inspection starts no student lookup or SQL operation");
+                form.Close();
+            }
+        }
+        finally
+        {
+            AppTheme.SetTheme(originalTheme);
+            CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Item5);
+        }
+    }
+
     // Offline captures for the audit's remaining layout questions. No student
     // lookup, report creation, certificate issuance or database access is started.
     private static void CaptureUiGuidanceReview()

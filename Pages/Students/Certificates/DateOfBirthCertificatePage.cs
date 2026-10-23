@@ -42,7 +42,8 @@ public sealed class DateOfBirthCertificatePage : V2Page
         Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
-    public DateOfBirthCertificatePage()
+    public DateOfBirthCertificatePage() : this(true) { }
+    internal DateOfBirthCertificatePage(bool initialize)
         : base("Date of Birth Certificate", "Create, issue, collect and print student date of birth certificates.")
     {
         createCertificateButton.Click +=
@@ -64,7 +65,7 @@ public sealed class DateOfBirthCertificatePage : V2Page
         dateOfBirth.TabStop = false;
         TrackStudentSearchStatus(student);
         /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
-        StudentSearchCache.Warm();
+        if(initialize)StudentSearchCache.Warm();
         /* dbo.Create...Certificate refuses a student with no date of birth (58505), so such students are not offered. */
         student.RowFilter = row => !row.IsNull("DateOfBirth");
         student.UserSelectionChanged +=
@@ -144,6 +145,7 @@ public sealed class DateOfBirthCertificatePage : V2Page
             new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(details, 0, 0);
         root.Controls.Add(records, 0, 1);
+        CertificateUi.CompactFields(details,fields,root,new[]{25f,25f,25f,25f},new[]{(0,0,2),(2,0,1),(3,0,1)},1100);
         SetContent(
             root,
             UiText.Certificates.IssueGuidance);

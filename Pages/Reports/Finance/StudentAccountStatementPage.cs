@@ -47,9 +47,9 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             ForeColor = AppTheme.MutedText,
             Text = "No students included"
         };
-    private bool groupMode;
+    private readonly bool groupMode;
     private Action? arrangeStatement;
-    private readonly CheckBox groupModeToggle = new() { Text = "Group / family statements", AutoSize = true };
+    private ModernButton? familyGroupButton;
     private readonly Label statementContext = new() {
         Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft,
         Font = AppTheme.ButtonFont, ForeColor = AppTheme.Text,
@@ -76,12 +76,15 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     public string BusyMessage=>"A financial statement or report is being prepared. Wait for the result before leaving.";
     public StudentAccountStatementPage() : this(true,null) { }
     internal StudentAccountStatementPage(bool initialize,Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>>? readStatement)
-        : base(PageTitles.StudentAccountStatement, "See what a student was charged, what was paid and what remains due.")
+        : this(initialize,readStatement,false) { }
+    internal StudentAccountStatementPage(bool initialize,Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>>? readStatement,bool groupMode)
+        : base(groupMode?PageTitles.FamilyGroupStatements:PageTitles.StudentAccountStatement,
+            groupMode?"Choose students or families, then view their account statements together.":"See what a student was charged, what was paid and what remains due.")
     {
+        this.groupMode=groupMode;
         this.readStatement=readStatement??LoadStatementDataAsync;
         FinanceHelp.Attach(this,openingBalance,"The amount already due before the selected statement period. It is carried into this statement, not newly charged.","Rs. 500 was unpaid before October. The October statement starts with Rs. 500 opening dues.");
         FinanceHelp.Attach(this,closingBalance,"The amount still due after the statement's charges, payments and adjustments. This report does not change the student's account.","Opening dues Rs. 500 plus fees Rs. 400 minus payment Rs. 300 leaves Rs. 600 due.");
-        FinanceHelp.Attach(this,groupModeToggle,"View statements for the included students together. This does not move payments or advance money between their accounts.","Including two siblings shows both accounts in the report; each child's dues remain on that child's account.");
         Disposed+=(_,_)=>statementReads.Dispose();
         var export =
             AddExportAction("Student_Fee_Statement");
@@ -158,7 +161,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             (_, _) => OnFiltersChanged();
         to.ValueChanged +=
             (_, _) => OnFiltersChanged();
-        if(initialize)Defer(BindContextLookups);
+        if(initialize&&groupMode)Defer(BindContextLookups);
         ConfigureStudentGrid();
         Grid.DataBindingComplete += (_, _) => { ConfigureStatementGrid(); FormatStatementAmounts(); };
         BuildStatementLayout();
@@ -166,26 +169,28 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     }
     private void BuildStatementLayout()
     {
-        var filters = HumanUi.Card("Student Account", "Dates limit the statement balances. Leave dates unchecked for the complete account; Print Outstanding includes all unpaid bills.");
+        var filters = HumanUi.Card(groupMode?"Find Students / Families":"Student Account",
+            groupMode?"Placement filters find students. Tick students or Include Family below, then view their statements for the chosen dates.":"Leave dates unchecked for the complete account.");
+        int headerHeight=filters.Header.Height;
         var filterGrid = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Margin = Padding.Empty
         };
-        foreach (float width in new[] { 30f, 30f, 20f, 20f })
+        foreach (float width in groupMode?new[] { 30f, 30f, 20f, 20f }:new[] { 25f, 25f, 25f, 25f })
             filterGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
         int fieldHeight = Math.Max(AppMetrics.FieldRowHeight,
             AppMetrics.TextHeight(AppTheme.FieldCaptionFont) + AppMetrics.InputControlHeight
             + AppMetrics.SpacingSm + Math.Max(studentSearch.Margin.Vertical, from.Margin.Vertical));
         filterGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        filterGrid.Controls.Add(HumanUi.Field("Student", studentSearch), 0, 0);
+        filterGrid.Controls.Add(HumanUi.Field(groupMode?"Find a student (optional)":"Student", studentSearch), 0, 0);
         filterGrid.SetColumnSpan(studentSearch.Parent!, 2);
         filterGrid.Controls.Add(HumanUi.Field("From (optional)", from), 2, 0);
         filterGrid.Controls.Add(HumanUi.Field("To (optional)", to), 3, 0);
         foreach (TableLayoutPanel field in filterGrid.Controls.OfType<TableLayoutPanel>())
             field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         var groupFilters = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Margin = Padding.Empty, Visible = false
+            Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 1, Margin = Padding.Empty, Visible = groupMode
         };
-        foreach (var item in new[] { ("Campus", campus), ("Academic Year", year), ("Class", cls), ("Section", section) })
+        foreach (var item in new[] { ("Campus", campus), ("Placement Year", year), ("Class", cls), ("Section", section) })
         {
             groupFilters.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
             groupFilters.Controls.Add(HumanUi.Field(item.Item1, item.Item2), groupFilters.Controls.Count, 0);
@@ -194,46 +199,40 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         find.Click += async (_, _) => await SearchStudents();
         generateStatementButton = CreateFilterButton("View Statement", AppTheme.Primary);
         generateStatementButton.Click += async (_, _) => await LoadStatement();
-        printAmountsDueButton = CreateFilterButton("Print Outstanding", AppTheme.MutedText);
-        printAmountsDueButton.Click += async (_, _) => await PrintDueReport();
-        SetToolTip(printAmountsDueButton,"Print current outstanding bills in the approved format. Statement dates do not limit these bills. Requires fee-view access.");
-        annualReceiptsButton = CreateFilterButton("Annual Receipts", AppTheme.MutedText);
-        annualReceiptsButton.Click += async (_, _) => await OpenAnnualReceipts();
-        SetToolTip(annualReceiptsButton,"Open annual receipts directly for this student: the chosen academic year in group mode, otherwise the current year.");
         var clear = CreateFilterButton("Clear", AppTheme.MutedText);
-        clear.Click += (_, _) => { ClearForm(); _ = ReloadSections(); };
-        SetToolTip(clear, "Clears all students, family selections, dates and the displayed statement.");
+        if(!groupMode)clear.MinimumSize=new Size(AppScale.Scale(90),AppMetrics.ButtonHeight);
+        clear.Click += (_, _) => { ClearForm(); if(groupMode)_ = ReloadSections(); };
+        SetToolTip(clear, "Clear this statement's selection, dates and displayed results.");
         var actions = new FlowLayoutPanel {
             Dock = DockStyle.Fill, WrapContents = true, Margin = Padding.Empty, Padding = Padding.Empty
         };
-        foreach (var button in new[] { generateStatementButton, printAmountsDueButton, annualReceiptsButton, clear })
+        foreach (var button in new[] { generateStatementButton, clear })
         {
-            AppMetrics.FitButtonWidth(button, minWidth: 110);
+            AppMetrics.FitButtonWidth(button, minWidth: button==clear&&!groupMode?AppScale.Scale(90):110);
             actions.Controls.Add(button);
         }
-        groupModeToggle.Font = AppTheme.NormalFont;
-        groupModeToggle.ForeColor = AppTheme.Text;
         var modeBar = new FlowLayoutPanel {
-            Dock = DockStyle.Fill, WrapContents = false, Margin = Padding.Empty, Padding = Padding.Empty
+            Dock = DockStyle.Fill, WrapContents = true, Margin = Padding.Empty, Padding = Padding.Empty
         };
-        modeBar.Controls.Add(groupModeToggle);
-        modeBar.Controls.Add(find);
-        find.Visible = false;
-        groupModeToggle.CheckedChanged += async (_, _) => {
-            if (IsBusy) { groupModeToggle.Checked = groupMode; return; }
-            if (groupMode == groupModeToggle.Checked) return;
-            groupMode = groupModeToggle.Checked;
-            // Expanding selection retains the current account and dates. Returning
-            // to one student drops extra members without clearing the chosen child.
-            bool reload = !groupMode && !GetSelectedAdmissionIds().SequenceEqual(new[]{studentSearch.SelectedId});
-            if (!groupMode && reload) SelectSingleStudent();
-            groupFilters.Visible = groupMode;
-            find.Visible = groupMode;
-            arrangeStatement?.Invoke();
-            OnFiltersChanged();
-            if (!groupMode) statementContext.Text = studentSearch.SelectedId>0 ? studentSearch.Text : "Select a student to view their account.";
-            if (reload && studentSearch.SelectedId>0) await LoadStatement();
-        };
+        if(groupMode)modeBar.Controls.Add(find);
+        else
+        {
+            familyGroupButton=CreateFilterButton("Family / Group Statements…",AppTheme.MutedText);
+            familyGroupButton.Click+=(_,_)=>OpenFamilyGroupStatements();
+            printAmountsDueButton=CreateFilterButton("Outstanding Bills…",AppTheme.MutedText);
+            printAmountsDueButton.Click+=async(_,_)=>await PrintDueReport();
+            SetToolTip(printAmountsDueButton,"Open current unpaid bills for this student. Statement dates do not limit these bills.");
+            annualReceiptsButton=CreateFilterButton("Annual Receipts…",AppTheme.MutedText);
+            annualReceiptsButton.Click+=async(_,_)=>await OpenAnnualReceipts();
+            SetToolTip(annualReceiptsButton,"Open the separate annual receipts report for this student and choose its academic year.");
+            foreach(var button in new[]{familyGroupButton,printAmountsDueButton,annualReceiptsButton})
+            {
+                AppMetrics.FitButtonWidth(button,minWidth:110);
+                button.Margin=new Padding(4,0,4,0);modeBar.Controls.Add(button);
+            }
+            filters.Header.Controls.Add(modeBar);
+            filters.Header.Controls.SetChildIndex(modeBar,filters.Header.Controls.Count-1);
+        }
         var filterBody = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty
         };
@@ -246,8 +245,8 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         filterBody.RowStyles.Add(actionsRow);
         filterBody.Controls.Add(filterGrid, 0, 0);
         filterBody.Controls.Add(groupFilters, 0, 1);
-        filterBody.Controls.Add(modeBar, 0, 2);
-        filterBody.Controls.Add(actions, 0, 3);
+        if(groupMode)filterBody.Controls.Add(modeBar,0,2);
+        filterBody.Controls.Add(actions,0,3);
         filters.Content.Controls.Add(filterBody);
 
         var studentCard = HumanUi.Card("Choose Students / Families", "Tick students or Include Family. Selections can span searches.");
@@ -256,18 +255,20 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         selectAll.Click += (_, _) => { SelectAllStudents(); OnFiltersChanged(); };
         deselect.Click += (_, _) => { ClearStudentSelection(); OnFiltersChanged(); };
         var selectionBody = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Margin = Padding.Empty
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4, Margin = Padding.Empty
         };
         selectionBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         selectionBody.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.NormalFont) + 8));
         selectionBody.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
         selectionBody.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        selectionBody.RowStyles.Add(new RowStyle(SizeType.Absolute,groupMode?AppMetrics.ButtonRowHeight:0));
         selectionBody.Controls.Add(selectionSummary, 0, 0);
         var selectionActions = HumanUi.ButtonRow(selectAll, deselect);
         selectionActions.Dock = DockStyle.Fill;
         selectionActions.Margin = Padding.Empty;
         selectionBody.Controls.Add(selectionActions, 0, 1);
         selectionBody.Controls.Add(students, 0, 2);
+        if(groupMode)selectionBody.Controls.Add(actions,0,3);
         studentCard.Content.Controls.Add(selectionBody);
         var statement = HumanUi.Card("Account Details", "Fee charges with allocated payments and remaining amounts.", accessory: exportButton);
         statement.Header.Controls.SetChildIndex(exportButton, statement.Header.Controls.Count - 1);
@@ -293,6 +294,12 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         root.Controls.Add(StatusLabel, 0, 5);
         var viewport = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Margin = Padding.Empty };
         viewport.Controls.Add(root);
+        int actionWidthNeeded=actions.Controls.Cast<Control>().Sum(control=>control.Width+control.Margin.Horizontal);
+        if(!groupMode)
+        {
+            filterGrid.ColumnCount=5;
+            filterGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,0));
+        }
         bool arranging = false;
         arrangeStatement = () => {
             if (arranging) return;
@@ -304,19 +311,45 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
                 studentCard.Visible = groupMode;
                 int width = Math.Max(AppScale.Scale(720), viewport.ClientSize.Width - SystemInformation.VerticalScrollBarWidth);
                 int actionWidth = width - filters.Padding.Horizontal - filters.Content.Padding.Horizontal;
-                int rows = 1, usedWidth = 0;
-                foreach (Control button in actions.Controls)
+                bool inlineActions=!groupMode&&actionWidth>=AppScale.Scale(880);
+                if(!groupMode)
                 {
-                    int required = button.Width + button.Margin.Horizontal;
-                    if (usedWidth > 0 && usedWidth + required > actionWidth) { rows++; usedWidth = 0; }
-                    usedWidth += required;
+                    int relatedWidth=modeBar.Controls.Cast<Control>().Sum(control=>control.Width+control.Margin.Horizontal);
+                    bool stackReports=actionWidth<relatedWidth+AppScale.Scale(250);
+                    filters.Header.Height=headerHeight+(stackReports?AppMetrics.ButtonRowHeight:0);
+                    modeBar.Dock=stackReports?DockStyle.Bottom:DockStyle.Right;
+                    modeBar.Width=relatedWidth;modeBar.Height=stackReports?AppMetrics.ButtonRowHeight:headerHeight;
+                    filterGrid.ColumnStyles[4].Width=inlineActions?actionWidthNeeded:0;
+                    if(inlineActions)
+                    {
+                        if(actions.Parent!=filterGrid)filterGrid.Controls.Add(actions,4,0);
+                        actions.Padding=new Padding(0,Math.Max(16,AppMetrics.TextHeight(AppTheme.FieldCaptionFont))-3,0,0);
+                    }
+                    else
+                    {
+                        if(actions.Parent!=filterBody)filterBody.Controls.Add(actions,0,3);
+                        actions.Padding=Padding.Empty;
+                    }
                 }
-                actionsRow.Height = AppMetrics.ButtonRowHeight * rows;
+                int NeededHeight(FlowLayoutPanel bar)
+                {
+                    int rows=1,usedWidth=0;
+                    foreach(Control control in bar.Controls)
+                    {
+                        int required=control.Width+control.Margin.Horizontal;
+                        if(usedWidth>0&&usedWidth+required>actionWidth){rows++;usedWidth=0;}
+                        usedWidth+=required;
+                    }
+                    return AppMetrics.ButtonRowHeight*rows;
+                }
+                filterBody.RowStyles[2].Height=groupMode?NeededHeight(modeBar):0;
+                actionsRow.Height=groupMode||inlineActions?0:NeededHeight(actions);
+                selectionBody.RowStyles[3].Height=groupMode?NeededHeight(actions):0;
                 filterRow.Height = filters.Padding.Vertical + filters.Header.Height + filters.Content.Padding.Vertical
-                    + fieldHeight * (groupMode ? 2 : 1) + AppMetrics.ButtonRowHeight + actionsRow.Height;
+                    + fieldHeight * (groupMode ? 2 : 1) + filterBody.RowStyles[2].Height + actionsRow.Height;
                 selectionRow.Height = groupMode ? studentCard.Padding.Vertical + studentCard.Header.Height
                     + studentCard.Content.Padding.Vertical + AppMetrics.TextHeight(AppTheme.NormalFont) + 8
-                    + AppMetrics.ButtonRowHeight + students.ColumnHeadersHeight + AppMetrics.GridRowHeight * 4 : 0;
+                    + AppMetrics.ButtonRowHeight + NeededHeight(actions) + students.ColumnHeadersHeight + AppMetrics.GridRowHeight * 4 : 0;
                 int fixedHeight = root.RowStyles.Cast<RowStyle>().Where(r => r.SizeType == SizeType.Absolute).Sum(r => (int)r.Height);
                 int statementHeight = statement.Padding.Vertical + statement.Header.Height + statement.Content.Padding.Vertical
                     + Grid.ColumnHeadersHeight + AppMetrics.GridRowHeight * 5 + SystemInformation.HorizontalScrollBarHeight;
@@ -334,7 +367,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     {
         statementReads.Cancel();
         Grid.DataSource = null;
-        openingBalance.Text = chargesTotal.Text = paymentsTotal.Text = closingBalance.Text = "0";
+        openingBalance.Text = chargesTotal.Text = paymentsTotal.Text = closingBalance.Text = "—";
         _appliedFilterSignature = string.Empty;
         SetReportActionsEnabled(false);
         manuallySelectedAdmissionIds.Clear();
@@ -354,35 +387,46 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         SelectSingleStudent();
         SetStatus("Select a student to view their charges, payments and balance.");
     }
-    private async Task OpenAnnualReceipts()
+    private Task OpenAnnualReceipts()
     {
-        if(IsBusy || IsDisposed)return;
-        if(!CurrentUser.HasPermission("Fees.Statement.View"))
-        { SetStatus("Annual receipts require statement access.",PageStatusKind.Warning);return; }
+        if(IsBusy||IsDisposed||!CurrentUser.HasPermission("Fees.Statement.View"))return Task.CompletedTask;
         var ids=GetSelectedAdmissionIds();
-        if(ids.Count!=1){Warn("Select exactly one student for annual receipts.");return;}
-        int id=ids[0], selectedYear=groupMode?year.SelectedId:0;
-        string signature=FilterSignature();
-        int user=CurrentUser.UserId;
-        bool Current()=>!IsDisposed && CurrentUser.UserId==user && signature==FilterSignature();
-        printingDueReport=true;UpdateSelectionActions();
+        if(ids.Count!=1)return Task.CompletedTask;
         try
         {
-            using var busy=BeginBusy("Preparing annual receipts…",this);
-            if(selectedYear<=0)
-            {
-                using var years=await DatabaseHelper.QueryUserAsync("GetAcademicYears");
-                if(!Current())return;
-                var current=years.AsEnumerable().FirstOrDefault(row=>row["IsCurrent"]!=DBNull.Value && Convert.ToBoolean(row["IsCurrent"]));
-                if(current is null){Warn("Set the current academic year in School Setup before printing annual receipts.");return;}
-                selectedYear=Convert.ToInt32(current["AcademicYearId"]);
-            }
-            await AnnualReceiptPreview.ShowAsync(FindForm(),id,selectedYear,Current,Warn);
+            using var dialog=CreateRelatedReportDialog(PageTitles.AnnualFeeReceipts,new AnnualFeeReceiptsPage(ids[0]));
+            dialog.ShowDialog(FindForm());
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
-        finally{printingDueReport=false;if(!IsDisposed)UpdateSelectionActions();}
+        return Task.CompletedTask;
     }
-    // Retain existing group/family selection alongside single-student search.
+    public static StudentAccountStatementPage CreateFamilyGroupStatements(int admissionId=0)
+    {
+        var page=new StudentAccountStatementPage(true,null,true);
+        if(admissionId>0)page.Defer(()=>page.PreloadAdmissionIdAsync(admissionId));
+        return page;
+    }
+    private void OpenFamilyGroupStatements()
+    {
+        if(IsBusy||IsDisposed||!CurrentUser.HasPermission("Fees.Statement.View"))return;
+        try
+        {
+            var page=CreateFamilyGroupStatements(studentSearch.SelectedId);
+            page.from.Value=from.Value;page.from.Checked=from.Checked;
+            page.to.Value=to.Value;page.to.Checked=to.Checked;
+            using var dialog=CreateRelatedReportDialog(PageTitles.FamilyGroupStatements,page);
+            dialog.ShowDialog(FindForm());
+        }
+        catch(Exception ex){if(!IsDisposed)Fail(ex);}
+    }
+    private static ApplicationWindowForm CreateRelatedReportDialog(string title,Control page)
+    {
+        var dialog=new ApplicationWindowForm { Text=title,StartPosition=FormStartPosition.CenterParent,
+            ClientSize=new Size(AppScale.Scale(1180),AppScale.Scale(760)),
+            MinimumSize=new Size(AppScale.Scale(820),AppScale.Scale(560)),ShowInTaskbar=false,MinimizeBox=false };
+        page.Dock=DockStyle.Fill;dialog.Controls.Add(page);ModalPageCloseGuard.Attach(dialog,page);
+        return dialog;
+    }
     public StudentAccountStatementPage(int preloadAdmissionId)
         : this()
     {
@@ -408,7 +452,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
                 return;
             }
             studentSearch.SetStudent(admissionId, Convert.ToString(selected.Cells["StudentName"].Value) ?? AdmissionNumbers.ForId(admissionId));
-            statementContext.Text = studentSearch.Text;
+            statementContext.Text = groupMode?$"Group statement · {GetSelectedAdmissionIds().Count:N0} student(s) included":studentSearch.Text;
             await LoadStatement();
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
@@ -1107,6 +1151,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         bool hasStudents = GetSelectedAdmissionIds().Count > 0;
         if (generateStatementButton is not null) generateStatementButton.Enabled = hasStudents&&!BusyOperationRunning;
         if (printAmountsDueButton is not null) printAmountsDueButton.Enabled = hasStudents && !IsBusy && CurrentUser.HasPermission("Fees.View");
+        if(familyGroupButton is not null)familyGroupButton.Enabled=!IsBusy&&CurrentUser.HasPermission("Fees.Statement.View");
         if (annualReceiptsButton is not null) annualReceiptsButton.Enabled = GetSelectedAdmissionIds().Count == 1
             && !IsBusy && CurrentUser.HasPermission("Fees.Statement.View");
         if (groupMode) statementContext.Text = $"Group statement · {GetSelectedAdmissionIds().Count:N0} student(s) included";
@@ -1664,13 +1709,13 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             DateTime.Today;
         from.Checked = to.Checked = false;
         openingBalance.Text =
-            "0";
+            "—";
         chargesTotal.Text =
-            "0";
+            "—";
         paymentsTotal.Text =
-            "0";
+            "—";
         closingBalance.Text =
-            "0";
+            "—";
         selectionSummary.Text =
             "No students included";
         /* The statement was cleared, so there is nothing current to export until View Statement runs again. */

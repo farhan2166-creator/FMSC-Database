@@ -24,6 +24,9 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Fixed
 
+- Align certificate inputs directly beneath their labels, let certificate grids size date/dropdown fields consistently, and use compact wide-screen layouts for student certificate details.
+- Separate student account statements from the family/group statement workflow; expose annual receipts and outstanding bills as related reports, and leave balances unshown until a statement loads.
+- Let the school issue student character certificates based on current or earlier Class 10/12 placement, without a passed-exam checkbox or an extra print-wording acknowledgement.
 - Fit Record Departure fields and explanations within the dialog, show the waiver month only when selected, and show the school cutoff's actual waiver month in the review.
 - Verify a backup's recovery identity and compatibility in a temporary database before replacing live school records; retain backup-file protection and verify identity again after restore or safety recovery.
 - Remove main-database version checks from the communication worker and webhook callback; retain communication API, structural, permission and delivery safeguards (migration 41).

@@ -38,23 +38,28 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
             "Student and Year",
             "Choose a student and year to print compact receipts in two columns per page.");
         int fieldRowHeight = AppMetrics.FieldRowHeight;
-        int buttonRowHeight = AppMetrics.ButtonRowHeight;
+        AppMetrics.FitButtonWidth(view,minWidth:170);
         var fieldsTable = new TableLayoutPanel {
             Dock = DockStyle.Top,
-            ColumnCount = 1,
-            RowCount = 3,
-            Height = fieldRowHeight * 2 + buttonRowHeight,
+            ColumnCount = 3,
+            RowCount = 1,
+            Height = fieldRowHeight,
             Margin = new Padding(0),
             Padding = new Padding(0)
         };
+        fieldsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,75));
+        fieldsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));
+        fieldsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,view.Width+AppMetrics.SpacingSm));
         fieldsTable.RowStyles.Add(new RowStyle(SizeType.Absolute, fieldRowHeight));
-        fieldsTable.RowStyles.Add(new RowStyle(SizeType.Absolute, fieldRowHeight));
-        fieldsTable.RowStyles.Add(new RowStyle(SizeType.Absolute, buttonRowHeight));
         fieldsTable.Controls.Add(HumanUi.Field("Student", student), 0, 0);
-        fieldsTable.Controls.Add(HumanUi.Field("Academic Year", year), 0, 1);
-        var buttonRow = HumanUi.ButtonRow(view);
-        buttonRow.Dock = DockStyle.Fill;
-        fieldsTable.Controls.Add(buttonRow, 0, 2);
+        fieldsTable.Controls.Add(HumanUi.Field("Academic Year", year), 1, 0);
+        foreach(var field in fieldsTable.Controls.OfType<TableLayoutPanel>())
+            field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        var buttonCell=new Panel { Dock=DockStyle.Fill,Margin=Padding.Empty,
+            Padding=new Padding(0,Math.Max(16,AppMetrics.TextHeight(AppTheme.FieldCaptionFont)),AppMetrics.SpacingSm,AppMetrics.SpacingSm) };
+        view.Dock=DockStyle.Top;view.Margin=Padding.Empty;
+        buttonCell.Controls.Add(view);
+        fieldsTable.Controls.Add(buttonCell, 2, 0);
         selector.Content.Controls.Add(fieldsTable);
         var tip = HumanUi.Card(
             "Tip",
@@ -66,7 +71,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
             Margin = new Padding(0),
             Padding = new Padding(0)
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(2) + buttonRowHeight));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(1)));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(selector, 0, 0);
         root.Controls.Add(tip, 0, 1);

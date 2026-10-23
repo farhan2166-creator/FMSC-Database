@@ -205,6 +205,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(details, 0, 0);
         root.Controls.Add(records, 0, 1);
+        CertificateUi.CompactFields(details,fields,root,new[]{40f,20f,20f,20f},new[]{(0,0,1),(1,0,1),(2,0,1),(3,0,1)},1320);
         SetContent(
             root,
             UiText.Certificates.StudentGuidance);

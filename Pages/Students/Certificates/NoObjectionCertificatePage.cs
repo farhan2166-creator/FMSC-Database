@@ -100,13 +100,14 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
                 RowCount = 1,
+                Tag=CertificateUi.FieldGridTag,
                 Margin = new Padding(0),
                 Padding = new Padding(0)
             };
         fields.ColumnStyles.Add(
-            new ColumnStyle(SizeType.Percent, 50));
+            new ColumnStyle(SizeType.Percent, 75));
         fields.ColumnStyles.Add(
-            new ColumnStyle(SizeType.Percent, 50));
+            new ColumnStyle(SizeType.Percent, 25));
         for (int i = 0; i < 1; i++)
         {
             fields.RowStyles.Add(

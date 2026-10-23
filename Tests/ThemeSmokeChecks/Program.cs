@@ -34,6 +34,14 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--student-certificate-layouts"))
+        {
+            CheckStudentCertificateLayouts();
+            CheckCharacterCertificateLayout();
+            CheckDatePickerVisibility();
+            Console.WriteLine($"PASS: {checks} student certificate layout, keyboard and date visibility checks (no database connection).");
+            return;
+        }
         if(args.Contains("--departure-layout"))
         {
             CheckDepartureLayout();
