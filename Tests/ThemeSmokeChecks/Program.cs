@@ -34,6 +34,13 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--departure-layout"))
+        {
+            CheckDepartureLayout();
+            CheckLifecycleCloseGuard();
+            Console.WriteLine($"PASS: {checks} departure layout and lifecycle review checks (no database connection).");
+            return;
+        }
         if(args.Contains("--new-reports"))
         {
             CheckNewReportForms();

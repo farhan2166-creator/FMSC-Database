@@ -21,8 +21,10 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
         this.admission=admission;this.cancel=cancel;
         this.query=query??((procedure,parameters)=>DatabaseHelper.QueryUserAsync(procedure,parameters));
         Text=cancel?"Cancel Registration":"Record Departure";StartPosition=FormStartPosition.CenterParent;
-        Size=new Size(AppScale.Scale(820),AppScale.Scale(680));MinimumSize=new Size(700,540);
-        impact.ReadOnly=true;impact.Dock=DockStyle.Fill;
+        ClientSize=new Size(AppScale.Scale(820),AppScale.Scale(740));MinimumSize=new Size(AppScale.Scale(680),AppScale.Scale(580));
+        ShowInTaskbar=false;MinimizeBox=false;
+        impact.ReadOnly=true;impact.Dock=DockStyle.Fill;impact.ScrollBars=ScrollBars.Vertical;
+        impact.Text="Enter the date and reason, then select Review to see the effect before saving.";
         monthlyPolicy.Items.AddRange(new object[]{"Use the school cutoff","Keep all issued monthly bills","Waive monthly bills from a selected month"});monthlyPolicy.SelectedIndex=0;
         paidReduction.Items.AddRange(new object[]{"Keep excess payment as advance","Refund the excess payment"});paidReduction.SelectedIndex=0;
         FinanceHelp.Attach(this,paidReduction,FinanceHelp.Topic.PaidReduction);
@@ -32,22 +34,35 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
         waiveFrom.Format=DateTimePickerFormat.Custom;waiveFrom.CustomFormat="MMMM yyyy";
         waiveFrom.Value=new DateTime(date.Value.Year,date.Value.Month,1);waiveFrom.Enabled=false;
         var close=new ModernButton{Text="Close",DialogResult=DialogResult.Cancel};CancelButton=close;
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight*2));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight*1.5f));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.Controls.Add(new Label{Text=student,AutoSize=true},0,0);root.Controls.Add(HumanUi.Field(cancel?"Cancellation date":"Leaving date",date,true),0,1);
         root.Controls.Add(HumanUi.Field("Reason",reason,true),0,2);
-        var choices=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,RowCount=2,Visible=!cancel};
-        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,60));choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,40));
-        choices.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));choices.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        choices.Controls.Add(HumanUi.Field("Existing monthly fees",monthlyPolicy),0,0);choices.Controls.Add(HumanUi.Field("First month to waive",waiveFrom),1,0);
-        choices.Controls.Add(HumanUi.Field("If reduced fees have already been paid",paidReduction),0,1);choices.SetColumnSpan(choices.Controls[choices.Controls.Count-1],2);
+        var choices=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=1,RowCount=3,Visible=!cancel,Margin=Padding.Empty};
+        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        choices.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
+        choices.RowStyles.Add(new RowStyle(SizeType.Absolute,0));
+        choices.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
+        choices.Controls.Add(HumanUi.Field("Already issued monthly fees",monthlyPolicy),0,0);
+        var monthField=HumanUi.Field("First month to waive",waiveFrom);monthField.Visible=false;choices.Controls.Add(monthField,0,1);
+        choices.Controls.Add(HumanUi.Field("If a waived fee has already been paid",paidReduction),0,2);
+        monthlyPolicy.MaximumSize=Size.Empty;paidReduction.MaximumSize=Size.Empty;
         root.Controls.Add(choices,0,3);
-        root.Controls.Add(new Label{AutoSize=true,Text=cancel?"The registration and its financial history remain searchable.":
-            "Choose the school's decision for this student. Annual fees and earlier placements stay as recorded. No new fees are posted by closing a placement."},0,4);
-        root.Controls.Add(impact,0,5);root.Controls.Add(HumanUi.ButtonRow(review,apply,close),0,6);Controls.Add(root);apply.Enabled=false;
+        var explanation=new Label{AutoSize=true,Dock=DockStyle.Top,Margin=new Padding(0,6,0,10),Text=cancel?"The registration and its financial history remain searchable.":
+            "Only this placement closes. Earlier placements, annual fees and receipts stay recorded. Review shows the exact monthly fee waiver and any advance or refund before you apply."};
+        root.Controls.Add(explanation,0,4);
+        root.SizeChanged+=(_,_)=>explanation.MaximumSize=new Size(Math.Max(1,root.ClientSize.Width-root.Padding.Horizontal-explanation.Margin.Horizontal),0);
+        var buttons=HumanUi.ButtonRow(review,apply,close);buttons.Dock=DockStyle.Fill;
+        root.Controls.Add(impact,0,5);root.Controls.Add(buttons,0,6);Controls.Add(root);apply.Enabled=false;
         date.ValueChanged+=(_,_)=>Reset();reason.TextChanged+=(_,_)=>Reset();waiveFrom.ValueChanged+=(_,_)=>Reset();
-        monthlyPolicy.SelectedIndexChanged+=(_,_)=>{waiveFrom.Enabled=monthlyPolicy.SelectedIndex==2;Reset();};paidReduction.SelectedIndexChanged+=(_,_)=>Reset();
+        monthlyPolicy.SelectedIndexChanged+=(_,_)=>{
+            bool selectedMonth=monthlyPolicy.SelectedIndex==2;
+            waiveFrom.Enabled=selectedMonth;monthField.Visible=selectedMonth;
+            choices.RowStyles[1].Height=selectedMonth?AppMetrics.FieldRowHeight:0;
+            paidReduction.Enabled=monthlyPolicy.SelectedIndex!=1;Reset();
+        };paidReduction.SelectedIndexChanged+=(_,_)=>Reset();
         review.Click+=async(_,_)=>await ReviewAsync();apply.Click+=async(_,_)=>await ApplyAsync();
         FormClosing+=(_,e)=>{if(busy&&!Changed)e.Cancel=true;};
     }
@@ -72,6 +87,8 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
                 decimal outstanding=Convert.ToDecimal(plan["Outstanding"]),reduction=Convert.ToDecimal(plan["FutureAmount"]),paid=Convert.ToDecimal(plan["PaidReturnAmount"]);
                 string policy=Policy=="KeepIssued"?"Keep all issued monthly fees collectible.":
                     Policy=="FromMonth"?$"Waive monthly fees from {waiveFrom.Value:MMM yyyy}.":"Apply the school cutoff to this departure.";
+                if(Policy=="SchoolCutoff"&&plan.Table.Columns.Contains("ReverseFromMonth")&&plan["ReverseFromMonth"]!=DBNull.Value)
+                    policy=$"School cutoff: waive monthly fees from {Convert.ToDateTime(plan["ReverseFromMonth"]):MMM yyyy}.";
                 impact.Text=$"Close this placement on {date.Value:dd MMM yyyy}. Future automatic posting stops.\r\n{policy}\r\n\r\n"+
                     $"Current outstanding on this placement: Rs. {outstanding:N0}\r\nMonthly bill(s) reduced: {plan["FutureCount"]}\r\nUnpaid amount waived: Rs. {reduction:N0}\r\n"+
                     $"Paid amount released as {(paidReduction.SelectedIndex==1?"refund":"credit")}: Rs. {paid:N0}\r\nRemaining outstanding on this placement: Rs. {outstanding-reduction:N0}\r\n\r\n"+
