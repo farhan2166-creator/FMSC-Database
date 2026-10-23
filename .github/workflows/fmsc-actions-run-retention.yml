@@ -1,0 +1,84 @@
+name: FMSC Actions Run Retention
+
+on:
+  schedule:
+    # Every day at 03:27 UTC (08:27 Pakistan time).
+    - cron: '27 3 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Preview deletions without removing runs'
+        type: boolean
+        default: true
+
+# Required only for listing and deleting Actions runs.
+permissions:
+  actions: write
+
+concurrency:
+  group: fmsc-actions-run-retention
+  cancel-in-progress: false
+
+jobs:
+  prune-runs:
+    if: github.repository == 'farhan2166-creator/FMSC-Database' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Retain three completed runs per workflow
+        uses: actions/github-script@v9
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const retain = 3;
+            const dryRun = process.env.DRY_RUN === 'true';
+            const { owner, repo } = context.repo;
+            // Fetch every page before deleting: deleting while paginating skips runs.
+            const allRuns = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+              owner, repo, status: 'completed', per_page: 100
+            });
+            const byWorkflow = new Map();
+            for (const run of allRuns) {
+              // Active runs must never be deleted, even if an API response changes.
+              if (run.status !== 'completed') continue;
+              if (!Number.isSafeInteger(run.workflow_id)) {
+                core.warning(`Skipping run ${run.id}: missing workflow ID`);
+                continue;
+              }
+              const group = byWorkflow.get(run.workflow_id) || [];
+              group.push(run);
+              byWorkflow.set(run.workflow_id, group);
+            }
+
+            let kept = 0;
+            let candidates = 0;
+            for (const [workflowId, runs] of byWorkflow) {
+              runs.sort((a, b) =>
+                Date.parse(b.created_at) - Date.parse(a.created_at) || b.id - a.id);
+              kept += Math.min(retain, runs.length);
+              const expired = runs.slice(retain);
+              core.info(`Workflow ${workflowId}: retain ${Math.min(retain, runs.length)} of ${runs.length}; ${expired.length} older completed runs.`);
+              for (const run of expired) {
+                if (run.id === context.runId) continue;
+                if (dryRun) {
+                  core.info(`[preview] Delete ${run.html_url}`);
+                } else {
+                  await github.rest.actions.deleteWorkflowRun({ owner, repo, run_id: run.id });
+                  core.info(`Deleted completed run ${run.id}`);
+                }
+                candidates++;
+              }
+            }
+            const heading = dryRun ? 'Actions run retention preview' : 'Actions run retention';
+            await core.summary
+              .addHeading(heading)
+              .addTable([
+                [{data:'Metric',header:true},{data:'Count',header:true}],
+                ['Workflows', String(byWorkflow.size)],
+                ['Completed runs retained', String(kept)],
+                [dryRun ? 'Runs eligible for deletion' : 'Runs deleted', String(candidates)]
+              ])
+              .addRaw('Only completed runs are eligible. Deleting a run may remove its logs and associated artifacts.\n')
+              .write();
