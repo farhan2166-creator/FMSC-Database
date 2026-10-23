@@ -3,13 +3,17 @@ using FMSC_SMS.Pages.Reports.Finance;
 
 internal static partial class Program
 {
-    private static DataTable Read(SqlConnection connection,string query,int user=1,int campus=0)
+    private static DataTable Read(SqlConnection connection,string query,int user=1,int campus=0,Action<SqlCommand>? configure=null)
     {
         using var command=new SqlCommand(query,connection);
         command.Parameters.AddWithValue("@UserId",user); command.Parameters.AddWithValue("@CampusId",campus);
         command.Parameters.AddWithValue("@ClassId",0);command.Parameters.AddWithValue("@SectionId",0);
         command.Parameters.Add("@FromDate",SqlDbType.Date).Value=new DateTime(2026,1,1);
         command.Parameters.Add("@ToDate",SqlDbType.Date).Value=new DateTime(2026,12,31);
+        command.Parameters.AddWithValue("@AcademicYearId",0);
+        foreach(string parameter in new[]{"@CertificateType","@RecipientType","@EntryKind","@CollectionStatus"}) command.Parameters.Add(parameter,SqlDbType.NVarChar,100).Value=DBNull.Value;
+        command.Parameters.AddWithValue("@Search","");
+        configure?.Invoke(command);
         var data=new DataTable();using var adapter=new SqlDataAdapter(command);adapter.Fill(data);return data;
     }
     private static void Execute(SqlConnection connection,string sql)
@@ -53,8 +57,10 @@ internal static partial class Program
             Execute(connection,"""
                 CREATE PROCEDURE dbo.RequirePermission @UserId int,@Permission nvarchar(100) AS
                 BEGIN
-                    IF @UserId NOT IN(1,2) THROW 51000,'Permission denied in synthetic fixture.',1;
+                    IF @UserId NOT IN(1,2,3,4) THROW 51000,'Permission denied in synthetic fixture.',1;
                     IF @UserId=2 AND @Permission=N'Fees.View' THROW 51000,'Fee viewing denied in synthetic fixture.',1;
+                    IF @UserId IN(2,4) AND @Permission=N'Certificates.Create' THROW 51000,'Certificate viewing denied in synthetic fixture.',1;
+                    IF @UserId IN(2,3) AND @Permission=N'Students.Leave' THROW 51000,'Leaving certificate viewing denied in synthetic fixture.',1;
                 END;
                 """);
             using var credit=Read(connection,CreditBalanceReportData.Query);
@@ -70,6 +76,7 @@ internal static partial class Program
             Check(denied,"Credit query enforces fee viewing in addition to report viewing");
             denied=false;try{Read(connection,ConcessionSummaryData.Query,user:0);}catch(SqlException){denied=true;}
             Check(denied,"Concession query enforces report permission");
+            CheckNewSql(connection);
         }
         finally { SqlConnection.ClearAllPools();Execute(master,$"ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{database}];"); }
     }

@@ -2,7 +2,8 @@
 
 Scope: existing report fixes and the Student Credit Balance Register, based on
 `main` at `17fef27`. Monthly Fee Reconciliation and the Certificate Issue Register
-are deferred. Financial writers, permissions, database versions, numbered
+were deferred from that batch and are now implemented in the follow-up described
+in [NEW_REPORTS.md](NEW_REPORTS.md). Financial writers, permission definitions, database versions, numbered
 migrations, saved bills and receipt snapshots are unchanged.
 
 ## Operator behavior
