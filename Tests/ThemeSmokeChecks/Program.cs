@@ -232,6 +232,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} latest receipt checks (no database connection).");
             return;
         }
+        if(args.Contains("--restore-identity"))
+        {
+            CheckRestoreIdentity();
+            Console.WriteLine($"PASS: {checks} restore identity checks (no database connection).");
+            return;
+        }
         if(args.Contains("--bill-line-identity"))
         {
             CheckBillLineIdentity();

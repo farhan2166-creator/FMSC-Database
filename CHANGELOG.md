@@ -24,6 +24,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Fixed
 
+- Verify a backup's recovery identity and compatibility in a temporary database before replacing live school records; retain backup-file protection and verify identity again after restore or safety recovery.
+- Remove main-database version checks from the communication worker and webhook callback; retain communication API, structural, permission and delivery safeguards (migration 41).
 - Make the database-file release helper stop a verified lingering LocalDB engine gracefully and require repeated process-exit and exclusive MDF/LDF checks, even when the controller incorrectly reports Stopped.
 - Validate each issued bill line against its saved charge balance and student, rejecting offsetting stale amounts even when the grand total matches (migration 40). Existing saved bills remain available for reprint.
 - Retain additional-fee posting intent across interrupted saves and reopening; both individual and bulk entry require a read-only outcome check before another posting can proceed.

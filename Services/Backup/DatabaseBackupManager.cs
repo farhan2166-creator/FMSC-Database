@@ -251,12 +251,26 @@ public static class DatabaseBackupManager
         bool singleUserSet = false;
         bool restoreStarted = false;
         string? safetyPath = null;
+        Guid expectedScope=Guid.Empty;
         try
         {
+            // Keep this exact backup readable but prevent it being overwritten
+            // or swapped between identity verification and the live restore.
+            using var backupLock=new FileStream(backupPath,FileMode.Open,FileAccess.Read,FileShare.Read);
             progress?.Report("Validating backup file...");
             ValidateBackupFile(backupPath);
+            using(var current=new SqlConnection(DatabaseHelper.GetConnectionString("FMSC_DB")))
+            {
+                DatabaseHelper.OpenConnection(current);expectedScope=BackupRestoreIdentity.ReadScope(current);
+            }
+            progress?.Report("Checking the backup's school identity and compatibility...");
+            BackupRestoreIdentity.ValidateCandidate(MasterConnectionString,backupPath,Path.Combine(DatabaseHelper.DatabaseFolder,"RestoreChecks"),expectedScope,DatabaseCompatibility.Validate);
             progress?.Report("Taking a safety backup of the current database...");
             safetyPath = TryCreatePreRestoreSafetyBackup(backupPath, progress, safetyBackupCreated);
+            using(var current=new SqlConnection(DatabaseHelper.GetConnectionString("FMSC_DB")))
+            {
+                DatabaseHelper.OpenConnection(current);BackupRestoreIdentity.RequireSame(expectedScope,BackupRestoreIdentity.ReadScope(current));
+            }
             SqlConnection.ClearAllPools();
             progress?.Report("Connecting to SQL Server...");
             using SqlConnection connection = new(MasterConnectionString);
@@ -291,6 +305,7 @@ public static class DatabaseBackupManager
             {
                 DatabaseHelper.OpenConnection(restored);
                 DatabaseCompatibility.Validate(restored);
+                BackupRestoreIdentity.RequireSame(expectedScope,BackupRestoreIdentity.ReadScope(restored));
             }
             progress?.Report("Recording restore history...");
             long fileSize = new FileInfo(backupPath).Length;
@@ -353,6 +368,7 @@ public static class DatabaseBackupManager
                     using var recovered = new SqlConnection(DatabaseHelper.GetConnectionString("FMSC_DB"));
                     DatabaseHelper.OpenConnection(recovered);
                     DatabaseCompatibility.Validate(recovered);
+                    BackupRestoreIdentity.RequireSame(expectedScope,BackupRestoreIdentity.ReadScope(recovered));
                     StudentSearchCache.Invalidate();
                     recoveryMessage = "\n\nThe pre-restore safety backup was automatically restored. Your original working database has been preserved.";
                 }
