@@ -49,9 +49,28 @@ internal static partial class Program
         editor.StartPosition = FormStartPosition.Manual; editor.Location = new Point(-20000, -20000);
         Seed(editor, history);
         editor.Show(); Application.DoEvents();
+        var historicalPlacement = Field<PlacementPicker>(editor, "placement");
+        Check(historicalPlacement.Source.Rows.Count == 2 && historicalPlacement.Source.AsEnumerable().All(row => Convert.ToInt32(row["ClassSectionId"]) != 102),
+            "Missing placement picker excludes classes that reverse the recorded progression.");
+        historicalPlacement.SelectedValue = 101;
         Check(!Field<ListBox>(editor, "record").Visible && Field<LookupBox>(editor, "year").Enabled,
             "Missing history opens a separate form with academic-year selection.");
         Check(Field<ModernComboBox>(editor, "status").Text == "Left", "Missing history defaults to a closed record when an active placement exists.");
+        Check(!Field<ModernComboBox>(editor, "status").Items.Contains("Active"), "Missing history never offers Active status.");
+        Check(!Field<CheckBox>(editor, "legacy").Visible, "Missing history offers no pre-admission override.");
+        Check(!Field<ModernDatePicker>(editor, "billing").Enabled && !Field<ModernDatePicker>(editor, "billing").Checked,
+            "Historical placement billing start remains disabled and empty.");
+        Check(Field<ModernDatePicker>(editor, "start").MinDate == new DateTime(2024,4,1) &&
+            Field<ModernDatePicker>(editor, "start").MaxDate == new DateTime(2025,3,31), "Historical dates are constrained to the selected gap.");
+        Field<ModernComboBox>(editor, "status").SelectedItem = "Promoted";
+        Check(Field<ModernDatePicker>(editor, "leave").MinDate == new DateTime(2025,4,1) &&
+            Field<ModernDatePicker>(editor, "leave").MaxDate == new DateTime(2025,4,1), "Promotion uses exactly the recorded destination date.");
+        Field<ModernComboBox>(editor, "status").SelectedItem = "Left";
+        Check(Field<ModernDatePicker>(editor, "leave").MaxDate == new DateTime(2025,3,31), "Leaving cannot cross the historical gap's end.");
+        historicalPlacement.SelectedValue = 103;
+        Check(!Field<ModernComboBox>(editor, "status").Items.Contains("Promoted"), "Repeating the destination class is not offered as promotion.");
+        historicalPlacement.SelectedValue = 101;
+        Check(Field<ModernComboBox>(editor, "status").Items.Contains("Promoted"), "A lower class can be promoted to the recorded higher destination.");
         Check(Field<ModernButton>(editor, "review").Visible && !Field<ModernButton>(editor, "addHistory").Visible && !Field<ModernButton>(editor, "apply").Enabled,
             "Missing history requires review before applying and cannot recursively open history entry.");
         Capture(editor, "missing-history");
@@ -60,6 +79,7 @@ internal static partial class Program
         Check(list.Items.Count == 0 && !Field<ModernButton>(browser, "dates").Visible && !Field<ModernButton>(browser, "edit").Visible,
             "Empty history offers no correction of a nonexistent record.");
         Check(Field<ModernTextBox>(browser, "impact").Text.Contains("No placement records"), "Empty history gives clear guidance.");
+        Check(!Field<ModernButton>(browser, "addHistory").Enabled, "No eligible gap disables missing history entry.");
         browser.Close();
 
         T Field<T>(object instance, string name) => (T)type.GetField(name, flags)!.GetValue(instance)!;
@@ -68,9 +88,24 @@ internal static partial class Program
             type.GetField("loading", flags)!.SetValue(instance, true);
             type.GetField("enrollments", flags)!.SetValue(instance, data);
             type.GetField("currentAcademicYear", flags)!.SetValue(instance, 28);
+            var windows = new DataTable();
+            windows.Columns.Add("WindowId", typeof(int)); windows.Columns.Add("AcademicYearId", typeof(int)); windows.Columns.Add("YearName");
+            windows.Columns.Add("GapStart", typeof(DateTime)); windows.Columns.Add("GapEnd", typeof(DateTime)); windows.Columns.Add("PromotionDate", typeof(DateTime));
+            if (data.Rows.Count > 0) windows.Rows.Add(1, 26, "2024-2025", new DateTime(2024,4,1), new DateTime(2025,3,31), new DateTime(2025,4,1));
+            type.GetField("missingWindows", flags)!.SetValue(instance, windows);
+            var choices = new DataTable(); choices.Columns.Add("WindowId", typeof(int));
+            choices.Columns.Add("ClassSectionId", typeof(int)); choices.Columns.Add("CanPromote", typeof(bool));
+            if (data.Rows.Count > 0) { choices.Rows.Add(1,101,true); choices.Rows.Add(1,103,false); }
+            type.GetField("missingPlacementChoices", flags)!.SetValue(instance, choices);
+            var placements = new DataTable(); placements.Columns.Add("ClassSectionId", typeof(int)); placements.Columns.Add("ClassId", typeof(int));
+            placements.Columns.Add("CampusName"); placements.Columns.Add("ClassName"); placements.Columns.Add("SectionName");
+            placements.Rows.Add(101,9,"Fixture campus","Class 9","F");
+            placements.Rows.Add(102,11,"Fixture campus","Class 11","F");
+            placements.Rows.Add(103,10,"Fixture campus","Class 10","F");
+            type.GetField("allPlacements", flags)!.SetValue(instance, placements);
             var years = new DataTable(); years.Columns.Add("AcademicYearId", typeof(int)); years.Columns.Add("YearName");
             years.Rows.Add(27, "2025-2026"); years.Rows.Add(28, "2026-2027");
-            Field<LookupBox>(instance, "year").Bind(years, "AcademicYearId", "YearName");
+            type.GetMethod("BindYears", flags)!.Invoke(instance, new object[] { years });
             type.GetMethod("BindHistory", flags)!.Invoke(instance, new object[] { -1 });
             type.GetField("loading", flags)!.SetValue(instance, false);
             type.GetMethod("LoadSelected", flags)!.Invoke(instance, null);

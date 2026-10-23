@@ -29,12 +29,21 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         (int.TryParse(Convert.ToString(record.SelectedValue), out int id) ? id : 0);
     private int currentAcademicYear;
     private DataTable enrollments = new();
+    private DataTable missingWindows = new();
+    private DataTable missingPlacementChoices = new(), allPlacements = new();
+    private DataRow? SelectedMissingPlacement => missingPlacementChoices.AsEnumerable().FirstOrDefault(row =>
+        Convert.ToInt32(row["WindowId"]) == year.SelectedId && Convert.ToInt32(row["ClassSectionId"]) == placement.SelectedId);
+    private bool updatingPeriod;
+    private DataRow? MissingWindow => missingWindows.AsEnumerable().FirstOrDefault(row =>
+        Convert.ToInt32(row["WindowId"]) == year.SelectedId);
+    private int SelectedYearId => editingEnrollment == 0 && MissingWindow is DataRow window
+        ? Convert.ToInt32(window["AcademicYearId"]) : year.SelectedId;
     private DataRow? plan;
     private bool busy, loading;
     private bool legacySetupPending;
     private bool Confirmed => !legacySetupPending && SelectedRecord()?["PlacementConfirmedAt"] is DateTime;
     private bool CanReviewPlacement => editingEnrollment.HasValue &&
-        (editingEnrollment == 0 || SelectedRecord() is not null && !Confirmed);
+        (editingEnrollment == 0 ? MissingWindow is not null : SelectedRecord() is not null && !Confirmed);
     private bool HasPlacementEdits => SelectedRecord() is DataRow current &&
         (year.SelectedId != Convert.ToInt32(current["AcademicYearId"]) || placement.SelectedId != Convert.ToInt32(current["ClassSectionId"]) ||
          status.Text != Convert.ToString(current["Status"]) || start.Value.Date != Convert.ToDateTime(current["EnrollmentDate"]).Date ||
@@ -93,9 +102,10 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         root.Controls.Add(impact, 0, 3); root.Controls.Add(buttons, 0, 4);
         Controls.Add(root); CancelButton = close;
         record.SelectedIndexChanged += (_, _) => LoadSelected();
-        year.SelectedIndexChanged += (_, _) => ResetReview(); placement.SelectedIndexChanged += (_, _) => ResetReview();
-        status.SelectedIndexChanged += (_, _) => { leave.Enabled = Convert.ToString(status.SelectedItem) != "Active"; if (!leave.Enabled) leave.Checked = false; ResetReview(); };
-        start.ValueChanged += (_, _) => ResetReview(); leave.ValueChanged += (_, _) => ResetReview();
+        year.SelectedIndexChanged += (_, _) => { ConfigureMissingPeriod(true); ResetReview(); };
+        placement.SelectedIndexChanged += (_, _) => { ConfigureMissingPeriod(false); ResetReview(); };
+        status.SelectedIndexChanged += (_, _) => { leave.Enabled = Convert.ToString(status.SelectedItem) != "Active"; if (!leave.Enabled) leave.Checked = false; ConfigureMissingPeriod(false); ResetReview(); };
+        start.ValueChanged += (_, _) => { ConfigureMissingPeriod(false); ResetReview(); }; leave.ValueChanged += (_, _) => { ConfigureMissingPeriod(false); ResetReview(); };
         billing.ValueChanged += (_, _) => ResetReview();
         reason.TextChanged += (_, _) => ResetReview(); legacy.CheckedChanged += (_, _) => ResetReview();
         review.Click += async (_, _) => await ReviewAsync();
@@ -126,17 +136,25 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
     }
     private void ResetReview()
     {
+        if (loading || updatingPeriod) return;
         plan = null; apply.Enabled = false;
         confirm.Enabled = !busy && SelectedEnrollmentId > 0 && !Confirmed && !HasPlacementEdits;
-        if (!loading && editingEnrollment.HasValue) impact.Text = "Complete the details and reason, then choose Review. Check the effect on fees before applying.";
+        if (editingEnrollment.HasValue) impact.Text = editingEnrollment == 0
+            ? MissingWindow is DataRow window
+                ? $"Available gap: {Convert.ToDateTime(window["GapStart"]):dd MMM yyyy} to {Convert.ToDateTime(window["GapEnd"]):dd MMM yyyy}. Complete the details, then Review."
+                : "No missing historical placement can be added. No eligible gaps are available. Use Re-admission for a return after departure."
+            : "Complete the details and reason, then choose Review. Check the effect on fees before applying.";
     }
     private void SetBusy(bool value)
     {
         busy = value; fields.Enabled = close.Enabled = !value;
-        legacy.Enabled = review.Enabled = !value && CanReviewPlacement;
+        legacy.Enabled = !value && CanReviewPlacement;
+        review.Enabled = !value && CanReviewPlacement && (editingEnrollment != 0 || SelectedMissingPlacement is not null);
         dates.Enabled = !value && SelectedRecord() is not null;
         edit.Enabled = !value && SelectedRecord() is not null && !Confirmed;
-        addHistory.Enabled = !value;
+        addHistory.Enabled = !value && missingWindows.Rows.Count > 0;
+        addHistory.AccessibleDescription = missingWindows.Rows.Count > 0 ? "Record a verified gap in placement history."
+            : "No missing historical placement can be added: no eligible gaps are available.";
         confirm.Enabled = !value && SelectedEnrollmentId > 0 && !Confirmed && !HasPlacementEdits;
         apply.Enabled = !value && !Confirmed && plan is not null && Convert.ToInt32(plan["BlockedCount"]) == 0;
     }
@@ -151,13 +169,63 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             var years = await DatabaseHelper.QueryUserAsync("GetAcademicYears");
             currentAcademicYear = years.AsEnumerable().FirstOrDefault(r => Convert.ToBoolean(r["IsCurrent"])) is DataRow currentYear
                 ? Convert.ToInt32(currentYear["AcademicYearId"]) : 0;
-            var placements = await DatabaseHelper.QueryUserAsync("GetClassSections", DatabaseHelper.Int("@CampusId", 0), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0));
-            year.Bind(years, "AcademicYearId", "YearName"); placement.Bind(placements);
+            allPlacements = await DatabaseHelper.QueryUserAsync("GetClassSections", DatabaseHelper.Int("@CampusId", 0), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0));
+            missingPlacementChoices = await MissingPlacementPolicy.ReadAsync(admission);
+            missingWindows = missingPlacementChoices.DefaultView.ToTable(true, "WindowId", "AcademicYearId", "YearName", "GapStart", "GapEnd", "PromotionDate");
+            BindYears(years); placement.Bind(allPlacements);
             BindHistory(selected);
             loading = false; LoadSelected();
         }
         catch (Exception ex) { impact.Text = DbMessage.UserMessage(ex); }
         finally { loading = false; SetBusy(false); }
+    }
+    private void BindYears(DataTable years)
+    {
+        if (editingEnrollment != 0) { year.Bind(years, "AcademicYearId", "YearName"); return; }
+        if (!missingWindows.Columns.Contains("Display")) missingWindows.Columns.Add("Display");
+        foreach (DataRow row in missingWindows.Rows)
+            row["Display"] = $"{row["YearName"]} · {Convert.ToDateTime(row["GapStart"]):dd MMM yyyy} – {Convert.ToDateTime(row["GapEnd"]):dd MMM yyyy}";
+        year.Bind(missingWindows, "WindowId", "Display", "Choose an available historical period");
+    }
+    private void ConfigureMissingPeriod(bool resetDates)
+    {
+        if (editingEnrollment != 0 || loading || updatingPeriod) return;
+        updatingPeriod = true;
+        try
+        {
+            if (resetDates)
+            {
+                int previous = placement.SelectedId;
+                var eligible = missingPlacementChoices.AsEnumerable().Where(row => Convert.ToInt32(row["WindowId"]) == year.SelectedId)
+                    .Select(row => Convert.ToInt32(row["ClassSectionId"])).ToHashSet();
+                var filtered = allPlacements.Clone();
+                foreach (DataRow row in allPlacements.Rows)
+                    if (eligible.Contains(Convert.ToInt32(row["ClassSectionId"]))) filtered.ImportRow(row);
+                placement.Bind(filtered);
+                placement.SelectedValue = eligible.Contains(previous) ? previous : 0;
+            }
+            if (MissingWindow is not DataRow window) { review.Enabled = false; return; }
+            DateTime first = Convert.ToDateTime(window["GapStart"]), last = Convert.ToDateTime(window["GapEnd"]);
+            string selectedStatus = status.Text;
+            status.Items.Clear(); status.Items.Add("Left");
+            if (window["PromotionDate"] is DateTime && SelectedMissingPlacement is DataRow choice && Convert.ToBoolean(choice["CanPromote"])) status.Items.Add("Promoted");
+            status.SelectedItem = status.Items.Contains(selectedStatus) ? selectedStatus : "Left";
+            Limit(start, first, last, resetDates ? first : start.Value);
+            DateTime end = status.Text == "Promoted" ? Convert.ToDateTime(window["PromotionDate"]) : last;
+            leave.ShowCheckBox = false; leave.Checked = true;
+            Limit(leave, status.Text == "Promoted" ? end : start.Value.Date, end, resetDates ? end : leave.Value);
+            billing.Checked = false;
+            billing.Enabled = false;
+            review.Enabled = !busy && SelectedMissingPlacement is not null;
+        }
+        finally { updatingPeriod = false; }
+
+        static void Limit(ModernDatePicker picker, DateTime min, DateTime max, DateTime value)
+        {
+            picker.MinDate = DateTimePicker.MinimumDateTime; picker.MaxDate = DateTimePicker.MaximumDateTime;
+            picker.Value = value < min ? min : value > max ? max : value;
+            picker.MinDate = min; picker.MaxDate = max;
+        }
     }
     private void BindHistory(int selected)
     {
@@ -178,9 +246,18 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
     {
         if (loading) return;
         loading = true;
+        if (editingEnrollment == 0)
+            foreach (var picker in new[] { start, leave, billing })
+            {
+                picker.MinDate = DateTimePicker.MinimumDateTime;
+                picker.MaxDate = DateTimePicker.MaximumDateTime;
+            }
         var current = SelectedRecord();
         // Existing history keeps its recorded year; a new placement uses the configured current year.
-        year.SelectedValue = current?["AcademicYearId"] ?? currentAcademicYear; placement.SelectedValue = current?["ClassSectionId"] ?? 0;
+        year.SelectedValue = editingEnrollment == 0
+            ? missingWindows.Rows.Count > 0 ? missingWindows.Rows[0]["WindowId"] : 0
+            : current?["AcademicYearId"] ?? currentAcademicYear;
+        placement.SelectedValue = current?["ClassSectionId"] ?? 0;
         status.SelectedItem = current?["Status"] ??
             (enrollments.AsEnumerable().Any(row => Convert.ToString(row["Status"]) == "Active") ? "Left" : "Active");
         start.Value = current is null ? DateTime.Today : Convert.ToDateTime(current["EnrollmentDate"]);
@@ -190,7 +267,8 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         billing.Checked = current?["BillingStartDate"] is DateTime;
         if (current?["BillingStartDate"] is DateTime billed) billing.Value = billed;
         reason.Clear(); legacy.Checked = false; dates.Enabled = current is not null;
-        loading = false; ResetReview();
+        loading = false;
+        ConfigureMissingPeriod(true); ResetReview();
         foreach (Control field in fields.Controls)
             field.Visible = editingEnrollment.HasValue ? CanReviewPlacement && !field.Contains(record) : field.Contains(record);
         fields.SetColumnSpan(record.Parent!, 2);
@@ -200,20 +278,25 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             fields.SetColumnSpan(year.Parent!, 2);
         }
         year.Enabled = editingEnrollment == 0;
-        legacy.Visible = review.Visible = apply.Visible = CanReviewPlacement;
+        review.Visible = apply.Visible = CanReviewPlacement;
+        legacy.Visible = CanReviewPlacement && editingEnrollment != 0;
+        billing.Enabled = editingEnrollment != 0;
+        if (editingEnrollment == 0) billing.Checked = false;
         confirm.Visible = false;
         dates.Visible = !editingEnrollment.HasValue && Confirmed;
         edit.Visible = !editingEnrollment.HasValue && current is not null && !Confirmed;
         addHistory.Visible = !editingEnrollment.HasValue;
         if (!editingEnrollment.HasValue) ShowHistorySummary(current);
-        else if (!CanReviewPlacement) impact.Text = "This placement is already confirmed or no longer available. Close this form and select it in Placement History.";
+        else if (!CanReviewPlacement && editingEnrollment != 0) impact.Text = "This placement is already confirmed or no longer available. Close this form and select it in Placement History.";
         SetBusy(busy);
     }
     private void ShowHistorySummary(DataRow? current)
     {
         if (current is null)
         {
-            impact.Text = "No placement records are available.\r\n\r\nUse Add Missing Historical Placement only to record verified missing history.";
+            impact.Text = "No placement records are available.\r\n\r\n" + (missingWindows.Rows.Count > 0
+                ? "Use Add Missing Historical Placement only to record verified missing history."
+                : "No missing historical placement can be added: no eligible gaps are available.");
             return;
         }
         string DateText(string column) => current[column] is DateTime date ? date.ToString("dd MMM yyyy") : "Not recorded";
@@ -221,10 +304,11 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             $"Placement starts: {DateText("EnrollmentDate")}\r\nBilling starts: {DateText("BillingStartDate")}\r\nLeaving / promotion date: {DateText("LeavingDate")}\r\n\r\n" +
             (Confirmed ? "To fix a date error, choose Correct Dates.\r\n\r\nUse Promotion for a new academic year, Transfer to change campus/class/section, or Re-admission after leaving."
             : "Choose Review / Complete Placement to check this draft and its effect on fees. Confirm the first current placement in Admission after completing setup.");
+        if (missingWindows.Rows.Count == 0) impact.Text += "\r\n\r\nNo missing historical placement can be added: no eligible gaps are available.";
     }
     private async Task OpenEditorAsync(int enrollmentId)
     {
-        if (busy || editingEnrollment.HasValue || enrollmentId > 0 && (SelectedRecord() is null || Confirmed)) return;
+        if (busy || editingEnrollment.HasValue || enrollmentId == 0 && missingWindows.Rows.Count == 0 || enrollmentId > 0 && (SelectedRecord() is null || Confirmed)) return;
         SetBusy(true);
         try
         {
@@ -239,22 +323,28 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         finally { SetBusy(false); }
     }
     private Task<DataTable> RunAsync(string? snapshot = null) => PlacementCorrection.ReviewAsync(admission,
-        Math.Max(0, SelectedEnrollmentId), year.SelectedId, placement.SelectedId, start.Value.Date,
-        leave.Checked ? leave.Value.Date : null, billing.Checked ? billing.Value.Date : null,
+        Math.Max(0, SelectedEnrollmentId), SelectedYearId, placement.SelectedId, start.Value.Date,
+        leave.Checked ? leave.Value.Date : null, editingEnrollment != 0 && billing.Checked ? billing.Value.Date : null,
         Convert.ToString(status.SelectedItem) ?? "", reason.Text.Trim(), legacy.Checked, snapshot);
     private async Task ReviewAsync()
     {
         if (busy || !CanReviewPlacement) return;
+        if (editingEnrollment == 0 && SelectedMissingPlacement is null)
+        {
+            impact.Text = "Choose a campus / class / section that fits the earlier and later placements.";
+            return;
+        }
         ResetReview(); SetBusy(true);
         try
         {
             plan = (await RunAsync()).Rows[0];
             impact.Text = $"{year.Text}\r\n{placement.Text}\r\n{status.Text}: {start.Value:dd MMM yyyy}" +
                 (leave.Checked ? $" → {leave.Value:dd MMM yyyy}" : "") +
-                "\r\nBilling starts: " + (billing.Checked ? billing.Value.ToString("dd MMM yyyy") : "placement start date") +
+                (editingEnrollment == 0 ? "\r\nBilling: not applicable to historical placement." :
+                    "\r\nBilling starts: " + (billing.Checked ? billing.Value.ToString("dd MMM yyyy") : "placement start date")) +
                 $"\r\n\r\nReverse {plan["CancelCount"]} out-of-period unpaid charge(s): Rs. {Convert.ToDecimal(plan["CancelledAmount"]):N0}." +
                 $"\r\nKeep {plan["RetainedCharges"]} valid charge(s). Existing fee rates and payments are preserved." +
-                (Convert.ToBoolean(plan["Creating"]) ? "\r\nThis records a draft only. No fees or bills are created. Mark the legacy record verified in Admission when ready." :
+                (Convert.ToBoolean(plan["Creating"]) ? "\r\nThis records historical placement only. No fees or bills are created; the student's current status is preserved." :
                 "\r\nNo new charges are posted. Review fee setup in Admission after correcting placement.") +
                 (Convert.ToInt32(plan["BlockedCount"]) > 0 ? $"\r\n\r\n{plan["BlockedCount"]} affected charge(s) have payments. Resolve those in Fee Corrections, then review again." :
                 "\r\n\r\nApply saves the correction and listed reversals together, with your reason in history.");

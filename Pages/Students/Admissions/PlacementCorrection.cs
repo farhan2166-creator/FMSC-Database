@@ -9,7 +9,7 @@ internal static class PlacementCorrection
         using var stream = typeof(PlacementCorrection).Assembly.GetManifestResourceStream(
             "FMSC_SMS.Pages.Students.Admissions.PlacementCorrection.sql")!;
         using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
+        return reader.ReadToEnd().Replace("-- MISSING_PLACEMENT_POLICY", MissingPlacementPolicy.Sql);
     }
     internal static Task<DataTable> ReviewAsync(int admission, int enrollment, int year, int placement,
         DateTime start, DateTime? leaving, DateTime? billing, string status, string reason, bool legacy, string? snapshot = null)
