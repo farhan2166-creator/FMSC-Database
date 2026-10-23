@@ -34,6 +34,13 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--fee-tasks"))
+        {
+            CheckOperatorConcessionChoices();
+            CheckFeeTaskFlow();
+            Console.WriteLine($"PASS: {checks} fee task, scope, overpayment and recovery checks (no database writes); previews in artifacts/fee-tasks.");
+            return;
+        }
         if (args.Contains("--placement-history-flow"))
         {
             CheckPlacementHistoryFlow();

@@ -3,63 +3,76 @@ using Microsoft.Data.SqlClient;
 
 namespace FMSC_SMS.Pages.Finance.StudentAccounts;
 
-/// <summary>Review fee terms and their explicit effect on the agreement and issued bills.</summary>
-public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
+/// <summary>Choose one fee task, its scope, and review the financial result before saving.</summary>
+public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
 {
     private readonly int assignment;
-    private readonly string identity;
-    private readonly decimal standardAmount;
-    private readonly ModernTextBox newRate=HumanUi.TextBox(false,20);
-    private readonly CheckBox changeRate=new(){Text="Change the full fee before discount",AutoSize=true},
-        fullWaiver=new(){Text="Waive the full fee for this period",AutoSize=true},
-        updateAgreement=new(){Text="Change the student's saved fee plan",AutoSize=true,Checked=true};
-    private readonly bool agreementAllowed;
+    private readonly string identity, feeName, originalLabel;
+    private readonly decimal standardAmount, originalDiscount;
+    private readonly bool originalWaiver, agreementAllowed;
     private readonly long? billId;
-    private readonly ModernTextBox amount=HumanUi.TextBox(false,20),reason=HumanUi.TextBox(false,500);
-    private readonly ModernComboBox concession=HumanUi.Combo(),paidReduction=HumanUi.Combo();
-    private readonly ModernDatePicker fromMonth=HumanUi.Date(),throughMonth=HumanUi.Date();
-    private readonly CheckBox applyBills=new(){Text="Also change existing bills in this period",AutoSize=true,Checked=true};
-    private readonly CheckBox useCredit=new(){Text="Use advance money for due tuition first, then other due fees",AutoSize=true};
-    private readonly Label impact=new(){AutoSize=true,Dock=DockStyle.Fill,Padding=new Padding(6)};
-    private readonly DataGridView bills=HumanUi.Grid(false),schedule=HumanUi.Grid(false);
-    private readonly ModernButton review=new(){Text="Review Fee Change",ThemeRole="Secondary"},
-        save=new(){Text="Confirm Fee Change",ThemeRole="Success",Enabled=false},
-        check=new(){Text="Check Save Outcome",ThemeRole="Secondary"};
-    private readonly TableLayoutPanel fields=new(){Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,RowCount=9};
+    private readonly ModernComboBox action = HumanUi.Combo(), scope = HumanUi.Combo();
+    private readonly ModernTextBox newRate = HumanUi.TextBox(false,20), amount = HumanUi.TextBox(false,20), reason = HumanUi.TextBox(false,500);
+    private readonly ModernComboBox concession = HumanUi.Combo(), paidReduction = HumanUi.Combo();
+    private readonly ModernDatePicker fromMonth = HumanUi.Date(), throughMonth = HumanUi.Date();
+    private readonly Label impact = new() { AutoSize=true, Dock=DockStyle.Fill, Padding=new Padding(6) };
+    private readonly DataGridView bills = HumanUi.Grid(false), schedule = HumanUi.Grid(false);
+    private readonly ModernButton review = new() { Text="Review Fee Change", ThemeRole="Secondary" },
+        save = new() { Text="Confirm Fee Change", ThemeRole="Success", Enabled=false },
+        check = new() { Text="Check Save Outcome", ThemeRole="Secondary" };
+    private readonly TableLayoutPanel fields = new() { Dock=DockStyle.Top, AutoSize=true, ColumnCount=2 };
     private readonly Func<SqlParameter[],Task<DataSet>> query;
     private readonly Func<SqlParameter[],Task<MutationWriteResult>> submit;
     private readonly string initial;
     private DataSet? reviewed;
     private MutationIntent? pending;
-    private bool busy,blocked,monthly,validContext;
+    private bool busy, blocked, monthly, validContext, reviewStage;
     private int generation;
-    internal bool Changed {get;private set;}
+    private decimal releasedPayment;
+    private bool HasAction => action.SelectedIndex>=0;
+    private bool DiscountAction => action.SelectedIndex==0;
+    private bool WaiverAction => action.SelectedIndex==1;
+    private bool RateAction => action.SelectedIndex==2;
+    private bool RemoveAction => action.SelectedIndex==3;
+    private bool UpdateAgreement => billId is null && agreementAllowed && scope.SelectedIndex is 0 or 1;
+    private bool ApplyBills => billId is not null || !agreementAllowed || scope.SelectedIndex is 1 or 2;
+    private bool FullWaiver => WaiverAction || RateAction && originalWaiver;
+    private decimal ChosenDiscount => FullWaiver || RemoveAction ? 0m : RateAction ? originalDiscount :
+        decimal.Parse(string.IsNullOrWhiteSpace(amount.Text)?"0":amount.Text);
+    private string? ChosenLabel => RemoveAction ? null : RateAction ? (string.IsNullOrWhiteSpace(originalLabel)||originalLabel=="None"?null:originalLabel) :
+        concession.Text=="None"?null:concession.Text;
+    internal bool Changed { get; private set; }
 
     public ChangeFeeDiscountForm(int id,string fee,decimal rate,decimal discount,DataRow? periodContext=null)
-        :this(id,fee,rate,discount,periodContext,null,null) { }
+        : this(id,fee,rate,discount,periodContext,null,null) { }
 
     internal ChangeFeeDiscountForm(int id,string fee,decimal rate,decimal discount,DataRow? context,
         Func<SqlParameter[],Task<DataSet>>? query,Func<SqlParameter[],Task<MutationWriteResult>>? submit)
     {
-        assignment=id;standardAmount=rate;
+        assignment=id; standardAmount=rate; originalDiscount=discount; feeName=fee;
         this.query=query??(args=>DatabaseHelper.QueryUserSetAsync("SaveStudentFeeDiscount",args));
         this.submit=submit??SubmitRecoverableAsync;
-        Text=$"Review Fee Terms — {fee}";StartPosition=FormStartPosition.CenterParent;
-        Size=new Size(AppScale.Scale(1040),AppScale.Scale(820));MinimumSize=new Size(850,650);
-        amount.ZeroAsPlaceholder = newRate.ZeroAsPlaceholder = true;
-        amount.Text=discount.ToString("0.##");newRate.Text=rate.ToString("0.##");
-        concession.Items.AddRange(new object[]{"None","Free","Scholarship","Waived"});concession.SelectedIndex=0;
-        paidReduction.Items.AddRange(new object[]{"Keep excess payment as advance","Refund the excess payment"});paidReduction.SelectedIndex=0;
+        Text=$"Review Fee Terms — {fee}"; StartPosition=FormStartPosition.CenterParent;
+        Size=new Size(AppScale.Scale(1000),AppScale.Scale(780)); MinimumSize=new Size(AppScale.Scale(850),AppScale.Scale(650));
+        amount.ZeroAsPlaceholder=newRate.ZeroAsPlaceholder=true;
+        amount.Text=discount.ToString("0.##"); newRate.Text=rate.ToString("0.##");
         context??=id>0?FeeDiscountPeriod.Context(id):null;
-        monthly=context is not null&&Convert.ToString(context["Frequency"])=="Monthly";
+        monthly=context is not null && Convert.ToString(context["Frequency"])=="Monthly";
         validContext=context is not null;
         identity=context?.Table.Columns.Contains("StudentName")==true?$"{context["AdmissionNumber"]} · {context["StudentName"]} · {context["YearName"]}":"";
-        agreementAllowed=context is not null&&(!context.Table.Columns.Contains("Status")||Convert.ToString(context["Status"]) is "Active" or "Pending");
+        agreementAllowed=context is not null && (!context.Table.Columns.Contains("Status") || Convert.ToString(context["Status"]) is "Active" or "Pending");
         billId=context?.Table.Columns.Contains("BillingChargeId")==true?Convert.ToInt64(context["BillingChargeId"]):null;
-        updateAgreement.Checked=agreementAllowed&&billId is null;
+        originalLabel=context?.Table.Columns.Contains("ConcessionLabel")==true?Convert.ToString(context["ConcessionLabel"])??"None":"None";
+        originalWaiver=originalLabel is "Free" or "Waived" || originalLabel=="Scholarship" && discount==rate;
+        action.Items.AddRange(new object[]{"Give Discount","Waive Fee","Correct Fee Amount","Remove Discount"});
+        if(billId is not null) scope.Items.Add("This Bill");
+        else if(!agreementAllowed) scope.Items.Add("Existing Bills Only");
+        else scope.Items.AddRange(new object[]{"Saved Fee Plan","Saved Fee Plan and Existing Bills","Existing Bills in This Period"});
+        scope.SelectedIndex=0;
+        concession.Items.AddRange(new object[]{"Scholarship","None"}); concession.SelectedIndex=0;
+        paidReduction.Items.AddRange(new object[]{"Keep as advance credit","Refund the excess payment"}); paidReduction.SelectedIndex=0;
         if(context is not null)
         {
-            if(context.Table.Columns.Contains("ConcessionLabel")&&context["ConcessionLabel"] is string label&&concession.Items.Contains(label))concession.SelectedItem=label;
             DateTime Date(string column,DateTime fallback)=>context.Table.Columns.Contains(column)&&context[column] is DateTime value?First(value):fallback;
             DateTime first=Date("StartDate",First(DateTime.Today)),last=Date("EndDate",First(DateTime.Today));
             first=new[]{first,Date("EnrollmentDate",first)}.Max();
@@ -68,27 +81,24 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
                 fromMonth.Format=throughMonth.Format=DateTimePickerFormat.Custom;
                 fromMonth.CustomFormat=throughMonth.CustomFormat="MMMM yyyy";
                 fromMonth.Value=throughMonth.Value=first;
-                fromMonth.MinDate=throughMonth.MinDate=first;fromMonth.MaxDate=throughMonth.MaxDate=last;
+                fromMonth.MinDate=throughMonth.MinDate=first; fromMonth.MaxDate=throughMonth.MaxDate=last;
                 fromMonth.Value=First(DateTime.Today)<first?first:First(DateTime.Today)>last?last:First(DateTime.Today);
                 throughMonth.Value=last;
-                if(!monthly)fromMonth.Value=first;
-                if(billId is not null&&context.Table.Columns.Contains("BillingMonth")&&context["BillingMonth"] is DateTime billMonth)
-                    fromMonth.Value=throughMonth.Value=First(billMonth);
+                if(!monthly) fromMonth.Value=first;
+                if(billId is not null && context.Table.Columns.Contains("BillingMonth") && context["BillingMonth"] is DateTime month)
+                    fromMonth.Value=throughMonth.Value=First(month);
             }
             else validContext=false;
         }
-        fullWaiver.Checked=concession.Text is "Free" or "Waived"||(concession.Text=="Scholarship"&&discount==rate);
-        Build(fee);
-        void InvalidateReview(){generation++;bills.DataSource=schedule.DataSource=null;reviewed?.Dispose();reviewed=null;
-            if(!busy)impact.Text="Choices changed. Review the period and financial effect before confirming.";State();}
-        amount.TextChanged+=(_,_)=>InvalidateReview();reason.TextChanged+=(_,_)=>InvalidateReview();
-        fromMonth.ValueChanged+=(_,_)=>InvalidateReview();throughMonth.ValueChanged+=(_,_)=>InvalidateReview();
-        applyBills.CheckedChanged+=(_,_)=>InvalidateReview();
-        newRate.TextChanged+=(_,_)=>InvalidateReview();changeRate.CheckedChanged+=(_,_)=>InvalidateReview();
-        fullWaiver.CheckedChanged+=(_,_)=>{if(fullWaiver.Checked&&concession.Text=="None")concession.SelectedItem="Scholarship";InvalidateReview();};
-        useCredit.CheckedChanged+=(_,_)=>InvalidateReview();updateAgreement.CheckedChanged+=(_,_)=>InvalidateReview();paidReduction.SelectedIndexChanged+=(_,_)=>InvalidateReview();
-        concession.SelectedIndexChanged+=(_,_)=>{if(concession.Text is "Free" or "Waived")fullWaiver.Checked=true;InvalidateReview();};
-        review.Click+=async(_,_)=>await ReviewAsync();save.Click+=async(_,_)=>await SaveAsync();check.Click+=async(_,_)=>await CheckOutcomeAsync();
+        Build();
+        action.SelectedIndexChanged+=(_,_)=>{ConfigureConcession();InvalidateReview();};
+        scope.SelectedIndexChanged+=(_,_)=>InvalidateReview();
+        amount.TextChanged+=(_,_)=>InvalidateReview(); reason.TextChanged+=(_,_)=>InvalidateReview();
+        newRate.TextChanged+=(_,_)=>InvalidateReview(); concession.SelectedIndexChanged+=(_,_)=>InvalidateReview();
+        fromMonth.ValueChanged+=(_,_)=>InvalidateReview(); throughMonth.ValueChanged+=(_,_)=>InvalidateReview();
+        paidReduction.SelectedIndexChanged+=(_,_)=>InvalidateReview(keepPaidDecision:true);
+        review.Click+=async(_,_)=>await ReviewAsync(); save.Click+=async(_,_)=>await SaveAsync(); check.Click+=async(_,_)=>await CheckOutcomeAsync();
+        editChoices.Click+=(_,_)=>InvalidateReview();
         initial=Draft();
         FormClosing+=(_,e)=>{
             if(busy&&!Changed){e.Cancel=true;return;}
@@ -96,105 +106,124 @@ public sealed class ChangeFeeDiscountForm : ApplicationWindowForm
                 e.Cancel=!ModernMessageDialog.Confirm(this,"Discard the unsaved fee choices?","Review Fee Terms",defaultYes:false);
         };
         Disposed+=(_,_)=>reviewed?.Dispose();
-        impact.Text=$"Current fee: Rs. {rate:N0}. Review the proposed agreement and bills before confirming. " +
-            (!agreementAllowed?"This placement is closed. Only existing bills can be changed; its saved fee plan remains historical.":
-             billId is not null?"Only the selected bill is reviewed. Its assignment and other bills stay unchanged.":"Choose the period and whether the agreement, issued bills, or both should change.");
-        ReadPending();State();
+        impact.Text="Choose what you want to change. Review shows the result before anything is saved.";
+        ReadPending(); State();
     }
     private static DateTime First(DateTime value)=>new(value.Year,value.Month,1);
-    private string Draft()=>string.Join("|",amount.Text,concession.Text,First(fromMonth.Value),First(throughMonth.Value),applyBills.Checked,paidReduction.Text,reason.Text,changeRate.Checked,newRate.Text,fullWaiver.Checked,updateAgreement.Checked,useCredit.Checked);
-    private void Build(string fee)
+    private string Draft()=>string.Join("|",action.SelectedIndex,scope.SelectedIndex,amount.Text,concession.Text,
+        First(fromMonth.Value),First(throughMonth.Value),paidReduction.Text,reason.Text,newRate.Text);
+    private void ConfigureConcession()
     {
-        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
-        for(int i=0;i<5;i++)fields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        for(int i=0;i<4;i++)fields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        fields.Controls.Add(HumanUi.Field("Proposed fee (Rs.)",newRate,true),0,0);fields.Controls.Add(changeRate,1,0);
-        fields.Controls.Add(HumanUi.Field($"Discount on {fee} (Rs.)",amount,true),0,1);
-        fields.Controls.Add(HumanUi.Field("Discount reason / type",concession),1,1);
-        fields.Controls.Add(HumanUi.Field("From month",fromMonth,true),0,2);fields.Controls.Add(HumanUi.Field("Through month",throughMonth,true),1,2);
-        fields.Controls.Add(HumanUi.Field("Reason",reason,true),0,3);fields.SetColumnSpan(fields.Controls[fields.Controls.Count-1],2);
-        fields.Controls.Add(HumanUi.Field("If a bill has already been paid",paidReduction),0,4);fields.SetColumnSpan(fields.Controls[fields.Controls.Count-1],2);
-        fields.Controls.Add(fullWaiver,0,5);fields.SetColumnSpan(fullWaiver,2);
-        fields.Controls.Add(updateAgreement,0,6);fields.SetColumnSpan(updateAgreement,2);
-        fields.Controls.Add(applyBills,0,7);fields.SetColumnSpan(applyBills,2);
-        fields.Controls.Add(useCredit,0,8);fields.SetColumnSpan(useCredit,2);
-        var tabs=new TabControl{Dock=DockStyle.Fill};
-        foreach(var (title,grid) in new[]{("Issued bills",bills),("Agreed fee periods",schedule)})
-        {var tab=new TabPage(title);grid.Dock=DockStyle.Fill;tab.Controls.Add(grid);tabs.TabPages.Add(tab);}
-        var close=new ModernButton{Text="Close",DialogResult=DialogResult.Cancel};CancelButton=close;
-        var root=new TableLayoutPanel{Dock=DockStyle.Fill,Padding=new Padding(12),ColumnCount=1,RowCount=5};
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.Controls.Add(new Label{Text=identity,AutoSize=true,Dock=DockStyle.Fill,Padding=new Padding(6)},0,0);root.Controls.Add(fields,0,1);root.Controls.Add(impact,0,2);root.Controls.Add(tabs,0,3);root.Controls.Add(HumanUi.ButtonRow(review,save,check,close),0,4);Controls.Add(root);
-        UiHelper.SetGridEmptyMessage(bills,"Review to see current and proposed issued bills.");
-        UiHelper.SetGridEmptyMessage(schedule,"Review to see concession periods, including scheduled fee rates.");
-        FinanceHelp.Attach(this,newRate,FinanceHelp.Topic.FeeRate);
-        FinanceHelp.Attach(this,changeRate,FinanceHelp.Topic.FeeRate);
-        FinanceHelp.Attach(this,amount,FinanceHelp.Topic.Discount);
-        FinanceHelp.Attach(this,concession,FinanceHelp.Topic.Discount);
-        FinanceHelp.Attach(this,fullWaiver,"Remove the whole fee at each agreed rate in the selected period.","A Rs. 400 fee becomes Rs. 0. If the agreed rate later becomes Rs. 500, the full discount covers Rs. 500.");
-        FinanceHelp.Attach(this,fromMonth,FinanceHelp.Topic.Period);FinanceHelp.Attach(this,throughMonth,FinanceHelp.Topic.Period);
-        FinanceHelp.Attach(this,updateAgreement,FinanceHelp.Topic.FeeAgreement);
-        FinanceHelp.Attach(this,applyBills,FinanceHelp.Topic.ExistingBills);
-        FinanceHelp.Attach(this,paidReduction,FinanceHelp.Topic.PaidReduction);
-        FinanceHelp.Attach(this,useCredit,FinanceHelp.Topic.UseAdvance);
-        FinanceHelp.Attach(this,review,FinanceHelp.Topic.Review);FinanceHelp.Attach(this,check,FinanceHelp.Topic.SaveOutcome);
+        string previous=concession.Text;
+        concession.Items.Clear();
+        concession.Items.AddRange(WaiverAction?new object[]{"Waived","Free","Scholarship"}:new object[]{"Scholarship","None"});
+        concession.SelectedItem=concession.Items.Contains(previous)?previous:concession.Items[0];
+    }
+    private void InvalidateReview(bool keepPaidDecision=false)
+    {
+        generation++; bills.DataSource=schedule.DataSource=null; reviewed?.Dispose(); reviewed=null;
+        if(!keepPaidDecision){releasedPayment=0;reviewStage=false;}
+        if(!busy&&!blocked) impact.Text=keepPaidDecision
+            ? $"Excess already paid: Rs. {releasedPayment:N0}. Review again to confirm the {(paidReduction.SelectedIndex==1?"refund":"advance credit")} choice."
+            : "Review the selected change to see its effect before confirming.";
+        State();
     }
     private void State()
     {
         if(IsDisposed)return;
         bool canChange=validContext&&!busy&&!blocked&&!Changed&&CurrentUser.HasPermission("Fees.Adjust");
-        fields.Enabled=canChange;amount.Enabled=!fullWaiver.Checked;
-        newRate.Enabled=changeRate.Checked;
-        fullWaiver.Enabled=concession.Text is not("Free" or "Waived");
-        updateAgreement.Enabled=agreementAllowed&&billId is null;
-        fromMonth.Enabled=throughMonth.Enabled=monthly&&billId is null;
-        paidReduction.Enabled=useCredit.Enabled=applyBills.Checked;
-        review.Enabled=canChange;save.Enabled=canChange&&reviewed is not null;check.Enabled=!busy;
+        fields.Enabled=canChange;
+        UpdateVisibleFields();
+        review.Enabled=canChange&&HasAction; save.Enabled=canChange&&reviewed is not null;
+        review.Visible=!reviewStage||reviewed is null;
+        review.Text=reviewStage?"Review Again":"Review Fee Change";
+        save.Visible=reviewStage;
+        editChoices.Visible=reviewStage;editChoices.Enabled=canChange;
+        check.Visible=blocked; check.Enabled=!busy;
     }
     private bool ValidateChoices()
     {
+        if(!validContext){impact.Text="This fee has no valid review period. Close and reload its bill or fee plan.";return false;}
         if(!CurrentUser.HasPermission("Fees.Adjust")){impact.Text="Your permission to change fees is no longer available.";return false;}
-        if(!updateAgreement.Checked&&!applyBills.Checked){impact.Text="Choose the agreement, issued bills, or both.";return false;}
+        if(!HasAction){impact.Text="Choose Give Discount, Waive Fee, Correct Fee Amount or Remove Discount.";action.Focus();return false;}
         decimal rate=standardAmount;
-        if(changeRate.Checked&&(!InputParse.TryWholeAmount(newRate.Text,out rate)||rate<0))
+        if(RateAction&&(!InputParse.TryWholeAmount(newRate.Text,out rate)||rate<0))
         {impact.Text="Enter a non-negative fee in whole rupees.";newRate.Focus();return false;}
-        if(!fullWaiver.Checked&&(!InputParse.TryWholeAmount(string.IsNullOrWhiteSpace(amount.Text)?"0":amount.Text,out decimal value)||value<0||value>rate))
-        {impact.Text=$"Enter a concession from zero to Rs. {rate:N0}, in whole rupees.";amount.Focus();return false;}
+        if(DiscountAction&&(!InputParse.TryWholeAmount(amount.Text,out decimal value)||value<=0||value>rate))
+        {impact.Text=$"Enter a discount above zero and no more than Rs. {rate:N0}. To clear it, choose Remove Discount.";amount.Focus();return false;}
+        if(RateAction&&!originalWaiver&&originalDiscount>rate)
+        {impact.Text=$"The new fee is below the existing Rs. {originalDiscount:N0} discount. Review or remove that discount first.";return false;}
         if(First(fromMonth.Value)>First(throughMonth.Value)){impact.Text="The through month must be on or after the from month.";return false;}
-        if(string.IsNullOrWhiteSpace(reason.Text)){impact.Text="Enter the reason so the agreed fee change can be understood later.";reason.Focus();return false;}
+        if(string.IsNullOrWhiteSpace(reason.Text)){impact.Text="Enter the reason for this fee change.";reason.Focus();return false;}
         return true;
     }
     private SqlParameter[] Args(bool preview)=>new[]{
-        DatabaseHelper.Int("@StudentFeeAssignmentId",assignment),DatabaseHelper.P("@DiscountAmount",fullWaiver.Checked?0m:decimal.Parse(string.IsNullOrWhiteSpace(amount.Text)?"0":amount.Text)),
-        DatabaseHelper.P("@ConcessionLabel",concession.Text=="None"?null:concession.Text),
+        DatabaseHelper.Int("@StudentFeeAssignmentId",assignment),DatabaseHelper.P("@DiscountAmount",ChosenDiscount),
+        DatabaseHelper.P("@ConcessionLabel",ChosenLabel),
         DatabaseHelper.Date("@EffectiveFrom",First(fromMonth.Value)),DatabaseHelper.Date("@EffectiveThrough",First(throughMonth.Value)),
-        DatabaseHelper.P("@NewAmount",changeRate.Checked?decimal.Parse(newRate.Text):null),
-        DatabaseHelper.Bit("@ApplyAvailableCredit",applyBills.Checked&&useCredit.Checked),DatabaseHelper.Bit("@UpdateAgreement",updateAgreement.Checked),DatabaseHelper.P("@BillingChargeId",billId),DatabaseHelper.Bit("@FullFeeWaiver",fullWaiver.Checked),
-        DatabaseHelper.Bit("@ApplyToBills",applyBills.Checked),DatabaseHelper.P("@PaidReductionAction",paidReduction.SelectedIndex==1?"Refund":"Credit"),
+        DatabaseHelper.P("@NewAmount",RateAction?decimal.Parse(newRate.Text):null),
+        DatabaseHelper.Bit("@ApplyAvailableCredit",false),DatabaseHelper.Bit("@UpdateAgreement",UpdateAgreement),DatabaseHelper.P("@BillingChargeId",billId),DatabaseHelper.Bit("@FullFeeWaiver",FullWaiver),
+        DatabaseHelper.Bit("@ApplyToBills",ApplyBills),DatabaseHelper.P("@PaidReductionAction",paidReduction.SelectedIndex==1?"Refund":"Credit"),
         DatabaseHelper.P("@Reason",reason.Text.Trim()),DatabaseHelper.Bit("@Preview",preview),
         DatabaseHelper.P("@ExpectedSnapshot",preview?null:Convert.ToString(reviewed!.Tables[0].Rows[0]["Snapshot"]))};
     private async Task ReviewAsync()
     {
         if(busy||blocked||Changed||!ValidateChoices())return;
-        int version=++generation;busy=true;State();impact.Text="Reviewing the agreed period and issued bills…";
+        int version=++generation; busy=true; State(); impact.Text="Reviewing the fee change…";
         try
         {
             var result=await query(Args(true));
             if(IsDisposed||version!=generation){result.Dispose();return;}
             if(result.Tables.Count<3||result.Tables[0].Rows.Count!=1){result.Dispose();throw new InvalidDataException("The fee review is incomplete. Reload before saving.");}
-            reviewed?.Dispose();reviewed=result;
-            bills.DataSource=result.Tables[1];schedule.DataSource=result.Tables[2];
-            foreach(var grid in new[]{bills,schedule})foreach(DataGridViewColumn column in grid.Columns)
-                if(column.ValueType==typeof(decimal))column.DefaultCellStyle.Format="N0";else if(column.ValueType==typeof(DateTime))column.DefaultCellStyle.Format="MMM yyyy";
-            var row=result.Tables[0].Rows[0];
-            decimal delta=Convert.ToDecimal(row["Difference"]),released=Convert.ToDecimal(row["ReleasedPaidAmount"]);
-            impact.Text=$"{First(fromMonth.Value):MMM yyyy} through {First(throughMonth.Value):MMM yyyy}: " +
-                (applyBills.Checked?$"{row["IssuedBills"]} existing bill(s) reviewed. Fees {(delta<0?"decrease by":delta>0?"increase by":"change by")} Rs. {Math.Abs(delta):N0}. Excess already paid, {(paidReduction.SelectedIndex==1?"to refund":"to keep as advance")}: Rs. {released:N0}.":"Existing bills and payments stay as recorded. Only the saved fee plan changes.")+
-                (row.Table.Columns.Contains("CurrentCredit")?$" Advance available before: Rs. {row["CurrentCredit"]:N0}. Advance to use: Rs. {row["CreditToUse"]:N0}. Advance left: Rs. {row["RemainingCredit"]:N0}.":"")+
-                "\r\nThe tables show the proposed changes. Other periods stay unchanged. Advance money stays available unless you choose to use it.";
+            var periods=result.Tables[2];
+            if(RateAction&&UpdateAgreement&&periods.Columns.Contains("Old Fee")&&periods.Columns.Contains("Old Concession")&&
+                periods.AsEnumerable().Any(period=>originalWaiver
+                    ? Convert.ToDecimal(period["Old Concession"])!=Convert.ToDecimal(period["Old Fee"])
+                    : Convert.ToDecimal(period["Old Concession"])!=originalDiscount))
+            {
+                result.Dispose();
+                InvalidateReview();
+                impact.Text="This period has different discount terms. Choose a narrower period or review each bill separately so correcting the fee does not replace those discounts.";
+                return;
+            }
+            reviewed?.Dispose(); reviewed=result;
+            reviewStage=true;
+            bills.DataSource=result.Tables[1]; schedule.DataSource=result.Tables[2];
+            foreach(var grid in new[]{bills,schedule}) foreach(DataGridViewColumn column in grid.Columns)
+                if(column.ValueType==typeof(decimal))column.DefaultCellStyle.Format="N0"; else if(column.ValueType==typeof(DateTime))column.DefaultCellStyle.Format="MMM yyyy";
+            releasedPayment=ApplyBills?Convert.ToDecimal(result.Tables[0].Rows[0]["ReleasedPaidAmount"]):0;
+            impact.Text=ReviewText(result);
         }
-        catch(Exception ex){reviewed?.Dispose();reviewed=null;if(!IsDisposed)impact.Text=DbMessage.UserMessage(ex);}
-        finally{busy=false;State();}
+        catch(Exception ex){reviewed?.Dispose();reviewed=null;releasedPayment=0;if(!IsDisposed)impact.Text=DbMessage.UserMessage(ex);}
+        finally
+        {
+            busy=false;State();
+            if(reviewed is not null) reviewScroll.ScrollControlIntoView(releasedPayment>0?paidField:impact);
+        }
+    }
+    private string ReviewText(DataSet result)
+    {
+        var row=result.Tables[0].Rows[0];
+        string summary=$"3. Review the change\r\n{action.Text}: {feeName}. {ScopeText()}";
+        if(ApplyBills && result.Tables[1].Rows.Count>0 && result.Tables[1].Columns.Contains("Current Bill") && result.Tables[1].Columns.Contains("Proposed Bill"))
+        {
+            decimal before=result.Tables[1].AsEnumerable().Sum(b=>Convert.ToDecimal(b["Current Bill"])),
+                after=result.Tables[1].AsEnumerable().Sum(b=>Convert.ToDecimal(b["Proposed Bill"]));
+            summary+=$"\r\n{(billId is not null?feeName:"Issued bill total")}: Rs. {before:N0} → Rs. {after:N0}.";
+        }
+        else if(ApplyBills)
+        {
+            decimal delta=Convert.ToDecimal(row["Difference"]);
+            summary+=$"\r\n{row["IssuedBills"]} bill(s): {(delta<0?"decrease":"increase")} of Rs. {Math.Abs(delta):N0}.";
+        }
+        if(DiscountAction) summary+=$" Discount: Rs. {ChosenDiscount:N0}.";
+        else if(WaiverAction) summary+=" Full fee waived.";
+        else if(RemoveAction) summary+=" The discount or full waiver is removed.";
+        else summary+=$" Full fee: Rs. {standardAmount:N0} → Rs. {decimal.Parse(newRate.Text):N0}. " +
+            (originalWaiver?"The existing full waiver is retained.":$"Existing discount retained: Rs. {originalDiscount:N0}.");
+        if(monthly&&billId is null) summary+=$"\r\nPeriod: {fromMonth.Value:MMM yyyy} through {throughMonth.Value:MMM yyyy}.";
+        if(releasedPayment>0) summary+=$"\r\nExcess already paid: Rs. {releasedPayment:N0}, {(paidReduction.SelectedIndex==1?"to refund":"to keep as advance credit")}.";
+        return summary+"\r\nReview the comparison below, then confirm. No payment is collected here.";
     }
     private async Task SaveAsync()
     {

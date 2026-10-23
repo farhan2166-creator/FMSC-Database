@@ -31,6 +31,8 @@ internal static partial class Program
                 var bills=data.Tables.Add();bills.Columns.Add("Month",typeof(DateTime));bills.Columns.Add("Bill Change",typeof(decimal));bills.Rows.Add(new DateTime(year,5,1),-1000m);
                 var schedule=data.Tables.Add();schedule.Columns.Add("From",typeof(DateTime));schedule.Columns.Add("New Concession",typeof(decimal));schedule.Rows.Add(new DateTime(year,5,1),1000m);return data;
             }
+            Check(!Field<ModernButton>("review").Enabled&&!Field<ModernTextBox>("amount").Visible,"A fee review starts with an explicit task choice rather than every scenario's controls");
+            Field<ModernComboBox>("action").SelectedIndex=0;Field<ModernComboBox>("scope").SelectedIndex=1;
             var from=Field<ModernDatePicker>("fromMonth");var through=Field<ModernDatePicker>("throughMonth");
             Check(from.Enabled&&through.Enabled,"The operator can choose concession start and end months");
             from.Value=new DateTime(year,5,1);through.Value=new DateTime(year,6,1);Field<ModernTextBox>("reason").Text="Approved temporary scholarship";
@@ -43,6 +45,10 @@ internal static partial class Program
             Check(!Field<ModernButton>("save").Enabled,"Changing the period invalidates an in-flight financial review");
             Click(Field<ModernButton>("review"));replies.Dequeue().SetResult(Plan());PumpUntil(()=>Field<ModernButton>("save").Enabled,"Current concession review settles");
             Check(Field<DataGridView>("bills").ReadOnly&&Field<Label>("impact").Text.Contains("500"),"The review presents paid money released and a read-only bill comparison");
+            Check(Field<ModernComboBox>("paidReduction").Visible,"Credit/refund choice appears only after an overpayment is found");
+            Field<ModernComboBox>("paidReduction").SelectedIndex=1;
+            Check(!Field<ModernButton>("save").Enabled,"Changing the excess-payment decision requires a new review");
+            Click(Field<ModernButton>("review"));replies.Dequeue().SetResult(Plan());PumpUntil(()=>Field<ModernButton>("save").Enabled,"Refund review settles");
             CurrentUser.SignIn(7782,"Read-only fixture","Accountant",false,new[]{"Fees.View"});Click(Field<ModernButton>("save"));
             Check(submissions==0,"Concession confirmation rechecks operator permission before submitting");
             CurrentUser.SignIn(7781,"Concession fixture","Administrator",false,Array.Empty<string>());
@@ -64,16 +70,18 @@ internal static partial class Program
                 using var terms=new ChangeFeeDiscountForm(41,"Fee example",5000,1000,selectedRow,TermsQuery,Save);
                 terms.StartPosition=FormStartPosition.Manual;terms.Location=new Point(-32000,-32000);terms.ShowInTaskbar=false;terms.Show();Application.DoEvents();
                 T Term<T>(string name)=>(T)typeof(ChangeFeeDiscountForm).GetField(name,flags)!.GetValue(terms)!;
-                var agreement=Term<CheckBox>("updateAgreement");
-                Check(agreement.Enabled==(choice.Status=="Active"&&!choice.Bill)&&agreement.Checked==agreement.Enabled,"Closed placements and individual bills retain their agreement history while annual agreements can be reviewed");
-                Term<CheckBox>("changeRate").Checked=true;Term<ModernTextBox>("newRate").Text="6000";
-                Term<ModernTextBox>("reason").Text="Approved revised fee";Term<CheckBox>("fullWaiver").Checked=true;
-                Term<CheckBox>("useCredit").Checked=true;Click(Term<ModernButton>("review"));Application.DoEvents();
+                var scope=Term<ModernComboBox>("scope");
+                Check(scope.Items.Count==(choice.Status=="Active"&&!choice.Bill?3:1),"Closed placements and individual bills cannot choose saved-plan changes");
+                Term<ModernComboBox>("action").SelectedIndex=2;Term<ModernTextBox>("newRate").Text="6000";
+                Term<ModernTextBox>("reason").Text="Approved revised fee";Click(Term<ModernButton>("review"));Application.DoEvents();
                 Check(captured is not null&&(decimal)captured.Single(p=>p.ParameterName=="@NewAmount").Value==6000m&&
-                    (bool)captured.Single(p=>p.ParameterName=="@FullFeeWaiver").Value&&(bool)captured.Single(p=>p.ParameterName=="@ApplyAvailableCredit").Value,
-                    "Annual, purchase and closed-placement reviews carry explicit rate, full-waiver and credit-use decisions");
+                    !(bool)captured.Single(p=>p.ParameterName=="@FullFeeWaiver").Value&&!(bool)captured.Single(p=>p.ParameterName=="@ApplyAvailableCredit").Value,
+                    "A fee correction changes the rate, preserves the fixed discount and leaves credit use to collection");
                 Check(!choice.Bill||(long)captured!.Single(p=>p.ParameterName=="@BillingChargeId").Value==8421L,"Individual bill review retains the selected bill identity");
-                Term<CheckBox>("useCredit").Checked=false;Check(!Term<ModernButton>("save").Enabled,"Changing credit use invalidates the reviewed financial decision");
+                Term<ModernComboBox>("action").SelectedIndex=1;Check(!Term<ModernButton>("save").Enabled,"Choosing a waiver instead invalidates the prior rate review");
+                Click(Term<ModernButton>("review"));Application.DoEvents();
+                Check((bool)captured!.Single(p=>p.ParameterName=="@FullFeeWaiver").Value&&captured!.Single(p=>p.ParameterName=="@NewAmount").Value is DBNull,
+                    "A full waiver is a separate task and does not carry over a hidden rate correction");
             }
             var issued=new DataTable();issued.Columns.Add("BillingChargeId",typeof(long));issued.Columns.Add("Charge Ref");issued.Columns.Add("Issued",typeof(DateTime));
             foreach(string name in new[]{"Bill Total","Settled","Due"})issued.Columns.Add(name,typeof(decimal));
