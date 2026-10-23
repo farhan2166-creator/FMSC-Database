@@ -32,9 +32,9 @@
         </Paragraphs>
         <rd:DefaultName>txtRefNo</rd:DefaultName>
         <Top>0.25in</Top>
-        <Left>4.65in</Left>
+        <Left>4.41042in</Left>
         <Height>0.25in</Height>
-        <Width>2.8in</Width>
+        <Width>3.03958in</Width>
         <Style>
           <Border>
             <Style>None</Style>
@@ -277,26 +277,14 @@
                 </Style>
               </TextRun>
               <TextRun>
-                <Value> is</Value>
-                <Style>
-                  <FontFamily>Segoe UI</FontFamily>
-                  <FontSize>12pt</FontSize>
-                </Style>
-              </TextRun>
-            </TextRuns>
-            <Style />
-          </Paragraph>
-          <Paragraph>
-            <TextRuns>
-              <TextRun>
-                <Value>working with us as </Value>
+                <Value> is working with us as </Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
                 </Style>
               </TextRun>
               <TextRun>
-                <Value>=First(Fields!Designation.Value, "BankAccountOpeningCertificateData")</Value>
+                <Value>=First(Fields!Designation.Value, "BankAccountOpeningCertificateData") &amp; "."</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -359,7 +347,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>It is requested to open a bank account for </Value>
+                <Value>             It is requested to open a bank account for </Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -408,7 +396,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>We shall be very thankful for this act of kindness.</Value>
+                <Value>             We shall be very thankful for this act of kindness.</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
