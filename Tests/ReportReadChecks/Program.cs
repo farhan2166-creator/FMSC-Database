@@ -12,7 +12,7 @@ internal static partial class Program
     }
     private static void Main(string[] args)
     {
-        CheckReceipts(); CheckOutstanding(); CheckCredit(); CheckConcessions(); CheckReceiptRdlc(); CheckQueryContracts();
+        CheckReceipts(); CheckOutstanding(); CheckCredit(); CheckConcessions(); CheckReceiptRdlc(); CheckQueryContracts(); CheckNewReports();
         if (args.Contains("--sql")) CheckSql();
         Console.WriteLine($"PASS: {checks} focused report data, grouping, totals, filtering and layout checks" + (args.Contains("--sql") ? " including disposable SQL queries." : ". SQL integration was not requested."));
     }

@@ -6,6 +6,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Report improvements
 
+- Add Monthly Fee Reconciliation by billing month and school/campus/class/section/fee type, comparing current signed money allocations, credit applied and unpaid fees; include excess settlement and missing-period charge-date fallback.
+- Add the consolidated Certificate Issue Register with permitted student/staff sources, date/type/recipient/entry/collection/search filters, recorded issue history and explicitly distinguished saved-only records.
 - Add Account Credit filtering and data-only CSV exports for Collections & Receipts; count receipt entries separately from headings/totals and repeat printed group context with numeric subtotals.
 - Add overdue/balance/day-range filters and permission-checked Open Statement to Outstanding & Aging; keep filtered output distinct from the full-location A4 report.
 - Add a read-only Student Credit Balance Register with student/family views and current/latest placement filters; preserve signed ledger sums and avoid duplicate balances.
