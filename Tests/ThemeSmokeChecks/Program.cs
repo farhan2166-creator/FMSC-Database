@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--release-reports"))
+        {
+            CheckReleaseReports();
+            Console.WriteLine($"PASS: {checks} focused release report forms, permissions, CSV and multipage PDF checks (no database connection).");
+            return;
+        }
         if (args.Contains("--character-certificate-layout"))
         {
             CheckCharacterCertificateLayout();

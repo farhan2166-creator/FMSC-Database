@@ -18,6 +18,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
     private readonly bool _usesYear;
     private readonly ModernButton _print;
     private readonly ModernButton _export;
+    private readonly ModernButton? _classOutstandingButton;
     private readonly Label _summary = new() {
         Dock = DockStyle.Top,
         Height = Math.Max(38, AppMetrics.TextHeight(AppTheme.ButtonFont) + 10),
@@ -60,7 +61,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         View.SelectedIndex = 0;
         GroupBy.Items.AddRange(groupings);
         if (GroupBy.Items.Count > 0) GroupBy.SelectedIndex = 0;
-        PaymentMethod.Items.AddRange(new object[] { "All", "Cash", "Bank", "Card", "Online", "Other", "Refund", "Correction" });
+        PaymentMethod.Items.AddRange(new object[] { "All", "Cash", "Bank", "Card", "Online", "Other", "Account Credit", "Refund", "Correction" });
         PaymentMethod.SelectedIndex = 0;
         FinanceHelp.Attach(this,PaymentMethod,"Filter the recorded payment method or adjustment type. Correction means a reduction in the recorded payment, rather than a change to the original fee.","A Rs. 1,000 payment reduced to Rs. 800 has a Rs. 200 payment reduction. It is separate from changing the fee itself.");
         ReportUi.RegisterChoiceFilter(PaymentMethod);
@@ -71,9 +72,12 @@ public abstract class CanonicalFinanceReportPage : V2Page
         var reportActions = new List<ModernButton> { run, _print };
         if (classOutstandingPrint)
         {
-            reportActions.Add(AddBusyAction("Class / Section A4", PreviewClassOutstandingAsync, "Secondary"));
+            _classOutstandingButton=AddBusyAction("Class / Section A4", PreviewClassOutstandingAsync, "Secondary");
+            SetToolTip(_classOutstandingButton,"Print all current outstanding within the location filters. For exact-day or minimum-balance filters, use Print.");
+            reportActions.Add(_classOutstandingButton);
         }
         reportActions.Add(_export);
+        reportActions.AddRange(AdditionalReportActions());
         RelocateFromActions(reportActions.ToArray());
         Defer(BindLookupsAsync);
         var fields = new List<(string, Control)> { ("View", View) };
@@ -84,6 +88,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         fields.Add(("Section", Section));
         if (paymentMethod) fields.Add(("Payment Method", PaymentMethod));
         if (grouping) fields.Add((GroupingCaption, GroupBy));
+        fields.AddRange(AdditionalReportFilters());
         UiHelper.SetGridPlaceholderMessage(Grid, UiText.EmptyGrid.RunReport);
         SetContent(ReportUi.CompactLayout(ReportUi.Bar(fields.ToArray()), Grid, title, () => {
             _scopeEdited = true;
@@ -92,6 +97,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
             _appliedSignature = _filterSummary = string.Empty;
             _print.Enabled = _export.Enabled = false;
             _summary.Text = "Run the report to see totals.";
+            ReportAvailabilityChanged();
             InvalidateReport();
             SetStatus("Filters cleared. Choose filters, then press Run Report.");
         }, reportActions.ToArray()));
@@ -108,7 +114,26 @@ public abstract class CanonicalFinanceReportPage : V2Page
                 FiltersChanged();
             };
         UpdateViewControls();
+        ReportAvailabilityChanged();
     }
+    protected virtual IEnumerable<ModernButton> AdditionalReportActions() => Array.Empty<ModernButton>();
+    protected virtual IEnumerable<(string, Control)> AdditionalReportFilters() => Array.Empty<(string, Control)>();
+    protected static string NumericFilterSignature(string text) => string.IsNullOrWhiteSpace(text) ? "0"
+        : decimal.TryParse(text,out decimal value) ? value.ToString(System.Globalization.CultureInfo.InvariantCulture) : text.Trim();
+    protected virtual string AdditionalFilterSignature => "";
+    protected virtual string AdditionalFilterDescription => "";
+    protected virtual bool ValidateAdditionalFilters() => true;
+    protected virtual Task<DataSet> ReadReportAsync(SqlParameter[] parameters, CancellationToken token) =>
+        DatabaseHelper.QueryUserSetAsync(_procedure, token, parameters);
+    protected virtual bool AppendReportTotals => _procedure != "GetOutstandingAndAgingReport" && _procedure != "GetCollectionsAndReceiptsReport";
+    protected virtual Func<DataTable, DataTable?, (DataTable Rows, DataTable? Totals)> CaptureResultTransform(SqlParameter[] parameters) =>
+        (rows, totals) => { PrepareReportData(rows, parameters); return (rows, totals); };
+    protected virtual bool CanPrintClassOutstanding => true;
+    protected virtual void ReportAvailabilityChanged()
+    {
+        if (_classOutstandingButton is not null) _classOutstandingButton.Enabled=CanPrintClassOutstanding;
+    }
+    protected bool CurrentReportAvailable => !_runningReport && _displayed is not null && _appliedSignature == Signature();
     protected virtual Task PreviewClassOutstandingAsync() => Task.CompletedTask;
     protected override void OnWorkspaceStateRestoring() => _scopeEdited = true;
     protected abstract IEnumerable<SqlParameter> BuildParameters();
@@ -164,17 +189,19 @@ public abstract class CanonicalFinanceReportPage : V2Page
     }
     private string Signature() => string.Join('|', ViewName, GroupName, MethodName,
         $"{From.Checked}:{From.Value.Date:yyyy-MM-dd}", $"{To.Checked}:{To.Value.Date:yyyy-MM-dd}",
-        Campus.SelectedId, Year.SelectedId, Class.SelectedId, Section.SelectedId);
+        Campus.SelectedId, Year.SelectedId, Class.SelectedId, Section.SelectedId, AdditionalFilterSignature);
     protected override string ReportFilterSignature() => Signature();
     protected override string ReportExportSubtitle() =>
         _filterSummary.Length == 0 ? base.ReportExportSubtitle() : _filterSummary;
-    private void FiltersChanged()
+    protected void FiltersChanged()
     {
         if (_runningReport)
         {
             CancelPendingReport();
+            ReportAvailabilityChanged();
             return;
         }
+        ReportAvailabilityChanged();
         if (_appliedSignature.Length == 0) return;
         bool current = string.Equals(_appliedSignature, Signature(), StringComparison.Ordinal);
         _print.Enabled = current;
@@ -193,6 +220,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         parts.Add(Pick(Section, "Section"));
         if (PaymentMethod.Enabled && MethodName.Length > 0) parts.Add($"Method: {MethodName}");
         if (GroupBy.Enabled) parts.Add($"Grouped by: {GroupName}");
+        if (AdditionalFilterDescription.Length > 0) parts.Add(AdditionalFilterDescription);
         return string.Join("   ", parts);
     }
     protected virtual void PrepareReportData(DataTable data, SqlParameter[] parameters) { }
@@ -204,23 +232,28 @@ public abstract class CanonicalFinanceReportPage : V2Page
         try
         {
             if (_usesDates && !ReportUi.ValidDateRange(_rangeValidator ??= CreateValidator(), From, To)) return;
+            if (!ValidateAdditionalFilters()) return;
             _runningReport = true;
             _print.Enabled = _export.Enabled = false;
             _summary.Text = "Generating report…";
             SqlParameter[] parameters = BuildParameters().ToArray();
             DataTable? captured = null;
             DataTable? totals = null;
-            string summary = FiltersText();
+            DateTime generated = DateTime.Now;
+            string summary = FiltersText() + $"   Report generated: {generated:dd-MMM-yyyy HH:mm}";
+            var asOf = parameters.FirstOrDefault(p => p.ParameterName == "@AsOfDate");
+            if (asOf?.Value is DateTime date) summary += $"   Aging date: {date:dd-MMM-yyyy}";
+            var transform = CaptureResultTransform(parameters);
             await BindReportAsync(async token => {
-                DataSet result = await DatabaseHelper.QueryUserSetAsync(_procedure, token, parameters).ConfigureAwait(false);
+                DataSet result = await ReadReportAsync(parameters, token).ConfigureAwait(false);
                 token.ThrowIfCancellationRequested();
                 captured = result.Tables.Count > 0 ? result.Tables[0] : new DataTable();
                 totals = result.Tables.Count > 1 ? result.Tables[1] : null;
                 // Outstanding totals already appear above the grid. Keep its rows
                 // limited to actual records so pagination does not count a total.
-                if (_procedure != "GetOutstandingAndAgingReport" && _procedure != "GetCollectionsAndReceiptsReport")
+                if (AppendReportTotals)
                     AppendAuthoritativeTotalRow(captured, totals);
-                PrepareReportData(captured, parameters);
+                (captured, totals) = transform(captured, totals);
                 return captured;
             });
             if (!ReportLanded || captured is null)
@@ -251,7 +284,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
                 Fail(ex);
             }
         }
-        finally { _runningReport = false; }
+        finally { _runningReport = false; if (!IsDisposed) ReportAvailabilityChanged(); }
     }
     private static string FormatTotals(DataTable? totals)
     {

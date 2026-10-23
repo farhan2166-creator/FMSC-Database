@@ -84,8 +84,7 @@ public sealed class ReportsHomePage : V2Page
                 "Finance",
                 "Collections, balances, billing and student financial documents.",
                 AppTheme.ModuleAccent("Finance"),
-                new ReportDefinition[]
-                {
+                [
                     new(
                         "Collections & Receipts",
                         "Receipts, payment allocations and summaries from one reconciled collection dataset.",
@@ -101,12 +100,16 @@ public sealed class ReportsHomePage : V2Page
                         "Charges created and discounts actually applied, kept separate from cash received.",
                         "Finance",
                         () => new BillingDiscountsReportPage()),
+                    ..(CurrentUser.HasPermission("Fees.View") ? new ReportDefinition[] {
+                        new("Student Credit Balance Register", "Current advance balances by student or family, with latest credit activity.",
+                            "Finance", () => new CreditBalanceReportPage())
+                    } : Array.Empty<ReportDefinition>()),
                     new(
                         PageTitles.StudentAccountStatement,
                         "A student's charges, payments and balance.",
                         "Finance",
                         () => new StudentAccountStatementPage())
-                });
+                ]);
             hasReports = true;
         }
         if (!hasReports)

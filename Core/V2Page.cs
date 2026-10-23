@@ -1317,11 +1317,18 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         }
         return false;
     }
+    private protected virtual ReportPaginator.Page CreateReportPage(DataTable source, int index, int pageSize) =>
+        ReportPaginator.Build(source, index, pageSize);
+    protected virtual DataTable SelectExportRows(DataTable source, bool asCsv) => source;
+    protected virtual void WritePdfExport(string path, string title, string subtitle, DataTable table, Color accent) =>
+        PdfTableExporter.Export(path, title, subtitle, table, accent);
+    protected virtual int ExportRecordCount(DataTable source) => source.Rows.Count;
+    protected virtual string CsvExportLabel => "CSV file (*.csv)";
     private void BindReportPage()
     {
         if (_reportSource is null)
             return;
-        ReportPaginator.Page page = ReportPaginator.Build(_reportSource, _reportPage, ReportPageSize);
+        ReportPaginator.Page page = CreateReportPage(_reportSource, _reportPage, ReportPageSize);
         _reportPage = page.Index;
         HookReportColumnLayout();
         Grid.DataSource = page.Rows;
@@ -1467,7 +1474,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             return;
         }
         using var dialog = new SaveFileDialog {
-            Filter = "PDF file (*.pdf)|*.pdf|CSV file (*.csv)|*.csv",
+            Filter = $"PDF file (*.pdf)|*.pdf|{CsvExportLabel}|*.csv",
             FilterIndex = 1,
             FileName = $"{filePrefix}_{DateTime.Now:yyyyMMdd_HHmm}.pdf",
             AddExtension = true,
@@ -1487,7 +1494,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 Path.GetExtension(filePath),
                 ".csv",
                 StringComparison.OrdinalIgnoreCase);
-            int rowCount = source.Rows.Count;
+            int rowCount = ExportRecordCount(source);
             if (source.Columns.Count == 0)
             {
                 Warn("There is no report data to export yet.");
@@ -1495,7 +1502,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             }
             /* The file is the report as it is on screen: the columns the operator has showing, in the order they have them, under the headers they read. */
             DataTable exportTable = ReportExportBuilder.Build(
-                source,
+                SelectExportRows(source, exportAsCsv),
                 Grid.Columns.Cast<DataGridViewColumn>(),
                 (ReportColumnCatalog ?? Array.Empty<ReportColumnDef>())
                     .Where(column => column.Kind == ReportColumnKind.Date)
@@ -1516,7 +1523,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                     if (exportAsCsv)
                         ReportExportBuilder.WriteCsv(exportTable, filePath);
                     else
-                        PdfTableExporter.Export(filePath, title, subtitle, exportTable, accent);
+                        WritePdfExport(filePath, title, subtitle, exportTable, accent);
                 });
                 try
                 {
