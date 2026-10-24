@@ -24,6 +24,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     private DataTable certificateResults = new();
     /* Finding 13 - a search debounce tick that lands while a modal (confirmation, collector prompt, print preview) is open runs inside that modal's message loop and re-binds the picker underneath… */
     private bool suppressStudentChanged;
+    private bool loadingCertificates;
     private int selectedCertificateRecordId;
     private int selectedIssueId;
     private int selectedCertificateAdmissionId;
@@ -102,8 +103,8 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             };
         examType.SelectedIndexChanged +=
             (_, _) => ApplyWorkflowState();
-        Grid.CellMouseClick +=
-            Grid_CellMouseClick;
+        Grid.SelectionChanged += GridSelectionChanged;
+        Grid.CurrentCellChanged += GridSelectionChanged;
         Defer(
             () => {
                 ResetToStart();
@@ -112,7 +113,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
-                "For current or former Class 10 (SSC) and Class 12 (HSSC) students. The school decides whether to issue.");
+                "The school decides whom to issue a certificate to. Choose SSC or HSSC wording for each print.");
         var fields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -256,6 +257,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
                 return;
             }
             LoadCertificates(admissionId);
+            SelectSavedCertificate(0);
         }
         catch (Exception ex)
         {
@@ -265,6 +267,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     }
     private void LoadCertificates(int admissionId)
     {
+        loadingCertificates = true;
         try
         {
             ClearCertificateSelection();
@@ -305,12 +308,13 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             FormatCertificateGrid();
             ApplyWorkflowState();
         }
+        finally { loadingCertificates = false; ApplyWorkflowState(); }
     }
     private void SelectSavedCertificate(int id)
     {
         
         CertificateRecordOrder.Select(Grid, "CharacterCertificateIssueId", id,
-            index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
+            index => LoadCertificateIssue(((DataRowView)Grid.Rows[index].DataBoundItem).Row));
     }
     private void FormatCertificateGrid()
     {
@@ -350,26 +354,21 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         Grid.Columns[columnName].Visible =
             false;
     }
-    private void Grid_CellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+    private void GridSelectionChanged(object? sender, EventArgs e)
     {
-        if(e.RowIndex>=0&&!ConfirmDraftDiscard()){Grid.ClearSelection();Grid.CurrentCell=null;return;}
-        if (e.Button != MouseButtons.Left ||
-            e.RowIndex < 0 ||
-            e.RowIndex >= certificateResults.Rows.Count)
+        if (loadingCertificates) return;
+        if (Grid.CurrentRow is { IsNewRow: false, Selected: true, DataBoundItem: DataRowView view })
         {
+            LoadCertificateIssue(view.Row);
             return;
         }
+        ClearCertificateSelection();
+        ApplyWorkflowState();
+    }
+    private void LoadCertificateIssue(DataRow row)
+    {
         try
         {
-            DataGridViewRow gridRow =
-                Grid.Rows[e.RowIndex];
-            if (gridRow.IsNewRow)
-                return;
-            Grid.ClearSelection();
-            gridRow.Selected = true;
-            DataRow row =
-                certificateResults.Rows[
-                    e.RowIndex];
             int certificateRecordId =
                 GetInt(row, "CertificateRecordId");
             int issueId =
@@ -384,9 +383,9 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
                 SetStatus("The selected certificate issuance contains invalid data.", true);
                 return;
             }
-            // Wording from a different certificate must not carry over to this print choice.
-            if (selectedCertificateRecordId != certificateRecordId ||
-                selectedCertificateAdmissionId != admissionId)
+            // StudentChanged clears wording on a student switch. Choosing this student's
+            // history row must preserve a wording choice already made by the operator.
+            if (student.SelectedId != admissionId)
                 examType.SelectedIndex = -1;
             selectedCertificateRecordId =
                 certificateRecordId;
@@ -436,7 +435,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         refreshButton.Enabled =
             hasStudent;
         issueAgainButton.Enabled =
-            hasSelectedIssue && examTypeChosen &&
+            hasSelectedIssue &&
             IsLatestIssueCollectedFor(selectedCertificateRecordId);
         collectButton.Enabled =
             hasSelectedIssue &&
@@ -444,7 +443,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         printButton.Enabled =
             hasSelectedIssue &&
             selectedIssueCollected &&
-            examTypeChosen;
+            CurrentUser.HasPermission("Certificates.Print");
         if (!hasStudent)
         {
             SetStatus(UiText.Prompts.SearchForStudent);
@@ -454,7 +453,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         {
             SetStatus(
                 hasCertificate
-                    ? "Select a copy and SSC/HSSC wording to print. Wording applies to this print only."
+                    ? "Choose SSC/HSSC wording before printing. Select a collected copy to print or issue again; wording applies to the print only."
                     : "Choose SSC/HSSC and complete the details to create the current-year certificate.");
             return;
         }
@@ -634,7 +633,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     }
     private void IssueAgain()
     {
-        if (!ValidateWording()) return;
         int printExamType = examType.SelectedIndex;
         // Finding 12 - see CreateCertificate: the confirmation is set last.
         string? successMessage =
@@ -681,6 +679,8 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             successMessage =
                 "Certificate issued again successfully. The new issuance has been added to the history.";
             LoadCertificates(student.SelectedId);
+            SelectSavedCertificate(0);
+            if (printExamType >= 0) examType.SelectedIndex = printExamType;
         }
         catch (Exception ex)
         {
@@ -780,6 +780,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             if (examTypeIndex < 0 || examTypeIndex >= ExamTypeLabels.Length)
             {
                 Warn("Choose SSC or HSSC wording before printing this certificate.");
+                examType.Focus();
                 return;
             }
             // Use the operator's selected wording directly for this print.
@@ -1075,8 +1076,8 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     {
         if (disposing)
         {
-            Grid.CellMouseClick -=
-                Grid_CellMouseClick;
+            Grid.SelectionChanged -= GridSelectionChanged;
+            Grid.CurrentCellChanged -= GridSelectionChanged;
         }
         base.Dispose(disposing);
     }
