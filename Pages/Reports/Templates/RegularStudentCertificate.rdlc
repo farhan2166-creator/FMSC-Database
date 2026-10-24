@@ -646,9 +646,9 @@
       </Line>
       <Line Name="lnAdmissionNo8">
         <Top>4.03542in</Top>
-        <Left>3.1493in</Left>
+        <Left>3.0243in</Left>
         <Height>0in</Height>
-        <Width>4.3007in</Width>
+        <Width>4.4257in</Width>
         <ZIndex>25</ZIndex>
         <Style>
           <Border>
