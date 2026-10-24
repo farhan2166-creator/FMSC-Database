@@ -85,8 +85,9 @@ internal sealed class EnrollmentDateCorrectionDialog : ApplicationWindowForm
                     (blocked
                         ? $"\r\n\r\n{plan["BlockedCount"]} affected charge(s) have payment or other recorded history. These dates cannot be applied while that history exists. Review the affected charges and their payments in Student Fees / Fee Corrections before reviewing this correction again. Existing dates, charges and payments remain unchanged."
                         : "\r\n\r\nCancelled charges remain in history. Payments stay unchanged. Apply saves the reviewed dates and charge changes together.");
+                OperationFeedback.Apply(impact,blocked);
             }
-            catch (Exception ex) { plan = null; impact.Text = DbMessage.UserMessage(ex); }
+            catch (Exception ex) { plan = null; OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
             finally { if (!IsDisposed) SetBusy(false); }
         };
         apply.Click += async (_, _) => {
@@ -105,7 +106,7 @@ internal sealed class EnrollmentDateCorrectionDialog : ApplicationWindowForm
                 ResultMessage = $"Placement dates corrected: {result.Rows[0]["CancelledCharges"]} charge(s) cancelled, {result.Rows[0]["AddedCharges"]} added. Payments unchanged.";
                 DialogResult = DialogResult.OK;
             }
-            catch (Exception ex) { plan = null; impact.Text = DbMessage.UserMessage(ex) + " Review again before applying."; }
+            catch (Exception ex) { plan = null; FMSC_SMS.Core.OperationFeedback.Set(impact,DbMessage.UserMessage(ex) + " Review again before applying.",true); }
             finally { if (!IsDisposed) SetBusy(false); }
         };
         FormClosing += (_, e) => { if (busy && DialogResult != DialogResult.OK) e.Cancel = true; };

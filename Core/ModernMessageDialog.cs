@@ -59,6 +59,8 @@ public static class ModernMessageDialog
     internal static ApplicationWindowForm CreateDialog(IWin32Window? owner, MessageDialogContent content, string title,
         MessageBoxButtons buttons, MessageBoxIcon icon, MessageBoxDefaultButton defaultButton)
     {
+        bool blocked=icon==MessageBoxIcon.Error || icon==MessageBoxIcon.Warning &&
+            buttons is MessageBoxButtons.OK or MessageBoxButtons.RetryCancel or MessageBoxButtons.AbortRetryIgnore;
         Rectangle work = (owner is Control control ? Screen.FromControl(control) : Screen.PrimaryScreen)?.WorkingArea
             ?? new Rectangle(0, 0, 1280, 720);
         int width = Math.Min(AppScale.Scale(content.Records is null ? 560 : 800), Math.Max(1, work.Width - AppScale.Scale(32)));
@@ -79,7 +81,7 @@ public static class ModernMessageDialog
         var iconLabel = new Label {
             Dock = DockStyle.Fill, UseMnemonic = false,
             Text = icon switch { MessageBoxIcon.Warning => "!", MessageBoxIcon.Error => "×", MessageBoxIcon.Question => "?", _ => "i" },
-            ForeColor = icon switch { MessageBoxIcon.Warning => AppTheme.Warning, MessageBoxIcon.Error => AppTheme.Danger, _ => AppTheme.Primary },
+            ForeColor = blocked?AppTheme.Danger:icon switch { MessageBoxIcon.Warning => AppTheme.Warning, _ => AppTheme.Primary },
             Font = AppTheme.SharedFont("Segoe UI", 20F, FontStyle.Bold), TextAlign = ContentAlignment.TopCenter
         };
         var viewport = new Panel {
@@ -102,16 +104,23 @@ public static class ModernMessageDialog
             Font = strong ? AppTheme.BodyBoldFont : AppTheme.NormalFont, ForeColor = AppTheme.Text,
             Margin = new Padding(0, 0, 0, AppScale.Scale(12)), TextAlign = ContentAlignment.TopLeft
         };
-        Add(TextBlock(content.Summary, content.Summary.Length <= 180, "MessageSummary"));
+        var summary=TextBlock(content.Summary, content.Summary.Length <= 180, "MessageSummary");
+        if(blocked)OperationFeedback.Apply(summary,true);
+        Add(summary);
         if (!string.IsNullOrWhiteSpace(content.Notice))
         {
             var notice = TextBlock(content.Notice, true, "MessageNotice");
             notice.Padding = new Padding(AppScale.Scale(10));
             notice.BackColor = AppTheme.SurfaceSecondary;
+            if(blocked){OperationFeedback.Apply(notice,true);notice.BackColor=AppTheme.Tint(AppTheme.Danger,0.94f);}
             Add(notice);
         }
         if (!string.IsNullOrWhiteSpace(content.Explanation))
-            Add(TextBlock(content.Explanation, false, "MessageExplanation"));
+        {
+            var explanation=TextBlock(content.Explanation, false, "MessageExplanation");
+            if(blocked)OperationFeedback.Apply(explanation,true);
+            Add(explanation);
+        }
         TableLayoutPanel? facts = null;
         if (content.Facts is { Count: > 0 })
         {

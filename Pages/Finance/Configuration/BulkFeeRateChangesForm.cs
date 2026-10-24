@@ -586,7 +586,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         }
         catch (Exception ex)
         {
-            summaryLabel.Text = DbMessage.UserMessage(ex);
+            FMSC_SMS.Core.OperationFeedback.Set(summaryLabel,DbMessage.UserMessage(ex),true);
             applyButton.Enabled = false;
         }
     }

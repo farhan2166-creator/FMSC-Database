@@ -225,6 +225,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
             Margin=new Padding(0,AppMetrics.SpacingXs,0,AppMetrics.SpacingSm)
         };
         var note = new Label {
+            Name="TransferFeeStatus",
             Text = "Review the new rates below. Issued monthly bills receive only the required difference; paid reductions follow your credit/refund choice.",
             Dock = DockStyle.Top,
             AutoSize = true,
@@ -277,6 +278,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         confirmButton.Enabled = keep || problem.Length==0;
         note.Text = problem.Length>0 ? problem : CanApplyDestinationFees ? DefaultNote()
             : missingDestinationFees + " Keep current fees or complete Fee Setup first.";
+        OperationFeedback.Apply(note,problem.Length>0 || !CanApplyDestinationFees);
         grid.Columns["New"].HeaderText = keep ? "After transfer" : $"From {effectiveMonth:MMM yyyy}";
         grid.Rows.Clear();
         foreach (var row in rows.OrderBy(r => r.DisplayOrder).ThenBy(r => r.FeeTypeName))

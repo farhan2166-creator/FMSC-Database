@@ -1176,7 +1176,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     {
         Color? tone = _statusKind switch {
             PageStatusKind.Success => AppTheme.Success,
-            PageStatusKind.Warning => AppTheme.Warning,
+            PageStatusKind.Warning => AppTheme.Danger,
             PageStatusKind.Error => AppTheme.Danger,
             PageStatusKind.Busy => AppTheme.Primary,
             _ => null

@@ -171,7 +171,7 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
             if (pending is not null) impact.Text = $"A previous decision needs checking: {pending.Summary}. Use Check Save Outcome before saving again.";
             else impact.Text = "Choose the school's decision, then review the amounts before saving.";
         }
-        catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex, "Loading student posting hold context"); impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex, "Loading student posting hold context"); OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { busy = false; loading = false; body.Enabled = true; UpdatePending(); }
     }
     private void UpdatePending()
@@ -199,7 +199,7 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
                 (resume ? "No new admission number. Original receipts and recorded refunds remain.\r\n" : "New fee posting stops. Existing dues remain collectible.\r\n") + FeeLines(plan, "ChangedFees", resume ? "Restore" : "Waive") + FeeLines(plan, "AddedFees", "Charge");
             save.Enabled = true;
         }
-        catch (Exception ex) { Reset(); AppExceptionHandler.LogNonFatal(ex, "Reviewing student posting hold decision"); impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { Reset(); AppExceptionHandler.LogNonFatal(ex, "Reviewing student posting hold decision"); OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { busy = false; body.Enabled = true; }
     }
     private static string FeeLines(DataRow row, string column, string verb)
@@ -254,7 +254,7 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
             if (data.Rows.Count == 1) Complete(Convert.ToString(data.Rows[0]["ResultJson"]));
             else { MutationRecoveryJournal.ClearVerified(pending, JournalPath(pending.Kind)); pending = null; Reset(); impact.Text = "The database confirms that this decision was not saved. Review again before saving."; }
         }
-        catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex, "Checking student posting decision outcome"); impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex, "Checking student posting decision outcome"); OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { busy = false; if (!IsDisposed) { body.Enabled = true; UpdatePending(); } }
     }
 }

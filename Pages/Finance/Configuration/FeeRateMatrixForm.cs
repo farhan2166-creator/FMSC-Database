@@ -301,7 +301,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         }
         catch (Exception ex)
         {
-            summaryLabel.Text = DbMessage.UserMessage(ex);
+            FMSC_SMS.Core.OperationFeedback.Set(summaryLabel,DbMessage.UserMessage(ex),true);
         }
     }
     private Label? titleLabel;
@@ -468,7 +468,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         }
         catch (Exception ex)
         {
-            summaryLabel.Text = DbMessage.UserMessage(ex);
+            FMSC_SMS.Core.OperationFeedback.Set(summaryLabel,DbMessage.UserMessage(ex),true);
         }
     }
     private async Task LoadGridAsync(string? savedMessage = null, int? savedCampusId = null)
@@ -573,7 +573,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         }
         catch (Exception ex)
         {
-            summaryLabel.Text = DbMessage.UserMessage(ex);
+            FMSC_SMS.Core.OperationFeedback.Set(summaryLabel,DbMessage.UserMessage(ex),true);
         }
     }
     private const string FeeTypeColumnName = "FeeType";
