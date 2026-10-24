@@ -938,7 +938,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         Year.SelectedIndexChanged +=
             (_, _) => Defer(LoadFeeStructure);
         Year.SelectedIndexChanged += (_, _) => Defer(ShowNextAdmissionNumberAsync);
-        admissionDate.ValueChanged += (_, _) => Defer(ShowNextAdmissionNumberAsync);
+        admissionDate.ValueChanged += (_, _) => {
+            if(currentAdmissionId<=0)editEnrollmentDate.Text=admissionDate.Value.ToString("dd-MMM-yyyy");
+            Defer(ShowNextAdmissionNumberAsync);
+        };
+        FinanceHelp.Attach(this,admissionDate,
+            "For new admission, this is also the class placement start. Monthly billing uses today's date and the school cutoff. Admissions in past academic years generate no fees.",
+            "An April admission entered in October keeps April as its placement start, while monthly billing begins in October or November according to the cutoff.");
         Class.SelectedIndexChanged +=
             (_, _) => Defer(LoadFeeStructure);
         addFeeButton.Click +=
@@ -2795,6 +2801,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         !string.IsNullOrWhiteSpace(placeOfBirthInput.Text);
     private void UpdateAdmissionEntryFlow()
     {
+        if(currentAdmissionId<=0)editEnrollmentDate.Text=admissionDate.Value.ToString("dd-MMM-yyyy");
         bool missing = currentAdmissionId > 0 && _editEnrollmentId <= 0;
         bool placementUnlocked = currentAdmissionId <= 0 && HasRequiredAdmissionDetails();
         Campus.Enabled = placementUnlocked;
@@ -2804,7 +2811,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         transport.Enabled = placementUnlocked;
         placementGuidance.Text = currentAdmissionId > 0
             ? "Use Actions → Student Setup / Placement Corrections for placement and billing."
-            : placementUnlocked ? "Choose Campus, Academic Year, Class and Section in order."
+            : placementUnlocked ? "Monthly billing uses today's cutoff. Past academic years generate no fees."
                 : "Complete the required student and family fields above to unlock academic placement.";
         placementGuidance.ForeColor = placementUnlocked
             ? AppTheme.MutedText
@@ -3248,6 +3255,16 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             feeGrid.DataSource = _selectedFees;
             feeStatus.Text =
                 "Select Campus, Academic Year and Class above to load fees.";
+            return;
+        }
+        if(currentAdmissionId<=0 && Year.SelectedItem is DataRowView selectedYear
+            && selectedYear.Row.Table.Columns.Contains("EndDate")
+            && selectedYear.Row["EndDate"] is DateTime yearEnd && yearEnd.Date<DateTime.Today)
+        {
+            _availableFeeOptions=new List<FeeConfigOption>();
+            feeGrid.DataSource=_selectedFees;
+            feeStatus.Text="Historical admission: student and placement history only. No fees will be generated.";
+            _feeScopeCampusId=campusId;_feeScopeYearId=yearId;_feeScopeClassId=classId;
             return;
         }
         try

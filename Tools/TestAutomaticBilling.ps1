@@ -1,5 +1,5 @@
 # Owns a unique schema-only LocalDB instance. Accepts no live database/connection parameter.
-param([switch]$KeepFixture)
+param([switch]$KeepFixture,[switch]$AdmissionOnly)
 $ErrorActionPreference='Stop'
 $projectRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $owner=[guid]::NewGuid().ToString('N')
@@ -67,6 +67,11 @@ try {
  }
  $seed=Get-Content -LiteralPath (Join-Path $projectRoot 'Validation/AutomaticBillingFixture.sql') -Raw
  [void](Query $seed)
+ if($AdmissionOnly){
+  . (Join-Path $projectRoot 'Validation/AdmissionBillingStartChecks.ps1')
+  Write-Output "PASS: $checks admission billing-start SQL checks."
+  return
+ }
  $review=Preview
  Check ($review.Tables[0].Rows[0].CurrentCharges -eq 2) 'Only ready current-month tuition and transport are eligible.'
  Check ($review.Tables[2].Rows.Count -ge 3) 'Legacy, missing-start and missing-placement records have visible exceptions.'
@@ -210,16 +215,18 @@ try {
  $beforeCutoff=Admit 15
  $earlyId=[int]$beforeCutoff.Tables[0].Rows[0].AdmissionId
  $earlyEnrollment=[int]$beforeCutoff.Tables[0].Rows[0].EnrollmentId
- Check ((Number "SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE AdmissionId=$earlyId AND ChargeKind=N'Monthly' AND BillingMonth=DATEADD(month,-1,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1));") -eq 10000) 'Admission before cutoff bills current tuition without prematurely applying its next-month discount.'
+ Check ((Number "SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE AdmissionId=$earlyId AND ChargeKind=N'Monthly' AND BillingMonth=DATEFROMPARTS(YEAR(dbo.GetMonthlyBillingStartDate(CONVERT(date,GETDATE()))),MONTH(dbo.GetMonthlyBillingStartDate(CONVERT(date,GETDATE()))),1);") -eq 8000) 'Backdated admission starts tuition from today under the school cutoff and the applicable concession.'
  Check ((Number "SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE AdmissionId=$earlyId AND FeeTypeId=1 AND EffectiveTo IS NULL;") -eq 2000) 'Admission records its student discount for next month.'
  $afterCutoff=Admit 16
  $lateId=[int]$afterCutoff.Tables[0].Rows[0].AdmissionId
  $lateEnrollment=[int]$afterCutoff.Tables[0].Rows[0].EnrollmentId
- Check ((Number "SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=$lateId AND ChargeKind=N'Monthly' AND BillingMonth=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1);") -eq 1) 'Admission on cutoff starts monthly tuition next month.'
+ Check ((Number "SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=$lateId AND ChargeKind=N'Monthly' AND BillingMonth=DATEFROMPARTS(YEAR(dbo.GetMonthlyBillingStartDate(CONVERT(date,GETDATE()))),MONTH(dbo.GetMonthlyBillingStartDate(CONVERT(date,GETDATE()))),1);") -eq 1) 'The earlier admission day does not change current-date monthly billing.'
  Check ((Number "SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE AdmissionId=$lateId AND ChargeKind=N'Annual' AND BillingMonth=DATEADD(month,-1,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1));") -eq 500) 'Admission annual fee remains immediately chargeable despite delayed monthly tuition.'
  $qr=Admit 16 $true
  $qrId=[int]$qr.Tables[0].Rows[0].AdmissionId
  Check ((Number "SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=$qrId AND ChargeKind=N'Annual';") -eq 1) 'Quick Registration uses the same immediate non-monthly opening-charge policy.'
+ # Transfer checks below model already-billed legacy records, independently of new admission policy.
+ [void](Query "BEGIN TRAN; DELETE dbo.BillingCharges WHERE EnrollmentId IN($earlyEnrollment,$lateEnrollment) AND ChargeKind=N'Monthly'; UPDATE dbo.Enrollments SET BillingStartDate=dbo.GetMonthlyBillingStartDate(EnrollmentDate) WHERE EnrollmentId IN($earlyEnrollment,$lateEnrollment); EXEC dbo.PostEnrollmentOpeningCharges $earlyEnrollment; EXEC dbo.PostEnrollmentOpeningCharges $lateEnrollment; COMMIT;")
  [void](Query "INSERT dbo.Classes(ClassCode,ClassName,AcademicProgramId) VALUES(N'TARGET',N'Fictional Destination',1); INSERT dbo.CampusClassSections(CampusId,ClassId,SectionId) VALUES(1,2,1); INSERT dbo.FeeConfigurations(CampusId,ClassId,FeeTypeId,Amount,Frequency) VALUES(1,2,1,12000,N'Monthly'),(1,2,2,2500,N'Monthly'),(1,2,3,500,N'Yearly');")
  [void](Query "DECLARE @Date date=DATEADD(day,14,DATEADD(month,-1,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1))); EXEC dbo.TransferEnrollmentClass @UserId=1,@EnrollmentId=$earlyEnrollment,@NewClassSectionId=2,@TransferDate=@Date,@Remarks=N'Fictional transfer before cutoff',@FeePolicy=N'SCHOOL_CUTOFF',@FeeSyncReason=N'Destination fixture rate',@PaidReductionAction=N'Credit';")
  Check ((Number "SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE AdmissionId=$earlyId AND FeeTypeId=1 AND BillingMonth=DATEADD(month,-1,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1)) AND Status<>N'Cancelled';") -eq 12000) 'Transfer before cutoff applies the new monthly rate to the current bill through a difference.'
@@ -244,9 +251,13 @@ try {
  Check ((Number "SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE AdmissionId=$scholarshipId AND FeeTypeId=1 AND EffectiveTo IS NULL AND ConcessionLabel=N'Scholarship';") -eq 2000) 'Quick Registration preserves a partial scholarship amount and label.'
  $pendingChange=Admit 15 $true
  $pendingId=[int]$pendingChange.Tables[0].Rows[0].AdmissionId
- [void](Query "DECLARE @Id int=(SELECT StudentFeeAssignmentId FROM dbo.StudentFeeAssignments WHERE AdmissionId=$pendingId AND FeeTypeId=1 AND EffectiveTo IS NULL); EXEC dbo.SaveStudentFeeDiscount @UserId=1,@StudentFeeAssignmentId=@Id,@DiscountAmount=3000;")
- Check ((Number "SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE AdmissionId=$pendingId AND FeeTypeId=1 AND EffectiveTo IS NULL;") -eq 3000) 'A saved pending registration can review next-month assignment discounts.'
- Check ((Number "SELECT SUM(DiscountAmount) FROM dbo.BillingCharges WHERE AdmissionId=$pendingId;") -eq 0) 'Editing a pending assignment leaves its existing opening bill unchanged.'
+ $pendingDiscounts=Number "SELECT SUM(DiscountAmount) FROM dbo.BillingCharges WHERE AdmissionId=$pendingId;"
+ $refused=$false
+ try{[void](Query "DECLARE @Id int=(SELECT StudentFeeAssignmentId FROM dbo.StudentFeeAssignments WHERE AdmissionId=$pendingId AND FeeTypeId=1 AND EffectiveTo IS NULL); EXEC dbo.SaveStudentFeeDiscount @UserId=1,@StudentFeeAssignmentId=@Id,@DiscountAmount=3000;")}
+ catch{$refused=$_.Exception.Message -like '*Issued bills exist*'}
+ Check $refused 'A pending registration with current opening bills requires the reviewed fee-discount workflow.'
+ Check ((Number "SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE AdmissionId=$pendingId AND FeeTypeId=1 AND EffectiveTo IS NULL;") -eq 2000) 'Refusing a direct pending discount edit preserves the billed assignment.'
+ Check ((Number "SELECT SUM(DiscountAmount) FROM dbo.BillingCharges WHERE AdmissionId=$pendingId;") -eq $pendingDiscounts) 'Editing a pending assignment leaves its existing opening bill unchanged.'
  # Credit must also reach an already-issued bill when no new charge is needed.
  [void](Post (Preview))
  [void](Query "DECLARE @R uniqueidentifier=NEWID(); EXEC dbo.ProcessStudentCredit @UserId=1,@AdmissionId=5,@Action=N'Deposit',@Amount=500,@RequestId=@R,@Reason=N'Fictional credit for issued bill';")

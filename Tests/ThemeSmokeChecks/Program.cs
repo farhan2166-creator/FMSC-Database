@@ -273,6 +273,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} fee document checks, including RDLC PNG/PDF rendering.");
             return;
         }
+        if(args.Contains("--current-receipt-balances"))
+        {
+            CheckCurrentReceiptBalances();
+            Console.WriteLine($"PASS: {checks} current receipt balance checks (no database connection).");
+            return;
+        }
         if (args.Contains("--collection-credit"))
         {
             CheckCollectionCredit();
