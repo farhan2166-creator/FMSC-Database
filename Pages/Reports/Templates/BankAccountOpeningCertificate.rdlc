@@ -239,7 +239,7 @@
                 </Style>
               </TextRun>
               <TextRun>
-                <Value>=IIF(First(Fields!Gender.Value, "BankAccountOpeningCertificateData") = "Female", "Miss.", IIF(First(Fields!Gender.Value, "BankAccountOpeningCertificateData") = "Male", "Mr.", "Mr./Ms."))</Value>
+                <Value>=IIF(First(Fields!Gender.Value, "BankAccountOpeningCertificateData") = "Female", "Ms.", IIF(First(Fields!Gender.Value, "BankAccountOpeningCertificateData") = "Male", "Mr.", "Mr./Ms."))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -267,7 +267,7 @@
                 </Style>
               </TextRun>
               <TextRun>
-                <Value>=IIF(First(Fields!Gender.Value, "BankAccountOpeningCertificateData") = "Female", "D/O", IIF(First(Fields!Gender.Value, "BankAccountOpeningCertificateData") = "Male", "S/O", "S/O, D/O"))</Value>
+                <Value>=IIF(First(Fields!Gender.Value, "BankAccountOpeningCertificateData") = "Female", "D/O", IIF(First(Fields!Gender.Value, "BankAccountOpeningCertificateData") = "Male", "S/O", "S/D/O"))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>

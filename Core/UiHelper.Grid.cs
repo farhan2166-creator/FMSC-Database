@@ -991,6 +991,11 @@ namespace FMSC_SMS.Core
             bool selected =
                 (grid.Rows.GetRowState(e.RowIndex) &
                  DataGridViewElementStates.Selected) != 0;
+            if(e.CellStyle is not null)
+            {
+                e.CellStyle.SelectionBackColor=AppTheme.SelectionBackground;
+                e.CellStyle.SelectionForeColor=AppTheme.SelectionText;
+            }
             if (!selected &&
                 GridLooks.TryGetValue(grid, out GridLook? look) &&
                 look.HoverRow == e.RowIndex &&

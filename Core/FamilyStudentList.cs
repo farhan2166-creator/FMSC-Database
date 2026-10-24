@@ -59,7 +59,7 @@ internal sealed class FamilyStudentList : CheckedListBox
     {
         if (e.Index < 0 || e.Index >= Items.Count) return;
         bool selected = (e.State & DrawItemState.Selected) != 0;
-        using var background = new SolidBrush(selected ? AppTheme.SurfaceSecondary : AppTheme.Surface);
+        using var background = new SolidBrush(selected ? AppTheme.SelectionBackground : AppTheme.Surface);
         e.Graphics.FillRectangle(background, e.Bounds);
         var state = GetItemChecked(e.Index) ? CheckBoxState.CheckedNormal : CheckBoxState.UncheckedNormal;
         var size = CheckBoxRenderer.GetGlyphSize(e.Graphics, state);
@@ -68,12 +68,12 @@ internal sealed class FamilyStudentList : CheckedListBox
         string[] lines = (GetItemText(Items[e.Index]) ?? "").Split('\n', 2);
         int left = e.Bounds.Left + inset + size.Width + gap;
         var first = new Rectangle(left, e.Bounds.Top + inset, Math.Max(1, e.Bounds.Right - left - inset), Font.Height + 4);
-        TextRenderer.DrawText(e.Graphics, lines[0], AppTheme.BodyBoldFont, first, AppTheme.Text,
+        TextRenderer.DrawText(e.Graphics, lines[0], AppTheme.BodyBoldFont, first, selected?AppTheme.SelectionText:AppTheme.Text,
             TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         if (lines.Length > 1)
         {
             var second = new Rectangle(first.Left, first.Bottom + 2, first.Width, Font.Height + 4);
-            TextRenderer.DrawText(e.Graphics, lines[1], Font, second, AppTheme.MutedText,
+            TextRenderer.DrawText(e.Graphics, lines[1], Font, second, selected?AppTheme.SelectionText:AppTheme.MutedText,
                 TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
         }
         if ((e.State & DrawItemState.Focus) != 0) e.DrawFocusRectangle();

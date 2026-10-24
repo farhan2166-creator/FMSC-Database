@@ -24,7 +24,10 @@ internal static class CertificateLetterhead
             image.Element(ns + "Width")!.Value = width.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + "in";
             image.SetElementValue(ns + "Left", ((7.45 - width) / 2).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + "in");
         }
-        string Text(string column) => profile is null ? string.Empty : CertificateUi.GetString(profile, column);
+        string Text(string column) => profile is null ? string.Empty : RecordTextPolicy.DisplayText(column,CertificateUi.GetString(profile, column));
+        if(Path.GetFileName(path)=="RegularStudentCertificate.rdlc" && !string.IsNullOrWhiteSpace(Text("SchoolName")))
+            document.Descendants(ns+"Textbox").Single(element=>(string?)element.Attribute("Name")=="txtInstitution")
+                .Descendants(ns+"Value").Single().Value=Text("SchoolName");
         string address = string.Join(" ", new[] { Text("AddressLine"), Text("City") }.Where(value => !string.IsNullOrWhiteSpace(value)));
         string contact = Text("ContactNumber");
         string email = Text("Email");

@@ -60,7 +60,7 @@ public sealed class StyledContextMenu : ContextMenuStrip
             var rect = new Rectangle(2, 1, e.Item.Width - 4, e.Item.Height - 2);
             if (AppTheme.UseSimpleRendering)
             {
-                using var flatBrush = new SolidBrush(AppTheme.PrimaryLight);
+                using var flatBrush = new SolidBrush(AppTheme.SelectionBackground);
                 e.Graphics.FillRectangle(flatBrush, rect);
                 return;
             }
@@ -71,7 +71,7 @@ public sealed class StyledContextMenu : ContextMenuStrip
             path.AddArc(rect.Right - radius, rect.Bottom - radius, radius, radius, 0, 90);
             path.AddArc(rect.Left, rect.Bottom - radius, radius, radius, 90, 90);
             path.CloseFigure();
-            using var brush = new SolidBrush(AppTheme.PrimaryLight);
+            using var brush = new SolidBrush(AppTheme.SelectionBackground);
             var previous = e.Graphics.SmoothingMode;
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.FillPath(brush, path);
@@ -80,13 +80,13 @@ public sealed class StyledContextMenu : ContextMenuStrip
 
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
-            e.TextColor = !e.Item.Enabled ? AppTheme.MutedText : AppTheme.Text;
+            e.TextColor = !e.Item.Enabled ? AppTheme.MutedText : e.Item.Selected?AppTheme.SelectionText:AppTheme.Text;
             base.OnRenderItemText(e);
         }
 
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
         {
-            e.ArrowColor = e.Item?.Enabled == true ? AppTheme.Primary : AppTheme.MutedText;
+            e.ArrowColor = e.Item?.Enabled == true ? e.Item.Selected?AppTheme.SelectionText:AppTheme.Primary : AppTheme.MutedText;
             base.OnRenderArrow(e);
         }
 

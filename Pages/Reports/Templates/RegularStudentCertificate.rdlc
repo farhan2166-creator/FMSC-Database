@@ -204,7 +204,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>It is certified that Mr./Ms.</Value>
+                <Value>=&quot;It is certified that &quot; &amp; IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Female&quot;, &quot;Ms.&quot;, IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Male&quot;, &quot;Mr.&quot;, &quot;Mr./Ms.&quot;))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -262,7 +262,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>S/O, D/O</Value>
+                <Value>=IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Female&quot;, &quot;D/O&quot;, IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Male&quot;, &quot;S/O&quot;, &quot;S/D/O&quot;))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -433,7 +433,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>He/She is currently studying here in Class</Value>
+                <Value>=IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Female&quot;, &quot;She&quot;, IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Male&quot;, &quot;He&quot;, &quot;He/She&quot;)) &amp; &quot; is currently studying here in Class&quot;</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -855,7 +855,7 @@
           <DataField>InstitutionLine</DataField>
           <rd:TypeName>System.String</rd:TypeName>
         </Field>
-      </Fields>
+      <Field Name="Gender"><DataField>Gender</DataField><rd:TypeName>System.String</rd:TypeName></Field></Fields>
     </DataSet>
   </DataSets>
   <rd:ReportUnitType>Inch</rd:ReportUnitType>

@@ -158,7 +158,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>He/She has passed </Value>
+                <Value>=IIF(First(Fields!Gender.Value, &quot;CharacterCertificateData&quot;) = &quot;Female&quot;, &quot;She&quot;, IIF(First(Fields!Gender.Value, &quot;CharacterCertificateData&quot;) = &quot;Male&quot;, &quot;He&quot;, &quot;He/She&quot;)) &amp; &quot; has passed &quot;</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -485,7 +485,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>This is to certify that Mr./Ms.</Value>
+                <Value>=&quot;This is to certify that &quot; &amp; IIF(First(Fields!Gender.Value, &quot;CharacterCertificateData&quot;) = &quot;Female&quot;, &quot;Ms.&quot;, IIF(First(Fields!Gender.Value, &quot;CharacterCertificateData&quot;) = &quot;Male&quot;, &quot;Mr.&quot;, &quot;Mr./Ms.&quot;))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -512,7 +512,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>Son/Daughter of</Value>
+                <Value>=IIF(First(Fields!Gender.Value, &quot;CharacterCertificateData&quot;) = &quot;Female&quot;, &quot;D/O&quot;, IIF(First(Fields!Gender.Value, &quot;CharacterCertificateData&quot;) = &quot;Male&quot;, &quot;S/O&quot;, &quot;S/D/O&quot;))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -740,7 +740,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>During his/her stay in this Institution, his/her Conduct and Moral Character was found </Value>
+                <Value>=&quot;During &quot; &amp; LCase(IIF(First(Fields!Gender.Value, &quot;CharacterCertificateData&quot;) = &quot;Female&quot;, &quot;Her&quot;, IIF(First(Fields!Gender.Value, &quot;CharacterCertificateData&quot;) = &quot;Male&quot;, &quot;His&quot;, &quot;His/Her&quot;))) &amp; &quot; stay in this Institution, &quot; &amp; LCase(IIF(First(Fields!Gender.Value, &quot;CharacterCertificateData&quot;) = &quot;Female&quot;, &quot;Her&quot;, IIF(First(Fields!Gender.Value, &quot;CharacterCertificateData&quot;) = &quot;Male&quot;, &quot;His&quot;, &quot;His/Her&quot;))) &amp; &quot; Conduct and Moral Character was found &quot;</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>

@@ -145,6 +145,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} report caption and rendering checks.");
             return;
         }
+        if(args.Contains("--record-presentation"))
+        {
+            CheckRecordPresentation();
+            Console.WriteLine($"PASS: {checks} gender, title-case, save-parameter and rendered certificate checks.");
+            return;
+        }
         if(args.Contains("--ui-guidance-review"))
         {
             CaptureUiGuidanceReview();
@@ -227,6 +233,12 @@ internal static partial class Program
         {
             CheckFinancePresentation();
             Console.WriteLine($"PASS: {checks} finance presentation and preserved interaction checks (no database connection).");
+            return;
+        }
+        if(args.Contains("--transfer-review"))
+        {
+            CheckTransferReview();
+            Console.WriteLine($"PASS: {checks} transfer scope, layout, cutoff and theme-selection checks.");
             return;
         }
         if(args.Contains("--grid-pdf"))

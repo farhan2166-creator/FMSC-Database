@@ -23,8 +23,8 @@ internal static class MasterGridActionColumns
             column.DefaultCellStyle.Font = AppTheme.SymbolFont(11F, FontStyle.Bold);
             column.DefaultCellStyle.ForeColor = accent;
             column.DefaultCellStyle.BackColor = AppTheme.Surface;
-            column.DefaultCellStyle.SelectionForeColor = accent;
-            column.DefaultCellStyle.SelectionBackColor = AppTheme.PrimaryLight;
+            column.DefaultCellStyle.SelectionForeColor = AppTheme.SelectionText;
+            column.DefaultCellStyle.SelectionBackColor = AppTheme.SelectionBackground;
         }
     }
 

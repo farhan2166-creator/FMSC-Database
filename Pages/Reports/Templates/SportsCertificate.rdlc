@@ -158,7 +158,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>This is to certify that Mr./Ms.</Value>
+                <Value>=&quot;This is to certify that &quot; &amp; IIF(First(Fields!Gender.Value, &quot;SportsCertificateData&quot;) = &quot;Female&quot;, &quot;Ms.&quot;, IIF(First(Fields!Gender.Value, &quot;SportsCertificateData&quot;) = &quot;Male&quot;, &quot;Mr.&quot;, &quot;Mr./Ms.&quot;))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -216,7 +216,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>Son/Daughter of</Value>
+                <Value>=IIF(First(Fields!Gender.Value, &quot;SportsCertificateData&quot;) = &quot;Female&quot;, &quot;D/O&quot;, IIF(First(Fields!Gender.Value, &quot;SportsCertificateData&quot;) = &quot;Male&quot;, &quot;S/O&quot;, &quot;S/D/O&quot;))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -359,7 +359,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>His/Her Performance / Achievement in this activity was as follows:</Value>
+                <Value>=IIF(First(Fields!Gender.Value, &quot;SportsCertificateData&quot;) = &quot;Female&quot;, &quot;Her&quot;, IIF(First(Fields!Gender.Value, &quot;SportsCertificateData&quot;) = &quot;Male&quot;, &quot;His&quot;, &quot;His/Her&quot;)) &amp; &quot; Performance / Achievement in this activity was as follows:&quot;</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -772,7 +772,7 @@
           <DataField>DateOfIssue</DataField>
           <rd:TypeName>System.DateTime</rd:TypeName>
         </Field>
-      </Fields>
+      <Field Name="Gender"><DataField>Gender</DataField><rd:TypeName>System.String</rd:TypeName></Field></Fields>
     </DataSet>
   </DataSets>
   <rd:ReportUnitType>Inch</rd:ReportUnitType>

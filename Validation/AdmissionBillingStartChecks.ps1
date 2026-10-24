@@ -49,4 +49,4 @@ $withoutRates=NewAdmission 2
 Check ($withoutRates.Tables[0].Rows.Count -eq 1) 'Historical admission does not require current class fee rates.'
 Check ((Number 'SELECT COUNT(*) FROM dbo.FeePayments;') -eq 0) 'Admission never fabricates payment records.'
 Check ((Number "SELECT COUNT(*) FROM dbo.fn_MonthlyBillingCandidates(DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1),1) WHERE AdmissionId=$oldId AND BlockReason IS NULL;") -eq 0) 'Historical admission remains excluded from automatic and missed-month billing.'
-Check ((Number "SELECT COUNT(*) FROM dbo.DatabaseVersion WHERE VersionNumber=N'43';") -eq 1) 'The full sequential migration chain reaches schema 43.'
+Check ((Number "SELECT COUNT(*) FROM dbo.DatabaseVersion WHERE VersionNumber=N'44';") -eq 1) 'The full sequential migration chain reaches schema 44.'

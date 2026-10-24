@@ -497,15 +497,15 @@ namespace FMSC_SMS.Core
             grid.DefaultCellStyle.BackColor =
                 AppTheme.Surface;
             grid.DefaultCellStyle.SelectionBackColor =
-                AppTheme.Tint(accent, 0.88f);
+                AppTheme.SelectionBackground;
             grid.DefaultCellStyle.SelectionForeColor =
-                AppTheme.HeadingText;
+                AppTheme.SelectionText;
             grid.AlternatingRowsDefaultCellStyle =
                 new DataGridViewCellStyle {
                     BackColor = AppTheme.SurfaceSecondary,
                     ForeColor = AppTheme.Text,
-                    SelectionBackColor = AppTheme.Tint(accent, 0.88f),
-                    SelectionForeColor = AppTheme.HeadingText,
+                    SelectionBackColor = AppTheme.SelectionBackground,
+                    SelectionForeColor = AppTheme.SelectionText,
                     Padding = new Padding(UiDpi.Metric(grid, AppMetrics.SpacingSm), 0, UiDpi.Metric(grid, AppMetrics.SpacingSm), 0)
                 };
             grid.ColumnHeadersDefaultCellStyle.Alignment =

@@ -1658,8 +1658,8 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             AppTheme.SymbolFont(11F, FontStyle.Bold);
         column.DefaultCellStyle.ForeColor = AppTheme.Danger;
         column.DefaultCellStyle.BackColor = AppTheme.Surface;
-        column.DefaultCellStyle.SelectionForeColor = AppTheme.Danger;
-        column.DefaultCellStyle.SelectionBackColor = AppTheme.PrimaryLight;
+        column.DefaultCellStyle.SelectionForeColor = AppTheme.SelectionText;
+        column.DefaultCellStyle.SelectionBackColor = AppTheme.SelectionBackground;
         return column;
     }
     /// <summary>Null uses the wording-based default; destructive/discard confirmations default to No.</summary>
