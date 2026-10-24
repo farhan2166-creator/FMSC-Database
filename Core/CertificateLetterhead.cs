@@ -20,7 +20,9 @@ internal static class CertificateLetterhead
             var image = document.Descendants(ns + "Image").Single(element => (string?)element.Attribute("Name") == item.Item1);
             image.Element(ns + "Value")!.Value = new Uri(imagePath).AbsoluteUri;
             using var bitmap = new Bitmap(imagePath);
-            double width = Math.Min(7.45, 2.0 * bitmap.Width / bitmap.Height);
+            // Each template reserves its own header height; keep the image proportional within it.
+            double height = double.Parse(image.Element(ns + "Height")!.Value[..^2], System.Globalization.CultureInfo.InvariantCulture);
+            double width = Math.Min(7.45, height * bitmap.Width / bitmap.Height);
             image.Element(ns + "Width")!.Value = width.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + "in";
             image.SetElementValue(ns + "Left", ((7.45 - width) / 2).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture) + "in");
         }

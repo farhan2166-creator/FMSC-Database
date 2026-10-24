@@ -71,7 +71,7 @@
         </Style>
       </Line>
       <Line Name="lnDateOfIssue">
-        <Top>5.72083in</Top>
+        <Top>5.22083in</Top>
         <Left>0.6in</Left>
         <Height>0in</Height>
         <Width>2in</Width>
@@ -326,7 +326,7 @@
             <Style />
           </Paragraph>
         </Paragraphs>
-        <Top>5.47083in</Top>
+        <Top>4.97083in</Top>
         <Height>0.25in</Height>
         <Width>0.6in</Width>
         <ZIndex>14</ZIndex>
@@ -357,7 +357,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>5.47083in</Top>
+        <Top>4.97083in</Top>
         <Left>0.6in</Left>
         <Height>0.25in</Height>
         <Width>2in</Width>
@@ -437,7 +437,7 @@
         </Style>
       </Textbox>
       <Line Name="lnPrincipal">
-        <Top>6.35in</Top>
+        <Top>5.85in</Top>
         <Left>5.15in</Left>
         <Height>0in</Height>
         <Width>2.3in</Width>
@@ -467,7 +467,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>6.45in</Top>
+        <Top>5.95in</Top>
         <Left>5.15in</Left>
         <Height>0.25in</Height>
         <Width>2.3in</Width>
@@ -786,13 +786,13 @@
         </Style>
       </Line>
     </ReportItems>
-    <Height>6.8in</Height>
+    <Height>6.3in</Height>
     <Style />
   </Body>
   <Width>7.45in</Width>
   <Page>
     <PageHeader>
-      <Height>2.1in</Height>
+      <Height>3.1in</Height>
       <PrintOnFirstPage>true</PrintOnFirstPage>
       <PrintOnLastPage>true</PrintOnLastPage>
       <ReportItems>
@@ -801,7 +801,7 @@
           <Value>Assets/header.png</Value>
           <Sizing>FitProportional</Sizing>
           <Top>0.02in</Top>
-          <Height>2in</Height>
+          <Height>3in</Height>
           <Width>7.45in</Width>
           <Style>
             <Border>

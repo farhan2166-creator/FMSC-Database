@@ -11,7 +11,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     public bool HasUnsavedChanges => false;
     public string UnsavedChangesMessage=>"The new certificate has unsaved details. Discard this draft?";
     private bool ConfirmDraftDiscard()=>!HasUnsavedChanges||Confirm(UnsavedChangesMessage,UiText.Dialogs.UnsavedChanges);
-    private readonly HashSet<int> eligibleSchoolClasses = new();
 
     private readonly ModernComboBox examType =
         HumanUi.Combo();
@@ -56,7 +55,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     /* Business rule (V20 audit F-01, confirmed by the owner): exam type is operator-selected
        wording for each print, not persisted certificate history. Keep this fixed combo;
        do not introduce an exam-type table/column or per-exam-type certificate uniqueness.
-       The school chooses issuance; require a wording selection without a pass acknowledgement. */
+       The school chooses issuance; require wording without class or pass eligibility checks. */
     private static readonly string[] ExamTypeLabels =
     {
         "S.S.C (Matric)",
@@ -135,7 +134,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         }
         var studentField=CertificateUi.Field("Student", student, true);
         var dateField=CertificateUi.Field(UiText.Certificates.Date, certificateDate, true);
-        var examField=CertificateUi.Field("Board Examination", examType, true);
+        var examField=CertificateUi.Field("Certificate Wording", examType, true);
         var rollField=CertificateUi.Field("BISE Roll No.", rollNumber, true);
         fields.Controls.Add(studentField,0,0);
         fields.Controls.Add(dateField,1,0);
@@ -236,7 +235,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             return;
         try
         {
-            eligibleSchoolClasses.Clear();
             ClearCertificateSelection();
             ClearCertificateFields();
             int admissionId =
@@ -256,19 +254,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             {
                 ApplyWorkflowState();
                 return;
-            }
-            var placements = DatabaseHelper.QuerySql("""
-                EXEC dbo.RequirePermission @UserId,N'Certificates.Create';
-                SELECT DISTINCT C.ClassName
-                FROM dbo.Enrollments E
-                JOIN dbo.CampusClassSections CCS ON CCS.ClassSectionId=E.ClassSectionId
-                JOIN dbo.Classes C ON C.ClassId=CCS.ClassId
-                WHERE E.AdmissionId=@AdmissionId AND E.Status<>N'Cancelled';
-                """, DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@AdmissionId",admissionId));
-            foreach(DataRow placement in placements.Rows)
-            {
-                int schoolClass=SchoolClassNumber(GetString(placement,"ClassName"));
-                if(schoolClass is 10 or 12)eligibleSchoolClasses.Add(schoolClass);
             }
             LoadCertificates(admissionId);
         }
@@ -430,15 +415,13 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             selectedIssueId > 0 &&
             selectedCertificateRecordId > 0;
         bool examTypeChosen = examType.SelectedIndex >= 0;
-        bool eligibleClass = HasSchoolClass(10) || HasSchoolClass(12);
-        bool canIssue = eligibleClass && ExamMatchesClass();
         student.Enabled = true;
         examType.Enabled =
             hasStudent;
         /* One certificate on file means no new Create; another copy is Issue Again. */
         bool canCreate =
             hasStudent &&
-            canIssue &&
+            examTypeChosen &&
             !hasCertificate;
         certificateDate.Enabled =
             canCreate;
@@ -453,7 +436,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         refreshButton.Enabled =
             hasStudent;
         issueAgainButton.Enabled =
-            hasSelectedIssue && canIssue &&
+            hasSelectedIssue && examTypeChosen &&
             IsLatestIssueCollectedFor(selectedCertificateRecordId);
         collectButton.Enabled =
             hasSelectedIssue &&
@@ -467,22 +450,12 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             SetStatus(UiText.Prompts.SearchForStudent);
             return;
         }
-        if (!eligibleClass)
-        {
-            SetStatus("Requires a current or earlier Class 10 (SSC) or Class 12 (HSSC) placement.");
-            return;
-        }
         if (!examTypeChosen)
         {
             SetStatus(
                 hasCertificate
                     ? "Select a copy and SSC/HSSC wording to print. Wording applies to this print only."
                     : "Choose SSC/HSSC and complete the details to create the current-year certificate.");
-            return;
-        }
-        if (!canIssue)
-        {
-            SetStatus("Choose SSC for a Class 10 placement or HSSC for a Class 12 placement.");
             return;
         }
         if (!hasCertificate)
@@ -551,34 +524,16 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         }
         return false;
     }
-    internal static int SchoolClassNumber(string className)
+    private bool ValidateWording()
     {
-        string normalized = className.Trim().ToUpperInvariant();
-        if (normalized is "X" or "SSC" or "MATRIC") return 10;
-        if (normalized is "XII" or "HSSC" or "INTERMEDIATE" or "SECOND YEAR" or "2ND YEAR") return 12;
-        var match = System.Text.RegularExpressions.Regex.Match(normalized, @"(?<!\d)(10|12)(?!\d)");
-        return match.Success ? int.Parse(match.Value) : 0;
-    }
-    private int SelectedSchoolClass()
-    {
-        var row = studentResults.AsEnumerable().FirstOrDefault(row => GetInt(row, "AdmissionId") == student.SelectedId);
-        return row is null ? 0 : SchoolClassNumber(GetString(row, "ClassName"));
-    }
-    private bool HasSchoolClass(int schoolClass) =>
-        eligibleSchoolClasses.Contains(schoolClass) || SelectedSchoolClass()==schoolClass;
-    private bool ExamMatchesClass() =>
-        (HasSchoolClass(10) && examType.SelectedIndex == 0) ||
-        (HasSchoolClass(12) && examType.SelectedIndex == 1);
-    private bool ValidateEligibility()
-    {
-        if (ExamMatchesClass()) return true;
-        Warn("Choose SSC for a current or earlier Class 10 placement, or HSSC for a current or earlier Class 12 placement.");
+        if (examType.SelectedIndex >= 0 && examType.SelectedIndex < ExamTypeLabels.Length) return true;
+        Warn("Choose SSC or HSSC wording for this certificate.");
         return false;
     }
     private void CreateCertificate()
     {
         int printExamType = examType.SelectedIndex;
-        if (!ValidateEligibility()) return;
+        if (!ValidateWording()) return;
         if (!ValidateRequiredInputs())
             return;
         /* Finding 12 - Info writes the status line, but the reload below calls Bind ("N record(s)") and ApplyWorkflowState after it. */
@@ -679,7 +634,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     }
     private void IssueAgain()
     {
-        if (!ValidateEligibility()) return;
+        if (!ValidateWording()) return;
         int printExamType = examType.SelectedIndex;
         // Finding 12 - see CreateCertificate: the confirmation is set last.
         string? successMessage =
@@ -1079,7 +1034,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     }
     private void ResetToStart()
     {
-        eligibleSchoolClasses.Clear();
         suppressStudentChanged = true;
         try
         {
@@ -1100,7 +1054,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     private void ClearForm()
     {
         if(!ConfirmDraftDiscard())return;
-        eligibleSchoolClasses.Clear();
         suppressStudentChanged = true;
         try
         {

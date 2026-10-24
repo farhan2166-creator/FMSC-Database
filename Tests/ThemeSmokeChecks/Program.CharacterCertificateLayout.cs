@@ -53,22 +53,45 @@ internal static partial class Program
             Check(form.SelectNextControl(focused,false,true,true,true)&&sequence[index].ContainsFocus,
                 $"Shift+Tab returns to position {index+1}.");
         }
-        var eligible=Field<HashSet<int>>("eligibleSchoolClasses");
         typeof(StudentPicker).GetField("_selectedId",flags)!.SetValue(student,41);
         void Refresh()=>typeof(CharacterCertificatePage).GetMethod("ApplyWorkflowState",flags)!.Invoke(page,null);
-        eligible.Add(10);exam.SelectedIndex=0;Refresh();
-        Check(create.Enabled,"A former Class 10 student can create SSC without a pass acknowledgement.");
+        using var students=new System.Data.DataTable();
+        students.Columns.Add("AdmissionId",typeof(int));students.Columns.Add("ClassName");
+        var selected=students.Rows.Add(41,"Nine");student.SetSource(students);
+        foreach(string className in new[]{"Nine","Ten","Eleven","Twelve","Custom class",""})
+        foreach(int wording in new[]{0,1})
+        {
+            selected["ClassName"]=className;exam.SelectedIndex=wording;Refresh();
+            Check(create.Enabled&&date.Enabled&&roll.Enabled&&remarks.Enabled,
+                "The operator can choose either certificate wording for class '"+className+"' without placement restrictions.");
+        }
         typeof(CharacterCertificatePage).GetMethod("ClearCertificateFields",flags)!.Invoke(page,null);
         exam.SelectedIndex=0;Refresh();
-        Check(create.Enabled,"Clearing saved certificate inputs retains this student's placement eligibility.");
-        exam.SelectedIndex=1;Refresh();
-        Check(!create.Enabled,"Class 10 history alone does not qualify for HSSC.");
-        eligible.Add(12);Refresh();
-        Check(create.Enabled,"Class 12 history qualifies for HSSC without a pass acknowledgement.");
+        Check(create.Enabled,"Clearing certificate inputs still lets the operator choose fresh wording.");
         exam.SelectedIndex=-1;Refresh();
         Check(!create.Enabled,"The operator still chooses the exam wording.");
-        eligible.Clear();exam.SelectedIndex=0;Refresh();
-        Check(!create.Enabled,"A student without Class 10 or 12 history cannot create a certificate.");
+        exam.SelectedIndex=0;
+        var records=Field<System.Data.DataTable>("certificateResults");
+        records.Columns.Add("CertificateRecordId",typeof(int));records.Rows.Add(8);Refresh();
+        Check(!create.Enabled,"An existing certificate still prevents duplicate creation regardless of wording.");
+        records.Columns.Add("CollectionStatus");records.Columns.Add("CharacterCertificateIssueId",typeof(int));
+        records.Rows[0]["CollectionStatus"]="Collected";records.Rows[0]["CharacterCertificateIssueId"]=12;
+        typeof(CharacterCertificatePage).GetField("selectedCertificateRecordId",flags)!.SetValue(page,8);
+        typeof(CharacterCertificatePage).GetField("selectedIssueId",flags)!.SetValue(page,12);
+        typeof(CharacterCertificatePage).GetField("selectedIssueCollected",flags)!.SetValue(page,true);
+        selected["ClassName"]="Nine";
+        foreach(int wording in new[]{0,1})
+        {
+            exam.SelectedIndex=wording;Refresh();
+            Check(Field<ModernButton>("issueAgainButton").Enabled,"Either wording allows another copy without a class check.");
+        }
+        records.Rows[0]["CollectionStatus"]="Not Collected";Refresh();
+        Check(!Field<ModernButton>("issueAgainButton").Enabled,"The latest copy must still be collected before issuing again.");
+        typeof(CharacterCertificatePage).GetField("selectedCertificateRecordId",flags)!.SetValue(page,0);
+        typeof(CharacterCertificatePage).GetField("selectedIssueId",flags)!.SetValue(page,0);
+        records.Clear();
+        typeof(StudentPicker).GetField("_selectedId",flags)!.SetValue(student,0);Refresh();
+        Check(!create.Enabled,"Certificate creation still requires a selected student.");
         Check(!page.IsHandleCreated,"Layout and keyboard checks never start the certificate page's SQL loaders.");
     }
 }
