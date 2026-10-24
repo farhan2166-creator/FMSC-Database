@@ -62,7 +62,7 @@ internal static class ClassOutstandingReportData
                 row["SerialNumber"] = ++serial;
                 row["SchoolName"] = schoolName;
                 row["YearSelection"] = yearSelection;
-                row["Generated"] = generated.ToString("dd-MMM-yyyy HH:mm");
+                row["Generated"] = generated.ToString("dd-MM-yyyy HH:mm");
                 row["Remarks"] = "";
                 data.Rows.Add(row);
             }

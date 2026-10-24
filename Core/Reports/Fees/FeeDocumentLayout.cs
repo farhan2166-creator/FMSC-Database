@@ -108,7 +108,7 @@ internal static class FeeDocumentLayout
     {
         if(!expression.StartsWith('='))return expression;
         if(expression.Contains("Now()",StringComparison.Ordinal))
-            return DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt",CultureInfo.CurrentCulture);
+            return DateTime.Now.ToString("dd-MM-yyyy hh:mm tt",CultureInfo.CurrentCulture);
         string key=Regex.Match(expression,@"Fields!(\w+)\.Value").Groups[1].Value;
         if(string.IsNullOrEmpty(key))throw new InvalidOperationException("Unsupported fee-document measurement expression: "+name);
         if(name=="TotalPaid" && key=="ShowSettlement")

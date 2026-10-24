@@ -52,7 +52,7 @@ internal static class ClassSectionSummaryData
         {
             var group = pair.Value;
             result.Rows.Add(++serial, group.Students.Count, group.Boys, group.Girls, group.Other, group.Outstanding,
-                school, scope, generated.ToString("dd-MMM-yyyy HH:mm"), group.Campus, group.Class, group.Section);
+                school, scope, generated.ToString("dd-MM-yyyy HH:mm"), group.Campus, group.Class, group.Section);
         }
         return result;
     }

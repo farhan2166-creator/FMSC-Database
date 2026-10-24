@@ -50,7 +50,7 @@ internal static class FeeBillDocuments
         foreach(DataRow row in data.Rows)
         {
             row["ReceiptNumber"]=saved["BillNumber"];
-            row["PaymentDateText"]=Convert.ToDateTime(saved["IssuedAt"]).ToString("dd-MMM-yyyy hh:mm tt");
+            row["PaymentDateText"]=Convert.ToDateTime(saved["IssuedAt"]).ToString("dd-MM-yyyy hh:mm tt");
         }
         return data;
     }
@@ -68,7 +68,7 @@ internal static class FeeBillDocuments
         grid.SelectionMode=DataGridViewSelectionMode.FullRowSelect;grid.AutoGenerateColumns=false;
         grid.Columns.Add(new DataGridViewTextBoxColumn {DataPropertyName="BillNumber",HeaderText="Bill No.",AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill});
         grid.Columns.Add(new DataGridViewTextBoxColumn {DataPropertyName="IssuedAt",HeaderText="Date",AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill,
-            DefaultCellStyle=new DataGridViewCellStyle {Format="dd-MMM-yyyy hh:mm tt"}});
+            DefaultCellStyle=new DataGridViewCellStyle {Format="dd-MM-yyyy hh:mm tt"}});
         grid.Columns.Add(new DataGridViewTextBoxColumn {DataPropertyName="DocumentType",HeaderText="Type",AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill});
         grid.CellFormatting+=(_,e)=> {if(e.ColumnIndex==2 && e.Value is string kind)e.Value=kind=="FB"?"Family Fee Bill":"Student Fee Bill";};
         grid.DataSource=bills;

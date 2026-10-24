@@ -41,7 +41,7 @@ internal static class ReportExportBuilder
                 object value = sourceRow[sourceColumns[index]];
                 row[index] = dateOrdinals.Contains(index)
                     ? value is DateTime date
-                        ? date.ToString("dd-MMM-yyyy", CultureInfo.CurrentCulture)
+                        ? date.ToString("dd-MM-yyyy", CultureInfo.CurrentCulture)
                         : DBNull.Value
                     : value;
             }

@@ -3659,7 +3659,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             string DateText(string column) =>
                 s.Table.Columns.Contains(column) &&
                 s[column] != DBNull.Value
-                    ? Convert.ToDateTime(s[column]).ToString("dd-MMM-yyyy")
+                    ? Convert.ToDateTime(s[column]).ToString("dd-MM-yyyy")
                     : "-";
             string TextOrDash(string column)
             {

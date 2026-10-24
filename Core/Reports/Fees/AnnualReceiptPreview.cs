@@ -47,7 +47,7 @@ internal static class AnnualReceiptPreview
                         var row = receipts.Rows.Add(pageKey,institution.Name,"STUDENT PAYMENT RECEIPT","STUDENT COPY",
                             receipt.Key,first["StudentName"],AdmissionNumbers.ForId(admissionId),
                             $"{first["ClassName"]} - {first["SectionName"]}",
-                            Convert.ToDateTime(header["PaymentDate"]).ToString("dd-MMM-yyyy hh:mm tt"),
+                            Convert.ToDateTime(header["PaymentDate"]).ToString("dd-MM-yyyy hh:mm tt"),
                             "",line["FeeTypeName"],line["Amount"],0m,total,0m,header["PaymentMethod"],
                             "",false,false,institution.ContactNumber,institution.Address,
                             first["CampusName"],first["FatherName"],

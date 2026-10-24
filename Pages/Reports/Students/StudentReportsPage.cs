@@ -80,12 +80,12 @@ public partial class StudentReportsPage : V2Page
     };
     private readonly ModernDatePicker from = new() {
         Format = DateTimePickerFormat.Custom,
-        CustomFormat = "dd-MMM-yyyy",
+        CustomFormat = "dd-MM-yyyy",
         Value = DateTime.Today.AddMonths(-1)
     };
     private readonly ModernDatePicker to = new() {
         Format = DateTimePickerFormat.Custom,
-        CustomFormat = "dd-MMM-yyyy",
+        CustomFormat = "dd-MM-yyyy",
         Value = DateTime.Today
     };
     private readonly CheckBox inactive = new ModernCheckBox {
@@ -1042,7 +1042,7 @@ public partial class StudentReportsPage : V2Page
         if (a.LimitDate)
         {
             string what = a.Mode == ModeChanges ? "Changes" : "Admitted";
-            parts.Add($"{what} {a.From:dd-MMM-yyyy} to {a.To:dd-MMM-yyyy}");
+            parts.Add($"{what} {a.From:dd-MM-yyyy} to {a.To:dd-MM-yyyy}");
         }
         return string.Join("  |  ", parts);
     }

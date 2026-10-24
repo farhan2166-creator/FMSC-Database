@@ -1274,7 +1274,7 @@
                               </Style>
                             </TextRun>
                             <TextRun>
-                              <Value>=Format(Now(), "dd-MMM-yyyy hh:mm tt")</Value>
+                              <Value>=Format(Now(), "dd-MM-yyyy hh:mm tt")</Value>
                               <Style>
                                 <FontStyle>Italic</FontStyle>
                                 <FontFamily>Segoe UI</FontFamily>

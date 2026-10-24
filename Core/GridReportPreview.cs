@@ -125,7 +125,7 @@ internal static class GridReportPreview
         }
         string safeBy=printedBy.Replace("\"","\"\"").Replace("\r"," ").Replace("\n"," ");
         var footerItems=new[]{
-            Position(Text("Stamp","=\"Printed \" & Format(Now(), \"dd-MMM-yyyy HH:mm\") & \"  |  Printed by: "+safeBy+"\"",false,"Left","7.5pt","#536578"),0,0,width*.75,.27),
+            Position(Text("Stamp","=\"Printed \" & Format(Now(), \"dd-MM-yyyy HH:mm\") & \"  |  Printed by: "+safeBy+"\"",false,"Left","7.5pt","#536578"),0,0,width*.75,.27),
             Position(Text("PageNumber","=\"Page \" & Globals!PageNumber & \" of \" & Globals!TotalPages",false,"Right","7.5pt","#536578"),width*.75,0,width*.25,.27)};
         var document=new XDocument(E("Report",
             E("DataSources",E("DataSource",new XAttribute("Name","Source"),E("ConnectionProperties",E("DataProvider","System.Data.DataSet"),E("ConnectString","")))),
