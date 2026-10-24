@@ -899,24 +899,10 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
                 Alert("The student's leave certificate record could not be found.");
                 return;
             }
-            DialogResult confirm =
-                ModernMessageDialog.Show(
-                    FindForm(),
-                    "The certificate will be issued again and a new issuance history record will be created.\n\n" +
-                    "The previous issuance history will remain unchanged.\n\n" +
-                    "Continue?",
-                    UiText.Certificates.IssueAgain,
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question);
-            if (confirm != DialogResult.Yes)
-                return;
+            var reviewed = CertificateReissueFlow.ReviewLeave(FindForm(), leaveRecordId);
+            if (reviewed is null) return;
             issueAgainButton.Enabled = false;
-            DatabaseHelper.Execute(
-                "IssueLeaveCertificate",
-                DatabaseHelper.P(
-                    "@UserId",
-                    CurrentUser.UserId),
-                DatabaseHelper.Int("@LeaveRecordId", leaveRecordId));
+            DatabaseHelper.Execute("IssueLeaveCertificate",new[] { DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@LeaveRecordId",leaveRecordId) }.Concat(reviewed).ToArray());
             successMessage =
                 "Certificate issued again successfully. The new issuance has been added to the history.";
             LoadCertificates(student.SelectedId);

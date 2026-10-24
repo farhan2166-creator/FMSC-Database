@@ -72,18 +72,20 @@ internal static partial class Program
         Check(!create.Enabled,"The operator still chooses the exam wording.");
         exam.SelectedIndex=0;
         var records=Field<System.Data.DataTable>("certificateResults");
-        records.Columns.Add("CertificateRecordId",typeof(int));records.Rows.Add(8);Refresh();
-        Check(!create.Enabled,"An existing certificate still prevents duplicate creation regardless of wording.");
+        records.Columns.Add("CertificateRecordId",typeof(int));records.Columns.Add("ExamType");records.Rows.Add(8,"SSC");Refresh();
+        Check(!create.Enabled,"An existing SSC certificate prevents duplicate SSC creation.");
+        exam.SelectedIndex=1;Refresh();Check(create.Enabled,"A saved SSC certificate still permits a separate HSSC certificate.");
         records.Columns.Add("CollectionStatus");records.Columns.Add("CharacterCertificateIssueId",typeof(int));
         records.Rows[0]["CollectionStatus"]="Collected";records.Rows[0]["CharacterCertificateIssueId"]=12;
         typeof(CharacterCertificatePage).GetField("selectedCertificateRecordId",flags)!.SetValue(page,8);
         typeof(CharacterCertificatePage).GetField("selectedIssueId",flags)!.SetValue(page,12);
         typeof(CharacterCertificatePage).GetField("selectedIssueCollected",flags)!.SetValue(page,true);
+        typeof(CharacterCertificatePage).GetField("selectedStoredExamType",flags)!.SetValue(page,"SSC");
         selected["ClassName"]="Nine";
         foreach(int wording in new[]{0,1})
         {
             exam.SelectedIndex=wording;Refresh();
-            Check(Field<ModernButton>("issueAgainButton").Enabled,"Either wording allows another copy without a class check.");
+            Check(Field<ModernButton>("issueAgainButton").Enabled&&!exam.Enabled,"A saved SSC copy may be reissued without changing its exam type.");
         }
         records.Rows[0]["CollectionStatus"]="Not Collected";Refresh();
         Check(!Field<ModernButton>("issueAgainButton").Enabled,"The latest copy must still be collected before issuing again.");

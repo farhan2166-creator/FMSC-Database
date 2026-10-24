@@ -1,23 +1,25 @@
 using FMSC_SMS.Core;
+using Microsoft.Data.SqlClient;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
-public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
+public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
     private readonly StudentPicker student = new();
     private string? draftBaseline;
     private string DraftSnapshot()=>System.Text.Json.JsonSerializer.Serialize(new {Exam=examType.SelectedIndex,Roll=rollNumber.Text.Trim(),Remarks=remarks.Text.Trim(),Date=certificateDate.Value.Date});
     private void CaptureDraftBaseline()=>draftBaseline=DraftSnapshot();
-    // Short certificate details can be retyped without a discard warning.
-    public bool HasUnsavedChanges => false;
-    public string UnsavedChangesMessage=>"The new certificate has unsaved details. Discard this draft?";
+    public bool IsBusy => saving;
+    public string BusyMessage => "Please wait for the certificate save to finish.";
+    public bool HasUnsavedChanges => recoveryBlocked;
+    public string UnsavedChangesMessage=>"A certificate save needs outcome checking. Its recovery record will be kept when you leave.";
     private bool ConfirmDraftDiscard()=>!HasUnsavedChanges||Confirm(UnsavedChangesMessage,UiText.Dialogs.UnsavedChanges);
 
     private readonly ModernComboBox examType =
         HumanUi.Combo();
     private readonly ModernTextBox rollNumber =
-        HumanUi.TextBox(false, 200);
+        HumanUi.TextBox(false, 50);
     private readonly ModernTextBox remarks =
-        HumanUi.TextBox(false, 500);
+        HumanUi.TextBox(false, 1000);
     private readonly ModernDatePicker certificateDate =
         HumanUi.Date();
     private DataTable studentResults => student.Source;
@@ -25,6 +27,12 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     /* Finding 13 - a search debounce tick that lands while a modal (confirmation, collector prompt, print preview) is open runs inside that modal's message loop and re-binds the picker underneath… */
     private bool suppressStudentChanged;
     private bool loadingCertificates;
+    private bool saving;
+    private bool recoveryBlocked;
+    private string selectedStoredExamType = "";
+    private readonly ModernButton newCertificateButton = new() { Text = "New Certificate", Width = AppScale.Scale(160) };
+    private readonly ModernButton correctButton = new() { Text = "Correct Details", Width = AppScale.Scale(150) };
+    private readonly ModernButton checkSaveButton = new() { Text = "Check Save", Width = AppScale.Scale(140) };
     private int selectedCertificateRecordId;
     private int selectedIssueId;
     private int selectedCertificateAdmissionId;
@@ -53,10 +61,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(120)
     };
-    /* Business rule (V20 audit F-01, confirmed by the owner): exam type is operator-selected
-       wording for each print, not persisted certificate history. Keep this fixed combo;
-       do not introduce an exam-type table/column or per-exam-type certificate uniqueness.
-       The school chooses issuance; require wording without class or pass eligibility checks. */
+    // Qualification is a saved identity. Reprints use the selected issue's snapshot.
     private static readonly string[] ExamTypeLabels =
     {
         "S.S.C (Matric)",
@@ -70,12 +75,13 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             ComboBoxStyle.DropDownList;
         examType.Items.AddRange(ExamTypeLabels);
         ConfigureFieldSuggestions();
-        createCertificateButton.Click +=
-            (_, _) => CreateCertificate();
+        createCertificateButton.Click += async (_, _) => await CreateCertificate();
         clearButton.Click +=
             (_, _) => ClearForm();
-        issueAgainButton.Click +=
-            (_, _) => IssueAgain();
+        issueAgainButton.Click += async (_, _) => await IssueAgain();
+        newCertificateButton.Click += (_, _) => BeginNewCertificate();
+        correctButton.Click += async (_, _) => await CorrectCertificate();
+        checkSaveButton.Click += async (_, _) => await CheckSave();
         collectButton.Click +=
             (_, _) => MarkCollected();
         printButton.Click +=
@@ -109,11 +115,11 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             () => {
                 ResetToStart();
             });
-        Defer(LoadFieldSuggestions);
+        if(initialize) { Defer(LoadFieldSuggestions); Defer(LoadRecovery); }
         var details =
             HumanUi.Card(
                 UiText.Certificates.Details,
-                "The school decides whom to issue a certificate to. Choose SSC or HSSC wording for each print.");
+                "SSC or HSSC is saved with the certificate. Use New Certificate for the other exam type.");
         var fields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -135,7 +141,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         }
         var studentField=CertificateUi.Field("Student", student, true);
         var dateField=CertificateUi.Field(UiText.Certificates.Date, certificateDate, true);
-        var examField=CertificateUi.Field("Certificate Wording", examType, true);
+        var examField=CertificateUi.Field("Exam Type", examType, true);
         var rollField=CertificateUi.Field("BISE Roll No.", rollNumber, true);
         fields.Controls.Add(studentField,0,0);
         fields.Controls.Add(dateField,1,0);
@@ -155,7 +161,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             field.TabIndex = fields.GetRow(field) * fields.ColumnCount + fields.GetColumn(field);
         details.Content.Controls.Add(fields);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, clearButton);
+            CertificateButtonRow.Create(createCertificateButton, clearButton, newCertificateButton, checkSaveButton);
         certButtonRow.Dock =
             DockStyle.Bottom;
         certButtonRow.TabIndex = 1;
@@ -167,7 +173,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
                 UiText.Certificates.IssuanceHistory,
                 UiText.Certificates.IssueHistoryGuidance);
         var certificateActions =
-            CertificateButtonRow.Create(issueAgainButton, collectButton, printButton, refreshButton);
+            CertificateButtonRow.Create(issueAgainButton, collectButton, printButton, correctButton, refreshButton);
         certificateActions.Dock =
             DockStyle.Bottom;
         Grid.TabIndex = 0;
@@ -383,10 +389,11 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
                 SetStatus("The selected certificate issuance contains invalid data.", true);
                 return;
             }
-            // StudentChanged clears wording on a student switch. Choosing this student's
-            // history row must preserve a wording choice already made by the operator.
-            if (student.SelectedId != admissionId)
-                examType.SelectedIndex = -1;
+            selectedStoredExamType = GetString(row, "ExamType");
+            examType.SelectedIndex = selectedStoredExamType switch { "SSC" => 0, "HSSC" => 1, _ => -1 };
+            certificateDate.Value = row.Table.Columns.Contains("CertificateDate") && !row.IsNull("CertificateDate") ? Convert.ToDateTime(row["CertificateDate"]) : DateTime.Today;
+            rollNumber.Text = GetString(row, "RollNumber");
+            remarks.Text = GetString(row, "Remarks");
             selectedCertificateRecordId =
                 certificateRecordId;
             selectedIssueId =
@@ -404,83 +411,47 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
             SetStatus($"Unable to read certificate issuance: {DbMessage.UserMessage(ex)}", true);
         }
     }
+    private bool HasCertificateForDraft()
+    {
+        string chosen = examType.SelectedIndex == 0 ? "SSC" : examType.SelectedIndex == 1 ? "HSSC" : "";
+        return certificateResults.AsEnumerable().GroupBy(row=>GetInt(row,"CertificateRecordId"))
+            .Select(group=>group.OrderByDescending(row=>GetInt(row,"CharacterCertificateIssueId")).First())
+            .Any(row => string.IsNullOrWhiteSpace(GetString(row, "ExamType")) || GetString(row, "ExamType") == chosen);
+    }
     private void ApplyWorkflowState()
     {
-        bool hasStudent =
-            student.SelectedId > 0;
-        bool hasCertificate =
-            certificateResults.Rows.Count > 0;
-        bool hasSelectedIssue =
-            selectedIssueId > 0 &&
-            selectedCertificateRecordId > 0;
-        bool examTypeChosen = examType.SelectedIndex >= 0;
-        student.Enabled = true;
-        examType.Enabled =
-            hasStudent;
-        /* One certificate on file means no new Create; another copy is Issue Again. */
-        bool canCreate =
-            hasStudent &&
-            examTypeChosen &&
-            !hasCertificate;
-        certificateDate.Enabled =
-            canCreate;
-        rollNumber.Enabled =
-            canCreate;
-        remarks.Enabled =
-            canCreate;
-        createCertificateButton.Enabled =
-            canCreate;
-        clearButton.Enabled =
-            true;
-        refreshButton.Enabled =
-            hasStudent;
-        issueAgainButton.Enabled =
-            hasSelectedIssue &&
-            IsLatestIssueCollectedFor(selectedCertificateRecordId);
-        collectButton.Enabled =
-            hasSelectedIssue &&
-            !selectedIssueCollected;
-        printButton.Enabled =
-            hasSelectedIssue &&
-            selectedIssueCollected &&
-            CurrentUser.HasPermission("Certificates.Print");
-        if (!hasStudent)
+        bool hasStudent = student.SelectedId > 0;
+        bool selected = selectedIssueId > 0 && selectedCertificateRecordId > 0;
+        bool knownType = selectedStoredExamType is "SSC" or "HSSC";
+        bool available = !saving && !recoveryBlocked;
+        Grid.Enabled = !saving;
+        student.Enabled = !saving;
+        examType.Enabled = available && hasStudent && !selected;
+        bool canCreate = available && hasStudent && !selected && examType.SelectedIndex >= 0 && !HasCertificateForDraft();
+        certificateDate.Enabled = rollNumber.Enabled = remarks.Enabled = canCreate;
+        createCertificateButton.Enabled = canCreate;
+        newCertificateButton.Enabled = available && hasStudent;
+        clearButton.Enabled = !saving;
+        refreshButton.Enabled = hasStudent && !saving;
+        issueAgainButton.Enabled = available && selected && knownType && IsLatestSelectedIssue() && IsLatestIssueCollectedFor(selectedCertificateRecordId);
+        correctButton.Text = knownType ? "Correct Details" : "Review Exam Type";
+        correctButton.Enabled = available && selected && IsLatestSelectedIssue();
+        collectButton.Enabled = available && selected && knownType && !selectedIssueCollected;
+        printButton.Enabled = !saving && selected && knownType && selectedIssueCollected && CurrentUser.HasPermission("Certificates.Print");
+        checkSaveButton.Visible = recoveryBlocked;
+        checkSaveButton.Enabled = recoveryBlocked && !saving;
+        if (recoveryBlocked) { SetStatus("An earlier save needs checking. Use Check Save before creating another copy.", true); return; }
+        if (!hasStudent) { SetStatus(UiText.Prompts.SearchForStudent); return; }
+        if (selected)
         {
-            SetStatus(UiText.Prompts.SearchForStudent);
+            SetStatus(!knownType ? "The saved exam type is missing. Review the original certificate before printing or reissuing."
+                : !selectedIssueCollected ? "Not collected. Mark Collected before printing. Correct Details creates a replacement if anything is wrong."
+                : "Print this saved copy, issue it again, or correct the latest copy. Use New Certificate for the other exam type.");
             return;
         }
-        if (!examTypeChosen)
-        {
-            SetStatus(
-                hasCertificate
-                    ? "Choose SSC/HSSC wording before printing. Select a collected copy to print or issue again; wording applies to the print only."
-                    : "Choose SSC/HSSC and complete the details to create the current-year certificate.");
-            return;
-        }
-        if (!hasCertificate)
-        {
-            SetStatus(
-                $"Complete the details to create the current-year {ExamTypeLabels[examType.SelectedIndex]} certificate.");
-            return;
-        }
-        if (hasSelectedIssue)
-        {
-            if (!selectedIssueCollected)
-            {
-                SetStatus("Not collected. Use Mark Collected before printing or issuing again.");
-                return;
-            }
-            if (IsLatestSelectedIssue())
-            {
-                SetStatus("Collected. Print this copy or use Issue Again.");
-                return;
-            }
-            SetStatus("Collected. You may print this copy.");
-            return;
-        }
-        /* Finding 6 - one per student, not one per exam type: say that plainly instead of naming the exam type the certificate does not record. */
-        SetStatus(
-            "Certificate already exists. Select it to print, or use Issue Again for another copy.");
+        SetStatus(examType.SelectedIndex < 0 ? "Choose SSC or HSSC for the new certificate."
+            : HasCertificateForDraft() ? "This exam-type certificate already exists. Select it in history to issue again or correct its details."
+            : "Complete the details to create the selected exam-type certificate.");
     }
     private bool IsLatestIssueCollectedFor(int certificateRecordId)
     {
@@ -529,176 +500,115 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
         Warn("Choose SSC or HSSC wording for this certificate.");
         return false;
     }
-    private void CreateCertificate()
+    private void BeginNewCertificate()
     {
-        int printExamType = examType.SelectedIndex;
-        if (!ValidateWording()) return;
-        if (!ValidateRequiredInputs())
-            return;
-        /* Finding 12 - Info writes the status line, but the reload below calls Bind ("N record(s)") and ApplyWorkflowState after it. */
-        string? successMessage =
-            null;
-        // Finding 13 - this path opens a modal confirmation; park the search.
-        try
-        {
-            if (student.SelectedId <= 0)
-            {
-                Warn(UiText.Prompts.SelectStudent);
-                return;
-            }
-            if (examType.SelectedIndex < 0)
-            {
-                Warn("Select the exam type (SSC or HSSC).");
-                return;
-            }
-            /* Finding 6 - the database allows one character certificate per student (58005). Say so here rather than letting the confirmation run and the write fail. */
-            if (certificateResults.Rows.Count > 0)
-            {
-                Warn("This student already has a character certificate. Print it, or use Issue Again for another copy.");
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(rollNumber.Text))
-            {
-                Warn("Enter the student's BISE Roll No.");
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(remarks.Text))
-            {
-                Warn("Enter remarks for the character certificate.");
-                return;
-            }
-            DateTime certDate =
-                certificateDate.Value.Date;
-            if (certDate > DateTime.Today)
-            {
-                Warn(UiText.Certificates.FutureDateRefused);
-                return;
-            }
-            DialogResult confirm =
-                ModernMessageDialog.Show(
-                    FindForm(),
-                    $"Creating this {ExamTypeLabels[examType.SelectedIndex]} character certificate will:\n\n" +
-                    "• save the character certificate for the current academic year\n" +
-                    "• record the original certificate issuance\n\n" +
-                    UiText.Dialogs.Continue,
-                    "Create Character Certificate",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question);
-            if (confirm != DialogResult.Yes)
-                return;
-            int admissionId =
-                student.SelectedId;
-            createCertificateButton.Enabled =
-                false;
-            DatabaseHelper.Execute(
-                "CreateCharacterCertificate",
-                DatabaseHelper.P(
-                    "@UserId",
-                    CurrentUser.UserId),
-                DatabaseHelper.Int(
-                    "@AdmissionId",
-                    admissionId),
-                /* The exam type is deliberately NOT passed. dbo.CreateCharacterCertificate declares only @UserId, @AdmissionId, @CertificateDate, @RollNumber and @Remarks (verified against the live database, not the .dacpac), and dbo.CharacterCertificates has no ExamType column. */
-                DatabaseHelper.Date(
-                    "@CertificateDate",
-                    certDate),
-                DatabaseHelper.P(
-                    "@RollNumber",
-                    DatabaseHelper.OptionalText(
-                        rollNumber.Text)),
-                DatabaseHelper.P(
-                    "@Remarks",
-                    DatabaseHelper.OptionalText(remarks.Text)));
-            successMessage =
-                $"{ExamTypeLabels[examType.SelectedIndex]} character certificate created successfully for the current academic year. " +
-                "The original issuance has also been recorded.";
-            AddSuggestionIfNew(remarks, remarks.Text);
-            ClearCertificateFields();
-            LoadCertificates(admissionId);
-            SelectSavedCertificate(0);
-            if (printExamType >= 0) examType.SelectedIndex = printExamType;
-        }
-        catch (Exception ex)
-        {
-            Fail(ex);
-        }
-        finally
-        {
-            ApplyWorkflowState();
-            if (successMessage is not null)
-            {
-                Info(successMessage);
-            }
-        }
+        if (saving || recoveryBlocked) return;
+        Grid.ClearSelection(); Grid.CurrentCell = null;
+        ClearCertificateSelection(); ClearCertificateFields(); ApplyWorkflowState();
+        examType.Focus();
     }
-    private void IssueAgain()
+    private void LoadRecovery()
     {
-        int printExamType = examType.SelectedIndex;
-        // Finding 12 - see CreateCertificate: the confirmation is set last.
-        string? successMessage =
-            null;
-        // Finding 13 - this path opens a modal confirmation; park the search.
+        recoveryBlocked = true;
+        try { recoveryBlocked = MutationRecoveryJournal.ReadPending(MutationKind.CharacterCertificateSave) is not null; }
+        finally { ApplyWorkflowState(); }
+    }
+    private async Task CheckSave()
+    {
+        if (saving) return;
+        saving = true; ApplyWorkflowState();
         try
         {
-            if (student.SelectedId <= 0)
+            var pending = MutationRecoveryJournal.ReadPending(MutationKind.CharacterCertificateSave);
+            if (pending is not null)
             {
-                Warn(UiText.Prompts.SelectStudent);
-                return;
+                var saved = await RecoverableMutationWriter.CheckAsync(pending);
+                MutationRecoveryJournal.ClearVerified(pending);
+                if (saved is not null && student.SelectedId==saved.SubjectId) { LoadCertificates(saved.SubjectId); SelectSavedCertificate(saved.RecordId); }
+                Info(saved is null ? "The earlier operation was not saved. You can review and try again." : "The earlier certificate save is confirmed.");
             }
-            if (selectedCertificateRecordId <= 0)
+            recoveryBlocked = false;
+        }
+        catch (Exception ex) { Fail(ex); }
+        finally { saving = false; ApplyWorkflowState(); }
+    }
+    private async Task SaveOperation(SqlParameter[] args, string summary)
+    {
+        if (saving || recoveryBlocked) return;
+        saving = true; ApplyWorkflowState();
+        try
+        {
+            int user = CurrentUser.UserId;
+            string scope = await RecoverableMutationWriter.GetScopeAsync();
+            MutationIntent intent;
+            MutationWriteResult outcome;
+            using (var journal = MutationRecoveryJournal.Begin(MutationKind.CharacterCertificateSave, user, scope,
+                RecoverableMutationWriter.PayloadHash(MutationKind.CharacterCertificateSave, user, args), summary))
             {
-                Warn("Select a certificate issuance from the history first.");
-                return;
+                intent = journal.Intent; recoveryBlocked = true;
+                outcome = await RecoverableMutationWriter.SaveAsync(intent, args);
             }
-            if (!IsLatestIssueCollectedFor(selectedCertificateRecordId))
-            {
-                Warn("The current certificate issuance must be collected before another issuance can be created.");
-                return;
-            }
-            int certificateRecordId =
-                selectedCertificateRecordId;
-            DialogResult confirm =
-                ModernMessageDialog.Show(
-                    FindForm(),
-                    "The certificate will be issued again and a new issuance history record will be created.\n\n" +
-                    "The previous issuance history will remain unchanged.\n\n" +
-                    "Continue?",
-                    UiText.Certificates.IssueAgain,
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question);
-            if (confirm != DialogResult.Yes)
-                return;
-            issueAgainButton.Enabled =
-                false;
-            DatabaseHelper.Execute(
-                "IssueCharacterCertificate",
-                DatabaseHelper.P(
-                    "@UserId",
-                    CurrentUser.UserId),
-                DatabaseHelper.Int("@CertificateRecordId", certificateRecordId));
-            successMessage =
-                "Certificate issued again successfully. The new issuance has been added to the history.";
-            LoadCertificates(student.SelectedId);
-            SelectSavedCertificate(0);
-            if (printExamType >= 0) examType.SelectedIndex = printExamType;
+            if (outcome.Outcome == MutationOutcome.Unconfirmed)
+            { Warn("The save outcome is not confirmed. Use Check Save before trying again."); return; }
+            MutationRecoveryJournal.ClearVerified(intent); recoveryBlocked = false;
+            if (outcome.Outcome == MutationOutcome.Rejected) throw outcome.Error ?? new InvalidOperationException("The certificate was not saved.");
+            var saved = outcome.Result!;
+            LoadCertificates(saved.SubjectId); SelectSavedCertificate(saved.RecordId);
+            Info("Certificate saved. The selected history row contains its saved exam type and details.");
         }
         catch (Exception ex)
         {
+            try { recoveryBlocked=MutationRecoveryJournal.ReadPending(MutationKind.CharacterCertificateSave) is not null; }
+            catch { recoveryBlocked=true; }
             Fail(ex);
         }
-        finally
+        finally { saving = false; ApplyWorkflowState(); }
+    }
+    private async Task CreateCertificate()
+    {
+        if (saving || recoveryBlocked || !ValidateWording() || !ValidateRequiredInputs()) return;
+        if (student.SelectedId <= 0) { Warn(UiText.Prompts.SelectStudent); return; }
+        if (HasCertificateForDraft()) { Warn("This exam-type certificate already exists. Select it to issue again or correct its details."); return; }
+        if (string.IsNullOrWhiteSpace(rollNumber.Text) || string.IsNullOrWhiteSpace(remarks.Text))
+        { Warn("Enter the BISE roll number and remarks."); return; }
+        if (certificateDate.Value.Date > DateTime.Today) { Warn(UiText.Certificates.FutureDateRefused); return; }
+        string exam = examType.SelectedIndex == 0 ? "SSC" : "HSSC";
+        if (!Confirm($"Create the {exam} character certificate? Its exam type, roll number and details will be saved with the original issuance.", "Create Character Certificate")) return;
+        await SaveOperation(new[] { DatabaseHelper.P("@Action", "Create"), DatabaseHelper.Int("@AdmissionId", student.SelectedId),
+            DatabaseHelper.P("@ExamType", exam), DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date),
+            DatabaseHelper.P("@RollNumber", rollNumber.Text.Trim()), DatabaseHelper.P("@Remarks", remarks.Text.Trim()) },
+            $"Create {exam} character certificate for student {student.SelectedId}");
+    }
+    private async Task IssueAgain()
+    {
+        if (saving || recoveryBlocked || !IsLatestSelectedIssue() || !IsLatestIssueCollectedFor(selectedCertificateRecordId) || selectedStoredExamType is not ("SSC" or "HSSC")) return;
+        try
         {
-            ApplyWorkflowState();
-            if (successMessage is not null)
-            {
-                Info(successMessage);
-            }
+            using var preview=DatabaseHelper.QueryUser("GetCertificateReissuePreview",DatabaseHelper.P("@CertificateKind","Character"),DatabaseHelper.Int("@CertificateRecordId",selectedCertificateRecordId));
+            if(preview.Rows.Count!=1||Convert.ToInt32(preview.Rows[0]["LatestIssueId"])!=selectedIssueId)
+            { Warn("A newer copy exists. Refresh its history before issuing again."); return; }
+            var row=preview.Rows[0];
+            if (!Confirm($"Issue another {selectedStoredExamType} copy dated {DateTime.Today:dd-MMM-yyyy}?\n\nCurrent Admission name: {row["CurrentStudentName"]}\nFather name: {row["CurrentFatherName"]}\nGender: {row["CurrentGender"]}\n\nThe exam type, examination year, roll number and remarks stay as saved. Earlier copies retain their original details.", "Issue Certificate Again")) return;
+            await SaveOperation(new[] { DatabaseHelper.P("@Action", "Issue"), DatabaseHelper.Int("@CertificateRecordId", selectedCertificateRecordId),
+                DatabaseHelper.Int("@ExpectedLatestIssueId", selectedIssueId),DatabaseHelper.P("@ExpectedSourceHash",row["SourceHash"]) }, $"Reissue character certificate {selectedCertificateRecordId} using reviewed Admission details");
         }
+        catch(Exception ex){Fail(ex);}
+    }
+    private async Task CorrectCertificate()
+    {
+        if (saving || recoveryBlocked || !IsLatestSelectedIssue()) return;
+        var row = certificateResults.AsEnumerable().Single(r => GetInt(r, "CharacterCertificateIssueId") == selectedIssueId);
+        bool review = selectedStoredExamType is not ("SSC" or "HSSC");
+        using var dialog = new CharacterCertificateCorrectionDialog(row, review);
+        if (dialog.ShowDialog(FindForm()) != DialogResult.OK) return;
+        await SaveOperation(new[] { DatabaseHelper.P("@Action", review ? "ReviewType" : "Correct"),
+            DatabaseHelper.Int("@CertificateRecordId", selectedCertificateRecordId), DatabaseHelper.Int("@ExpectedLatestIssueId", selectedIssueId) }
+            .Concat(dialog.Parameters).ToArray(), $"{(review ? "Review type of" : "Correct")} character certificate {selectedCertificateRecordId}");
     }
     private void MarkCollected()
     {
         int savedIssueId = selectedIssueId;
-        int printExamType = examType.SelectedIndex;
+
         // Finding 12 - see CreateCertificate: the confirmation is set last.
         string? successMessage =
             null;
@@ -741,7 +651,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
                 "Certificate issuance marked as collected.";
             LoadCertificates(admissionId);
             SelectSavedCertificate(0);
-            if (printExamType >= 0) examType.SelectedIndex = printExamType;
+
         }
         catch (Exception ex)
         {
@@ -758,65 +668,21 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     }
     private void PrintSelected()
     {
-        // Finding 13 - the preview is modal; park the search while it is open.
         try
         {
-            if (selectedCertificateRecordId <= 0)
-            {
-                Warn("Select a certificate issuance from the history first.");
-                return;
-            }
-            if (selectedIssueId <= 0)
-            {
-                Warn(UiText.Certificates.InvalidIssuance);
-                return;
-            }
-            if (!selectedIssueCollected)
-            {
-                Warn("This certificate has not been collected yet. It cannot be printed.");
-                return;
-            }
-            int examTypeIndex = examType.SelectedIndex;
-            if (examTypeIndex < 0 || examTypeIndex >= ExamTypeLabels.Length)
-            {
-                Warn("Choose SSC or HSSC wording before printing this certificate.");
-                examType.Focus();
-                return;
-            }
-            // Use the operator's selected wording directly for this print.
-            string examWording = ExamTypeLabels[examTypeIndex];
-            int certificateRecordId = selectedCertificateRecordId;
-            PrintCertificate(certificateRecordId, examWording);
+            if (selectedCertificateRecordId <= 0 || selectedIssueId <= 0 || !selectedIssueCollected || selectedStoredExamType is not ("SSC" or "HSSC"))
+            { Warn("Select a collected certificate with a saved exam type."); return; }
+            PrintCertificate(selectedCertificateRecordId, selectedIssueId);
         }
-        catch (Exception ex)
-        {
-            Fail(ex);
-        }
-        finally
-        {
-        }
+        catch (Exception ex) { Fail(ex); }
     }
-    private void PrintCertificate(int certificateRecordId, string examWording)
+    private void PrintCertificate(int certificateRecordId, int issueId)
     {
-        DataTable data =
-            DatabaseHelper.QueryUser(
-                "GetCharacterCertificatePrintData",
-                DatabaseHelper.Int("@CertificateRecordId", certificateRecordId));
-        if (data.Rows.Count == 0)
-        {
-            Warn(UiText.Certificates.PrintDataMissing);
-            return;
-        }
-        if (!data.Columns.Contains("ExamTypeDisplay"))
-            data.Columns.Add("ExamTypeDisplay", typeof(string));
-        foreach (DataRow row in data.Rows)
-            row["ExamTypeDisplay"] = examWording;
-        string reportPath =
-            Path.Combine(AppContext.BaseDirectory, "Reports", "CharacterCertificate.rdlc");
-        if (!File.Exists(reportPath))
-        {
-            throw new FileNotFoundException("Character Certificate RDLC report was not found.", reportPath);
-        }
+        DataTable data = DatabaseHelper.QueryUser("GetCharacterCertificatePrintData",
+            DatabaseHelper.Int("@CertificateRecordId", certificateRecordId), DatabaseHelper.Int("@CharacterCertificateIssueId", issueId));
+        if (data.Rows.Count == 0) { Warn(UiText.Certificates.PrintDataMissing); return; }
+        string reportPath = Path.Combine(AppContext.BaseDirectory, "Reports", "CharacterCertificate.rdlc");
+        if (!File.Exists(reportPath)) throw new FileNotFoundException("Character Certificate report was not found.", reportPath);
         ShowReport(FindForm(), "Character Certificate", reportPath, "CharacterCertificateData", data);
     }
     private string? PromptCollectedBy()
@@ -1029,7 +895,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges
     private void ClearCertificateSelection()
     {
         selectedCertificateRecordId = 0;
-        selectedIssueId = 0;
+        selectedIssueId = 0; selectedStoredExamType = "";
         selectedCertificateAdmissionId = 0;
         selectedIssueCollected = false;
     }

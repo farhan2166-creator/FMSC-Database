@@ -179,6 +179,36 @@
       "name": "IssueRegularStudentCertificate",
       "schema": "dbo",
       "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "CharacterCertificateIssueSnapshots",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "CharacterCertificateTypeReviews",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "SaveCharacterCertificateOperation",
+      "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "CertificateAdmissionFingerprint",
+      "type": "FN"
+    },
+    {
+      "schema": "dbo",
+      "name": "LeaveCertificateIssueSnapshots",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "GetLeaveCertificateReissuePreview",
+      "type": "P "
     }
   ],
   "columns": [
@@ -829,6 +859,18 @@
       "objectName": "DateOfBirthCertificateIssueSnapshots",
       "isComputed": false,
       "scale": 0
+    },
+    {
+      "schema": "dbo",
+      "objectName": "CharacterCertificates",
+      "name": "ExamType",
+      "type": "nvarchar",
+      "maxLength": 20,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
     }
   ],
   "uniqueIndexes": [
@@ -901,6 +943,12 @@
       "filter": null,
       "schema": "dbo",
       "keys": "DateOfBirthCertificateIssueId"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "CharacterCertificates",
+      "name": "UX_CharacterCertificates_AdmissionExam",
+      "keys": "AdmissionId,ExamType"
     }
   ],
   "foreignKeys": [
@@ -1182,6 +1230,22 @@
       "name": "TR_DateOfBirthCertificate_IssueSnapshot",
       "schema": "dbo",
       "parentSchema": "dbo"
+    },
+    {
+      "schema": "dbo",
+      "name": "TR_CharacterCertificate_IssueSnapshot",
+      "parentSchema": "dbo",
+      "parentName": "CharacterCertificateIssues",
+      "events": "INSERT",
+      "insteadOf": false
+    },
+    {
+      "schema": "dbo",
+      "name": "TR_LeaveCertificate_IssueSnapshot",
+      "parentSchema": "dbo",
+      "parentName": "LeaveCertificateIssues",
+      "events": "INSERT",
+      "insteadOf": false
     }
   ],
   "parameters": [
@@ -1564,6 +1628,56 @@
       "precision": 10,
       "maxLength": 3,
       "name": "@CertificateDate"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "IssueCharacterCertificate",
+      "name": "@ExpectedSourceHash",
+      "type": "varbinary",
+      "maxLength": 32,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "IssueRegularStudentCertificate",
+      "name": "@ExpectedSourceHash",
+      "type": "varbinary",
+      "maxLength": 32,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "IssueDateOfBirthCertificate",
+      "name": "@ExpectedSourceHash",
+      "type": "varbinary",
+      "maxLength": 32,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveCharacterCertificateOperation",
+      "name": "@ExpectedSourceHash",
+      "type": "varbinary",
+      "maxLength": 32,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "IssueLeaveCertificate",
+      "name": "@ExpectedSourceHash",
+      "type": "varbinary",
+      "maxLength": 32,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
     }
   ]
 }

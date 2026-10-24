@@ -37,7 +37,7 @@ try{Query("EXEC dbo.UpdateRegularStudentCertificate @UserId=@User,@RegularStuden
 Check(legacyEditRefused&&PrintRegular(firstRegular).Rows[0].Field<string>("ClassName")=="Ten","The legacy edit endpoint cannot overwrite a saved certificate copy.");
 Query($"UPDATE dbo.Students SET DateOfBirth='2002-03-04' WHERE AdmissionId={admission};");
 Check(PrintRegular(firstRegular).Rows[0].Field<DateTime>("DateOfBirth")==oldDob,"Correcting the school DOB does not change an earlier regular print.");
-SqlParameter[] Args(int certificate,int latest,DateTime dob)=>new[]{DatabaseHelper.Int("@CertificateRecordId",certificate),DatabaseHelper.Int("@ExpectedLatestIssueId",latest),DatabaseHelper.Date("@ExpectedDateOfBirth",dob),DatabaseHelper.Date("@CertificateDate",today)};
+SqlParameter[] Args(int certificate,int latest,DateTime dob)=>new[]{DatabaseHelper.Int("@CertificateRecordId",certificate),DatabaseHelper.Int("@ExpectedLatestIssueId",latest),DatabaseHelper.Date("@ExpectedDateOfBirth",dob),DatabaseHelper.Date("@CertificateDate",today),DatabaseHelper.P("@ExpectedSourceHash",Query($"SELECT dbo.CertificateAdmissionFingerprint({admission});").Rows[0][0])};
 async Task<MutationIntent> Intent(MutationKind kind,SqlParameter[] args)=>new(Guid.NewGuid(),kind,admin,await RecoverableMutationWriter.GetScopeAsync(),RecoverableMutationWriter.PayloadHash(kind,admin,args),"Disposable certificate reissue check",DateTime.UtcNow);
 var regularArgs=Args(regular,firstRegular,newDob);var regularIntent=await Intent(MutationKind.RegularCertificateReissue,regularArgs);
 var saved=await RecoverableMutationWriter.SaveAsync(regularIntent,regularArgs);
@@ -91,7 +91,7 @@ var concurrent=await Task.WhenAll(intents.Select(intent=>RecoverableMutationWrit
 Check(concurrent.Count(r=>r.Outcome==MutationOutcome.Saved)==1&&concurrent.Count(r=>r.Outcome==MutationOutcome.Rejected)==1,
     "Two concurrent regular reissues reviewed against the same copy cannot both commit.");
 int thirdRegular=concurrent.Single(r=>r.Outcome==MutationOutcome.Saved).Result!.RecordId;
-Check(PrintRegular(thirdRegular).Rows[0].Field<string>("StudentName")=="Certificate Test Student","A DOB-only reissue does not silently replace other personal details.");
+Check(PrintRegular(thirdRegular).Rows[0].Field<string>("StudentName")=="Changed School Name"&&PrintRegular(firstRegular).Rows[0].Field<string>("StudentName")=="Certificate Test Student","A reissue uses fresh Admission personal details while earlier copies keep their original details.");
 var lostArgs=Args(regular,thirdRegular,newDob);var lostIntent=await Intent(MutationKind.RegularCertificateReissue,lostArgs);
 var lost=await RecoverableMutationWriter.SaveAsync(lostIntent,lostArgs,t=>{t.Commit();throw new IOException("Simulated lost commit reply");});
 Check(lost.Outcome==MutationOutcome.Unconfirmed,"A lost commit reply is reported as uncertain rather than retried.");
@@ -112,4 +112,12 @@ var deniedIntent=new MutationIntent(Guid.NewGuid(),MutationKind.RegularCertifica
 CurrentUser.UserId=deniedUser;
 Check((await RecoverableMutationWriter.SaveAsync(deniedIntent,deniedArgs)).Outcome==MutationOutcome.Rejected,"An operator without certificate permission cannot reissue.");
 CurrentUser.UserId=admin;
+await CharacterCertificateChecks.Run(connection,owner,admin,deniedUser);
+LeaveCertificateChecks.Run(connection,owner,admin);
+var register=Query(FMSC_SMS.Pages.Reports.Certificates.CertificateIssueRegisterData.BuildQuery(true,true),DatabaseHelper.Int("@UserId",admin),
+    DatabaseHelper.P("@FromDate",null),DatabaseHelper.P("@ToDate",null),DatabaseHelper.P("@CertificateType",null),DatabaseHelper.P("@RecipientType",null),
+    DatabaseHelper.P("@EntryKind",null),DatabaseHelper.P("@CollectionStatus",null),DatabaseHelper.P("@Search",""));
+Check(register.AsEnumerable().Any(row=>row.Field<string>("Recipient")=="Fresh Admission Name"),"Certificate register uses the saved character issue's fresh Admission snapshot.");
+Check(register.AsEnumerable().Any(row=>row.Field<string>("Recipient")=="Changed School Name"),"Certificate register includes regular reissues and their saved personal details.");
+Check(register.AsEnumerable().Any(row=>row.Field<string>("Recipient")=="Fresh Leaving Name"),"Certificate register uses school/college leaving issue snapshots.");
 Console.WriteLine($"PASS: {checks} isolated SQL snapshot, corrected-DOB, stale review, collection, request replay and recovery checks.");
