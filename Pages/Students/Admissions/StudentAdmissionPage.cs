@@ -863,7 +863,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     CurrentUser.HasPermission(item.Text == "Re-Admit" ? "Students.Administer" : "Enrollment.Manage");
         };
         enrollmentActionsMenu.Items.Add(new ToolStripSeparator());
-        var correctPlacement = enrollmentActionsMenu.Items.Add("Student Setup / Placement Corrections");
+        var correctPlacement = enrollmentActionsMenu.Items.Add("Placement Setup");
         correctPlacement.Click += async (_, _) => await OpenPlacementCorrectionAsync();
         enrollmentActionsMenu.Opening += (_, _) => correctPlacement.Enabled = currentAdmissionId > 0 && !IsPendingRegistration && !saveBusy && CurrentUser.HasPermission("Students.Administer");
         var hold = enrollmentActionsMenu.Items.Add("Put on Hold");
@@ -2812,7 +2812,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         Section.Enabled = placementUnlocked;
         transport.Enabled = placementUnlocked;
         placementGuidance.Text = currentAdmissionId > 0
-            ? "Use Actions → Student Setup / Placement Corrections for placement and billing."
+            ? "Use Actions → Placement Setup for placement and billing."
             : placementUnlocked ? "Monthly billing uses today's cutoff. Past academic years generate no fees."
                 : "Complete the required student and family fields above to unlock academic placement.";
         placementGuidance.ForeColor = placementUnlocked
