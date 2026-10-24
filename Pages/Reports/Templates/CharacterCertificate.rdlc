@@ -719,7 +719,7 @@
                 </Style>
               </TextRun>
               <TextRun>
-                <Value>="During " &amp; LCase(IIF(First(Fields!Gender.Value, "CharacterCertificateData") = "Female", "Her", IIF(First(Fields!Gender.Value, "CharacterCertificateData") = "Male", "His", "His/Her"))) &amp; " stay in this Institution, " &amp; LCase(IIF(First(Fields!Gender.Value, "CharacterCertificateData") = "Female", "Her", IIF(First(Fields!Gender.Value, "CharacterCertificateData") = "Male", "His", "His/Her"))) &amp; ""</Value>
+                <Value>="During stay in this Institution, " &amp; LCase(IIF(First(Fields!Gender.Value, "CharacterCertificateData") = "Female", "Her", IIF(First(Fields!Gender.Value, "CharacterCertificateData") = "Male", "His", "His/Her"))) &amp; ""</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>

@@ -21,15 +21,15 @@ internal static partial class Program
             bool certificate=name.EndsWith("Certificate",StringComparison.Ordinal);
             if(certificate && !CertificateLetterhead.UsesPreprintedPad(path))
                 document=XDocument.Parse(CertificateLetterhead.Definition(path,school));
-            if(name=="CharacterCertificate")
+            if(certificate && !CertificateLetterhead.UsesPreprintedPad(path))
             {
                 var image=document.Descendants(ns+"Image").Single(element=>(string?)element.Attribute("Name")=="CertificateHeaderImage");
                 Check(image.Element(ns+"Height")!.Value=="3in"&&image.Element(ns+"Sizing")!.Value=="FitProportional",
-                    "The character certificate reserves a three-inch header without stretching the artwork.");
+                    name+" reserves a three-inch header without stretching the artwork.");
                 Check(double.Parse(image.Element(ns+"Width")!.Value[..^2],System.Globalization.CultureInfo.InvariantCulture)>7.4,
-                    "The new character header fills the existing printable report width.");
+                    name+" fills the existing printable report width.");
                 Check(document.Descendants(ns+"LeftMargin").Single().Value=="0.41in"&&document.Descendants(ns+"RightMargin").Single().Value=="0.41in",
-                    "The character certificate preserves its original paper margins.");
+                    name+" preserves its original paper margins.");
             }
             if(CertificateLetterhead.UsesPreprintedPad(path))
                 Check(document.Descendants(ns+"TopMargin").Single().Value=="2in",name+" reserves two inches for preprinted letterhead.");
@@ -51,6 +51,12 @@ internal static partial class Program
                         column.ColumnName=="InstitutionLine"?"Fictional School Boys Campus Fictional City":"Example":column.DataType==typeof(DateTime)?new DateTime(2026,10,24):
                         column.DataType==typeof(bool)?true:Convert.ChangeType(1,column.DataType);
                 data.Rows.Add(row);
+                if(name=="ProvisionalCertificate")
+                {
+                    document=XDocument.Parse(CertificateLetterhead.Definition(path,school,row,
+                        new[]{"English","Urdu","Islamiyat","Pakistan Studies","Mathematics","Physics","Chemistry","Biology","Computer Science","Economics","Statistics","Civics"}));
+                    report.LoadReportDefinition(new StringReader(document.ToString()));
+                }
                 using var printable=CertificateUi.PrintData(path,data);
                 if(CertificateLetterhead.UsesPreprintedPad(path))
                     Check(printable.Rows[0].Field<string>("ClassPromotedTo")=="Class 8"
@@ -59,9 +65,9 @@ internal static partial class Program
                 report.DataSources.Add(new ReportDataSource((string)dataset.Attribute("Name")!,printable.Copy()));
             }
             byte[] pdf=report.Render("PDF");File.WriteAllBytes(Path.Combine(output,name+".pdf"),pdf);
-            if(name=="CharacterCertificate")
+            if(certificate && !CertificateLetterhead.UsesPreprintedPad(path))
                 Check(System.Text.RegularExpressions.Regex.Matches(System.Text.Encoding.Latin1.GetString(pdf),@"/Type\s*/Page\b").Count==1,
-                    "The taller character header and certificate body still fit on one PDF page.");
+                    name+" fits its taller header and certificate body on one PDF page.");
             byte[] png=report.Render("IMAGE","<DeviceInfo><OutputFormat>PNG</OutputFormat><DpiX>110</DpiX><DpiY>110</DpiY></DeviceInfo>");
             File.WriteAllBytes(Path.Combine(output,name+".png"),png);
             Check(pdf.Length>1000&&png.Length>1000,name+" renders its split text/data runs with representative typed fixture values.");
