@@ -127,7 +127,9 @@
               EnvironmentVariables="PSModulePath=$(SystemRoot)\System32\WindowsPowerShell\v1.0\Modules" />
 	</Target>
 	<Target Name="RemoveEmptyPublishLanguageFolders" AfterTargets="Publish" BeforeTargets="CopyDeploymentFiles">
-		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Tools\RemoveEmptyPublishLanguageFolders.ps1&quot; -PublishDirectory &quot;$(PublishDir)&quot;" />
+		<!-- End the argument with a dot so a trailing backslash cannot escape its closing quote. -->
+		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Tools\RemoveEmptyPublishLanguageFolders.ps1&quot; -PublishDirectory &quot;$(PublishDir)\.&quot;"
+              EnvironmentVariables="PSModulePath=$(SystemRoot)\System32\WindowsPowerShell\v1.0\Modules" />
 	</Target>
 	<Target Name="CopyDeploymentFiles" AfterTargets="Publish" DependsOnTargets="ValidateDeploymentAssets" Condition="'$(CIAppOnlyBundle)' != 'true' Or '$(GITHUB_ACTIONS)' != 'true'">
 		<PropertyGroup>
