@@ -241,6 +241,14 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} transfer scope, layout, cutoff and theme-selection checks.");
             return;
         }
+        if(args.Contains("--blocking-feedback"))
+        {
+            CheckBlockingFeedback();
+            CheckCompactStatusLayout();
+            CheckMessageDialogs();
+            Console.WriteLine($"PASS: {checks} blocking-message colour and reset checks across all themes.");
+            return;
+        }
         if(args.Contains("--grid-pdf"))
         {
             CheckGridPdfReports();

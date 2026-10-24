@@ -130,7 +130,7 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
             if (placement.SelectedId > 0) await LoadFeesAsync(true);
             Reset();
         }
-        catch (Exception ex) { impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { loading = false; SetBusy(false); }
     }
     private async Task LoadFeesAsync(bool preserveExisting)
@@ -162,7 +162,7 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
             ApplyAdmissionFeeChoice();
             impact.Text = "Review selected fees and discounts, then click Preview Activation. Selected As Needed fees are charged once on activation.";
         }
-        catch (Exception ex) { impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { SetBusy(false); }
     }
     private void ApplyAdmissionFeeChoice()
@@ -200,14 +200,14 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
             var row = (await RunAsync()).Rows[0]; snapshot = Convert.ToString(row["Snapshot"]);
             impact.Text = $"{studentName.Text} · {year.Text}\r\n{placement.Text}\r\nIn this class from {start.Value:dd MMM yyyy}.\r\nBilling starts from {billing.Value:dd MMM yyyy}; monthly fees from {monthlyStart:MMMM yyyy} after applying the school cutoff.\r\nAdmission and selected one-time fees use the billing start date.\r\nAdmission fee: {(AdmissionFeeAlreadyPaid ? "already paid before system — acknowledgement only, no charge or receipt" : "charge now")}.\r\nOpening charges: {row["ChargeCount"]} · Rs {Convert.ToDecimal(row["OpeningTotal"]):N0}.\r\nOnly this student will be activated. Existing unbilled fee assignments will be replaced by the reviewed selection. No earlier monthly charges are generated.\r\nConfirm with Confirm & Activate.";
         }
-        catch (Exception ex) { snapshot = null; impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { snapshot = null; OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { SetBusy(false); }
     }
     private async Task ActivateAsync()
     {
         if (busy || snapshot is null) return; string expected = snapshot; SetBusy(true);
         try { await RunAsync(expected); Changed = true; StudentSearchCache.Invalidate(); busy = false; DialogResult = DialogResult.OK; Close(); }
-        catch (Exception ex) { snapshot = null; impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { snapshot = null; OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { if (!IsDisposed) SetBusy(false); }
     }
 }

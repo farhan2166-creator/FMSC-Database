@@ -35,7 +35,7 @@ internal static class StatusAttention
         {
             if(owner.IsDisposed||status.IsDisposed){Stop(false);return;}
             if(!status.Visible||AppTheme.UseSimpleRendering||++ticks>4){Stop(true);return;}
-            status.BackColor=AppTheme.Tint(AppTheme.Warning,ticks%2==1?0.55f:0.90f);
+            status.BackColor=AppTheme.Tint(AppTheme.Danger,ticks%2==1?0.55f:0.90f);
         }
         private void OnDisposed(object? sender,EventArgs e)=>Stop(false);
         private void OnThemeChanged(object? sender,EventArgs e)=>Stop(true);

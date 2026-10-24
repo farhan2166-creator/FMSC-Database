@@ -75,6 +75,22 @@ internal static partial class Program
             using var noTransport=Create();
             var only=(DataGridView)typeof(TransferFeeSyncDialog).GetField("grid",flags)!.GetValue(noTransport)!;
             Check(only.Rows.Count==1,"A configured destination transport rate does not add transport to a non-user");
+            current.Rows[0]["EffectiveFrom"]=new DateTime(2026,11,1);
+            using(var scheduled=Create())
+            {
+                var message=MessageChildren(scheduled).OfType<Label>().Single(label=>label.Name=="TransferFeeStatus");
+                var confirm=MessageChildren(scheduled).OfType<Button>().Single(button=>button.Text=="Confirm Transfer");
+                Check(message.ForeColor==AppTheme.Danger && !confirm.Enabled,"A scheduled fee that blocks transfer confirmation is explained in red");
+                var replace=(CheckBox)typeof(TransferFeeSyncDialog).GetField("replaceSchedule",flags)!.GetValue(scheduled)!;
+                replace.Checked=true;
+                Check(message.ForeColor==AppTheme.MutedText && confirm.Enabled,"Resolving the blocking fee choice restores neutral guidance and confirmation");
+            }
+            destination.Clear();
+            using(var missing=Create())
+            {
+                var message=MessageChildren(missing).OfType<Label>().Single(label=>label.Name=="TransferFeeStatus");
+                Check(!missing.CanApplyDestinationFees && message.ForeColor==AppTheme.Danger,"Missing destination fees are visibly red immediately on opening");
+            }
         }
         finally{themeField.SetValue(null,previous);}
     }

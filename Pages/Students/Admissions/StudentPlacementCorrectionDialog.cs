@@ -122,7 +122,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
                 if (await StudentPlacementConfirmation.ConfirmAsync(this, SelectedEnrollmentId, record.Text))
                 { Changed = true; await LoadAsync(SelectedEnrollmentId); }
             }
-            catch (Exception ex) { impact.Text = DbMessage.UserMessage(ex); }
+            catch (Exception ex) { OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
             finally { SetBusy(false); }
         };
         if (initialize) Shown += async (_, _) => await LoadAsync();
@@ -176,7 +176,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             BindHistory(selected);
             loading = false; LoadSelected();
         }
-        catch (Exception ex) { impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { loading = false; SetBusy(false); }
     }
     private void BindYears(DataTable years)
@@ -331,7 +331,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         if (busy || !CanReviewPlacement) return;
         if (editingEnrollment == 0 && SelectedMissingPlacement is null)
         {
-            impact.Text = "Choose a campus / class / section that fits the earlier and later placements.";
+            OperationFeedback.Set(impact,"Choose a campus / class / section that fits the earlier and later placements.",true);
             return;
         }
         ResetReview(); SetBusy(true);
@@ -348,8 +348,9 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
                 "\r\nNo new charges are posted. Review fee setup in Admission after correcting placement.") +
                 (Convert.ToInt32(plan["BlockedCount"]) > 0 ? $"\r\n\r\n{plan["BlockedCount"]} affected charge(s) have payments. Resolve those in Fee Corrections, then review again." :
                 "\r\n\r\nApply saves the correction and listed reversals together, with your reason in history.");
+            OperationFeedback.Apply(impact,Convert.ToInt32(plan["BlockedCount"]! )>0);
         }
-        catch (Exception ex) { plan = null; impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { plan = null; OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { SetBusy(false); }
     }
     private async Task ApplyAsync()
@@ -362,7 +363,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             Changed = true; StudentSearchCache.Invalidate(); DialogResult = DialogResult.OK;
             busy = false; Close();
         }
-        catch (Exception ex) { plan = null; impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { plan = null; OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { if (!IsDisposed) SetBusy(false); }
     }
     private async Task CorrectDatesAsync()
@@ -374,7 +375,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             bool corrected;
             if (Convert.ToString(current["Status"]) == "Active")
             {
-                if (!CurrentUser.HasPermission("Fees.Adjust")) { impact.Text = "Placement and billing date correction requires Fees.Adjust permission."; return; }
+                if (!CurrentUser.HasPermission("Fees.Adjust")) { OperationFeedback.Set(impact,"Placement and billing date correction requires Fees.Adjust permission.",true); return; }
                 using var dialog = new EnrollmentDateCorrectionDialog(record.Text, SelectedEnrollmentId, current,
                     Convert.ToDateTime(current["EnrollmentDate"]), current["BillingStartDate"] is DateTime billing ? billing : null, "", false);
                 corrected = dialog.ShowDialog(this) == DialogResult.OK;
@@ -395,7 +396,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             }
             if (corrected) { Changed = true; await LoadAsync(SelectedEnrollmentId); }
         }
-        catch (Exception ex) { impact.Text = DbMessage.UserMessage(ex); }
+        catch (Exception ex) { OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { SetBusy(false); }
     }
 }

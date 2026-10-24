@@ -60,7 +60,7 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
             if(value.Length==0 && grid.Columns[e.ColumnIndex].Name!="EnrollmentDate") {e.Value=DBNull.Value;e.ParsingApplied=true;}
             else if(DateTime.TryParse(value,CultureInfo.CurrentCulture,DateTimeStyles.None,out var parsed)) {e.Value=parsed.Date;e.ParsingApplied=true;}
         };
-        grid.DataError+=(_,e)=>{e.ThrowException=false;impact.Text="Enter a valid date, for example 07 Oct 2026. Start date cannot be empty.";save.Enabled=false;};
+        grid.DataError+=(_,e)=>{e.ThrowException=false;OperationFeedback.Set(impact,"Enter a valid date, for example 07 Oct 2026. Start date cannot be empty.",true);save.Enabled=false;};
         var certificates=HumanUi.Grid(true);certificates.AutoGenerateColumns=false;certificates.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.None;
         certificates.Columns.Add(new DataGridViewCheckBoxColumn {Name="Apply",DataPropertyName="Apply",HeaderText="Update?",FillWeight=50});
         foreach(var col in new[]{("EnrollmentId","Record"),("CertificateNumber","Certificate"),("LeaveDate","Current leave date"),("ProposedLeaveDate","Repaired leave date"),("RecordedAt","Recorded at"),("FirstIssuedAt","First issued at")}) {
@@ -74,7 +74,7 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
         foreach(DataRow certificate in certificatePreview.Rows) {certificate["Apply"]=false;certificate["ProposedLeaveDate"]=certificate["LeaveDate"];}
         certificates.DataSource=certificatePreview;
         certificates.CurrentCellDirtyStateChanged+=(_,_)=>{if(certificates.IsCurrentCellDirty)certificates.CommitEdit(DataGridViewDataErrorContexts.Commit);};
-        certificates.DataError+=(_,e)=>{e.ThrowException=false;impact.Text="Enter a valid certificate leave date";save.Enabled=false;};
+        certificates.DataError+=(_,e)=>{e.ThrowException=false;OperationFeedback.Set(impact,"Enter a valid certificate leave date",true);save.Enabled=false;};
         withdrawalDate.ShowCheckBox=true;withdrawalDate.Checked=student["WithdrawalDate"]!=DBNull.Value;
         if(withdrawalDate.Checked)withdrawalDate.Value=Convert.ToDateTime(student["WithdrawalDate"]);
         withdrawalDate.Enabled=false;
@@ -101,6 +101,7 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
             if(focused && invalid==null)
                 impact.Text=$"Billing starts: {(SelectedRow()?["BillingStartDate"] is DateTime billing?billing.ToString("dd MMM yyyy"):"not set")}\nExisting charges keep their dates and amounts."+
                     (mismatches>0?"\nA linked certificate has a different leaving date; use Review Dates to correct it.":"");
+            OperationFeedback.Apply(impact,invalid!=null);
             save.Enabled=!saving && invalid==null && (edits>0 || certEdits>0 || withdrawalEdited) && !string.IsNullOrWhiteSpace(reason.Text) && (!financeRequired || finances.Checked);
         }
         updateWithdrawal.CheckedChanged+=(_,_)=>{withdrawalDate.Enabled=updateWithdrawal.Checked;UpdateImpact();};
@@ -126,7 +127,7 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
                     DatabaseHelper.Bit("@UpdateWithdrawal",updateWithdrawal.Checked),
                     DatabaseHelper.P("@NewWithdrawalDate",withdrawalDate.Checked?(object)withdrawalDate.Value.Date:DBNull.Value));
                 DialogResult=DialogResult.OK;
-            } catch(Exception ex) {impact.Text=DbMessage.UserMessage(ex);}
+            } catch(Exception ex) {OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true);}
             finally {saving=false;cancel.Enabled=true;grid.Enabled=true;reason.Enabled=true;flags.Enabled=true;
                 certificates.Enabled=true;startDate.Enabled=true;leaveDate.Enabled=true;billingDate.Enabled=true;updateWithdrawal.Enabled=true;withdrawalDate.Enabled=updateWithdrawal.Checked;
                 save.Enabled=true;}

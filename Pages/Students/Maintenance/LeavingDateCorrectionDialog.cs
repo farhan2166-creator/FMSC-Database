@@ -110,7 +110,7 @@ internal sealed class LeavingDateCorrectionDialog : ApplicationWindowForm
                 ResultMessage = $"Leaving date correction saved: {result.Rows[0]["EnrollmentsChanged"]} placement(s), {result.Rows[0]["CertificatesUpdated"]} certificate(s). Bills and payments unchanged.";
                 DialogResult = DialogResult.OK;
             }
-            catch (Exception ex) { reviewed = false; outcome.Text = DbMessage.UserMessage(ex) + " Close and reopen the correction if records changed."; }
+            catch (Exception ex) { reviewed = false; FMSC_SMS.Core.OperationFeedback.Set(outcome,DbMessage.UserMessage(ex) + " Close and reopen the correction if records changed.",true); }
             finally { if (!IsDisposed) SetBusy(false); }
         };
         FormClosing += (_, e) => { if (busy && DialogResult != DialogResult.OK) e.Cancel = true; };

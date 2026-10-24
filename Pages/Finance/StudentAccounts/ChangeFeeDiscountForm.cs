@@ -194,7 +194,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
             releasedPayment=ApplyBills?Convert.ToDecimal(result.Tables[0].Rows[0]["ReleasedPaidAmount"]):0;
             impact.Text=ReviewText(result);
         }
-        catch(Exception ex){reviewed?.Dispose();reviewed=null;releasedPayment=0;if(!IsDisposed)impact.Text=DbMessage.UserMessage(ex);}
+        catch(Exception ex){reviewed?.Dispose();reviewed=null;releasedPayment=0;if(!IsDisposed)FMSC_SMS.Core.OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true);}
         finally
         {
             busy=false;State();

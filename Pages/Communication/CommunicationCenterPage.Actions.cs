@@ -101,7 +101,7 @@ public sealed partial class CommunicationCenterPage
                 next.Enabled=rows.Rows.Count==100&&page<100000;
             }
             catch(OperationCanceledException) when(stop.IsCancellationRequested){}
-            catch(Exception ex){if(!dialog.IsDisposed){grid.DataSource=null;UiHelper.SetGridState(grid,UiHelper.GridDisplayState.Failed,"School records could not be loaded. Use Search to try again.");feedback.Text=DbMessage.UserMessage(ex);next.Enabled=false;}}
+            catch(Exception ex){if(!dialog.IsDisposed){grid.DataSource=null;UiHelper.SetGridState(grid,UiHelper.GridDisplayState.Failed,"School records could not be loaded. Use Search to try again.");FMSC_SMS.Core.OperationFeedback.Set(feedback,DbMessage.UserMessage(ex),true);next.Enabled=false;}}
             finally{loading=false;if(!dialog.IsDisposed){toolbar.Enabled=true;previous.Enabled=page>0;UpdateSelection();}}
         }
         use.Click+=(_,_)=>{if(loading)return;picked=Selected(grid);if(picked is null||grid.SelectedRows.Count==0)return;dialog.DialogResult=DialogResult.OK;dialog.Close();};

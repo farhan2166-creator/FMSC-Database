@@ -27,7 +27,7 @@ internal sealed class CommunicationEditor : ApplicationWindowForm, IBusyPage, IU
         save.Click+=async(_,_)=>{
             if(IsBusy)return;IsBusy=true;save.Enabled=false;fields.Enabled=false;status.Text="";
             try{await this.persist(this);saved=true;}
-            catch(Exception ex){status.Text=DbMessage.UserMessage(ex);}
+            catch(Exception ex){FMSC_SMS.Core.OperationFeedback.Set(status,DbMessage.UserMessage(ex),true);}
             finally{IsBusy=false;if(!IsDisposed){save.Enabled=true;fields.Enabled=true;}if(saved&&!IsDisposed){DialogResult=DialogResult.OK;Close();}}
         };
         FormClosing+=(_,e)=>{if(IsBusy){e.Cancel=true;return;}if(HasUnsavedChanges)e.Cancel=!ModernMessageDialog.Confirm(this,UnsavedChangesMessage,UiText.Dialogs.UnsavedChanges);};

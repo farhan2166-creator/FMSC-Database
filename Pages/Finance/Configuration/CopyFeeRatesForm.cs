@@ -223,7 +223,7 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
         }
         catch (Exception ex)
         {
-            summaryLabel.Text = DbMessage.UserMessage(ex);
+            FMSC_SMS.Core.OperationFeedback.Set(summaryLabel,DbMessage.UserMessage(ex),true);
         }
         finally
         {
@@ -273,7 +273,7 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
         }
         catch (Exception ex)
         {
-            summaryLabel.Text = DbMessage.UserMessage(ex);
+            FMSC_SMS.Core.OperationFeedback.Set(summaryLabel,DbMessage.UserMessage(ex),true);
         }
         finally
         {
@@ -442,7 +442,7 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
             plan.Clear();
             preview.Rows.Clear();
             selectAllButton.Enabled = selectNoneButton.Enabled = false;
-            summaryLabel.Text = DbMessage.UserMessage(ex);
+            FMSC_SMS.Core.OperationFeedback.Set(summaryLabel,DbMessage.UserMessage(ex),true);
             applyButton.Enabled = false;
         }
     }
