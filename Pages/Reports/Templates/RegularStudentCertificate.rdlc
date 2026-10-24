@@ -204,7 +204,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>=&quot;It is certified that &quot; &amp; IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Female&quot;, &quot;Ms.&quot;, IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Male&quot;, &quot;Mr.&quot;, &quot;Mr./Ms.&quot;))</Value>
+                <Value>="It is certified that " &amp; IIF(First(Fields!Gender.Value, "RegularStudentCertificateData") = "Female", "Ms.", IIF(First(Fields!Gender.Value, "RegularStudentCertificateData") = "Male", "Mr.", "Mr./Ms."))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -262,7 +262,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>=IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Female&quot;, &quot;D/O&quot;, IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Male&quot;, &quot;S/O&quot;, &quot;S/D/O&quot;))</Value>
+                <Value>=IIF(First(Fields!Gender.Value, "RegularStudentCertificateData") = "Female", "D/O", IIF(First(Fields!Gender.Value, "RegularStudentCertificateData") = "Male", "S/O", "S/D/O"))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -433,7 +433,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>=IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Female&quot;, &quot;She&quot;, IIF(First(Fields!Gender.Value, &quot;RegularStudentCertificateData&quot;) = &quot;Male&quot;, &quot;He&quot;, &quot;He/She&quot;)) &amp; &quot; is currently studying here in Class&quot;</Value>
+                <Value>=IIF(First(Fields!Gender.Value, "RegularStudentCertificateData") = "Female", "She", IIF(First(Fields!Gender.Value, "RegularStudentCertificateData") = "Male", "He", "He/She")) &amp; " is currently studying here in Class"</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -445,7 +445,7 @@
         </Paragraphs>
         <Top>3.78542in</Top>
         <Height>0.25in</Height>
-        <Width>3.4in</Width>
+        <Width>2.93in</Width>
         <ZIndex>14</ZIndex>
         <Style>
           <Border>
@@ -472,9 +472,9 @@
           </Paragraph>
         </Paragraphs>
         <Top>3.78542in</Top>
-        <Left>3.44167in</Left>
+        <Left>3.1493in</Left>
         <Height>0.25in</Height>
-        <Width>1.95833in</Width>
+        <Width>2.2507in</Width>
         <ZIndex>15</ZIndex>
         <Style>
           <Border>
@@ -855,7 +855,11 @@
           <DataField>InstitutionLine</DataField>
           <rd:TypeName>System.String</rd:TypeName>
         </Field>
-      <Field Name="Gender"><DataField>Gender</DataField><rd:TypeName>System.String</rd:TypeName></Field></Fields>
+        <Field Name="Gender">
+          <DataField>Gender</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
+        </Field>
+      </Fields>
     </DataSet>
   </DataSets>
   <rd:ReportUnitType>Inch</rd:ReportUnitType>
