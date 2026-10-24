@@ -151,6 +151,13 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} regular certificate search, missing birth date and duplicate checks (no database connection).");
             return;
         }
+        if(args.Contains("--certificate-reissue-snapshots"))
+        {
+            CheckCertificateReissueSnapshots();
+            CheckRegularCertificateSearch();
+            Console.WriteLine($"PASS: {checks} certificate reissue history, saved DOB, search and operation guard checks (no database connection).");
+            return;
+        }
         if(args.Contains("--certificate-headers"))
         {
             CheckReportCaptions(new[]{"BankAccountOpeningCertificate","CharacterCertificate","DateOfBirthCertificate",

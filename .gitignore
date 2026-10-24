@@ -358,6 +358,10 @@ Database/*.bak
 /Tests/MutationSqlChecks/*
 !/Tests/MutationSqlChecks/*.cs
 !/Tests/MutationSqlChecks/*.csproj
+!/Tests/CertificateReissueSqlChecks/
+/Tests/CertificateReissueSqlChecks/*
+!/Tests/CertificateReissueSqlChecks/*.cs
+!/Tests/CertificateReissueSqlChecks/*.csproj
 !/Tests/MutationSqlChecks/*.sql
 
 # Level 1 sources and the reviewed schema-only fixture; never generated output or credentials.

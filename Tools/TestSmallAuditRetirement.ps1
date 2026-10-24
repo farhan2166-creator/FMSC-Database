@@ -70,7 +70,7 @@ try {
  }
  $baselineLogs=Number 'SELECT COUNT(*) FROM dbo.AuditLogs;'
  $baselineOperations=Number 'SELECT COUNT(*) FROM dbo.AuditOperations;'
- Check ((Number 'SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;') -eq 45) 'Sequential migration chain reaches schema 45.'
+ Check ((Number 'SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;') -eq 46) 'Sequential migration chain reaches schema 46.'
  $feeTypes=(Query 'EXEC dbo.GetFeeTypes @UserId=1;').Tables[0]
  Check ($feeTypes.Columns.Contains('IsTransportLinked')) 'The real fee lookup returns the transport flag used by transfer review.'
  Check ($feeTypes.Columns['IsTransportLinked'].DataType -eq [bool]) 'The transfer transport flag has the expected boolean type.'

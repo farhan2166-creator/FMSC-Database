@@ -49,11 +49,11 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + gap));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
         var title = new Label {
-            Text = "School records connection", Dock = DockStyle.Fill,
+            Text = "", Dock = DockStyle.Fill,
             Font = AppTheme.PageTitleFont, ForeColor = AppTheme.HeadingText,
             TextAlign = ContentAlignment.MiddleLeft, Margin = Padding.Empty
         };
-        var connectionCard = HumanUi.Card("Connection status", accent: AppTheme.Primary);
+        var connectionCard = HumanUi.Card("Connection Status", accent: AppTheme.Primary);
         var state = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3,
             BackColor = AppTheme.Surface, Margin = Padding.Empty
@@ -62,11 +62,11 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         state.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.ButtonFont) + gap));
         state.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         state.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.S(12)));
-        _message.Text = "Please wait while FMSC connects to your saved school records.";
+        _message.Text = "Please wait while we connect you to the Database.";
         _message.ForeColor = AppTheme.Text;
         _message.UseMnemonic = false;
         _message.Margin = new Padding(0, 0, 0, gap);
-        _status.Text = "Preparing connection…";
+        _status.Text = "Preparing connection………………";
         _status.Font = AppTheme.ButtonFont;
         _status.ForeColor = AppTheme.Primary;
         _status.TextAlign = ContentAlignment.MiddleLeft;
@@ -164,8 +164,8 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
     {
         if (_busy) return;
         SetBusy(true);
-        _message.Text = restart ? "Restarting the connection. Your saved school records will be kept." : "Reconnecting to your saved school records…";
-        _status.Text = restart ? "Restarting connection…" : "Checking connection…";
+        _message.Text = restart ? "Restarting the connection. Your database records will be kept." : "Reconnecting to your Database…";
+        _status.Text = restart ? "Restarting connection………" : "Checking connection………";
         _details.Text = ConnectionDetails(_status.Text);
         try
         {
@@ -180,8 +180,8 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
                 _canRestart = true;
                 _canRepair = false;
                 _repair.Visible = false;
-                _message.Text = "Your school records are connected and ready.";
-                _status.Text = "Connection successful";
+                _message.Text = "Your database is connected and ready.";
+                _status.Text = "Connection Successful";
                 _details.Text = ConnectionDetails(string.Empty);
                 if (_startup) { SetBusy(false); DialogResult = DialogResult.OK; Close(); }
             }
@@ -189,7 +189,7 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         }
         catch (Exception ex)
         {
-            AppExceptionHandler.LogNonFatal(ex, "School records connection recovery");
+            AppExceptionHandler.LogNonFatal(ex, "Database connection recovery");
             if (!IsDisposed) ShowFailure(ex is DatabaseRecoveryException recovery ? recovery.Message : DbMessage.UserMessage(ex),
                 ex);
         }
@@ -238,7 +238,7 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
             else if (result == 0)
             { SetBusy(false); await ConnectAsync(false); }
             else
-            { _status.Text = "SQL repair did not complete"; _message.Text = $"SQL dependency repair returned code {result}. Your school records have not been replaced. Try again or contact your administrator."; }
+            { _status.Text = "SQL repair did not complete"; _message.Text = $"SQL dependency repair returned code {result}. Database has not been replaced. Try again or contact your administrator."; }
         }
         catch (Exception ex)
         {

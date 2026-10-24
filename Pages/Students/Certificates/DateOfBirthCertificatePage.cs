@@ -1,8 +1,17 @@
 using FMSC_SMS.Core;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
-public sealed class DateOfBirthCertificatePage : V2Page
+public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChanges
 {
+    private bool reissuing;
+    private bool loadingCertificates;
+    private readonly Func<int,DataTable> readCertificates;
+    private readonly CertificateReissueFlow reissue=new(MutationKind.BirthCertificateReissue);
+    private readonly ModernButton checkReissue=new(){Text="Check Reissue",Width=AppScale.Scale(170)};
+    public bool IsBusy=>reissuing;
+    public string BusyMessage=>"Please wait for the certificate reissue to finish.";
+    public bool HasUnsavedChanges=>reissue.Blocked;
+    public string UnsavedChangesMessage=>"A certificate reissue needs outcome checking. Its recovery record is retained when you leave.";
     private readonly StudentPicker student = new();
     private readonly ModernTextBox dateOfBirth =
         HumanUi.TextBox(false, 150);
@@ -12,7 +21,7 @@ public sealed class DateOfBirthCertificatePage : V2Page
     private DataTable certificateResults = new();
     private DateTime? currentDateOfBirth;
     /* Finding 13 - a search debounce tick that lands while a modal (confirmation, collector prompt, print preview) is open runs inside that modal's message loop and re-binds the picker underneath… */
-    /* Students hidden from the picker because they have no date of birth on record. */
+    /* Saved copies remain available even when the current record is incomplete. */
     private bool suppressStudentChanged;
     private int selectedCertificateRecordId;
     private int selectedIssueId;
@@ -43,15 +52,17 @@ public sealed class DateOfBirthCertificatePage : V2Page
         Width = AppScale.Scale(120)
     };
     public DateOfBirthCertificatePage() : this(true) { }
-    internal DateOfBirthCertificatePage(bool initialize)
+    internal DateOfBirthCertificatePage(bool initialize,Func<int,DataTable>? readCertificates=null)
         : base("Date of Birth Certificate", "Create, issue, collect and print student date of birth certificates.")
     {
+        this.readCertificates=readCertificates??(id=>DatabaseHelper.QueryUser("GetDateOfBirthCertificateRecords",DatabaseHelper.Int("@AdmissionId",id)));
         createCertificateButton.Click +=
             (_, _) => CreateCertificate();
         clearButton.Click +=
             (_, _) => ClearForm();
-        issueAgainButton.Click +=
-            (_, _) => IssueAgain();
+        issueAgainButton.Click += async (_, _) => await ReissueCertificateAsync(false);
+        checkReissue.Click += async (_, _) => await ReissueCertificateAsync(true);
+        if(initialize)Defer(()=>{reissue.Load();ApplyWorkflowState();});
         collectButton.Click +=
             (_, _) => MarkCollected();
         printButton.Click +=
@@ -67,7 +78,7 @@ public sealed class DateOfBirthCertificatePage : V2Page
         /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
         if(initialize)StudentSearchCache.Warm();
         /* dbo.Create...Certificate refuses a student with no date of birth (58505), so such students are not offered. */
-        student.RowFilter = row => !row.IsNull("DateOfBirth");
+        // Existing saved copies remain searchable even when current birth details are missing.
         student.UserSelectionChanged +=
             (_, _) => {
                 if (suppressStudentChanged)
@@ -80,8 +91,8 @@ public sealed class DateOfBirthCertificatePage : V2Page
                     return;
                 StudentChanged();
             };
-        Grid.CellMouseClick +=
-            Grid_CellMouseClick;
+        Grid.SelectionChanged += GridSelectionChanged;
+        Grid.CurrentCellChanged += GridSelectionChanged;
         Defer(
             () => {
                 ResetToStart();
@@ -112,10 +123,10 @@ public sealed class DateOfBirthCertificatePage : V2Page
         fields.Controls.Add(
             CertificateUi.Field(UiText.Certificates.Date, certificateDate, true), 1, 0);
         fields.Controls.Add(
-            CertificateUi.Field("Date of Birth (School Record)", dateOfBirth, true), 0, 1);
+            CertificateUi.Field("Date of Birth", dateOfBirth, true), 0, 1);
         details.Content.Controls.Add(fields);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, clearButton);
+            CertificateButtonRow.Create(createCertificateButton, clearButton,checkReissue);
         certButtonRow.Dock =
             DockStyle.Bottom;
         details.Content.Controls.Add(certButtonRow);
@@ -187,6 +198,7 @@ public sealed class DateOfBirthCertificatePage : V2Page
                     ? currentDateOfBirth.Value.ToString("dd-MM-yyyy")
                     : "Not on record";
             LoadCertificates(admissionId);
+            SelectSavedCertificate(0);
         }
         catch (Exception ex)
         {
@@ -195,6 +207,7 @@ public sealed class DateOfBirthCertificatePage : V2Page
     }
     private void LoadCertificates(int admissionId)
     {
+        loadingCertificates=true;
         try
         {
             ClearCertificateSelection();
@@ -207,10 +220,7 @@ public sealed class DateOfBirthCertificatePage : V2Page
                 ApplyWorkflowState();
                 return;
             }
-            DataTable table =
-                DatabaseHelper.QueryUser(
-                    "GetDateOfBirthCertificateRecords",
-                    DatabaseHelper.Int("@AdmissionId", admissionId));
+            DataTable table = readCertificates(admissionId);
             certificateResults = CertificateRecordOrder.NewestFirst(table, "DateOfBirthCertificateIssueId");
             Bind(certificateResults);
             FormatCertificateGrid();
@@ -235,12 +245,13 @@ public sealed class DateOfBirthCertificatePage : V2Page
             FormatCertificateGrid();
             ApplyWorkflowState();
         }
+        finally {loadingCertificates=false;ApplyWorkflowState();}
     }
     private void SelectSavedCertificate(int id)
     {
         
         CertificateRecordOrder.Select(Grid, "DateOfBirthCertificateIssueId", id,
-            index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
+            index => LoadCertificateIssue(((DataRowView)Grid.Rows[index].DataBoundItem).Row));
     }
     private void FormatCertificateGrid()
     {
@@ -274,25 +285,16 @@ public sealed class DateOfBirthCertificatePage : V2Page
         Grid.Columns[columnName].Visible =
             false;
     }
-    private void Grid_CellMouseClick(object? sender, DataGridViewCellMouseEventArgs e)
+    private void GridSelectionChanged(object? sender,EventArgs e)
     {
-        if (e.Button != MouseButtons.Left ||
-            e.RowIndex < 0 ||
-            e.RowIndex >= certificateResults.Rows.Count)
-        {
-            return;
-        }
+        if(loadingCertificates)return;
+        if(Grid.CurrentRow is {IsNewRow:false,Selected:true,DataBoundItem:DataRowView view}){LoadCertificateIssue(view.Row);return;}
+        ClearCertificateSelection();ApplyWorkflowState();
+    }
+    private void LoadCertificateIssue(DataRow row)
+    {
         try
         {
-            DataGridViewRow gridRow =
-                Grid.Rows[e.RowIndex];
-            if (gridRow.IsNewRow)
-                return;
-            Grid.ClearSelection();
-            gridRow.Selected = true;
-            DataRow row =
-                certificateResults.Rows[
-                    e.RowIndex];
             int certificateRecordId =
                 GetInt(row, "CertificateRecordId");
             int issueId =
@@ -316,6 +318,8 @@ public sealed class DateOfBirthCertificatePage : V2Page
             selectedIssueCollected =
                 string.Equals(
                     GetString(row, "CollectionStatus"), "Collected", StringComparison.OrdinalIgnoreCase);
+            dateOfBirth.Text=GetDate(row,"DateOfBirth")?.ToString("dd-MM-yyyy")??"Not on record";
+            certificateDate.Value=GetDate(row,"CertificateDate")??DateTime.Today;
             ApplyWorkflowState();
         }
         catch (Exception ex)
@@ -341,25 +345,28 @@ public sealed class DateOfBirthCertificatePage : V2Page
             hasStudent &&
             !hasCertificate &&
             currentDateOfBirth.HasValue;
-        certificateDate.Enabled = canCreate;
+        certificateDate.Enabled = canCreate&&!reissuing;
         createCertificateButton.Enabled =
-            canCreate;
+            canCreate&&!reissuing&&!reissue.Blocked;
         clearButton.Enabled = true;
         refreshButton.Enabled =
             hasStudent;
         issueAgainButton.Enabled =
             hasCertificate &&
-            latestIssueCollected;
+            latestIssueCollected&&!reissuing&&!reissue.Blocked;
+        checkReissue.Visible=reissue.Blocked;
+        checkReissue.Enabled=reissue.Blocked&&!reissuing;
         collectButton.Enabled =
             hasSelectedIssue &&
             !selectedIssueCollected;
         printButton.Enabled =
             hasSelectedIssue &&
-            selectedIssueCollected;
+            selectedIssueCollected&&!reissuing&&CurrentUser.HasPermission("Certificates.Print");
+        if(reissue.Blocked){SetStatus("A certificate reissue needs checking. Use Check Reissue before issuing another copy.",true);return;}
         if (!hasStudent)
         {
             SetStatus(
-                UiText.Prompts.SearchForStudent + " Students without a date of birth are not listed - add the date of birth on the student's record first.");
+                UiText.Prompts.SearchForStudent);
             return;
         }
         if (hasStudent && !currentDateOfBirth.HasValue && !hasCertificate)
@@ -500,70 +507,30 @@ public sealed class DateOfBirthCertificatePage : V2Page
             }
         }
     }
-    private void IssueAgain()
+    private async Task ReissueCertificateAsync(bool checkOnly)
     {
-        // Finding 12 - see CreateCertificate: the confirmation is set last.
-        string? successMessage =
-            null;
-        // Finding 13 - this path opens a modal confirmation; park the search.
+        if(reissuing)return;
+        int certificateId=GetExistingCertificateRecordId();
+        if(!checkOnly&&(certificateId<=0||!IsLatestIssueCollected()))
+        { Warn("Select a certificate whose latest copy has been collected before issuing again.");return; }
+        reissuing=true;Enabled=false;
         try
         {
-            if (student.SelectedId <= 0)
+            MutationResult? saved=checkOnly?await reissue.CheckAsync():await reissue.IssueAsync(FindForm(),certificateId);
+            if(IsDisposed)return;
+            if(saved is not null)
             {
-                Warn(UiText.Prompts.SelectStudent);
-                return;
+                if(student.SelectedId==saved.SubjectId)
+                {
+                    LoadCertificates(saved.SubjectId);
+                    SelectSavedCertificate(saved.RecordId);
+                }
+                Info("The new certificate copy is saved. Earlier copies keep their original birth dates and details.");
             }
-            if (certificateResults.Rows.Count == 0)
-            {
-                Warn("The student does not have an existing date of birth certificate.");
-                return;
-            }
-            if (!IsLatestIssueCollected())
-            {
-                Warn("The current certificate issuance must be collected before another issuance can be created.");
-                return;
-            }
-            int certificateRecordId =
-                GetExistingCertificateRecordId();
-            if (certificateRecordId <= 0)
-            {
-                Alert("The student's date of birth certificate record could not be found.");
-                return;
-            }
-            DialogResult confirm =
-                ModernMessageDialog.Show(
-                    FindForm(),
-                    "The certificate will be issued again and a new issuance history record will be created.\n\n" +
-                    "The previous issuance history will remain unchanged.\n\n" +
-                    "Continue?",
-                    UiText.Certificates.IssueAgain,
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question);
-            if (confirm != DialogResult.Yes)
-                return;
-            issueAgainButton.Enabled = false;
-            DatabaseHelper.Execute(
-                "IssueDateOfBirthCertificate",
-                DatabaseHelper.P(
-                    "@UserId",
-                    CurrentUser.UserId),
-                DatabaseHelper.Int("@CertificateRecordId", certificateRecordId));
-            successMessage =
-                "Certificate issued again successfully. The new issuance has been added to the history.";
-            LoadCertificates(student.SelectedId);
+            else if(checkOnly)Info("The earlier reissue was not saved. You may review and issue again.");
         }
-        catch (Exception ex)
-        {
-            Fail(ex);
-        }
-        finally
-        {
-            ApplyWorkflowState();
-            if (successMessage is not null)
-            {
-                Info(successMessage);
-            }
-        }
+        catch(Exception ex){Fail(ex);}
+        finally{reissuing=false;if(!IsDisposed){Enabled=true;ApplyWorkflowState();}}
     }
     private int GetExistingCertificateRecordId()
     {
@@ -664,7 +631,8 @@ public sealed class DateOfBirthCertificatePage : V2Page
         DataTable data =
             DatabaseHelper.QueryUser(
                 "GetDateOfBirthCertificatePrintData",
-                DatabaseHelper.Int("@CertificateRecordId", certificateRecordId));
+                DatabaseHelper.Int("@CertificateRecordId", certificateRecordId),
+                DatabaseHelper.Int("@DateOfBirthCertificateIssueId",selectedIssueId));
         if (data.Rows.Count == 0)
         {
             Warn(UiText.Certificates.PrintDataMissing);
@@ -883,8 +851,8 @@ public sealed class DateOfBirthCertificatePage : V2Page
     {
         if (disposing)
         {
-            Grid.CellMouseClick -=
-                Grid_CellMouseClick;
+            Grid.SelectionChanged -= GridSelectionChanged;
+            Grid.CurrentCellChanged -= GridSelectionChanged;
         }
         base.Dispose(disposing);
     }

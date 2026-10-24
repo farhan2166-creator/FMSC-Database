@@ -159,6 +159,26 @@
       "schema": "dbo",
       "name": "SaveStudentPostingDecision",
       "type": "P "
+    },
+    {
+      "name": "RegularStudentCertificateIssues",
+      "schema": "dbo",
+      "type": "U "
+    },
+    {
+      "name": "DateOfBirthCertificateIssueSnapshots",
+      "schema": "dbo",
+      "type": "U "
+    },
+    {
+      "name": "GetCertificateReissuePreview",
+      "schema": "dbo",
+      "type": "P "
+    },
+    {
+      "name": "IssueRegularStudentCertificate",
+      "schema": "dbo",
+      "type": "P "
     }
   ],
   "columns": [
@@ -761,6 +781,54 @@
       "isNullable": true,
       "isIdentity": false,
       "isComputed": false
+    },
+    {
+      "isIdentity": false,
+      "schema": "dbo",
+      "maxLength": 3,
+      "isNullable": false,
+      "precision": 10,
+      "name": "DateOfBirth",
+      "type": "date",
+      "objectName": "RegularStudentCertificateIssues",
+      "isComputed": false,
+      "scale": 0
+    },
+    {
+      "isIdentity": false,
+      "schema": "dbo",
+      "maxLength": 3,
+      "isNullable": false,
+      "precision": 10,
+      "name": "CertificateDate",
+      "type": "date",
+      "objectName": "RegularStudentCertificateIssues",
+      "isComputed": false,
+      "scale": 0
+    },
+    {
+      "isIdentity": false,
+      "schema": "dbo",
+      "maxLength": 3,
+      "isNullable": false,
+      "precision": 10,
+      "name": "DateOfBirth",
+      "type": "date",
+      "objectName": "DateOfBirthCertificateIssueSnapshots",
+      "isComputed": false,
+      "scale": 0
+    },
+    {
+      "isIdentity": false,
+      "schema": "dbo",
+      "maxLength": 3,
+      "isNullable": false,
+      "precision": 10,
+      "name": "CertificateDate",
+      "type": "date",
+      "objectName": "DateOfBirthCertificateIssueSnapshots",
+      "isComputed": false,
+      "scale": 0
     }
   ],
   "uniqueIndexes": [
@@ -819,6 +887,20 @@
       "name": "PK_StudentPostingDecisions",
       "filter": null,
       "keys": "RequestId"
+    },
+    {
+      "name": "PK_RegularStudentCertificateIssues",
+      "objectName": "RegularStudentCertificateIssues",
+      "filter": null,
+      "schema": "dbo",
+      "keys": "RegularStudentCertificateIssueId"
+    },
+    {
+      "name": "PK_DateOfBirthCertificateIssueSnapshots",
+      "objectName": "DateOfBirthCertificateIssueSnapshots",
+      "filter": null,
+      "schema": "dbo",
+      "keys": "DateOfBirthCertificateIssueId"
     }
   ],
   "foreignKeys": [
@@ -991,6 +1073,56 @@
       "referencedColumns": "UserId",
       "deleteAction": 0,
       "updateAction": 0
+    },
+    {
+      "referencedSchema": "dbo",
+      "referencedObject": "RegularStudentCertificates",
+      "deleteAction": 0,
+      "updateAction": 0,
+      "referencedColumns": "RegularStudentCertificateId",
+      "columns": "RegularStudentCertificateId",
+      "schema": "dbo",
+      "objectName": "RegularStudentCertificateIssues"
+    },
+    {
+      "referencedSchema": "dbo",
+      "referencedObject": "RegularStudentCertificateIssues",
+      "deleteAction": 0,
+      "updateAction": 0,
+      "referencedColumns": "RegularStudentCertificateIssueId",
+      "columns": "PreviousIssueId",
+      "schema": "dbo",
+      "objectName": "RegularStudentCertificateIssues"
+    },
+    {
+      "referencedSchema": "dbo",
+      "referencedObject": "Users",
+      "deleteAction": 0,
+      "updateAction": 0,
+      "referencedColumns": "UserId",
+      "columns": "IssuedByUserId",
+      "schema": "dbo",
+      "objectName": "RegularStudentCertificateIssues"
+    },
+    {
+      "referencedSchema": "dbo",
+      "referencedObject": "DateOfBirthCertificateIssues",
+      "deleteAction": 0,
+      "updateAction": 0,
+      "referencedColumns": "DateOfBirthCertificateIssueId",
+      "columns": "DateOfBirthCertificateIssueId",
+      "schema": "dbo",
+      "objectName": "DateOfBirthCertificateIssueSnapshots"
+    },
+    {
+      "referencedSchema": "dbo",
+      "referencedObject": "DateOfBirthCertificateIssues",
+      "deleteAction": 0,
+      "updateAction": 0,
+      "referencedColumns": "DateOfBirthCertificateIssueId",
+      "columns": "PreviousIssueId",
+      "schema": "dbo",
+      "objectName": "DateOfBirthCertificateIssueSnapshots"
     }
   ],
   "databaseProperties": [
@@ -1034,6 +1166,22 @@
       "parentName": "BillingCharges",
       "events": "INSERT,UPDATE",
       "insteadOf": false
+    },
+    {
+      "insteadOf": false,
+      "events": "INSERT",
+      "parentName": "RegularStudentCertificates",
+      "name": "TR_RegularStudentCertificate_InitialIssue",
+      "schema": "dbo",
+      "parentSchema": "dbo"
+    },
+    {
+      "insteadOf": false,
+      "events": "INSERT",
+      "parentName": "DateOfBirthCertificateIssues",
+      "name": "TR_DateOfBirthCertificate_IssueSnapshot",
+      "schema": "dbo",
+      "parentSchema": "dbo"
     }
   ],
   "parameters": [
@@ -1286,6 +1434,136 @@
       "precision": 0,
       "scale": 0,
       "isOutput": false
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "int",
+      "objectName": "GetRegularStudentCertificatePrintData",
+      "precision": 10,
+      "maxLength": 4,
+      "name": "@RegularStudentCertificateIssueId"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "int",
+      "objectName": "GetDateOfBirthCertificatePrintData",
+      "precision": 10,
+      "maxLength": 4,
+      "name": "@DateOfBirthCertificateIssueId"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "int",
+      "objectName": "GetCertificateReissuePreview",
+      "precision": 10,
+      "maxLength": 4,
+      "name": "@UserId"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "int",
+      "objectName": "GetCertificateReissuePreview",
+      "precision": 10,
+      "maxLength": 4,
+      "name": "@CertificateRecordId"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "int",
+      "objectName": "IssueRegularStudentCertificate",
+      "precision": 10,
+      "maxLength": 4,
+      "name": "@UserId"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "int",
+      "objectName": "IssueRegularStudentCertificate",
+      "precision": 10,
+      "maxLength": 4,
+      "name": "@CertificateRecordId"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "nvarchar",
+      "objectName": "GetCertificateReissuePreview",
+      "precision": 0,
+      "maxLength": 40,
+      "name": "@CertificateKind"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "int",
+      "objectName": "IssueRegularStudentCertificate",
+      "precision": 10,
+      "maxLength": 4,
+      "name": "@ExpectedLatestIssueId"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "date",
+      "objectName": "IssueRegularStudentCertificate",
+      "precision": 10,
+      "maxLength": 3,
+      "name": "@ExpectedDateOfBirth"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "date",
+      "objectName": "IssueRegularStudentCertificate",
+      "precision": 10,
+      "maxLength": 3,
+      "name": "@CertificateDate"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "int",
+      "objectName": "IssueDateOfBirthCertificate",
+      "precision": 10,
+      "maxLength": 4,
+      "name": "@ExpectedLatestIssueId"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "date",
+      "objectName": "IssueDateOfBirthCertificate",
+      "precision": 10,
+      "maxLength": 3,
+      "name": "@ExpectedDateOfBirth"
+    },
+    {
+      "scale": 0,
+      "schema": "dbo",
+      "isOutput": false,
+      "type": "date",
+      "objectName": "IssueDateOfBirthCertificate",
+      "precision": 10,
+      "maxLength": 3,
+      "name": "@CertificateDate"
     }
   ]
 }

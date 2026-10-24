@@ -61,7 +61,7 @@ public static class DbMessage
         }
         return sql.Number switch {
             -1 or 0 or 2 or 20 or 26 or 40 or 52 or 53 or 64 or 233 or 10053 or 10054 or 10060 or 10061 or 17142 =>
-                "FMSC could not connect to your school records. Try reconnecting or contact the administrator." + Code(sql),
+                "FMSC could not connect to Database. Try reconnecting or contact the administrator." + Code(sql),
             18456 =>
                 "Access to school records was refused. Contact the administrator.",
             4060 =>
