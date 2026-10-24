@@ -319,7 +319,7 @@
         </Paragraphs>
         <Top>3.05in</Top>
         <Height>0.3in</Height>
-        <Width>4.34514in</Width>
+        <Width>4.64097in</Width>
         <ZIndex>10</ZIndex>
         <Style>
           <Border>
@@ -560,9 +560,9 @@
           </Paragraph>
         </Paragraphs>
         <Top>3.05in</Top>
-        <Left>4.5125in</Left>
+        <Left>4.71042in</Left>
         <Height>0.3in</Height>
-        <Width>2.9375in</Width>
+        <Width>2.73958in</Width>
         <ZIndex>21</ZIndex>
         <Style>
           <Border>
@@ -603,9 +603,9 @@
       </Textbox>
       <Line Name="lnAdmissionNo5">
         <Top>3.35in</Top>
-        <Left>4.5125in</Left>
+        <Left>4.71042in</Left>
         <Height>0in</Height>
-        <Width>2.9375in</Width>
+        <Width>2.73958in</Width>
         <ZIndex>23</ZIndex>
         <Style>
           <Border>
