@@ -3,6 +3,7 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
+    private const string MissingBirthDateMessage = "Date of birth is missing. Add it to the student's Admission record, then reselect the student to create this certificate.";
     private DateTime? newCertificateDateBaseline;
     private int newDraftStudent;
     private readonly Func<string,bool>? discardConfirmation;
@@ -32,7 +33,6 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     private DataTable studentResults => student.Source;
     private DataTable certificateResults = new();
     /* Finding 13 - a search debounce tick that lands while a modal (print preview, confirmation) is open runs inside that modal's message loop and re-binds the picker underneath it. */
-    /* Students hidden from the picker because they have no date of birth on record. */
     private bool suppressStudentChanged;
     private int selectedRegularStudentCertificateId;
     private bool loadingCertificates;
@@ -121,8 +121,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         TrackStudentSearchStatus(student);
         /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
         if(initialize)StudentSearchCache.Warm();
-        /* dbo.Create...Certificate refuses a student with no date of birth (58505), so such students are not offered. */
-        student.RowFilter = row => !row.IsNull("DateOfBirth");
+        // Show all students; explain missing certificate details after selection.
         student.SelectionChangeGuard = _ => !creatingCertificate &&
             ConfirmDraftDiscard("Discard the unsaved certificate changes and choose another student?");
         student.UserSelectionChanged +=
@@ -420,7 +419,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         certificateDate.Enabled = hasStudent && !creatingCertificate;
         className.Enabled = hasStudent && !creatingCertificate;
         createCertificateButton.Enabled =
-            hasStudent &&
+            hasStudent && HasRecordedBirthDate() &&
             !hasSelection && certificatesLoaded && ExistingClassCertificateId(certificateResults, className.Text) == 0 && !creatingCertificate;
         updateCertificateButton.Enabled =
             hasStudent &&
@@ -434,7 +433,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         if (!hasStudent)
         {
             SetStatus(
-                UiText.Prompts.SearchForStudent + " Students need a date of birth on record to appear here.");
+                UiText.Prompts.SearchForStudent);
             return;
         }
         if (hasSelection)
@@ -442,6 +441,11 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             SetStatus(
                 dirty ? "Save your changes before printing this certificate."
                     : "Certificate ready to print.");
+            return;
+        }
+        if (!HasRecordedBirthDate())
+        {
+            SetStatus(MissingBirthDateMessage, true);
             return;
         }
         /* Finding 8 - say so up front when the student is not active: the certificate is proof of enrolment, and Create asks for a confirmation. */
@@ -453,6 +457,9 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
                 ? $"Student status: {status}. Confirm the class; creation requires confirmation. Select a saved certificate to edit or print."
                 : "Confirm the class to create. Select a saved certificate to edit or print.");
     }
+    private bool HasRecordedBirthDate() =>
+        student.SelectedRow is DataRow row && GetDate(row, "DateOfBirth").HasValue;
+
     /// <summary>Finding 8 - the status of the selected student, from the row the picker was bound from. Empty when it is not known; no query is made.</summary>
     private string GetSelectedStudentStatus()
     {
@@ -476,6 +483,11 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             if (student.SelectedId <= 0)
             {
                 Warn(UiText.Prompts.SelectStudent);
+                return;
+            }
+            if (!HasRecordedBirthDate())
+            {
+                Warn(MissingBirthDateMessage);
                 return;
             }
             if (!ValidateCertificateFields())

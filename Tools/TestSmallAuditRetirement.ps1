@@ -70,7 +70,11 @@ try {
  }
  $baselineLogs=Number 'SELECT COUNT(*) FROM dbo.AuditLogs;'
  $baselineOperations=Number 'SELECT COUNT(*) FROM dbo.AuditOperations;'
- Check ((Number 'SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;') -eq 44) 'Sequential migration chain reaches schema 44.'
+ Check ((Number 'SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;') -eq 45) 'Sequential migration chain reaches schema 45.'
+ $feeTypes=(Query 'EXEC dbo.GetFeeTypes @UserId=1;').Tables[0]
+ Check ($feeTypes.Columns.Contains('IsTransportLinked')) 'The real fee lookup returns the transport flag used by transfer review.'
+ Check ($feeTypes.Columns['IsTransportLinked'].DataType -eq [bool]) 'The transfer transport flag has the expected boolean type.'
+ Check ((Number 'SELECT COUNT(*) FROM dbo.FeeTypes;') -eq $feeTypes.Rows.Count) 'Adding transfer metadata preserves every fee type.'
  [void](Query "INSERT dbo.Roles(RoleName) VALUES(N'Fictional No Grants'); INSERT dbo.Users(Username,RoleId) VALUES(N'fictional_second_user',2); UPDATE dbo.Users SET MustChangePassword=1 WHERE UserId=1;")
  Refused "EXEC dbo.ChangeOwnPassword @UserId=1,@PasswordHash=0x01,@PasswordSalt=0x02;" 57001 'Invalid password hash remains rejected.'
  Refused "DECLARE @H varbinary(64)=CONVERT(varbinary(64),REPLICATE('h',64)); EXEC dbo.ChangeOwnPassword @UserId=1,@PasswordHash=@H,@PasswordSalt=0x01;" 57002 'Invalid password salt remains rejected.'

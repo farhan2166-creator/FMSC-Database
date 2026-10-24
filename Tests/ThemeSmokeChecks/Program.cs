@@ -139,6 +139,18 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} hold/resume UI and recovery checks.");
             return;
         }
+        if(args.Contains("--regular-certificate-search"))
+        {
+            CheckRegularCertificateSearch();
+            Console.WriteLine($"PASS: {checks} regular certificate search, missing birth date and duplicate checks (no database connection).");
+            return;
+        }
+        if(args.Contains("--character-report-header"))
+        {
+            CheckReportCaptions(new[]{"CharacterCertificate"});
+            Console.WriteLine($"PASS: {checks} character report header and single-page rendering checks; previews in artifacts/report-captions.");
+            return;
+        }
         if(args.Contains("--report-captions"))
         {
             CheckReportCaptions();
