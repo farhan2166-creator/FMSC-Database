@@ -24,7 +24,7 @@
           </Paragraph>
         </Paragraphs>
         <rd:DefaultName>txtTitle</rd:DefaultName>
-        <Top>0.3in</Top>
+        <Top>0.2in</Top>
         <Height>0.45in</Height>
         <Width>7.45in</Width>
         <Style>
@@ -50,7 +50,7 @@
             <Style />
           </Paragraph>
         </Paragraphs>
-        <Top>0.9in</Top>
+        <Top>0.75in</Top>
         <Height>0.25in</Height>
         <Width>1.35in</Width>
         <ZIndex>1</ZIndex>
@@ -81,7 +81,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>0.9in</Top>
+        <Top>0.75in</Top>
         <Left>1.42in</Left>
         <Height>0.25in</Height>
         <Width>1.51in</Width>
@@ -109,7 +109,7 @@
             <Style />
           </Paragraph>
         </Paragraphs>
-        <Top>0.9in</Top>
+        <Top>0.75in</Top>
         <Left>4.2in</Left>
         <Height>0.25in</Height>
         <Width>1.4in</Width>
@@ -141,7 +141,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>0.9in</Top>
+        <Top>0.75in</Top>
         <Left>5.65in</Left>
         <Height>0.25in</Height>
         <Width>1.8in</Width>
@@ -229,7 +229,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>2.4in</Top>
+        <Top>1.95in</Top>
         <Height>0.75in</Height>
         <Width>7.35in</Width>
         <ZIndex>5</ZIndex>
@@ -258,7 +258,7 @@
             <Style />
           </Paragraph>
         </Paragraphs>
-        <Top>5.15in</Top>
+        <Top>4.5in</Top>
         <Height>0.25in</Height>
         <Width>3in</Width>
         <ZIndex>6</ZIndex>
@@ -288,7 +288,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>5.5in</Top>
+        <Top>4.85in</Top>
         <Height>0.65in</Height>
         <Width>7.45in</Width>
         <ZIndex>7</ZIndex>
@@ -319,7 +319,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>3.25in</Top>
+        <Top>2.8in</Top>
         <Left>3.7in</Left>
         <Height>0.3in</Height>
         <Width>1.65in</Width>
@@ -351,7 +351,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>3.25in</Top>
+        <Top>2.8in</Top>
         <Left>5.45in</Left>
         <Height>0.3in</Height>
         <Width>2in</Width>
@@ -383,7 +383,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>3.7in</Top>
+        <Top>3.2in</Top>
         <Height>0.3in</Height>
         <Width>1.45in</Width>
         <ZIndex>10</ZIndex>
@@ -414,7 +414,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>3.7in</Top>
+        <Top>3.2in</Top>
         <Left>1.65in</Left>
         <Height>0.3in</Height>
         <Width>1.75in</Width>
@@ -446,7 +446,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>4.15in</Top>
+        <Top>3.6in</Top>
         <Left>2.4in</Left>
         <Height>0.3in</Height>
         <Width>2.95in</Width>
@@ -478,7 +478,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>3.7in</Top>
+        <Top>3.2in</Top>
         <Left>5.45in</Left>
         <Height>0.3in</Height>
         <Width>2in</Width>
@@ -510,7 +510,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>4.15in</Top>
+        <Top>3.6in</Top>
         <Height>0.3in</Height>
         <Width>2.2in</Width>
         <ZIndex>14</ZIndex>
@@ -541,7 +541,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>3.25in</Top>
+        <Top>2.8in</Top>
         <Left>1.65in</Left>
         <Height>0.3in</Height>
         <Width>1.75in</Width>
@@ -573,7 +573,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>4.6in</Top>
+        <Top>4.01389in</Top>
         <Height>0.3in</Height>
         <Width>2.2in</Width>
         <ZIndex>16</ZIndex>
@@ -604,7 +604,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>3.7in</Top>
+        <Top>3.2in</Top>
         <Left>3.7in</Left>
         <Height>0.3in</Height>
         <Width>1.65in</Width>
@@ -636,7 +636,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>3.25in</Top>
+        <Top>2.8in</Top>
         <Height>0.3in</Height>
         <Width>1.45in</Width>
         <ZIndex>18</ZIndex>
@@ -667,7 +667,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>1.95in</Top>
+        <Top>1.55in</Top>
         <Left>2.79583in</Left>
         <Height>0.3in</Height>
         <Width>4.65417in</Width>
@@ -699,7 +699,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>1.95in</Top>
+        <Top>1.55in</Top>
         <Height>0.3in</Height>
         <Width>2.2in</Width>
         <ZIndex>20</ZIndex>
@@ -726,7 +726,7 @@
             <Style />
           </Paragraph>
         </Paragraphs>
-        <Top>6.5in</Top>
+        <Top>5.85in</Top>
         <Height>0.25in</Height>
         <Width>1in</Width>
         <ZIndex>21</ZIndex>
@@ -757,7 +757,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>1.5in</Top>
+        <Top>1.15in</Top>
         <Left>2.79583in</Left>
         <Height>0.3in</Height>
         <Width>4.65417in</Width>
@@ -789,7 +789,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>1.5in</Top>
+        <Top>1.15in</Top>
         <Height>0.3in</Height>
         <Width>2.2in</Width>
         <ZIndex>23</ZIndex>
@@ -820,7 +820,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>4.58611in</Top>
+        <Top>4in</Top>
         <Left>2.4in</Left>
         <Height>0.3in</Height>
         <Width>2.95in</Width>
@@ -852,7 +852,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>6.5in</Top>
+        <Top>5.85in</Top>
         <Left>1.1in</Left>
         <Height>0.25in</Height>
         <Width>2in</Width>
@@ -865,7 +865,7 @@
         </Style>
       </Textbox>
       <Line Name="lnFatherName">
-        <Top>2.25in</Top>
+        <Top>1.85in</Top>
         <Left>2.4in</Left>
         <Height>0in</Height>
         <Width>5.05in</Width>
@@ -877,7 +877,7 @@
         </Style>
       </Line>
       <Line Name="lnDOBFigures">
-        <Top>4.45in</Top>
+        <Top>3.9in</Top>
         <Left>2.4in</Left>
         <Height>0in</Height>
         <Width>5.05in</Width>
@@ -889,7 +889,7 @@
         </Style>
       </Line>
       <Line Name="lnPrincipal">
-        <Top>6.75in</Top>
+        <Top>6.1in</Top>
         <Left>5.15in</Left>
         <Height>0in</Height>
         <Width>2.3in</Width>
@@ -901,7 +901,7 @@
         </Style>
       </Line>
       <Line Name="lnGrade">
-        <Top>4in</Top>
+        <Top>3.5in</Top>
         <Left>5.45in</Left>
         <Height>0in</Height>
         <Width>2in</Width>
@@ -913,7 +913,7 @@
         </Style>
       </Line>
       <Line Name="lnMarksOutOf">
-        <Top>4in</Top>
+        <Top>3.5in</Top>
         <Left>1.65in</Left>
         <Height>0in</Height>
         <Width>1.75in</Width>
@@ -925,7 +925,7 @@
         </Style>
       </Line>
       <Line Name="lnStudentAdmissionNo">
-        <Top>1.15in</Top>
+        <Top>1in</Top>
         <Left>1.42in</Left>
         <Height>0in</Height>
         <Width>1.51in</Width>
@@ -937,7 +937,7 @@
         </Style>
       </Line>
       <Line Name="lnMarksObtained">
-        <Top>3.55in</Top>
+        <Top>3.1in</Top>
         <Left>5.45in</Left>
         <Height>0in</Height>
         <Width>2in</Width>
@@ -949,7 +949,7 @@
         </Style>
       </Line>
       <Line Name="lnRollNumber">
-        <Top>3.55in</Top>
+        <Top>3.1in</Top>
         <Left>1.65in</Left>
         <Height>0in</Height>
         <Width>1.75in</Width>
@@ -961,7 +961,7 @@
         </Style>
       </Line>
       <Line Name="lnStudentName">
-        <Top>1.8in</Top>
+        <Top>1.45in</Top>
         <Left>2.4in</Left>
         <Height>0in</Height>
         <Width>5.05in</Width>
@@ -973,7 +973,7 @@
         </Style>
       </Line>
       <Line Name="lnDOBWords">
-        <Top>4.9in</Top>
+        <Top>4.31389in</Top>
         <Left>2.4in</Left>
         <Height>0in</Height>
         <Width>5.05in</Width>
@@ -1003,7 +1003,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>6.85in</Top>
+        <Top>6.2in</Top>
         <Left>5.15in</Left>
         <Height>0.25in</Height>
         <Width>2.3in</Width>
@@ -1016,7 +1016,7 @@
         </Style>
       </Textbox>
       <Line Name="lnAdmissionNo3">
-        <Top>1.15in</Top>
+        <Top>1in</Top>
         <Left>5.65in</Left>
         <Height>0in</Height>
         <Width>1.8in</Width>
@@ -1028,7 +1028,7 @@
         </Style>
       </Line>
       <Line Name="lnAdmissionNo4">
-        <Top>6.75in</Top>
+        <Top>6.1in</Top>
         <Left>1.1in</Left>
         <Height>0in</Height>
         <Width>2in</Width>
@@ -1040,13 +1040,13 @@
         </Style>
       </Line>
     </ReportItems>
-    <Height>7.2in</Height>
+    <Height>6.55in</Height>
     <Style />
   </Body>
   <Width>7.45in</Width>
   <Page>
     <PageHeader>
-      <Height>2.1in</Height>
+      <Height>3.1in</Height>
       <PrintOnFirstPage>true</PrintOnFirstPage>
       <PrintOnLastPage>true</PrintOnLastPage>
       <ReportItems>
@@ -1055,7 +1055,7 @@
           <Value>Assets/header.png</Value>
           <Sizing>FitProportional</Sizing>
           <Top>0.02in</Top>
-          <Height>2in</Height>
+          <Height>3in</Height>
           <Width>7.45in</Width>
           <Style>
             <Border>
@@ -1135,7 +1135,7 @@
               </Style>
             </Paragraph>
           </Paragraphs>
-          <Top>0.36in</Top>
+          <Top>0.26in</Top>
           <Height>0.27in</Height>
           <Width>7.45in</Width>
           <ZIndex>2</ZIndex>

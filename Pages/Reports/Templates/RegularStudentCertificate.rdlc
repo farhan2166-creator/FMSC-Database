@@ -499,7 +499,7 @@
             <Style />
           </Paragraph>
         </Paragraphs>
-        <Top>5.08542in</Top>
+        <Top>4.58542in</Top>
         <Height>0.25in</Height>
         <Width>1in</Width>
         <ZIndex>16</ZIndex>
@@ -529,7 +529,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>5.08542in</Top>
+        <Top>4.58542in</Top>
         <Left>1in</Left>
         <Height>0.25in</Height>
         <Width>2in</Width>
@@ -542,7 +542,7 @@
         </Style>
       </Textbox>
       <Line Name="lnPrincipal">
-        <Top>5.98542in</Top>
+        <Top>5.48542in</Top>
         <Left>5.15in</Left>
         <Height>0in</Height>
         <Width>2.3in</Width>
@@ -572,7 +572,7 @@
             </Style>
           </Paragraph>
         </Paragraphs>
-        <Top>6.08542in</Top>
+        <Top>5.58542in</Top>
         <Left>5.15in</Left>
         <Height>0.25in</Height>
         <Width>2.3in</Width>
@@ -657,7 +657,7 @@
         </Style>
       </Line>
       <Line Name="lnAdmissionNo9">
-        <Top>5.33542in</Top>
+        <Top>4.83542in</Top>
         <Left>1in</Left>
         <Height>0in</Height>
         <Width>2in</Width>
@@ -681,13 +681,13 @@
         </Style>
       </Line>
     </ReportItems>
-    <Height>6.58542in</Height>
+    <Height>6.08542in</Height>
     <Style />
   </Body>
   <Width>7.45in</Width>
   <Page>
     <PageHeader>
-      <Height>2.1in</Height>
+      <Height>3.1in</Height>
       <PrintOnFirstPage>true</PrintOnFirstPage>
       <PrintOnLastPage>true</PrintOnLastPage>
       <ReportItems>
@@ -696,7 +696,7 @@
           <Value>Assets/header.png</Value>
           <Sizing>FitProportional</Sizing>
           <Top>0.02in</Top>
-          <Height>2in</Height>
+          <Height>3in</Height>
           <Width>7.45in</Width>
           <Style>
             <Border>

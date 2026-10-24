@@ -151,6 +151,13 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} regular certificate search, missing birth date and duplicate checks (no database connection).");
             return;
         }
+        if(args.Contains("--certificate-headers"))
+        {
+            CheckReportCaptions(new[]{"BankAccountOpeningCertificate","CharacterCertificate","DateOfBirthCertificate",
+                "NoObjectionCertificate","ProvisionalCertificate","RegularLecturerCertificate","RegularStudentCertificate","SportsCertificate"});
+            Console.WriteLine($"PASS: {checks} certificate header, margin and single-page rendering checks; previews in artifacts/report-captions.");
+            return;
+        }
         if(args.Contains("--character-report-header"))
         {
             CheckReportCaptions(new[]{"CharacterCertificate"});
