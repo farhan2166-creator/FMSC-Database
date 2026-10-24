@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace FMSC_SMS.Core;
 
-internal enum MutationKind { FeeAdjustment, BankCertificateCreate, FeeConcession, StudentHold, StudentResume, AdditionalFeePosting, RegularCertificateReissue, BirthCertificateReissue }
+internal enum MutationKind { FeeAdjustment, BankCertificateCreate, FeeConcession, StudentHold, StudentResume, AdditionalFeePosting, RegularCertificateReissue, BirthCertificateReissue, CharacterCertificateSave }
 internal enum MutationOutcome { Saved, Rejected, Unconfirmed }
 internal sealed record MutationIntent(Guid Id,MutationKind Kind,int UserId,string Scope,string PayloadHash,string Summary,DateTime StartedUtc);
 internal sealed record MutationResult(MutationKind Kind,int SubjectId,int OriginId,int RecordId,string Receipt,string TransactionType,decimal Amount,decimal? Balance)
@@ -20,6 +20,8 @@ internal sealed record MutationResult(MutationKind Kind,int SubjectId,int Origin
             Kind==MutationKind.FeeConcession&&(OriginId<=0||TransactionType!="FeeConcession"||EffectiveFrom is null||EffectiveThrough is null||EffectiveFrom>EffectiveThrough||ReleasedPaidAmount is null or <0))
             throw new InvalidDataException("The saved operation identity could not be verified.");
         WholeRupees.Require(Amount);
+        if(Kind==MutationKind.CharacterCertificateSave && (OriginId<=0||CertificateDate is null||TransactionType!=Kind.ToString()))
+            throw new InvalidDataException("The saved character certificate could not be verified.");
         if(Kind is MutationKind.RegularCertificateReissue or MutationKind.BirthCertificateReissue &&
             (OriginId<=0||DateOfBirth is null||CertificateDate is null||TransactionType!=Kind.ToString()))
             throw new InvalidDataException("The saved certificate reissue could not be verified.");
@@ -28,6 +30,12 @@ internal sealed record MutationResult(MutationKind Kind,int SubjectId,int Origin
     internal DataTable ToTable()
     {
         Validate();var table=new DataTable();
+        if(Kind==MutationKind.CharacterCertificateSave)
+        {
+            table.Columns.Add("AdmissionId",typeof(int));table.Columns.Add("CertificateRecordId",typeof(int));table.Columns.Add("IssueId",typeof(int));
+            table.Columns.Add("CertificateDate",typeof(DateTime));table.Rows.Add(SubjectId,OriginId,RecordId,CertificateDate!.Value);
+            return table;
+        }
         if(Kind is MutationKind.RegularCertificateReissue or MutationKind.BirthCertificateReissue)
         {
             table.Columns.Add("AdmissionId",typeof(int));table.Columns.Add("CertificateRecordId",typeof(int));table.Columns.Add("IssueId",typeof(int));

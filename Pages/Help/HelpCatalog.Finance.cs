@@ -197,7 +197,7 @@ internal static partial class HelpCatalog
             new[] { HelpRule.Choice, HelpRule.Recovery }, HelpOwner.CSharp | HelpOwner.Environment,
             new[] { "Core/AtomicExportFile.cs", "Core/CsvFileExporter.cs", "Pages/Reports/ReportUi.cs#ReportUi" }, System.Array.Empty<string>(), ""),
         new("FAQ-124", "Reports", "Is Issue Again the same as printing an existing certificate?",
-            "No. Use the selected saved issue for its available print action. Issue Again records another supported certificate issue and its own history. Review the student, issue date and collection state before confirming; do not issue a duplicate just because you need another printout.",
+            "No. Print uses the selected saved copy. Character certificates save SSC or HSSC with each copy; it cannot be changed just for printing. Use New Certificate for the other exam type. Correct Details changes only the fields entered when creating the character certificate and saves a replacement with a reason. Correct names, DOB or other personal details in Admission, then use Issue Again to review and save a copy using the current Admission details. Earlier copies keep their original details. Mark a new copy collected where collection applies. If a character save is uncertain, use Check Save before trying again.",
             "certificate issue again reprint collected history", "Daily Work → Student Certificates",
             new[] { HelpRule.Choice, HelpRule.System, HelpRule.Permission }, HelpOwner.SQL | HelpOwner.CSharp,
             new[] { "Pages/Students/Certificates/CharacterCertificatePage.cs#CharacterCertificatePage", "fmsc.dacpac#IssueCharacterCertificate" }, System.Array.Empty<string>(), ""),

@@ -102,10 +102,12 @@ public sealed class ClassSheetsPage : V2Page
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(3)));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(details, 0, 0);
-        root.Controls.Add(HumanUi.ButtonRow(load, selectAllButton, clearSelectionButton, previewButton), 0, 1);
+        var buttons = HumanUi.ButtonRow(load, selectAllButton, clearSelectionButton, previewButton);
+        buttons.Dock = DockStyle.Top;
+        root.Controls.Add(buttons, 0, 1);
         root.Controls.Add(studentsCard, 0, 2);
         SetContent(root, "Load students, choose who to print, then open Print Preview. Attendance is marked by hand on the printed sheet.");
         UpdateSheetFields();

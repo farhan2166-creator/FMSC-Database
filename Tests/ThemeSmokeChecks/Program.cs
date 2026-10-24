@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--class-sheet-buttons"))
+        {
+            CheckClassSheetButtons();
+            Console.WriteLine($"PASS: {checks} class sheet button layout checks (no database connection).");
+            return;
+        }
         if(args.Contains("--fee-matrix-clearing"))
         {
             CheckFeeMatrixClearing();

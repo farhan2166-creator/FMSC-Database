@@ -19,6 +19,9 @@ internal static class DatabaseCompatibility
         // Historical migration-3 harnesses still validate the reviewed v2 shape.
         if(int.TryParse(DatabaseHelper.RequiredDatabaseSchemaVersion,out int required)&&required<4)return baseline;
         var definition=JsonNode.Parse(baseline)!.AsObject();
+        if(required>=47 && definition["uniqueIndexes"] is JsonArray characterIndexes)
+            foreach(var index in characterIndexes.Where(item=>item?["name"]?.GetValue<string>()=="UX_CharacterCertificates_AdmissionId").ToArray())
+                characterIndexes.Remove(index);
         // Preserve the embedded compatibility requirements and combine them with
         // features installed by numbered migrations.
         using var migrations=typeof(DatabaseCompatibility).Assembly.GetManifestResourceStream(
