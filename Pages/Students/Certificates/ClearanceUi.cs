@@ -96,35 +96,21 @@ internal static class ClearanceUi
         validator.BindSummary(remarksLabel);
         dialog.Disposed += (_, _) => validator.Dispose();
         var confirmButton = new ModernButton { Text = "Confirm Clearance & Continue", ThemeRole = "Success", Width = AppScale.Scale(220) };
-        /* no DialogResult on the button: a button that assigns it dismisses the modal form before the discard confirmation can keep it open. */
         var cancelButton = new ModernButton { Text = UiText.Actions.Cancel, ThemeRole = "Secondary", Width = AppScale.Scale(100) };
         var buttonRow = HumanUi.ButtonRow(confirmButton, cancelButton);
         buttonRow.Dock = DockStyle.Bottom;
         bool confirmed = false;
-        /* One confirmation per close gesture. Assigning DialogResult on a modal form raises FormClosing too, so a single Cancel click would otherwise ask twice. */
-        bool discardConfirmed = false;
         /* (9) - the clearance write below is awaited, so the dialog stays live while dbo.RecordStudentClearance runs. */
         bool writeInFlight = false;
-        /* The only values this dialog takes from the operator are the checklist boxes and the remarks box. */
-        bool IsDirty() =>
-            !confirmed &&
-            (checkBoxes.Any(c => c.Box.Checked) || remarks.Text.Length > 0);
-        /* asks at most once for a close gesture. True when the caller may proceed with the close. */
-        bool ConfirmDiscard()
-        {
-            if (writeInFlight)
-                return false;
-            return ModernMessageDialog.ConfirmDiscardOnce(dialog, IsDirty, ref discardConfirmed);
-        }
         cancelButton.Click += (_, _) => {
-            if (!ConfirmDiscard())
+            if (writeInFlight)
                 return;
             dialog.DialogResult = DialogResult.Cancel;
         };
-        /* The window's own close (X, Alt+F4, Esc) is guarded the same way; programmatic closes are left alone. */
+        /* Block closing only while a write is running. */
         dialog.FormClosing += (_, e) => {
             if (e.CloseReason == CloseReason.UserClosing)
-                e.Cancel = !ConfirmDiscard();
+                e.Cancel = writeInFlight;
         };
         /* Confirm Clearance records the checklist through dbo.RecordStudentClearance, so a double click could record it twice. */
         confirmButton.Click += async (_, _) => {

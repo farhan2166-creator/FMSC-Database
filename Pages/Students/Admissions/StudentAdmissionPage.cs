@@ -446,7 +446,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     }
                     break;
                 case DateTimePicker date:
-                    signature.Append(date.Value.Ticks);
+                    if (!date.ShowCheckBox || date.Checked)
+                        signature.Append(date.Value.Ticks);
                     /* DOB is entered only when its checkbox is checked. */
                     signature
                         .Append('~')
@@ -465,7 +466,8 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                     }
                     break;
                 case ModernDatePicker modernDate:
-                    signature.Append(modernDate.Value.Ticks);
+                    if (!modernDate.ShowCheckBox || modernDate.Checked)
+                        signature.Append(modernDate.Value.Ticks);
                     signature
                         .Append('~')
                         .Append(modernDate.Checked);

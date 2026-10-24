@@ -13,12 +13,8 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
     private readonly ModernButton cancel;
     public int SelectedId { get; private set; }
     public string? SelectedParentValue { get; private set; }
-    /* The editable values the editor was last loaded with, so Cancel on an untouched form closes without asking about changes that are not there. */
-    private (int ProgramType, string Code, string Name) editorBaseline;
-    /* Set only once a save has committed, so that path closes without the unsaved-changes prompt. */
+    /* Prevent a queued click from repeating a completed save. */
     private bool savedSuccessfully;
-    /* One confirmation per close gesture. Assigning DialogResult on a modal form raises FormClosing too, so a single Close click would otherwise ask twice. */
-    private bool discardConfirmed;
     public AcademicProgramManagerForm()
     {
         Text = "Manage Programs";
@@ -88,10 +84,8 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
             ThemeRole = "Secondary",
             TabIndex = 8
         };
-        /* The guard runs here rather than from the button's own DialogResult, because a button that assigns DialogResult dismisses the modal form before the confirmation can keep it open. */
+        /* Cancel closes immediately when no save is running. */
         cancel.Click += (_, _) => {
-            if (!ConfirmDiscard())
-                return;
             DialogResult = DialogResult.Cancel;
             Close();
         };
@@ -172,14 +166,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
         CancelButton = cancel;
         FormFlow.EnterMovesToNext(this);
         Disposed += (_, _) => validator.Dispose();
-        /* The window's own close (X, Alt+F4, Esc) is guarded the same way; programmatic closes are left alone. */
-        FormClosing += (_, e) => {
-            if (e.CloseReason == CloseReason.UserClosing)
-                e.Cancel = !ConfirmDiscard();
-        };
         TabStop = true;
-        // Establish the untouched dialog baseline before New checks for changes.
-        editorBaseline = EditorState();
         LoadPrograms();
         BeginNewProgram();
     }
@@ -192,20 +179,6 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
         Padding = new Padding(0, 0, 8, 0),
         TabStop = false
     };
-    /// <summary>The editable values as one comparable snapshot: the program type selection, both text fields, and program name.</summary>
-    private (int ProgramType, string Code, string Name) EditorState() =>
-        (programType.SelectedIndex,
-         code.Text,
-         name.Text);
-    /// <summary>True when the editor holds something the operator has not saved. A dialog that has already saved is never dirty, so its own save path closes without a prompt.</summary>
-    private bool IsDirty() =>
-        !savedSuccessfully &&
-        EditorState() != editorBaseline;
-    /// <summary>asks at most once for a close gesture. True when the caller may proceed with the close.</summary>
-    private bool ConfirmDiscard()
-    {
-        return ModernMessageDialog.ConfirmDiscardOnce(this, IsDirty, ref discardConfirmed);
-    }
     private void LoadPrograms()
     {
         var dt = DatabaseHelper.QueryUser(
@@ -251,11 +224,10 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
                 row["ProgramName"]) ?? string.Empty;
         SelectedId =
             Convert.ToInt32(row["AcademicProgramId"]);
-        editorBaseline = EditorState();
     }
     private void BeginNewProgram()
     {
-        // New explicitly discards the editor. Selecting another program still asks.
+        // New explicitly discards the small program editor.
         existing.SelectedIndexChanged -=
             Existing_SelectedIndexChanged;
         try
@@ -272,7 +244,6 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
         programType.SelectedIndex = -1;
         code.Clear();
         name.Clear();
-        editorBaseline = EditorState();
         programType.Focus();
     }
     /* Set while LoadPrograms binds the list: that bind raises Existing_SelectedIndexChanged programmatically and must not prompt. */
@@ -281,40 +252,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
     {
         if (suppressProgramSelection)
             return;
-        /* loading another program replaces every field, so it asks the same question Close asks. */
-        if (!ModernMessageDialog.ConfirmDiscardIfDirty(this, IsDirty))
-        {
-            /* Declined - put the selector back on the record the editor still shows, so the two do not disagree about what is loaded. */
-            suppressProgramSelection = true;
-            try
-            {
-                existing.SelectedIndex =
-                    SelectedId > 0
-                        ? IndexOfProgram(SelectedId)
-                        : -1;
-            }
-            finally
-            {
-                suppressProgramSelection = false;
-            }
-            return;
-        }
         LoadSelected();
-    }
-    /// <summary>The combo index of the program with this id, or -1. Used to put the selector back on the record still in the editor when a switch is declined.</summary>
-    private int IndexOfProgram(int programId)
-    {
-        for (int i = 0; i < existing.Items.Count; i++)
-        {
-            if (existing.Items[i] is DataRowView row &&
-                row.Row.Table.Columns.Contains("AcademicProgramId") &&
-                row["AcademicProgramId"] != DBNull.Value &&
-                Convert.ToInt32(row["AcademicProgramId"]) == programId)
-            {
-                return i;
-            }
-        }
-        return -1;
     }
     private void SaveProgram()
     {

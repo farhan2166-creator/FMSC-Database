@@ -4,12 +4,6 @@ public sealed class ChangeUsernameForm : ApplicationWindowForm
 {
     readonly ModernTextBox newUsername = HumanUi.TextBox(false, 100);
     readonly ModernButton save = new() { Text = "Change Username", Dock = DockStyle.Fill };
-    /* The username this form was loaded with, so closing an untouched form does not ask about a change that is not there. */
-    readonly string initialUsername;
-    /* Set only once the rename has succeeded, so that path closes without the unsaved-changes prompt. */
-    bool savedSuccessfully;
-    /* One confirmation per close gesture. */
-    bool discardConfirmed;
     /* True from the moment the rename is sent until it returns. */
     bool savingUsername;
     /* UX - a missing username is marked on the field, not shown in a message box. */
@@ -26,7 +20,6 @@ public sealed class ChangeUsernameForm : ApplicationWindowForm
         Font = AppTheme.NormalFont;
         newUsername.Text = CurrentUser.Username;
         newUsername.PlaceholderText = "Enter new username";
-        initialUsername = newUsername.Text;
         save.SetColors(AppTheme.Success);
         Disposed += (_, _) => validator.Dispose();
         /* this writes dbo.RenameOwnUsername, so a double click could rename twice (and the second attempt would race the first). */
@@ -121,7 +114,7 @@ public sealed class ChangeUsernameForm : ApplicationWindowForm
         AcceptButton = save;
         SetSaveShortcut(save);
         FormFlow.EnterMovesToNext(this);
-        /* this form has no Cancel button, so the window's own close (X, Alt+F4) is the only discard gesture and the one that is guarded; programmatic closes are left alone. */
+        /* Block closing only while a write is running. */
         FormClosing += (_, e) => {
             if (e.CloseReason != CloseReason.UserClosing)
                 return;
@@ -135,23 +128,11 @@ public sealed class ChangeUsernameForm : ApplicationWindowForm
                     "Username");
                 return;
             }
-            e.Cancel = !ConfirmDiscard();
         };
         Shown += (_, _) => {
             newUsername.Focus();
             newUsername.SelectAll();
         };
-    }
-    /// <summary>The one field this form edits, compared with the value it was loaded with.</summary>
-    bool IsDirty() =>
-        !savedSuccessfully &&
-        !savingUsername &&
-        DialogResult == DialogResult.None &&
-        newUsername.Text != initialUsername;
-    /// <summary>asks at most once for a close gesture. True when the caller may proceed with the close.</summary>
-    bool ConfirmDiscard()
-    {
-        return ModernMessageDialog.ConfirmDiscardOnce(this, IsDirty, ref discardConfirmed);
     }
     async Task SaveAsync()
     {
@@ -173,7 +154,6 @@ public sealed class ChangeUsernameForm : ApplicationWindowForm
                 DatabaseHelper.P("@NewUsername", cleanUsername));
             CurrentUser.Username = cleanUsername;
             /* The rename committed, so this close is not a discard. */
-            savedSuccessfully = true;
             DialogResult = DialogResult.OK;
         }
         catch (Exception ex)

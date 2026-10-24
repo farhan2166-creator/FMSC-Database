@@ -279,13 +279,8 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Warning"
     };
-    /* The month and reason this form was loaded with, so Cancel on an untouched form closes without asking about changes that are not there. */
-    private readonly DateTime initialEffectiveTo;
-    private readonly string initialReason;
-    /* Set only once the discontinue has been written, so that path closes without the unsaved-changes prompt. */
+    /* Prevent a queued click from repeating a completed save. */
     private bool savedSuccessfully;
-    /* Confirm once: setting DialogResult also raises FormClosing. */
-    private bool discardConfirmed;
     public DiscontinueFeeAssignmentForm(int studentFeeAssignmentId, string feeTypeName, DateTime? effectiveFrom)
     {
         this.studentFeeAssignmentId = studentFeeAssignmentId;
@@ -313,15 +308,13 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
         BuildLayout(feeTypeName);
         FinanceHelp.Attach(this,effectiveTo,FinanceHelp.Topic.StopFee);
         FinanceHelp.Attach(this,discontinueButton,FinanceHelp.Topic.StopFee);
-        initialEffectiveTo = discontinueButton.Enabled ? SelectedStopMonth : DateTime.MinValue;
-        initialReason = reason.Text;
         UpdateEffectiveConsequence();
         effectiveTo.SelectedIndexChanged += (_, _) => UpdateEffectiveConsequence();
         discontinueButton.Click += (_, _) => Save();
-        /* The window's own close (X, Alt+F4, Esc) is guarded the same way; programmatic closes are left alone. */
+        /* Block closing only while a write is running. */
         FormClosing += (_, e) => {
             if (e.CloseReason == CloseReason.UserClosing)
-                e.Cancel = !ConfirmDiscard();
+                e.Cancel = submitting;
         };
     }
     private void UpdateEffectiveConsequence()
@@ -356,9 +349,9 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
             Height = AppMetrics.ButtonHeight,
             ThemeRole = "Secondary"
         };
-        /* Confirm before assigning DialogResult so Cancel can keep the dialog open. */
+        /* Keep Cancel from closing the dialog during a save. */
         cancel.Click += (_, _) => {
-            if (!ConfirmDiscard())
+            if (submitting)
                 return;
             DialogResult = DialogResult.Cancel;
             Close();
@@ -437,16 +430,5 @@ public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
         {
             submitting = false;
         }
-    }
-    /// <summary>Compare last active month and reason with the loaded values; saving is not dirty.</summary>
-    private bool IsDirty() =>
-        !savedSuccessfully &&
-        DialogResult != DialogResult.OK &&
-        ((effectiveTo.SelectedItem is StopMonth selected ? selected.Month : DateTime.MinValue) != initialEffectiveTo ||
-         reason.Text != initialReason);
-    /// <summary>asks at most once for a close gesture. True when the caller may proceed with the close.</summary>
-    private bool ConfirmDiscard()
-    {
-        return ModernMessageDialog.ConfirmDiscardOnce(this, IsDirty, ref discardConfirmed);
     }
 }
