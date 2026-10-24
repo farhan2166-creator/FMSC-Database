@@ -157,7 +157,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>=&quot;It is certified that &quot; &amp; IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Female&quot;, &quot;Ms.&quot;, IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Male&quot;, &quot;Mr.&quot;, &quot;Mr./Ms.&quot;))</Value>
+                <Value>="It is certified that " &amp; IIF(First(Fields!Gender.Value, "DateOfBirthCertificateData") = "Female", "Ms.", IIF(First(Fields!Gender.Value, "DateOfBirthCertificateData") = "Male", "Mr.", "Mr./Ms."))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -218,7 +218,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>=IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Female&quot;, &quot;D/O&quot;, IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Male&quot;, &quot;S/O&quot;, &quot;S/D/O&quot;))</Value>
+                <Value>=IIF(First(Fields!Gender.Value, "DateOfBirthCertificateData") = "Female", "D/O", IIF(First(Fields!Gender.Value, "DateOfBirthCertificateData") = "Male", "S/O", "S/D/O"))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -307,7 +307,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>=IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Female&quot;, &quot;Her&quot;, IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Male&quot;, &quot;His&quot;, &quot;His/Her&quot;)) &amp; &quot; Date of Birth according to the school record is (In Fig) &quot;</Value>
+                <Value>=IIF(First(Fields!Gender.Value, "DateOfBirthCertificateData") = "Female", "Her", IIF(First(Fields!Gender.Value, "DateOfBirthCertificateData") = "Male", "His", "His/Her")) &amp; " Date of Birth according to the school record is (In Fig) "</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -319,7 +319,7 @@
         </Paragraphs>
         <Top>3.05in</Top>
         <Height>0.3in</Height>
-        <Width>4.98056in</Width>
+        <Width>4.34514in</Width>
         <ZIndex>10</ZIndex>
         <Style>
           <Border>
@@ -560,9 +560,9 @@
           </Paragraph>
         </Paragraphs>
         <Top>3.05in</Top>
-        <Left>5.15in</Left>
+        <Left>4.5125in</Left>
         <Height>0.3in</Height>
-        <Width>2.3in</Width>
+        <Width>2.9375in</Width>
         <ZIndex>21</ZIndex>
         <Style>
           <Border>
@@ -603,9 +603,9 @@
       </Textbox>
       <Line Name="lnAdmissionNo5">
         <Top>3.35in</Top>
-        <Left>5.15in</Left>
+        <Left>4.5125in</Left>
         <Height>0in</Height>
-        <Width>2.3in</Width>
+        <Width>2.9375in</Width>
         <ZIndex>23</ZIndex>
         <Style>
           <Border>
