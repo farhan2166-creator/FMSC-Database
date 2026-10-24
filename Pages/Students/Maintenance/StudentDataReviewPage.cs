@@ -44,7 +44,7 @@ public sealed class AdmissionReviewListPage : V2Page
     private readonly ModernTextBox search=HumanUi.TextBox(false,200);
     private readonly CheckBox remaining=new(){Text="Needs review only",AutoSize=true},active=new(){Text="Active students only",AutoSize=true,Checked=true};
     public AdmissionReviewListPage(Action<Func<Control>,string,string> navigate,bool pending,Func<int,Task>? openRegistration=null)
-        : base(pending?"Pending Registrations":"Awaiting Student Setup",pending?"Find an unfinished registration and open it to edit details, confirm admission or cancel.":"Open a student in Admission, then use Student Setup / Placement Corrections to review placement, fees and start billing individually.")
+        : base(pending?"Pending Registrations":"Awaiting Student Setup",pending?"Find an unfinished registration and open it to edit details, confirm admission or cancel.":"Open a student in Admission, then use Placement Setup to review placement, fees and start billing individually.")
     {
         this.navigate=navigate;this.pending=pending;this.openRegistration=openRegistration;
         AddBusyAction("Refresh",RefreshAsync,"Secondary");
