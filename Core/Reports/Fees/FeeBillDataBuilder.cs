@@ -18,7 +18,7 @@ internal static partial class FeeBillDataBuilder
         void AddLine(string description,decimal amount,string kind,string period="",DataRow? charge=null){
             var line=data.Rows.Add(1,institutionName,multipleStudents?"FAMILY FEE BILL":"STUDENT FEE BILL","PARENT COPY","",
                 multipleStudents?parent:Convert.ToString(charges.Rows[0]["StudentName"]),references,"",
-                DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt"),"",
+                DateTime.Now.ToString("dd-MM-yyyy hh:mm tt"),"",
                 description,amount,discount,total,0m,"","",discount>0m,false,
                 contactNumber,address,campusHeading,multipleStudents?"":parent,"");
             line["DocumentKind"]="Bill";line["FamilyRowKind"]=kind;line["FamilyAmountText"]=kind=="Fee"?amount.ToString("N0"):"";

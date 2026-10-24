@@ -7,8 +7,8 @@ public sealed class CertificateIssueRegisterPage : V2Page
 {
     private readonly ModernComboBox type=new(),recipient=new(),entry=new(),collection=new();
     private readonly ModernTextBox search=new() { PlaceholderText="Name, student/staff no. or certificate no." };
-    private readonly ModernDatePicker from=new() { Format=DateTimePickerFormat.Custom,CustomFormat="dd-MMM-yyyy",ShowCheckBox=true,Checked=false };
-    private readonly ModernDatePicker to=new() { Format=DateTimePickerFormat.Custom,CustomFormat="dd-MMM-yyyy",ShowCheckBox=true,Checked=false };
+    private readonly ModernDatePicker from=new() { Format=DateTimePickerFormat.Custom,CustomFormat="dd-MM-yyyy",ShowCheckBox=true,Checked=false };
+    private readonly ModernDatePicker to=new() { Format=DateTimePickerFormat.Custom,CustomFormat="dd-MM-yyyy",ShowCheckBox=true,Checked=false };
     private readonly Label summary=new() { Dock=DockStyle.Top,AutoSize=true,Padding=new Padding(8),Text="Run the report to see totals.",Font=AppTheme.ButtonFont,ForeColor=AppTheme.HeadingText };
     private readonly ModernButton print,export;
     private readonly FormValidator validator;
@@ -73,9 +73,9 @@ public sealed class CertificateIssueRegisterPage : V2Page
             DatabaseHelper.P("@CertificateType",Selected(type)),DatabaseHelper.P("@RecipientType",Selected(recipient)),
             DatabaseHelper.P("@EntryKind",Selected(entry)),DatabaseHelper.P("@CollectionStatus",Selected(collection)),DatabaseHelper.P("@Search",search.Text.Trim()) };
         string captured=$"Type: {type.Text} | Recipient: {recipient.Text} | Entry: {entry.Text} | Collection: {collection.Text}"
-            +$" | Recorded dates: {(from.Checked ? from.Value.ToString("dd-MMM-yyyy") : "Any start")} to {(to.Checked ? to.Value.ToString("dd-MMM-yyyy") : "Any end")}"
+            +$" | Recorded dates: {(from.Checked ? from.Value.ToString("dd-MM-yyyy") : "Any start")} to {(to.Checked ? to.Value.ToString("dd-MM-yyyy") : "Any end")}"
             +$" | Find: {search.Text.Trim()} | Sources: {(CurrentUser.HasPermission("Certificates.Create") ? "General certificates" : "")}{(CurrentUser.HasPermission("Students.Leave") ? " Leaving certificates" : "")}"
-            +$" | Report generated: {DateTime.Now:dd-MMM-yyyy HH:mm}";
+            +$" | Report generated: {DateTime.Now:dd-MM-yyyy HH:mm}";
         try
         {
             running=true; hasRows=false; print.Enabled=export.Enabled=false; summary.Text="Generating report…";

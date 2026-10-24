@@ -480,7 +480,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>=Format(First(Fields!CertificateDate.Value, "BankAccountOpeningCertificateData"), "dd MMMM yyyy")</Value>
+                <Value>=Format(First(Fields!CertificateDate.Value, "BankAccountOpeningCertificateData"), "dd-MM-yyyy")</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>

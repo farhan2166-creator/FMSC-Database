@@ -170,7 +170,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>=Format(First(Fields!LeaveDate.Value, "LeaveCertificateData"), "dd MMMM yyyy")</Value>
+                <Value>=Format(First(Fields!LeaveDate.Value, "LeaveCertificateData"), "dd-MM-yyyy")</Value>
                 <Style>
                   <FontStyle>Normal</FontStyle>
                   <FontFamily>Segoe UI</FontFamily>
@@ -457,7 +457,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>=Format(First(Fields!DateofIssue.Value, "LeaveCertificateData"), "dd MMMM yyyy")</Value>
+                <Value>=Format(First(Fields!DateofIssue.Value, "LeaveCertificateData"), "dd-MM-yyyy")</Value>
                 <Style>
                   <FontStyle>Normal</FontStyle>
                   <FontFamily>Segoe UI</FontFamily>

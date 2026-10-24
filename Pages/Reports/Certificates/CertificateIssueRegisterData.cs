@@ -89,7 +89,7 @@ internal static class CertificateIssueRegisterData
             var row=rows.NewRow();
             foreach (DataColumn column in source.Columns)
                 row[column.ColumnName]=sourceRow[column] is DateTime date
-                    ? date.ToString(column.ColumnName=="Certificate Date" ? "dd-MMM-yyyy" : "dd-MMM-yyyy HH:mm") : sourceRow[column];
+                    ? date.ToString(column.ColumnName=="Certificate Date" ? "dd-MM-yyyy" : "dd-MM-yyyy HH:mm") : sourceRow[column];
             rows.Rows.Add(row);
         }
         return rows;

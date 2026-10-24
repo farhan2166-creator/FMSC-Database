@@ -14,7 +14,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     private readonly ModernDatePicker from =
         new ModernDatePicker {
             Format = DateTimePickerFormat.Custom,
-            CustomFormat = "dd-MMM-yyyy",
+            CustomFormat = "dd-MM-yyyy",
             Value = DateTime.Today.AddMonths(-1),
             ShowCheckBox = true,
             Checked = false,
@@ -23,7 +23,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     private readonly ModernDatePicker to =
         new ModernDatePicker {
             Format = DateTimePickerFormat.Custom,
-            CustomFormat = "dd-MMM-yyyy",
+            CustomFormat = "dd-MM-yyyy",
             Value = DateTime.Today,
             ShowCheckBox = true,
             Checked = false,
@@ -1603,7 +1603,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         SetStatementColumn("PaidAmount", "Paid", 70, true);
         SetStatementColumn("Balance", "Due", 70, true);
         if (Grid.Columns.Contains("TransactionDate"))
-            Grid.Columns["TransactionDate"].DefaultCellStyle.Format = "dd-MMM-yyyy";
+            Grid.Columns["TransactionDate"].DefaultCellStyle.Format = "dd-MM-yyyy";
         if (Grid.Columns.Contains("BillingMonth"))
             Grid.Columns["BillingMonth"].DefaultCellStyle.Format = "MMM-yyyy";
         if (Grid.Columns.Contains("DebitAmount"))

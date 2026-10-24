@@ -68,7 +68,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private readonly ModernDatePicker paymentDate =
         new ModernDatePicker {
             Format = DateTimePickerFormat.Custom,
-            CustomFormat = "dd-MMM-yyyy HH:mm",
+            CustomFormat = "dd-MM-yyyy HH:mm",
             ShowUpDown = true,
             Value = DateTime.Now
         };
@@ -2856,7 +2856,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             {
                 if (Confirm(
                     "A previous collection was interrupted and may already have been recorded.\n\n" +
-                    pending.Summary + $"\nStarted: {pending.StartedUtc.ToLocalTime():dd-MMM-yyyy HH:mm}\n\n" +
+                    pending.Summary + $"\nStarted: {pending.StartedUtc.ToLocalTime():dd-MM-yyyy HH:mm}\n\n" +
                     "Check Payment History and receipts for every student listed above. " +
                     "Have you checked those records and established whether this collection was recorded?\n\n" +
                     "Yes clears this recovery notice and the current entries. It does not record a payment.",
@@ -3150,12 +3150,12 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             if (creditUsed > 0m) description += $"\r\nStudent advance used: Rs. {creditUsed:N0}.";
             /* The payment date is stamped on the receipt and the ledger. */
             description +=
-                $"\r\nPayment date: {paymentDate.Value:dd-MMM-yyyy hh:mm tt}   Method: {method.Text}.";
+                $"\r\nPayment date: {paymentDate.Value:dd-MM-yyyy hh:mm tt}   Method: {method.Text}.";
             var confirmationFacts = new List<(string, string)> {
                 ("Student", student.Text.Trim()),
                 ("Cash / bank received", $"Rs. {amount:#,##0.##}"),
                 ("Discount", $"Rs. {discount:#,##0.##}"),
-                ("Payment date", paymentDate.Value.ToString("dd-MMM-yyyy hh:mm tt")),
+                ("Payment date", paymentDate.Value.ToString("dd-MM-yyyy hh:mm tt")),
                 ("Method", method.Text)
             };
             if (creditUsed > 0m)
@@ -4095,7 +4095,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 row[column]),
             out DateTime value)
                 ? value.ToString(
-                    "dd-MMM-yyyy")
+                    "dd-MM-yyyy")
                 : Convert.ToString(
                     row[column])
                     ?? string.Empty;
@@ -4201,7 +4201,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 value),
             out DateTime parsed)
                 ? parsed.ToString(
-                    "dd-MMM-yyyy")
+                    "dd-MM-yyyy")
                 : Convert.ToString(
                     value)
                     ?? string.Empty;
@@ -4429,7 +4429,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 studentName,
                 admissionNumberText: admissionId > 0 ? AdmissionNumbers.ForId(admissionId) : string.Empty,
                 classSection: FormatClassSection(className, sectionName),
-                paymentDateText: transactionDate.ToString("dd-MMM-yyyy hh:mm tt"),
+                paymentDateText: transactionDate.ToString("dd-MM-yyyy hh:mm tt"),
                 familyBatch: string.Empty,
                 feeDescription: row.feeType,
                 amount: showActualAmount ? row.actualAmount : row.nominalAmount,

@@ -15,7 +15,7 @@ internal static class GridReportColumns
             DBNull=>"",
             decimal money=>money.ToString(moneyFormat,CultureInfo.CurrentCulture),
             DateTime date=>date.ToString(row.Table.Columns[index].ColumnName.Contains("Month",StringComparison.OrdinalIgnoreCase)
-                || row.Table.Columns[index].ColumnName.Contains("Period",StringComparison.OrdinalIgnoreCase)?"MMM yyyy":"dd-MMM-yyyy",CultureInfo.CurrentCulture),
+                || row.Table.Columns[index].ColumnName.Contains("Period",StringComparison.OrdinalIgnoreCase)?"MMM yyyy":"dd-MM-yyyy",CultureInfo.CurrentCulture),
             _=>Convert.ToString(value,CultureInfo.CurrentCulture)??""
         };
     }

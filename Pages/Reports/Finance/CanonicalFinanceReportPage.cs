@@ -4,8 +4,8 @@ namespace FMSC_SMS.Pages.Reports.Finance;
 /// <summary>Shared behavior for the three canonical finance reports. The same captured table feeds the grid, printer and CSV export.</summary>
 public abstract class CanonicalFinanceReportPage : V2Page
 {
-    protected readonly ModernDatePicker From = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd-MMM-yyyy", Value = DateTime.Today.AddMonths(-1) };
-    protected readonly ModernDatePicker To = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd-MMM-yyyy", Value = DateTime.Today };
+    protected readonly ModernDatePicker From = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd-MM-yyyy", Value = DateTime.Today.AddMonths(-1) };
+    protected readonly ModernDatePicker To = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd-MM-yyyy", Value = DateTime.Today };
     protected readonly LookupBox Campus = new();
     protected readonly LookupBox Year = new();
     protected readonly LookupBox Class = new();
@@ -213,7 +213,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
     {
         string Pick(LookupBox box, string label) => $"{label}: {(box.SelectedId > 0 ? box.Text : "All")}";
         var parts = new List<string> { $"View: {ViewName}" };
-        if (_usesDates) parts.Add($"Period: {(From.Checked ? From.Value.ToString("dd-MMM-yyyy") : "Any start")} to {(To.Checked ? To.Value.ToString("dd-MMM-yyyy") : "Any end")}");
+        if (_usesDates) parts.Add($"Period: {(From.Checked ? From.Value.ToString("dd-MM-yyyy") : "Any start")} to {(To.Checked ? To.Value.ToString("dd-MM-yyyy") : "Any end")}");
         if (_usesYear) parts.Add(Pick(Year, "Year"));
         parts.Add(Pick(Campus, "Campus"));
         parts.Add(Pick(Class, "Class"));
@@ -240,9 +240,9 @@ public abstract class CanonicalFinanceReportPage : V2Page
             DataTable? captured = null;
             DataTable? totals = null;
             DateTime generated = DateTime.Now;
-            string summary = FiltersText() + $"   Report generated: {generated:dd-MMM-yyyy HH:mm}";
+            string summary = FiltersText() + $"   Report generated: {generated:dd-MM-yyyy HH:mm}";
             var asOf = parameters.FirstOrDefault(p => p.ParameterName == "@AsOfDate");
-            if (asOf?.Value is DateTime date) summary += $"   Aging date: {date:dd-MMM-yyyy}";
+            if (asOf?.Value is DateTime date) summary += $"   Aging date: {date:dd-MM-yyyy}";
             var transform = CaptureResultTransform(parameters);
             await BindReportAsync(async token => {
                 DataSet result = await ReadReportAsync(parameters, token).ConfigureAwait(false);

@@ -19,7 +19,7 @@ internal static partial class FeeReceiptDataBuilder
             var row=data.Rows.Add(1,institution.Name,family?"FAMILY PAYMENT RECEIPT":"STUDENT PAYMENT RECEIPT","PARENT COPY",
                 Text(header,"ReceiptNumber"),family?parent:Text(first,"StudentName"),references,
                 family || detail is null?"":Text(detail,"ClassName")+(string.IsNullOrWhiteSpace(Text(detail,"SectionName"))?"":" - "+Text(detail,"SectionName")),
-                Convert.ToDateTime(header["TransactionDate"]).ToString("dd-MMM-yyyy hh:mm tt"),family?$"{students.Rows.Count} students":"",
+                Convert.ToDateTime(header["TransactionDate"]).ToString("dd-MM-yyyy hh:mm tt"),family?$"{students.Rows.Count} students":"",
                 description,amount,Money(header,"DiscountApplied"),settled,Money(header,"BalanceRemaining"),Text(header,"PaymentMethod"),
                 Text(header,"ReceiptStatus"),Money(header,"DiscountApplied")>0,true,institution.ContactNumber,institution.Address,
                 family?campusHeading:detail is null?"":Text(detail,"CampusName"),family?"":parent,period);

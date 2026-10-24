@@ -1920,7 +1920,7 @@ Photograph</Value>
                 </Style>
               </TextRun>
               <TextRun>
-                <Value>=Format(Globals!ExecutionTime, "dd-MMM-yyyy hh:mm tt")</Value>
+                <Value>=Format(Globals!ExecutionTime, "dd-MM-yyyy hh:mm tt")</Value>
                 <Style>
                   <FontStyle>Italic</FontStyle>
                   <FontFamily>Segoe UI</FontFamily>

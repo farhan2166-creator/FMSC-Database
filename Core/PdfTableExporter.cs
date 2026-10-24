@@ -41,8 +41,8 @@ public static class PdfTableExporter
         title.Format.Font.Bold = true;
         title.Format.SpaceAfter = Unit.FromPoint(2);
         Paragraph meta = section.AddParagraph(string.IsNullOrWhiteSpace(subtitle)
-                ? $"Generated {DateTime.Now:yyyy-MM-dd HH:mm} - {table.Rows.Count:N0} record(s)"
-                : $"{subtitle}  •  Generated {DateTime.Now:yyyy-MM-dd HH:mm}  •  {table.Rows.Count:N0} record(s)");
+                ? $"Generated {DateTime.Now:dd-MM-yyyy HH:mm} - {table.Rows.Count:N0} record(s)"
+                : $"{subtitle}  •  Generated {DateTime.Now:dd-MM-yyyy HH:mm}  •  {table.Rows.Count:N0} record(s)");
         meta.Format.Font.Size = Unit.FromPoint(9);
         meta.Format.Font.Color = new MigraColor(107, 114, 128);
         meta.Format.SpaceAfter = Unit.FromPoint(12);
@@ -80,6 +80,7 @@ public static class PdfTableExporter
                 object value = dataRow[columns[i]];
                 string text = value == null || value == DBNull.Value
                     ? string.Empty
+                    : value is DateTime date ? date.ToString(date.TimeOfDay==TimeSpan.Zero?"dd-MM-yyyy":"dd-MM-yyyy HH:mm:ss", CultureInfo.CurrentCulture)
                     : Convert.ToString(value, CultureInfo.CurrentCulture) ?? string.Empty;
                 Paragraph cell = row[i].AddParagraph(text);
                 cell.Format.SpaceBefore = Unit.FromPoint(3);
@@ -116,6 +117,7 @@ public static class PdfTableExporter
                 object value = row[columns[i]];
                 string text = value == null || value == DBNull.Value
                     ? string.Empty
+                    : value is DateTime date ? date.ToString(date.TimeOfDay==TimeSpan.Zero?"dd-MM-yyyy":"dd-MM-yyyy HH:mm:ss", CultureInfo.CurrentCulture)
                     : Convert.ToString(value, CultureInfo.CurrentCulture) ?? string.Empty;
                 double cellWidth = MeasureWidthPoints(g, text, bodyFont);
                 if (cellWidth > widest)

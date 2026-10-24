@@ -180,7 +180,7 @@
               <Paragraph>
                 <TextRuns>
                   <TextRun>
-                    <Value>=Format(Globals!ExecutionTime, "dd MMM yyyy · hh:mm tt")</Value>
+                    <Value>=Format(Globals!ExecutionTime, "dd-MM-yyyy · hh:mm tt")</Value>
                     <Style>
                       <FontFamily>Segoe UI</FontFamily>
                       <FontSize>8.5pt</FontSize>
@@ -827,7 +827,7 @@
                               </Style>
                             </TextRun>
                             <TextRun>
-                              <Value>=IIF(IsNothing(Fields!OldestDueDate.Value), "", Format(Fields!OldestDueDate.Value, "dd MMM yyyy"))</Value>
+                              <Value>=IIF(IsNothing(Fields!OldestDueDate.Value), "", Format(Fields!OldestDueDate.Value, "dd-MM-yyyy"))</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>

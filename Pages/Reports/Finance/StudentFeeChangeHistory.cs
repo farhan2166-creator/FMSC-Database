@@ -155,7 +155,7 @@ internal static class StudentFeeChangeHistory
                 string reason = current.GetValueOrDefault("Reason") ?? old.GetValueOrDefault("Reason")
                     ?? current.GetValueOrDefault("Remarks")
                     ?? (operation=="TRANSPORT_STOP" || operation=="FEE_SCHEDULE_REPAIR" ? Text(audit,"CorrelationNote") : "Not recorded");
-                rows.Rows.Add(Convert.ToDateTime(audit["ActionDateTime"]).ToString("dd MMM yyyy\nHH:mm:ss"),
+                rows.Rows.Add(Convert.ToDateTime(audit["ActionDateTime"]).ToString("dd-MM-yyyy\nHH:mm:ss"),
                     fee + "\n" + (gap && operation=="FEE_DISCOUNT_CHANGE" ? "Discount update recorded" : ActionName(operation,Text(audit,"Action"),table)),
                     changes.Count>0 ? string.Join("\n",changes) : "Amounts not recorded",
                     periods.Count>0 ? string.Join("\n",periods) : "Not recorded",
@@ -167,7 +167,7 @@ internal static class StudentFeeChangeHistory
             if (!any && (direct || operation=="TRANSPORT_STOP"))
             {
                 string reason=Text(audit,"CorrelationNote");
-                rows.Rows.Add(Convert.ToDateTime(audit["ActionDateTime"]).ToString("dd MMM yyyy\nHH:mm:ss"),
+                rows.Rows.Add(Convert.ToDateTime(audit["ActionDateTime"]).ToString("dd-MM-yyyy\nHH:mm:ss"),
                     table=="BillingCharges" ? "Transport charges\nCharges cancelled" : "Fee change",
                     "Detailed linkage or values not retained in audit", "Not recorded",Text(audit,"Username"),
                     (reason.Length>0 ? reason : "Not recorded") + $"\nAudit #{audit["AuditLogId"]}");

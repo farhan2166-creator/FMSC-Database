@@ -18,7 +18,7 @@ internal static partial class StudentBillReport
         foreach(var line in lines)
         {
             var row=data.Rows.Add(1,institutionName,"STUDENT FEE BILL","PARENT COPY","",studentName,reference,classSection,
-                DateTime.Now.ToString("dd-MMM-yyyy hh:mm tt"),"",line.FeeName,line.Amount,discount,total,0m,"","",discount>0m,false,
+                DateTime.Now.ToString("dd-MM-yyyy hh:mm tt"),"",line.FeeName,line.Amount,discount,total,0m,"","",discount>0m,false,
                 contactNumber,address,campusName,fatherName,FeeDocumentData.FormatPeriod(line.Period));
             row["DocumentKind"]="Bill";row["BillSourceKey"]=sourceKey;
             row["BillChargeId"]=line.ChargeId;row["BillAdmissionId"]=line.AdmissionId;
