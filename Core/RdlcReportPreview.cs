@@ -17,6 +17,7 @@ internal static class RdlcReportPreview
         bool enableExternalImages = false,
         bool allowMultiplePages = true)
     {
+        using var printData=RecordTextPolicy.PrintCopy(data);
         Rectangle workingArea = owner is Control ownerControl
             ? Screen.FromControl(ownerControl).WorkingArea
             : Screen.PrimaryScreen?.WorkingArea ?? new Rectangle(0, 0, 1366, 768);
@@ -50,7 +51,7 @@ internal static class RdlcReportPreview
         else viewer.LocalReport.LoadReportDefinition(new StringReader(reportDefinition));
         viewer.LocalReport.DataSources.Clear();
         viewer.LocalReport.DataSources.Add(
-            new Microsoft.Reporting.WinForms.ReportDataSource(dataSourceName, data));
+            new Microsoft.Reporting.WinForms.ReportDataSource(dataSourceName, printData));
 
         using var surface = new Panel { Dock = DockStyle.Fill };
         using var overview = new ReportPageOverview { Visible = false };

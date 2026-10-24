@@ -16,7 +16,7 @@ internal static class GridReportColumns
             decimal money=>money.ToString(moneyFormat,CultureInfo.CurrentCulture),
             DateTime date=>date.ToString(row.Table.Columns[index].ColumnName.Contains("Month",StringComparison.OrdinalIgnoreCase)
                 || row.Table.Columns[index].ColumnName.Contains("Period",StringComparison.OrdinalIgnoreCase)?"MMM yyyy":"dd-MM-yyyy",CultureInfo.CurrentCulture),
-            _=>Convert.ToString(value,CultureInfo.CurrentCulture)??""
+            _=>RecordTextPolicy.DisplayText(row.Table.Columns[index].ColumnName,Convert.ToString(value,CultureInfo.CurrentCulture)??"")
         };
     }
     private static string Key(string text)=>new(text.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());

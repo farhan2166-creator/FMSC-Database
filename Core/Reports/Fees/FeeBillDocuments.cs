@@ -52,6 +52,7 @@ internal static class FeeBillDocuments
             row["ReceiptNumber"]=saved["BillNumber"];
             row["PaymentDateText"]=Convert.ToDateTime(saved["IssuedAt"]).ToString("dd-MM-yyyy hh:mm tt");
         }
+        RecordTextPolicy.FormatDisplayRows(data);
         return data;
     }
 

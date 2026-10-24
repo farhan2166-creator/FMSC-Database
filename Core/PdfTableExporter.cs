@@ -81,7 +81,7 @@ public static class PdfTableExporter
                 string text = value == null || value == DBNull.Value
                     ? string.Empty
                     : value is DateTime date ? date.ToString(date.TimeOfDay==TimeSpan.Zero?"dd-MM-yyyy":"dd-MM-yyyy HH:mm:ss", CultureInfo.CurrentCulture)
-                    : Convert.ToString(value, CultureInfo.CurrentCulture) ?? string.Empty;
+                    : RecordTextPolicy.DisplayText(columns[i].ColumnName,Convert.ToString(value, CultureInfo.CurrentCulture) ?? string.Empty);
                 Paragraph cell = row[i].AddParagraph(text);
                 cell.Format.SpaceBefore = Unit.FromPoint(3);
                 cell.Format.SpaceAfter = Unit.FromPoint(3);
@@ -118,7 +118,7 @@ public static class PdfTableExporter
                 string text = value == null || value == DBNull.Value
                     ? string.Empty
                     : value is DateTime date ? date.ToString(date.TimeOfDay==TimeSpan.Zero?"dd-MM-yyyy":"dd-MM-yyyy HH:mm:ss", CultureInfo.CurrentCulture)
-                    : Convert.ToString(value, CultureInfo.CurrentCulture) ?? string.Empty;
+                    : RecordTextPolicy.DisplayText(columns[i].ColumnName,Convert.ToString(value, CultureInfo.CurrentCulture) ?? string.Empty);
                 double cellWidth = MeasureWidthPoints(g, text, bodyFont);
                 if (cellWidth > widest)
                     widest = cellWidth;

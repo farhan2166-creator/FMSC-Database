@@ -10,7 +10,7 @@ namespace FMSC_SMS.Core
         private Color MenuColor =>
             ControlPaint.Dark(AppTheme.Primary, 0.35f);
         private Color HoverColor =>
-            AppTheme.Primary;
+            AppTheme.SelectionBackground;
         protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
         {
             using var brush =
@@ -41,13 +41,13 @@ namespace FMSC_SMS.Core
         protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
         {
             e.TextColor =
-                AppTheme.MenuText;
+                e.Item.Selected ? AppTheme.SelectionText : AppTheme.MenuText;
             base.OnRenderItemText(e);
         }
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
         {
             e.ArrowColor =
-                AppTheme.MenuText;
+                e.Item?.Selected == true ? AppTheme.SelectionText : AppTheme.MenuText;
             base.OnRenderArrow(e);
         }
     }
@@ -57,7 +57,7 @@ namespace FMSC_SMS.Core
         private Color MenuColor =>
             ControlPaint.Dark(AppTheme.Primary, 0.35f);
         private Color HoverColor =>
-            AppTheme.Primary;
+            AppTheme.SelectionBackground;
         private Color BorderColor =>
             ControlPaint.Dark(AppTheme.Primary, 0.50f);
         public override Color MenuStripGradientBegin =>

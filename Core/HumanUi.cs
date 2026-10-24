@@ -129,6 +129,7 @@ public static class HumanUi
         Math.Max(16, AppMetrics.TextHeight(UiDesignSystem.Typography.Caption)) + UiDesignSystem.Spacing.Sm + 2;
     public static Panel Field(string caption, Control control, bool required = false, bool fillHeight = true)
     {
+        RecordTextPolicy.WireField(control,caption);
         var panel = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
@@ -370,8 +371,8 @@ public static class HumanUi
         grid.DefaultCellStyle.Font = UiDpi.ForControl(grid, AppTheme.NormalFont);
         grid.DefaultCellStyle.ForeColor = AppTheme.Text;
         grid.DefaultCellStyle.BackColor = AppTheme.Surface;
-        grid.DefaultCellStyle.SelectionBackColor = AppTheme.Tint(accent, 0.88f);
-        grid.DefaultCellStyle.SelectionForeColor = AppTheme.Text;
+        grid.DefaultCellStyle.SelectionBackColor = AppTheme.SelectionBackground;
+        grid.DefaultCellStyle.SelectionForeColor = AppTheme.SelectionText;
         grid.DefaultCellStyle.Padding =
             new Padding(UiDpi.Metric(grid, AppMetrics.SpacingSm), 0, UiDpi.Metric(grid, AppMetrics.SpacingSm), 0);
         grid.AlternatingRowsDefaultCellStyle.BackColor = AppTheme.SurfaceSecondary;

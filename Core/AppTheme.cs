@@ -12,6 +12,13 @@ namespace FMSC_SMS.Core
         private static LightweightPalette Lightweight => ThemeAppearance.Palette(_currentTheme);
         public static string CurrentThemeName =>
             GetThemeName(_currentTheme);
+        public static Color SelectionBackground => BaseTheme switch {
+            AppThemeType.Violet or AppThemeType.Rose or AppThemeType.ProfessionalSimple => Color.FromArgb(15,118,110),
+            AppThemeType.Emerald or AppThemeType.Teal => Color.FromArgb(109,40,217),
+            AppThemeType.ProfessionalOrange or AppThemeType.Amber => Color.FromArgb(30,64,175),
+            _ => Color.FromArgb(136,19,55)
+        };
+        public static Color SelectionText => Color.White;
         private static readonly string ThemeFilePath =
             Path.Combine(
 #if FMSC_LEVEL2

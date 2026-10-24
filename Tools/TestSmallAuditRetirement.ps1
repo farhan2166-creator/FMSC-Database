@@ -70,7 +70,7 @@ try {
  }
  $baselineLogs=Number 'SELECT COUNT(*) FROM dbo.AuditLogs;'
  $baselineOperations=Number 'SELECT COUNT(*) FROM dbo.AuditOperations;'
- Check ((Number 'SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;') -eq 43) 'Sequential migration chain reaches schema 43.'
+ Check ((Number 'SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;') -eq 44) 'Sequential migration chain reaches schema 44.'
  [void](Query "INSERT dbo.Roles(RoleName) VALUES(N'Fictional No Grants'); INSERT dbo.Users(Username,RoleId) VALUES(N'fictional_second_user',2); UPDATE dbo.Users SET MustChangePassword=1 WHERE UserId=1;")
  Refused "EXEC dbo.ChangeOwnPassword @UserId=1,@PasswordHash=0x01,@PasswordSalt=0x02;" 57001 'Invalid password hash remains rejected.'
  Refused "DECLARE @H varbinary(64)=CONVERT(varbinary(64),REPLICATE('h',64)); EXEC dbo.ChangeOwnPassword @UserId=1,@PasswordHash=@H,@PasswordSalt=0x01;" 57002 'Invalid password salt remains rejected.'

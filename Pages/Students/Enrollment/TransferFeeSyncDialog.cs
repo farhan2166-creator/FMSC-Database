@@ -22,6 +22,8 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         public decimal? DestAmount;
         public string? Frequency;
     }
+    internal sealed record ComparisonData(DataTable FeeTypes,DataTable Current,DataTable Destination,DateTime CutoffDate);
+    private DateTime cutoffMonth;
     public FeeDecision Decision { get; private set; } = FeeDecision.Cancel;
     /// <summary>True when at least one fee type differs between the
     /// student's current assignments and the destination's configuration
@@ -60,17 +62,22 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         int enrollmentId,
         int destinationCampusId,
         int destinationClassId)
+        :this(studentDisplay,currentPlacementLabel,destinationPlacementLabel,transferDate,enrollmentId,destinationCampusId,destinationClassId,null) { }
+
+    internal TransferFeeSyncDialog(string studentDisplay,string currentPlacementLabel,string destinationPlacementLabel,
+        DateTime transferDate,int enrollmentId,int destinationCampusId,int destinationClassId,ComparisonData? comparison)
     {
         Text = "Fees After Transfer";
         StartPosition = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MaximizeBox = true;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(AppScale.Scale(760), AppScale.Scale(720));
+        MinimumSize = new Size(AppScale.Scale(880), AppScale.Scale(660));
+        ClientSize = new Size(AppScale.Scale(1040), AppScale.Scale(760));
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
-        LoadComparison(enrollmentId, destinationCampusId, destinationClassId);
+        LoadComparison(enrollmentId, destinationCampusId, destinationClassId,comparison);
         paidReduction.Items.AddRange(new object[] { "Keep excess payment as advance", "Refund the excess payment" });
         paidReduction.SelectedIndex = 0;
         FinanceHelp.Attach(this,paidReduction,FinanceHelp.Topic.PaidReduction);
@@ -79,29 +86,37 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         FinanceHelp.Attach(this,nextMonthOption,FinanceHelp.Topic.TransferFees);
         FinanceHelp.Attach(this,customMonthOption,FinanceHelp.Topic.TransferFees);
         FinanceHelp.Attach(this,replaceSchedule,"Replace future rates or full discounts that have not yet been billed, starting in the chosen month.","An unbilled November discount may be replaced by the new class terms. Check the review before continuing.");
-        var policy = DatabaseHelper.QuerySql("SELECT dbo.GetMonthlyBillingStartDate(@Date) StartDate;", DatabaseHelper.Date("@Date", transferDate));
-        DateTime cutoffDate = Convert.ToDateTime(policy.Rows[0]["StartDate"]);
+        var policy = comparison is null ? DatabaseHelper.QuerySql("SELECT dbo.GetMonthlyBillingStartDate(@Date) StartDate;", DatabaseHelper.Date("@Date", transferDate)) : null;
+        DateTime cutoffDate = comparison?.CutoffDate ?? Convert.ToDateTime(policy!.Rows[0]["StartDate"]);
+        cutoffMonth=new DateTime(cutoffDate.Year,cutoffDate.Month,1);
         currentMonthOption.Text = $"Use School Profile cutoff: new fees from {cutoffDate:MMMM yyyy}";
 
-        effectiveMonth.MinDate = new DateTime(transferDate.Year,transferDate.Month,1);
+        effectiveMonth.MinDate = cutoffMonth;
         DateTime lastBilled = existingPeriods.Select(row => PeriodDate(row,"LastBilledMonth") ?? effectiveMonth.MinDate.AddMonths(-1)).DefaultIfEmpty(effectiveMonth.MinDate.AddMonths(-1)).Max();
         effectiveMonth.Value = lastBilled >= effectiveMonth.MinDate ? lastBilled.AddMonths(1) : effectiveMonth.MinDate;
         HasFeeDifference = rows.Any(r => r.Changes);
         if (CanApplyDestinationFees) { keepOption.Checked = false; currentMonthOption.Checked = true; }
         BuildLayout(studentDisplay, currentPlacementLabel, destinationPlacementLabel, transferDate);
     }
-    private void LoadComparison(int enrollmentId, int destinationCampusId, int destinationClassId)
+    private void LoadComparison(int enrollmentId, int destinationCampusId, int destinationClassId,ComparisonData? comparison)
     {
-        var feeTypes = DatabaseHelper.QueryUser("GetFeeTypes");
+        var feeTypes = comparison?.FeeTypes ?? DatabaseHelper.QueryUser("GetFeeTypes");
         var displayOrder = feeTypes.AsEnumerable().ToDictionary(
             row => Convert.ToInt32(row["FeeTypeId"]),
             row => Convert.ToInt32(row["DisplayOrder"]));
         // "Current" = the enrollment's currently-OPEN assignments (same EffectiveTo IS NULL definition used everywhere else in this system).
-        var current = DatabaseHelper.QueryUser("GetStudentFeeAssignments", DatabaseHelper.Int("@EnrollmentId", enrollmentId), DatabaseHelper.Bit("@IncludeCancelled", true));
+        var current = comparison?.Current ?? DatabaseHelper.QueryUser("GetStudentFeeAssignments", DatabaseHelper.Int("@EnrollmentId", enrollmentId), DatabaseHelper.Bit("@IncludeCancelled", true));
         var cancelledFees = current.AsEnumerable()
             .Where(r => r["EffectiveTo"] == DBNull.Value && r["CancelledAt"] != DBNull.Value)
             .Select(r => Convert.ToInt32(r["FeeTypeId"])).ToHashSet();
-        var liveCurrent = current.AsEnumerable().Where(r => r["CancelledAt"] == DBNull.Value).ToArray();
+        var eligibleTypes=feeTypes.AsEnumerable().Where(type=>
+            string.Equals(Convert.ToString(type["FeeTypeCode"]),"TUITION",StringComparison.OrdinalIgnoreCase)
+            || (Convert.ToBoolean(type["IsTransportLinked"]) && current.AsEnumerable().Any(a=>
+                Convert.ToInt32(a["FeeTypeId"])==Convert.ToInt32(type["FeeTypeId"]) && a["CancelledAt"]==DBNull.Value
+                && a["EffectiveTo"]==DBNull.Value && Convert.ToString(a["Frequency"])=="Monthly")))
+            .Select(type=>Convert.ToInt32(type["FeeTypeId"])).ToHashSet();
+        var liveCurrent = current.AsEnumerable().Where(r => r["CancelledAt"] == DBNull.Value
+            && Convert.ToString(r["Frequency"])=="Monthly" && eligibleTypes.Contains(Convert.ToInt32(r["FeeTypeId"]))).ToArray();
         existingPeriods = liveCurrent;
         var currentByFeeType = liveCurrent
             .Where(r => r["EffectiveTo"] == DBNull.Value)
@@ -115,15 +130,15 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
                     Frequency: Convert.ToString(r["Frequency"]) ?? string.Empty,
                     Id: Convert.ToInt32(r["StudentFeeAssignmentId"])));
         // Destination fees match the configuration used by the transfer procedure.
-        var destination = DatabaseHelper.QueryUser(
+        var destination = comparison?.Destination ?? DatabaseHelper.QueryUser(
             "GetFeeConfigurations",
             DatabaseHelper.Int("@CampusId", destinationCampusId),
             DatabaseHelper.Int("@ClassId", destinationClassId));
-        var activeDestination = destination.AsEnumerable().ToArray();
+        var activeDestination = destination.AsEnumerable().Where(r=>Convert.ToString(r["Frequency"])=="Monthly" && eligibleTypes.Contains(Convert.ToInt32(r["FeeTypeId"]))).ToArray();
         var destByFeeType = activeDestination.Where(r =>
             !cancelledFees.Contains(Convert.ToInt32(r["FeeTypeId"])) &&
-            (Convert.ToString(r["Frequency"]) is "Monthly" or "Yearly") &&
-            (Convert.ToBoolean(r["IsMandatory"]) ||
+            (Convert.ToString(r["Frequency"]) == "Monthly") &&
+            (string.Equals(Convert.ToString(r["FeeTypeCode"]),"TUITION",StringComparison.OrdinalIgnoreCase) ||
              (Convert.ToBoolean(r["IsTransportLinked"]) && currentByFeeType.ContainsKey(Convert.ToInt32(r["FeeTypeId"])))))
             .ToDictionary(
                 r => Convert.ToInt32(r["FeeTypeId"]),
@@ -169,29 +184,31 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
             Dock = DockStyle.Top,
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 2,
-            RowCount = 4,
+            ColumnCount = 4,
+            RowCount = 2,
             Margin = new Padding(3, AppMetrics.SpacingXs, 3, AppMetrics.SpacingSm)
         };
         summary.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        summary.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         var details = new[] {
             (Label: "Student", Value: studentDisplay),
             (Label: "Current", Value: currentPlacementLabel),
             (Label: "Destination", Value: destinationPlacementLabel),
-            (Label: "Date", Value: transferDate.ToString("dd MMM yyyy"))
+            (Label: "Date", Value: transferDate.ToString("dd-MM-yyyy"))
         };
         var detailValues = new List<Label>();
         for (int row = 0; row < details.Length; row++)
         {
-            summary.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            if(row%2==0)summary.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             summary.Controls.Add(new Label {
                 Text = details[row].Label,
                 AutoSize = true,
                 Font = AppTheme.BodyBoldFont,
                 ForeColor = AppTheme.Text,
                 Margin = new Padding(0, 2, AppMetrics.SpacingMd, 2)
-            }, 0, row);
+            }, (row%2)*2, row/2);
             var value = new Label {
                 Text = details[row].Value,
                 AutoSize = true,
@@ -200,8 +217,13 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
                 Margin = new Padding(0, 2, 0, 2)
             };
             detailValues.Add(value);
-            summary.Controls.Add(value, 1, row);
+            summary.Controls.Add(value, (row%2)*2+1, row/2);
         }
+        var scopeNote=new Label {
+            Text="Same-year transfer: tuition and existing transport only. Admission, books and other fees stay unchanged.",
+            AutoSize=true,Dock=DockStyle.Top,Font=AppTheme.NormalFont,ForeColor=AppTheme.MutedText,
+            Margin=new Padding(0,AppMetrics.SpacingXs,0,AppMetrics.SpacingSm)
+        };
         var note = new Label {
             Text = "Review the new rates below. Issued monthly bills receive only the required difference; paid reductions follow your credit/refund choice.",
             Dock = DockStyle.Top,
@@ -215,6 +237,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
             note.AutoSize = true;
             nextMonthOption.Enabled = false;
             currentMonthOption.Enabled = false;
+            customMonthOption.Enabled = false;
         }
         grid.Dock = DockStyle.Fill;
         grid.AutoGenerateColumns = false;
@@ -222,6 +245,12 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         grid.Columns.Add("Current", "Current fees");
         grid.Columns.Add("New", "New fees");
         grid.Columns.Add("Change", "Change");
+        grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;
+        grid.Columns["FeeTypeName"].FillWeight=34;grid.Columns["FeeTypeName"].MinimumWidth=190;
+        grid.Columns["Current"].FillWeight=18;grid.Columns["Current"].MinimumWidth=120;
+        grid.Columns["New"].FillWeight=22;grid.Columns["New"].MinimumWidth=140;
+        grid.Columns["Change"].FillWeight=26;grid.Columns["Change"].MinimumWidth=170;
+        grid.RowTemplate.Height=Math.Max(AppScale.Scale(34),AppMetrics.InputControlHeight);
         foreach (var name in new[] { "Current", "New", "Change" })
         {
             grid.Columns[name].DefaultCellStyle = new DataGridViewCellStyle {
@@ -233,13 +262,14 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         var confirmButton = new ModernButton {
             Text = "Confirm Transfer",Width=AppScale.Scale(150),Height=AppMetrics.ButtonHeight,ThemeRole="Success"
         };
-        string DefaultNote() => "Existing bills stay unchanged. Choose when new rates start; replacing scheduled rates or waivers requires your selection.";
+        string DefaultNote() => "New tuition / transport rates may adjust issued monthly bills. Paid reductions use your advance/refund choice.";
         void RefreshComparison()
         {
         bool keep = keepOption.Checked;
         if (keep && replaceSchedule.Checked) replaceSchedule.Checked = false;
         DateTime effectiveMonth = new DateTime(transferDate.Year,transferDate.Month,1)
             .AddMonths(nextMonthOption.Checked ? 1 : 0);
+        if(currentMonthOption.Checked)effectiveMonth=cutoffMonth;
         if (customMonthOption.Checked) effectiveMonth = EffectiveMonth!.Value;
         this.effectiveMonth.Enabled = customMonthOption.Checked;
         replaceSchedule.Enabled = !keep;
@@ -313,7 +343,19 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         customRow.Controls.Add(effectiveMonth);
         choicePanel.Controls.Add(customRow);
         choicePanel.Controls.Add(replaceSchedule);
-        choicePanel.Controls.Add(HumanUi.Field("If the reduced fee was already paid", paidReduction));
+        var choices=new TableLayoutPanel {Dock=DockStyle.Fill,AutoSize=true,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
+        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,64));
+        choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,36));
+        choices.Controls.Add(choicePanel,0,0);
+        var paidPanel=new TableLayoutPanel {Dock=DockStyle.Top,AutoSize=true,ColumnCount=1,RowCount=2,Margin=new Padding(AppMetrics.SpacingMd,0,0,0)};
+        paidPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        var paidField=HumanUi.Field("If a reduced fee was already paid",paidReduction);
+        paidField.Height=AppMetrics.FieldRowHeight;
+        paidPanel.Controls.Add(paidField,0,0);
+        var paidNote=new Label {Text="Choose how to return any excess payment after the reviewed rate reduction.",AutoSize=true,Dock=DockStyle.Top,
+            Font=AppTheme.NormalFont,ForeColor=AppTheme.MutedText};
+        paidPanel.Controls.Add(paidNote,0,1);
+        choices.Controls.Add(paidPanel,1,0);
         // Radio buttons need one shared parent to remain mutually exclusive.
         customMonthOption.CheckedChanged += (_, _) => {
             if(customMonthOption.Checked) {
@@ -351,7 +393,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 7,
+            RowCount = 8,
             Padding = new Padding(16)
         };
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -361,36 +403,45 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.Controls.Add(title, 0, 0);
         root.Controls.Add(summary, 0, 1);
-        root.Controls.Add(note, 0, 2);
+        root.Controls.Add(scopeNote, 0, 2);
         root.Controls.Add(grid, 0, 3);
-        root.Controls.Add(choiceLabel, 0, 4);
-        root.Controls.Add(choicePanel, 0, 5);
-        root.Controls.Add(buttons, 0, 6);
+        root.Controls.Add(note, 0, 4);
+        root.Controls.Add(choiceLabel, 0, 5);
+        root.Controls.Add(choices, 0, 6);
+        root.Controls.Add(buttons, 0, 7);
         void FitText()
         {
             int width = Math.Max(1, root.ClientSize.Width - root.Padding.Horizontal - summary.Margin.Horizontal);
             summary.MaximumSize = new Size(width, 0);
             note.MaximumSize = new Size(width, 0);
+            scopeNote.MaximumSize=new Size(width,0);
+            paidNote.MaximumSize=new Size(Math.Max(1,paidPanel.Width-paidPanel.Margin.Horizontal),0);
             int captionWidth = summary.Controls.OfType<Label>()
                 .Where(label => summary.GetColumn(label) == 0)
                 .Max(label => label.PreferredWidth + label.Margin.Horizontal);
             foreach (var value in detailValues)
-                value.MaximumSize = new Size(Math.Max(1, width - captionWidth), 0);
+                value.MaximumSize = new Size(Math.Max(1, width/2 - captionWidth-AppMetrics.SpacingMd), 0);
         }
         root.SizeChanged += (_, _) => FitText();
         Controls.Add(root);
         FitText();
+        // Adding radio buttons to their shared parent can reset the initial choice.
+        if(CanApplyDestinationFees){keepOption.Checked=false;currentMonthOption.Checked=true;}
+        else keepOption.Checked=true;
+        RefreshComparison();
         /* UX - the decision on this dialog is the choice below the grid, not the grid. */
         AcceptButton = confirmButton;
         CancelButton = cancelButton;
-        ActiveControl = keepOption;
+        ActiveControl = CanApplyDestinationFees ? currentMonthOption : keepOption;
     }
     private static DateTime? PeriodDate(DataRow row,string column) => row.Table.Columns.Contains(column) && row[column]!=DBNull.Value
         ? Convert.ToDateTime(row[column]) : null;
     private string ValidateChoice(DateTime target)
     {
+        if(target<cutoffMonth)return $"The school cutoff permits new rates from {cutoffMonth:MMMM yyyy}. Choose that month or a later one.";
         if(!CanApplyDestinationFees) return missingDestinationFees + " Keep current fees or complete Fee Setup first.";
         foreach(var period in existingPeriods)
         {

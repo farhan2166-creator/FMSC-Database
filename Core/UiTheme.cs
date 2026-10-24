@@ -152,7 +152,7 @@ internal static class UiTheme
             if (color == SystemColors.Control || color == SystemColors.Window) return () => AppTheme.Surface;
         }
         Func<Color>[] roles = {
-            () => AppTheme.Primary, () => AppTheme.Success, () => AppTheme.Warning, () => AppTheme.Danger,
+            () => AppTheme.SelectionBackground, () => AppTheme.SelectionText, () => AppTheme.Primary, () => AppTheme.Success, () => AppTheme.Warning, () => AppTheme.Danger,
             () => AppTheme.PrimaryLight, () => AppTheme.PageBackground, () => AppTheme.Surface,
             () => AppTheme.SurfaceSecondary, () => AppTheme.SurfaceElevated,
             () => AppTheme.HeadingText, () => AppTheme.Text, () => AppTheme.MutedText,

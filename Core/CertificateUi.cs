@@ -2,6 +2,54 @@ namespace FMSC_SMS.Core;
 /// <summary>Small shared mechanics used by the certificate screens; certificate-specific business rules stay on their pages.</summary>
 internal static class CertificateUi
 {
+    internal static string PromotionClassText(string value)
+    {
+        // Older certificates saved the picker caption (class name plus class code).
+        int separator=value.LastIndexOf(" — ",StringComparison.Ordinal);
+        return (separator<0?value:value[..separator]).Trim();
+    }
+
+    internal static string NormalizeGender(string? value) => value?.Trim().ToUpperInvariant() switch
+    {
+        "MALE"=>"Male", "FEMALE"=>"Female", _=>""
+    };
+
+    private static string? ReadRecordedGender(DataRow row,string readPermission)
+    {
+        bool staff=row.Table.Columns.Contains("StaffId");
+        string key=staff?"StaffId":"AdmissionId";
+        if(!row.Table.Columns.Contains(key) || !int.TryParse(Convert.ToString(row[key]),out int id) || id<=0)
+            return row.Table.Columns.Contains("Gender")?Convert.ToString(row["Gender"]):null;
+        using var person=DatabaseHelper.QuerySql(staff?"""
+            EXEC dbo.RequirePermission @UserId,@ReadPermission;
+            SELECT Gender FROM dbo.Staff WHERE StaffId=@Id;
+            """:"""
+            EXEC dbo.RequirePermission @UserId,@ReadPermission;
+            SELECT Gender FROM dbo.Students WHERE AdmissionId=@Id;
+            """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Id",id),DatabaseHelper.P("@ReadPermission",readPermission));
+        if(person.Rows.Count==0)throw new InvalidOperationException("The person's record could not be read. Reload before printing the certificate.");
+        return Convert.ToString(person.Rows[0]["Gender"]);
+    }
+
+    internal static DataTable PrintData(string reportPath,DataTable source,Func<DataRow,string?>? readGender=null)
+    {
+        var data=RecordTextPolicy.PrintCopy(source);
+        if(!data.Columns.Contains("Gender"))data.Columns.Add("Gender",typeof(string));
+        foreach(DataRow row in data.Rows)
+            row["Gender"]=NormalizeGender(readGender is null?Convert.ToString(row["Gender"]):readGender(row));
+        if(CertificateLetterhead.UsesPreprintedPad(reportPath) && data.Columns.Contains("ClassPromotedTo"))
+            foreach(DataRow row in data.Rows)
+                row["ClassPromotedTo"]=PromotionClassText(Convert.ToString(row["ClassPromotedTo"])??"");
+        if(CertificateLetterhead.UsesPreprintedPad(reportPath))FormatLeavingReasons(data);
+        return data;
+    }
+
+    internal static void FormatLeavingReasons(DataTable data)
+    {
+        if(data.Columns.Contains("Remarks"))
+            foreach(DataRow row in data.Rows)
+                if(row["Remarks"] is string text)row["Remarks"]=RecordTextPolicy.TitleCase(text);
+    }
     internal const string FieldGridTag="CertificateFieldGrid";
     internal static bool ConfirmCertificateSelection(IWin32Window? owner, DataGridView grid,
         string idColumn, int currentId, int requestedId, bool hasEdits,Func<bool>? confirmDiscard=null)
@@ -121,6 +169,8 @@ internal static class CertificateUi
         DataTable data,
         IReadOnlyList<string>? provisionalSubjects = null)
     {
+        string readPermission=CertificateLetterhead.UsesPreprintedPad(reportPath)?"Students.Leave":"Certificates.Print";
+        using var printable=PrintData(reportPath,data,row=>ReadRecordedGender(row,readPermission));
         string? definition = null;
         if (!CertificateLetterhead.UsesPreprintedPad(reportPath))
         {
@@ -133,7 +183,7 @@ internal static class CertificateUi
             title,
             reportPath,
             dataSourceName,
-            data,
+            printable,
             reportDefinition: definition,
             enableExternalImages: definition is not null);
     }

@@ -65,6 +65,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
     internal CollegeLeaveCertificatePage(bool initialize)
         : base("College Leaving Certificate", "Create, issue, collect and print leaving certificates for college students.")
     {
+        RecordTextPolicy.WireInput(remarks,"@LeavingReason");
         feeReview = new LeaveFeeReviewBar(() => student.SelectedId, () => currentEnrollmentId, () => leave.Value.Date, () => HasCertificateForCurrentEnrollment());
         leave.ValueChanged += (_, _) => feeReview.RefreshFees();
         ConfigureFieldSuggestions();
@@ -305,6 +306,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
                 new DataTable();
             dt.Columns.Add("ClassId", typeof(int));
             dt.Columns.Add("Display", typeof(string));
+            dt.Columns.Add("ClassName", typeof(string));
             foreach (DataRow row in raw.Rows)
             {
                 int classId =
@@ -317,7 +319,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
                     string.IsNullOrWhiteSpace(classCode)
                         ? className
                         : $"{className} — {classCode}";
-                dt.Rows.Add(classId, display);
+                dt.Rows.Add(classId, display, className);
             }
             promoted.Bind(dt, "ClassId", "Display");
         }
@@ -347,6 +349,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
                         "@AdmissionId",
                         admissionId),
                     DatabaseHelper.P("@CertificateType", CertificateTypeName));
+            CertificateUi.FormatLeavingReasons(table);
             certificateResults = CertificateRecordOrder.NewestFirst(table, "LeaveCertificateIssueId");
             Bind(certificateResults);
             FormatCertificateGrid();
@@ -803,7 +806,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
                 DatabaseHelper.P(
                     "@Remarks",
                     DatabaseHelper.OptionalText(
-                        remarks.Text)),
+                        RecordTextPolicy.TitleCase(remarks.Text))),
                 DatabaseHelper.P("@CertificateType", CertificateTypeName) }.Concat(feeReview.Parameters()).ToArray());
             successMessage =
                 "College leaving certificate created successfully. " +
@@ -1247,7 +1250,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
         {
             return string.Empty;
         }
-        return GetString(row.Row, "Display");
+        return row.Row.Table.Columns.Contains("ClassName") ? GetString(row.Row, "ClassName") : CertificateUi.PromotionClassText(GetString(row.Row, "Display"));
     }
     private void RefreshCertificates()
     {

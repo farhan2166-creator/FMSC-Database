@@ -157,7 +157,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>It is certified that Mr. /Miss.</Value>
+                <Value>=&quot;It is certified that &quot; &amp; IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Female&quot;, &quot;Ms.&quot;, IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Male&quot;, &quot;Mr.&quot;, &quot;Mr./Ms.&quot;))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -218,7 +218,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>S/D/O</Value>
+                <Value>=IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Female&quot;, &quot;D/O&quot;, IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Male&quot;, &quot;S/O&quot;, &quot;S/D/O&quot;))</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
@@ -307,7 +307,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>His/her Date of Birth according to the school record is (In Fig) </Value>
+                <Value>=IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Female&quot;, &quot;Her&quot;, IIF(First(Fields!Gender.Value, &quot;DateOfBirthCertificateData&quot;) = &quot;Male&quot;, &quot;His&quot;, &quot;His/Her&quot;)) &amp; &quot; Date of Birth according to the school record is (In Fig) &quot;</Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>

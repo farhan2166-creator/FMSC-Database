@@ -19,13 +19,79 @@ internal static class RecordTextPolicy
         "@Designation", "@GuardianRelation", "@City", "@PlaceOfBirth", "@PreviousSchool",
         "@FatherOccupation", "@Religion", "@CasteTribe", "@BankName", "@BranchName", "@RoleTitle"
     };
+    private static readonly Dictionary<string,string> Acronyms=new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["FMSC"]="FMSC",["SSC"]="SSC",["HSSC"]="HSSC",["BISE"]="BISE",["CNIC"]="CNIC",
+        ["BPS"]="BPS",["BS"]="BS",["MS"]="MS",["BA"]="BA",["MA"]="MA",
+        ["BSc"]="BSc",["MSc"]="MSc",["MPhil"]="MPhil",["PhD"]="PhD",["IT"]="IT"
+    };
+    private static readonly Dictionary<string,string> DisplayAliases=new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Student"]="StudentName",["Staff"]="StaffName",["Father"]="FatherName",["Parent"]="FatherName",
+        ["Class"]="ClassName",["Section"]="SectionName",["Campus"]="CampusName",["Subject"]="SubjectName",
+        ["Fee"]="FeeTypeName",["FeeName"]="FeeTypeName",["ClassSection"]="ClassName",
+        ["InstitutionName"]="SchoolName",["InstitutionLine"]="SchoolName",["StudentFullName"]="StudentName",
+        ["CurrentClass"]="ClassName",["CurrentClassName"]="ClassName",["CurrentCampusName"]="CampusName",
+        ["AdmissionCampusName"]="CampusName",["FatherOccupationText"]="FatherOccupation",
+        ["AddressText"]="Address",["PlaceOfBirthText"]="PlaceOfBirth",["ReligionText"]="Religion",
+        ["PreviousSchoolText"]="PreviousSchool",["CampusNameText"]="CampusName",["ClassNameText"]="ClassName",
+        ["SectionNameText"]="SectionName"
+    };
+
+    private static bool IsTitleCaseField(string field)
+    {
+        string key=new(field.Where(char.IsLetterOrDigit).ToArray());
+        key=DisplayAliases.GetValueOrDefault(key,key);
+        return TitleCaseParameters.Contains("@"+key);
+    }
+
+    internal static string DisplayText(string field,string text) => IsTitleCaseField(field)?TitleCase(text):text;
+
+    internal static void FormatDisplayRows(DataTable table)
+    {
+        foreach(DataColumn column in table.Columns)
+        {
+            if(column.DataType!=typeof(string) || column.Expression.Length>0 || !IsTitleCaseField(column.ColumnName))continue;
+            bool readOnly=column.ReadOnly;
+            try
+            {
+                column.ReadOnly=false;
+                foreach(DataRow row in table.Rows)
+                {
+                    if(row.RowState==DataRowState.Deleted || row[column] is not string text)continue;
+                    string formatted=TitleCase(text);
+                    if(formatted!=text)row[column]=formatted;
+                }
+            }
+            finally{column.ReadOnly=readOnly;}
+        }
+    }
+
+    internal static DataTable PrintCopy(DataTable source)
+    {
+        var data=source.Copy();FormatDisplayRows(data);return data;
+    }
+
+    internal static void WireField(Control input,string caption)
+    {
+        string key=new(caption.Where(char.IsLetterOrDigit).ToArray());
+        key=key.ToLowerInvariant() switch {
+            "fathersname"=>"FatherName",
+            "designationteacherlecturer"=>"RoleTitle",
+            "othersubjectsnotinlistbelow"=>"OtherSubjects",
+            _=>key
+        };
+        WireInput(input,"@"+key);
+    }
     private static readonly HashSet<string> TitleCaseParameters = new(StringComparer.OrdinalIgnoreCase)
     {
         "@SubjectName", "@ClassName", "@SectionName", "@FeeTypeName", "@ProgramName",
         "@CampusName", "@SchoolName", "@Designation", "@PersonName", "@StaffName",
         "@StudentName", "@FatherName", "@GuardianName", "@GuardianRelation",
         "@Address", "@AddressLine", "@City", "@PlaceOfBirth", "@PreviousSchool",
-        "@FatherOccupation", "@Religion", "@CasteTribe", "@BankName", "@BranchName", "@RoleTitle"
+        "@FatherOccupation", "@Religion", "@CasteTribe", "@BankName", "@BranchName", "@RoleTitle",
+        "@AcademicRecord", "@AttendanceRecord", "@ClassStudied", "@ClassPromotedTo",
+        "@SportName", "@BoardName", "@SubjectTaught", "@OtherSubjects", "@LeavingReason"
     };
     private static readonly HashSet<string> RomanNumerals = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -107,6 +173,7 @@ internal static class RecordTextPolicy
 
     internal static string TitleCase(string text) => Regex.Replace(text.Trim(), @"[\p{L}\p{Nd}]+", match => {
         string word = match.Value;
+        if (Acronyms.TryGetValue(word,out string? acronym)) return acronym;
         if (RomanNumerals.Contains(word)) return word.ToUpperInvariant();
         string lower = word.ToLowerInvariant();
         string first = StringInfo.GetNextTextElement(lower);

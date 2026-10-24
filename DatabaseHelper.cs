@@ -7,7 +7,7 @@ public static class DatabaseHelper
     public const string LocalDbInstance = @"(localdb)\MSSQLLocalDB";
     private const string DatabaseName = "FMSC_DB";
     // Version and required schema features are checked together by DatabaseCompatibility.
-    public const string RequiredDatabaseSchemaVersion = "43";
+    public const string RequiredDatabaseSchemaVersion = "44";
 #if !FMSC_LEVEL2
     private static volatile bool _databaseAttachConfirmed;
     private static readonly object DatabaseAttachSync = new();
@@ -260,6 +260,7 @@ FOR ATTACH;";
             adapter.Fill(dt);
             Core.LookupDataCache.OperationCompleted(procedure);
             Core.AdmissionNumbers.Enrich(dt, cn);
+            Core.RecordTextPolicy.FormatDisplayRows(dt);
             return dt;
         }));
     public static DataTable QuerySql(
@@ -283,6 +284,7 @@ FOR ATTACH;";
             OpenConnection(cn);
             adapter.Fill(dt);
             Core.AdmissionNumbers.Enrich(dt, cn);
+            Core.RecordTextPolicy.FormatDisplayRows(dt);
             return dt;
         });
     public static DataTable QueryUser(
@@ -317,6 +319,7 @@ FOR ATTACH;";
                 while (await reader.ReadAsync(token).ConfigureAwait(false)) { }
         }
         await Core.AdmissionNumbers.EnrichAsync(table, cn, token).ConfigureAwait(false);
+        Core.RecordTextPolicy.FormatDisplayRows(table);
         token.ThrowIfCancellationRequested();
         return table;
     }
@@ -413,7 +416,7 @@ FOR ATTACH;";
             OpenConnection(cn);
             adapter.Fill(ds);
             Core.LookupDataCache.OperationCompleted(procedure);
-            foreach (DataTable table in ds.Tables) Core.AdmissionNumbers.Enrich(table, cn);
+            foreach (DataTable table in ds.Tables) { Core.AdmissionNumbers.Enrich(table, cn); Core.RecordTextPolicy.FormatDisplayRows(table); }
             return ds;
         });
     }
@@ -582,8 +585,10 @@ FOR ATTACH;";
         }
         Core.LookupDataCache.OperationCompleted(procedure);
         // Close the reader before issuing the admission-number lookup on this connection.
-        foreach (DataTable table in result.Tables)
+        foreach (DataTable table in result.Tables) {
             await Core.AdmissionNumbers.EnrichAsync(table, cn, token).ConfigureAwait(false);
+            Core.RecordTextPolicy.FormatDisplayRows(table);
+        }
         token.ThrowIfCancellationRequested();
         return result;
     }

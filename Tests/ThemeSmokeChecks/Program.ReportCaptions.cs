@@ -8,6 +8,8 @@ internal static partial class Program
     private static void CheckReportCaptions()
     {
         string output=Path.GetFullPath("artifacts/report-captions");Directory.CreateDirectory(output);
+        using var profile=new DataTable();profile.Columns.Add("SchoolName");
+        var school=profile.Rows.Add("Fictional School");
         foreach(string name in new[]{"AdmissionForm","ClassMarksSheet","ClassAttendanceSheet",
             "ClassMonthlyAttendanceSheet","ClassOutstandingCharges","ClassSectionSummary","FeeAgingReport",
             "BankAccountOpeningCertificate","CharacterCertificate","CollegeLeaveCertificate","DateOfBirthCertificate",
@@ -18,7 +20,9 @@ internal static partial class Program
             var document=XDocument.Load(path);XNamespace ns=document.Root!.Name.Namespace;
             bool certificate=name.EndsWith("Certificate",StringComparison.Ordinal);
             if(certificate && !CertificateLetterhead.UsesPreprintedPad(path))
-                document=XDocument.Parse(CertificateLetterhead.Definition(path,null));
+                document=XDocument.Parse(CertificateLetterhead.Definition(path,school));
+            if(CertificateLetterhead.UsesPreprintedPad(path))
+                Check(document.Descendants(ns+"TopMargin").Single().Value=="2in",name+" reserves two inches for preprinted letterhead.");
             using var report=new LocalReport();report.LoadReportDefinition(new StringReader(document.ToString()));
             report.EnableExternalImages=true;
             foreach(var dataset in document.Descendants(ns+"DataSet"))
@@ -32,10 +36,17 @@ internal static partial class Program
                 var row=data.NewRow();
                 foreach(DataColumn column in data.Columns)
                     row[column]=column.DataType==typeof(string)?column.ColumnName=="DateOfBirthInWords"?"24 October 2026":
-                        column.ColumnName=="DateOfBirthInFigures"?"24-10-2026":"Example":column.DataType==typeof(DateTime)?new DateTime(2026,10,24):
+                        column.ColumnName=="DateOfBirthInFigures"?"24-10-2026":
+                        column.ColumnName=="ClassPromotedTo"?"Class 8 — 8":
+                        column.ColumnName=="InstitutionLine"?"Fictional School Boys Campus Fictional City":"Example":column.DataType==typeof(DateTime)?new DateTime(2026,10,24):
                         column.DataType==typeof(bool)?true:Convert.ChangeType(1,column.DataType);
                 data.Rows.Add(row);
-                report.DataSources.Add(new ReportDataSource((string)dataset.Attribute("Name")!,data));
+                using var printable=CertificateUi.PrintData(path,data);
+                if(CertificateLetterhead.UsesPreprintedPad(path))
+                    Check(printable.Rows[0].Field<string>("ClassPromotedTo")=="Class 8"
+                        && data.Rows[0].Field<string>("ClassPromotedTo")=="Class 8 — 8",
+                        name+" prints the class once without rewriting the saved certificate.");
+                report.DataSources.Add(new ReportDataSource((string)dataset.Attribute("Name")!,printable.Copy()));
             }
             byte[] pdf=report.Render("PDF");File.WriteAllBytes(Path.Combine(output,name+".pdf"),pdf);
             byte[] png=report.Render("IMAGE","<DeviceInfo><OutputFormat>PNG</OutputFormat><DpiX>110</DpiX><DpiY>110</DpiY></DeviceInfo>");
@@ -47,6 +58,9 @@ internal static partial class Program
                 Check(html.Contains("24-10-2026",StringComparison.Ordinal),name+" prints its standard date as day-month-year.");
                 if(name is "CollegeLeaveCertificate" or "LeaveCertificate" or "ProvisionalCertificate" or "DateOfBirthCertificate")
                     Check(html.Contains("24 October 2026",StringComparison.Ordinal),name+" retains the full month in its written birth date.");
+                if(name=="RegularStudentCertificate")
+                    Check(html.Contains("Fictional School",StringComparison.Ordinal) && !html.Contains("Boys Campus",StringComparison.Ordinal),
+                        "Regular student certificate prints the school name without the campus.");
             }
         }
     }

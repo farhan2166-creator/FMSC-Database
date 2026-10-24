@@ -685,7 +685,7 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value>=IIF(First(Fields!Gender.Value, "ProvisionalCertificateData") = "Female", "Daughter of", IIF(First(Fields!Gender.Value, "ProvisionalCertificateData") = "Male", "Son of", "Son/Daughter of"))</Value>
+                <Value>=IIF(First(Fields!Gender.Value, "ProvisionalCertificateData") = "Female", "D/O", IIF(First(Fields!Gender.Value, "ProvisionalCertificateData") = "Male", "S/O", "S/D/O"))</Value>
                 <Style>
                   <FontStyle>Normal</FontStyle>
                   <FontFamily>Segoe UI</FontFamily>

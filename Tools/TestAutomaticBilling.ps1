@@ -1,5 +1,5 @@
 # Owns a unique schema-only LocalDB instance. Accepts no live database/connection parameter.
-param([switch]$KeepFixture,[switch]$AdmissionOnly)
+param([switch]$KeepFixture,[switch]$AdmissionOnly,[switch]$TransferOnly)
 $ErrorActionPreference='Stop'
 $projectRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $owner=[guid]::NewGuid().ToString('N')
@@ -67,6 +67,11 @@ try {
  }
  $seed=Get-Content -LiteralPath (Join-Path $projectRoot 'Validation/AutomaticBillingFixture.sql') -Raw
  [void](Query $seed)
+ if($TransferOnly){
+  . (Join-Path $projectRoot 'Validation/TransferFeeScopeChecks.ps1')
+  Write-Output "PASS: $checks same-year transfer fee SQL checks."
+  return
+ }
  if($AdmissionOnly){
   . (Join-Path $projectRoot 'Validation/AdmissionBillingStartChecks.ps1')
   Write-Output "PASS: $checks admission billing-start SQL checks."

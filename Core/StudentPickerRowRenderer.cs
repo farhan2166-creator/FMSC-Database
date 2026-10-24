@@ -6,8 +6,8 @@ internal static class StudentPickerRowRenderer
         IReadOnlyList<StudentPicker.ColumnSpec> columns, Font font)
     {
         bool selected = (e.State & DrawItemState.Selected) != 0 && entry.Id > 0;
-        Color back = selected ? AppTheme.Primary : AppTheme.SurfaceElevated;
-        Color fore = entry.Id == 0 ? AppTheme.MutedText : selected ? AppTheme.ThemeOnPrimaryText : AppTheme.Text;
+        Color back = selected ? AppTheme.SelectionBackground : AppTheme.SurfaceElevated;
+        Color fore = entry.Id == 0 ? AppTheme.MutedText : selected ? AppTheme.SelectionText : AppTheme.Text;
         using (var brush = new SolidBrush(back)) e.Graphics.FillRectangle(brush, e.Bounds);
         if (entry.Id == 0 || entry.Cells.Length == 0)
         {
