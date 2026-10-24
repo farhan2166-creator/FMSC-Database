@@ -212,7 +212,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         var help = FeeToolLayout.Help(
             "Choose the fees and adjustment amount, then preview the changes before applying them.",
             tip);
-        /* Present direction, amount and unit as one adjustment. */
+        /* Read the adjustment in the same order it is chosen. */
         typePercentage.Text = "Percent (%)";
         typeFlatAmount.Text = "Flat (Rs.)";
         var directionPanel = ChoicePanel(directionIncrease, directionDecrease);
@@ -225,9 +225,18 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
             ("Frequency", frequencyScope, false));
         var changeRow = FeeToolLayout.FieldRow(
             ("Change", directionPanel, false),
-            ("Amount", adjustmentValue, false),
-            ("Type", typePanel, false),
+            ("Adjustment type", typePanel, false),
+            ("Amount (%)", adjustmentValue, false),
             ("Rounding", roundingScope, false));
+        var amountCaption = changeRow.GetControlFromPosition(2, 0)!.Controls.OfType<Label>().Single();
+        typePercentage.CheckedChanged += (_, _) =>
+            amountCaption.Text = typePercentage.Checked ? "Amount (%)" : "Amount (Rs.)";
+        // Keep related fields together instead of stretching them across a wide workspace.
+        int fieldWidth = AppMetrics.TextWidth(new string('M', 20), AppTheme.NormalFont, AppScale.Scale(32));
+        scopeRow.MaximumSize = changeRow.MaximumSize = new Size(fieldWidth * 4, 0);
+        scopeRow.Height = AppMetrics.FieldRowHeight;
+        changeRow.Height = AppMetrics.FieldRowHeightFor(Math.Max(AppMetrics.InputControlHeight,
+            new[] { directionIncrease, directionDecrease, typePercentage, typeFlatAmount }.Max(choice => choice.PreferredSize.Height) * 2));
         preview.Dock = DockStyle.Fill;
         preview.AutoGenerateColumns = false;
         preview.ReadOnly = false;
@@ -251,7 +260,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         selectAllButton.Click += (_, _) => SelectPreviewRows(true);
         selectNoneButton.Click += (_, _) => SelectPreviewRows(false);
         selectAllButton.Enabled = selectNoneButton.Enabled = false;
-        HumanUi.ApplyGridStyle(preview, AppTheme.Warning);
+        HumanUi.ApplyGridStyle(preview, AppTheme.Primary);
         /* Confirm before assigning DialogResult so Cancel can keep the dialog open. */
         closeButton.Click += (_, _) => {
             if (embedded)
@@ -294,17 +303,19 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         CancelButton = closeButton;
         Disposed += (_, _) => tip.Dispose();
     }
-    /// <summary>Two radio buttons on one line, vertically centred on the input row.</summary>
+    /// <summary>Keep each pair together as a short list that also fits narrow windows.</summary>
     private static Control ChoicePanel(RadioButton first, RadioButton second)
     {
-        first.Margin = new Padding(4, 0, 18, 0);
-        second.Margin = new Padding(0, 0, 0, 0);
+        first.Font = second.Font = AppTheme.NormalFont;
+        first.Margin = Padding.Empty;
+        second.Margin = Padding.Empty;
         var flow = new FlowLayoutPanel {
-            Dock = DockStyle.Top,
+            Dock = DockStyle.Fill,
+            Width = 1,
             Height = AppMetrics.InputControlHeight,
-            FlowDirection = FlowDirection.LeftToRight,
+            FlowDirection = FlowDirection.TopDown,
             WrapContents = false,
-            Padding = new Padding(0, 6, 0, 0),
+            Padding = Padding.Empty,
             Margin = new Padding(0)
         };
         flow.Controls.Add(first);
