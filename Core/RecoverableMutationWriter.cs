@@ -25,7 +25,7 @@ internal static class RecoverableMutationWriter
     private static void Permission(SqlConnection c,SqlTransaction t,int user,MutationKind kind,bool write,bool otherOwner=false)
     {
         using var q=new SqlCommand("EXEC dbo.RequirePermission @UserId,@Permission;"+(otherOwner?" EXEC dbo.RequirePermission @UserId,N'System.Administration';":""),c,t);
-        q.Parameters.AddRange(new[]{DatabaseHelper.Int("@UserId",user),DatabaseHelper.P("@Permission",kind==MutationKind.BankCertificateCreate?"Certificates.Create":write?"Fees.Adjust":"Fees.View")});q.ExecuteNonQuery();
+        q.Parameters.AddRange(new[]{DatabaseHelper.Int("@UserId",user),DatabaseHelper.P("@Permission",kind is MutationKind.BankCertificateCreate or MutationKind.RegularCertificateReissue or MutationKind.BirthCertificateReissue?"Certificates.Create":write?"Fees.Adjust":"Fees.View")});q.ExecuteNonQuery();
     }
     private static void Lock(SqlConnection c,SqlTransaction t,Guid id,bool read)
     {
@@ -64,6 +64,8 @@ internal static class RecoverableMutationWriter
                         MutationKind.FeeAdjustment=>"ProcessFeeTransaction",
                         MutationKind.FeeConcession=>"SaveStudentFeeDiscount",
                         MutationKind.BankCertificateCreate=>"CreateBankAccountOpeningCertificate",
+                        MutationKind.RegularCertificateReissue=>"IssueRegularStudentCertificate",
+                        MutationKind.BirthCertificateReissue=>"IssueDateOfBirthCertificate",
                         _=>throw new InvalidOperationException("Unsupported operation.") };
                     using var command=new SqlCommand(procedure,c,t){CommandType=CommandType.StoredProcedure,CommandTimeout=120};
                     command.Parameters.AddRange(parameters.Where(p=>!p.ParameterName.Equals("@UserId",StringComparison.OrdinalIgnoreCase)).Select(p=>(SqlParameter)((ICloneable)p).Clone()).ToArray());command.Parameters.Add(DatabaseHelper.Int("@UserId",user));
@@ -81,6 +83,15 @@ internal static class RecoverableMutationWriter
         if(data.Rows.Count!=1)throw new InvalidDataException("The operation did not return one authoritative saved result.");var row=data.Rows[0];
         object? Arg(string name)=>args.First(p=>p.ParameterName.Equals(name,StringComparison.OrdinalIgnoreCase)).Value;
         int Key(string column)=>row.Table.Columns.Contains(column)&&row[column] is int id&&id>0?id:throw new InvalidDataException("The saved operation identity is invalid.");
+        if(kind is MutationKind.RegularCertificateReissue or MutationKind.BirthCertificateReissue)
+        {
+            int certificate=Convert.ToInt32(Arg("@CertificateRecordId"));
+            if(Key("CertificateRecordId")!=certificate||Convert.ToDateTime(row["DateOfBirth"]).Date!=Convert.ToDateTime(Arg("@ExpectedDateOfBirth")).Date||
+                Convert.ToDateTime(row["CertificateDate"]).Date!=Convert.ToDateTime(Arg("@CertificateDate")).Date)
+                throw new InvalidDataException("The saved reissue does not match its reviewed certificate and birth date.");
+            return new(kind,Key("AdmissionId"),certificate,Key("IssueId"),"",kind.ToString(),0,null) {
+                DateOfBirth=Convert.ToDateTime(row["DateOfBirth"]).Date,CertificateDate=Convert.ToDateTime(row["CertificateDate"]).Date };
+        }
         if(kind==MutationKind.FeeConcession)
         {
             int assignment=Convert.ToInt32(Arg("@StudentFeeAssignmentId"));
