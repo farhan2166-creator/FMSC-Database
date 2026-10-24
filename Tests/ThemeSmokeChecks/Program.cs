@@ -139,6 +139,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} hold/resume UI and recovery checks.");
             return;
         }
+        if(args.Contains("--character-certificate-reprint"))
+        {
+            CheckCharacterCertificateReprint();
+            Console.WriteLine($"PASS: {checks} character certificate history, wording, collection and reprint checks (no database connection).");
+            return;
+        }
         if(args.Contains("--regular-certificate-search"))
         {
             CheckRegularCertificateSearch();
