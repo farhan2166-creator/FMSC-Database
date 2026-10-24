@@ -126,6 +126,9 @@
 		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Installer\ValidateReleaseAssets.ps1&quot; -DatabaseDirectory &quot;$(DeploymentDatabaseDirectory)&quot; -LocalDbMsiPath &quot;$(LocalDbMsiPath)&quot;"
               EnvironmentVariables="PSModulePath=$(SystemRoot)\System32\WindowsPowerShell\v1.0\Modules" />
 	</Target>
+	<Target Name="RemoveEmptyPublishLanguageFolders" AfterTargets="Publish" BeforeTargets="CopyDeploymentFiles">
+		<Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\Tools\RemoveEmptyPublishLanguageFolders.ps1&quot; -PublishDirectory &quot;$(PublishDir)&quot;" />
+	</Target>
 	<Target Name="CopyDeploymentFiles" AfterTargets="Publish" DependsOnTargets="ValidateDeploymentAssets" Condition="'$(CIAppOnlyBundle)' != 'true' Or '$(GITHUB_ACTIONS)' != 'true'">
 		<PropertyGroup>
 			<ReleaseRoot Condition="'$(ReleaseRoot)' == ''">$(MSBuildProjectDirectory)\..\FMSC_SMS_Release\</ReleaseRoot>
