@@ -164,7 +164,7 @@ public sealed class LoginForm : ApplicationWindowForm
             4);
         root.Controls.Add(
             new JustifiedNote {
-                Text = "Use your account credentials to continue.",
+                Text = "Use your credentials to continue.",
                 Dock = DockStyle.Fill,
                 Font = AppTheme.NormalFont,
                 ForeColor = AppTheme.MutedText,
