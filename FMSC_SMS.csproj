@@ -18,6 +18,8 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWindowsForms>true</UseWindowsForms>
+		<!-- Keep English and Urdu library translations; neutral English resources remain embedded. -->
+		<SatelliteResourceLanguages>en;en-US;en-GB;ur;ur-PK;ur-IN</SatelliteResourceLanguages>
 		<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 		<ApplicationIcon>Assets\FMSC_Logo Icon.ico</ApplicationIcon>
 		<Version>1.1.0-rc.2</Version>
