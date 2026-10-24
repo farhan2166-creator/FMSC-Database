@@ -27,7 +27,7 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
     internal DatabaseConnectionForm(bool startup)
     {
         _startup = startup;
-        Text = "FMSC — School Records Connection";
+        Text = "FMSC — Management System Connection";
         StartPosition = startup ? FormStartPosition.CenterScreen : FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
