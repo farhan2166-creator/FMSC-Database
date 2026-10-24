@@ -11,7 +11,7 @@ internal sealed class PasswordResetDialog : ApplicationWindowForm
     private readonly ModernButton save=new(){Text="Reset Password",ThemeRole="Success"},cancel=new(){Text="Cancel",ThemeRole="Secondary"};
     private readonly FormValidator validator=new();
     private readonly Func<string,bool,Task<AccessSaveResult>> reset;
-    private bool busy,finished;
+    private bool busy;
 
     internal PasswordResetDialog(string username,Func<string,bool,Task<AccessSaveResult>> reset)
     {
@@ -32,8 +32,6 @@ internal sealed class PasswordResetDialog : ApplicationWindowForm
         FormFlow.EnterMovesToNext(this);Shown+=(_,_)=>password.Focus();
         FormClosing+=(_,e)=>{
             if(busy){e.Cancel=true;status.Text="Wait for the password operation to finish.";return;}
-            if(!finished&&(password.Text.Length>0||confirmation.Text.Length>0))
-                e.Cancel=!ModernMessageDialog.Confirm(this,"Discard the entered password?","Unsaved password",defaultYes:false);
         };
         Disposed+=(_,_)=>validator.Dispose();
     }
@@ -49,7 +47,7 @@ internal sealed class PasswordResetDialog : ApplicationWindowForm
             var result=await reset(password.Text,forceChange.Checked);
             if(IsDisposed)return;
             if(result.Outcome!=AccessSaveOutcome.Rejected||result.Error is AdministrativeStaleStateException)
-            {finished=true;password.Clear();confirmation.Clear();busy=false;DialogResult=result.Outcome==AccessSaveOutcome.Rejected?DialogResult.Cancel:DialogResult.OK;Close();}
+            {password.Clear();confirmation.Clear();busy=false;DialogResult=result.Outcome==AccessSaveOutcome.Rejected?DialogResult.Cancel:DialogResult.OK;Close();}
             else status.Text="Password was not reset. "+DbMessage.UserMessage(result.Error??new IOException("The write was refused."));
         }
         catch(Exception ex){AppExceptionHandler.LogNonFatal(ex,"Resetting a maintenance account password");if(!IsDisposed)status.Text="The operation could not complete. "+DbMessage.UserMessage(ex);}

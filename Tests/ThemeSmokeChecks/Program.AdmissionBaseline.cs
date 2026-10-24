@@ -17,6 +17,18 @@ internal static partial class Program
         Set("currentAdmissionId", 41); Set("_editEnrollmentId", 71);
         name.Text = "Synthetic Student"; Capture();
         Check(!page.HasUnsavedChanges, "A freshly loaded admission is clean");
+        var dob = Field<ModernDatePicker>("dob");
+        dob.Checked = false; Capture();
+        dob.Checked = true;
+        dob.Value = new DateTime(2015, 4, 12);
+        Check(page.HasUnsavedChanges, "Entering an optional birth date protects the admission draft");
+        dob.Checked = false;
+        Check(!page.HasUnsavedChanges, "Checking, changing and unchecking an initially empty birth date returns to a clean draft");
+        dob.Checked = true; Capture();
+        dob.Checked = false;
+        Check(page.HasUnsavedChanges, "Clearing a previously saved birth date still counts as a real edit");
+        dob.Checked = true;
+        Check(!page.HasUnsavedChanges, "Restoring the saved birth date returns to a clean draft");
         name.Text = "Synthetic Corrected Student";
         Check(page.HasUnsavedChanges, "Actual personal-detail edits remain protected");
         // Match the real Save -> held inputs -> successful reload -> baseline -> release order.
@@ -65,5 +77,23 @@ internal static partial class Program
         using (Hold()) Capture();
         Check(page.HasUnsavedChanges, "A refreshed details baseline never clears an unsaved photo");
         Check(!page.IsHandleCreated, "Baseline regression fixtures never start student loaders or connect to SQL");
+        foreach (Control certificate in new Control[] {
+            new FMSC_SMS.Pages.Students.Certificates.LeaveCertificatePage(),
+            new FMSC_SMS.Pages.Students.Certificates.CollegeLeaveCertificatePage() })
+        using (certificate)
+        {
+            var certificateType = certificate.GetType();
+            var date = (ModernDatePicker)certificateType.GetField("leave", flags)!.GetValue(certificate)!;
+            var snapshot = certificateType.GetMethod("DraftSnapshot", flags)!;
+            date.ShowCheckBox = true; date.Checked = false;
+            string baseline = (string)snapshot.Invoke(certificate, null)!;
+            date.Checked = true; date.Value = new DateTime(2026, 9, 1);
+            Check((string)snapshot.Invoke(certificate, null)! != baseline,
+                certificateType.Name + " counts an entered leave date as an edit");
+            date.Checked = false;
+            Check((string)snapshot.Invoke(certificate, null)! == baseline,
+                certificateType.Name + " ignores the hidden value of an unchecked date");
+            Check(!certificate.IsHandleCreated, "Certificate date fixtures never start database loaders");
+        }
     }
 }

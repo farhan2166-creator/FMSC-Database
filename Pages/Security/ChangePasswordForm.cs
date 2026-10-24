@@ -6,10 +6,7 @@ public sealed class ChangePasswordForm : ApplicationWindowForm
     readonly ModernTextBox p1 = HumanUi.TextBox(false, 100);
     readonly ModernTextBox p2 = HumanUi.TextBox(false, 100);
     readonly ModernButton save = new() { Text = "Change Password", Dock = DockStyle.Fill };
-    /* this form had no close guard at all, while its sibling ChangeUsernameForm has had one since: a typed password was thrown away by the window's close button with no prompt. */
-    bool savedSuccessfully;
-    bool discardConfirmed;
-    /* (, same rule) - the hash and the write cannot be cancelled once they have started. */
+    /* Keep the dialog open while the password change is being saved. */
     bool savingPassword;
     /* UX - a missing or mismatched password is marked on the field, not shown in a message box. */
     readonly FormValidator validator = new();
@@ -127,7 +124,7 @@ public sealed class ChangePasswordForm : ApplicationWindowForm
         FormFlow.EnterMovesToNext(this);
         Shown += (_, _) => p1.Focus();
         Disposed += (_, _) => validator.Dispose();
-        /* The window's close is the only discard gesture on this form, so it is the one that is guarded; programmatic closes are left alone. */
+        /* Block closing only while a write is running. */
         FormClosing += (_, e) => {
             if (e.CloseReason != CloseReason.UserClosing)
                 return;
@@ -141,19 +138,7 @@ public sealed class ChangePasswordForm : ApplicationWindowForm
                     "Password");
                 return;
             }
-            e.Cancel = !ConfirmDiscard();
         };
-    }
-    /// <summary>dirty means "something typed and not saved yet".</summary>
-    bool IsDirty() =>
-        !savedSuccessfully &&
-        !savingPassword &&
-        DialogResult == DialogResult.None &&
-        (p1.Text.Length > 0 || p2.Text.Length > 0);
-    /// <summary>asks at most once per close gesture, and never about a write that is already running.</summary>
-    bool ConfirmDiscard()
-    {
-        return ModernMessageDialog.ConfirmDiscardOnce(this, IsDirty, ref discardConfirmed);
     }
     async Task SaveAsync()
     {
@@ -187,7 +172,6 @@ public sealed class ChangePasswordForm : ApplicationWindowForm
                 DatabaseHelper.P("@PasswordSalt", salt));
             CurrentUser.MustChangePassword = false;
             /* The change committed, so this close is not a discard. */
-            savedSuccessfully = true;
             DialogResult = DialogResult.OK;
         }
         catch (Exception ex)

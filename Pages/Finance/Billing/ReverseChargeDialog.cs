@@ -11,10 +11,6 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Danger"
     };
-    /* Set only once the reversal has been written, so that path closes without the unsaved-changes prompt. */
-    private bool savedSuccessfully;
-    /* One confirmation per close gesture. Assigning DialogResult on a modal form raises FormClosing too, so a single Cancel click would otherwise ask twice. */
-    private bool discardConfirmed;
     /* True from the moment the write leaves for the server until it has answered. */
     private bool saving;
     /* UX - the missing reason is marked on its field, not shown in a message box. */
@@ -46,16 +42,10 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
         Font = AppTheme.NormalFont;
         BuildLayout(chargeName, billingMonth, amount, studentDisplay);
         reverseButton.Click += async (_, _) => await SaveAsync();
-        /* The window's own close (X, Alt+F4, Esc) is guarded the same way; programmatic closes are left alone. */
+        /* Block closing only while a write is running. */
         FormClosing += (_, e) => {
-            /* The write is in flight: ignore the gesture entirely rather than ask, so the result flags are always set before the caller gets the window back. */
-            if (saving && e.CloseReason == CloseReason.UserClosing)
-            {
-                e.Cancel = true;
-                return;
-            }
             if (e.CloseReason == CloseReason.UserClosing)
-                e.Cancel = !ConfirmDiscard();
+                e.Cancel = saving;
         };
     }
     private void BuildLayout(
@@ -65,12 +55,10 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
         string studentDisplay)
     {
         var cancel = cancelButton;
-        /* The guard runs here rather than from the button's own DialogResult, because a button that assigns DialogResult dismisses the modal form before the confirmation can keep it open. */
+        /* Cancel closes immediately when no save is running. */
         cancel.Click += (_, _) => {
             /* A click that slipped through while the write is in flight. */
             if (saving)
-                return;
-            if (!ConfirmDiscard())
                 return;
             DialogResult = DialogResult.Cancel;
             Close();
@@ -145,7 +133,6 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
                 DatabaseHelper.BigInt("@BillingChargeId", billingChargeId),
                 DatabaseHelper.P("@Reason", reason.Text.Trim()));
             /* The flags the caller reads are set before anything can close this window. */
-            savedSuccessfully = true;
             Reversed = true;
             saving = false;
             /* The window can still have been torn down while the server was answering (the application closing, for instance). */
@@ -171,15 +158,4 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
             cancelButton.Enabled = true;
         }
     }
-    /// <summary>The one value this form edits: the reason. The form opens with it empty, so anything typed is an edit, and a form whose write is already under way is never dirty.</summary>
-    private bool IsDirty() =>
-        !savedSuccessfully &&
-        DialogResult != DialogResult.OK &&
-        reason.Text.Trim().Length > 0;
-    /// <summary>asks at most once for a close gesture. True when the caller may proceed with the close.</summary>
-    private bool ConfirmDiscard()
-    {
-        return ModernMessageDialog.ConfirmDiscardOnce(this, IsDirty, ref discardConfirmed);
-    }
 }
-
