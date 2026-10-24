@@ -383,7 +383,6 @@
       </Textbox>
       <Textbox Name="txtPerformance">
         <CanGrow>true</CanGrow>
-        <CanShrink>true</CanShrink>
         <KeepTogether>true</KeepTogether>
         <Paragraphs>
           <Paragraph>
