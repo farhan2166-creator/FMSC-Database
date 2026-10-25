@@ -37,6 +37,10 @@ internal static partial class Program
             if(familyRows is not null)data=familyRows;
             using var billRows=bill&&data.Columns.Contains("FamilyRowKind")?FamilyBillReport.PrepareData(data):null;
             if(billRows is not null)data=billRows;
+            using var billDisplay=bill?(data.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Bill(data):FeeBillPresentation.Prepare(data)):null;
+            if(billDisplay is not null)data=billDisplay;
+            using var receiptDisplay=!bill&&data.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Receipt(data):null;
+            if(receiptDisplay is not null)data=receiptDisplay;
             if(bill) foreach(DataRow row in data.Rows)row["ReceiptNumber"]=data.Columns.Contains("FamilyRowKind")?"FB-2026-00001":"B-2026-00001";
             string file=data.Columns.Contains("FamilyRowKind")?(bill?"FamilyBill.rdlc":"FamilyReceipt.rdlc"):(bill?"StudentBill.rdlc":"StudentReceipt.rdlc");
             file=templateName??file;
@@ -84,6 +88,24 @@ internal static partial class Program
             {
                 Check(xml.Descendants(ns+"Group").Any(group=>(string?)group.Attribute("Name")=="BillStudentGroup"),"Family bills group real fee rows under separate student headings");
             }
+            if(file is "FamilyBill.rdlc" or "FamilyReceipt.rdlc")
+            {
+                string childGroup=bill?"BillStudentGroup":"ReceiptStudentGroup";
+                int schoolRow=Array.FindIndex(printedRows,row=>row.Descendants(ns+"Textbox").Any(box=>(string?)box.Attribute("Name")=="InstitutionName"));
+                Check(!printedMembers[schoolRow].Ancestors(ns+"TablixMember").Any(member=>(string?)member.Element(ns+"Group")?.Attribute("Name")==childGroup),
+                    "The school heading is outside the repeating child group");
+                int titleRow=Array.FindIndex(printedRows,row=>row.Descendants(ns+"Textbox").Any(box=>(string?)box.Attribute("Name")=="ReceiptHeading"));
+                Check(printedMembers[titleRow].Ancestors(ns+"TablixMember").Any(member=>(string?)member.Element(ns+"Group")?.Attribute("Name")==childGroup),
+                    "Document titles, identities and calculations repeat inside the child group");
+                Check(!xml.Descendants(ns+"PageBreak").Any(),"Continuous family slips never force a page break between children");
+                Check(xml.Descendants(ns+"Group").Single(group=>(string?)group.Attribute("Name")==childGroup)
+                    .Parent!.Element(ns+"Visibility")!.Value.Contains("ShowChildDocument"),"Each complete child slip follows its own visibility rule");
+                Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="GroupSummaryHeading")
+                    .Descendants(ns+"Value").First().Value=="GROUP SUMMARY","The family printout has one final group summary");
+                foreach(var (labelName,caption) in new[]{("GroupFeeTotalLabel","Net total"),("GroupDiscountLabel","Net discount"),("GroupPayableLabel","Net payable"),("GroupDueLabel","Net due")})
+                    Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")==labelName).Descendants(ns+"Value").First().Value==caption,
+                        "Family summary uses the agreed net captions");
+            }
             using var report=new LocalReport();report.LoadReportDefinition(new StringReader(definition));
             report.DataSources.Add(new ReportDataSource(xml.Descendants(ns+"DataSet").Single().Attribute("Name")!.Value,data));
             byte[] pdf=report.Render("PDF");File.WriteAllBytes(Path.Combine(folder,name+".pdf"),pdf);
@@ -102,12 +124,19 @@ internal static partial class Program
             {
                 row["CreditApplied"]=0m;row["CreditRemaining"]=0m;row["ShowCreditRemaining"]=false;
                 row["CashReceived"]=row["TotalPaid"];row["PaymentMethod"]="Cash";
+                if(cash.Columns.Contains("ChildCreditApplied"))
+                {
+                    row["ChildCreditApplied"]=0m;row["ChildCreditRemaining"]=0m;row["ChildShowCreditRemaining"]=false;
+                    row["ChildCashReceived"]=row["ChildTotalPaid"];
+                }
             }
             string file=source.Columns.Contains("FamilyRowKind")?"FamilyReceipt.rdlc":"StudentReceipt.rdlc";
             string path=Path.Combine(AppContext.BaseDirectory,"Reports",file);
             XNamespace ns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";
-            var full=XDocument.Parse(FeeDocumentLayout.SizeToContent(path,source));
-            var compact=XDocument.Parse(FeeDocumentLayout.SizeToContent(path,cash));
+            using var fullData=source.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Receipt(source):source.Copy();
+            using var compactData=cash.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Receipt(cash):cash.Copy();
+            var full=XDocument.Parse(FeeDocumentLayout.SizeToContent(path,fullData));
+            var compact=XDocument.Parse(FeeDocumentLayout.SizeToContent(path,compactData));
             double Height(XDocument document)=>double.Parse(document.Descendants(ns+"PageHeight").Single().Value.Replace("in",""),System.Globalization.CultureInfo.InvariantCulture);
             Check(Height(compact)<Height(full),"Zero credit rows collapse completely, including their paper space");
             var table=compact.Descendants(ns+"Tablix").First();
@@ -128,9 +157,17 @@ internal static partial class Program
                     row["CreditApplied"]=applied;row["CreditRemaining"]=remaining;
                     row["ShowCreditRemaining"]=applied!=0m||remaining!=0m;
                     row["CashReceived"]=Convert.ToDecimal(row["TotalPaid"])-applied;
+                    if(cash.Columns.Contains("ChildCreditApplied"))
+                    {
+                        bool firstChild=Convert.ToInt32(row["ReceiptStudentKey"])==Convert.ToInt32(cash.Rows[0]["ReceiptStudentKey"]);
+                        row["ChildCreditApplied"]=firstChild?applied:0m;row["ChildCreditRemaining"]=firstChild?remaining:0m;
+                        row["ChildShowCreditRemaining"]=firstChild&&(applied!=0m||remaining!=0m);
+                        row["ChildCashReceived"]=Convert.ToDecimal(row["ChildTotalPaid"])-(firstChild?applied:0m);
+                    }
                 }
-                var visible=XDocument.Parse(FeeDocumentLayout.SizeToContent(path,cash));
-                Check(applied==0m?Height(visible)>Height(compact)&&Height(visible)<Height(full):Height(visible)==Height(full),
+                using var visibleData=cash.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Receipt(cash):cash.Copy();
+                var visible=XDocument.Parse(FeeDocumentLayout.SizeToContent(path,visibleData));
+                Check(applied==0m?Height(visible)>Height(compact)&&Height(visible)<Height(full):Height(visible)>Height(compact),
                     "Remaining-only credit occupies one row; credit used occupies both rows even when exhausted");
                 Check(Render(name+"-"+label,cash)==1,"Credit visibility scenario prints on one page");
             }
@@ -201,13 +238,21 @@ internal static partial class Program
             Check(family.Rows[0].Field<decimal>("FeesCovered")==4800m && family.Rows[0].Field<decimal>("CashReceived")==3000m
                 && family.Rows[0].Field<decimal>("StudentOutstanding")==4300m && family.Rows[0].Field<decimal>("BalanceRemaining")==6500m,
                 "Receipt fees, payment, child debt and family debt retain their separate financial scopes");
+            var unpaidChild=family.AsEnumerable().Single(row=>row.Field<string>("ReceiptStudentName")=="1002 · Sara Example");
+            Check(unpaidChild.Field<string>("FeeDescription")=="No fees paid in this receipt"
+                && unpaidChild.Field<decimal>("Amount")==0m && unpaidChild.Field<decimal>("StudentSettled")==0m
+                && unpaidChild.Field<decimal>("StudentOutstanding")==2200m,
+                "A listed sibling without fee allocations remains visible with zero paid and their own balance");
+            Check(family.Rows[0].Field<string>("AdmissionNumberText")=="1001, 1002",
+                "Family receipt admission numbers match the children shown in its body");
             Check(Render("family-partial-payment",family)==1,"A partial family payment fits with explicit student and family balance labels");
             string sourcePath=Path.Combine(AppContext.BaseDirectory,"Reports",FamilyReceiptReport.TemplateFile);
             var editable=XDocument.Load(sourcePath);XNamespace editableNs=editable.Root!.Name.Namespace;
             editable.Descendants(editableNs+"Textbox").Single(box=>(string?)box.Attribute("Name")=="DocumentDateFooter")
                 .Descendants(editableNs+"Value").First().Value=new string('W',150)+" ";
             string editedPath=Path.Combine(folder,"edited-caption.rdlc");editable.Save(editedPath);
-            decimal PaperHeight(string path)=>decimal.Parse(XDocument.Parse(FeeDocumentLayout.SizeToContent(path,family))
+            using var familyDisplay=FamilyFeeDocumentPresentation.Receipt(family);
+            decimal PaperHeight(string path)=>decimal.Parse(XDocument.Parse(FeeDocumentLayout.SizeToContent(path,familyDisplay))
                 .Descendants(editableNs+"PageHeight").Single().Value.Replace("in",""),System.Globalization.CultureInfo.InvariantCulture);
             Check(PaperHeight(editedPath)>PaperHeight(sourcePath),
                 "Editing a literal date caption grows the receipt paper while its separate date formula remains intact");
@@ -271,10 +316,51 @@ internal static partial class Program
             Check(Render("individual-bill",studentBill)==1,"Individual bill uses the established receipt design");
             Check(Render("individual-bill-a4",studentBill,annual:true)>=1,"A4 bill printing reuses the approved bill RDLC on a sheet");
         }
+        using(var waivedCharges=charges.Clone())
+        {
+            waivedCharges.Columns.Add("GrossAmount",typeof(decimal));
+            waivedCharges.Rows.Add("6590","Aqsa","Tuition Fee — Free",new DateTime(2026,10,1),2100m,0m,"Campus Girls",2100m);
+            using var waived=StudentBillReport.BuildData(school.Name,school.ContactNumber,school.Address,"Example Parent",waivedCharges);
+            string saved=FeeBillDocuments.Snapshot(waived);
+            using(var display=FeeBillPresentation.Prepare(waived))
+            {
+                var row=display.Rows[0];
+                Check(row.Field<decimal>("Amount")==0m && row.Field<decimal>("BillDisplayAmount")==2100m
+                    && row.Field<string>("BillDiscountText")==(-2100m).ToString("N0") && row.Field<decimal>("TotalPaid")==0m,
+                    "Free bill displays original fee and negative concession while preserving its zero unpaid amount");
+                Check(row.Field<string>("BillDiscountCaption")=="Less: Free concession" && row.Field<string>("BillPaymentPrompt")=="No payment required",
+                    "Free bills explain the concession and never request payment");
+            }
+            Check(FeeBillDocuments.Snapshot(waived)==saved,"Preparing the printable bill does not rewrite the financial snapshot");
+            Check(Render("individual-free-bill",waived)==1,"The fully waived student bill fits one clear page");
+            using(var legacy=waived.Copy())
+            {
+                legacy.Columns.Remove("BillGrossAmount");legacy.Columns.Remove("BillLineDiscount");
+                using var display=FeeBillPresentation.Prepare(legacy);
+                Check(display.Rows[0].Field<decimal>("BillDisplayAmount")==2100m,"An existing single-fee free bill can show its original amount from saved concession evidence");
+                Check(Render("existing-free-bill",legacy)==1,"An existing free bill renders without requiring new snapshot fields");
+            }
+            waivedCharges.Rows[0]["FeeTypeName"]="Tuition Fee — Scholarship";
+            waivedCharges.Rows[0]["DiscountAmount"]=500m;waivedCharges.Rows[0]["Due"]=600m;
+            using var partial=StudentBillReport.BuildData(school.Name,school.ContactNumber,school.Address,"Example Parent",waivedCharges);
+            using(var display=FeeBillPresentation.Prepare(partial))
+            {
+                var row=display.Rows[0];
+                Check(row.Field<decimal>("BillDisplayAmount")==2100m && row.Field<decimal>("BillPreviouslySettled")==1000m
+                    && row.Field<bool>("ShowBillPreviouslySettled") && row.Field<decimal>("TotalPaid")==600m,
+                    "A scholarship bill separates the original fee, concession and previous settlement without inflating the unpaid balance");
+                Check(row.Field<string>("BillPaymentPrompt")=="Please pay at the fee counter","A positive bill continues to request payment");
+            }
+            Check(Render("scholarship-partly-paid-bill",partial)==1,"A partly paid scholarship bill renders the complete breakdown on one page");
+            waivedCharges.Rows.Add("6500","Other Child","Transport Fee",new DateTime(2026,10,1),0m,900m,"Campus Boys",900m);
+            using var family=FamilyBillReport.BuildData(school.Name,school.ContactNumber,school.Address,"Example Parent",waivedCharges);
+            Check(Render("family-concession-bill",family)==1,"A family bill keeps separate child headings with the shared concession and settlement breakdown");
+        }
         charges.Rows.Add("1002","Sara Example","Tuition",new DateTime(2026,11,1),0m,500m);
         charges.Rows.Add("1001","Ali Example","Transport",new DateTime(2026,12,1),0m,600m);
         charges.Rows.Add("1002","Sara Example","Admission",DBNull.Value,0m,200m);
         using(var familyBill=FeeBillDataBuilder.BuildGrouped(school.Name,school.ContactNumber,school.Address,"Example Parent",charges))
             Check(Render("family-bill",familyBill)==1,"Family bill is one combined document in the same design");
+        CheckFamilyDocumentSections(school,(name,data)=>Render(name,data));
     }
 }

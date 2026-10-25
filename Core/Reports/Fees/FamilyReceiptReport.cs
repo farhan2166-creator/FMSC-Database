@@ -8,7 +8,7 @@ internal static partial class FamilyReceiptReport
 
     internal static void Show(Form? owner,DataTable source)
     {
-        using var data=PrepareData(source);
+        using var data=FamilyFeeDocumentPresentation.Receipt(source);
         string path=Path.Combine(AppContext.BaseDirectory,"Reports",TemplateFile);
         RdlcReportPreview.Show(owner,"Family Payment Receipt",path,DataSetName,data,
             reportDefinition:FeeDocumentLayout.SizeToContent(path,data));

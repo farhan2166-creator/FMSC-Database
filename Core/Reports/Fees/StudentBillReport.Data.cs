@@ -2,7 +2,7 @@ namespace FMSC_SMS.Core;
 
 internal static partial class StudentBillReport
 {
-    internal sealed record Line(string FeeName,string Period,decimal Amount,decimal Discount,long ChargeId=0,int AdmissionId=0);
+    internal sealed record Line(string FeeName,string Period,decimal Amount,decimal Discount,long ChargeId=0,int AdmissionId=0,decimal? GrossAmount=null);
 
     internal static DataTable BuildData(string institutionName,string contactNumber,string address,string parent,DataTable charges)
     {
@@ -13,7 +13,7 @@ internal static partial class StudentBillReport
     internal static DataTable BuildData(string institutionName,string contactNumber,string address,string studentName,string reference,
         string classSection,IReadOnlyList<Line> lines,bool showDiscount,string campusName,string fatherName,string sourceKey)
     {
-        var data=FeeDocumentData.Create();
+        var data=FeeBillPresentation.Create();
         decimal discount=showDiscount?lines.Sum(line=>line.Discount):0m,total=lines.Sum(line=>line.Amount);
         foreach(var line in lines)
         {
@@ -22,12 +22,14 @@ internal static partial class StudentBillReport
                 contactNumber,address,campusName,fatherName,FeeDocumentData.FormatPeriod(line.Period));
             row["DocumentKind"]="Bill";row["BillSourceKey"]=sourceKey;
             row["BillChargeId"]=line.ChargeId;row["BillAdmissionId"]=line.AdmissionId;
+            row["BillLineDiscount"]=showDiscount?line.Discount:0m;
+            row["BillGrossAmount"]=showDiscount?line.GrossAmount??line.Amount+line.Discount:line.Amount;
         }
         return data;
     }
     internal static DataTable FromGroupedData(DataTable grouped)
     {
-        var data=FeeDocumentData.Create();string month="",previousPeriod="";
+        var data=FeeBillPresentation.Create();string month="",previousPeriod="";
         foreach(DataRow source in grouped.Rows)
         {
             string kind=Convert.ToString(source["FamilyRowKind"])??"";

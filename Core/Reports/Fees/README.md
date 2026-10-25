@@ -21,6 +21,12 @@ Shared files:
 - `FeeReceiptDocuments`: reads saved collections and chooses the receipt type.
 - `FeeBillDataBuilder` / `FeeReceiptDataBuilder`: shared preparation for the
   paired document builders; these files do not define a visual layout.
+- `FamilyFeeDocumentPresentation`: child calculations and the final net summary
+  for continuous family printouts. The school heading prints once; child sections
+  have no page breaks. Receipts retain children with payments, advances or debt;
+  bills retain children with an unpaid balance. Original document records stay intact.
+- `FeeReceiptDocuments` reads each child's original linked cash payment so an
+  advance appears only under its actual owner, including when no fee was paid.
 - `FeeReceiptQueries`: read-only identity, payment and allocation queries.
 - `FeeDocumentData`: common column contract and month formatting. Its internal
   XML table name `FeeReceiptData` is retained so existing saved bill snapshots

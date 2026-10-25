@@ -13,6 +13,7 @@ internal static partial class FamilyReceiptReport
         var children=source.AsEnumerable().GroupBy(row=>Convert.ToInt32(row["ReceiptPageKey"])).ToArray();
         if(children.Length<2) return source.Copy();
         var data=source.Clone();data.Columns.Add("FamilyRowKind",typeof(string));data.Columns.Add("FamilyAmountText",typeof(string));
+        FamilyFeeDocumentPresentation.AddChildColumns(data);
         var first=children[0].First();
         decimal Sum(string column)=>children.Sum(child=>Convert.ToDecimal(child.First()[column]));
         decimal total=Sum("NetPaid");
@@ -32,6 +33,13 @@ internal static partial class FamilyReceiptReport
             row["ShowAdjustments"]=children.Any(child=>Convert.ToBoolean(child.First()["ShowAdjustments"]));
             row["ShowBalance"]=showBalance;row["BalanceRemaining"]=showBalance?Sum("BalanceRemaining"):0m;
             row["FamilyRowKind"]=kind;row["FamilyAmountText"]=kind is "Fee" or "Summary"?amount.ToString("N0"):"";data.Rows.Add(row);
+            foreach(string field in FamilyFeeDocumentPresentation.IdentityFields)row["Child"+field]=template[field];
+            foreach(string field in FamilyFeeDocumentPresentation.MoneyFields)
+                if(source.Columns.Contains(field))row["Child"+field]=template[field];
+            foreach(string field in FamilyFeeDocumentPresentation.FlagFields)
+                if(source.Columns.Contains(field))row["Child"+field]=template[field];
+            row["ChildFeesCovered"]=children.Single(child=>ReferenceEquals(child.First(),template)).Sum(line=>Convert.ToDecimal(line["Amount"]));
+            row["ChildPayable"]=Convert.ToDecimal(row["ChildFeesCovered"])-Convert.ToDecimal(template["DiscountApplied"]);
         }
         foreach(var child in children)
         {
