@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--sports-certificate-input"))
+        {
+            CheckSportsCertificateInput();
+            Console.WriteLine($"PASS: {checks} sports keyboard, populated-history and collection-lock checks (no database connection).");
+            return;
+        }
         if(args.Contains("--admission-actions"))
         {
             CheckAdmissionActions();

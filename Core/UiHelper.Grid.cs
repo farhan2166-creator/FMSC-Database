@@ -572,6 +572,7 @@ namespace FMSC_SMS.Core
                 name.Equals("UpdatedAt", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("ModifiedAt", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("RowVersion", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("ContentVersion", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("Timestamp", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("ConcurrencyToken", StringComparison.OrdinalIgnoreCase);
         }
@@ -983,6 +984,10 @@ namespace FMSC_SMS.Core
             }
             var column =
                 grid.Columns[e.ColumnIndex];
+            if(column.DataPropertyName=="ContentVersion"&&e.Value is byte[] version)
+            {
+                e.Value=Convert.ToHexString(version);e.FormattingApplied=true;return;
+            }
             ApplyGridValueAlignment(column);
             if (e.CellStyle is not null && (IsCenteredGridValue(column) || e.Value is DateTime ||
                 e.Value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal))

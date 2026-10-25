@@ -1089,7 +1089,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 DatabaseHelper.Date(
                     "@CertificateDate",
                     certificateDate.Value.Date),
-                DatabaseHelper.P("@SubjectIds", GetCheckedSubjectIdsCsv()),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"ProvisionalCertificateId",selectedProvisionalCertificateId)));
+                DatabaseHelper.P("@SubjectIds", GetCheckedSubjectIdsCsv()),CertificateCollectionFlow.VersionParameter(certificateResults,"ProvisionalCertificateId",selectedProvisionalCertificateId));
             successMessage =
                 "Certificate updated successfully.";
             /* Refresh only if the saved certificate's student is still selected. */

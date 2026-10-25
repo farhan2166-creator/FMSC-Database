@@ -678,7 +678,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
         if(selectedIssueId>0)
         {
             if(selectedIssueCollected||!IsLatestSelectedIssue())return;
-            try { DatabaseHelper.ExecuteUser("UpdateLeavingCertificateCopy",DatabaseHelper.Int("@CopyId",selectedIssueId),DatabaseHelper.P("@ClassPromotedTo",GetSelectedPromotionClassName()),DatabaseHelper.P("@AcademicRecord",academic.Text),DatabaseHelper.P("@AttendanceRecord",attendance.Text),DatabaseHelper.P("@Remarks",RecordTextPolicy.TitleCase(remarks.Text)),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"LeaveCertificateIssueId",selectedIssueId)));
+            try { DatabaseHelper.ExecuteUser("UpdateLeavingCertificateCopy",DatabaseHelper.Int("@CopyId",selectedIssueId),DatabaseHelper.P("@ClassPromotedTo",GetSelectedPromotionClassName()),DatabaseHelper.P("@AcademicRecord",academic.Text),DatabaseHelper.P("@AttendanceRecord",attendance.Text),DatabaseHelper.P("@Remarks",RecordTextPolicy.TitleCase(remarks.Text)),CertificateCollectionFlow.VersionParameter(certificateResults,"LeaveCertificateIssueId",selectedIssueId));
                 int id=selectedIssueId;LoadCertificates(student.SelectedId);SelectSavedCertificate(id);Info("Certificate changes saved. Student status and fees are unchanged."); }
             catch(Exception ex){Fail(ex);}
             return;
@@ -965,7 +965,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
                 DatabaseHelper.Int(
                     "@LeaveCertificateIssueId",
                     selectedIssueId),
-                DatabaseHelper.P("@CollectedBy", collectedBy),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"LeaveCertificateIssueId",selectedIssueId)));
+                DatabaseHelper.P("@CollectedBy", collectedBy),CertificateCollectionFlow.VersionParameter(certificateResults,"LeaveCertificateIssueId",selectedIssueId));
             successMessage =
                 "Certificate issuance marked as collected.";
             LoadCertificates(admissionId);

@@ -592,7 +592,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         await SaveOperation(new[] { DatabaseHelper.P("@Action", editing?"Update":"Create"), DatabaseHelper.Int("@AdmissionId", student.SelectedId),
             DatabaseHelper.Int("@CertificateRecordId",selectedCertificateRecordId),DatabaseHelper.Int("@ExpectedLatestIssueId",selectedIssueId),
             DatabaseHelper.P("@ExamType", exam), DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date),
-            DatabaseHelper.P("@RollNumber", rollNumber.Text.Trim()), DatabaseHelper.P("@Remarks", remarks.Text.Trim()),DatabaseHelper.Int("@AcademicYearId",academicYear.SelectedId),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"CharacterCertificateIssueId",selectedIssueId)) },
+            DatabaseHelper.P("@RollNumber", rollNumber.Text.Trim()), DatabaseHelper.P("@Remarks", remarks.Text.Trim()),DatabaseHelper.Int("@AcademicYearId",academicYear.SelectedId),CertificateCollectionFlow.VersionParameter(certificateResults,"CharacterCertificateIssueId",selectedIssueId) },
             $"{(editing?"Update":"Create")} {exam} character certificate for student {student.SelectedId}");
     }
     private async Task IssueAgain()
@@ -654,7 +654,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
                 DatabaseHelper.Int(
                     "@CharacterCertificateIssueId",
                     selectedIssueId),
-                DatabaseHelper.P("@CollectedBy", collectedBy),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"CharacterCertificateIssueId",selectedIssueId)));
+                DatabaseHelper.P("@CollectedBy", collectedBy),CertificateCollectionFlow.VersionParameter(certificateResults,"CharacterCertificateIssueId",selectedIssueId));
             successMessage =
                 "Certificate issuance marked as collected.";
             LoadCertificates(admissionId);
