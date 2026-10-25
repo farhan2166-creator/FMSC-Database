@@ -1729,7 +1729,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 Fail(ex);
         }
     }
-    /// <summary>Tuition first; other fees share chronological priority.</summary>
+    /// <summary>Retained tuition/date tie priority for discounts; payment order is defined separately.</summary>
     private static int SettlementRank(DataRow row) =>
         string.Equals(GetText(row, "FeeTypeCode"), "TUITION", StringComparison.OrdinalIgnoreCase) ||
         GetText(row, "FeeTypeName").Contains("tuition", StringComparison.OrdinalIgnoreCase) ? 0 : 1;
@@ -1751,7 +1751,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         // data can use the existing user-scoped cache across sibling accounts.
         var feeOrderTask = DatabaseHelper.QueryUserAsync("GetFeeTypes");
         var creditTask = DatabaseHelper.QueryUserAsync("GetStudentCredit", DatabaseHelper.Int("@AdmissionId", forAdmissionId));
-        await Task.WhenAll(chargesTask, feeOrderTask, creditTask);
+        var settlementTask = ReadSettlementMetadataAsync(forAdmissionId);
+        await Task.WhenAll(chargesTask, feeOrderTask, creditTask, settlementTask);
         DataTable raw = await chargesTask;
         var feeOrderRows = await feeOrderTask;
         var feeOrder=feeOrderRows.AsEnumerable().ToDictionary(row=>GetInt(row,"FeeTypeId"),row=>GetInt(row,"DisplayOrder"));
@@ -1771,7 +1772,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         }
         var creditRows = await creditTask;
         availableCreditByStudent[forAdmissionId] = creditRows.Rows.Count > 0 ? GetDecimal(creditRows.Rows[0], "AvailableCredit") : 0m;
-        /* Oldest tuition first, then all other charges in date order. */
+        var settlement=await settlementTask;
+        /* Preserve the existing tuition tag for discount ties; payment order has its own metadata. */
         List<DataRow> ordered =
             raw.Rows
                 .Cast<DataRow>()
@@ -1828,35 +1830,23 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             charges.Rows[index].Cells["AdmissionId"].Value = forAdmissionId;
             charges.Rows[index].Cells["EnrollmentId"].Value = GetInt(row, "EnrollmentId");
             charges.Rows[index].Cells["StudentName"].Value=StudentNameFor(forAdmissionId);
+            charges.Rows[index].Cells["StudentName"].Tag=(settlement.ClassPosition,settlement.Number);
+            charges.Rows[index].Cells["FeeTypeName"].Tag=settlement.MonthlyCharges.Contains(chargeId);
             charges.Rows[index].Cells["FeeDisplayOrder"].Value=feeOrder.GetValueOrDefault(GetInt(row,"FeeTypeId"),int.MaxValue);
             charges.Rows[index].Cells["StudentName"].ToolTipText=$"{StudentNameFor(forAdmissionId)} · Admission {AdmissionNumbers.ForId(forAdmissionId)}";
             charges.Rows[index].Cells["FeeTypeName"].ToolTipText=$"{GetText(row,"FeeTypeName")} · Due {FormatDueDate(row["DueDate"])}";
             added++;
         }
-        if (added > 0) charges.Sort(new StudentChargeComparer(admissionId));
+        if (added > 0) charges.Sort(new StudentChargeComparer());
         return added;
     }
-    private sealed class StudentChargeComparer(int primaryAdmissionId) : System.Collections.IComparer
+    private sealed class StudentChargeComparer : System.Collections.IComparer
     {
         public int Compare(object? x, object? y)
         {
             var left = (DataGridViewRow)x!;
             var right = (DataGridViewRow)y!;
-            int leftStudent=Convert.ToInt32(left.Cells["AdmissionId"].Value);
-            int rightStudent=Convert.ToInt32(right.Cells["AdmissionId"].Value);
-            if(leftStudent!=rightStudent) {
-                if(leftStudent==primaryAdmissionId) return -1;
-                if(rightStudent==primaryAdmissionId) return 1;
-                int name=StringComparer.CurrentCultureIgnoreCase.Compare(
-                    Convert.ToString(left.Cells["StudentName"].Value),Convert.ToString(right.Cells["StudentName"].Value));
-                return name!=0 ? name : leftStudent.CompareTo(rightStudent);
-            }
-            int priority = Convert.ToInt32(left.Cells["BillingChargeId"].Tag)
-                .CompareTo(Convert.ToInt32(right.Cells["BillingChargeId"].Tag));
-            if (priority != 0) return priority;
-            int period=ChargePeriod(left).CompareTo(ChargePeriod(right));
-            return period!=0 ? period : Convert.ToInt64(left.Cells["BillingChargeId"].Value)
-                .CompareTo(Convert.ToInt64(right.Cells["BillingChargeId"].Value));
+            return SettlementKey(left).CompareTo(SettlementKey(right));
         }
     }
     private static DateTime ChargePeriod(DataGridViewRow row) =>
@@ -1870,11 +1860,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         v.Fail(field, message);
         v.Finish();
     }
-    private IEnumerable<DataGridViewRow> SettlementRows() => charges.Rows.Cast<DataGridViewRow>()
-        .Where(row => !row.IsNewRow)
-        .OrderBy(row => row.Cells["BillingChargeId"].Tag is int rank ? rank : 12)
-        .ThenBy(ChargePeriod)
-        .ThenBy(row => Convert.ToInt64(row.Cells["BillingChargeId"].Value));
     /// <summary>Allocate across open charges in settlement order.</summary>
     private decimal FillFromReceivedAmount(decimal received)
     {
@@ -1887,7 +1872,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         }
         var discountMap = GetDiscountAllocations();
         var creditMap = GetCreditAllocations(discountMap);
-        var open = SettlementRows()
+        var open = SettlementRows(discountMap,creditMap)
             .Select(r => new {
                 Row = r,
                 ChargeId = GetLong(r.Cells["BillingChargeId"].Value),
@@ -1957,7 +1942,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         if (!useAvailableCredit.Checked) return result;
         discounts ??= GetDiscountAllocations();
         var remaining = availableCreditByStudent.ToDictionary(pair => pair.Key, pair => Math.Max(0m, pair.Value));
-        foreach (var row in SettlementRows())
+        foreach (var row in SettlementRows(discounts))
         {
             int owner = GetInt(row.Cells["AdmissionId"].Value);
             long id = GetLong(row.Cells["BillingChargeId"].Value);
@@ -2453,7 +2438,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         if (discount <= 0m)
             return result;
         var rows =
-            SettlementRows()
+            DiscountTieRows()
                 .Select(
                     r => new {
                         Row = r,
@@ -2474,7 +2459,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                         x.Due > 0m)
                 // Discounts settle the largest remaining fee balance first,
                 // across all included students. Equal balances retain the
-                // existing settlement order; payment allocation is unchanged.
+                // established discount tie order, independently of payment allocation.
                 .OrderByDescending(x => x.Due)
                 .ToList();
         foreach (var item in rows)
@@ -2593,6 +2578,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     {
         var discountMap =
             GetDiscountAllocations();
+        var creditMap = GetCreditAllocations(discountMap);
         decimal remaining =
             Math.Max(
                 0m,
@@ -2600,7 +2586,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         suppressPaymentEvents = true;
         try
         {
-            foreach (DataGridViewRow row in SettlementRows())
+            foreach (DataGridViewRow row in SettlementRows(discountMap,creditMap))
             {
                 if (row.IsNewRow)
                     continue;
