@@ -33,8 +33,8 @@ internal static partial class FeeBillDataBuilder
         }
         // Group by the reference, never by name: siblings can share a name.
         foreach(var student in charges.AsEnumerable().GroupBy(r=>Convert.ToString(r["Reference"]))){
-            studentKey=student.Key??"";studentHeading=$"{student.First()["StudentName"]} · {student.Key}";
-            AddLine($"{student.First()["StudentName"]} · {student.Key}",0m,"Student");
+            studentKey=student.Key??"";studentHeading=$"{student.Key} · {student.First()["StudentName"]}";
+            AddLine(studentHeading,0m,"Student");
             foreach(var month in student.GroupBy(r=>r["BillingMonth"] is DateTime date?new DateTime(date.Year,date.Month,1):new DateTime(1,1,1)).OrderBy(g=>g.Key)){
                 AddLine("  "+(month.Key.Year==1?"One-time fees":month.Key.ToString("MMM yyyy")),0m,"Month");
                 foreach(var fee in month.OrderBy(r=>charges.Columns.Contains("FeeDisplayOrder")?Convert.ToInt32(r["FeeDisplayOrder"]):0).ThenBy(r=>Convert.ToString(r["FeeTypeName"])))

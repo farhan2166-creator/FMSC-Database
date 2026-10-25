@@ -32,7 +32,7 @@ internal static partial class FeeReceiptDataBuilder
         foreach(DataRow student in students.Rows)
         {
             var child=lines.AsEnumerable().Where(row=>Convert.ToInt32(row["AdmissionId"])==Convert.ToInt32(student["AdmissionId"])).ToArray();
-            if(family) Add($"{Text(student,"StudentName")} · {Text(student,"AdmissionNumber")}","",0,"Student");
+            if(family) Add($"{Text(student,"AdmissionNumber")} · {Text(student,"StudentName")}","",0,"Student");
             foreach(var month in child.GroupBy(row=>Convert.ToDateTime(row["FeePeriod"]).ToString("MMM yyyy")))
             {
                 if(family) Add("  "+month.Key,"",0,"Month");
