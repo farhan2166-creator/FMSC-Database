@@ -9,6 +9,23 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPage
 {
     protected override int ActionStatusWidth => 240;
+    protected override async Task<DataTable> QueryClassesAsync(int campusId)
+    {
+        var classesTask = base.QueryClassesAsync(campusId);
+        var assignmentsTask = DatabaseHelper.QueryUserAsync("GetClassSections",
+            DatabaseHelper.Int("@CampusId", campusId),
+            DatabaseHelper.Int("@ClassId", 0),
+            DatabaseHelper.Int("@SectionId", 0));
+        await Task.WhenAll(classesTask, assignmentsTask);
+        var assignedClassIds = (await assignmentsTask).AsEnumerable()
+            .Select(row => Convert.ToInt32(row["ClassId"])).ToHashSet();
+        var classes = await classesTask;
+        var available = classes.Clone();
+        foreach (DataRow row in classes.Rows)
+            if (assignedClassIds.Contains(Convert.ToInt32(row["ClassId"])))
+                available.ImportRow(row);
+        return available;
+    }
     private ToolStripItem? confirmPlacementAction;
     private int pendingPlacementId;
     private static readonly Padding AdmissionDetailsCardPadding =
