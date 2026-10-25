@@ -469,7 +469,7 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
                 DatabaseHelper.P(
                     "@SubjectTaught",
                     subjectTaught.Text.Trim()),
-                DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"RegularLecturerCertificateId",selectedRegularLecturerCertificateId)));
+                DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date),CertificateCollectionFlow.VersionParameter(certificateResults,"RegularLecturerCertificateId",selectedRegularLecturerCertificateId));
             successMessage =
                 "Certificate updated successfully.";
             ClearCertificateFields();

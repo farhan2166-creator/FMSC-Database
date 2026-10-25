@@ -437,7 +437,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 DatabaseHelper.Int(
                     "@NoObjectionCertificateId",
                     selectedNoObjectionCertificateId),
-                DatabaseHelper.Date("@CertificateDate", certDate),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"NoObjectionCertificateId",selectedNoObjectionCertificateId)));
+                DatabaseHelper.Date("@CertificateDate", certDate),CertificateCollectionFlow.VersionParameter(certificateResults,"NoObjectionCertificateId",selectedNoObjectionCertificateId));
             successMessage =
                 "NOC updated successfully.";
             /* same rule as the create path: the student this certificate was updated for must still be the selected one, or the reload would show the previous student's certificates under the… */

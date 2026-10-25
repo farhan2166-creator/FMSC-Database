@@ -443,7 +443,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         if(selectedIssueId>0)
         {
             if(selectedIssueCollected||!IsLatestSelectedIssue())return;
-            try { DatabaseHelper.ExecuteUser("UpdateCertificateCopyDate",DatabaseHelper.P("@Kind","DOB"),DatabaseHelper.Int("@CopyId",selectedIssueId),DatabaseHelper.Date("@CertificateDate",certificateDate.Value.Date),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"DateOfBirthCertificateIssueId",selectedIssueId)));
+            try { DatabaseHelper.ExecuteUser("UpdateCertificateCopyDate",DatabaseHelper.P("@Kind","DOB"),DatabaseHelper.Int("@CopyId",selectedIssueId),DatabaseHelper.Date("@CertificateDate",certificateDate.Value.Date),CertificateCollectionFlow.VersionParameter(certificateResults,"DateOfBirthCertificateIssueId",selectedIssueId));
                 int id=selectedIssueId;LoadCertificates(student.SelectedId);SelectSavedCertificate(id);Info("Certificate changes saved."); }
             catch(Exception ex){Fail(ex);}
             return;
@@ -599,7 +599,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
                 DatabaseHelper.Int(
                     "@DateOfBirthCertificateIssueId",
                     selectedIssueId),
-                DatabaseHelper.P("@CollectedBy", collectedBy),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"DateOfBirthCertificateIssueId",selectedIssueId)));
+                DatabaseHelper.P("@CollectedBy", collectedBy),CertificateCollectionFlow.VersionParameter(certificateResults,"DateOfBirthCertificateIssueId",selectedIssueId));
             successMessage =
                 "Certificate issuance marked as collected.";
             LoadCertificates(admissionId);

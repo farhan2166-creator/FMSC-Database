@@ -79,7 +79,6 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
             int index=performanceSuggestions.SelectedIndex-1;
             if(index<0||creatingCertificate||!performance.Enabled||!performanceSuggestions.Enabled)return;
             performance.Text=PerformanceSentences[index].Sentence;
-            performanceSuggestions.SelectedIndex=0;
         };
         performance.EnabledChanged+=(_,_)=>performanceSuggestions.Enabled=performance.Enabled;
         /* dbo.CreateSportsCertificate has no duplicate guard, and the certificate table has no unique constraint on (AdmissionId, ...). */
@@ -324,6 +323,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
                 selectedSportsCertificateId, sportsCertificateId, false)) return;
             selectedSportsCertificateId =
                 sportsCertificateId;
+            performanceSuggestions.SelectedIndex=0;
             sportName.Text =
                 GetString(row, "SportName");
             performance.Text =
@@ -505,7 +505,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
                         sportName.Text)),
                 DatabaseHelper.P(
                     "@Performance",
-                    DatabaseHelper.OptionalText(performance.Text)),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"SportsCertificateId",selectedSportsCertificateId)));
+                    DatabaseHelper.OptionalText(performance.Text)),CertificateCollectionFlow.VersionParameter(certificateResults,"SportsCertificateId",selectedSportsCertificateId));
             successMessage =
                 "Sports certificate updated successfully.";
             AddSuggestionIfNew(sportName, sportName.Text);
@@ -648,6 +648,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     }
     private void ClearCertificateFields()
     {
+        performanceSuggestions.SelectedIndex=0;
         sportName.Clear();
         performance.Clear();
         certificateDate.Value =

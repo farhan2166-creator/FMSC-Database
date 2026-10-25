@@ -496,7 +496,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     {
         if(selectedIssueId>0)
         {
-            try { DatabaseHelper.ExecuteUser("UpdateCertificateCopyDate",DatabaseHelper.P("@Kind","Regular"),DatabaseHelper.Int("@CopyId",selectedIssueId),DatabaseHelper.Date("@CertificateDate",certificateDate.Value.Date),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId)));
+            try { DatabaseHelper.ExecuteUser("UpdateCertificateCopyDate",DatabaseHelper.P("@Kind","Regular"),DatabaseHelper.Int("@CopyId",selectedIssueId),DatabaseHelper.Date("@CertificateDate",certificateDate.Value.Date),CertificateCollectionFlow.VersionParameter(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId));
                 int issue=selectedIssueId,record=selectedRegularStudentCertificateId;LoadCertificates(student.SelectedId);SelectCertificate(record,issue);Info("Certificate changes saved."); }
             catch(Exception ex){Fail(ex);}
             return;

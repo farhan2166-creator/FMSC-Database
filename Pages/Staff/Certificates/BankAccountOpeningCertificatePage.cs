@@ -609,7 +609,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
                 DatabaseHelper.P(
                     "@Purpose",
                     purpose.Text.Trim()),
-                DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"BankAccountOpeningCertificateId",selectedBankAccountOpeningCertificateId)));
+                DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date),CertificateCollectionFlow.VersionParameter(certificateResults,"BankAccountOpeningCertificateId",selectedBankAccountOpeningCertificateId));
             successMessage =
                 "Certificate updated successfully.";
             ClearCertificateFields();

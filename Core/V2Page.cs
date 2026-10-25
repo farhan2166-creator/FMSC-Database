@@ -1208,6 +1208,16 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     }
     protected void Bind(DataTable table)
     {
+        // WinForms otherwise infers an image column for rowversion byte arrays.
+        // Prepare the hidden metadata column before binding can measure or paint it.
+        if(Grid.AutoGenerateColumns&&table.Columns.Contains("ContentVersion")&&table.Columns["ContentVersion"]!.DataType==typeof(byte[]))
+        {
+            if(Grid.Columns["ContentVersion"] is DataGridViewImageColumn imageColumn)Grid.Columns.Remove(imageColumn);
+            if(!Grid.Columns.Contains("ContentVersion"))Grid.Columns.Add(new DataGridViewTextBoxColumn {
+                Name="ContentVersion",DataPropertyName="ContentVersion",Visible=false,ReadOnly=true,ValueType=typeof(byte[])
+            });
+            Grid.Columns["ContentVersion"]!.Visible=false;
+        }
         Grid.DataSource = table;
         StyleGrid();
         ClearGridSelection(Grid);

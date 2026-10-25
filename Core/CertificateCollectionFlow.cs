@@ -1,4 +1,5 @@
 using FMSC_SMS.Pages.Security;
+using Microsoft.Data.SqlClient;
 
 namespace FMSC_SMS.Core;
 
@@ -13,6 +14,8 @@ internal sealed class CertificateCollectionFlow(string kind)
     private byte[]? expectedVersion;
     internal bool Available { get; set; } = true;
     internal static byte[]? Version(DataTable rows,string key,int id) => Find(rows,key,id) is DataRow row && row.Table.Columns.Contains("ContentVersion") ? row["ContentVersion"] as byte[] : null;
+    internal static SqlParameter VersionParameter(DataTable rows,string key,int id) => VersionParameter(Version(rows,key,id));
+    internal static SqlParameter VersionParameter(byte[]? value) => new("@ExpectedVersion",SqlDbType.Binary,8) {Value=(object?)value??DBNull.Value};
     internal static void FormatGrid(DataGridView grid)
     {
         foreach(string name in new[]{"ContentVersion","PreviousCertificateId","VoidedAt","VoidReason","EnrollmentId"})if(grid.Columns.Contains(name))grid.Columns[name].Visible=false;
@@ -79,7 +82,7 @@ internal sealed class CertificateCollectionFlow(string kind)
             if(busy||!Collect.Enabled||dirty())return;
             string? name=Prompt(owner,"Mark Certificate Collected","Name of person collecting this certificate:\nCollection permanently locks this copy.",200);
             if(name is null)return;
-            Run(owner,()=>DatabaseHelper.ExecuteUser("CollectCertificateCopy",DatabaseHelper.P("@Kind",kind),DatabaseHelper.Int("@CopyId",selected()),DatabaseHelper.P("@CollectedBy",name),DatabaseHelper.P("@ExpectedVersion",expectedVersion)),reload,selected());
+            Run(owner,()=>DatabaseHelper.ExecuteUser("CollectCertificateCopy",DatabaseHelper.P("@Kind",kind),DatabaseHelper.Int("@CopyId",selected()),DatabaseHelper.P("@CollectedBy",name),VersionParameter(expectedVersion)),reload,selected());
         };
         IssueAgain.Click+=(_,_)=>{
             if(busy||!IssueAgain.Enabled)return;
