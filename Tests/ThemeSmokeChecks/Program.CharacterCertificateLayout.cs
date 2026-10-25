@@ -13,7 +13,13 @@ internal static partial class Program
         var exam=Field<ModernComboBox>("examType");
         var date=Field<ModernDatePicker>("certificateDate");
         var roll=Field<ModernTextBox>("rollNumber");
-        var remarks=Field<ModernTextBox>("remarks");
+        var remarks=Field<ModernComboBox>("remarks");
+        var year=Field<LookupBox>("academicYear");
+        using var years=new System.Data.DataTable();years.Columns.Add("AcademicYearId",typeof(int));years.Columns.Add("YearName");years.Columns.Add("StartDate",typeof(DateTime));years.Columns.Add("EndDate",typeof(DateTime));
+        years.Rows.Add(1,"2026-2027",new DateTime(2026,4,1),new DateTime(2027,3,31));
+        CharacterCertificateOptions.BindYears(year,years);year.SelectedValue=1;
+        Check(CharacterCertificateOptions.PassingYear(year)==2026,"The 2026-2027 academic year offers passing year 2026, never 2027.");
+        Check(remarks.DropDownStyle==ComboBoxStyle.DropDownList&&remarks.Items.Cast<string>().SequenceEqual(new[]{"Good","Very Good","Excellent"}),"Conduct is chosen from the agreed options rather than entered as arbitrary text.");
         var create=Field<ModernButton>("createCertificateButton");
         var next=Field<ModernButton>("clearButton");
         Control details=student;
@@ -24,7 +30,7 @@ internal static partial class Program
             Location=new Point(-20000,-20000),ClientSize=new Size(1000,430),AutoScaleMode=AutoScaleMode.None };
         details.Dock=DockStyle.Fill;form.Controls.Add(details);
         exam.SelectedIndex=1;
-        var sequence=new Control[]{student,date,exam,roll,remarks,create,next};
+        var sequence=new Control[]{student,date,exam,roll,remarks,year,create,next};
         foreach(var control in sequence)control.Enabled=true;
         form.Show();Application.DoEvents();
         Directory.CreateDirectory("artifacts/character-certificate");
@@ -85,7 +91,7 @@ internal static partial class Program
         foreach(int wording in new[]{0,1})
         {
             exam.SelectedIndex=wording;Refresh();
-            Check(Field<ModernButton>("issueAgainButton").Enabled&&!exam.Enabled,"A saved SSC copy may be reissued without changing its exam type.");
+            Check(Field<ModernButton>("issueAgainButton").Enabled&&exam.Enabled&&create.Text=="Save Changes","The latest saved copy can be edited on the form and saved, or issued again separately.");
         }
         records.Rows[0]["CollectionStatus"]="Not Collected";Refresh();
         Check(!Field<ModernButton>("issueAgainButton").Enabled,"The latest copy must still be collected before issuing again.");

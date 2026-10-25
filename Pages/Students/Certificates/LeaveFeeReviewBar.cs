@@ -210,7 +210,7 @@ internal sealed class LeaveFeeReviewBar : TableLayoutPanel
         }};
         foreach(var choice in new[]{keep,reverse,payments}) choice.CheckedChanged+=(_,_)=>{
             if(choice.Checked) {
-                foreach(DataGridViewRow row in grid.Rows) if(row.Tag is ValueTuple<long,bool> tag && tag.Item2) row.Cells["Reverse"].Value=false;
+                foreach(DataGridViewRow row in grid.Rows) if(row.Tag is ValueTuple<long,bool> tag && tag.Item2) row.Cells["Reverse"].Value=reverse.Checked;
                 use.Text=payments.Checked?"Open Fee Collection":"Use This Decision"; UpdateTotals();
             }
         };

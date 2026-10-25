@@ -52,9 +52,10 @@ internal static partial class Program
                 Check(Convert.ToString(grid.Rows[0].Cells["ReversalReason"].Value)!.Contains("Payment history"),"A now-unpaid charge explains its retained payment history");
                 Check(Convert.ToString(grid.Rows[4].Cells["ReversalReason"].Value)!.Contains("Previous placement"),"Previous-placement charges explain their separate restriction");
                 reverse.Checked=true;
-                Check(!use.Enabled,"Reversal requires at least one eligible charge to be selected");
+                Check(use.Enabled&&Convert.ToBoolean(grid.Rows[3].Cells["Reverse"].Value)&&Find<Label>(dialog,"DecisionSummary").Text.Contains("2,500"),"Choosing reversal automatically selects eligible charges and previews the remaining balance");
                 void Select(int row)=>typeof(DataGridView).GetMethod("OnCellClick",flags)!.Invoke(grid,new object[]{new DataGridViewCellEventArgs(0,row)});
-                Select(0);Check(!use.Enabled,"A history-blocked unpaid charge cannot be selected for reversal");
+                Select(0);Check(grid.Rows[0].Cells["Reverse"] is DataGridViewTextBoxCell&&use.Enabled,"A history-blocked unpaid charge cannot be selected for reversal");
+                Select(3);Check(!use.Enabled&&!Convert.ToBoolean(grid.Rows[3].Cells["Reverse"].Value),"An automatically selected charge can be unchecked, requiring a selection before continuing");
                 Select(3);Check(use.Enabled&&Find<Label>(dialog,"DecisionSummary").Text.Contains("2,500"),"Selecting an eligible charge previews the exact remaining balance");
                 history.Checked=true;
                 Check(grid.Rows.Count==7&&Convert.ToBoolean(grid.Rows[3].Cells["Reverse"].Value),"Showing history preserves the selected unpaid charge");

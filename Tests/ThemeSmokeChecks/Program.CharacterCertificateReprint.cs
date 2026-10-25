@@ -35,9 +35,11 @@ internal static partial class Program
                 grid.ClearSelection();grid.CurrentCell=grid.Rows[row].Cells.Cast<DataGridViewCell>().First(cell=>cell.Visible);grid.Rows[row].Selected=true;Application.DoEvents();
             }
             exam.SelectedIndex=0;Select(0);
-            Check(Field<int>("selectedIssueId")==2&&exam.SelectedIndex==1&&!exam.Enabled,
-                "Selecting a saved history row loads its stored HSSC type and prevents print-time changes.");
+            Check(Field<int>("selectedIssueId")==2&&exam.SelectedIndex==1&&exam.Enabled,
+                "Selecting the latest history row loads its saved HSSC type and permits editing its entered details.");
             Check(print.Enabled&&again.Enabled,"A collected character certificate permits both reprint and another issuance.");
+            Check(Field<ModernButton>("createCertificateButton").Text=="Save Changes"&&Field<ModernButton>("createCertificateButton").Enabled,
+                "The latest copy uses Save Changes on the same certificate form.");
             type.GetMethod("SelectSavedCertificate",flags)!.Invoke(page,new object[]{0});
             Check(Field<int>("selectedIssueId")==2&&exam.SelectedIndex==1,"Automatic history selection chooses the newest issue's saved type.");
             Select(1);
@@ -56,18 +58,6 @@ internal static partial class Program
             Check(!print.Enabled,"Reprinting still requires Certificates.Print permission.");
             Check(!page.IsHandleCreated,"History selection checks never start page database loaders.");
             host.Close();
-            var details=new DataTable();
-            foreach(string name in new[]{"ExamType","StudentName","FatherName","Gender","RollNumber","Remarks"})details.Columns.Add(name);
-            details.Columns.Add("LastExamYear",typeof(int));details.Columns.Add("CertificateDate",typeof(DateTime));
-            var saved=details.Rows.Add("SSC","Synthetic Student","Synthetic Parent","Male","12345","Satisfactory conduct",2026,DateTime.Today);
-            using var dialog=new CharacterCertificateCorrectionDialog(saved,false);
-            dialog.StartPosition=FormStartPosition.Manual;dialog.Location=new Point(-20000,-20000);dialog.ShowInTaskbar=false;
-            dialog.Show();Application.DoEvents();
-            Check(Descendants(dialog).OfType<ModernTextBox>().Count()==3,"Correction editor includes only the entered roll, remarks and correction reason; Admission details and derived exam year are excluded.");
-            Check(Descendants(dialog).OfType<ModernButton>().Any(button=>button.Text=="Save Replacement"&&button.Visible),"Correction editor exposes its explicit replacement action.");
-            Directory.CreateDirectory("artifacts/character-certificate");
-            using var bitmap=new Bitmap(dialog.Width,dialog.Height);dialog.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));
-            bitmap.Save(Path.GetFullPath("artifacts/character-certificate/correction.png"));dialog.Close();
         }
         finally {CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Permissions);}
     }

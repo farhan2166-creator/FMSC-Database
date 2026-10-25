@@ -267,6 +267,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} leaving-fee decision, eligibility and checkbox checks (no database writes).");
             return;
         }
+        if(args.Contains("--leave-student-dates"))
+        {
+            CheckLeaveStudentDates();
+            Console.WriteLine($"PASS: {checks} leaving-certificate student date checks (no database connection).");
+            return;
+        }
         if(args.Contains("--payment-adjustments"))
         {
             CheckPaymentAdjustmentContext();

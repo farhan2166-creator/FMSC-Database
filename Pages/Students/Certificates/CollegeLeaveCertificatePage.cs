@@ -16,6 +16,11 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
     private readonly ModernTextBox currentClass =
         HumanUi.TextBox(false, 150);
     private readonly LookupBox promoted = new();
+    private readonly ModernTextBox admissionDateDisplay = HumanUi.TextBox(false, 150);
+    private readonly ModernTextBox dateOfBirthDisplay = HumanUi.TextBox(false, 150);
+    private DateTime? currentAdmissionDate;
+    private DateTime? currentDateOfBirth;
+    private bool HasRequiredStudentDates => currentAdmissionDate.HasValue && currentDateOfBirth.HasValue;
     private readonly ModernTextBox academic =
         HumanUi.TextBox(false, 200);
     private readonly ModernTextBox attendance =
@@ -90,6 +95,8 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
         RelocateFromActions(createCertificateButton, clearButton);
         currentClass.ReadOnly = true;
         currentClass.TabStop = false;
+        admissionDateDisplay.ReadOnly = dateOfBirthDisplay.ReadOnly = true;
+        admissionDateDisplay.TabStop = dateOfBirthDisplay.TabStop = false;
         TrackStudentSearchStatus(student);
         /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
         if(initialize)StudentSearchCache.Warm();
@@ -127,7 +134,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 4,
+                RowCount = 5,
                 Margin = new Padding(0),
                 Padding = new Padding(0)
             };
@@ -135,7 +142,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
             new ColumnStyle(SizeType.Percent, 50));
         fields.ColumnStyles.Add(
             new ColumnStyle(SizeType.Percent, 50));
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 5; i++)
         {
             fields.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
@@ -144,18 +151,20 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
             CertificateUi.Field("Student", student, true), 0, 0);
         fields.Controls.Add(
             CertificateUi.Field("Leave Date", leave, true), 1, 0);
+        fields.Controls.Add(CertificateUi.Field("Admission Date", admissionDateDisplay), 0, 1);
+        fields.Controls.Add(CertificateUi.Field("Date of Birth", dateOfBirthDisplay), 1, 1);
         fields.Controls.Add(
-            CertificateUi.Field("Current Class", currentClass, true), 0, 1);
+            CertificateUi.Field("Current Class", currentClass, true), 0, 2);
         fields.Controls.Add(
-            CertificateUi.Field("Class Promoted To", promoted, true), 1, 1);
+            CertificateUi.Field("Class Promoted To", promoted, true), 1, 2);
         fields.Controls.Add(
-            CertificateUi.Field("Academic Record", academic, true), 0, 2);
+            CertificateUi.Field("Academic Record", academic, true), 0, 3);
         fields.Controls.Add(
-            CertificateUi.Field("Attendance Record", attendance, true), 1, 2);
+            CertificateUi.Field("Attendance Record", attendance, true), 1, 3);
         fields.Controls.Add(
-            CertificateUi.Field("Remarks", remarks, true), 0, 3);
+            CertificateUi.Field("Remarks", remarks, true), 0, 4);
         details.Content.Controls.Add(fields);
-        fields.Controls.Add(feeReview, 1, 3);
+        fields.Controls.Add(feeReview, 1, 4);
         var certButtonRow =
             CertificateButtonRow.Create(createCertificateButton, clearButton);
         certButtonRow.Dock =
@@ -181,13 +190,13 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
                 Padding = new Padding(0)
             };
         root.RowStyles.Add(
-            new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(4)
+            new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(5)
                 + AppMetrics.ButtonRowHeight));
         root.RowStyles.Add(
             new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(details, 0, 0);
         root.Controls.Add(records, 0, 1);
-        CertificateUi.CompactFields(details,fields,root,new[]{40f,20f,20f,20f},new[]{(0,0,1),(1,0,1),(2,0,1),(3,0,1),(0,1,2),(2,1,2),(0,2,2),(2,2,2)},1200);
+        CertificateUi.CompactFields(details,fields,root,new[]{40f,20f,20f,20f},new[]{(0,0,1),(1,0,1),(0,1,2),(2,1,2),(2,0,1),(3,0,1),(0,2,2),(2,2,2),(0,3,2),(2,3,2)},1200);
         SetContent(
             root,
             "Select a college student to create. Then issue again, mark collected or print.");
@@ -222,6 +231,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
             }
             DataRow row =
                 matches[0];
+            LoadStudentDates(admissionId);
             currentClassId =
                 GetInt(row, "ClassId");
             // Finding 4 - which leaving episode a new certificate would belong to.
@@ -254,7 +264,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
         {
             Fail(ex);
         }
-        finally{CaptureDraftBaseline();}
+        finally{ApplyWorkflowState();CaptureDraftBaseline();}
     }
     /// <summary>Finding 5 - ported from the school Leave page.</summary>
     private bool TryPrefillLeaveDateFromExistingWithdrawal(int admissionId)
@@ -501,7 +511,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
         attendance.Enabled = canCreate;
         remarks.Enabled = canCreate;
         createCertificateButton.Enabled =
-            canCreate;
+            canCreate && HasRequiredStudentDates;
         clearButton.Enabled = true;
         refreshButton.Enabled =
             hasStudent;
@@ -538,6 +548,11 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
         }
         if (!hasCertificateForThisLeaving)
         {
+            if (!HasRequiredStudentDates)
+            {
+                SetStatus("Admission date and date of birth are required. Complete the missing dates in the student record, then refresh.", true);
+                return;
+            }
             if (!studentIsActive && !studentIsLeft)
             {
                 SetStatus("This student is not active. A new college leaving certificate cannot be created.", true);
@@ -686,6 +701,12 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
             }
             /* Finding 5 - a student already marked Left with no certificate goes down dbo.CreateLeaveCertificate's retroactive branch, which accepts the College type too. Ported from the school Leave page. */
             DataRow studentRow = matches[0];
+            LoadStudentDates(student.SelectedId);
+            if (currentAdmissionDate is not DateTime admissionDate || !currentDateOfBirth.HasValue)
+            {
+                Warn("Admission date and date of birth are required. Complete the missing dates in the student record, then refresh.");
+                return;
+            }
             string studentStatus =
                 GetString(studentRow, "Status");
             bool isRetroactive =
@@ -741,10 +762,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
                 Warn("Leave date cannot be in the future.");
                 return;
             }
-            DateTime admissionDate =
-                GetAdmissionDate(studentRow);
-            if (admissionDate != DateTime.MinValue &&
-                leaveDate < admissionDate)
+            if (leaveDate < admissionDate)
             {
                 Warn("Leave date cannot be earlier than the student's admission date.");
                 return;
@@ -1206,12 +1224,15 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
     {
         if(!ConfirmDraftDiscard())return;
         if (student.SelectedId <= 0) return;
+        try { LoadStudentDates(student.SelectedId); }
+        catch (Exception ex) { Fail(ex); return; }
         int selectedId = selectedIssueId;
         LoadCertificates(student.SelectedId);
         if (selectedId > 0) SelectSavedCertificate(selectedId);
     }
     private void ClearStudentDetails()
     {
+        SetStudentDates(null);
         currentClassId = 0;
         currentEnrollmentId = 0;
         feeReview.ClearFees();
@@ -1277,20 +1298,22 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
         }
         ApplyWorkflowState();
     }
-    private static DateTime GetAdmissionDate(DataRow row)
+    private void LoadStudentDates(int admissionId)
     {
-        if (!row.Table.Columns.Contains(
-                "AdmissionDate") ||
-            row["AdmissionDate"] == DBNull.Value)
+        SetStudentDates(null);
+        try
         {
-            return DateTime.MinValue;
+            var details = DatabaseHelper.QueryUser("GetStudentDetails", DatabaseHelper.Int("@AdmissionId", admissionId));
+            SetStudentDates(details.Rows.Count > 0 ? details.Rows[0] : null);
         }
-        if (row["AdmissionDate"] is DateTime date)
-            return date.Date;
-        return DateTime.TryParse(
-            Convert.ToString(row["AdmissionDate"]), out DateTime parsed)
-                ? parsed.Date
-                : DateTime.MinValue;
+        finally { ApplyWorkflowState(); }
+    }
+    private void SetStudentDates(DataRow? row)
+    {
+        currentAdmissionDate = row is null ? null : GetDate(row, "AdmissionDate")?.Date;
+        currentDateOfBirth = row is null ? null : GetDate(row, "DateOfBirth")?.Date;
+        admissionDateDisplay.Text = currentAdmissionDate?.ToString("dd MMM yyyy") ?? (student.SelectedId > 0 ? "Not on record" : string.Empty);
+        dateOfBirthDisplay.Text = currentDateOfBirth?.ToString("dd MMM yyyy") ?? (student.SelectedId > 0 ? "Not on record" : string.Empty);
     }
     protected override void Dispose(bool disposing)
     {
