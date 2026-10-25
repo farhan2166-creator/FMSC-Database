@@ -223,12 +223,11 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
                 BackColor = AppTheme.Surface,
                 ForeColor = AppTheme.Text,
                 Font = AppTheme.ButtonFont,
-                Alignment = DataGridViewContentAlignment.MiddleCenter,
-                Padding = new Padding(10, 0, 10, 0),
+                Alignment = DataGridViewContentAlignment.MiddleLeft,
+                Padding = new Padding(14, 0, 10, 0),
                 SelectionBackColor = AppTheme.PrimaryLight,
                 SelectionForeColor = AppTheme.Text
             };
-        classColumn.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
         matrix.Columns.Add(classColumn);
         matrix.CellValueChanged += (_, _) => { if (!updatingMatrix) UpdateAssignmentSummary(); };
         matrix.SelectionChanged += (_, _) => { if (!updatingMatrix) UpdateAssignmentSummary(); };
@@ -423,7 +422,6 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
                     SelectionForeColor =
                         AppTheme.Text
                 };
-            column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
             matrix.Columns.Add(column);
         }
     }

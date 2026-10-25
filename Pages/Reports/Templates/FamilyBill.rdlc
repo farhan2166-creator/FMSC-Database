@@ -804,7 +804,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=IIf(RowNumber("BillStudentGroup") = 1 Or Fields!FeePeriod.Value &lt;&gt; Previous(Fields!FeePeriod.Value, "BillStudentGroup"), Fields!FeePeriod.Value, "")</Value>
+                              <Value>=Fields!FeePeriod.Value</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
