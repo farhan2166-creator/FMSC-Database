@@ -43,6 +43,28 @@ In Setup Readiness, select an issue and use **Open Selected Setup**. The action 
 
 ## Common workspaces
 
+In Student Admissions, **Actions** shows choices for the selected student's state:
+
+- **Activate Current Student…** reviews a legacy student's current placement,
+  fees and billing start through the established activation dialog.
+- **Complete Placement…** opens an existing unconfirmed placement directly.
+  Review/apply any corrections, then Confirm Placement after checking the saved
+  details and fee plan. Confirmation is unavailable after a failed reload, while
+  edits remain, or for legacy records that require activation instead.
+- **Placement History…** always opens the history browser, including for legacy
+  students. Use Add Missing Historical Placement for verified gaps; it preserves
+  current student status and creates no fees or bills.
+- **Put on Hold… / Lift Hold / Resume…** handles temporary absence. **Record
+  Departure…** remains the separate formal leaving operation. **Re-Admit…** is
+  offered for eligible former/inactive students without a hold. **Confirm Return**
+  remains the existing contextual button for promoted students awaiting return.
+- **Transfer** contains section, class and campus choices. **Corrections /
+  Advanced** contains Review Left Record as Temporary Hold for correcting a
+  wrongly classified temporary absence.
+
+Save personal-detail edits before opening these workflows. Each existing dialog
+retains its financial preview, confirmation and server-side permissions.
+
 | Work | Where to start | Operational caution |
 |---|---|---|
 | New student | **Daily Work → Student Admissions** | Check student, placement, guardian, date, and opening charges before saving |

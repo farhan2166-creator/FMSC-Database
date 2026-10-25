@@ -413,6 +413,11 @@ Database/*.bak
 !/Tests/ReportRdlcChecks/*.csproj
 
 # Isolated communication and restore safety regression sources.
+!/Tests/AdmissionActionsChecks/
+/Tests/AdmissionActionsChecks/*
+!/Tests/AdmissionActionsChecks/*.cs
+!/Tests/AdmissionActionsChecks/*.csproj
+
 !/Tests/SafetySqlChecks/
 /Tests/SafetySqlChecks/*
 !/Tests/SafetySqlChecks/*.cs

@@ -17,7 +17,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         confirm = new() { Text = "Confirm Placement", ThemeRole = "Primary" },
         apply = new() { Text = "Apply Correction", ThemeRole = "Warning", Enabled = false },
         dates = new() { Text = "Correct Dates", ThemeRole = "Secondary" },
-        edit = new() { Text = "Review / Complete Placement", ThemeRole = "Primary" },
+        edit = new() { Text = "Complete Placement", ThemeRole = "Primary" },
         addHistory = new() { Text = "Add Missing Historical Placement", ThemeRole = "Secondary" },
         close = new() { Text = "Close", DialogResult = DialogResult.Cancel };
     private readonly TableLayoutPanel fields;
@@ -41,10 +41,12 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         ? Convert.ToInt32(window["AcademicYearId"]) : year.SelectedId;
     private DataRow? plan;
     private bool busy, loading;
+    private bool loadSucceeded;
     private bool legacySetupPending;
     private bool Confirmed => !legacySetupPending && SelectedRecord()?["PlacementConfirmedAt"] is DateTime;
     private bool CanReviewPlacement => editingEnrollment.HasValue &&
         (editingEnrollment == 0 ? MissingWindow is not null : SelectedRecord() is not null && !Confirmed);
+    private bool CanConfirmPlacement => loadSucceeded && CanReviewPlacement && editingEnrollment>0 && !legacySetupPending;
     private bool HasPlacementEdits => SelectedRecord() is DataRow current &&
         (year.SelectedId != Convert.ToInt32(current["AcademicYearId"]) || placement.SelectedId != Convert.ToInt32(current["ClassSectionId"]) ||
          status.Text != Convert.ToString(current["Status"]) || start.Value.Date != Convert.ToDateTime(current["EnrollmentDate"]).Date ||
@@ -55,13 +57,19 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
     internal StudentPlacementCorrectionDialog(int admissionId, string studentName, bool initialize = true)
         : this(admissionId, studentName, null, initialize) { }
 
+    internal static StudentPlacementCorrectionDialog ForDraft(int admissionId,string studentName,int enrollment,bool initialize=true)
+    {
+        if (enrollment<=0) throw new ArgumentOutOfRangeException(nameof(enrollment));
+        return new(admissionId,studentName,enrollment,initialize);
+    }
+
     private StudentPlacementCorrectionDialog(int admissionId, string studentName, int? editingEnrollment, bool initialize = true)
     {
         admission = admissionId;
         this.studentName = studentName;
         this.editingEnrollment = editingEnrollment;
         Text = editingEnrollment == 0 ? "Add Missing Historical Placement" :
-            editingEnrollment.HasValue ? "Review / Complete Placement" : "Placement History";
+            editingEnrollment.HasValue ? "Complete Placement" : "Placement History";
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(AppScale.Scale(850), AppScale.Scale(650));
         MinimumSize = new Size(AppScale.Scale(740), AppScale.Scale(600));
@@ -116,15 +124,15 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         addHistory.Click += async (_, _) => await OpenEditorAsync(0);
         UiAccessibility.Describe(dates, "Correct placement, billing or leaving dates", "Review date corrections and their effect on charges and certificates.");
         confirm.Click += async (_, _) => {
-            if (busy || SelectedEnrollmentId <= 0 || Confirmed) return;
+            if (busy || !CanConfirmPlacement || HasPlacementEdits) return;
             SetBusy(true);
             try
             {
                 if (await StudentPlacementConfirmation.ConfirmAsync(this, SelectedEnrollmentId, record.Text))
-                { Changed = true; await LoadAsync(SelectedEnrollmentId); }
+                { Changed = true; busy=false;DialogResult=DialogResult.OK;Close(); }
             }
             catch (Exception ex) { OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
-            finally { SetBusy(false); }
+            finally { if (!IsDisposed) SetBusy(false); }
         };
         if (initialize) Shown += async (_, _) => await LoadAsync();
         FormClosing += (_, e) => { if (busy) e.Cancel = true; };
@@ -139,7 +147,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
     {
         if (loading || updatingPeriod) return;
         plan = null; apply.Enabled = false;
-        confirm.Enabled = !busy && SelectedEnrollmentId > 0 && !Confirmed && !HasPlacementEdits;
+        confirm.Enabled = !busy && CanConfirmPlacement && !HasPlacementEdits;
         if (editingEnrollment.HasValue) impact.Text = editingEnrollment == 0
             ? MissingWindow is DataRow window
                 ? $"Available gap: {Convert.ToDateTime(window["GapStart"]):dd MMM yyyy} to {Convert.ToDateTime(window["GapEnd"]):dd MMM yyyy}. Complete the details, then Review."
@@ -156,11 +164,12 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         addHistory.Enabled = !value && missingWindows.Rows.Count > 0;
         addHistory.AccessibleDescription = missingWindows.Rows.Count > 0 ? "Record a verified gap in placement history."
             : "No missing historical placement can be added: no eligible gaps are available.";
-        confirm.Enabled = !value && SelectedEnrollmentId > 0 && !Confirmed && !HasPlacementEdits;
+        confirm.Enabled = !value && CanConfirmPlacement && !HasPlacementEdits;
         apply.Enabled = !value && !Confirmed && plan is not null && Convert.ToInt32(plan["BlockedCount"]) == 0;
     }
     private async Task LoadAsync(int selected = -1)
     {
+        loadSucceeded=false;plan=null;
         SetBusy(true); loading = true;
         try
         {
@@ -178,9 +187,9 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             missingWindows = missingPlacementChoices.DefaultView.ToTable(true, "WindowId", "AcademicYearId", "YearName", "GapStart", "GapEnd", "PromotionDate");
             BindYears(years); placement.Bind(allPlacements);
             BindHistory(selected);
-            loading = false; LoadSelected();
+            loadSucceeded=true;loading = false; LoadSelected();
         }
-        catch (Exception ex) { OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
+        catch (Exception ex) { loadSucceeded=false;OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { loading = false; SetBusy(false); }
     }
     private void BindYears(DataTable years)
@@ -265,8 +274,8 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         placement.SelectedValue = current?["ClassSectionId"] ?? 0;
         status.SelectedItem = current?["Status"] ??
             (enrollments.AsEnumerable().Any(row => Convert.ToString(row["Status"]) == "Active") ? "Left" : "Active");
-        start.Value = editingEnrollment.HasValue && academicYearStarts.TryGetValue(SelectedYearId,out DateTime yearStart)
-            ? yearStart : current is null ? DateTime.Today : Convert.ToDateTime(current["EnrollmentDate"]);
+        start.Value = current is not null ? Convert.ToDateTime(current["EnrollmentDate"])
+            : editingEnrollment.HasValue && academicYearStarts.TryGetValue(SelectedYearId,out DateTime yearStart) ? yearStart : DateTime.Today;
         leave.Checked = current?["LeavingDate"] is DateTime || current is null && status.Text != "Active";
         leave.Value = DateTime.Today;
         if (current?["LeavingDate"] is DateTime leaving) leave.Value = leaving;
@@ -288,7 +297,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         legacy.Visible = CanReviewPlacement && editingEnrollment != 0;
         billing.Enabled = editingEnrollment != 0;
         if (editingEnrollment == 0) billing.Checked = false;
-        confirm.Visible = false;
+        confirm.Visible = CanConfirmPlacement;
         dates.Visible = !editingEnrollment.HasValue && Confirmed;
         edit.Visible = !editingEnrollment.HasValue && current is not null && !Confirmed;
         addHistory.Visible = !editingEnrollment.HasValue;
@@ -309,7 +318,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         impact.Text = $"{record.Text}\r\n{(Confirmed ? "Confirmed placement" : "Unconfirmed placement")}\r\n\r\n" +
             $"Placement starts: {DateText("EnrollmentDate")}\r\nBilling starts: {DateText("BillingStartDate")}\r\nLeaving / promotion date: {DateText("LeavingDate")}\r\n\r\n" +
             (Confirmed ? "To fix a date error, choose Correct Dates.\r\n\r\nUse Promotion for a new academic year, Transfer to change campus/class/section, or Re-admission after leaving."
-            : "Choose Review / Complete Placement to check this draft and its effect on fees. Confirm the first current placement in Admission after completing setup.");
+            : "Choose Complete Placement to review this draft and its effect on fees, then confirm the saved placement. Activation of a legacy student uses Activate Current Student in Admission.");
         if (missingWindows.Rows.Count == 0) impact.Text += "\r\n\r\nNo missing historical placement can be added: no eligible gaps are available.";
     }
     private async Task OpenEditorAsync(int enrollmentId)
@@ -366,8 +375,13 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         try
         {
             await RunAsync(Convert.ToString(plan["Snapshot"]));
-            Changed = true; StudentSearchCache.Invalidate(); DialogResult = DialogResult.OK;
-            busy = false; Close();
+            Changed = true; StudentSearchCache.Invalidate();
+            if (editingEnrollment>0)
+            {
+                await LoadAsync(SelectedEnrollmentId);
+                if (loadSucceeded) impact.Text="Placement changes saved. Review the saved details and fee plan before choosing Confirm Placement.";
+            }
+            else { DialogResult = DialogResult.OK;busy = false; Close(); }
         }
         catch (Exception ex) { plan = null; OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true); }
         finally { if (!IsDisposed) SetBusy(false); }
