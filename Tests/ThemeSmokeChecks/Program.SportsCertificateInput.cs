@@ -15,8 +15,8 @@ internal static partial class Program
             CurrentUser.SignIn(992,"Sports input fixture","Administrator",false,Array.Empty<string>());
             using var history=new DataTable();
             foreach(string name in new[]{"SportsCertificateId","AdmissionId"})history.Columns.Add(name,typeof(int));
-            foreach(string name in new[]{"StudentName","FatherName","SportName","Performance","CollectionStatus","VoidReason"})history.Columns.Add(name);
-            foreach(string name in new[]{"CertificateDate","CreatedAt","UpdatedAt","CollectedAt","VoidedAt"})history.Columns.Add(name,typeof(DateTime));
+            foreach(string name in new[]{"StudentName","FatherName","SportName","Performance","CollectionStatus"})history.Columns.Add(name);
+            foreach(string name in new[]{"CertificateDate","CreatedAt","UpdatedAt","CollectedAt"})history.Columns.Add(name,typeof(DateTime));
             history.Columns.Add("ContentVersion",typeof(byte[]));
             var saved=history.NewRow();saved["SportsCertificateId"]=91;saved["AdmissionId"]=41;saved["StudentName"]="Fixture Student";saved["FatherName"]="Fixture Parent";
             saved["SportName"]="Cricket";saved["Performance"]="Saved performance";saved["CollectionStatus"]="Not Collected";saved["CertificateDate"]=DateTime.Today;saved["CreatedAt"]=DateTime.Now;

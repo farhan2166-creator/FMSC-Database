@@ -8,6 +8,7 @@ internal static partial class Program
 {
     private static void CheckCertificateCollectionWorkflow()
     {
+        CheckCertificateHistoryMetadata();
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
         var previous=(CurrentUser.UserId,CurrentUser.Username,CurrentUser.RoleName,CurrentUser.MustChangePassword,Permissions:CurrentUser.GetPermissions().ToArray());
         try
@@ -48,7 +49,7 @@ internal static partial class Program
                 using var rows=new DataTable();
                 foreach(string key in new[]{item.Item2,"CertificateRecordId","LeaveRecordId","RegularStudentCertificateId","AdmissionId","EnrollmentId"}.Distinct())rows.Columns.Add(key,typeof(int));
                 foreach(string name in new[]{"CollectionStatus","ClassName","IssueType","ExamType"})rows.Columns.Add(name);
-                foreach(string date in new[]{"CollectedAt","CertificateDate","IssuedAt","DateOfBirth","VoidedAt"})rows.Columns.Add(date,typeof(DateTime));
+                foreach(string date in new[]{"CollectedAt","CertificateDate","IssuedAt","DateOfBirth"})rows.Columns.Add(date,typeof(DateTime));
                 rows.Columns.Add("ContentVersion",typeof(byte[]));
                 var row=rows.NewRow();foreach(DataColumn column in rows.Columns)if(column.DataType==typeof(int))row[column]=11;
                 row[item.Item2]=101;row["AdmissionId"]=41;row["EnrollmentId"]=201;row["CollectionStatus"]="Collected";
@@ -68,11 +69,37 @@ internal static partial class Program
                 Check(!Descendants(page).OfType<ModernButton>().Any(button=>button.Text.Contains("Void",StringComparison.OrdinalIgnoreCase)||button.Text.Contains("Cancel Copy",StringComparison.OrdinalIgnoreCase)),item.Item1+": cancellation is not offered");
                 row["CollectedAt"]=DBNull.Value;row["CollectionStatus"]="Not Collected";Set("selectedIssueCollected",false);Apply();
                 Check(Field<ModernButton>("printButton").Enabled,item.Item1+": ready copy can print before collection");
-                row["VoidedAt"]=DateTime.Now;row["CollectionStatus"]="Void";Apply();
-                Check(!Field<ModernButton>("printButton").Enabled&&!save.Enabled,item.Item1+": historical cancelled copy remains read-only and cannot print");
                 Check(!page.IsHandleCreated,item.Item1+": lifecycle checks start no database loaders");
             }
         }
         finally {CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Permissions);}
+    }
+
+    private static void CheckCertificateHistoryMetadata()
+    {
+        using var rows=new DataTable();
+        rows.Columns.Add("CertificateDate",typeof(DateTime));
+        rows.Columns.Add("CollectionStatus");
+        rows.Columns.Add("CollectedAt",typeof(DateTime));
+        rows.Columns.Add("CollectedBy");
+        rows.Columns.Add("PreviousCertificateId",typeof(int));
+        rows.Columns.Add("EnrollmentId",typeof(int));
+        rows.Rows.Add(DateTime.Today,"Not Collected",DBNull.Value,DBNull.Value,12,201);
+        using var grid=new DataGridView {AutoGenerateColumns=true,DataSource=rows};
+        CertificateCollectionFlow.FormatGrid(grid);
+        Check(grid.Columns.Count==0,"Certificate history formatting can precede deferred column generation");
+        grid.BindingContext=new BindingContext();
+        void CheckColumns(string stage)
+        {
+            foreach(string name in new[]{"PreviousCertificateId","EnrollmentId"})
+                Check(grid.Columns.Contains(name)&&!grid.Columns[name].Visible,stage+": "+name+" remains hidden");
+            foreach(string name in new[]{"CertificateDate","CollectionStatus","CollectedAt","CollectedBy"})
+                Check(grid.Columns[name].Visible,stage+": "+name+" remains available");
+        }
+        CheckColumns("First binding");
+        grid.DataSource=null;
+        grid.Columns.Clear();
+        grid.DataSource=rows.Copy();
+        CheckColumns("Regenerated columns");
     }
 }

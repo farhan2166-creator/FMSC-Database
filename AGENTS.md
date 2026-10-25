@@ -33,8 +33,8 @@ markers: these remain necessary business and recovery records.
 
 The owner removed certificate cancel/void from the application because it adds
 unnecessary complexity and can imply deleting a record or undoing leaving and
-fees. Do not reintroduce it without a new explicit owner decision. Preserve
-existing historical cancellation markers and locks; do not delete or resurrect
-those records. The normal flow uses Create, Save Changes before collection,
+fees. Do not reintroduce it without a new explicit owner decision. The owner subsequently approved permanently dropping the cancellation columns
+from code and SQL after restoring a clean schema-48 database. Migration 52 removes
+them; refuse other snapshots containing cancelled copies rather than reviving them. The normal flow uses Create, Save Changes before collection,
 Print, Mark Collected and Issue Again. See
 `Docs/Decisions/CERTIFICATE_CANCELLATION_REMOVED.md` for the rationale.

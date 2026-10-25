@@ -18,7 +18,19 @@ internal sealed class CertificateCollectionFlow(string kind)
     internal static SqlParameter VersionParameter(byte[]? value) => new("@ExpectedVersion",SqlDbType.Binary,8) {Value=(object?)value??DBNull.Value};
     internal static void FormatGrid(DataGridView grid)
     {
-        foreach(string name in new[]{"ContentVersion","PreviousCertificateId","VoidedAt","VoidReason","EnrollmentId"})if(grid.Columns.Contains(name))grid.Columns[name].Visible=false;
+        // Binding can generate columns only after the grid receives a BindingContext.
+        // Keep the certificate presentation in effect on first display and every rebind.
+        grid.DataBindingComplete -= GridDataBindingComplete;
+        grid.DataBindingComplete += GridDataBindingComplete;
+        ApplyGridFormat(grid);
+    }
+    private static void GridDataBindingComplete(object? sender, DataGridViewBindingCompleteEventArgs e)
+    {
+        if(sender is DataGridView grid)ApplyGridFormat(grid);
+    }
+    private static void ApplyGridFormat(DataGridView grid)
+    {
+        foreach(string name in new[]{"ContentVersion","PreviousCertificateId","EnrollmentId"})if(grid.Columns.Contains(name))grid.Columns[name].Visible=false;
         foreach(var pair in new[]{("CollectionStatus","Status"),("CollectedAt","Collected On"),("CollectedBy","Collected By")})if(grid.Columns.Contains(pair.Item1))grid.Columns[pair.Item1].HeaderText=pair.Item2;
     }
     internal static void RefreshStudent(StudentPicker picker)
@@ -33,22 +45,9 @@ internal sealed class CertificateCollectionFlow(string kind)
     internal static DataRow? Find(DataTable rows,string key,int id) => rows.Columns.Contains(key)
         ? rows.AsEnumerable().FirstOrDefault(row=>CertificateUi.GetInt(row,key)==id) : null;
     internal static bool Locked(DataRow? row) => row is not null && (CertificateUi.GetDate(row,"CollectedAt").HasValue || CertificateUi.GetString(row,"CollectionStatus")=="Collected");
-    // Read-only compatibility for copies cancelled before schema 51; no cancellation action remains.
-    internal static bool Voided(DataRow? row) => row is not null && CertificateUi.GetDate(row,"VoidedAt").HasValue;
     private static bool HasNewerCopy(DataTable rows,string key,int id)
     {
-        if(!rows.Columns.Contains("PreviousCertificateId"))return false;
-        var pending=new Queue<int>();var visited=new HashSet<int>();pending.Enqueue(id);
-        while(pending.TryDequeue(out int source))
-        {
-            if(!visited.Add(source))continue;
-            foreach(var row in rows.AsEnumerable().Where(row=>CertificateUi.GetInt(row,"PreviousCertificateId")==source))
-            {
-                if(!Voided(row))return true;
-                pending.Enqueue(CertificateUi.GetInt(row,key));
-            }
-        }
-        return false;
+        return rows.Columns.Contains("PreviousCertificateId") && rows.AsEnumerable().Any(row=>CertificateUi.GetInt(row,"PreviousCertificateId")==id);
     }
     internal static void SelectPromotion(LookupBox lookup,string value)
     {
@@ -63,18 +62,17 @@ internal sealed class CertificateCollectionFlow(string kind)
     internal string Status { get; private set; } = "";
     internal bool Apply(DataTable rows,string key,int id,ModernButton save,ModernButton print,bool dirty,params Control[] fields)
     {
-        var row=Find(rows,key,id); bool locked=Locked(row),voided=Voided(row);
+        var row=Find(rows,key,id); bool locked=Locked(row);
         expectedVersion=Version(rows,key,id);
-        Collect.Enabled=Available&&!busy&&row is not null&&!locked&&!voided&&!dirty;
-        IssueAgain.Enabled=Available&&!busy&&(locked||voided)&&!HasNewerCopy(rows,key,id);
-        if(row is not null&&(locked||voided))
+        Collect.Enabled=Available&&!busy&&row is not null&&!locked&&!dirty;
+        IssueAgain.Enabled=Available&&!busy&&locked&&!HasNewerCopy(rows,key,id);
+        if(row is not null&&locked)
         {
             foreach(var field in fields)field.Enabled=false;
             save.Enabled=false;
         }
-        if(voided)print.Enabled=false;
-        Status=voided?"Historical cancelled copy — retained as read-only history.":"Collected copy — details are locked. Print this saved copy or use Issue Again for a new copy.";
-        return row is not null&&(locked||voided);
+        Status="Collected copy — details are locked. Print this saved copy or use Issue Again for a new copy.";
+        return row is not null&&locked;
     }
     internal void Wire(Control owner,Func<int> selected,Action<int> reload,Func<bool> dirty)
     {
