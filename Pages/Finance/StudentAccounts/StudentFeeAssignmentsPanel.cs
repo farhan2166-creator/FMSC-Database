@@ -51,14 +51,17 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
     private int enrollmentId;
     private int admissionId;
     private bool hasOpenTransport;
+    private readonly bool allowManualPosting;
     private TableLayoutPanel? actionLayout, panelLayout;
     private bool familyView;
     /// <summary>True if any change (add / discontinue / amount change / discount / remove) was actually applied.</summary>
     public bool ChangesMade { get; private set; }
     /// <summary>Raised once per applied change, after <see cref="ChangesMade"/> is set. A host that shows something derived from these fees listens here instead of polling ChangesMade after the fact.</summary>
     public event EventHandler? Changed;
-    public StudentFeeAssignmentsPanel()
+    public StudentFeeAssignmentsPanel() : this(allowManualPosting: true) { }
+    internal StudentFeeAssignmentsPanel(bool allowManualPosting)
     {
+        this.allowManualPosting = allowManualPosting;
         Dock = DockStyle.Fill;
         BackColor = AppTheme.Surface;
         Font = AppTheme.NormalFont;
@@ -131,7 +134,9 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             column.SortMode = DataGridViewColumnSortMode.NotSortable;
             if (column.Visible) column.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
         }
-        var actions = new[] { addButton, discontinueButton, startTransportButton, discountButton, issuedBillButton, reviewButton };
+        var actions = allowManualPosting
+            ? new[] { addButton, discontinueButton, startTransportButton, discountButton, issuedBillButton, reviewButton }
+            : new[] { addButton, discontinueButton, startTransportButton, discountButton, issuedBillButton };
         var buttons = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = actions.Length, RowCount = 1,
             Margin = Padding.Empty, Padding = Padding.Empty
@@ -233,7 +238,9 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             }
             e.FormattingApplied=true;
         };
-        var actions=new[]{addButton,discountButton,issuedBillButton,discontinueButton,startTransportButton,reviewButton};
+        var actions=allowManualPosting
+            ? new[]{addButton,discountButton,issuedBillButton,discontinueButton,startTransportButton,reviewButton}
+            : new[]{addButton,discountButton,issuedBillButton,discontinueButton,startTransportButton};
         foreach(var button in actions)
         {
             button.Dock=DockStyle.None;button.Anchor=AnchorStyles.Top|AnchorStyles.Left;
@@ -355,7 +362,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             }
             addButton.Enabled = true;
             UpdateMonthView();
-            if (!enrollmentHasLeft && CurrentUser.HasPermission("Fees.Collect")) {
+            if (allowManualPosting && !enrollmentHasLeft && CurrentUser.HasPermission("Fees.Collect")) {
                 int pending = FeeAssignmentPosting.PendingThrough(enrollmentId, ReferenceMonth).Rows.Count;
                 NeedsReview = NeedsReview || pending > 0;
                 hint.Text += pending > 0 ? $"  |  {pending} pending through {ReferenceMonth:MMM yyyy} — Review Pending Fees." : "  |  Posting up to date.";

@@ -3,7 +3,7 @@ namespace FMSC_SMS.Pages.Finance.StudentAccounts;
 /// <summary>Contextual fee-assignment dialog for the selected enrollment. Hosts <see cref="StudentFeeAssignmentsPanel"/> and exposes whether changes were applied.</summary>
 public sealed class FeeAssignmentsDialog : ApplicationWindowForm
 {
-    private readonly StudentFeeAssignmentsPanel panel = new();
+    private readonly StudentFeeAssignmentsPanel panel = new(allowManualPosting: false);
     /// <summary>True if any change (add / discontinue / amount change / discount / remove) was actually applied.</summary>
     public bool ChangesMade => panel.ChangesMade;
     public bool ReviewCompleted => panel.ReviewCompleted;
