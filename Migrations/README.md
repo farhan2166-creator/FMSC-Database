@@ -1,41 +1,43 @@
 # Apply the database changes later
 
-The application requires **schema 49**. SQL changes are checked in here;
+The application requires **schema 51**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 | Current database version | Files to apply, in order |
 |---|---|
-| 19 | `20.sql`, `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 20 | `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 21 | `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 22 | `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 23 | `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 24 | `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 25 | `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 26 | `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 27 | `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 28 | `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 29 | `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 30 | `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 31 | `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 32 | `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 33 | `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 34 | `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 35 | `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 36 | `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 37 | `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 38 | `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 39 | `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 40 | `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 41 | `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 42 | `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 43 | `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 44 | `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 45 | `46.sql`, `47.sql`, `48.sql`, `49.sql` |
-| 46 | `47.sql`, `48.sql`, `49.sql` |
-| 47 | `48.sql`, `49.sql` |
-| 48 | `49.sql` |
-| 49 | None |
+| 19 | `20.sql`, `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 20 | `21.sql`, `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 21 | `22.sql`, `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 22 | `23.sql`, `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 23 | `24.sql`, `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 24 | `25.sql`, `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 25 | `26.sql`, `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 26 | `27.sql`, `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 27 | `28.sql`, `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 28 | `29.sql`, `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 29 | `30.sql`, `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 30 | `31.sql`, `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 31 | `32.sql`, `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 32 | `33.sql`, `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 33 | `34.sql`, `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 34 | `35.sql`, `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 35 | `36.sql`, `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 36 | `37.sql`, `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 37 | `38.sql`, `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 38 | `39.sql`, `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 39 | `40.sql`, `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 40 | `41.sql`, `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 41 | `42.sql`, `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 42 | `43.sql`, `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 43 | `44.sql`, `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 44 | `45.sql`, `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 45 | `46.sql`, `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 46 | `47.sql`, `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 47 | `48.sql`, `49.sql`, `50.sql`, `51.sql` |
+| 48 | `49.sql`, `50.sql`, `51.sql` |
+| 49 | `50.sql`, `51.sql` |
+| 50 | `51.sql` |
+| 51 | None |
 
 Check your version first:
 
@@ -82,7 +84,7 @@ transaction, which the installer normally provides.
 For a schema-19 database, save this wrapper **outside this directory**, change the
 include paths to your checkout, and run it with SQLCMD. For a newer supported
 database, omit every include up to and including its current version. For example,
-schema 48 needs only migration 49.
+schema 48 needs migrations 49 and 50. Schema 49 needs only migration 50.
 
 ```sql
 :ON ERROR EXIT
@@ -148,12 +150,15 @@ GO
 :r "C:\FMSC-Database\Migrations\48.sql"
 GO
 :r "C:\FMSC-Database\Migrations\49.sql"
+:r "C:\FMSC-Database\Migrations\50.sql"
+GO
+:r "C:\FMSC-Database\Migrations\51.sql"
 GO
 IF XACT_STATE() <> 1
     THROW 51000, 'The upgrade transaction cannot be committed.', 1;
 IF ISNULL((SELECT TOP (1) TRY_CONVERT(int, VersionNumber)
-           FROM dbo.DatabaseVersion ORDER BY VersionId DESC), -1) <> 49
-    THROW 51000, 'The upgrade did not reach schema 49.', 1;
+           FROM dbo.DatabaseVersion ORDER BY VersionId DESC), -1) <> 51
+    THROW 51000, 'The upgrade did not reach schema 51.', 1;
 COMMIT TRANSACTION;
 GO
 ```
@@ -220,3 +225,7 @@ Migration 47 saves SSC/HSSC on character certificates, allows one certificate id
 Migration 48 makes normal Admission save the operator's exact fee selection. Tuition and admission still load by default but can be removed before saving, including removing every fee. Omitted fees create no assignment or charge. The admission screen submits all retained fees and opts into this behavior with @UseSelectedFeeTypes. Existing callers, including Quick Registration's separate reviewed exclusion flow, retain their existing behavior until they opt in. No existing assignments, bills or payments are changed.
 
 Migration 49 adds the character certificate academic-year choice (passing year = end year minus one), fixed conduct options, and direct Save Changes for the latest copy. Issue Again creates a new copy with current Admission personal details. Existing records are not rewritten by this migration.
+
+Migration 50 adds collection to every certificate type. Collected copies are immutable, including saved subjects and personal wording. Printing is allowed before collection. Uncollected copies can be corrected on the form or voided; Issue Again preserves earlier copies. Regular Student identities use the enrollment. Leaving copy corrections do not repeat withdrawal or fee operations.
+
+Migration 51 retires the certificate cancellation action and drops `VoidCertificateCopy`. It retains existing cancellation markers and historical locks without deleting records or reversing student/financial actions. See `Docs/Decisions/CERTIFICATE_CANCELLATION_REMOVED.md`.

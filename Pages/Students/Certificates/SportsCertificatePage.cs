@@ -13,10 +13,20 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     private readonly Func<SqlParameter[], Task> writeCertificate;
     private readonly Func<int, DataTable> readCertificates;
     private readonly StudentPicker student = new();
+    private readonly CertificateCollectionFlow copyFlow = new("Sports");
     private readonly ModernTextBox sportName =
         HumanUi.TextBox(false, 200);
     private readonly ModernTextBox performance =
         HumanUi.TextBox(false, 1000);
+    private readonly ModernComboBox performanceSuggestions = HumanUi.Combo();
+    private static readonly (string Label,string Sentence)[] PerformanceSentences = {
+        ("Sportsmanship and discipline", "Demonstrated good sportsmanship, discipline and respect for fellow players."),
+        ("Active participation", "Participated actively in school sports with enthusiasm and dedication."),
+        ("Teamwork", "Displayed commendable teamwork and contributed positively to team performance."),
+        ("Representing the institution", "Represented the institution in sports competitions with commitment and good conduct."),
+        ("Leadership and fair play", "Demonstrated leadership, encouraged fellow players and upheld the spirit of fair play."),
+        ("Effort and achievement", "Achieved a commendable standard of performance through regular practice and consistent effort.")
+    };
     private readonly ModernDatePicker certificateDate =
         HumanUi.Date();
     private DataTable studentResults => student.Source;
@@ -36,11 +46,11 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton updateCertificateButton = new() {
-        Text = UiText.Certificates.Update,
+        Text = "Save Changes",
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton newButton = new() {
-        Text = UiText.Certificates.New,
+        Text = "New Certificate",
         Width = AppScale.Scale(110)
     };
     private readonly ModernButton clearButton = new() {
@@ -65,6 +75,17 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         sportName.MaxLength = 200;
         performance.MaxLength = 1000;
         ConfigureFieldSuggestions();
+        performanceSuggestions.DropDownStyle=ComboBoxStyle.DropDownList;
+        performanceSuggestions.Items.Add("Choose a sentence, then edit the Performance field if needed");
+        foreach(var suggestion in PerformanceSentences)performanceSuggestions.Items.Add(suggestion.Label);
+        performanceSuggestions.SelectedIndex=0;
+        performanceSuggestions.SelectedIndexChanged+=(_,_)=>{
+            int index=performanceSuggestions.SelectedIndex-1;
+            if(index<0||creatingCertificate||!performance.Enabled||!performanceSuggestions.Enabled)return;
+            performance.Text=PerformanceSentences[index].Sentence;
+            performanceSuggestions.SelectedIndex=0;
+        };
+        performance.EnabledChanged+=(_,_)=>performanceSuggestions.Enabled=performance.Enabled;
         /* dbo.CreateSportsCertificate has no duplicate guard, and the certificate table has no unique constraint on (AdmissionId, ...). */
         createCertificateButton.Click += async (_, _) => await RunCreateCertificateAsync();
         updateCertificateButton.Click +=
@@ -80,6 +101,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         refreshButton.Click +=
             (_, _) => RefreshCertificates();
         RelocateFromActions(createCertificateButton, clearButton);
+        copyFlow.Wire(this,()=>selectedSportsCertificateId,id=>{LoadCertificates(student.SelectedId);SelectSavedCertificate(id);},()=>HasCertificateEdits);
         TrackStudentSearchStatus(student);
         /* Filter as the operator types; load only after a committed student selection. */
         if (initialize) StudentSearchCache.Warm();
@@ -111,7 +133,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
                 ColumnCount = 2,
-                RowCount = 2,
+                RowCount = 3,
                 Margin = new Padding(0),
                 Padding = new Padding(0)
             };
@@ -119,7 +141,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
             new ColumnStyle(SizeType.Percent, 50));
         fields.ColumnStyles.Add(
             new ColumnStyle(SizeType.Percent, 50));
-        for (int i = 0; i < 2; i++)
+        for (int i = 0; i < 3; i++)
         {
             fields.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
@@ -132,6 +154,8 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
             CertificateUi.Field("Sport Name", sportName, true), 0, 1);
         fields.Controls.Add(
             CertificateUi.Field("Performance", performance, true), 1, 1);
+        var suggestedField=CertificateUi.Field("Suggested Performance Sentence (optional)",performanceSuggestions);
+        fields.Controls.Add(suggestedField,0,2);fields.SetColumnSpan(suggestedField,2);
         details.Content.Controls.Add(fields);
         var certButtonRow =
             CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, newButton, clearButton);
@@ -141,7 +165,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         var records =
             HumanUi.Card("Sports Certificates", "A student may have more than one sports certificate. Select a row to edit or print it.");
         var certificateActions =
-            CertificateButtonRow.Create(printButton, refreshButton);
+            CertificateButtonRow.Create(printButton, copyFlow.Collect, copyFlow.IssueAgain, refreshButton);
         certificateActions.Dock =
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
@@ -156,13 +180,13 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
                 Padding = new Padding(0)
             };
         root.RowStyles.Add(
-            new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(2)
+            new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(3)
                 + AppMetrics.ButtonRowHeight));
         root.RowStyles.Add(
             new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(details, 0, 0);
         root.Controls.Add(records, 0, 1);
-        CertificateUi.CompactFields(details,fields,root,new[]{40f,20f,20f,20f},new[]{(0,0,1),(1,0,1),(2,0,1),(3,0,1)},1200);
+        CertificateUi.CompactFields(details,fields,root,new[]{40f,20f,20f,20f},new[]{(0,0,1),(1,0,1),(2,0,1),(3,0,1),(0,1,4)},1200);
         SetContent(
             root,
             UiText.Certificates.StudentGuidance);
@@ -263,6 +287,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         SetGridWidth("CreatedAt", 145);
         SetGridWidth("UpdatedAt", 145);
         HideGridColumn("AdmissionId");
+        CertificateCollectionFlow.FormatGrid(Grid);
         CertificateRecordOrder.FitColumns(Grid);
     }
     private void HideGridColumn(string columnName)
@@ -354,6 +379,9 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
             hasStudent;
         printButton.Enabled =
             hasSelection && !HasCertificateEdits && CurrentUser.HasPermission("Certificates.Print");
+        copyFlow.Available=!creatingCertificate;
+        if(copyFlow.Apply(certificateResults,"SportsCertificateId",selectedSportsCertificateId,updateCertificateButton,printButton,HasCertificateEdits,certificateDate,sportName,performance,performanceSuggestions))
+        { SetStatus(copyFlow.Status); return; }
         if (!showStatus) return;
         if (!hasStudent)
         {
@@ -363,7 +391,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         if (hasSelection)
         {
             SetStatus(
-                "Editing sports certificate. Use Update Certificate to save, or New for another.");
+                "Editing sports certificate. Use Save Changes to save, or New for another.");
             return;
         }
         SetStatus("Enter sport and performance to create. Select a saved certificate to edit or print.");
@@ -486,7 +514,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
                         sportName.Text)),
                 DatabaseHelper.P(
                     "@Performance",
-                    DatabaseHelper.OptionalText(performance.Text)));
+                    DatabaseHelper.OptionalText(performance.Text)),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"SportsCertificateId",selectedSportsCertificateId)));
             successMessage =
                 "Sports certificate updated successfully.";
             AddSuggestionIfNew(sportName, sportName.Text);
@@ -596,6 +624,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         performance.AutoCompleteMode = AutoCompleteMode.SuggestAppend;
         performance.AutoCompleteSource = AutoCompleteSource.CustomSource;
         performance.AutoCompleteCustomSource = new AutoCompleteStringCollection();
+        performance.AutoCompleteCustomSource.AddRange(PerformanceSentences.Select(item=>item.Sentence).ToArray());
     }
     private void LoadFieldSuggestions()
     {
@@ -608,10 +637,11 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         {
             DataTable table = DatabaseHelper.QueryUser("GetSportsCertificateFieldSuggestions", DatabaseHelper.P("@Field", columnField));
             var source = new AutoCompleteStringCollection();
+            if(columnField=="Performance")source.AddRange(PerformanceSentences.Select(item=>item.Sentence).ToArray());
             foreach (DataRow row in table.Rows)
             {
                 string? value = Convert.ToString(row["Value"]);
-                if (!string.IsNullOrWhiteSpace(value))
+                if (!string.IsNullOrWhiteSpace(value)&&!source.Cast<string>().Any(existing=>string.Equals(existing,value,StringComparison.OrdinalIgnoreCase)))
                     source.Add(value);
             }
             field.AutoCompleteCustomSource = source;

@@ -91,7 +91,7 @@ internal static partial class Program
         foreach(int wording in new[]{0,1})
         {
             exam.SelectedIndex=wording;Refresh();
-            Check(Field<ModernButton>("issueAgainButton").Enabled&&exam.Enabled&&create.Text=="Save Changes","The latest saved copy can be edited on the form and saved, or issued again separately.");
+            Check(Field<ModernButton>("issueAgainButton").Enabled&&!exam.Enabled&&!create.Enabled&&create.Text=="Save Changes","The collected copy stays locked and can be issued again separately.");
         }
         records.Rows[0]["CollectionStatus"]="Not Collected";Refresh();
         Check(!Field<ModernButton>("issueAgainButton").Enabled,"The latest copy must still be collected before issuing again.");

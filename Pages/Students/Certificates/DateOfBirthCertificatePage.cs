@@ -13,6 +13,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
     public bool HasUnsavedChanges=>reissue.Blocked;
     public string UnsavedChangesMessage=>"A certificate reissue needs outcome checking. Its recovery record is retained when you leave.";
     private readonly StudentPicker student = new();
+    private readonly CertificateCollectionFlow copyFlow = new("DOB");
     private readonly ModernTextBox dateOfBirth =
         HumanUi.TextBox(false, 150);
     private readonly ModernDatePicker certificateDate =
@@ -56,6 +57,8 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         : base("Date of Birth Certificate", "Create, issue, collect and print student date of birth certificates.")
     {
         this.readCertificates=readCertificates??(id=>DatabaseHelper.QueryUser("GetDateOfBirthCertificateRecords",DatabaseHelper.Int("@AdmissionId",id)));
+        certificateDate.ValueChanged+=(_,_)=>ApplyWorkflowState();
+        copyFlow.Wire(this,()=>selectedIssueId,id=>{LoadCertificates(student.SelectedId);SelectSavedCertificate(id);},()=>certificateResults.AsEnumerable().Any(row=>GetInt(row,"DateOfBirthCertificateIssueId")==selectedIssueId&&GetDate(row,"CertificateDate")?.Date!=certificateDate.Value.Date));
         createCertificateButton.Click +=
             (_, _) => CreateCertificate();
         clearButton.Click +=
@@ -135,7 +138,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
                 UiText.Certificates.IssuanceHistory,
                 UiText.Certificates.IssueHistoryGuidance);
         var certificateActions =
-            CertificateButtonRow.Create(issueAgainButton, collectButton, printButton, refreshButton);
+            CertificateButtonRow.Create(printButton, collectButton, issueAgainButton, refreshButton);
         certificateActions.Dock =
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
@@ -274,6 +277,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         HideGridColumn("AdmissionId");
         HideGridColumn("IssuedByUserId");
         HideGridColumn("CertificateRecordId");
+        CertificateCollectionFlow.FormatGrid(Grid);
         CertificateRecordOrder.FitColumns(Grid);
     }
     private void HideGridColumn(string columnName)
@@ -345,9 +349,11 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
             hasStudent &&
             !hasCertificate &&
             currentDateOfBirth.HasValue;
-        certificateDate.Enabled = canCreate&&!reissuing;
+        bool editableCopy=hasSelectedIssue&&!selectedIssueCollected&&IsLatestSelectedIssue();
+        certificateDate.Enabled = (canCreate||editableCopy)&&!reissuing;
         createCertificateButton.Enabled =
-            canCreate&&!reissuing&&!reissue.Blocked;
+            (canCreate||editableCopy)&&!reissuing&&!reissue.Blocked;
+        createCertificateButton.Text=hasSelectedIssue?"Save Changes":UiText.Certificates.Create;
         clearButton.Enabled = true;
         refreshButton.Enabled =
             hasStudent;
@@ -358,10 +364,18 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         checkReissue.Enabled=reissue.Blocked&&!reissuing;
         collectButton.Enabled =
             hasSelectedIssue &&
-            !selectedIssueCollected;
+            !selectedIssueCollected && !certificateResults.AsEnumerable().Any(row=>GetInt(row,"DateOfBirthCertificateIssueId")==selectedIssueId && GetDate(row,"CertificateDate")?.Date!=certificateDate.Value.Date);
         printButton.Enabled =
             hasSelectedIssue &&
-            selectedIssueCollected&&!reissuing&&CurrentUser.HasPermission("Certificates.Print");
+            !reissuing&&CurrentUser.HasPermission("Certificates.Print");
+        var workflowRow=CertificateCollectionFlow.Find(certificateResults,"DateOfBirthCertificateIssueId",selectedIssueId);
+        bool unusedVoid=CertificateCollectionFlow.Voided(workflowRow);
+        copyFlow.Available=!reissuing&&!reissue.Blocked;
+        if(copyFlow.Apply(certificateResults,"DateOfBirthCertificateIssueId",selectedIssueId,createCertificateButton,printButton,certificateResults.AsEnumerable().Any(row=>GetInt(row,"DateOfBirthCertificateIssueId")==selectedIssueId&&GetDate(row,"CertificateDate")?.Date!=certificateDate.Value.Date),certificateDate))
+        {
+            collectButton.Enabled=false;
+            SetStatus(unusedVoid?"Historical cancelled copy — retained as read-only history.":copyFlow.Status);return;
+        }
         if(reissue.Blocked){SetStatus("A certificate reissue needs checking. Use Check Reissue before issuing another copy.",true);return;}
         if (!hasStudent)
         {
@@ -385,7 +399,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         {
             if (!selectedIssueCollected)
             {
-                SetStatus("Not collected. Use Mark Collected before printing or issuing again.");
+                SetStatus("Ready to print. Check the details, print, then Mark Collected to lock this copy.");
                 return;
             }
             if (IsLatestSelectedIssue())
@@ -410,7 +424,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         DataRow latest =
             certificateResults.Rows[0];
         return string.Equals(
-            GetString(latest, "CollectionStatus"), "Collected", StringComparison.OrdinalIgnoreCase);
+            GetString(latest, "CollectionStatus"), "Collected", StringComparison.OrdinalIgnoreCase) || CertificateCollectionFlow.Voided(latest);
     }
     private bool IsLatestSelectedIssue()
     {
@@ -426,6 +440,14 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
     }
     private void CreateCertificate()
     {
+        if(selectedIssueId>0)
+        {
+            if(selectedIssueCollected||!IsLatestSelectedIssue())return;
+            try { DatabaseHelper.ExecuteUser("UpdateCertificateCopyDate",DatabaseHelper.P("@Kind","DOB"),DatabaseHelper.Int("@CopyId",selectedIssueId),DatabaseHelper.Date("@CertificateDate",certificateDate.Value.Date),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"DateOfBirthCertificateIssueId",selectedIssueId)));
+                int id=selectedIssueId;LoadCertificates(student.SelectedId);SelectSavedCertificate(id);Info("Certificate changes saved."); }
+            catch(Exception ex){Fail(ex);}
+            return;
+        }
         if (!ValidateRequiredInputs())
             return;
         /* Finding 12 - Info writes the status line, but the reload below calls Bind ("N record(s)") and ApplyWorkflowState after it. */
@@ -577,7 +599,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
                 DatabaseHelper.Int(
                     "@DateOfBirthCertificateIssueId",
                     selectedIssueId),
-                DatabaseHelper.P("@CollectedBy", collectedBy));
+                DatabaseHelper.P("@CollectedBy", collectedBy),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"DateOfBirthCertificateIssueId",selectedIssueId)));
             successMessage =
                 "Certificate issuance marked as collected.";
             LoadCertificates(admissionId);
@@ -609,11 +631,6 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
             if (selectedIssueId <= 0)
             {
                 Warn(UiText.Certificates.InvalidIssuance);
-                return;
-            }
-            if (!selectedIssueCollected)
-            {
-                Warn("This certificate has not been collected yet. It cannot be printed.");
                 return;
             }
             PrintCertificate(selectedCertificateRecordId);
@@ -667,8 +684,8 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
             };
         int labelHeight =
             Math.Max(
-                45,
-                AppMetrics.TextHeight(AppTheme.NormalFont) + 24);
+                70,
+                AppMetrics.TextHeight(AppTheme.NormalFont) * 2 + 24);
         int inputHeight =
             Math.Max(
                 36,
@@ -689,7 +706,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         var label =
             new Label {
                 Text =
-                    "Name of person collecting the certificate:",
+                    "Name of person collecting the certificate:\nCollection permanently locks this copy.",
                 AutoSize =
                     false,
                 Dock =
@@ -786,6 +803,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
     private void RefreshCertificates()
     {
         if (student.SelectedId <= 0) return;
+        try {CertificateCollectionFlow.RefreshStudent(student);currentDateOfBirth=student.SelectedRow is DataRow row?GetDate(row,"DateOfBirth"):null;}catch(Exception ex){Fail(ex);return;}
         int selectedId = selectedIssueId;
         LoadCertificates(student.SelectedId);
         if (selectedId > 0) SelectSavedCertificate(selectedId);

@@ -5,7 +5,7 @@ using FMSC_SMS.Pages.Security;
 string connection=Environment.GetEnvironmentVariable("FMSC_CERTIFICATE_TEST_CONNECTION")??throw new Exception("Owned fixture connection required.");
 string owner=Environment.GetEnvironmentVariable("FMSC_CERTIFICATE_TEST_OWNER")??"";
 var builder=new SqlConnectionStringBuilder(connection);
-if(!Guid.TryParseExact(owner,"N",out _)||builder.InitialCatalog!="FMSC_CertReissueChecks_"+owner)throw new Exception("Unsafe fixture identity.");
+if(!Guid.TryParseExact(owner,"N",out _)||(builder.InitialCatalog!="FMSC_CertReissueChecks_"+owner&&builder.InitialCatalog!="FMSC_CertificateWorkflow_"+owner))throw new Exception("Unsafe fixture identity.");
 DatabaseHelper.ConnectionString=connection;
 DataTable Query(string sql,params SqlParameter[] parameters)
 {
@@ -21,11 +21,12 @@ void Check(bool condition,string message){if(!condition)throw new Exception(mess
 int admin=Number("SELECT TOP(1) U.UserId FROM dbo.Users U JOIN dbo.Roles R ON R.RoleId=U.RoleId WHERE R.RoleName=N'Administrator' ORDER BY U.UserId;");
 CurrentUser.UserId=admin;
 using(var c=new SqlConnection(connection)){c.Open();DatabaseCompatibility.Validate(c);checks++;}
+if(args.Contains("--contract-only")){Console.WriteLine("PASS: schema 51 startup and restore compatibility contract.");return;}
 string suffix=Guid.NewGuid().ToString("N");
 int admission=Convert.ToInt32(Query("INSERT dbo.Students(AdmissionNumber,RegistrationNumber,AdmissionDate,AdmissionCampusId,StudentName,FatherName,DateOfBirth,Status,LegacySetupPending) VALUES(@Number,@Registration,CONVERT(date,GETDATE()),(SELECT MIN(CampusId) FROM dbo.Campuses),N'Certificate Test Student',N'Certificate Test Parent','2001-01-02',N'Active',0);SELECT CONVERT(int,SCOPE_IDENTITY());",
     DatabaseHelper.P("@Number","8"+DateTime.UtcNow.Ticks),DatabaseHelper.P("@Registration","CERT-"+suffix)).Rows[0][0]);
 DateTime oldDob=new(2001,1,2),newDob=new(2002,3,4),today=DateTime.Today;
-int regular=Convert.ToInt32(Query("EXEC dbo.CreateRegularStudentCertificate @UserId=@User,@AdmissionId=@Admission,@CertificateDate=@Date,@ClassName=N'Ten';",
+int regular=Convert.ToInt32(Query("INSERT dbo.RegularStudentCertificates(AdmissionId,StudentName,FatherName,DateOfBirth,ClassName,CertificateDate,CreatedByUserId) SELECT AdmissionId,StudentName,FatherName,DateOfBirth,N'Ten',@Date,@User FROM dbo.Students WHERE AdmissionId=@Admission;SELECT CONVERT(int,SCOPE_IDENTITY());",
     DatabaseHelper.Int("@User",admin),DatabaseHelper.Int("@Admission",admission),DatabaseHelper.Date("@Date",today)).Rows[0][0]);
 int firstRegular=Number($"SELECT MIN(RegularStudentCertificateIssueId) FROM dbo.RegularStudentCertificateIssues WHERE RegularStudentCertificateId={regular};");
 DataTable PrintRegular(int issue)=>Query("EXEC dbo.GetRegularStudentCertificatePrintData @UserId=@User,@RegularStudentCertificateId=@Certificate,@RegularStudentCertificateIssueId=@Issue;",
@@ -40,6 +41,8 @@ Check(PrintRegular(firstRegular).Rows[0].Field<DateTime>("DateOfBirth")==oldDob,
 SqlParameter[] Args(int certificate,int latest,DateTime dob)=>new[]{DatabaseHelper.Int("@CertificateRecordId",certificate),DatabaseHelper.Int("@ExpectedLatestIssueId",latest),DatabaseHelper.Date("@ExpectedDateOfBirth",dob),DatabaseHelper.Date("@CertificateDate",today),DatabaseHelper.P("@ExpectedSourceHash",Query($"SELECT dbo.CertificateAdmissionFingerprint({admission});").Rows[0][0])};
 async Task<MutationIntent> Intent(MutationKind kind,SqlParameter[] args)=>new(Guid.NewGuid(),kind,admin,await RecoverableMutationWriter.GetScopeAsync(),RecoverableMutationWriter.PayloadHash(kind,admin,args),"Disposable certificate reissue check",DateTime.UtcNow);
 var regularArgs=Args(regular,firstRegular,newDob);var regularIntent=await Intent(MutationKind.RegularCertificateReissue,regularArgs);
+void CollectRegular(int issue)=>Query("EXEC dbo.CollectCertificateCopy @UserId=@User,@Kind=N'Regular',@CopyId=@Issue,@CollectedBy=N'Fixture Collector';",DatabaseHelper.Int("@User",admin),DatabaseHelper.Int("@Issue",issue));
+CollectRegular(firstRegular);
 var saved=await RecoverableMutationWriter.SaveAsync(regularIntent,regularArgs);
 Check(saved.Outcome==MutationOutcome.Saved&&saved.Result?.DateOfBirth==newDob,"Regular reissue saves the reviewed corrected DOB.");
 int secondRegular=saved.Result!.RecordId;
@@ -85,6 +88,7 @@ Check((await RecoverableMutationWriter.SaveAsync(await Intent(MutationKind.Regul
 Check(PrintRegular(firstRegular).Rows.Count==1&&PrintBirth(firstBirth).Rows.Count==1,"Missing current school DOB does not prevent reprinting saved snapshots.");
 Check(Number($"SELECT COUNT(*) FROM dbo.MutationRequests WHERE RequestId IN('{regularIntent.Id}','{birthIntent.Id}');")==2,"Successful reissues commit durable recovery records.");
 Query($"UPDATE dbo.Students SET DateOfBirth='2002-03-04',StudentName=N'Changed School Name' WHERE AdmissionId={admission};");
+CollectRegular(secondRegular);
 var concurrentArgs=Args(regular,secondRegular,newDob);
 var intents=new[]{await Intent(MutationKind.RegularCertificateReissue,concurrentArgs),await Intent(MutationKind.RegularCertificateReissue,concurrentArgs)};
 var concurrent=await Task.WhenAll(intents.Select(intent=>RecoverableMutationWriter.SaveAsync(intent,concurrentArgs)));
@@ -92,6 +96,7 @@ Check(concurrent.Count(r=>r.Outcome==MutationOutcome.Saved)==1&&concurrent.Count
     "Two concurrent regular reissues reviewed against the same copy cannot both commit.");
 int thirdRegular=concurrent.Single(r=>r.Outcome==MutationOutcome.Saved).Result!.RecordId;
 Check(PrintRegular(thirdRegular).Rows[0].Field<string>("StudentName")=="Changed School Name"&&PrintRegular(firstRegular).Rows[0].Field<string>("StudentName")=="Certificate Test Student","A reissue uses fresh Admission personal details while earlier copies keep their original details.");
+CollectRegular(thirdRegular);
 var lostArgs=Args(regular,thirdRegular,newDob);var lostIntent=await Intent(MutationKind.RegularCertificateReissue,lostArgs);
 var lost=await RecoverableMutationWriter.SaveAsync(lostIntent,lostArgs,t=>{t.Commit();throw new IOException("Simulated lost commit reply");});
 Check(lost.Outcome==MutationOutcome.Unconfirmed,"A lost commit reply is reported as uncertain rather than retried.");

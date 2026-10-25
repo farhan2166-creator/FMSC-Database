@@ -5,21 +5,17 @@ $owner=[guid]::NewGuid().ToString('N');$catalog='FMSC_CertReissueChecks_'+$owner
 $run=Join-Path $project ('artifacts/certificate-reissue-sql/'+$owner)
 New-Item -ItemType Directory -Path $run -Force | Out-Null
 & SqlLocalDB.exe start MSSQLLocalDB | Out-Null
-$log=Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Microsoft/Microsoft SQL Server Local DB/Instances/MSSQLLocalDB/error.log'
-$stream=[IO.File]::Open($log,'Open','Read','ReadWrite');$reader=[IO.StreamReader]::new($stream)
-try{$text=$reader.ReadToEnd()}finally{$reader.Dispose()}
-$pipes=[regex]::Matches($text,'ready to accept connection on \[ (.*?) \]')
-if(!$pipes.Count){throw 'No running application database endpoint found.'}
-$endpoint='np:'+$pipes[$pipes.Count-1].Groups[1].Value
+$endpoint='(localdb)\MSSQLLocalDB'
 $connection=[Data.SqlClient.SqlConnection]::new("Server=$endpoint;Database=FMSC_DB;Integrated Security=True;TrustServerCertificate=True;Pooling=False;Connect Timeout=8")
 $created=$false
 function Query([string]$sql){$q=$connection.CreateCommand();$q.CommandText=$sql;$q.CommandTimeout=120;$t=[Data.DataTable]::new();$a=[Data.SqlClient.SqlDataAdapter]::new($q);try{[void]$a.Fill($t);return ,$t}finally{$a.Dispose();$q.Dispose()}}
-function Fingerprint([string]$table){$data=Query "SELECT (SELECT * FROM dbo.[$table] ORDER BY 1 FOR JSON PATH,INCLUDE_NULL_VALUES) Json;";return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes([string]$data.Rows[0][0])))}
+$fingerprintColumns=@{}
+function Fingerprint([string]$table){if(!$fingerprintColumns.ContainsKey($table)){$fingerprintColumns[$table]=[string](Query "SELECT STRING_AGG(QUOTENAME(name),N',') WITHIN GROUP(ORDER BY column_id) FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.[$table]');").Rows[0][0]};$data=Query "SELECT (SELECT $($fingerprintColumns[$table]) FROM dbo.[$table] ORDER BY 1 FOR JSON PATH,INCLUDE_NULL_VALUES) Json;";return [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes([string]$data.Rows[0][0])))}
 try{
  $connection.Open()
  if([string](Query 'SELECT physical_name FROM sys.database_files WHERE file_id=1;').Rows[0][0] -ine 'C:\ProgramData\FMSC_Database\FMSC_DB.mdf'){throw 'Unexpected source database.'}
  $sourceVersion=[int](Query 'SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;').Rows[0][0]
- if($sourceVersion -lt 45 -or $sourceVersion -gt 49){throw 'This fixture requires schema 45 through 49.'}
+ if($sourceVersion -lt 45 -or $sourceVersion -gt 51){throw 'This fixture requires schema 45 through 51.'}
  $backup=Join-Path $run 'before46.bak';$quotedBackup=$backup.Replace("'","''")
  [void](Query "BACKUP DATABASE FMSC_DB TO DISK=N'$quotedBackup' WITH COPY_ONLY,CHECKSUM,INIT; RESTORE VERIFYONLY FROM DISK=N'$quotedBackup' WITH CHECKSUM;")
  $files=Query "RESTORE FILELISTONLY FROM DISK=N'$quotedBackup';"
@@ -34,7 +30,7 @@ try{
  $before=@{};foreach($table in $tables){$before[$table]=Fingerprint $table}
  $transaction=$connection.BeginTransaction()
  try{
-  foreach($migration in @(46,47,48,49)|Where-Object {$_ -gt $sourceVersion}){
+  foreach($migration in @(46,47,48,49,50,51)|Where-Object {$_ -gt $sourceVersion}){
   foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $project "Migrations/$migration.sql")),'(?im)^\s*GO\s*\r?$')){
    if([string]::IsNullOrWhiteSpace($batch)){continue};$q=$connection.CreateCommand();$q.Transaction=$transaction;$q.CommandTimeout=90;$q.CommandText=$batch;try{[void]$q.ExecuteNonQuery()}finally{$q.Dispose()}
   }

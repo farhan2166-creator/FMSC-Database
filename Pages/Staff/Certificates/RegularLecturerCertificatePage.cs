@@ -4,6 +4,7 @@ namespace FMSC_SMS.Pages.Staff.Certificates;
 public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
 {
     private readonly StaffPicker staff = new();
+    private readonly CertificateCollectionFlow copyFlow = new("Lecturer");
     private string? _baseline;
     private string Snapshot() => string.Join("\u001f", roleTitle.Text, subjectTaught.Text, certificateDate.Value.Date.ToString("yyyy-MM-dd"));
     // Short certificate details can be retyped without a discard warning.
@@ -29,11 +30,11 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton updateCertificateButton = new() {
-        Text = UiText.Certificates.Update,
+        Text = "Save Changes",
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton newButton = new() {
-        Text = UiText.Certificates.New,
+        Text = "New Certificate",
         Width = AppScale.Scale(110)
     };
     private readonly ModernButton clearButton = new() {
@@ -59,6 +60,7 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
         subjectTaught.MaxLength = 100;
         UiAccessibility.Describe(subjectTaught, "Subject taught",
             "Filled from the selected staff member's Specialization. Review the wording before creating the certificate.");
+        copyFlow.Wire(this,()=>selectedRegularLecturerCertificateId,id=>{LoadCertificates(staff.SelectedId);SelectSavedCertificate(id);},()=>HasCertificateEdits);
         createCertificateButton.Click +=
             (_, _) => CreateCertificate();
         updateCertificateButton.Click +=
@@ -131,7 +133,7 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
                 "Regular Lecturer/Teacher Certificates",
                 "A staff member may have more than one of these. Select a row to edit or print it.");
         var certificateActions =
-            CertificateButtonRow.Create(printButton, refreshButton);
+            CertificateButtonRow.Create(printButton, copyFlow.Collect, copyFlow.IssueAgain, refreshButton);
         certificateActions.Dock =
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
@@ -283,6 +285,7 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
         SetGridWidth("CreatedAt", 145);
         SetGridWidth("UpdatedAt", 145);
         HideGridColumn("StaffId");
+        CertificateCollectionFlow.FormatGrid(Grid);
         CertificateRecordOrder.FitColumns(Grid);
     }
     private void HideGridColumn(string columnName)
@@ -372,6 +375,9 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
             hasStaff;
         printButton.Enabled =
             hasSelection && !HasCertificateEdits && CurrentUser.HasPermission("Certificates.Print");
+        copyFlow.Available=true;
+        if(copyFlow.Apply(certificateResults,"RegularLecturerCertificateId",selectedRegularLecturerCertificateId,updateCertificateButton,printButton,HasCertificateEdits,roleTitle,subjectTaught,certificateDate))
+        { SetStatus(copyFlow.Status); return; }
         if (!hasStaff)
         {
             SetStatus("Select a staff member.");
@@ -380,7 +386,7 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
         if (hasSelection)
         {
             SetStatus(
-                "Editing certificate. Use Update Certificate to save, or New for another certificate.");
+                "Editing certificate. Use Save Changes to save, or New for another certificate.");
             return;
         }
         SetStatus(
@@ -472,7 +478,7 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
                 DatabaseHelper.P(
                     "@SubjectTaught",
                     subjectTaught.Text.Trim()),
-                DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date));
+                DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"RegularLecturerCertificateId",selectedRegularLecturerCertificateId)));
             successMessage =
                 "Certificate updated successfully.";
             ClearCertificateFields();

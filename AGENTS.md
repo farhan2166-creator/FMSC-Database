@@ -28,3 +28,13 @@ and audit-only before/after JSON preparation. Do not make a separate sweep throu
 unrelated procedures. Preserve operational student/lifecycle history, bills,
 payments, allocations, credit movements, migration versions, and request/recovery
 markers: these remain necessary business and recovery records.
+
+# Certificate cancellation decision — 25 October 2026
+
+The owner removed certificate cancel/void from the application because it adds
+unnecessary complexity and can imply deleting a record or undoing leaving and
+fees. Do not reintroduce it without a new explicit owner decision. Preserve
+existing historical cancellation markers and locks; do not delete or resurrect
+those records. The normal flow uses Create, Save Changes before collection,
+Print, Mark Collected and Issue Again. See
+`Docs/Decisions/CERTIFICATE_CANCELLATION_REMOVED.md` for the rationale.

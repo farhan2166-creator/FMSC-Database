@@ -14,23 +14,6 @@ internal static class CertificateUi
         "MALE"=>"Male", "FEMALE"=>"Female", _=>""
     };
 
-    private static string? ReadRecordedGender(DataRow row,string readPermission)
-    {
-        bool staff=row.Table.Columns.Contains("StaffId");
-        string key=staff?"StaffId":"AdmissionId";
-        if(!row.Table.Columns.Contains(key) || !int.TryParse(Convert.ToString(row[key]),out int id) || id<=0)
-            return row.Table.Columns.Contains("Gender")?Convert.ToString(row["Gender"]):null;
-        using var person=DatabaseHelper.QuerySql(staff?"""
-            EXEC dbo.RequirePermission @UserId,@ReadPermission;
-            SELECT Gender FROM dbo.Staff WHERE StaffId=@Id;
-            """:"""
-            EXEC dbo.RequirePermission @UserId,@ReadPermission;
-            SELECT Gender FROM dbo.Students WHERE AdmissionId=@Id;
-            """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Id",id),DatabaseHelper.P("@ReadPermission",readPermission));
-        if(person.Rows.Count==0)throw new InvalidOperationException("The person's record could not be read. Reload before printing the certificate.");
-        return Convert.ToString(person.Rows[0]["Gender"]);
-    }
-
     internal static DataTable PrintData(string reportPath,DataTable source,Func<DataRow,string?>? readGender=null)
     {
         var data=RecordTextPolicy.PrintCopy(source);
@@ -169,8 +152,7 @@ internal static class CertificateUi
         DataTable data,
         IReadOnlyList<string>? provisionalSubjects = null)
     {
-        string readPermission=CertificateLetterhead.UsesPreprintedPad(reportPath)?"Students.Leave":"Certificates.Print";
-        using var printable=PrintData(reportPath,data,row=>ReadRecordedGender(row,readPermission));
+        using var printable=PrintData(reportPath,data);
         string? definition = null;
         if (!CertificateLetterhead.UsesPreprintedPad(reportPath))
         {

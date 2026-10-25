@@ -273,6 +273,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} leaving-certificate student date checks (no database connection).");
             return;
         }
+        if(args.Contains("--certificate-collection-workflow"))
+        {
+            CheckCertificateCollectionWorkflow();
+            Console.WriteLine($"PASS: {checks} certificate collection, lock, print and unused-copy checks across all ten forms.");
+            return;
+        }
         if(args.Contains("--payment-adjustments"))
         {
             CheckPaymentAdjustmentContext();

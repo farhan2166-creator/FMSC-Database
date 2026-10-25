@@ -35,11 +35,11 @@ internal static partial class Program
                 grid.ClearSelection();grid.CurrentCell=grid.Rows[row].Cells.Cast<DataGridViewCell>().First(cell=>cell.Visible);grid.Rows[row].Selected=true;Application.DoEvents();
             }
             exam.SelectedIndex=0;Select(0);
-            Check(Field<int>("selectedIssueId")==2&&exam.SelectedIndex==1&&exam.Enabled,
-                "Selecting the latest history row loads its saved HSSC type and permits editing its entered details.");
+            Check(Field<int>("selectedIssueId")==2&&exam.SelectedIndex==1&&!exam.Enabled,
+                "Selecting a collected history row loads its saved HSSC type with entered details locked.");
             Check(print.Enabled&&again.Enabled,"A collected character certificate permits both reprint and another issuance.");
-            Check(Field<ModernButton>("createCertificateButton").Text=="Save Changes"&&Field<ModernButton>("createCertificateButton").Enabled,
-                "The latest copy uses Save Changes on the same certificate form.");
+            Check(Field<ModernButton>("createCertificateButton").Text=="Save Changes"&&!Field<ModernButton>("createCertificateButton").Enabled,
+                "A collected copy cannot be overwritten through Save Changes.");
             type.GetMethod("SelectSavedCertificate",flags)!.Invoke(page,new object[]{0});
             Check(Field<int>("selectedIssueId")==2&&exam.SelectedIndex==1,"Automatic history selection chooses the newest issue's saved type.");
             Select(1);
@@ -48,8 +48,8 @@ internal static partial class Program
             exam.SelectedIndex=-1;
             Check(print.Enabled&&!again.Enabled,"Changing the UI selection cannot change the stored print type or enable an older reissue.");
             records.Rows[0]["CollectionStatus"]="Not Collected";Select(0);
-            Check(!print.Enabled&&!again.Enabled&&Field<ModernButton>("collectButton").Enabled,
-                "An uncollected latest issue exposes Mark Collected and blocks another issue.");
+            Check(print.Enabled&&!again.Enabled&&Field<ModernButton>("collectButton").Enabled,
+                "An uncollected latest issue can be printed and collected, while another issue stays blocked.");
             Select(1);
             Check(print.Enabled&&!again.Enabled,"An older collected copy remains reprintable while a newer copy awaits collection.");
             records.Rows[0]["CollectionStatus"]="Collected";Select(0);
