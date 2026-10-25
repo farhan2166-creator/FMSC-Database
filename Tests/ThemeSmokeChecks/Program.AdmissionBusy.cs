@@ -92,7 +92,7 @@ internal static partial class Program
         Check(outcome.Enabled&&!create.Enabled&&!update.Enabled&&page.HasUnsavedChanges,"Pending bank creation exposes exact recovery and blocks conflicting writes");
         var task=(Task)type.GetMethod("CreateCertificate",flags)!.Invoke(page,null)!;
         Check(task.IsCompletedSuccessfully&&!page.IsBusy,"Pending certificate runtime guard refuses another create before SQL or validation");
-        foreach(string action in new[]{"StartNewCertificate","ClearForm","RefreshCertificates","UpdateCertificate"})type.GetMethod(action,flags)!.Invoke(page,null);
+        foreach(string action in new[]{"ClearForm","RefreshCertificates","UpdateCertificate"})type.GetMethod(action,flags)!.Invoke(page,null);
         Check(page.HasUnsavedChanges&&page.UnsavedChangesMessage.Contains("retained")&&!page.IsHandleCreated,"Pending certificate identity survives direct conflicting actions and explains retained recovery on leaving");
     }
 

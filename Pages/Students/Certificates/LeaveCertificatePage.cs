@@ -49,9 +49,8 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
         Text = UiText.Certificates.Create,
         Width = AppScale.Scale(170)
     };
-    private readonly ModernButton newCertificateButton = new() {Text="New Certificate",Width=140};
     private readonly ModernButton clearButton = new() {
-        Text = UiText.Certificates.NextStudent,
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton issueAgainButton = new() {
@@ -78,7 +77,6 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
         feeReview = new LeaveFeeReviewBar(() => student.SelectedId, () => currentEnrollmentId, () => leave.Value.Date, () => HasCertificateForCurrentEnrollment());
         leave.ValueChanged += (_, _) => feeReview.RefreshFees();
         ConfigureFieldSuggestions();
-        newCertificateButton.Click+=(_,_)=>{if(ConfirmDraftDiscard())StudentChanged();};
         academic.TextChanged+=(_,_)=>ApplyWorkflowState();attendance.TextChanged+=(_,_)=>ApplyWorkflowState();remarks.TextChanged+=(_,_)=>ApplyWorkflowState();promoted.SelectedIndexChanged+=(_,_)=>ApplyWorkflowState();
         copyFlow.Wire(this,()=>selectedIssueId,id=>{LoadCertificates(student.SelectedId);SelectSavedCertificate(id);},()=>draftBaseline!=DraftSnapshot());
         createCertificateButton.Click +=
@@ -170,7 +168,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
         details.Content.Controls.Add(fields);
         fields.Controls.Add(feeReview, 1, 4);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, newCertificateButton, clearButton);
+            CertificateButtonRow.Create(createCertificateButton, clearButton);
         certButtonRow.Dock =
             DockStyle.Bottom;
         details.Content.Controls.Add(certButtonRow);
@@ -429,7 +427,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
     }
     private void SelectSavedCertificate(int id)
     {
-        
+
         CertificateRecordOrder.Select(Grid, "LeaveCertificateIssueId", id,
             index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
     }
@@ -557,7 +555,6 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
         promoted.Enabled = academic.Enabled = attendance.Enabled = remarks.Enabled = editableCopy||(canCreate&&!hasSelectedIssue);
         createCertificateButton.Enabled = editableCopy||(canCreate&&!hasSelectedIssue&&HasRequiredStudentDates);
         createCertificateButton.Text=hasSelectedIssue?"Save Changes":UiText.Certificates.Create;
-        newCertificateButton.Enabled=hasStudent&&!hasCertificateForThisLeaving;
         clearButton.Enabled = true;
         refreshButton.Enabled =
             hasStudent;

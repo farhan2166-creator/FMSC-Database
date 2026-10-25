@@ -31,7 +31,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
     private bool saving;
     private bool recoveryBlocked;
     private string selectedStoredExamType = "";
-    private readonly ModernButton newCertificateButton = new() { Text = "New Certificate", Width = AppScale.Scale(160) };
     private readonly ModernButton checkSaveButton = new() { Text = "Check Save", Width = AppScale.Scale(140) };
     private int selectedCertificateRecordId;
     private int selectedIssueId;
@@ -42,7 +41,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton clearButton = new() {
-        Text = UiText.Certificates.NextStudent,
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton issueAgainButton = new() {
@@ -85,7 +84,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         clearButton.Click +=
             (_, _) => ClearForm();
         issueAgainButton.Click += async (_, _) => await IssueAgain();
-        newCertificateButton.Click += (_, _) => BeginNewCertificate();
         checkSaveButton.Click += async (_, _) => await CheckSave();
         collectButton.Click +=
             (_, _) => MarkCollected();
@@ -167,13 +165,12 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
             field.TabIndex = fields.GetRow(field) * fields.ColumnCount + fields.GetColumn(field);
         details.Content.Controls.Add(fields);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, newCertificateButton, clearButton, checkSaveButton);
+            CertificateButtonRow.Create(createCertificateButton, clearButton, checkSaveButton);
         certButtonRow.Dock =
             DockStyle.Bottom;
         certButtonRow.TabIndex = 1;
         createCertificateButton.TabIndex = 0;
-        newCertificateButton.TabIndex = 1;
-        clearButton.TabIndex = 2;
+        clearButton.TabIndex = 1;
         details.Content.Controls.Add(certButtonRow);
         var records =
             HumanUi.Card(
@@ -328,7 +325,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
     }
     private void SelectSavedCertificate(int id)
     {
-        
+
         CertificateRecordOrder.Select(Grid, "CharacterCertificateIssueId", id,
             index => LoadCertificateIssue(((DataRowView)Grid.Rows[index].DataBoundItem).Row));
     }
@@ -446,7 +443,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         certificateDate.Enabled = rollNumber.Enabled = remarks.Enabled = academicYear.Enabled = selected?editable:canCreate;
         createCertificateButton.Enabled = selected?editable:canCreate;
         createCertificateButton.Text=selected?"Save Changes":UiText.Certificates.Create;
-        newCertificateButton.Enabled = available && hasStudent;
         clearButton.Enabled = !saving;
         refreshButton.Enabled = hasStudent && !saving;
         issueAgainButton.Enabled = available && selected && knownType && IsLatestSelectedIssue() && IsLatestIssueCollectedFor(selectedCertificateRecordId);
@@ -520,13 +516,6 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         if (examType.SelectedIndex >= 0 && examType.SelectedIndex < ExamTypeLabels.Length) return true;
         Warn("Choose SSC or HSSC wording for this certificate.");
         return false;
-    }
-    private void BeginNewCertificate()
-    {
-        if (saving || recoveryBlocked) return;
-        Grid.ClearSelection(); Grid.CurrentCell = null;
-        ClearCertificateSelection(); ClearCertificateFields(); ApplyWorkflowState();
-        examType.Focus();
     }
     private void LoadRecovery()
     {

@@ -59,7 +59,7 @@ internal static partial class Program
                     kind + " field events cannot re-enable submission or student switching");
                 Check(((Task)Call("RunCreateCertificateAsync")!).IsCompleted && writes == 1,
                     kind + " second submission is refused without a second write");
-                foreach (string action in new[] { "ClearForm", "RefreshCertificates", "StartNewCertificate", "UpdateCertificate" }) Call(action);
+                foreach (string action in new[] { "ClearForm", "RefreshCertificates",  "UpdateCertificate" }) Call(action);
                 Check(student.SelectedId == 41 && reads == 0 && ((IBusyPage)page).IsBusy,
                     kind + " direct actions cannot clear, reload, update or release the active operation");
                 string original = kind == "Sports" ? "Team captain" : kind == "Provisional" ? "Fixture Board" : "";
