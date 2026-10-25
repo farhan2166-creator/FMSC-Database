@@ -44,17 +44,23 @@ internal static partial class Program
             using(var form=new ChangeFeeDiscountForm(41,"Admission Fee",10000,0,data.Rows[0],Query,Save))
             {
                 Show(form);Capture(form,"choose-task");
+                Check(Field<ModernButton[]>(form,"taskButtons").All(button=>button.Visible&&button.Enabled),
+                    "All four fee actions are directly visible and keyboard-accessible.");
                 Check(!Field<ModernComboBox>(form,"scope").Visible&&!Field<ModernDatePicker>(form,"fromMonth").Visible,
                     "A single bill has a fixed scope and no irrelevant monthly date controls.");
                 Check(!Field<ModernComboBox>(form,"paidReduction").Visible&&!Field<TabControl>(form,"comparisons").Visible,
                     "No overpayment question or empty comparison tabs are shown before review.");
-                Field<ModernComboBox>(form,"action").SelectedIndex=0;
+                ClickTask(form,0);
+                Check(Field<ModernComboBox>(form,"action").SelectedIndex==0&&Field<ModernComboBox>(form,"concession").Text=="None",
+                    "Give Discount opens its fields without classifying an ordinary discount as Scholarship.");
                 Field<ModernTextBox>(form,"amount").Text="2000";Field<ModernTextBox>(form,"reason").Text="Approved admission discount";
+                Check(Field<Label>(form,"taskNote").Text.Contains("Rs. 8,000"),"The draft immediately shows the selected fee's resulting net amount.");
                 Check(!Field<ModernTextBox>(form,"newRate").Visible,"A discount does not display the fee-rate correction input.");
                 Click(form,"review");
                 Check(!(bool)Arg("@UpdateAgreement")&&(bool)Arg("@ApplyToBills")&&(long)Arg("@BillingChargeId")==321L,
                     "Opening a bill changes only that bill and preserves its saved fee plan.");
                 Check(!(bool)Arg("@ApplyAvailableCredit"),"Fee changes never spend advance credit.");
+                Check(Arg("@ConcessionLabel") is DBNull,"The approved ordinary-discount default reaches review as an unlabelled discount.");
                 Check(!Field<ModernComboBox>(form,"paidReduction").Visible,"An unpaid reduction does not ask for a credit/refund decision.");
                 Check(Field<Label>(form,"impact").Text.Contains("10,000 → Rs. 8,000")&&Field<Label>(form,"impact").Text.Contains("Discount: Rs. 2,000"),
                     "The review uses the authoritative current/proposed bill totals and discount.");
@@ -63,11 +69,13 @@ internal static partial class Program
                 Click(form,"editChoices");
                 Check(Field<ModernTextBox>(form,"amount").Visible&&Field<ModernTextBox>(form,"amount").Text=="2000"&&!Field<ModernButton>(form,"save").Enabled,
                     "Edit Choices preserves the entries and requires a fresh review.");
-                Field<ModernComboBox>(form,"action").SelectedIndex=1;
+                ClickTask(form,1);
+                Check(Field<ModernComboBox>(form,"action").SelectedIndex==1,"The waiver quick action selects the existing full-waiver task.");
+                Capture(form,"waiver-entry");
                 Check(!Field<ModernTextBox>(form,"amount").Visible&&!Field<ModernTextBox>(form,"newRate").Visible&&!Field<ModernButton>(form,"save").Enabled,
                     "Switching to a waiver hides unrelated amounts and invalidates the discount preview.");
                 Click(form,"review");Check((bool)Arg("@FullFeeWaiver")&&Arg("@NewAmount") is DBNull,"Waiver task leaves the fee rate unchanged.");
-                Field<ModernComboBox>(form,"action").SelectedIndex=3;Click(form,"review");
+                ClickTask(form,3);Check(Field<ModernComboBox>(form,"action").SelectedIndex==3,"Remove Discount selects its existing task directly.");Click(form,"review");
                 Check(!(bool)Arg("@FullFeeWaiver")&&(decimal)Arg("@DiscountAmount")==0m&&Arg("@ConcessionLabel") is DBNull,
                     "Remove Discount clears both fixed concessions and full-waiver labels explicitly.");
                 Field<ModernComboBox>(form,"action").SelectedIndex=0;paid=10000;
@@ -84,7 +92,10 @@ internal static partial class Program
             var monthly=data.Copy();monthly.Columns.Remove("BillingChargeId");monthly.Rows[0]["Frequency"]="Monthly";oldDiscount=2000m;
             using(var form=new ChangeFeeDiscountForm(41,"Tuition",10000,2000,monthly.Rows[0],Query,Save))
             {
-                Show(form);Field<ModernComboBox>(form,"action").SelectedIndex=2;
+                Show(form);ClickTask(form,0);Field<ModernTextBox>(form,"amount").Text="2000";
+                Capture(form,"monthly-discount-entry");
+                ClickTask(form,2);
+                Check(Field<ModernComboBox>(form,"action").SelectedIndex==2,"The fee correction quick action selects the existing rate-change task.");
                 Field<ModernTextBox>(form,"newRate").Text="12000";Field<ModernTextBox>(form,"reason").Text="Correct agreed rate";
                 Check(Field<ModernDatePicker>(form,"fromMonth").Visible&&Field<ModernDatePicker>(form,"throughMonth").Visible,
                     "Monthly fee plans offer a start and through month.");
@@ -121,6 +132,13 @@ internal static partial class Program
         {
             typeof(Control).GetMethod("OnClick",flags)!.Invoke(Field<ModernButton>(form,name),new object[]{EventArgs.Empty});Application.DoEvents();
         }
+        void ClickTask(Form form,int index)
+        {
+            typeof(Control).GetMethod("OnClick",flags)!.Invoke(Field<ModernButton[]>(form,"taskButtons")[index],new object[]{EventArgs.Empty});
+            Application.DoEvents();
+            Check(Field<ModernButton[]>(form,"taskButtons").Select((button,position)=>button.ThemeRole==(position==index?"TabActive":"TabInactive")).All(selected=>selected),
+                "Exactly the chosen quick action is highlighted, including Remove Discount.");
+        }
         void Show(Form form)
         {form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-20000,-20000);form.ShowInTaskbar=false;form.Show();Application.DoEvents();}
         void Capture(Form form,string name)
@@ -130,6 +148,12 @@ internal static partial class Program
                 form.Size=size;form.PerformLayout();Application.DoEvents();
                 var root=Descendants(form).OfType<TableLayoutPanel>().Single(panel=>panel.AutoScroll);
                 Check(!root.HorizontalScroll.Visible,$"{name} fits horizontally at {size.Width}px.");
+                if(name=="monthly-discount-entry")
+                {
+                    var viewport=Field<Panel>(form,"reviewScroll");var input=Field<ModernTextBox>(form,"reason");
+                    Check(viewport.ClientRectangle.Contains(viewport.RectangleToClient(input.RectangleToScreen(input.ClientRectangle))),
+                        $"The monthly discount's reason input is visible without scrolling at {size.Width}px.");
+                }
                 foreach(var button in Descendants(form).OfType<ModernButton>().Where(button=>button.Visible))
                     Check(form.ClientRectangle.Contains(form.RectangleToClient(button.RectangleToScreen(button.ClientRectangle))),
                         $"{name}: {button.Text} stays visible at {size.Width}px.");
