@@ -566,13 +566,11 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
             hasSelectedIssue &&
             !selectedIssueCollected && draftBaseline==DraftSnapshot();
         printButton.Enabled = hasSelectedIssue;
-        var workflowRow=CertificateCollectionFlow.Find(certificateResults,"LeaveCertificateIssueId",selectedIssueId);
-        bool unusedVoid=CertificateCollectionFlow.Voided(workflowRow);
         copyFlow.Available=true;
         if(copyFlow.Apply(certificateResults,"LeaveCertificateIssueId",selectedIssueId,createCertificateButton,printButton,draftBaseline!=DraftSnapshot(),promoted,academic,attendance,remarks))
         {
             collectButton.Enabled=false;
-            SetStatus(unusedVoid?"Historical cancelled copy — retained as read-only history.":copyFlow.Status);return;
+            SetStatus(copyFlow.Status);return;
         }
         if (!hasStudent)
         {
@@ -674,7 +672,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
             {
                 continue;
             }
-            if (!CertificateCollectionFlow.Voided(row) && string.Equals(
+            if (string.Equals(
                     GetString(row, "IssueType"), "Duplicate", StringComparison.OrdinalIgnoreCase))
             {
                 count++;
@@ -690,7 +688,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
     private bool IsLatestIssueCollected()
     {
         var row=certificateResults.AsEnumerable().FirstOrDefault(row=>selectedLeaveRecordId<=0||GetInt(row,"LeaveRecordId")==selectedLeaveRecordId);
-        return CertificateCollectionFlow.Locked(row)||CertificateCollectionFlow.Voided(row);
+        return CertificateCollectionFlow.Locked(row);
     }
     private bool IsLatestSelectedIssue()
     {

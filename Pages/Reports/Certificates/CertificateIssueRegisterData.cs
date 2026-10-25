@@ -65,7 +65,7 @@ internal static class CertificateIssueRegisterData
         string hasIssue=tracked ? "I.IssuedAt IS NOT NULL" : "1=1";
         string activity=tracked ? "COALESCE(I.IssuedAt,C.CreatedAt)" : "C.CreatedAt";
         string recordedBy=tracked ? "COALESCE(I.IssuedByUserId,C.CreatedByUserId)" : "C.CreatedByUserId";
-        string collection=$"CASE WHEN NOT ({hasIssue}) THEN N'Not tracked' WHEN {collectionSource}.VoidedAt IS NOT NULL THEN N'Void' WHEN {collectionSource}.CollectedAt IS NULL THEN N'Not Collected' ELSE N'Collected' END";
+        string collection=$"CASE WHEN NOT ({hasIssue}) THEN N'Not tracked' WHEN {collectionSource}.CollectedAt IS NULL THEN N'Not Collected' ELSE N'Collected' END";
         string issueId=tracked ? regular?"I.RegularStudentCertificateIssueId":$"I.{(leave ? "Leave" : character ? "Character" : "DateOfBirth")}CertificateIssueId" : "CAST(NULL AS int)";
         return $"""
             SELECT {type} CertificateType,C.{key} RecordId,{issueId} IssueId,

@@ -368,13 +368,11 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         printButton.Enabled =
             hasSelectedIssue &&
             !reissuing&&CurrentUser.HasPermission("Certificates.Print");
-        var workflowRow=CertificateCollectionFlow.Find(certificateResults,"DateOfBirthCertificateIssueId",selectedIssueId);
-        bool unusedVoid=CertificateCollectionFlow.Voided(workflowRow);
         copyFlow.Available=!reissuing&&!reissue.Blocked;
         if(copyFlow.Apply(certificateResults,"DateOfBirthCertificateIssueId",selectedIssueId,createCertificateButton,printButton,certificateResults.AsEnumerable().Any(row=>GetInt(row,"DateOfBirthCertificateIssueId")==selectedIssueId&&GetDate(row,"CertificateDate")?.Date!=certificateDate.Value.Date),certificateDate))
         {
             collectButton.Enabled=false;
-            SetStatus(unusedVoid?"Historical cancelled copy — retained as read-only history.":copyFlow.Status);return;
+            SetStatus(copyFlow.Status);return;
         }
         if(reissue.Blocked){SetStatus("A certificate reissue needs checking. Use Check Reissue before issuing another copy.",true);return;}
         if (!hasStudent)
@@ -424,7 +422,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         DataRow latest =
             certificateResults.Rows[0];
         return string.Equals(
-            GetString(latest, "CollectionStatus"), "Collected", StringComparison.OrdinalIgnoreCase) || CertificateCollectionFlow.Voided(latest);
+            GetString(latest, "CollectionStatus"), "Collected", StringComparison.OrdinalIgnoreCase);
     }
     private bool IsLatestSelectedIssue()
     {

@@ -1,5 +1,10 @@
 IF OBJECT_ID(N'dbo.VoidCertificateCopy',N'P') IS NOT NULL THROW 51000,'Certificate cancellation must be removed.',1;
+IF EXISTS(SELECT 1 FROM sys.columns WHERE name IN(N'VoidedAt',N'VoidReason'))
+ THROW 51000,'Retired cancellation columns still exist.',1;
+IF EXISTS(SELECT 1 FROM sys.sql_modules WHERE definition LIKE N'%VoidedAt%' OR definition LIKE N'%VoidReason%')
+ THROW 51000,'An active SQL module still references retired cancellation columns.',1;
 SELECT N'PASS: certificate cancellation command is absent';
+SELECT N'PASS: cancellation columns and active SQL references are absent';
 GO
 SET XACT_ABORT ON;
 DECLARE @User int=(SELECT TOP(1) U.UserId FROM dbo.Users U JOIN dbo.Roles R ON R.RoleId=U.RoleId WHERE R.RoleName=N'Administrator' ORDER BY U.UserId),@Student int,@Staff int=(SELECT TOP(1) StaffId FROM dbo.Staff ORDER BY StaffId),@Record int,@Copy int,@New int,@Gender nvarchar(20),@Version binary(8),@Hash varbinary(32),@Request uniqueidentifier=NEWID();

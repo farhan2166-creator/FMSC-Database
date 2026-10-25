@@ -436,7 +436,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             ((!hasSelection && certificatesLoaded && string.Equals(GetSelectedStudentStatus(),"Active",StringComparison.OrdinalIgnoreCase) && ExistingClassCertificateId(certificateResults, className.Text,enrollmentId) == 0)||editableCopy) && !IsBusy && !reissue.Blocked;
         createCertificateButton.Text=hasSelection?"Save Changes":UiText.Certificates.Create;
         updateCertificateButton.Enabled =
-            hasStudent && hasSelection && selectedIssueId>0 && !IsBusy && !reissue.Blocked && (CertificateCollectionFlow.Locked(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId))||CertificateCollectionFlow.Voided(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId)));
+            hasStudent && hasSelection && selectedIssueId>0 && !IsBusy && !reissue.Blocked && CertificateCollectionFlow.Locked(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId));
         checkReissue.Visible=reissue.Blocked;
         checkReissue.Enabled=reissue.Blocked&&!IsBusy;
         clearButton.Enabled = !creatingCertificate;
@@ -447,8 +447,6 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         copyFlow.Available=!IsBusy&&!reissue.Blocked;
         copyFlow.Apply(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId,createCertificateButton,printButton,dirty,certificateDate);
         if(reissue.Blocked){SetStatus("A certificate reissue needs checking. Use Check Reissue before issuing another copy.",true);return;}
-        if(hasSelection&&CertificateCollectionFlow.Voided(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId)))
-        {SetStatus("Historical cancelled copy — retained as read-only history.");return;}
         if (!hasStudent)
         {
             SetStatus(

@@ -450,13 +450,11 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         printButton.Enabled = !saving && selected && knownType && (selectedIssueCollected||draftBaseline==DraftSnapshot()) && CurrentUser.HasPermission("Certificates.Print");
         checkSaveButton.Visible = recoveryBlocked;
         checkSaveButton.Enabled = recoveryBlocked && !saving;
-        var workflowRow=CertificateCollectionFlow.Find(certificateResults,"CharacterCertificateIssueId",selectedIssueId);
-        bool unusedVoid=CertificateCollectionFlow.Voided(workflowRow);
         copyFlow.Available=available;
         if(copyFlow.Apply(certificateResults,"CharacterCertificateIssueId",selectedIssueId,createCertificateButton,printButton,draftBaseline!=DraftSnapshot(),examType,certificateDate,rollNumber,remarks,academicYear))
         {
             collectButton.Enabled=false;
-            SetStatus(unusedVoid?"Historical cancelled copy — retained as read-only history.":copyFlow.Status);return;
+            SetStatus(copyFlow.Status);return;
         }
         if (recoveryBlocked) { SetStatus("An earlier save needs checking. Use Check Save before creating another copy.", true); return; }
         if (!hasStudent) { SetStatus(UiText.Prompts.SearchForStudent); return; }
@@ -484,7 +482,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
                 continue;
             }
             return string.Equals(
-                GetString(row, "CollectionStatus"), "Collected", StringComparison.OrdinalIgnoreCase) || CertificateCollectionFlow.Voided(row);
+                GetString(row, "CollectionStatus"), "Collected", StringComparison.OrdinalIgnoreCase);
         }
         return false;
     }

@@ -923,18 +923,6 @@
     },
     {
       "schema": "dbo",
-      "objectName": "SportsCertificates",
-      "name": "VoidedAt",
-      "type": "datetime2",
-      "maxLength": 8,
-      "precision": 27,
-      "scale": 7,
-      "isNullable": true,
-      "isIdentity": false,
-      "isComputed": false
-    },
-    {
-      "schema": "dbo",
       "objectName": "NoObjectionCertificates",
       "name": "CollectedAt",
       "type": "datetime2",
@@ -953,18 +941,6 @@
       "maxLength": 400,
       "precision": 0,
       "scale": 0,
-      "isNullable": true,
-      "isIdentity": false,
-      "isComputed": false
-    },
-    {
-      "schema": "dbo",
-      "objectName": "NoObjectionCertificates",
-      "name": "VoidedAt",
-      "type": "datetime2",
-      "maxLength": 8,
-      "precision": 27,
-      "scale": 7,
       "isNullable": true,
       "isIdentity": false,
       "isComputed": false
@@ -995,18 +971,6 @@
     },
     {
       "schema": "dbo",
-      "objectName": "ProvisionalCertificates",
-      "name": "VoidedAt",
-      "type": "datetime2",
-      "maxLength": 8,
-      "precision": 27,
-      "scale": 7,
-      "isNullable": true,
-      "isIdentity": false,
-      "isComputed": false
-    },
-    {
-      "schema": "dbo",
       "objectName": "RegularLecturerCertificates",
       "name": "CollectedAt",
       "type": "datetime2",
@@ -1025,18 +989,6 @@
       "maxLength": 400,
       "precision": 0,
       "scale": 0,
-      "isNullable": true,
-      "isIdentity": false,
-      "isComputed": false
-    },
-    {
-      "schema": "dbo",
-      "objectName": "RegularLecturerCertificates",
-      "name": "VoidedAt",
-      "type": "datetime2",
-      "maxLength": 8,
-      "precision": 27,
-      "scale": 7,
       "isNullable": true,
       "isIdentity": false,
       "isComputed": false
@@ -1067,18 +1019,6 @@
     },
     {
       "schema": "dbo",
-      "objectName": "BankAccountOpeningCertificates",
-      "name": "VoidedAt",
-      "type": "datetime2",
-      "maxLength": 8,
-      "precision": 27,
-      "scale": 7,
-      "isNullable": true,
-      "isIdentity": false,
-      "isComputed": false
-    },
-    {
-      "schema": "dbo",
       "objectName": "RegularStudentCertificateIssues",
       "name": "CollectedAt",
       "type": "datetime2",
@@ -1097,18 +1037,6 @@
       "maxLength": 400,
       "precision": 0,
       "scale": 0,
-      "isNullable": true,
-      "isIdentity": false,
-      "isComputed": false
-    },
-    {
-      "schema": "dbo",
-      "objectName": "RegularStudentCertificateIssues",
-      "name": "VoidedAt",
-      "type": "datetime2",
-      "maxLength": 8,
-      "precision": 27,
-      "scale": 7,
       "isNullable": true,
       "isIdentity": false,
       "isComputed": false
@@ -1139,18 +1067,6 @@
     },
     {
       "schema": "dbo",
-      "objectName": "CharacterCertificateIssues",
-      "name": "VoidedAt",
-      "type": "datetime2",
-      "maxLength": 8,
-      "precision": 27,
-      "scale": 7,
-      "isNullable": true,
-      "isIdentity": false,
-      "isComputed": false
-    },
-    {
-      "schema": "dbo",
       "objectName": "DateOfBirthCertificateIssues",
       "name": "CollectedAt",
       "type": "datetime2",
@@ -1169,18 +1085,6 @@
       "maxLength": 400,
       "precision": 0,
       "scale": 0,
-      "isNullable": true,
-      "isIdentity": false,
-      "isComputed": false
-    },
-    {
-      "schema": "dbo",
-      "objectName": "DateOfBirthCertificateIssues",
-      "name": "VoidedAt",
-      "type": "datetime2",
-      "maxLength": 8,
-      "precision": 27,
-      "scale": 7,
       "isNullable": true,
       "isIdentity": false,
       "isComputed": false
@@ -1193,18 +1097,6 @@
       "maxLength": 400,
       "precision": 0,
       "scale": 0,
-      "isNullable": true,
-      "isIdentity": false,
-      "isComputed": false
-    },
-    {
-      "schema": "dbo",
-      "objectName": "LeaveCertificateIssues",
-      "name": "VoidedAt",
-      "type": "datetime2",
-      "maxLength": 8,
-      "precision": 27,
-      "scale": 7,
       "isNullable": true,
       "isIdentity": false,
       "isComputed": false

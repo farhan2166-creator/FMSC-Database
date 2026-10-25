@@ -15,7 +15,7 @@ try{
  $connection.Open()
  if([string](Query 'SELECT physical_name FROM sys.database_files WHERE file_id=1;').Rows[0][0] -ine 'C:\ProgramData\FMSC_Database\FMSC_DB.mdf'){throw 'Unexpected source database.'}
  $sourceVersion=[int](Query 'SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC;').Rows[0][0]
- if($sourceVersion -lt 45 -or $sourceVersion -gt 51){throw 'This fixture requires schema 45 through 51.'}
+ if($sourceVersion -lt 45 -or $sourceVersion -gt 52){throw 'This fixture requires schema 45 through 52.'}
  $backup=Join-Path $run 'before46.bak';$quotedBackup=$backup.Replace("'","''")
  [void](Query "BACKUP DATABASE FMSC_DB TO DISK=N'$quotedBackup' WITH COPY_ONLY,CHECKSUM,INIT; RESTORE VERIFYONLY FROM DISK=N'$quotedBackup' WITH CHECKSUM;")
  $files=Query "RESTORE FILELISTONLY FROM DISK=N'$quotedBackup';"
@@ -30,7 +30,7 @@ try{
  $before=@{};foreach($table in $tables){$before[$table]=Fingerprint $table}
  $transaction=$connection.BeginTransaction()
  try{
-  foreach($migration in @(46,47,48,49,50,51)|Where-Object {$_ -gt $sourceVersion}){
+  foreach($migration in @(46,47,48,49,50,51,52)|Where-Object {$_ -gt $sourceVersion}){
   foreach($batch in [regex]::Split([IO.File]::ReadAllText((Join-Path $project "Migrations/$migration.sql")),'(?im)^\s*GO\s*\r?$')){
    if([string]::IsNullOrWhiteSpace($batch)){continue};$q=$connection.CreateCommand();$q.Transaction=$transaction;$q.CommandTimeout=90;$q.CommandText=$batch;try{[void]$q.ExecuteNonQuery()}finally{$q.Dispose()}
   }

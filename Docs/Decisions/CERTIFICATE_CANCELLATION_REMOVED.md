@@ -19,3 +19,7 @@ The supported counter flow remains: **Create → Save Changes while uncollected 
 - RDLC files are unchanged.
 
 Do not reintroduce certificate cancellation or a “show cancelled / prepare replacement” workflow without a new explicit owner decision.
+
+## Follow-up: permanent column removal
+
+On 25 October 2026 the owner explicitly approved permanently dropping `VoidedAt` and `VoidReason` from code and SQL, then restored a clean schema-48 database containing students and leaving certificates. Migration 52 removes the columns and all active cancellation branches, and keeps collection locks, certificate records and recovery markers. It refuses a different snapshot containing historical cancelled copies to avoid silently reviving them. Old migrations remain immutable upgrade history. This supersedes the earlier instruction to retain the columns in the current schema.

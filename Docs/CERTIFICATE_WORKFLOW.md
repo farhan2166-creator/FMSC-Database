@@ -36,7 +36,7 @@ Sports certificates offer six optional performance sentences covering sportsmans
 
 ## Database delivery and checks
 
-Cancellation is removed from the forms and database command in schema 51. The decision and rationale are recorded in [the cancellation decision](Decisions/CERTIFICATE_CANCELLATION_REMOVED.md). Existing cancelled copies remain protected as historical data.
+Cancellation is removed from the forms and database command in schema 51. The decision and rationale are recorded in [the cancellation decision](Decisions/CERTIFICATE_CANCELLATION_REMOVED.md). Schema 52 removes the cancellation columns and branches after the owner restored a clean schema-48 database. Snapshots containing historical cancelled copies are refused to avoid reviving them.
 
 `Migrations/51.sql` retires the command after schema 50. `Migrations/50.sql` contains the complete schema/procedure/trigger change from schema 49. Apply it through the established transactional migration mechanism after restoring a schema-49 database. Older databases must first receive their intervening migrations. Existing collection timestamps are retained; collection is not invented for previously untracked certificates.
 
