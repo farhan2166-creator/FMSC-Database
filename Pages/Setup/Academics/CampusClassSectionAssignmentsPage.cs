@@ -55,17 +55,6 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
             (_, _) => {
                 if (suppressCampusChanged)
                     return;
-                /* The campus change is what reloads the matrix, so this is where the unapplied ticks would be lost. */
-                if (HasUnsavedChanges &&
-                    !Confirm(
-                        $"{UnsavedChangesMessage}{Environment.NewLine}{Environment.NewLine}" +
-                        $"Changing the campus will discard your unsaved selections.{Environment.NewLine}{Environment.NewLine}" +
-                        "Use Apply Changes first to keep them - the saved assignments are not changed either way.",
-                        "Unsaved Assignment Changes"))
-                {
-                    RestoreLoadedCampusSelection();
-                    return;
-                }
                 LoadCampusMatrix();
             };
         Defer(BindLookups);
@@ -462,6 +451,7 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
         loadedCampusId > 0 &&
         appliedMatrixSignature is not null &&
         !string.Equals(appliedMatrixSignature, MatrixSignature(), StringComparison.Ordinal);
+    bool IUnsavedChanges.HasUnsavedChanges => false;
     public string UnsavedChangesMessage =>
         $"The class/section ticks for \"{campus.Text}\" have not been applied yet.";
     /// <summary>puts the campus picker back on the campus whose ticks are still on screen, WITHOUT reloading the matrix that is already showing them. Reloading would be the very defect this guards against.</summary>

@@ -319,6 +319,7 @@ Database/*.bak
 # Keep audit regression source; generated clone files and test outputs stay ignored.
 !/Tests/
 /Tests/*
+!/Tests/AdmissionFeeSelectionChecks.sql
 !/Tests/Level2UiChecks/
 !/Tests/Level2Fixture/
 /Tests/Level2UiChecks/*

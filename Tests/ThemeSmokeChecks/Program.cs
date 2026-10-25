@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--admission-fee-selection"))
+        {
+            CheckAdmissionFeeSelection();
+            Console.WriteLine($"PASS: {checks} admission fee removal and saved-charge protection checks (no database connection).");
+            return;
+        }
         if(args.Contains("--class-sheet-buttons"))
         {
             CheckClassSheetButtons();
