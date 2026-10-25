@@ -110,6 +110,14 @@ internal static partial class Program
             report.DataSources.Add(new ReportDataSource(xml.Descendants(ns+"DataSet").Single().Attribute("Name")!.Value,data));
             byte[] pdf=report.Render("PDF");File.WriteAllBytes(Path.Combine(folder,name+".pdf"),pdf);
             using var parsed=PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdf),PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+            if(name is "batch-outstanding-months" or "family-bill-months")
+            {
+                string csv=System.Text.Encoding.UTF8.GetString(report.Render("CSV"));
+                File.WriteAllText(Path.Combine(folder,name+".csv"),csv);
+                Check(System.Text.RegularExpressions.Regex.Matches(csv,"Oct-2026").Count==2
+                    &&System.Text.RegularExpressions.Regex.Matches(csv,"Nov-2026").Count==2,
+                    "Every student prints both October and November, even when the preceding bill or sibling has the same months");
+            }
             byte[] png=report.Render("IMAGE","<DeviceInfo><OutputFormat>PNG</OutputFormat><DpiX>130</DpiX><DpiY>130</DpiY></DeviceInfo>");
             File.WriteAllBytes(Path.Combine(folder,name+".png"),png);
             Check(pdf.Length>1000 && png.Length>1000,"Established RDLC renders a real PDF and PNG");
@@ -362,5 +370,26 @@ internal static partial class Program
         using(var familyBill=FeeBillDataBuilder.BuildGrouped(school.Name,school.ContactNumber,school.Address,"Example Parent",charges))
             Check(Render("family-bill",familyBill)==1,"Family bill is one combined document in the same design");
         CheckFamilyDocumentSections(school,(name,data)=>Render(name,data));
+        using(var periodCharges=charges.Clone())
+        {
+            periodCharges.Columns.Add("GrossAmount",typeof(decimal));
+            periodCharges.Rows.Add("3334","Eman","Tuition Fee",new DateTime(2026,10,1),0m,1600m,"Campus Girls",3000m);
+            periodCharges.Rows.Add("3334","Eman","Tuition Fee",new DateTime(2026,11,1),0m,3000m,"Campus Girls",3000m);
+            using var original=StudentBillReport.BuildData(school.Name,school.ContactNumber,school.Address,"Example Parent",periodCharges);
+            using var saved=FeeBillDocuments.ReadSnapshot(FeeBillDocuments.Snapshot(original));
+            using var batch=saved.Clone();
+            for(int page=1;page<=2;page++)
+                foreach(DataRow row in saved.Rows)
+                {
+                    batch.ImportRow(row);var line=batch.Rows[^1];line["ReceiptPageKey"]=page;
+                    line["AdmissionNumberText"]=page==1?"1001":"3334";
+                    line["StudentName"]=page==1?"First Student":"Eman";
+                }
+            Check(Render("batch-outstanding-months",batch)==2,"Print Outstanding renders each saved bill on its own page without losing fee months");
+            periodCharges.Rows.Add("1001","Other Child","Tuition Fee",new DateTime(2026,10,1),0m,3000m,"Campus Girls",3000m);
+            periodCharges.Rows.Add("1001","Other Child","Tuition Fee",new DateTime(2026,11,1),0m,3000m,"Campus Girls",3000m);
+            using var family=FamilyBillReport.BuildData(school.Name,school.ContactNumber,school.Address,"Example Parent",periodCharges);
+            Check(Render("family-bill-months",family)==1,"Family bill prints both months for each child on one continuous page");
+        }
     }
 }
