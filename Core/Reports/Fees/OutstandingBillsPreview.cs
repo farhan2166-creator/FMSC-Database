@@ -13,7 +13,7 @@ internal static class OutstandingBillsPreview
         var institution=await InstitutionProfile.GetPrintIdentityAsync();
         if(!Current())return;
         if(string.IsNullOrWhiteSpace(institution.Name)){notify("Check School Profile before printing bills.");return;}
-        using var combined=FeeDocumentData.Create();
+        using var combined=FeeBillPresentation.Create();
         int page=0;
         foreach(int id in students.Distinct())
         {

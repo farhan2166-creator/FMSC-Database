@@ -1,8 +1,8 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
   <Body>
     <ReportItems>
-      <Tablix Name="ReceiptPages">
+      <Tablix Name="FamilyBillContents">
         <TablixBody>
           <TablixColumns>
             <TablixColumn>
@@ -130,6 +130,81 @@
               <TablixCells>
                 <TablixCell>
                   <CellContents>
+                    <Textbox Name="ReceiptNumber">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Bill No. </Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun>
+                            <TextRun>
+                              <Value>=First(Fields!ReceiptNumber.Value, "ReceiptPageGroup")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>2</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="PaymentMethod">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=First(Fields!PaymentMethod.Value, "ReceiptPageGroup")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Right</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.16in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
                     <Textbox Name="ReceiptHeading">
                       <CanGrow>true</CanGrow>
                       <CanShrink>true</CanShrink>
@@ -137,7 +212,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>FAMILY FEE BILL</Value>
+                              <Value>STUDENT FEE BILL</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.25pt</FontSize>
@@ -153,7 +228,7 @@
                               </Style>
                             </TextRun>
                             <TextRun>
-                              <Value>=Replace(Replace(First(Fields!CopyLabel.Value, "ReceiptPageGroup"), "STUDENT COPY", "Student Copy"), "CUSTOMER COPY", "Customer Copy")</Value>
+                              <Value>=Replace(Replace(First(Fields!CopyLabel.Value, "BillStudentGroup"), "STUDENT COPY", "Student Copy"), "CUSTOMER COPY", "Customer Copy")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.25pt</FontSize>
@@ -190,74 +265,6 @@
                   </CellContents>
                 </TablixCell>
                 <TablixCell />
-                <TablixCell />
-              </TablixCells>
-            </TablixRow>
-            <TablixRow>
-              <Height>0.16in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="ReceiptNumberLabel">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>Bill No.</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Left</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="ReceiptNumber">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=First(Fields!ReceiptNumber.Value, "ReceiptPageGroup")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7pt</FontSize>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Left</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                    <ColSpan>2</ColSpan>
-                  </CellContents>
-                </TablixCell>
                 <TablixCell />
               </TablixCells>
             </TablixRow>
@@ -304,7 +311,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=First(Fields!AdmissionNumberText.Value, "ReceiptPageGroup")</Value>
+                              <Value>=First(Fields!ChildAdmissionNumberText.Value, "BillStudentGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -328,7 +335,8 @@
                 </TablixCell>
                 <TablixCell />
               </TablixCells>
-            </TablixRow><TablixRow>
+            </TablixRow>
+            <TablixRow>
               <Height>0.16in</Height>
               <TablixCells>
                 <TablixCell>
@@ -340,7 +348,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Parent</Value>
+                              <Value>Student</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -371,7 +379,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=First(Fields!StudentName.Value, "ReceiptPageGroup")</Value>
+                              <Value>=First(Fields!ChildStudentName.Value, "BillStudentGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -439,7 +447,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=First(Fields!FatherName.Value, "ReceiptPageGroup")</Value>
+                              <Value>=First(Fields!ChildFatherName.Value, "BillStudentGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -463,7 +471,76 @@
                 </TablixCell>
                 <TablixCell />
               </TablixCells>
-            </TablixRow><TablixRow>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.16in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="ChildCampusLabel">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Campus</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="ChildCampus">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=First(Fields!ChildCampusName.Value, "BillStudentGroup")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>2</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
               <Height>0.16in</Height>
               <TablixCells>
                 <TablixCell>
@@ -506,7 +583,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=First(Fields!ClassSection.Value, "ReceiptPageGroup")</Value>
+                              <Value>=First(Fields!ChildClassSection.Value, "BillStudentGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -574,75 +651,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=First(Fields!FamilyBatch.Value, "ReceiptPageGroup")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7pt</FontSize>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Left</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                    <ColSpan>2</ColSpan>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell />
-              </TablixCells>
-            </TablixRow>
-            <TablixRow>
-              <Height>0.16in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="PaymentMethodLabel">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>Method</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Left</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="PaymentMethod">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=First(Fields!PaymentMethod.Value, "ReceiptPageGroup")</Value>
+                              <Value>=First(Fields!FamilyBatch.Value, "BillStudentGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -788,45 +797,6 @@
               <TablixCells>
                 <TablixCell>
                   <CellContents>
-                    <Textbox Name="BillStudentHeading">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=Fields!BillStudentName.Value</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>8pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Left</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <BackgroundColor>#f0f0f0</BackgroundColor>
-                        <TextAlign>Left</TextAlign>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                      </Style>
-                    </Textbox>
-                    <ColSpan>3</ColSpan>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell />
-                <TablixCell />
-              </TablixCells>
-            </TablixRow>
-            <TablixRow>
-              <Height>0.16in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
                     <Textbox Name="FeePeriod">
                       <CanGrow>true</CanGrow>
                       <CanShrink>true</CanShrink>
@@ -838,7 +808,6 @@
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
-                                <FontWeight>=IIf(Fields!FamilyRowKind.Value = "Fee", "Normal", "Bold")</FontWeight>
                               </Style>
                             </TextRun>
                           </TextRuns>
@@ -869,7 +838,6 @@
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
-                                <FontWeight>=IIf(Fields!FamilyRowKind.Value = "Fee", "Normal", "Bold")</FontWeight>
                               </Style>
                             </TextRun>
                           </TextRuns>
@@ -896,7 +864,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(Fields!Amount.Value, "N0")</Value>
+                              <Value>=Format(Fields!BillDisplayAmount.Value, "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -934,7 +902,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Discount</Value>
+                              <Value>=First(Fields!ChildBillDiscountCaption.Value, "BillStudentGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -966,7 +934,77 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(First(Fields!DiscountApplied.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Value>=First(Fields!ChildBillDiscountText.Value, "BillStudentGroup")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Center</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <Border>
+                          <Style>None</Style>
+                        </Border>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.16in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="BillSettledLabel">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Less: Already settled</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>2</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="BillSettledAmount">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Format(-First(Fields!ChildBillPreviouslySettled.Value, "BillStudentGroup"), "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1041,7 +1079,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(First(Fields!TotalPaid.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Value>=Format(First(Fields!ChildTotalPaid.Value, "BillStudentGroup"), "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1116,7 +1154,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(First(Fields!BalanceRemaining.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Value>=Format(First(Fields!ChildBalanceRemaining.Value, "BillStudentGroup"), "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1185,7 +1223,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=First(Fields!ReceiptStatus.Value, "ReceiptPageGroup")</Value>
+                              <Value>=First(Fields!ReceiptStatus.Value, "BillStudentGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1215,6 +1253,43 @@
               <TablixCells>
                 <TablixCell>
                   <CellContents>
+                    <Textbox Name="ChildCutLine">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>------------------------------------</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Center</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>3</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+                <TablixCell />
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.16in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
                     <Textbox Name="ThankYou">
                       <CanGrow>true</CanGrow>
                       <CanShrink>true</CanShrink>
@@ -1222,7 +1297,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Please pay at the fee counter</Value>
+                              <Value>=IIf(First(Fields!GroupDue.Value, "ReceiptPageGroup") &lt;= 0, "No payment required", "Please pay at the fee counter")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1299,6 +1374,388 @@
                 <TablixCell />
               </TablixCells>
             </TablixRow>
+            <TablixRow>
+              <Height>0.12in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="GroupSummaryHeading">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>GROUP SUMMARY</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Center</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>3</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+                <TablixCell />
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.12in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="GroupFeeTotalLabel">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Net total</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                                <FontWeight>Normal</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>2</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="GroupFeeTotalAmount">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Format(First(Fields!GroupFeeTotal.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                                <FontWeight>Normal</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Center</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.12in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="GroupDiscountLabel">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Net discount</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                                <FontWeight>Normal</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>2</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="GroupDiscountAmount">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Format(First(Fields!GroupDiscount.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                                <FontWeight>Normal</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Center</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.12in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="GroupPayableLabel">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Net payable</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                                <FontWeight>Normal</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>2</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="GroupPayableAmount">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Format(First(Fields!GroupPayable.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                                <FontWeight>Normal</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Center</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.12in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="GroupPreviouslySettledLabel">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Already settled</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                                <FontWeight>Normal</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>2</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="GroupPreviouslySettledAmount">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Format(First(Fields!GroupPreviouslySettled.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>6.5pt</FontSize>
+                                <FontWeight>Normal</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Center</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
+            <TablixRow>
+              <Height>0.12in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="GroupDueLabel">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Net due</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>2</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="GroupDueAmount">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Format(First(Fields!GroupDue.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                                <FontWeight>Bold</FontWeight>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Center</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>0pt</PaddingTop>
+                        <PaddingBottom>0pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow>
           </TablixRows>
         </TablixBody>
         <TablixColumnHierarchy>
@@ -1315,9 +1772,6 @@
                 <GroupExpressions>
                   <GroupExpression>=Fields!ReceiptPageKey.Value</GroupExpression>
                 </GroupExpressions>
-                <PageBreak>
-                  <BreakLocation>Between</BreakLocation>
-                </PageBreak>
               </Group>
               <TablixMembers>
                 <TablixMember />
@@ -1332,32 +1786,6 @@
                   </Visibility>
                 </TablixMember>
                 <TablixMember />
-                <TablixMember />
-                <TablixMember>
-                  <Visibility>
-                    <Hidden>=Len(First(Fields!AdmissionNumberText.Value, "ReceiptPageGroup")) = 0</Hidden>
-                  </Visibility>
-                </TablixMember><TablixMember />
-                <TablixMember>
-                  <Visibility>
-                    <Hidden>=Len(First(Fields!FatherName.Value, "ReceiptPageGroup")) = 0</Hidden>
-                  </Visibility>
-                </TablixMember><TablixMember>
-                  <Visibility>
-                    <Hidden>=Len(First(Fields!ClassSection.Value, "ReceiptPageGroup")) = 0</Hidden>
-                  </Visibility>
-                </TablixMember>
-                <TablixMember>
-                  <Visibility>
-                    <Hidden>true</Hidden>
-                  </Visibility>
-                </TablixMember>
-                <TablixMember>
-                  <Visibility>
-                    <Hidden>true</Hidden>
-                  </Visibility>
-                </TablixMember>
-                <TablixMember />
                 <TablixMember>
                   <Group Name="BillStudentGroup">
                     <GroupExpressions>
@@ -1367,45 +1795,111 @@
                   <TablixMembers>
                     <TablixMember />
                     <TablixMember>
+                      <Visibility>
+                        <Hidden>=Len(First(Fields!ChildAdmissionNumberText.Value, "BillStudentGroup")) = 0</Hidden>
+                      </Visibility>
+                    </TablixMember>
+                    <TablixMember />
+                    <TablixMember>
+                      <Visibility>
+                        <Hidden>=Len(First(Fields!ChildFatherName.Value, "BillStudentGroup")) = 0</Hidden>
+                      </Visibility>
+                    </TablixMember>
+                    <TablixMember>
+                      <Visibility>
+                        <Hidden>=Len(First(Fields!ChildCampusName.Value, "BillStudentGroup")) = 0</Hidden>
+                      </Visibility>
+                    </TablixMember>
+                    <TablixMember>
+                      <Visibility>
+                        <Hidden>=Len(First(Fields!ChildClassSection.Value, "BillStudentGroup")) = 0</Hidden>
+                      </Visibility>
+                    </TablixMember>
+                    <TablixMember>
+                      <Visibility>
+                        <Hidden>true</Hidden>
+                      </Visibility>
+                    </TablixMember>
+                    <TablixMember />
+                    <TablixMember>
                       <Group Name="ReceiptFeeDetail" />
                     </TablixMember>
+                    <TablixMember>
+                      <Visibility>
+                        <Hidden>=Not First(Fields!ChildShowDiscount.Value, "BillStudentGroup")</Hidden>
+                      </Visibility>
+                    </TablixMember>
+                    <TablixMember>
+                      <Visibility>
+                        <Hidden>=Not First(Fields!ChildShowBillPreviouslySettled.Value, "BillStudentGroup")</Hidden>
+                      </Visibility>
+                    </TablixMember>
+                    <TablixMember />
+                    <TablixMember>
+                      <Visibility>
+                        <Hidden>=Not First(Fields!ChildShowBalance.Value, "BillStudentGroup")</Hidden>
+                      </Visibility>
+                    </TablixMember>
+                    <TablixMember>
+                      <Visibility>
+                        <Hidden>=Len(First(Fields!ReceiptStatus.Value, "BillStudentGroup")) = 0</Hidden>
+                      </Visibility>
+                    </TablixMember>
+                    <TablixMember />
                   </TablixMembers>
-                </TablixMember>
-                <TablixMember>
                   <Visibility>
-                    <Hidden>=Not First(Fields!ShowDiscount.Value, "ReceiptPageGroup")</Hidden>
-                  </Visibility>
-                </TablixMember>
-                <TablixMember />
-                <TablixMember>
-                  <Visibility>
-                    <Hidden>=Not First(Fields!ShowBalance.Value, "ReceiptPageGroup")</Hidden>
-                  </Visibility>
-                </TablixMember>
-                <TablixMember>
-                  <Visibility>
-                    <Hidden>=Len(First(Fields!ReceiptStatus.Value, "ReceiptPageGroup")) = 0</Hidden>
+                    <Hidden>=Not First(Fields!ShowChildDocument.Value, "BillStudentGroup")</Hidden>
                   </Visibility>
                 </TablixMember>
                 <TablixMember />
                 <TablixMember />
+                <TablixMember>
+                  <Visibility>
+                    <Hidden>=Not First(Fields!ShowGroupSummary.Value, "ReceiptPageGroup")</Hidden>
+                  </Visibility>
+                </TablixMember>
+                <TablixMember>
+                  <Visibility>
+                    <Hidden>=Not First(Fields!ShowGroupSummary.Value, "ReceiptPageGroup")</Hidden>
+                  </Visibility>
+                </TablixMember>
+                <TablixMember>
+                  <Visibility>
+                    <Hidden>=Not First(Fields!ShowGroupSummary.Value, "ReceiptPageGroup")</Hidden>
+                  </Visibility>
+                </TablixMember>
+                <TablixMember>
+                  <Visibility>
+                    <Hidden>=Not First(Fields!ShowGroupSummary.Value, "ReceiptPageGroup")</Hidden>
+                  </Visibility>
+                </TablixMember>
+                <TablixMember>
+                  <Visibility>
+                    <Hidden>=Not First(Fields!ShowGroupSummary.Value, "ReceiptPageGroup") Or Not First(Fields!ShowGroupPreviouslySettled.Value, "ReceiptPageGroup")</Hidden>
+                  </Visibility>
+                </TablixMember>
+                <TablixMember>
+                  <Visibility>
+                    <Hidden>=Not First(Fields!ShowGroupSummary.Value, "ReceiptPageGroup")</Hidden>
+                  </Visibility>
+                </TablixMember>
               </TablixMembers>
               <KeepTogether>true</KeepTogether>
             </TablixMember>
           </TablixMembers>
         </TablixRowHierarchy>
         <DataSetName>FamilyBillData</DataSetName>
-        <Height>3.04in</Height>
+        <Height>2.88in</Height>
         <Width>2.05in</Width>
         <Style />
       </Tablix>
     </ReportItems>
-    <Height>3.04in</Height>
+    <Height>3.02in</Height>
     <Style />
   </Body>
   <Width>2.05in</Width>
   <Page>
-    <PageHeight>3.4in</PageHeight>
+    <PageHeight>2.7in</PageHeight>
     <PageWidth>2.28in</PageWidth>
     <LeftMargin>0.14in</LeftMargin>
     <RightMargin>0.09in</RightMargin>
@@ -1470,10 +1964,6 @@
           <DataField>FamilyBatch</DataField>
           <rd:TypeName>System.String</rd:TypeName>
         </Field>
-        <Field Name="FeePeriod">
-          <DataField>FeePeriod</DataField>
-          <rd:TypeName>System.String</rd:TypeName>
-        </Field>
         <Field Name="FeeDescription">
           <DataField>FeeDescription</DataField>
           <rd:TypeName>System.String</rd:TypeName>
@@ -1524,19 +2014,153 @@
           <DataField>FatherName</DataField>
           <rd:TypeName>System.String</rd:TypeName>
         </Field>
-        <Field Name="FamilyRowKind">
-          <DataField>FamilyRowKind</DataField>
+        <Field Name="FeePeriod">
+          <DataField>FeePeriod</DataField>
+          <rd:TypeName>System.String</rd:TypeName>
         </Field>
-        <Field Name="FamilyAmountText">
-          <DataField>FamilyAmountText</DataField>
+        <Field Name="BillDisplayAmount">
+          <DataField>BillDisplayAmount</DataField>
+        </Field>
+        <Field Name="BillPreviouslySettled">
+          <DataField>BillPreviouslySettled</DataField>
+        </Field>
+        <Field Name="ShowBillPreviouslySettled">
+          <DataField>ShowBillPreviouslySettled</DataField>
+        </Field>
+        <Field Name="BillDiscountCaption">
+          <DataField>BillDiscountCaption</DataField>
+        </Field>
+        <Field Name="BillDiscountText">
+          <DataField>BillDiscountText</DataField>
+        </Field>
+        <Field Name="BillPaymentPrompt">
+          <DataField>BillPaymentPrompt</DataField>
         </Field>
         <Field Name="BillStudentKey">
           <DataField>BillStudentKey</DataField>
-          <rd:TypeName>System.String</rd:TypeName>
         </Field>
-        <Field Name="BillStudentName">
-          <DataField>BillStudentName</DataField>
-          <rd:TypeName>System.String</rd:TypeName>
+        <Field Name="ChildAdmissionNumberText">
+          <DataField>ChildAdmissionNumberText</DataField>
+        </Field>
+        <Field Name="ChildBalanceRemaining">
+          <DataField>ChildBalanceRemaining</DataField>
+        </Field>
+        <Field Name="ChildBillDiscountCaption">
+          <DataField>ChildBillDiscountCaption</DataField>
+        </Field>
+        <Field Name="ChildBillDiscountText">
+          <DataField>ChildBillDiscountText</DataField>
+        </Field>
+        <Field Name="ChildBillPaymentPrompt">
+          <DataField>ChildBillPaymentPrompt</DataField>
+        </Field>
+        <Field Name="ChildBillPreviouslySettled">
+          <DataField>ChildBillPreviouslySettled</DataField>
+        </Field>
+        <Field Name="ChildCampusName">
+          <DataField>ChildCampusName</DataField>
+        </Field>
+        <Field Name="ChildCashReceived">
+          <DataField>ChildCashReceived</DataField>
+        </Field>
+        <Field Name="ChildClassSection">
+          <DataField>ChildClassSection</DataField>
+        </Field>
+        <Field Name="ChildCorrectionAmount">
+          <DataField>ChildCorrectionAmount</DataField>
+        </Field>
+        <Field Name="ChildCreditApplied">
+          <DataField>ChildCreditApplied</DataField>
+        </Field>
+        <Field Name="ChildCreditRemaining">
+          <DataField>ChildCreditRemaining</DataField>
+        </Field>
+        <Field Name="ChildCreditRetained">
+          <DataField>ChildCreditRetained</DataField>
+        </Field>
+        <Field Name="ChildDiscountApplied">
+          <DataField>ChildDiscountApplied</DataField>
+        </Field>
+        <Field Name="ChildFatherName">
+          <DataField>ChildFatherName</DataField>
+        </Field>
+        <Field Name="ChildFeesCovered">
+          <DataField>ChildFeesCovered</DataField>
+        </Field>
+        <Field Name="ChildNetPaid">
+          <DataField>ChildNetPaid</DataField>
+        </Field>
+        <Field Name="ChildOriginalPaid">
+          <DataField>ChildOriginalPaid</DataField>
+        </Field>
+        <Field Name="ChildPayable">
+          <DataField>ChildPayable</DataField>
+        </Field>
+        <Field Name="ChildReceiptMessage">
+          <DataField>ChildReceiptMessage</DataField>
+        </Field>
+        <Field Name="ChildRefundAmount">
+          <DataField>ChildRefundAmount</DataField>
+        </Field>
+        <Field Name="ChildReversedAmount">
+          <DataField>ChildReversedAmount</DataField>
+        </Field>
+        <Field Name="ChildShowAdjustments">
+          <DataField>ChildShowAdjustments</DataField>
+        </Field>
+        <Field Name="ChildShowBalance">
+          <DataField>ChildShowBalance</DataField>
+        </Field>
+        <Field Name="ChildShowBillPreviouslySettled">
+          <DataField>ChildShowBillPreviouslySettled</DataField>
+        </Field>
+        <Field Name="ChildShowCreditRemaining">
+          <DataField>ChildShowCreditRemaining</DataField>
+        </Field>
+        <Field Name="ChildShowDiscount">
+          <DataField>ChildShowDiscount</DataField>
+        </Field>
+        <Field Name="ChildShowSettlement">
+          <DataField>ChildShowSettlement</DataField>
+        </Field>
+        <Field Name="ChildStudentName">
+          <DataField>ChildStudentName</DataField>
+        </Field>
+        <Field Name="ChildTotalPaid">
+          <DataField>ChildTotalPaid</DataField>
+        </Field>
+        <Field Name="GroupCreditApplied">
+          <DataField>GroupCreditApplied</DataField>
+        </Field>
+        <Field Name="GroupDiscount">
+          <DataField>GroupDiscount</DataField>
+        </Field>
+        <Field Name="GroupDue">
+          <DataField>GroupDue</DataField>
+        </Field>
+        <Field Name="GroupFeeTotal">
+          <DataField>GroupFeeTotal</DataField>
+        </Field>
+        <Field Name="GroupPayable">
+          <DataField>GroupPayable</DataField>
+        </Field>
+        <Field Name="GroupPreviouslySettled">
+          <DataField>GroupPreviouslySettled</DataField>
+        </Field>
+        <Field Name="GroupReceived">
+          <DataField>GroupReceived</DataField>
+        </Field>
+        <Field Name="ShowChildDocument">
+          <DataField>ShowChildDocument</DataField>
+        </Field>
+        <Field Name="ShowGroupCreditApplied">
+          <DataField>ShowGroupCreditApplied</DataField>
+        </Field>
+        <Field Name="ShowGroupPreviouslySettled">
+          <DataField>ShowGroupPreviouslySettled</DataField>
+        </Field>
+        <Field Name="ShowGroupSummary">
+          <DataField>ShowGroupSummary</DataField>
         </Field>
       </Fields>
     </DataSet>

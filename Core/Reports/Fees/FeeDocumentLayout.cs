@@ -43,6 +43,11 @@ internal static class FeeDocumentLayout
                     ?receipt.GroupBy(record=>record[headingKey]).Select(group=>group.First()):new[]{first}.AsEnumerable();
                 foreach (var record in records)
                 {
+                    // A whole child slip may be hidden while its group summary
+                    // remains visible on the same continuous paper.
+                    if(members[index].Ancestors(ns+"TablixMember").Select(member=>member.Element(ns+"Visibility")?.Element(ns+"Hidden")?.Value)
+                        .Any(expression=>expression is not null&&expression.Contains("Fields!ShowChildDocument.Value")
+                            &&!Convert.ToBoolean(record["ShowChildDocument"])))continue;
                     // A child footer's visibility belongs to that child, not
                     // necessarily the first child on the family document.
                     if(hidden.Contains(" Or ") && Regex.Matches(hidden,@"Not First\(Fields!(\w+)\.Value")
@@ -111,8 +116,11 @@ internal static class FeeDocumentLayout
             return DateTime.Now.ToString("dd-MM-yyyy hh:mm tt",CultureInfo.CurrentCulture);
         string key=Regex.Match(expression,@"Fields!(\w+)\.Value").Groups[1].Value;
         if(string.IsNullOrEmpty(key))throw new InvalidOperationException("Unsupported fee-document measurement expression: "+name);
-        if(name=="TotalPaid" && key=="ShowSettlement")
-            return Convert.ToDecimal(record[Convert.ToBoolean(record[key])?"TotalPaid":"NetPaid"]).ToString("N0");
+        if(name=="TotalPaid" && key.EndsWith("ShowSettlement",StringComparison.Ordinal))
+        {
+            string prefix=key=="ShowSettlement"?"":"Child";
+            return Convert.ToDecimal(record[prefix+(Convert.ToBoolean(record[key])?"TotalPaid":"NetPaid")]).ToString("N0");
+        }
         if(expression.StartsWith("=Format(",StringComparison.Ordinal))
             return (Convert.ToDecimal(record[key])*(expression.StartsWith("=Format(-",StringComparison.Ordinal)?-1:1))
                 .ToString(expression.Contains("\"N2\"")?"N2":"N0",CultureInfo.CurrentCulture);

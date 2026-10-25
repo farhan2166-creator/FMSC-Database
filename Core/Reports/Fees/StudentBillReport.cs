@@ -24,8 +24,9 @@ internal static partial class StudentBillReport
 
     internal static void ShowData(Form? owner,DataTable data,bool a4=false)
     {
+        using var display=FeeBillPresentation.Prepare(data);
         string path=Path.Combine(AppContext.BaseDirectory,"Reports",TemplateFile);
-        RdlcReportPreview.Show(owner,"Student Fee Bill",path,DataSetName,data,
-            fitPageWidth:a4,reportDefinition:FeeDocumentLayout.SizeToContent(path,data,a4));
+        RdlcReportPreview.Show(owner,"Student Fee Bill",path,DataSetName,display,
+            fitPageWidth:a4,reportDefinition:FeeDocumentLayout.SizeToContent(path,display,a4));
     }
 }

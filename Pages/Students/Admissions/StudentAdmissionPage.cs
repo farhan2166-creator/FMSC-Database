@@ -3579,6 +3579,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                                 ? FormatBillMonth(row["BillingMonth"])
                                 : string.Empty,
                         Amount = amountToPrint,
+                        GrossAmount = grossAmount,
                         DiscountAmount = discountAmount
                     });
             }
@@ -3600,7 +3601,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             }
             await StudentBillReport.ShowAsync(FindForm(), institution, name.Text.Trim(), currentAdmissionId,
                 classSectionText, billRows.Select(row => new StudentBillReport.Line(
-                    row.FeeName, row.BillingMonth, row.Amount, row.DiscountAmount,row.ChargeId,currentAdmissionId)).ToList(), showActualAmount,
+                    row.FeeName, row.BillingMonth, row.Amount, row.DiscountAmount,row.ChargeId,currentAdmissionId,row.GrossAmount)).ToList(), showActualAmount,
                 viewCampus.Text == "-" ? string.Empty : viewCampus.Text.Trim(), fatherName.Text.Trim(),
                 string.Join(",",raw.AsEnumerable().Where(row=>GetDecimalColumn(row,"Balance")>0)
                     .Select(row=>Convert.ToString(row["BillingChargeId"])).OrderBy(value=>value)));
@@ -3767,6 +3768,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         public string BillingMonth { get; init; } = string.Empty;
         public decimal Amount { get; init; }
         public decimal DiscountAmount { get; init; }
+        public decimal GrossAmount { get; init; }
     }
     private async Task RefreshConfirmReturnAvailabilityAsync(int admissionId, int version)
     {

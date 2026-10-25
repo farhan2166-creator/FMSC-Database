@@ -41,7 +41,7 @@ internal static class FeeBillPreview
             THROW 51000,'The family has new members. Refresh before printing the whole family bill.',1;
         SELECT COALESCE(S.AdmissionNumber,S.QuickReference) Reference,S.StudentName,
             CASE WHEN A.ConcessionLabel IS NULL THEN F.FeeTypeName ELSE CONCAT(F.FeeTypeName,N' — ',A.ConcessionLabel) END FeeTypeName,F.DisplayOrder FeeDisplayOrder,B.BillingMonth,B.DiscountAmount,
-            dbo.GetFeeChargeBalance(B.BillingChargeId) Due,B.BillingChargeId,S.AdmissionId,CAMP.CampusName
+            dbo.GetFeeChargeBalance(B.BillingChargeId) Due,B.BillingChargeId,S.AdmissionId,CAMP.CampusName,B.GrossAmount
         FROM dbo.Students S JOIN dbo.BillingCharges B ON B.AdmissionId=S.AdmissionId
         JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
         LEFT JOIN dbo.StudentFeeAssignments A ON A.StudentFeeAssignmentId=B.StudentFeeAssignmentId
@@ -54,7 +54,7 @@ internal static class FeeBillPreview
         UNION ALL
         SELECT COALESCE(S.AdmissionNumber,S.QuickReference),S.StudentName,
             CONCAT(F.FeeTypeName,N' — ',A.ConcessionLabel),F.DisplayOrder,
-            DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1),A.DiscountAmount,CONVERT(decimal(12,2),0),-CONVERT(bigint,A.StudentFeeAssignmentId),S.AdmissionId,CAMP.CampusName
+            DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1),A.DiscountAmount,CONVERT(decimal(12,2),0),-CONVERT(bigint,A.StudentFeeAssignmentId),S.AdmissionId,CAMP.CampusName,A.Amount
         FROM dbo.StudentFeeAssignments A JOIN dbo.FeeTypes F ON F.FeeTypeId=A.FeeTypeId
         JOIN dbo.Students S ON S.AdmissionId=A.AdmissionId
         JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId

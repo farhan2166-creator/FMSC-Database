@@ -15,8 +15,9 @@ internal static partial class FamilyBillReport
 
     internal static void ShowData(Form? owner,DataTable data)
     {
+        using var display=FamilyFeeDocumentPresentation.Bill(data);
         string path=Path.Combine(AppContext.BaseDirectory,"Reports",TemplateFile);
-        RdlcReportPreview.Show(owner,"Family Fee Bill",path,DataSetName,data,
-            reportDefinition:FeeDocumentLayout.SizeToContent(path,data));
+        RdlcReportPreview.Show(owner,"Family Fee Bill",path,DataSetName,display,
+            reportDefinition:FeeDocumentLayout.SizeToContent(path,display));
     }
 }

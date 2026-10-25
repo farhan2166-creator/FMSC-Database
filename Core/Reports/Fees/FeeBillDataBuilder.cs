@@ -4,11 +4,12 @@ internal static partial class FeeBillDataBuilder
 {
     internal static DataTable BuildGrouped(string institutionName,string contactNumber,string address,string parent,DataTable charges)
     {
-        var data=FeeDocumentData.Create();
+        var data=FeeBillPresentation.Create();
         data.Columns.Add("FamilyRowKind",typeof(string));
         data.Columns.Add("FamilyAmountText",typeof(string));
         data.Columns.Add("BillStudentKey",typeof(string));
         data.Columns.Add("BillStudentName",typeof(string));
+        FamilyFeeDocumentPresentation.AddChildColumns(data);
         decimal total=charges.AsEnumerable().Sum(r=>Convert.ToDecimal(r["Due"]));
         decimal discount=charges.AsEnumerable().Sum(r=>Convert.ToDecimal(r["DiscountAmount"]));
         string references=string.Join(", ",charges.AsEnumerable().Select(r=>Convert.ToString(r["Reference"])).Distinct());
@@ -27,6 +28,11 @@ internal static partial class FeeBillDataBuilder
             line["BillStudentKey"]=studentKey;line["BillStudentName"]=studentHeading;line["FeePeriod"]=FeeDocumentData.FormatPeriod(period);
             if(charge is not null)
             {
+                line["BillLineDiscount"]=charge["DiscountAmount"];
+                line["BillGrossAmount"]=charges.Columns.Contains("GrossAmount") && !charge.IsNull("GrossAmount")
+                    ?charge["GrossAmount"]:amount+Convert.ToDecimal(charge["DiscountAmount"]);
+                line["ChildFatherName"]=parent;
+                if(charges.Columns.Contains("CampusName"))line["ChildCampusName"]=charge["CampusName"];
                 if(charges.Columns.Contains("BillingChargeId"))line["BillChargeId"]=charge["BillingChargeId"];
                 if(charges.Columns.Contains("AdmissionId"))line["BillAdmissionId"]=charge["AdmissionId"];
             }
