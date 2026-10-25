@@ -101,7 +101,10 @@ public sealed partial class FeeCollectionPage
         finally
         {
             counterLoading=false;
-            if(!IsDisposed){LockCounterContext();UpdateProcessCollectionAvailability();}
+            if(!IsDisposed){
+                LockCounterContext();UpdateProcessCollectionAvailability();
+                if(counterReady)QueueLoadedAmountFocus(counterIds[0]);
+            }
         }
     }
 

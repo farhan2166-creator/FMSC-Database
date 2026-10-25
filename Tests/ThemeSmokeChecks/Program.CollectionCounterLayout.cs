@@ -19,6 +19,16 @@ internal static partial class Program
             page.Dock = DockStyle.Fill; owner.Controls.Add(page);
             if(selected.Length > 1) page.ConfigureCounter(selected); // Real counter opening order.
             owner.Show(); Application.DoEvents();
+            typeof(FeeCollectionPage).GetField("admissionId",flags)!.SetValue(page,41);
+            typeof(FeeCollectionPage).GetField("enrollmentId",flags)!.SetValue(page,91);
+            typeof(FeeCollectionPage).GetField("counterLoading",flags)!.SetValue(page,false);
+            typeof(FeeCollectionPage).GetField("suppressPaymentEvents",flags)!.SetValue(page,true);
+            var amount=Field<ModernTextBox>("paymentAmount");amount.Text="1250";
+            Field<ModernTextBox>("reference").Focus();
+            Check(page.FocusEntryField()&&amount.ContainsFocus,
+                "A loaded account opens at Amount for both ordinary navigation and the family counter.");
+            Check(amount.Text=="1250"&&amount.SelectionLength==4,
+                "Entry focus selects the existing Amount without changing its value.");
             var next = Field<ModernButton>("nextStudentButton");
             var summary = (TableLayoutPanel)next.Parent!;
             var scroll = (Panel)summary.Parent!;

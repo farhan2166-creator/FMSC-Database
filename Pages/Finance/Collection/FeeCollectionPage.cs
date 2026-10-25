@@ -190,7 +190,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         };
     }
     private readonly bool initialize;
-    private readonly int preloadFocusAdmissionId;
     private sealed class DialogReturnFocus(FeeCollectionPage page) : IDisposable
     {
         private readonly int studentId = page.admissionId;
@@ -210,14 +209,25 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     }
     internal override bool FocusEntryField()
     {
-        if (preloadFocusAdmissionId > 0 && admissionId == preloadFocusAdmissionId &&
-            HasOutstandingCharges() && paymentAmount.CanFocus)
+        if (admissionId > 0 && enrollmentId > 0 && !IsBusy && paymentAmount.CanFocus)
         {
             bool focused = paymentAmount.Focus();
             if (focused) paymentAmount.SelectAll();
             return focused;
         }
         return base.FocusEntryField();
+    }
+    private void QueueLoadedAmountFocus(int expectedAdmissionId)
+    {
+        if (IsDisposed || !IsHandleCreated) return;
+        int version = loadVersion;
+        // Wait for navigation and busy-control restoration to finish before focusing.
+        BeginInvoke((Action)(() => {
+            if (IsDisposed || !Visible || !Enabled || IsBusy || version != loadVersion ||
+                admissionId != expectedAdmissionId || student.SelectedId != expectedAdmissionId ||
+                FindForm()?.Enabled != true || paymentAmount.ContainsFocus) return;
+            FocusEntryField();
+        }));
     }
     public FeeCollectionPage() : this(true) { }
     internal FeeCollectionPage(bool initialize)
@@ -233,7 +243,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     {
         if (preloadAdmissionId > 0)
         {
-            preloadFocusAdmissionId = preloadAdmissionId;
             Defer(() => LoadStudentByAdmissionId(preloadAdmissionId));
         }
     }
@@ -1465,15 +1474,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 suppressStudentEvents = false;
             }
             await SelectStudentAsync(version);
-            // Navigation may focus the search before the preloaded bills finish loading.
-            // Advance that initial focus, while preserving any input the operator moved to.
-            if (!IsDisposed && ContainsFocus && student.ContainsFocus &&
-                this.admissionId == admissionId && student.SelectedId == admissionId &&
-                HasOutstandingCharges() && paymentAmount.CanFocus)
-            {
-                paymentAmount.Focus();
-                paymentAmount.SelectAll();
-            }
+            QueueLoadedAmountFocus(admissionId);
         }
         catch (Exception ex)
         {
