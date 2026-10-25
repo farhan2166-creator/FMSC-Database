@@ -369,6 +369,8 @@ public abstract class ContextPage : V2Page
         LoadAllClasses();
     }
     protected void LoadAllClasses() => _ = LoadAllClassesAsync();
+    protected virtual Task<DataTable> QueryClassesAsync(int campusId) =>
+        DatabaseHelper.QueryUserAsync("GetClasses");
     private async Task LoadAllClassesAsync()
     {
         if (!IsHandleCreated)
@@ -392,7 +394,7 @@ public abstract class ContextPage : V2Page
                 loaded = true;
                 return;
             }
-            DataTable classes = await DatabaseHelper.QueryUserAsync("GetClasses");
+            DataTable classes = await QueryClassesAsync(campusId);
             if (IsDisposed || version != _contextLoadVersion ||
                 Campus.SelectedId != campusId || Year.SelectedId != yearId)
             {
