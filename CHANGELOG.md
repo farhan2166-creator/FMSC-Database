@@ -4,6 +4,11 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ## [Unreleased]
 
+### Admission workflow
+
+- Separate current-student activation, draft placement completion and historical records in Admission. Group transfers and move Left-to-Hold correction under Advanced; retain the existing return, permission and financial review rules.
+- Put the existing placement confirmation inside the draft editor, with loaded-record and unsaved-change guards. No database migration is required.
+
 ### Report improvements
 
 - Add Monthly Fee Reconciliation by billing month and school/campus/class/section/fee type, comparing current signed money allocations, credit applied and unpaid fees; include excess settlement and missing-period charge-date fallback.
