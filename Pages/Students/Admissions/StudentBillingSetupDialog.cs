@@ -126,6 +126,8 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
                 var currentYear = years.AsEnumerable().FirstOrDefault(r => Convert.ToBoolean(r["IsCurrent"]));
                 year.SelectedValue = currentYear?["AcademicYearId"] ?? 0;
             }
+            if (years.AsEnumerable().FirstOrDefault(row => Convert.ToInt32(row["AcademicYearId"]) == year.SelectedId)?["StartDate"] is DateTime yearStart)
+                start.Value = yearStart.Date;
             loading = false;
             if (placement.SelectedId > 0) await LoadFeesAsync(true);
             Reset();
