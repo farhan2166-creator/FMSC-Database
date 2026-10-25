@@ -28,6 +28,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
     private int SelectedEnrollmentId => editingEnrollment ??
         (int.TryParse(Convert.ToString(record.SelectedValue), out int id) ? id : 0);
     private int currentAcademicYear;
+    private readonly Dictionary<int,DateTime> academicYearStarts = new();
     private DataTable enrollments = new();
     private DataTable missingWindows = new();
     private DataTable missingPlacementChoices = new(), allPlacements = new();
@@ -167,6 +168,9 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             legacySetupPending = student.Rows.Count > 0 && Convert.ToBoolean(student.Rows[0]["LegacySetupPending"]);
             enrollments = await DatabaseHelper.QueryUserAsync("GetStudentEnrollmentsForLifecycle", DatabaseHelper.Int("@AdmissionId", admission));
             var years = await DatabaseHelper.QueryUserAsync("GetAcademicYears");
+            academicYearStarts.Clear();
+            foreach(DataRow row in years.Rows)
+                if(row["StartDate"] is DateTime date) academicYearStarts[Convert.ToInt32(row["AcademicYearId"])]=date.Date;
             currentAcademicYear = years.AsEnumerable().FirstOrDefault(r => Convert.ToBoolean(r["IsCurrent"])) is DataRow currentYear
                 ? Convert.ToInt32(currentYear["AcademicYearId"]) : 0;
             allPlacements = await DatabaseHelper.QueryUserAsync("GetClassSections", DatabaseHelper.Int("@CampusId", 0), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0));
@@ -210,7 +214,8 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             status.Items.Clear(); status.Items.Add("Left");
             if (window["PromotionDate"] is DateTime && SelectedMissingPlacement is DataRow choice && Convert.ToBoolean(choice["CanPromote"])) status.Items.Add("Promoted");
             status.SelectedItem = status.Items.Contains(selectedStatus) ? selectedStatus : "Left";
-            Limit(start, first, last, resetDates ? first : start.Value);
+            DateTime defaultStart=academicYearStarts.GetValueOrDefault(SelectedYearId,first);
+            Limit(start, first, last, resetDates ? defaultStart : start.Value);
             DateTime end = status.Text == "Promoted" ? Convert.ToDateTime(window["PromotionDate"]) : last;
             leave.ShowCheckBox = false; leave.Checked = true;
             Limit(leave, status.Text == "Promoted" ? end : start.Value.Date, end, resetDates ? end : leave.Value);
@@ -260,7 +265,8 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         placement.SelectedValue = current?["ClassSectionId"] ?? 0;
         status.SelectedItem = current?["Status"] ??
             (enrollments.AsEnumerable().Any(row => Convert.ToString(row["Status"]) == "Active") ? "Left" : "Active");
-        start.Value = current is null ? DateTime.Today : Convert.ToDateTime(current["EnrollmentDate"]);
+        start.Value = editingEnrollment.HasValue && academicYearStarts.TryGetValue(SelectedYearId,out DateTime yearStart)
+            ? yearStart : current is null ? DateTime.Today : Convert.ToDateTime(current["EnrollmentDate"]);
         leave.Checked = current?["LeavingDate"] is DateTime || current is null && status.Text != "Active";
         leave.Value = DateTime.Today;
         if (current?["LeavingDate"] is DateTime leaving) leave.Value = leaving;
