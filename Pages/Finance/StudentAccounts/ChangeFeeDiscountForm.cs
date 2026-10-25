@@ -53,7 +53,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         this.query=query??(args=>DatabaseHelper.QueryUserSetAsync("SaveStudentFeeDiscount",args));
         this.submit=submit??SubmitRecoverableAsync;
         Text=$"Review Fee Terms — {fee}"; StartPosition=FormStartPosition.CenterParent;
-        Size=new Size(AppScale.Scale(1000),AppScale.Scale(780)); MinimumSize=new Size(AppScale.Scale(850),AppScale.Scale(650));
+        Size=new Size(AppScale.Scale(940),AppScale.Scale(700)); MinimumSize=new Size(AppScale.Scale(850),AppScale.Scale(650));
         amount.ZeroAsPlaceholder=newRate.ZeroAsPlaceholder=true;
         amount.Text=discount.ToString("0.##"); newRate.Text=rate.ToString("0.##");
         context??=id>0?FeeDiscountPeriod.Context(id):null;
@@ -69,7 +69,8 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         else if(!agreementAllowed) scope.Items.Add("Existing Bills Only");
         else scope.Items.AddRange(new object[]{"Saved Fee Plan","Saved Fee Plan and Existing Bills","Existing Bills in This Period"});
         scope.SelectedIndex=0;
-        concession.Items.AddRange(new object[]{"Scholarship","None"}); concession.SelectedIndex=0;
+        concession.Items.AddRange(new object[]{"Scholarship","None"});
+        concession.SelectedItem=originalLabel=="Scholarship"?"Scholarship":"None";
         paidReduction.Items.AddRange(new object[]{"Keep as advance credit","Refund the excess payment"}); paidReduction.SelectedIndex=0;
         if(context is not null)
         {
@@ -117,7 +118,8 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         string previous=concession.Text;
         concession.Items.Clear();
         concession.Items.AddRange(WaiverAction?new object[]{"Waived","Free","Scholarship"}:new object[]{"Scholarship","None"});
-        concession.SelectedItem=concession.Items.Contains(previous)?previous:concession.Items[0];
+        concession.SelectedItem=concession.Items.Contains(previous)?previous:
+            WaiverAction?"Waived":originalLabel=="Scholarship"?"Scholarship":"None";
     }
     private void InvalidateReview(bool keepPaidDecision=false)
     {
@@ -140,6 +142,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         save.Visible=reviewStage;
         editChoices.Visible=reviewStage;editChoices.Enabled=canChange;
         check.Visible=blocked; check.Enabled=!busy;
+        UpdateQuickControls(canChange);
     }
     private bool ValidateChoices()
     {
