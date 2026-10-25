@@ -1731,17 +1731,13 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
             row.Cells["IsTransportLinked"].Value ?? false);
         bool hasPayments = Convert.ToBoolean(
             row.Cells["HasPayments"].Value ?? false);
-        bool isLocked = isMandatory ||
-            hasPayments ||
-            (isTransportLinked && UsesTransport);
-        /* Manage other fee types through Fee Configuration. */
-        bool canRemove = isTransportLinked && !isLocked;
+        bool canRemove = !hasPayments && (currentAdmissionId <= 0 || isTransportLinked && !UsesTransport && !isMandatory);
         var cell = (DataGridViewButtonCell)row.Cells["Remove"];
         if (canRemove)
         {
             cell.Value = "✕";
             cell.ReadOnly = false;
-            cell.ToolTipText = "Remove the transport fee from this admission";
+            cell.ToolTipText = "Remove this fee from this admission";
         }
         else
         {
@@ -1767,12 +1763,9 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         FeeSelectionRow? row = feeGrid.Rows[e.RowIndex].DataBoundItem as FeeSelectionRow;
         if (row is null ||
-            !row.IsTransportLinked ||
-            row.IsMandatory ||
             row.HasPayments ||
-            (row.IsTransportLinked && UsesTransport))
+            (currentAdmissionId > 0 && (!row.IsTransportLinked || row.IsMandatory || UsesTransport)))
         {
-            /* Only transport-linked fees can be removed here. */
             return;
         }
         /* Await removal before refreshing fee state. */
@@ -3241,7 +3234,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         int yearId = Year.SelectedId;
         int classId = Class.SelectedId;
         /* Check the load and context before clearing fees. */
-        if (_selectedFees.Count > 0 &&
+        if (campusId > 0 && yearId > 0 && classId > 0 &&
             campusId == _feeScopeCampusId &&
             yearId == _feeScopeYearId &&
             classId == _feeScopeClassId)
@@ -3250,6 +3243,7 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
         }
         int version = ++feeStructureLoadVersion;
         _selectedFees.Clear();
+        _feeScopeCampusId = _feeScopeYearId = _feeScopeClassId = 0;
         if(currentAdmissionId<=0)monthlyConcessionsFromAdmission.Checked=true;
         if (campusId <= 0 || yearId <= 0 || classId <= 0)
         {
@@ -4469,14 +4463,14 @@ public sealed class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPa
                 DatabaseHelper.Bit(
                     "@UsesTransport",
                     UsesTransport),
-                /* Submit selected fees; AdmitStudent assigns mandatory fees from Fee Configurations. */
+                /* The operator's remaining fees are the complete admission fee selection. */
+                DatabaseHelper.Bit("@UseSelectedFeeTypes", true),
                 new SqlParameter(
                     "@SelectedFeeTypeIds",
                     System.Data.SqlDbType.Structured) {
                     TypeName = "dbo.FeeTypeIdList",
                     Value = Tvp.FeeTypeIds(
                         _selectedFees
-                            .Where(f => !f.IsMandatory)
                             .Select(f => f.FeeTypeId))
                 },
                 new SqlParameter(
@@ -4914,6 +4908,7 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
         _selectedFees.Clear();
         if(currentAdmissionId<=0)monthlyConcessionsFromAdmission.Checked=true;
         _availableFeeOptions = new List<FeeConfigOption>();
+        _feeScopeCampusId = _feeScopeYearId = _feeScopeClassId = 0;
         feeGrid.DataSource = _selectedFees;
         feeStatus.Text =
             "Select Campus, Academic Year and Class to load fees.";

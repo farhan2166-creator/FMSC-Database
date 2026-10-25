@@ -40,12 +40,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
         RecordTextPolicy.WireInput(addressLine, "@AddressLine");
         RecordTextPolicy.WireInput(city, "@City");
         AddAction(UiText.Actions.Save, (_, _) => Save(), "Success");
-        /* # - Reload re-reads every field and the logo, so a click could throw away typed work without a word. */
-        AddAction(UiText.Actions.Reload, (_, _) => {
-            if (!ConfirmDiscardChanges())
-                return;
-            LoadProfile();
-        });
+        AddAction(UiText.Actions.Reload, (_, _) => LoadProfile());
         AddBusyAction("Choose Logo…", ChooseLogoAsync);
         AddAction("Remove Logo", (_, _) => RemoveLogo(), "Danger");
         UseToolbar();
@@ -409,6 +404,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
     /// <summary>implements IUnsavedChanges so the dashboard's navigation guard can see this page.</summary>
     public bool HasUnsavedChanges =>
         ComputeHasUnsavedChanges();
+    bool IUnsavedChanges.HasUnsavedChanges => false;
     public string UnsavedChangesMessage =>
         "This record has unsaved changes.\r\n\r\nIf you leave now, those changes will be lost.";
     /* Renamed from HasUnsavedChanges so the interface property can take that name: the page had a private method of that name. */
@@ -445,12 +441,6 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             /* A dirty check must never throw, and it must never invent a prompt: an unreadable form is treated as clean. */
             return false;
         }
-    }
-    private bool ConfirmDiscardChanges()
-    {
-        if (!ComputeHasUnsavedChanges())
-            return true;
-        return ModernMessageDialog.Confirm(FindForm(), UnsavedChangesMessage, UiText.Dialogs.UnsavedChanges);
     }
     private static string TextOf(
         object value) =>

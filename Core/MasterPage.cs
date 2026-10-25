@@ -138,6 +138,8 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
     private readonly List<(Control Control, bool Multiline)> _editorFields = new();
     /// <summary>The editor values as they were when the record was loaded, cleared or saved.</summary>
     private readonly MasterEditorChangeTracker _changeTracker;
+    private bool IsSetupForm => GetType().Namespace?.StartsWith("FMSC_SMS.Pages.Setup", StringComparison.Ordinal) == true;
+    bool IUnsavedChanges.HasUnsavedChanges => !IsSetupForm && HasUnsavedChanges;
     public bool HasUnsavedChanges => _changeTracker.HasChanges;
     public string UnsavedChangesMessage =>
         "This record has unsaved changes.\r\n\r\nIf you leave now, those changes will be lost.";
@@ -150,7 +152,7 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
     {
         if (_saving || !CanChangeRecord())
             return false;
-        if (!HasUnsavedChanges)
+        if (IsSetupForm || !HasUnsavedChanges)
             return true;
         return ModernMessageDialog.Confirm(
             FindForm(),
