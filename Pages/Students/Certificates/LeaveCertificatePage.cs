@@ -8,6 +8,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
     private const string CertificateTypeName = "School";
     private const int MaxDuplicateIssues = 2;
     private readonly StudentPicker student = new();
+    private readonly CertificateCollectionFlow copyFlow = new("Leave");
     private string? draftBaseline;
     private string DraftSnapshot()=>System.Text.Json.JsonSerializer.Serialize(new {Date=leave.ShowCheckBox&&!leave.Checked?(DateTime?)null:leave.Value.Date,Confirmed=leave.Checked,Promoted=promoted.SelectedId,Academic=academic.Text.Trim(),Attendance=attendance.Text.Trim(),Remarks=remarks.Text.Trim()});
     private void CaptureDraftBaseline()=>draftBaseline=DraftSnapshot();
@@ -48,6 +49,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
         Text = UiText.Certificates.Create,
         Width = AppScale.Scale(170)
     };
+    private readonly ModernButton newCertificateButton = new() {Text="New Certificate",Width=140};
     private readonly ModernButton clearButton = new() {
         Text = UiText.Certificates.NextStudent,
         Width = AppScale.Scale(120)
@@ -76,6 +78,9 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
         feeReview = new LeaveFeeReviewBar(() => student.SelectedId, () => currentEnrollmentId, () => leave.Value.Date, () => HasCertificateForCurrentEnrollment());
         leave.ValueChanged += (_, _) => feeReview.RefreshFees();
         ConfigureFieldSuggestions();
+        newCertificateButton.Click+=(_,_)=>{if(ConfirmDraftDiscard())StudentChanged();};
+        academic.TextChanged+=(_,_)=>ApplyWorkflowState();attendance.TextChanged+=(_,_)=>ApplyWorkflowState();remarks.TextChanged+=(_,_)=>ApplyWorkflowState();promoted.SelectedIndexChanged+=(_,_)=>ApplyWorkflowState();
+        copyFlow.Wire(this,()=>selectedIssueId,id=>{LoadCertificates(student.SelectedId);SelectSavedCertificate(id);},()=>draftBaseline!=DraftSnapshot());
         createCertificateButton.Click +=
             (_, _) => CreateCertificate();
         clearButton.Click +=
@@ -165,7 +170,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
         details.Content.Controls.Add(fields);
         fields.Controls.Add(feeReview, 1, 4);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, clearButton);
+            CertificateButtonRow.Create(createCertificateButton, newCertificateButton, clearButton);
         certButtonRow.Dock =
             DockStyle.Bottom;
         details.Content.Controls.Add(certButtonRow);
@@ -174,7 +179,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
                 UiText.Certificates.IssuanceHistory,
                 UiText.Certificates.IssueHistoryGuidance);
         var certificateActions =
-            CertificateButtonRow.Create(issueAgainButton, collectButton, printButton, refreshButton);
+            CertificateButtonRow.Create(printButton, collectButton, issueAgainButton, refreshButton);
         certificateActions.Dock =
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
@@ -454,6 +459,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
         HideGridColumn("CertificateType");
         // Finding 4 - read by the page (see HasCertificateForCurrentEnrollment), not shown.
         HideGridColumn("EnrollmentId");
+        CertificateCollectionFlow.FormatGrid(Grid);
         CertificateRecordOrder.FitColumns(Grid);
     }
     private void HideGridColumn(string columnName)
@@ -508,7 +514,12 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
             selectedIssueCollected =
                 string.Equals(
                     GetString(row, "CollectionStatus"), "Collected", StringComparison.OrdinalIgnoreCase);
-            ApplyWorkflowState();
+            leave.Value=GetDate(row,"LeaveDate")??leave.Value;
+            currentClass.Text=GetString(row,"ClassStudied");
+            academic.Text=GetString(row,"AcademicRecord");attendance.Text=GetString(row,"AttendanceRecord");remarks.Text=GetString(row,"Remarks");
+            SetStudentDates(row);
+            CertificateCollectionFlow.SelectPromotion(promoted,GetString(row,"ClassPromotedTo"));
+            CaptureDraftBaseline();ApplyWorkflowState();
         }
         catch (Exception ex)
         {
@@ -541,26 +552,31 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
             hasStudent &&
             !hasCertificateForThisLeaving &&
             (studentIsActive || studentIsLeft);
-        leave.Enabled = canCreate;
-        promoted.Enabled = canCreate;
-        academic.Enabled = canCreate;
-        attendance.Enabled = canCreate;
-        remarks.Enabled = canCreate;
-        createCertificateButton.Enabled =
-            canCreate && HasRequiredStudentDates;
+        bool editableCopy=hasSelectedIssue&&!selectedIssueCollected&&IsLatestSelectedIssue();
+        leave.Enabled = canCreate&&!hasSelectedIssue;
+        promoted.Enabled = academic.Enabled = attendance.Enabled = remarks.Enabled = editableCopy||(canCreate&&!hasSelectedIssue);
+        createCertificateButton.Enabled = editableCopy||(canCreate&&!hasSelectedIssue&&HasRequiredStudentDates);
+        createCertificateButton.Text=hasSelectedIssue?"Save Changes":UiText.Certificates.Create;
+        newCertificateButton.Enabled=hasStudent&&!hasCertificateForThisLeaving;
         clearButton.Enabled = true;
         refreshButton.Enabled =
             hasStudent;
         issueAgainButton.Enabled =
-            hasCertificate &&
+            hasSelectedIssue && IsLatestSelectedIssue() &&
             latestIssueCollected &&
             !duplicateLimitReached;
         collectButton.Enabled =
             hasSelectedIssue &&
-            !selectedIssueCollected;
-        printButton.Enabled =
-            hasSelectedIssue &&
-            selectedIssueCollected;
+            !selectedIssueCollected && draftBaseline==DraftSnapshot();
+        printButton.Enabled = hasSelectedIssue;
+        var workflowRow=CertificateCollectionFlow.Find(certificateResults,"LeaveCertificateIssueId",selectedIssueId);
+        bool unusedVoid=CertificateCollectionFlow.Voided(workflowRow);
+        copyFlow.Available=true;
+        if(copyFlow.Apply(certificateResults,"LeaveCertificateIssueId",selectedIssueId,createCertificateButton,printButton,draftBaseline!=DraftSnapshot(),promoted,academic,attendance,remarks))
+        {
+            collectButton.Enabled=false;
+            SetStatus(unusedVoid?"Historical cancelled copy — retained as read-only history.":copyFlow.Status);return;
+        }
         if (!hasStudent)
         {
             SetStatus(UiText.Prompts.SearchForStudent);
@@ -571,7 +587,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
         {
             if (!selectedIssueCollected)
             {
-                SetStatus("Not collected. Use Mark Collected before printing or issuing again.");
+                SetStatus("Ready to print. Check the details, print, then Mark Collected to lock this copy.");
                 return;
             }
             if (IsLatestSelectedIssue())
@@ -652,8 +668,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
     private int CountDuplicateIssues()
     {
         /* Finding 4 - dbo.IssueLeaveCertificate counts duplicates per LeaveRecordId, and Issue Again always acts on the newest record. */
-        int newestRecordId =
-            GetExistingLeaveRecordId();
+        int newestRecordId = selectedLeaveRecordId>0?selectedLeaveRecordId:GetExistingLeaveRecordId();
         int count = 0;
         foreach (DataRow row in certificateResults.Rows)
         {
@@ -662,7 +677,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
             {
                 continue;
             }
-            if (string.Equals(
+            if (!CertificateCollectionFlow.Voided(row) && string.Equals(
                     GetString(row, "IssueType"), "Duplicate", StringComparison.OrdinalIgnoreCase))
             {
                 count++;
@@ -677,24 +692,14 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
     }
     private bool IsLatestIssueCollected()
     {
-        if (certificateResults.Rows.Count == 0)
-            return false;
-        DataRow latest =
-            certificateResults.Rows[0];
-        return string.Equals(
-            GetString(latest, "CollectionStatus"), "Collected", StringComparison.OrdinalIgnoreCase);
+        var row=certificateResults.AsEnumerable().FirstOrDefault(row=>selectedLeaveRecordId<=0||GetInt(row,"LeaveRecordId")==selectedLeaveRecordId);
+        return CertificateCollectionFlow.Locked(row)||CertificateCollectionFlow.Voided(row);
     }
     private bool IsLatestSelectedIssue()
     {
-        if (selectedIssueId <= 0 ||
-            certificateResults.Rows.Count == 0)
-        {
-            return false;
-        }
-        int latestIssueId =
-            GetInt(certificateResults.Rows[0], "LeaveCertificateIssueId");
-        return latestIssueId ==
-               selectedIssueId;
+        if(selectedIssueId<=0||selectedLeaveRecordId<=0)return false;
+        var row=certificateResults.AsEnumerable().FirstOrDefault(row=>GetInt(row,"LeaveRecordId")==selectedLeaveRecordId);
+        return row is not null&&GetInt(row,"LeaveCertificateIssueId")==selectedIssueId;
     }
     private bool IsSelectedStudentActive()
     {
@@ -709,6 +714,14 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
     }
     private void CreateCertificate()
     {
+        if(selectedIssueId>0)
+        {
+            if(selectedIssueCollected||!IsLatestSelectedIssue())return;
+            try { DatabaseHelper.ExecuteUser("UpdateLeavingCertificateCopy",DatabaseHelper.Int("@CopyId",selectedIssueId),DatabaseHelper.P("@ClassPromotedTo",GetSelectedPromotionClassName()),DatabaseHelper.P("@AcademicRecord",academic.Text),DatabaseHelper.P("@AttendanceRecord",attendance.Text),DatabaseHelper.P("@Remarks",RecordTextPolicy.TitleCase(remarks.Text)),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"LeaveCertificateIssueId",selectedIssueId)));
+                int id=selectedIssueId;LoadCertificates(student.SelectedId);SelectSavedCertificate(id);Info("Certificate changes saved. Student status and fees are unchanged."); }
+            catch(Exception ex){Fail(ex);}
+            return;
+        }
         if (!ValidateRequiredInputs())
             return;
         /* Finding 12 - Info writes the status line, but the reload below calls Bind ("N record(s)") and ApplyWorkflowState after it. */
@@ -910,8 +923,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
                     "the maximum allowed. No further copies can be issued for this student.");
                 return;
             }
-            int leaveRecordId =
-                GetExistingLeaveRecordId();
+            int leaveRecordId = selectedLeaveRecordId;
             if (leaveRecordId <= 0)
             {
                 Alert("The student's leave certificate record could not be found.");
@@ -923,7 +935,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
             DatabaseHelper.Execute("IssueLeaveCertificate",new[] { DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@LeaveRecordId",leaveRecordId) }.Concat(reviewed).ToArray());
             successMessage =
                 "Certificate issued again successfully. The new issuance has been added to the history.";
-            LoadCertificates(student.SelectedId);
+            LoadCertificates(student.SelectedId);SelectSavedCertificate(0);
         }
         catch (Exception ex)
         {
@@ -946,6 +958,8 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
     }
     private void MarkCollected()
     {
+        if(draftBaseline!=DraftSnapshot()){Warn("Save the certificate changes before marking it collected.");return;}
+
         int savedIssueId = selectedIssueId;
         // Finding 12 - see CreateCertificate: the confirmation is set last.
         string? successMessage =
@@ -983,12 +997,12 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
                 DatabaseHelper.Int(
                     "@LeaveCertificateIssueId",
                     selectedIssueId),
-                DatabaseHelper.P("@CollectedBy", collectedBy));
+                DatabaseHelper.P("@CollectedBy", collectedBy),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"LeaveCertificateIssueId",selectedIssueId)));
             successMessage =
                 "Certificate issuance marked as collected.";
             LoadCertificates(admissionId);
             feeReview.RefreshFees();
-            SelectSavedCertificate(0);
+            SelectSavedCertificate(savedIssueId);
         }
         catch (Exception ex)
         {
@@ -1016,11 +1030,6 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
             if (selectedIssueId <= 0)
             {
                 Warn(UiText.Certificates.InvalidIssuance);
-                return;
-            }
-            if (!selectedIssueCollected)
-            {
-                Warn("This certificate has not been collected yet. It cannot be printed.");
                 return;
             }
             PrintCertificate(selectedLeaveRecordId, selectedIssueId);
@@ -1076,8 +1085,8 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
             };
         int labelHeight =
             Math.Max(
-                45,
-                AppMetrics.TextHeight(AppTheme.NormalFont) + 24);
+                70,
+                AppMetrics.TextHeight(AppTheme.NormalFont) * 2 + 24);
         int inputHeight =
             Math.Max(
                 36,
@@ -1098,7 +1107,7 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
         var label =
             new Label {
                 Text =
-                    "Name of person collecting the certificate:",
+                    "Name of person collecting the certificate:\nCollection permanently locks this copy.",
                 AutoSize =
                     false,
                 Dock =

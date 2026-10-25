@@ -13,6 +13,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     private readonly Func<SqlParameter[], Task> writeCertificate;
     private readonly Func<int, DataTable> readCertificates;
     private readonly StudentPicker student = new();
+    private readonly CertificateCollectionFlow copyFlow = new("NOC");
     private readonly ModernDatePicker certificateDate =
         HumanUi.Date();
     private DataTable studentResults => student.Source;
@@ -28,11 +29,11 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton updateCertificateButton = new() {
-        Text = UiText.Certificates.Update,
+        Text = "Save Changes",
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton newButton = new() {
-        Text = UiText.Certificates.New,
+        Text = "New Certificate",
         Width = AppScale.Scale(110)
     };
     private readonly ModernButton clearButton = new() {
@@ -69,6 +70,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         refreshButton.Click +=
             (_, _) => RefreshCertificates();
         RelocateFromActions(createCertificateButton, clearButton);
+        copyFlow.Wire(this,()=>selectedNoObjectionCertificateId,id=>{LoadCertificates(student.SelectedId);SelectSavedCertificate(id);},()=>HasCertificateEdits);
         TrackStudentSearchStatus(student);
         /* The shared student finder (StudentPicker): the list narrows on every keystroke and nothing is chosen until the operator clicks a row, presses Enter on a highlighted row, or types an… */
         if (initialize) StudentSearchCache.Warm();
@@ -126,7 +128,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         var records =
             HumanUi.Card("No Objection Certificates", "A student may have more than one NOC. Select a row to edit or print it.");
         var certificateActions =
-            CertificateButtonRow.Create(printButton, refreshButton);
+            CertificateButtonRow.Create(printButton, copyFlow.Collect, copyFlow.IssueAgain, refreshButton);
         certificateActions.Dock =
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
@@ -243,6 +245,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         SetGridWidth("CreatedAt", 145);
         SetGridWidth("UpdatedAt", 145);
         HideGridColumn("AdmissionId");
+        CertificateCollectionFlow.FormatGrid(Grid);
         CertificateRecordOrder.FitColumns(Grid);
     }
     private void HideGridColumn(string columnName)
@@ -328,6 +331,9 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
             hasStudent;
         printButton.Enabled =
             hasSelection && !HasCertificateEdits && CurrentUser.HasPermission("Certificates.Print");
+        copyFlow.Available=!creatingCertificate;
+        if(copyFlow.Apply(certificateResults,"NoObjectionCertificateId",selectedNoObjectionCertificateId,updateCertificateButton,printButton,HasCertificateEdits,certificateDate))
+        { SetStatus(copyFlow.Status); return; }
         if (!showStatus) return;
         if (!hasStudent)
         {
@@ -337,7 +343,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         if (hasSelection)
         {
             SetStatus(
-                "Editing NOC. Use Update Certificate to save, or New for another certificate.");
+                "Editing NOC. Use Save Changes to save, or New for another certificate.");
             return;
         }
         SetStatus("Confirm the date to create the NOC. Select a saved NOC to edit or print.");
@@ -440,7 +446,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 DatabaseHelper.Int(
                     "@NoObjectionCertificateId",
                     selectedNoObjectionCertificateId),
-                DatabaseHelper.Date("@CertificateDate", certDate));
+                DatabaseHelper.Date("@CertificateDate", certDate),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"NoObjectionCertificateId",selectedNoObjectionCertificateId)));
             successMessage =
                 "NOC updated successfully.";
             /* same rule as the create path: the student this certificate was updated for must still be the selected one, or the reload would show the previous student's certificates under the… */

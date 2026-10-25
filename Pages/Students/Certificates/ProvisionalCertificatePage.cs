@@ -12,6 +12,8 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
     private readonly Func<SqlParameter[], Task> writeCertificate;
     private readonly Func<int, DataTable> readCertificates;
     private readonly StudentPicker student = new();
+    private readonly ModernTextBox dateOfBirthDisplay = HumanUi.TextBox(false,150);
+    private readonly CertificateCollectionFlow copyFlow = new("Provisional");
     private readonly ModernComboBox examType =
         HumanUi.Combo();
     private readonly ModernTextBox examYear =
@@ -66,11 +68,11 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton updateCertificateButton = new() {
-        Text = UiText.Certificates.Update,
+        Text = "Save Changes",
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton newButton = new() {
-        Text = UiText.Certificates.New,
+        Text = "New Certificate",
         Width = AppScale.Scale(110)
     };
     private readonly ModernButton clearButton = new() {
@@ -141,6 +143,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         refreshButton.Click +=
             (_, _) => RefreshCertificates();
         RelocateFromActions(createCertificateButton, clearButton);
+        copyFlow.Wire(this,()=>selectedProvisionalCertificateId,id=>{LoadCertificates(student.SelectedId);SelectSavedCertificate(id);},()=>HasCertificateEdits);
         TrackStudentSearchStatus(student);
         /* Filter as the operator types; load only after a committed student selection. */
         if (initialize) StudentSearchCache.Warm();
@@ -191,7 +194,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         var studentField =
             CertificateUi.Field("Student", student, true);
         fields.Controls.Add(studentField, 0, 0);
-        fields.SetColumnSpan(studentField, 4);
+        fields.SetColumnSpan(studentField, 3);
         fields.Controls.Add(
             CertificateUi.Field("Exam Type", examType, true), 4, 0);
         fields.Controls.Add(
@@ -214,6 +217,8 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             CertificateUi.Field("Other Subjects (not in list below)", otherSubjects);
         fields.Controls.Add(otherSubjectsField, 1, 2);
         fields.SetColumnSpan(otherSubjectsField, 5);
+        dateOfBirthDisplay.ReadOnly=true;dateOfBirthDisplay.TabStop=false;
+        fields.Controls.Add(CertificateUi.Field("Date of Birth",dateOfBirthDisplay),3,0);
         var subjectsLabel =
             new Label {
                 Text =
@@ -342,8 +347,8 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             for (int i = 0; i < columns; i++) fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / columns));
             for (int i = 0; i < fields.RowCount; i++) fields.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
             var positions = columns == 3
-                ? new[] { (0, 0, 2), (2, 0, 1), (0, 1, 1), (1, 1, 2), (0, 2, 1), (1, 2, 1), (2, 2, 1), (0, 3, 1), (1, 3, 2), (0, 4, 3) }
-                : new[] { (0, 0, 4), (4, 0, 1), (5, 0, 1), (0, 1, 2), (2, 1, 1), (3, 1, 1), (4, 1, 1), (5, 1, 1), (0, 2, 1), (1, 2, 5) };
+                ? new[] { (0, 0, 2), (0, 1, 1), (1, 1, 1), (0, 2, 2), (2, 2, 1), (0, 3, 1), (1, 3, 1), (2, 3, 1), (2, 1, 1), (0, 4, 3), (2,0,1) }
+                : new[] { (0, 0, 3), (4, 0, 1), (5, 0, 1), (0, 1, 2), (2, 1, 1), (3, 1, 1), (4, 1, 1), (5, 1, 1), (0, 2, 1), (1, 2, 5), (3,0,1) };
             for (int i = 0; i < fieldControls.Length; i++)
             {
                 fields.Controls.Add(fieldControls[i], positions[i].Item1, positions[i].Item2);
@@ -366,7 +371,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 "Provisional Certificates",
                 "Select an existing certificate to update or reprint it. Use New Certificate for another exam result.");
         var certificateActions =
-            CertificateButtonRow.Create(printButton, refreshButton);
+            CertificateButtonRow.Create(printButton, copyFlow.Collect, copyFlow.IssueAgain, refreshButton);
         certificateActions.Dock =
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
@@ -695,6 +700,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             ("AdmissionNumber", "Admission No."), ("ExamTypeDisplay", "Exam"), ("ExamYear", "Year"),
             ("BoardName", "Board"), ("RollNumber", "Roll No."), ("MarksObtained", "Marks"), ("MarksOutOf", "Total")
         }) if (Grid.Columns.Contains(column)) Grid.Columns[column].HeaderText = caption;
+        CertificateCollectionFlow.FormatGrid(Grid);
         CertificateRecordOrder.FitColumns(Grid);
     }
     private void HideGridColumn(string columnName)
@@ -888,7 +894,10 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             student.SelectedId > 0;
         bool hasSelection =
             selectedProvisionalCertificateId > 0;
-        bool validEditor = hasStudent && CheckEditor(false);
+        var birthRow=hasSelection?CertificateCollectionFlow.Find(certificateResults,"ProvisionalCertificateId",selectedProvisionalCertificateId):student.SelectedRow;
+        DateTime? recordedBirth=birthRow is null?null:GetDate(birthRow,"DateOfBirth");
+        dateOfBirthDisplay.Text=recordedBirth?.ToString("dd MMM yyyy")??(hasStudent?"Not on record":"");
+        bool validEditor = hasStudent && recordedBirth.HasValue && CheckEditor(false);
         student.Enabled = true;
         examType.Enabled = hasStudent;
         examYear.Enabled = hasStudent;
@@ -918,7 +927,11 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             hasStudent;
         printButton.Enabled =
             hasSelection && !HasCertificateEdits && CurrentUser.HasPermission("Certificates.Print");
+        copyFlow.Available=!creatingCertificate;
+        if(copyFlow.Apply(certificateResults,"ProvisionalCertificateId",selectedProvisionalCertificateId,updateCertificateButton,printButton,HasCertificateEdits,examType,examYear,boardName,rollNumber,marksObtained,marksOutOf,grade,certificateDate,otherSubjects,subjectsList,subjectChoices,selectAllSubjects,clearAllSubjects))
+        { SetStatus(copyFlow.Status); return; }
         if (!showStatus) return;
+        if(hasStudent&&!hasSelection&&!recordedBirth.HasValue){SetStatus("Date of birth is missing. Complete the student's record, then refresh before creating the certificate.",true);return;}
         if (!hasStudent)
         {
             SetStatus(UiText.Prompts.SearchForStudent);
@@ -927,7 +940,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         if (hasSelection)
         {
             SetStatus(
-                "Editing certificate. Use Update Certificate to save, or New for another certificate.");
+                "Editing certificate. Use Save Changes to save, or New for another certificate.");
             return;
         }
         SetStatus(
@@ -1085,7 +1098,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 DatabaseHelper.Date(
                     "@CertificateDate",
                     certificateDate.Value.Date),
-                DatabaseHelper.P("@SubjectIds", GetCheckedSubjectIdsCsv()));
+                DatabaseHelper.P("@SubjectIds", GetCheckedSubjectIdsCsv()),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"ProvisionalCertificateId",selectedProvisionalCertificateId)));
             successMessage =
                 "Certificate updated successfully.";
             /* Refresh only if the saved certificate's student is still selected. */
@@ -1250,9 +1263,8 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             SELECT PCS.SubjectName, PC.OtherSubjects
             FROM dbo.ProvisionalCertificates PC
             LEFT JOIN dbo.ProvisionalCertificateSubjects PCS ON PCS.ProvisionalCertificateId = PC.ProvisionalCertificateId
-            LEFT JOIN dbo.Subjects S ON S.SubjectId = PCS.SubjectId
             WHERE PC.ProvisionalCertificateId = @CertificateId
-            ORDER BY COALESCE(S.DisplayOrder, PCS.DisplayOrder), PCS.DisplayOrder, PCS.SubjectId;
+            ORDER BY PCS.DisplayOrder, PCS.ProvisionalCertificateSubjectId;
             """, DatabaseHelper.Int("@UserId", CurrentUser.UserId),
             DatabaseHelper.Int("@CertificateId", provisionalCertificateId));
         var printSubjects = subjectRows.AsEnumerable().Select(row => GetString(row, "SubjectName"))
@@ -1267,6 +1279,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         if (creatingCertificate) return;
         if (HasCertificateEdits && !Confirm("Discard the unsaved changes and refresh certificates?", "Refresh Certificates")) return;
         if (student.SelectedId <= 0) return;
+        try {CertificateCollectionFlow.RefreshStudent(student);}catch(Exception ex){Fail(ex);return;}
         int selectedId = selectedProvisionalCertificateId;
         LoadCertificates(student.SelectedId);
         if (selectedId > 0) SelectSavedCertificate(selectedId);

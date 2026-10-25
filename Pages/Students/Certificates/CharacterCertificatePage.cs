@@ -5,6 +5,7 @@ namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
     private readonly StudentPicker student = new();
+    private readonly CertificateCollectionFlow copyFlow = new("Character");
     private string? draftBaseline;
     private string DraftSnapshot()=>System.Text.Json.JsonSerializer.Serialize(new {Exam=examType.SelectedIndex,Year=academicYear.SelectedId,Roll=rollNumber.Text.Trim(),Remarks=remarks.Text.Trim(),Date=certificateDate.Value.Date});
     private void CaptureDraftBaseline()=>draftBaseline=DraftSnapshot();
@@ -75,6 +76,11 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         examType.Items.AddRange(ExamTypeLabels);
         remarks.DropDownStyle=ComboBoxStyle.DropDownList;
         remarks.Items.AddRange(CharacterCertificateOptions.Conduct);
+        certificateDate.ValueChanged+=(_,_)=>ApplyWorkflowState();
+        rollNumber.TextChanged+=(_,_)=>ApplyWorkflowState();
+        remarks.SelectedIndexChanged+=(_,_)=>ApplyWorkflowState();
+        academicYear.SelectedIndexChanged+=(_,_)=>ApplyWorkflowState();
+        copyFlow.Wire(this,()=>selectedIssueId,id=>{LoadCertificates(student.SelectedId);SelectSavedCertificate(id);},()=>draftBaseline!=DraftSnapshot());
         createCertificateButton.Click += async (_, _) => await CreateCertificate();
         clearButton.Click +=
             (_, _) => ClearForm();
@@ -161,19 +167,20 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
             field.TabIndex = fields.GetRow(field) * fields.ColumnCount + fields.GetColumn(field);
         details.Content.Controls.Add(fields);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, clearButton, newCertificateButton, checkSaveButton);
+            CertificateButtonRow.Create(createCertificateButton, newCertificateButton, clearButton, checkSaveButton);
         certButtonRow.Dock =
             DockStyle.Bottom;
         certButtonRow.TabIndex = 1;
         createCertificateButton.TabIndex = 0;
-        clearButton.TabIndex = 1;
+        newCertificateButton.TabIndex = 1;
+        clearButton.TabIndex = 2;
         details.Content.Controls.Add(certButtonRow);
         var records =
             HumanUi.Card(
                 UiText.Certificates.IssuanceHistory,
                 UiText.Certificates.IssueHistoryGuidance);
         var certificateActions =
-            CertificateButtonRow.Create(issueAgainButton, collectButton, printButton, refreshButton);
+            CertificateButtonRow.Create(printButton, collectButton, issueAgainButton, refreshButton);
         certificateActions.Dock =
             DockStyle.Bottom;
         Grid.TabIndex = 0;
@@ -354,6 +361,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         HideGridColumn("AdmissionId");
         HideGridColumn("IssuedByUserId");
         HideGridColumn("CertificateRecordId");
+        CertificateCollectionFlow.FormatGrid(Grid);
         CertificateRecordOrder.FitColumns(Grid);
     }
     private void HideGridColumn(string columnName)
@@ -432,7 +440,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         bool available = !saving && !recoveryBlocked;
         Grid.Enabled = !saving;
         student.Enabled = !saving;
-        bool editable=available&&hasStudent&&(!selected||IsLatestSelectedIssue());
+        bool editable=available&&hasStudent&&(!selected||(IsLatestSelectedIssue()&&!selectedIssueCollected));
         examType.Enabled = editable;
         bool canCreate = available && hasStudent && !selected && examType.SelectedIndex >= 0 && !HasCertificateForDraft();
         certificateDate.Enabled = rollNumber.Enabled = remarks.Enabled = academicYear.Enabled = selected?editable:canCreate;
@@ -442,15 +450,23 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         clearButton.Enabled = !saving;
         refreshButton.Enabled = hasStudent && !saving;
         issueAgainButton.Enabled = available && selected && knownType && IsLatestSelectedIssue() && IsLatestIssueCollectedFor(selectedCertificateRecordId);
-        collectButton.Enabled = available && selected && knownType && !selectedIssueCollected;
-        printButton.Enabled = !saving && selected && knownType && selectedIssueCollected && CurrentUser.HasPermission("Certificates.Print");
+        collectButton.Enabled = available && selected && knownType && !selectedIssueCollected && draftBaseline==DraftSnapshot();
+        printButton.Enabled = !saving && selected && knownType && (selectedIssueCollected||draftBaseline==DraftSnapshot()) && CurrentUser.HasPermission("Certificates.Print");
         checkSaveButton.Visible = recoveryBlocked;
         checkSaveButton.Enabled = recoveryBlocked && !saving;
+        var workflowRow=CertificateCollectionFlow.Find(certificateResults,"CharacterCertificateIssueId",selectedIssueId);
+        bool unusedVoid=CertificateCollectionFlow.Voided(workflowRow);
+        copyFlow.Available=available;
+        if(copyFlow.Apply(certificateResults,"CharacterCertificateIssueId",selectedIssueId,createCertificateButton,printButton,draftBaseline!=DraftSnapshot(),examType,certificateDate,rollNumber,remarks,academicYear))
+        {
+            collectButton.Enabled=false;
+            SetStatus(unusedVoid?"Historical cancelled copy — retained as read-only history.":copyFlow.Status);return;
+        }
         if (recoveryBlocked) { SetStatus("An earlier save needs checking. Use Check Save before creating another copy.", true); return; }
         if (!hasStudent) { SetStatus(UiText.Prompts.SearchForStudent); return; }
         if (selected)
         {
-            SetStatus(!IsLatestSelectedIssue()?"This is an earlier copy. Select the latest copy to edit or issue again."
+            SetStatus(selectedIssueCollected?"Collected copy — details are locked. Print this saved copy or use Issue Again for a new copy.":!IsLatestSelectedIssue()?"This is an earlier copy. Select the latest copy to edit or issue again."
                 :"Edit the entered details and Save Changes. Issue Again creates a fresh copy using current Admission details.");
             return;
         }
@@ -472,7 +488,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
                 continue;
             }
             return string.Equals(
-                GetString(row, "CollectionStatus"), "Collected", StringComparison.OrdinalIgnoreCase);
+                GetString(row, "CollectionStatus"), "Collected", StringComparison.OrdinalIgnoreCase) || CertificateCollectionFlow.Voided(row);
         }
         return false;
     }
@@ -574,7 +590,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         if (saving || recoveryBlocked || !ValidateWording() || !ValidateRequiredInputs()) return;
         if (student.SelectedId <= 0) { Warn(UiText.Prompts.SelectStudent); return; }
         bool editing=selectedCertificateRecordId>0;
-        if(editing&&!IsLatestSelectedIssue())return;
+        if(editing&&(!IsLatestSelectedIssue()||selectedIssueCollected))return;
         if (!editing&&HasCertificateForDraft()) { Warn("This exam-type certificate already exists. Select it to edit or issue again."); return; }
         if (string.IsNullOrWhiteSpace(rollNumber.Text) || !CharacterCertificateOptions.Conduct.Contains(remarks.Text))
         { Warn("Enter the BISE roll number and choose the conduct."); return; }
@@ -587,7 +603,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         await SaveOperation(new[] { DatabaseHelper.P("@Action", editing?"Update":"Create"), DatabaseHelper.Int("@AdmissionId", student.SelectedId),
             DatabaseHelper.Int("@CertificateRecordId",selectedCertificateRecordId),DatabaseHelper.Int("@ExpectedLatestIssueId",selectedIssueId),
             DatabaseHelper.P("@ExamType", exam), DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date),
-            DatabaseHelper.P("@RollNumber", rollNumber.Text.Trim()), DatabaseHelper.P("@Remarks", remarks.Text.Trim()),DatabaseHelper.Int("@AcademicYearId",academicYear.SelectedId) },
+            DatabaseHelper.P("@RollNumber", rollNumber.Text.Trim()), DatabaseHelper.P("@Remarks", remarks.Text.Trim()),DatabaseHelper.Int("@AcademicYearId",academicYear.SelectedId),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"CharacterCertificateIssueId",selectedIssueId)) },
             $"{(editing?"Update":"Create")} {exam} character certificate for student {student.SelectedId}");
     }
     private async Task IssueAgain()
@@ -608,6 +624,8 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
     }
     private void MarkCollected()
     {
+        if(draftBaseline!=DraftSnapshot()){Warn("Save the certificate changes before marking it collected.");return;}
+
         int savedIssueId = selectedIssueId;
 
         // Finding 12 - see CreateCertificate: the confirmation is set last.
@@ -647,11 +665,11 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
                 DatabaseHelper.Int(
                     "@CharacterCertificateIssueId",
                     selectedIssueId),
-                DatabaseHelper.P("@CollectedBy", collectedBy));
+                DatabaseHelper.P("@CollectedBy", collectedBy),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"CharacterCertificateIssueId",selectedIssueId)));
             successMessage =
                 "Certificate issuance marked as collected.";
             LoadCertificates(admissionId);
-            SelectSavedCertificate(0);
+            SelectSavedCertificate(savedIssueId);
 
         }
         catch (Exception ex)
@@ -671,8 +689,8 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
     {
         try
         {
-            if (selectedCertificateRecordId <= 0 || selectedIssueId <= 0 || !selectedIssueCollected || selectedStoredExamType is not ("SSC" or "HSSC"))
-            { Warn("Select a collected certificate with a saved exam type."); return; }
+            if (selectedCertificateRecordId <= 0 || selectedIssueId <= 0 || selectedStoredExamType is not ("SSC" or "HSSC"))
+            { Warn("Select a saved certificate with a recorded exam type."); return; }
             PrintCertificate(selectedCertificateRecordId, selectedIssueId);
         }
         catch (Exception ex) { Fail(ex); }
@@ -707,8 +725,8 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
             };
         int labelHeight =
             Math.Max(
-                45,
-                AppMetrics.TextHeight(AppTheme.NormalFont) + 24);
+                70,
+                AppMetrics.TextHeight(AppTheme.NormalFont) * 2 + 24);
         int inputHeight =
             Math.Max(
                 36,
@@ -729,7 +747,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         var label =
             new Label {
                 Text =
-                    "Name of person collecting the certificate:",
+                    "Name of person collecting the certificate:\nCollection permanently locks this copy.",
                 AutoSize =
                     false,
                 Dock =

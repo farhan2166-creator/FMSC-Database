@@ -5,6 +5,7 @@ namespace FMSC_SMS.Pages.Staff.Certificates;
 public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
     private readonly StaffPicker staff = new();
+    private readonly CertificateCollectionFlow copyFlow = new("Bank");
     public bool IsBusy=>BusyOperationRunning;
     public string BusyMessage=>"The bank certificate is being created. Wait for the result and history reload before leaving.";
     private readonly Func<string,bool>? discardConfirmation;
@@ -43,11 +44,11 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton updateCertificateButton = new() {
-        Text = UiText.Certificates.Update,
+        Text = "Save Changes",
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton newButton = new() {
-        Text = UiText.Certificates.New,
+        Text = "New Certificate",
         Width = AppScale.Scale(110)
     };
     private readonly ModernButton clearButton = new() {
@@ -83,6 +84,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         monthlyIncome.DecimalPlaces = 0;
         monthlyIncome.ThousandsSeparator = true;
         checkOutcome.Click+=async(_,_)=>await CheckCertificateOutcomeAsync();
+        copyFlow.Wire(this,()=>selectedBankAccountOpeningCertificateId,id=>{LoadCertificates(staff.SelectedId);SelectSavedCertificate(id);},()=>HasCertificateEdits);
         createCertificateButton.Click+=async(_,_)=>
         {
             if(IsBusy||!createCertificateButton.Enabled)return;
@@ -165,7 +167,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
                 "Bank Account Opening Certificates",
                 "A staff member may have more than one of these. Select a row to edit or print it.");
         var certificateActions =
-            CertificateButtonRow.Create(printButton, refreshButton, checkOutcome);
+            CertificateButtonRow.Create(printButton, copyFlow.Collect, copyFlow.IssueAgain, refreshButton, checkOutcome);
         certificateActions.Dock =
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
@@ -322,6 +324,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         SetGridWidth("CreatedAt", 145);
         SetGridWidth("UpdatedAt", 145);
         HideGridColumn("StaffId");
+        CertificateCollectionFlow.FormatGrid(Grid);
         CertificateRecordOrder.FitColumns(Grid);
     }
     private void HideGridColumn(string columnName)
@@ -422,6 +425,9 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             hasStaff&&!recoveryBlocked;
         printButton.Enabled =
             hasSelection && !HasCertificateEdits && CurrentUser.HasPermission("Certificates.Print");
+        copyFlow.Available=!IsBusy&&!recoveryBlocked;
+        if(copyFlow.Apply(certificateResults,"BankAccountOpeningCertificateId",selectedBankAccountOpeningCertificateId,updateCertificateButton,printButton,HasCertificateEdits,bankName,branchName,designation,monthlyIncome,purpose,certificateDate))
+        {SetStatus(copyFlow.Status);return;}
         if(recoveryBlocked)
         {
             SetStatus((pendingCertificate?.Summary??"An earlier certificate creation")+" · Outcome needs checking. Use Check Save Outcome; do not create it again.",PageStatusKind.Warning);
@@ -612,7 +618,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
                 DatabaseHelper.P(
                     "@Purpose",
                     purpose.Text.Trim()),
-                DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date));
+                DatabaseHelper.Date("@CertificateDate", certificateDate.Value.Date),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"BankAccountOpeningCertificateId",selectedBankAccountOpeningCertificateId)));
             successMessage =
                 "Certificate updated successfully.";
             ClearCertificateFields();

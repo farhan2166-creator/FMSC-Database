@@ -24,6 +24,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     private bool HasCertificateEdits => selectedRegularStudentCertificateId > 0 &&
         (className.Text.Trim() != savedClassName.Trim() || certificateDate.Value.Date != savedCertificateDate);
     private readonly StudentPicker student = new();
+    private readonly CertificateCollectionFlow copyFlow = new("Regular");
     private readonly ModernTextBox dateOfBirth =
         HumanUi.TextBox(false, 150);
     private readonly ModernTextBox className =
@@ -74,6 +75,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     {
         this.discardConfirmation=discardConfirmation;
         this.readCertificates=readCertificates??(id=>DatabaseHelper.QueryUser("GetRegularStudentCertificateRecords",DatabaseHelper.Int("@AdmissionId",id)));
+        copyFlow.Wire(this,()=>selectedIssueId,id=>{int record=selectedRegularStudentCertificateId;LoadCertificates(student.SelectedId);SelectCertificate(record,id);},()=>HasCertificateEdits);
         className.MaxLength = 100;
         className.ReadOnly = true;
         className.TabStop = false;
@@ -180,7 +182,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             CertificateUi.Field("Class (School Record)", className, true), 1, 1);
         details.Content.Controls.Add(fields);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, newButton, clearButton, checkReissue);
+            CertificateButtonRow.Create(createCertificateButton, newButton, clearButton, checkReissue);
         certButtonRow.Dock =
             DockStyle.Bottom;
         details.Content.Controls.Add(certButtonRow);
@@ -189,7 +191,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
                 "Regular Student Certificates",
                 "Select a saved copy to reprint its original details, or use Issue Again for a new copy with the corrected school birth date.");
         var certificateActions =
-            CertificateButtonRow.Create(printButton, refreshButton);
+            CertificateButtonRow.Create(printButton, copyFlow.Collect, updateCertificateButton, refreshButton);
         certificateActions.Dock =
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
@@ -311,20 +313,21 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         }
         finally { loadingCertificates = false; }
     }
-    internal static int ExistingClassCertificateId(DataTable records, string className)
+    internal static int ExistingClassCertificateId(DataTable records, string className, int enrollmentId=0)
     {
         if (!records.Columns.Contains("ClassName") || !records.Columns.Contains("RegularStudentCertificateId"))
             return 0;
         string normalizedClass = className.Trim();
         if (normalizedClass.Length == 0) return 0;
         return records.AsEnumerable()
+            .Where(row=>enrollmentId<=0||!records.Columns.Contains("EnrollmentId")||GetInt(row,"EnrollmentId")==enrollmentId)
             .Where(row => string.Equals(GetString(row, "ClassName").Trim(), normalizedClass, StringComparison.OrdinalIgnoreCase))
             .Select(row => GetInt(row, "RegularStudentCertificateId"))
             .DefaultIfEmpty(0).Max();
     }
     private void SelectCurrentClassCertificate()
     {
-        int id = ExistingClassCertificateId(certificateResults, className.Text);
+        int id = ExistingClassCertificateId(certificateResults, className.Text,student.SelectedRow is DataRow row?GetInt(row,"EnrollmentId"):0);
         if (id > 0) SelectCertificate(id);
     }
     private void FormatCertificateGrid()
@@ -353,6 +356,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         HideGridColumn("AdmissionId");
         HideGridColumn("IssuedByUserId");
         HideGridColumn("PreviousIssueId");
+        CertificateCollectionFlow.FormatGrid(Grid);
         CertificateRecordOrder.FitColumns(Grid);
     }
     private void HideGridColumn(string columnName)
@@ -425,17 +429,20 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             student.SelectedId > 0;
         bool hasSelection =
             selectedRegularStudentCertificateId > 0;
+        int enrollmentId=student.SelectedRow is DataRow selectedStudent?GetInt(selectedStudent,"EnrollmentId"):0;
         bool dirty = HasCertificateEdits;
         student.Enabled = !IsBusy;
         dateOfBirth.Enabled = false;
         dateOfBirth.ReadOnly = true;
-        certificateDate.Enabled = hasStudent && !hasSelection && !IsBusy;
+        bool editableCopy=hasSelection&&selectedIssueId>0&&!CertificateCollectionFlow.Locked(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId))&&selectedIssueId==certificateResults.AsEnumerable().Where(row=>GetInt(row,"RegularStudentCertificateId")==selectedRegularStudentCertificateId).Select(row=>GetInt(row,"RegularStudentCertificateIssueId")).DefaultIfEmpty(0).Max();
+        certificateDate.Enabled = hasStudent && (!hasSelection||editableCopy) && !IsBusy;
         className.Enabled = hasStudent && !creatingCertificate;
         createCertificateButton.Enabled =
             hasStudent && HasRecordedBirthDate() &&
-            !hasSelection && certificatesLoaded && ExistingClassCertificateId(certificateResults, className.Text) == 0 && !IsBusy && !reissue.Blocked;
+            ((!hasSelection && certificatesLoaded && string.Equals(GetSelectedStudentStatus(),"Active",StringComparison.OrdinalIgnoreCase) && ExistingClassCertificateId(certificateResults, className.Text,enrollmentId) == 0)||editableCopy) && !IsBusy && !reissue.Blocked;
+        createCertificateButton.Text=hasSelection?"Save Changes":UiText.Certificates.Create;
         updateCertificateButton.Enabled =
-            hasStudent && hasSelection && selectedIssueId>0 && !IsBusy && !reissue.Blocked;
+            hasStudent && hasSelection && selectedIssueId>0 && !IsBusy && !reissue.Blocked && (CertificateCollectionFlow.Locked(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId))||CertificateCollectionFlow.Voided(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId)));
         checkReissue.Visible=reissue.Blocked;
         checkReissue.Enabled=reissue.Blocked&&!IsBusy;
         newButton.Enabled = hasStudent && !creatingCertificate;
@@ -444,7 +451,11 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             hasStudent && !creatingCertificate;
         printButton.Enabled =
             hasSelection && selectedIssueId>0 && !dirty && !IsBusy && CurrentUser.HasPermission("Certificates.Print");
+        copyFlow.Available=!IsBusy&&!reissue.Blocked;
+        copyFlow.Apply(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId,createCertificateButton,printButton,dirty,certificateDate);
         if(reissue.Blocked){SetStatus("A certificate reissue needs checking. Use Check Reissue before issuing another copy.",true);return;}
+        if(hasSelection&&CertificateCollectionFlow.Voided(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId)))
+        {SetStatus("Historical cancelled copy — retained as read-only history.");return;}
         if (!hasStudent)
         {
             SetStatus(
@@ -454,8 +465,8 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         if (hasSelection)
         {
             SetStatus(
-                dirty ? "Save your changes before printing this certificate."
-                    : "Certificate ready to print.");
+                dirty ? "Save your changes before printing or collecting this certificate."
+                    : CertificateCollectionFlow.Locked(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId))?"Collected copy — details are locked. Print this copy or use Issue Again.":"Ready to print. Mark Collected after handing over the certificate.");
             return;
         }
         if (!HasRecordedBirthDate())
@@ -463,6 +474,8 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             SetStatus(MissingBirthDateMessage, true);
             return;
         }
+        if(!string.Equals(GetSelectedStudentStatus(),"Active",StringComparison.OrdinalIgnoreCase))
+        {SetStatus("A new Regular Student certificate requires an active enrollment. Saved copies remain available for printing.",true);return;}
         /* Finding 8 - say so up front when the student is not active: the certificate is proof of enrolment, and Create asks for a confirmation. */
         string status =
             GetSelectedStudentStatus();
@@ -488,6 +501,13 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     }
     private async Task CreateCertificate()
     {
+        if(selectedIssueId>0)
+        {
+            try { DatabaseHelper.ExecuteUser("UpdateCertificateCopyDate",DatabaseHelper.P("@Kind","Regular"),DatabaseHelper.Int("@CopyId",selectedIssueId),DatabaseHelper.Date("@CertificateDate",certificateDate.Value.Date),DatabaseHelper.P("@ExpectedVersion",CertificateCollectionFlow.Version(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId)));
+                int issue=selectedIssueId,record=selectedRegularStudentCertificateId;LoadCertificates(student.SelectedId);SelectCertificate(record,issue);Info("Certificate changes saved."); }
+            catch(Exception ex){Fail(ex);}
+            return;
+        }
         if (!ValidateRequiredInputs())
             return;
         /* Finding 12 - Info writes the status line, but the reload below calls Bind ("N record(s)") and ApplyWorkflowState after it. */
@@ -511,7 +531,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
                 "GetRegularStudentCertificateRecords",
                 DatabaseHelper.Int("@AdmissionId", student.SelectedId));
             if (IsDisposed) return;
-            int existingId = ExistingClassCertificateId(existing, className.Text);
+            int existingId = ExistingClassCertificateId(existing, className.Text,student.SelectedRow is DataRow selectedStudent?GetInt(selectedStudent,"EnrollmentId"):0);
             if (existingId > 0)
             {
                 LoadCertificates(student.SelectedId);
@@ -642,7 +662,9 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     private void StartNewCertificate()
     {
         if (creatingCertificate) return;
-        ClearForm();
+        ClearCertificateSelection(); ClearCertificateFields(); Grid.ClearSelection(); Grid.CurrentCell=null;
+        if(student.SelectedRow is DataRow row){className.Text=GetString(row,"ClassName");dateOfBirth.Text=GetDate(row,"DateOfBirth")?.ToString("dd MMM yyyy")??"Not on record";}
+        ApplyWorkflowState();
     }
     private void PrintSelected()
     {
@@ -689,6 +711,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     {
         if (creatingCertificate||student.SelectedId<=0)return;
         if(!ConfirmDraftDiscard("Discard the unsaved changes and refresh certificates?"))return;
+        try {CertificateCollectionFlow.RefreshStudent(student);}catch(Exception ex){Fail(ex);return;}
         if (selectedRegularStudentCertificateId > 0)
         {
             int id = selectedRegularStudentCertificateId;

@@ -42,7 +42,7 @@ internal static partial class Program
         type.GetField("savedClassName", flags)!.SetValue(page, "Ten");
         type.GetField("savedCertificateDate", flags)!.SetValue(page, DateTime.Today);
         Refresh();
-        Check(status.Text == "Certificate ready to print.", "Missing current birth details do not block an existing certificate's saved snapshot.");
+        Check(status.Text.Contains("Ready to print"), "Missing current birth details do not block an existing certificate's saved snapshot.");
         Check(!page.IsHandleCreated, "Search regression checks never start page database loaders.");
     }
 }

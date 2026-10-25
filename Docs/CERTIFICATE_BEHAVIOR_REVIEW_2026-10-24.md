@@ -1,4 +1,12 @@
-## Current Character Certificate workflow (migration 49)
+## Cancellation decision — schema 51
+
+The certificate cancellation feature is removed. It confused cancelling paperwork with deleting a record or undoing leaving/fees, and complicated replacement handling. Existing historical cancellation markers are retained read-only. See [the decision](Decisions/CERTIFICATE_CANCELLATION_REMOVED.md) and [current workflow](CERTIFICATE_WORKFLOW.md).
+
+## Current certificate workflow (migration 50)
+
+Collection is now implemented for every certificate type. Collected copies remain selectable for viewing and printing, but are permanently locked. Uncollected copies can be corrected on the form or voided; a new issue preserves the previous copy. Printing is available before physical collection. See [the final workflow](CERTIFICATE_WORKFLOW.md) for the operator flow and certificate-specific rules.
+
+## Earlier Character Certificate workflow (migration 49)
 
 Select a saved certificate, edit its entered details on the same form and use **Save Changes**. This updates the latest copy in place, keeps its collection state and does not add an issuance or ask for a correction reason. Earlier copies from Issue Again remain separate, read-only history.
 
