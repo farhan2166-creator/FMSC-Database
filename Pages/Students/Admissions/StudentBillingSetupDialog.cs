@@ -38,7 +38,7 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
     internal StudentBillingSetupDialog(int admissionId)
     {
         admission = admissionId;
-        Text = "Student Setup / Start Billing";
+        Text = "Activate Current Student";
         StartPosition = FormStartPosition.CenterParent;
         Size = new Size(AppScale.Scale(900), AppScale.Scale(760));
         MinimumSize = new Size(AppScale.Scale(800), AppScale.Scale(680));

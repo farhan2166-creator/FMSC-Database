@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--admission-actions"))
+        {
+            CheckAdmissionActions();
+            Console.WriteLine($"PASS: {checks} focused admission menu and draft-confirmation checks (no database connection).");
+            return;
+        }
         if(args.Contains("--collection-allocation"))
         {
             CheckCollectionAllocationPolicy();
