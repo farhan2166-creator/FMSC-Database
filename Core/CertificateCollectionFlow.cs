@@ -15,8 +15,8 @@ internal sealed class CertificateCollectionFlow(string kind)
     internal static byte[]? Version(DataTable rows,string key,int id) => Find(rows,key,id) is DataRow row && row.Table.Columns.Contains("ContentVersion") ? row["ContentVersion"] as byte[] : null;
     internal static void FormatGrid(DataGridView grid)
     {
-        foreach(string name in new[]{"ContentVersion","PreviousCertificateId","VoidedAt","EnrollmentId"})if(grid.Columns.Contains(name))grid.Columns[name].Visible=false;
-        foreach(var pair in new[]{("CollectionStatus","Status"),("CollectedAt","Collected On"),("CollectedBy","Collected By"),("VoidReason","Void Reason")})if(grid.Columns.Contains(pair.Item1))grid.Columns[pair.Item1].HeaderText=pair.Item2;
+        foreach(string name in new[]{"ContentVersion","PreviousCertificateId","VoidedAt","VoidReason","EnrollmentId"})if(grid.Columns.Contains(name))grid.Columns[name].Visible=false;
+        foreach(var pair in new[]{("CollectionStatus","Status"),("CollectedAt","Collected On"),("CollectedBy","Collected By")})if(grid.Columns.Contains(pair.Item1))grid.Columns[pair.Item1].HeaderText=pair.Item2;
     }
     internal static void RefreshStudent(StudentPicker picker)
     {

@@ -97,8 +97,8 @@ public static class UiText
     public static class Certificates
     {
         /// <summary>Window title of a new certificate.</summary>
-        public const string Create = "Create Certificate";
-        public const string New = "New Certificate";
+        public const string Create = "Create";
+        public const string New = "New";
         public const string NextStudent = "Next Student";
         public const string IssueAgainAction = "Issue Again";
         public const string MarkCollected = "Mark Collected";

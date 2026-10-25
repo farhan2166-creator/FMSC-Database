@@ -33,7 +33,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton clearButton = new() {
-        Text = UiText.Certificates.NextStudent,
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton issueAgainButton = new() {
@@ -252,7 +252,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
     }
     private void SelectSavedCertificate(int id)
     {
-        
+
         CertificateRecordOrder.Select(Grid, "DateOfBirthCertificateIssueId", id,
             index => LoadCertificateIssue(((DataRowView)Grid.Rows[index].DataBoundItem).Row));
     }

@@ -33,12 +33,8 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
         Text = "Save Changes",
         Width = AppScale.Scale(170)
     };
-    private readonly ModernButton newButton = new() {
-        Text = "New Certificate",
-        Width = AppScale.Scale(110)
-    };
     private readonly ModernButton clearButton = new() {
-        Text = "Next Staff Member",
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton printButton = new() {
@@ -65,8 +61,6 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
             (_, _) => CreateCertificate();
         updateCertificateButton.Click +=
             (_, _) => UpdateCertificate();
-        newButton.Click +=
-            (_, _) => StartNewCertificate();
         clearButton.Click +=
             (_, _) => ClearForm();
         printButton.Click +=
@@ -124,7 +118,7 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
             CertificateUi.Field("Subject Taught", subjectTaught, true), 1, 1);
         details.Content.Controls.Add(fields);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, newButton, clearButton);
+            CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, clearButton);
         certButtonRow.Dock =
             DockStyle.Bottom;
         details.Content.Controls.Add(certButtonRow);
@@ -367,9 +361,6 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
         updateCertificateButton.Enabled =
             hasStaff &&
             hasSelection && HasCertificateEdits;
-        newButton.Enabled =
-            hasStaff &&
-            hasSelection;
         clearButton.Enabled = true;
         refreshButton.Enabled =
             hasStaff;
@@ -386,7 +377,7 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
         if (hasSelection)
         {
             SetStatus(
-                "Editing certificate. Use Save Changes to save, or New for another certificate.");
+                "Editing certificate. Use Save Changes to save, or New to clear the form.");
             return;
         }
         SetStatus(
@@ -523,21 +514,6 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
             return false;
         }
         return true;
-    }
-    private void StartNewCertificate()
-    {
-        ClearCertificateSelection();
-        ClearCertificateFields();
-        Grid.ClearSelection();
-        try
-        {
-            Grid.CurrentCell = null;
-        }
-        catch (Exception nonFatalException46)
-        {
-            FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException46, "RegularLecturerCertificatePage: StartNewCertificate fallback");
-        }
-        ApplyWorkflowState();
     }
     private void PrintSelected()
     {

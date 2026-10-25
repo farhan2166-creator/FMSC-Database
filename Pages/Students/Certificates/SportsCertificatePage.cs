@@ -49,12 +49,8 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         Text = "Save Changes",
         Width = AppScale.Scale(170)
     };
-    private readonly ModernButton newButton = new() {
-        Text = "New Certificate",
-        Width = AppScale.Scale(110)
-    };
     private readonly ModernButton clearButton = new() {
-        Text = UiText.Certificates.NextStudent,
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton printButton = new() {
@@ -90,8 +86,6 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         createCertificateButton.Click += async (_, _) => await RunCreateCertificateAsync();
         updateCertificateButton.Click +=
             (_, _) => UpdateCertificate();
-        newButton.Click +=
-            (_, _) => StartNewCertificate();
         clearButton.Click +=
             (_, _) => ClearForm();
         printButton.Click +=
@@ -158,7 +152,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         fields.Controls.Add(suggestedField,0,2);fields.SetColumnSpan(suggestedField,2);
         details.Content.Controls.Add(fields);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, newButton, clearButton);
+            CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, clearButton);
         certButtonRow.Dock =
             DockStyle.Bottom;
         details.Content.Controls.Add(certButtonRow);
@@ -263,7 +257,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     }
     private void SelectSavedCertificate(int id)
     {
-        
+
         CertificateRecordOrder.Select(Grid, "SportsCertificateId", id,
             index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
     }
@@ -353,7 +347,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         student.Enabled = Grid.Enabled = !creatingCertificate;
         if (creatingCertificate)
         {
-            createCertificateButton.Enabled = updateCertificateButton.Enabled = newButton.Enabled =
+            createCertificateButton.Enabled = updateCertificateButton.Enabled =
                 clearButton.Enabled = refreshButton.Enabled = printButton.Enabled = false;
             return;
         }
@@ -371,9 +365,6 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         updateCertificateButton.Enabled =
             hasStudent &&
             hasSelection && HasCertificateEdits;
-        newButton.Enabled =
-            hasStudent &&
-            hasSelection;
         clearButton.Enabled = true;
         refreshButton.Enabled =
             hasStudent;
@@ -391,7 +382,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
         if (hasSelection)
         {
             SetStatus(
-                "Editing sports certificate. Use Save Changes to save, or New for another.");
+                "Editing sports certificate. Use Save Changes to save, or New to clear the form.");
             return;
         }
         SetStatus("Enter sport and performance to create. Select a saved certificate to edit or print.");
@@ -558,22 +549,6 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
             return false;
         }
         return true;
-    }
-    private void StartNewCertificate()
-    {
-        if (creatingCertificate) return;
-        ClearCertificateFields();
-        ClearCertificateSelection();
-        Grid.ClearSelection();
-        try
-        {
-            Grid.CurrentCell = null;
-        }
-        catch (Exception nonFatalException70)
-        {
-            FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException70, "SportsCertificatePage: StartNewCertificate fallback");
-        }
-        ApplyWorkflowState();
     }
     private void PrintSelected()
     {

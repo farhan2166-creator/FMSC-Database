@@ -47,12 +47,8 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         Text = "Save Changes",
         Width = AppScale.Scale(170)
     };
-    private readonly ModernButton newButton = new() {
-        Text = "New Certificate",
-        Width = AppScale.Scale(110)
-    };
     private readonly ModernButton clearButton = new() {
-        Text = "Next Staff Member",
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton printButton = new() {
@@ -92,8 +88,6 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         };
         updateCertificateButton.Click +=
             (_, _) => UpdateCertificate();
-        newButton.Click +=
-            (_, _) => StartNewCertificate();
         clearButton.Click +=
             (_, _) => ClearForm();
         printButton.Click +=
@@ -158,7 +152,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             CertificateUi.Field("Purpose", purpose, true), 0, 3);
         details.Content.Controls.Add(fields);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, newButton, clearButton);
+            CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, clearButton);
         certButtonRow.Dock =
             DockStyle.Bottom;
         details.Content.Controls.Add(certButtonRow);
@@ -417,9 +411,6 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         updateCertificateButton.Enabled =
             !recoveryBlocked&&hasStaff &&
             hasSelection && HasCertificateEdits;
-        newButton.Enabled =
-            !recoveryBlocked&&hasStaff &&
-            hasSelection;
         clearButton.Enabled = !recoveryBlocked;
         refreshButton.Enabled =
             hasStaff&&!recoveryBlocked;
@@ -441,7 +432,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
         if (hasSelection)
         {
             SetStatus(
-                "Editing certificate. Use Update Certificate to save, or New for another certificate.");
+                "Editing certificate. Use Update Certificate to save, or New to clear the form.");
             return;
         }
         SetStatus(
@@ -668,22 +659,6 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
             return false;
         }
         return true;
-    }
-    private void StartNewCertificate()
-    {
-        if(IsBusy||recoveryBlocked||!ConfirmDiscard())return;
-        ClearCertificateSelection();
-        ClearCertificateFields();
-        Grid.ClearSelection();
-        try
-        {
-            Grid.CurrentCell = null;
-        }
-        catch (Exception nonFatalException44)
-        {
-            FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException44, "BankAccountOpeningCertificatePage: StartNewCertificate fallback");
-        }
-        ApplyWorkflowState();
     }
     private void PrintSelected()
     {

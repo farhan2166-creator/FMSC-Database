@@ -4,8 +4,8 @@ Applies to Character, Date of Birth, Regular Student, School Leaving, College Le
 
 ## Normal counter flow
 
-1. Select the student or staff member. Open an existing certificate when the request is for that saved copy, or choose **New Certificate** for a different request where that certificate type allows it.
-2. Complete the certificate details and choose **Create Certificate**. Required recorded birth dates must be available for DOB, Regular Student, Provisional and Leaving certificates; Leaving also requires the admission date. Refresh reloads corrected date information.
+1. Select the student or staff member. Open an existing certificate when the request is for that saved copy. **New** clears the selected person and certificate details so another request can start. The separate New Certificate action has been removed.
+2. Complete the certificate details and choose **Create**. Required recorded birth dates must be available for DOB, Regular Student, Provisional and Leaving certificates; Leaving also requires the admission date. Refresh reloads corrected date information.
 3. A saved, uncollected copy is ready for **Print**. Review the preview and print the paper. Printing does not collect it, create another copy, or consume a Leaving duplicate allowance.
 4. Correct entered details on the same form using **Save Changes** while the copy is uncollected. Personal-record corrections belong in Admission or Staff.
 5. Hand over the paper and choose **Mark Collected**. Enter the collector's name. The collection prompt explains that this permanently locks the copy.

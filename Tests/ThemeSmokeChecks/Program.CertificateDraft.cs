@@ -31,8 +31,8 @@ internal static partial class Program
         type.GetMethod("ApplyCertificateRow", flags)!.Invoke(page, new object[] { certificates.Rows[0] });
         Check(subject.Text == "Previously certified subject" && !page.HasUnsavedChanges,
             "Opening an existing certificate preserves its issued wording instead of replacing it with current specialization");
-        Invoke("StartNewCertificate");
-        Check(subject.Text == "Chemistry, Biology", "New after an existing certificate returns to the current staff specialization");
+        Invoke("ClearForm");
+        Check(picker.SelectedId==0 && subject.Text=="", "New clears the staff selection and saved-certificate details");
         picker.SetStaff(staffRows.Rows[1]); Invoke("ClearCertificateFields");
         Check(subject.Text == "Mathematics", "Changing staff uses the new staff member's specialization");
         picker.SetStaff(staffRows.Rows[2]); Invoke("ClearCertificateFields");
@@ -115,29 +115,24 @@ internal static partial class Program
     private static void CheckCertificateNewDiscard()
     {
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
-        bool allow=false;int regularAsks=0,bankAsks=0;
-        using var regular=new FMSC_SMS.Pages.Students.Certificates.RegularStudentCertificatePage(false,_=>{regularAsks++;return allow;},_=>new System.Data.DataTable());
-        using var bank=new FMSC_SMS.Pages.Staff.Certificates.BankAccountOpeningCertificatePage(false,_=>{bankAsks++;return allow;});
+        using var regular=new FMSC_SMS.Pages.Students.Certificates.RegularStudentCertificatePage(false,readCertificates:_=>new System.Data.DataTable());
+        using var bank=new FMSC_SMS.Pages.Staff.Certificates.BankAccountOpeningCertificatePage(false);
         var regularType=regular.GetType();var bankType=bank.GetType();
-        using var students=new System.Data.DataTable();students.Columns.Add("AdmissionId",typeof(int));students.Columns.Add("ClassName");students.Columns.Add("Status");students.Rows.Add(41,"Class 5","Active");
-        var student=(StudentPicker)regularType.GetField("student",flags)!.GetValue(regular)!;student.SetStudent(students.Rows[0]);
-        ((ModernTextBox)regularType.GetField("className",flags)!.GetValue(regular)!).Text="Class 5";
-        regularType.GetField("selectedRegularStudentCertificateId",flags)!.SetValue(regular,7);
-        regularType.GetField("savedClassName",flags)!.SetValue(regular,"Class 5");regularType.GetField("savedCertificateDate",flags)!.SetValue(regular,DateTime.Today);
-        var date=(ModernDatePicker)regularType.GetField("certificateDate",flags)!.GetValue(regular)!;date.Value=DateTime.Today.AddDays(-1);
-        ((StaffPicker)bankType.GetField("staff",flags)!.GetValue(bank)!).SetStaff(101,"Fixture staff");bankType.GetField("selectedBankAccountOpeningCertificateId",flags)!.SetValue(bank,8);
-        var name=(ModernTextBox)bankType.GetField("bankName",flags)!.GetValue(bank)!;name.Text="Saved bank";bankType.GetMethod("CaptureBaseline",flags)!.Invoke(bank,null);bankType.GetField("savedEditorSnapshot",flags)!.SetValue(bank,bankType.GetMethod("EditorSnapshot",flags)!.Invoke(bank,null));name.Text="Edited bank";
-        regularType.GetMethod("StartNewCertificate",flags)!.Invoke(regular,null);bankType.GetMethod("StartNewCertificate",flags)!.Invoke(bank,null);
-        Check(regularAsks==1&&student.SelectedId==41&&date.Value.Date==DateTime.Today.AddDays(-1)&&(int)regularType.GetField("selectedRegularStudentCertificateId",flags)!.GetValue(regular)! ==7,"Regular New/Stay retains the exact saved record, student and edited date");
-        Check(bankAsks==1&&name.Text=="Edited bank"&&(int)bankType.GetField("selectedBankAccountOpeningCertificateId",flags)!.GetValue(bank)! ==8,"Bank New/Stay retains the saved record and edited fields");
-        bankType.GetField("recoveryBlocked",flags)!.SetValue(bank,true);bankType.GetMethod("StartNewCertificate",flags)!.Invoke(bank,null);
-        Check(bankAsks==1&&name.Text=="Edited bank","Unresolved bank creation is an unconditional New refusal before any discard question");bankType.GetField("recoveryBlocked",flags)!.SetValue(bank,false);
-        regularType.GetField("creatingCertificate",flags)!.SetValue(regular,true);regularType.GetMethod("StartNewCertificate",flags)!.Invoke(regular,null);
-        Check(regularAsks==1&&student.SelectedId==41,"An active regular certificate save cannot be overridden with a discard answer");regularType.GetField("creatingCertificate",flags)!.SetValue(regular,false);
-        allow=true;regularType.GetMethod("StartNewCertificate",flags)!.Invoke(regular,null);bankType.GetMethod("StartNewCertificate",flags)!.Invoke(bank,null);
-        Check(regularAsks==2&&bankAsks==2&&!regular.HasUnsavedChanges&&!bank.HasUnsavedChanges&&student.SelectedId==0&&name.Text=="","Accepted New discard starts clean editors without saving the previous edits");
-        regularType.GetMethod("StartNewCertificate",flags)!.Invoke(regular,null);bankType.GetMethod("StartNewCertificate",flags)!.Invoke(bank,null);
-        Check(regularAsks==2&&bankAsks==2&&!regular.IsHandleCreated&&!bank.IsHandleCreated,"Clean and repeated New actions need no prompt, SQL write or profile recovery file");
+        var student=(StudentPicker)regularType.GetField("student",flags)!.GetValue(regular)!;
+        var staff=(StaffPicker)bankType.GetField("staff",flags)!.GetValue(bank)!;
+        student.SetStudent(41,"Student");staff.SetStaff(101,"Staff");
+        void ClearRegular()=>regularType.GetMethod("ClearForm",flags)!.Invoke(regular,new object[]{true});
+        void ClearBank()=>bankType.GetMethod("ClearForm",flags)!.Invoke(bank,null);
+        bankType.GetField("recoveryBlocked",flags)!.SetValue(bank,true);ClearBank();
+        Check(staff.SelectedId==101,"New cannot clear a staff certificate while recovery is unresolved");
+        bankType.GetField("recoveryBlocked",flags)!.SetValue(bank,false);
+        regularType.GetField("creatingCertificate",flags)!.SetValue(regular,true);ClearRegular();
+        Check(student.SelectedId==41,"New cannot clear a student certificate while saving");
+        regularType.GetField("creatingCertificate",flags)!.SetValue(regular,false);
+        ClearRegular();ClearBank();
+        Check(student.SelectedId==0&&staff.SelectedId==0,"New clears the selected person and certificate details");
+        ClearRegular();ClearBank();
+        Check(!regular.IsHandleCreated&&!bank.IsHandleCreated,"Repeated New actions need no database connection");
     }
 
 }

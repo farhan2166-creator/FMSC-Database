@@ -71,12 +71,8 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         Text = "Save Changes",
         Width = AppScale.Scale(170)
     };
-    private readonly ModernButton newButton = new() {
-        Text = "New Certificate",
-        Width = AppScale.Scale(110)
-    };
     private readonly ModernButton clearButton = new() {
-        Text = UiText.Certificates.NextStudent,
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton printButton = new() {
@@ -132,8 +128,6 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         createCertificateButton.Click += async (_, _) => await RunCreateCertificateAsync();
         updateCertificateButton.Click +=
             (_, _) => UpdateCertificate();
-        newButton.Click +=
-            (_, _) => StartNewCertificate();
         clearButton.Click +=
             (_, _) => ClearForm();
         printButton.Click +=
@@ -360,7 +354,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         }
         editorBody.SizeChanged += (_, _) => ReflowFields();
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, newButton, clearButton);
+            CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, clearButton);
         certButtonRow.Dock =
             DockStyle.Bottom;
         details.Content.Controls.Add(editorBody);
@@ -369,7 +363,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         var records =
             HumanUi.Card(
                 "Provisional Certificates",
-                "Select an existing certificate to update or reprint it. Use New Certificate for another exam result.");
+                "Select an existing certificate to update or reprint it. Use New to start another request.");
         var certificateActions =
             CertificateButtonRow.Create(printButton, copyFlow.Collect, copyFlow.IssueAgain, refreshButton);
         certificateActions.Dock =
@@ -663,7 +657,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
     }
     private void SelectSavedCertificate(int id)
     {
-        
+
         CertificateRecordOrder.Select(Grid, "ProvisionalCertificateId", id,
             index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
     }
@@ -886,7 +880,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         student.Enabled = Grid.Enabled = !creatingCertificate;
         if (creatingCertificate)
         {
-            createCertificateButton.Enabled = updateCertificateButton.Enabled = newButton.Enabled =
+            createCertificateButton.Enabled = updateCertificateButton.Enabled =
                 clearButton.Enabled = refreshButton.Enabled = printButton.Enabled = false;
             return;
         }
@@ -919,9 +913,6 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         updateCertificateButton.Enabled =
             hasStudent &&
             hasSelection && HasCertificateEdits && validEditor;
-        newButton.Enabled =
-            hasStudent &&
-            hasSelection;
         clearButton.Enabled = true;
         refreshButton.Enabled =
             hasStudent;
@@ -940,7 +931,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         if (hasSelection)
         {
             SetStatus(
-                "Editing certificate. Use Save Changes to save, or New for another certificate.");
+                "Editing certificate. Use Save Changes to save, or New to clear the form.");
             return;
         }
         SetStatus(
@@ -1200,22 +1191,6 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         }
         return true;
     }
-    private void StartNewCertificate()
-    {
-        if (creatingCertificate) return;
-        ClearCertificateSelection();
-        ClearCertificateFields();
-        Grid.ClearSelection();
-        try
-        {
-            Grid.CurrentCell = null;
-        }
-        catch (Exception nonFatalException66)
-        {
-            FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException66, "ProvisionalCertificatePage: StartNewCertificate fallback");
-        }
-        ApplyWorkflowState();
-    }
     private void PrintSelected()
     {
         if (creatingCertificate) return;
@@ -1325,7 +1300,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
     private void ClearForm()
     {
         if (creatingCertificate) return;
-        if (HasCertificateEdits && !Confirm("Discard the unsaved changes and choose another student?", "Next Student")) return;
+        if (HasCertificateEdits && !Confirm("Discard the unsaved changes and choose another student?", "New")) return;
         suppressStudentChanged = true;
         try
         {

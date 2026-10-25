@@ -32,12 +32,8 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         Text = "Save Changes",
         Width = AppScale.Scale(170)
     };
-    private readonly ModernButton newButton = new() {
-        Text = "New Certificate",
-        Width = AppScale.Scale(110)
-    };
     private readonly ModernButton clearButton = new() {
-        Text = UiText.Certificates.NextStudent,
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton printButton = new() {
@@ -59,8 +55,6 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         createCertificateButton.Click += async (_, _) => await RunCreateCertificateAsync();
         updateCertificateButton.Click +=
             (_, _) => UpdateCertificate();
-        newButton.Click +=
-            (_, _) => StartNewCertificate();
         clearButton.Click +=
             (_, _) => ClearForm();
         printButton.Click +=
@@ -121,7 +115,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
             CertificateUi.Field(UiText.Certificates.Date, certificateDate, true), 1, 0);
         details.Content.Controls.Add(fields);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, newButton, clearButton);
+            CertificateButtonRow.Create(createCertificateButton, updateCertificateButton, clearButton);
         certButtonRow.Dock =
             DockStyle.Bottom;
         details.Content.Controls.Add(certButtonRow);
@@ -223,7 +217,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     }
     private void SelectSavedCertificate(int id)
     {
-        
+
         CertificateRecordOrder.Select(Grid, "NoObjectionCertificateId", id,
             index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
     }
@@ -307,7 +301,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         student.Enabled = Grid.Enabled = !creatingCertificate;
         if (creatingCertificate)
         {
-            createCertificateButton.Enabled = updateCertificateButton.Enabled = newButton.Enabled =
+            createCertificateButton.Enabled = updateCertificateButton.Enabled =
                 clearButton.Enabled = refreshButton.Enabled = printButton.Enabled = false;
             return;
         }
@@ -323,9 +317,6 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         updateCertificateButton.Enabled =
             hasStudent &&
             hasSelection && HasCertificateEdits;
-        newButton.Enabled =
-            hasStudent &&
-            hasSelection;
         clearButton.Enabled = true;
         refreshButton.Enabled =
             hasStudent;
@@ -343,7 +334,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
         if (hasSelection)
         {
             SetStatus(
-                "Editing NOC. Use Save Changes to save, or New for another certificate.");
+                "Editing NOC. Use Save Changes to save, or New to clear the form.");
             return;
         }
         SetStatus("Confirm the date to create the NOC. Select a saved NOC to edit or print.");
@@ -478,23 +469,6 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
             return false;
         }
         return true;
-    }
-    private void StartNewCertificate()
-    {
-        if (creatingCertificate) return;
-        ClearCertificateSelection();
-        certificateDate.Value =
-            DateTime.Today;
-        Grid.ClearSelection();
-        try
-        {
-            Grid.CurrentCell = null;
-        }
-        catch (Exception nonFatalException64)
-        {
-            FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException64, "NoObjectionCertificatePage: StartNewCertificate fallback");
-        }
-        ApplyWorkflowState();
     }
     private void PrintSelected()
     {

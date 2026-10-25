@@ -53,12 +53,8 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         Text = UiText.Certificates.IssueAgainAction,
         Width = AppScale.Scale(170)
     };
-    private readonly ModernButton newButton = new() {
-        Text = UiText.Certificates.New,
-        Width = AppScale.Scale(110)
-    };
     private readonly ModernButton clearButton = new() {
-        Text = UiText.Certificates.NextStudent,
+        Text = UiText.Certificates.New,
         Width = AppScale.Scale(120)
     };
     private readonly ModernButton printButton = new() {
@@ -114,8 +110,6 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         updateCertificateButton.Click += async (_, _) => await ReissueCertificateAsync(false);
         checkReissue.Click += async (_, _) => await ReissueCertificateAsync(true);
         if(initialize)Defer(()=>{reissue.Load();ApplyWorkflowState();});
-        newButton.Click +=
-            (_, _) => StartNewCertificate();
         clearButton.Click +=
             (_, _) => ClearForm();
         printButton.Click +=
@@ -182,7 +176,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             CertificateUi.Field("Class (School Record)", className, true), 1, 1);
         details.Content.Controls.Add(fields);
         var certButtonRow =
-            CertificateButtonRow.Create(createCertificateButton, newButton, clearButton, checkReissue);
+            CertificateButtonRow.Create(createCertificateButton, clearButton, checkReissue);
         certButtonRow.Dock =
             DockStyle.Bottom;
         details.Content.Controls.Add(certButtonRow);
@@ -445,7 +439,6 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             hasStudent && hasSelection && selectedIssueId>0 && !IsBusy && !reissue.Blocked && (CertificateCollectionFlow.Locked(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId))||CertificateCollectionFlow.Voided(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId)));
         checkReissue.Visible=reissue.Blocked;
         checkReissue.Enabled=reissue.Blocked&&!IsBusy;
-        newButton.Enabled = hasStudent && !creatingCertificate;
         clearButton.Enabled = !creatingCertificate;
         refreshButton.Enabled =
             hasStudent && !creatingCertificate;
@@ -658,13 +651,6 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             GridSelectionChanged(Grid,EventArgs.Empty);
             return;
         }
-    }
-    private void StartNewCertificate()
-    {
-        if (creatingCertificate) return;
-        ClearCertificateSelection(); ClearCertificateFields(); Grid.ClearSelection(); Grid.CurrentCell=null;
-        if(student.SelectedRow is DataRow row){className.Text=GetString(row,"ClassName");dateOfBirth.Text=GetDate(row,"DateOfBirth")?.ToString("dd MMM yyyy")??"Not on record";}
-        ApplyWorkflowState();
     }
     private void PrintSelected()
     {
