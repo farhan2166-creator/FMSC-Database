@@ -35,7 +35,7 @@ internal static partial class FamilyReceiptReport
         }
         foreach(var child in children)
         {
-            var identity=child.First();Add(identity,$"{identity["StudentName"]} · {identity["AdmissionNumberText"]}",0,"Student");
+            var identity=child.First();Add(identity,$"{identity["AdmissionNumberText"]} · {identity["StudentName"]}",0,"Student");
             foreach(var month in child.GroupBy(row=>Convert.ToString(row["FeePeriod"])))
             {
                 if(!string.IsNullOrWhiteSpace(month.Key)) Add(identity,"  "+month.Key,0,"Month");
