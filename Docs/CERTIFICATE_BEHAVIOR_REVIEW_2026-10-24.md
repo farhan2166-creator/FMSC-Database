@@ -1,3 +1,13 @@
+## Current Character Certificate workflow (migration 49)
+
+Select a saved certificate, edit its entered details on the same form and use **Save Changes**. This updates the latest copy in place, keeps its collection state and does not add an issuance or ask for a correction reason. Earlier copies from Issue Again remain separate, read-only history.
+
+The Academic Year dropdown shows the resulting passing year: the selected year’s end year minus one. Future passing years are unavailable. Conduct offers Good, Very Good and Excellent. Both choices are validated by the database and stored in the existing certificate fields.
+
+Issue Again creates another copy with reviewed, current Admission names and gender, retaining the saved exam type, passing year, roll number and conduct. Printing always reads the selected saved copy.
+
+The review below describes the earlier migration-47 workflow; its separate correction/replacement dialog has been retired for Character Certificate.
+
 # Certificate identity, correction and reprint review
 
 Reviewed the application pages, RDLC field bindings and local schema-46 stored procedures. Character-certificate changes are delivered in migration 47. No student placement or lifecycle data changes are required for those changes.

@@ -1688,6 +1688,26 @@
       "precision": 1,
       "scale": 0,
       "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "CreateCharacterCertificate",
+      "name": "@AcademicYearId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveCharacterCertificateOperation",
+      "name": "@AcademicYearId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
     }
   ]
 }
