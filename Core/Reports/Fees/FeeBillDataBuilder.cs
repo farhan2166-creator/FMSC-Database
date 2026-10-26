@@ -54,7 +54,7 @@ internal static partial class FeeBillDataBuilder
                 {
                     string name=FeeDocumentData.FeeName(Convert.ToString(fee["FeeTypeName"])??"");
                     bool visit=charges.Columns.Contains("IsVisitBill")&&Convert.ToBoolean(fee["IsVisitBill"]);
-                    if(visit&&Convert.ToBoolean(fee["IsCarriedForward"])&&Convert.ToDecimal(fee["OpeningBalance"])>0m)name+=" (outstanding)";
+                    if(visit&&Convert.ToBoolean(fee["IsCarriedForward"])&&Convert.ToDecimal(fee["OpeningBalance"])>0m)name+=" - Due";
                     AddLine(name,Convert.ToDecimal(fee["Due"]),"Fee",month.Key.Year==1?"One-time fees":month.Key.ToString("MMM yyyy"),fee);
                     if(visit)
                         foreach(var (field,caption) in new[]{("RateAdjustment","Fee adjustment"),("DiscountReversed","Discount withdrawn"),("SettlementAdjustment","Payment adjustment")})

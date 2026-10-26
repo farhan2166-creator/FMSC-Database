@@ -24,11 +24,12 @@ internal static class FeeBillDocuments
     {
         using var saved=await IssueAsync(data,primaryAdmission,students);
         if(owner?.IsDisposed==true) return;
-        ShowSaved(owner,saved.Rows[0]);
+        await ShowSavedAsync(owner,saved.Rows[0]);
     }
 
     internal static async Task<DataTable> IssueAsync(DataTable data,int primaryAdmission,int[] students)
     {
+        await FeeDocumentParents.ApplyAsync(data);
         var saved=await DatabaseHelper.QueryUserAsync("IssueFeeBill",
             DatabaseHelper.Int("@PrimaryAdmissionId",primaryAdmission),
             DatabaseHelper.P("@StudentIdsJson",System.Text.Json.JsonSerializer.Serialize(students.Distinct().OrderBy(id=>id))),
@@ -37,9 +38,11 @@ internal static class FeeBillDocuments
         return saved;
     }
 
-    internal static void ShowSaved(Form? owner,DataRow saved)
+    internal static async Task ShowSavedAsync(Form? owner,DataRow saved)
     {
         using var data=ReadSavedData(saved);
+        await FeeDocumentParents.ApplyAsync(data);
+        if(owner?.IsDisposed==true)return;
         if(data.Columns.Contains("FamilyRowKind"))FamilyBillReport.ShowData(owner,data);
         else StudentBillReport.ShowData(owner,data);
     }
@@ -74,7 +77,7 @@ internal static class FeeBillDocuments
         grid.CellFormatting+=(_,e)=> {if(e.ColumnIndex==2 && e.Value is string kind)e.Value=kind=="FB"?"Family Fee Bill":"Student Fee Bill";};
         grid.DataSource=bills;
         var print=new ModernButton {Text="Reprint Bill",ThemeRole="Primary",Enabled=bills.Rows.Count>0};
-        print.Click+=(_,_)=>{if(Current()&&grid.CurrentRow?.DataBoundItem is DataRowView row)ShowSaved(dialog,row.Row);};
+        print.Click+=async(_,_)=>{if(Current()&&grid.CurrentRow?.DataBoundItem is DataRowView row)await ShowSavedAsync(dialog,row.Row);};
         var close=new ModernButton {Text="Close",DialogResult=DialogResult.Cancel};dialog.CancelButton=close;
         var card=HumanUi.Card("Issued Fee Bills","Reprint the saved bill with its original number, date and charges.");
         card.Content.Controls.Add(grid);

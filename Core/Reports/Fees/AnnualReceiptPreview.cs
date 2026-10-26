@@ -90,6 +90,8 @@ internal static class AnnualReceiptPreview
                 foreach(var row in receipts.AsEnumerable().Where(row=>row.Field<int>("ReceiptPageKey")==original.Field<int>("ReceiptPageKey")))
                     foreach(string field in new[]{"BalanceRemaining","OriginalPaid","RefundAmount","CorrectionAmount","ReversedAmount","NetPaid","ShowAdjustments","ReceiptStatus","ShowBalance"})row[field]=original[field];
             if(!Current())return;
+            await FeeDocumentParents.ApplyAsync(receipts,"Fees.Statement.View");
+            if(!Current())return;
             StudentReceiptReport.Show(owner,receipts,annualSheet:true);
 
     }

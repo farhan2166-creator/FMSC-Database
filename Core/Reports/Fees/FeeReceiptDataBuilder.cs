@@ -79,7 +79,7 @@ internal static partial class FeeReceiptDataBuilder
                         decimal rate=Money(line,"RateAdjustment"),reversed=Money(line,"DiscountReversed"),settlement=Money(line,"SettlementAdjustment"),amount=Money(line,"BaseAmount");
                         bool carried=Convert.ToBoolean(line["IsCarriedForward"])&&Money(line,"OpeningBalance")>0m;
                         if(amount!=0m||rate==0m&&reversed==0m&&settlement==0m)
-                            Add((family?"    ":"")+fee+(carried?" (outstanding)":""),month.Key,amount,"Fee",line);
+                            Add((family?"    ":"")+fee+(carried?" - Due":""),month.Key,amount,"Fee",line);
                         if(rate!=0m)Add("Fee adjustment - "+fee,month.Key,rate,"Fee",line);
                         if(reversed!=0m)Add("Discount withdrawn - "+fee,month.Key,reversed,"Fee",line);
                         if(settlement!=0m)Add((settlement>0m?"Refund / payment adjustment - ":"Payment / credit adjustment - ")+fee,month.Key,settlement,"Fee",line);
