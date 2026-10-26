@@ -747,14 +747,16 @@
           <Paragraph>
             <TextRuns>
               <TextRun>
-                <Value> Conduct and Moral Character was found </Value>
+                <Value>Conduct and Moral Character was found </Value>
                 <Style>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
                 </Style>
               </TextRun>
             </TextRuns>
-            <Style />
+            <Style>
+              <TextAlign>Left</TextAlign>
+            </Style>
           </Paragraph>
         </Paragraphs>
         <Top>3.79167in</Top>
