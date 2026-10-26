@@ -27,7 +27,6 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
     private readonly ModernButton review = new() { Text = "Preview Activation", ThemeRole = "Secondary" },
         activate = new() { Text = "Confirm & Activate", ThemeRole = "Primary", Enabled = false },
         reloadFees = new() { Text = "Load Class Fees", ThemeRole = "Secondary" },
-        history = new() { Text = "Placement History", ThemeRole = "Secondary" },
         close = new() { Text = "Close", DialogResult = DialogResult.Cancel };
     private readonly TableLayoutPanel root;
     private DataTable placements = new(), feeRows = new();
@@ -53,6 +52,7 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
         var fields = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2 };
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         void Field(string label, Control input, int col, int row) { var field = HumanUi.Field(label, input, true); field.Height = AppMetrics.FieldRowHeight; fields.Controls.Add(field, col, row); }
+        studentName.Enabled = false; fatherName.Enabled = false;
         Field("Student name", studentName, 0, 0); Field("Father name", fatherName, 1, 0);
         Field("Academic year", year, 0, 1); Field("Campus / Class / Section", placement, 1, 1);
         Field("Placement start", start, 0, 2); Field("Billing starts from", billing, 1, 2);
@@ -63,7 +63,7 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
         remarksField.Height = AppMetrics.FieldRowHeight;
         fields.Controls.Add(remarksField, 1, 3);
         root.Controls.Add(fields, 0, 1);
-        var feeTools = HumanUi.ButtonRow(reloadFees, history);
+        var feeTools = HumanUi.ButtonRow(reloadFees);
         feeTools.Dock = DockStyle.Fill;
         feeTools.Margin = new Padding(0, 0, 0, UiDesignSystem.Spacing.Sm);
         root.Controls.Add(feeTools, 0, 2);
@@ -87,12 +87,6 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
         fees.DataError += (_, e) => { e.ThrowException = false; Reset(); impact.Text = "Enter valid whole-rupee amounts and discounts."; };
         reloadFees.Click += async (_, _) => await LoadFeesAsync(false);
         review.Click += async (_, _) => await ReviewAsync(); activate.Click += async (_, _) => await ActivateAsync();
-        history.Click += async (_, _) => {
-            if (busy) return;
-            using var dialog = new StudentPlacementCorrectionDialog(admission, studentName.Text);
-            dialog.ShowDialog(this);
-            if (dialog.Changed) { Changed = true; await LoadAsync(); }
-        };
         Shown += async (_, _) => await LoadAsync();
         FinanceHelp.Attach(this,start,FinanceHelp.Topic.PlacementStart);
         FinanceHelp.Attach(this,billing,FinanceHelp.Topic.BillingStart);

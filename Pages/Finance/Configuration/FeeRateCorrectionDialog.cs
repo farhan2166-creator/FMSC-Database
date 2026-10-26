@@ -23,6 +23,7 @@ internal sealed class FeeRateCorrectionDialog : ApplicationWindowForm
         scopeLabel = scope;
         Text = "Apply Fee Matrix Rates to Existing Bills"; StartPosition = FormStartPosition.CenterParent;
         Size = new Size(AppScale.Scale(1050), AppScale.Scale(680)); MinimumSize = new Size(760, 500);
+        WindowState = FormWindowState.Maximized;
         from.Value = through.Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
         from.Format = through.Format = DateTimePickerFormat.Custom; from.CustomFormat = through.CustomFormat = "MMMM yyyy";
         disposition.Items.AddRange(new object[] { "Keep excess payment as advance", "Refund the excess payment" }); disposition.SelectedIndex = 0;
