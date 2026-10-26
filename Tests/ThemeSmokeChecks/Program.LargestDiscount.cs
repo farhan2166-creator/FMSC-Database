@@ -31,7 +31,7 @@ internal static partial class Program
         var all = Allocate(3800);
         Check(all[2] == 2500 && all[3] == 900 && all[1] == 400, "Discount covers descending fee balances exactly");
         Check(Allocate(0).Count == 0, "Zero discount does not allocate any reduction");
-        Check(!grid.Columns["AppliedDiscount"].Visible && grid.Columns["AppliedDiscount"].ReadOnly,
-            "Separate bill-discount editor is hidden and read-only");
+        Check(grid.Columns["AppliedDiscount"].Visible && grid.Columns["AppliedDiscount"].ReadOnly,
+            "Saved charge discounts are visible and read-only");
     }
 }
