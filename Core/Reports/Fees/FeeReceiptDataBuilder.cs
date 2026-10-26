@@ -59,7 +59,7 @@ internal static partial class FeeReceiptDataBuilder
             currentStudent=student;currentLines=child;
             if(family) Add($"{Text(student,"AdmissionNumber")} · {Text(student,"StudentName")}","",0,"Student");
             if(family && child.Length==0)
-                Add(FamilyFeeDocumentPresentation.Money(student,"CashReceived")>0m?"    Advance retained as student credit":"    No fees paid in this receipt","",0m,"Fee");
+                Add(FamilyFeeDocumentPresentation.Money(student,"CashReceived")>0m?"    Advance retained as student credit":"    No payment applied to this child","",0m,"Fee");
             foreach(var month in child.GroupBy(row=>Convert.ToDateTime(row["FeePeriod"]).ToString("MMM yyyy")))
             {
                 if(family) Add("  "+month.Key,"",0,"Month");

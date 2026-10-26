@@ -10,6 +10,23 @@ internal static partial class Program
 {
     private static void CheckPromotionHistoryEntry()
     {
+        using (var catalog = new DataTable())
+        using (var assignments = new DataTable())
+        {
+            catalog.Columns.Add("ClassId", typeof(int)); catalog.Columns.Add("ClassName");
+            catalog.Columns.Add("DisplayOrder", typeof(int)); catalog.Columns.Add("AcademicProgramId", typeof(int));
+            catalog.Rows.Add(1, "Nursery", 1, 1); catalog.Rows.Add(4, "Four", 4, 1); catalog.Rows.Add(5, "Five", 5, 1);
+            assignments.Columns.Add("ClassId", typeof(int));
+            assignments.Rows.Add(5); assignments.Rows.Add(4); assignments.Rows.Add(4);
+            using var filtered = BulkPromotionPage.CampusClasses(catalog, assignments);
+            Check(filtered.AsEnumerable().Select(row => row.Field<int>("ClassId")).SequenceEqual(new[] { 4, 5 }),
+                "Promotion offers only campus-assigned classes in catalog order, without duplicating sections");
+            Check(filtered.Rows[1].Field<int>("AcademicProgramId") == 1 && filtered.Rows[1].Field<int>("DisplayOrder") == 5,
+                "Campus filtering preserves program and progression rules for destination classes");
+            assignments.Clear();
+            using var empty = BulkPromotionPage.CampusClasses(catalog, assignments);
+            Check(empty.Rows.Count == 0, "A campus without assignments cannot fall back to every class");
+        }
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var previous = (CurrentUser.UserId, CurrentUser.Username, CurrentUser.RoleName,
             CurrentUser.MustChangePassword, CurrentUser.GetPermissions().ToArray());
