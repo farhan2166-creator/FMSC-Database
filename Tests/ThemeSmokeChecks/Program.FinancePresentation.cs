@@ -91,15 +91,18 @@ internal static partial class Program
             if(dialog is null){failure=new Exception("Recent Payments dialog did not open");return;}
             try
             {
-                var details=Field<Label>(page,"paymentHistoryDetails");
+                var details=Field<TableLayoutPanel>(page,"paymentHistoryDetails");
                 var reprint=Field<ModernButton>(page,"reprintReceiptButton");
                 foreach(var size in new[]{new Size(1180,520),new Size(720,420)})
                 {
                     dialog.ClientSize=size;Application.DoEvents();grid.CurrentCell=grid.Rows[mixed].Cells["ReceiptNumber"];
                     grid.ClearSelection();grid.Rows[mixed].Selected=true;Application.DoEvents();
-                    Check(details.Text.Contains("credit used: Rs. 300") && details.Text.Contains("3,000") && reprint.Enabled,
+                    Check(details.Text.Contains("Credit used for this student: Rs. 300") && details.Text.Contains("3,000") && reprint.Enabled,
                         "A mixed family payment visibly distinguishes student credit from whole-family total and remains printable");
                     Check(details.RectangleToScreen(details.ClientRectangle).Bottom<=reprint.Parent!.RectangleToScreen(reprint.Parent.ClientRectangle).Top && grid.Height>80,"Details, grid and actions fit without overlapping");
+                    Check(details.Controls.OfType<Label>().Where(label => details.GetColumn(label) % 2 == 1)
+                        .All(label => label.TextAlign == ContentAlignment.MiddleRight),
+                        "Receipt summary values align consistently beside their labels");
                     grid.CurrentCell=grid.Rows[corrected].Cells["ReceiptNumber"];
                     grid.ClearSelection();grid.Rows[corrected].Selected=true;Application.DoEvents();
                     Check(details.Text.Contains("Refunds: Rs. 150") && details.Text.Contains("Corrections: Rs. 50") && details.Text.Contains("800") && !details.Text.Contains("Whole family"),
@@ -122,7 +125,7 @@ internal static partial class Program
             finally{dialog.Close();}
         };
         // Capture grid preservation before clearing it in the modal test.
-        using var detailsOnly=new Label();type.GetField("paymentHistoryDetails",flags)!.SetValue(page,detailsOnly);
+        using var detailsOnly=new TableLayoutPanel { ColumnCount = 4 };type.GetField("paymentHistoryDetails",flags)!.SetValue(page,detailsOnly);
         grid.CurrentCell=grid.Rows[mixed].Cells["ReceiptNumber"];
         type.GetMethod("UpdatePaymentHistoryDetails",flags)!.Invoke(page,null);
         Check(grid.Rows.Cast<DataGridViewRow>().Select((r,i)=>r.Cells.Cast<DataGridViewCell>().Select(c=>c.Value).SequenceEqual(before[i])).All(s=>s),
@@ -130,7 +133,7 @@ internal static partial class Program
         type.GetField("paymentHistoryDetails",flags)!.SetValue(page,null);
         timer.Start();type.GetMethod("OpenPaymentHistory",flags)!.Invoke(page,null);
         if(failure is not null)throw failure;
-        Check(passes==1 && !grid.IsDisposed && Field<Label?>(page,"paymentHistoryDetails") is null &&
+        Check(passes==1 && !grid.IsDisposed && Field<TableLayoutPanel?>(page,"paymentHistoryDetails") is null &&
             Field<ModernButton?>(page,"reprintReceiptButton") is null,"Closing the history dialog preserves the page-owned grid and releases dialog-only references");
 
         // Do not show this page: its deferred database load must remain uninvoked.
