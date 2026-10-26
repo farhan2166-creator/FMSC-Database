@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--collection-sibling-navigation"))
+        {
+            CheckCollectionSiblingNavigation();
+            Console.WriteLine($"PASS: {checks} collection sibling navigation guards and pending-read checks (no database connection).");
+            return;
+        }
         if(args.Contains("--promotion-campus-classes"))
         {
             CheckPromotionHistoryEntry();

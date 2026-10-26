@@ -14,11 +14,11 @@ internal static partial class FeeBillDataBuilder
         decimal discount=charges.AsEnumerable().Sum(r=>Convert.ToDecimal(r["DiscountAmount"]));
         string references=string.Join(", ",charges.AsEnumerable().Select(r=>Convert.ToString(r["Reference"])).Distinct());
         bool multipleStudents=charges.AsEnumerable().Select(r=>Convert.ToString(r["Reference"])).Distinct().Count()>1;
-        string studentKey="",studentHeading="";
+        string studentKey="",studentHeading="",studentPlacement="";
         string campusHeading=FeeDocumentData.CampusHeading(charges);
         void AddLine(string description,decimal amount,string kind,string period="",DataRow? charge=null){
             var line=data.Rows.Add(1,institutionName,multipleStudents?"FAMILY FEE BILL":"STUDENT FEE BILL","PARENT COPY","",
-                multipleStudents?parent:Convert.ToString(charges.Rows[0]["StudentName"]),references,"",
+                multipleStudents?parent:Convert.ToString(charges.Rows[0]["StudentName"]),references,multipleStudents?"":studentPlacement,
                 DateTime.Now.ToString("dd-MM-yyyy hh:mm tt"),"",
                 description,amount,discount,total,0m,"","",discount>0m,false,
                 contactNumber,address,campusHeading,multipleStudents?"":parent,"");
@@ -32,6 +32,7 @@ internal static partial class FeeBillDataBuilder
                 line["BillGrossAmount"]=charges.Columns.Contains("GrossAmount") && !charge.IsNull("GrossAmount")
                     ?charge["GrossAmount"]:amount+Convert.ToDecimal(charge["DiscountAmount"]);
                 line["ChildFatherName"]=parent;
+                line["ChildClassSection"]=studentPlacement;
                 if(charges.Columns.Contains("CampusName"))line["ChildCampusName"]=charge["CampusName"];
                 if(charges.Columns.Contains("BillingChargeId"))line["BillChargeId"]=charge["BillingChargeId"];
                 if(charges.Columns.Contains("AdmissionId"))line["BillAdmissionId"]=charge["AdmissionId"];
@@ -40,6 +41,7 @@ internal static partial class FeeBillDataBuilder
         // Group by the reference, never by name: siblings can share a name.
         foreach(var student in charges.AsEnumerable().GroupBy(r=>Convert.ToString(r["Reference"]))){
             studentKey=student.Key??"";studentHeading=$"{student.Key} · {student.First()["StudentName"]}";
+            studentPlacement=string.Join(" / ",student.Select(PlacementText).Where(value=>value.Length>0).Distinct(StringComparer.OrdinalIgnoreCase));
             AddLine(studentHeading,0m,"Student");
             foreach(var month in student.GroupBy(r=>r["BillingMonth"] is DateTime date?new DateTime(date.Year,date.Month,1):new DateTime(1,1,1)).OrderBy(g=>g.Key)){
                 AddLine("  "+(month.Key.Year==1?"One-time fees":month.Key.ToString("MMM yyyy")),0m,"Month");
@@ -49,6 +51,12 @@ internal static partial class FeeBillDataBuilder
         }
         return data;
     }
-
+    private static string PlacementText(DataRow charge)
+    {
+        string Read(string column)=>charge.Table.Columns.Contains(column)&&!charge.IsNull(column)
+            ?Convert.ToString(charge[column])?.Trim()??"":"";
+        string className=Read("ClassName"),section=Read("SectionName");
+        return className.Length==0?"":section.Length==0?className:$"{className} - {section}";
+    }
 
 }

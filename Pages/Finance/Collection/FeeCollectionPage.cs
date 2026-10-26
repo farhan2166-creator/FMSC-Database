@@ -26,6 +26,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     /* Collect selected siblings' fees in one workflow without a separate family screen. */
     private readonly CheckedListBox siblings = new FamilyStudentList() {
         Dock = DockStyle.Fill,
+        CheckBoxOnly = true,
         CheckOnClick = true,
         IntegralHeight = false,
         BorderStyle = BorderStyle.None,
@@ -434,17 +435,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 futureFeesButton.Enabled = admissionId > 0 && enrollmentId > 0;
             if (historyButton is not null)
                 historyButton.Enabled = admissionId > 0 && enrollmentId > 0;
-            /* Clear sibling charges, discounts and payment amounts when enrollment changes. */
-            suppressSiblingEvents = true;
-            try
-            {
-                for (int i = 0; i < siblings.Items.Count; i++)
-                    siblings.SetItemChecked(i, false);
-            }
-            finally
-            {
-                suppressSiblingEvents = false;
-            }
+            /* Keep the family's inclusion choices when changing the main placement. */
             suppressDiscountEvents = true;
             suppressPaymentEvents = true;
             try
@@ -1779,6 +1770,16 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             await AppendChargesAsync(admissionId, enrollmentId, version);
             if (IsDisposed || version != loadVersion)
                 return;
+            if (counterIds is null)
+            {
+                foreach (int index in siblings.CheckedIndices.Cast<int>().ToArray())
+                {
+                    int memberAdmissionId = SiblingAdmissionIdAt(index);
+                    if (payingFor.TryGetValue(memberAdmissionId, out var info) && info.EnrollmentId > 0)
+                        await AppendChargesAsync(memberAdmissionId, info.EnrollmentId, version);
+                    if (IsDisposed || version != loadVersion) return;
+                }
+            }
             UpdateCollectionTotals();
         }
         catch (Exception ex)
@@ -2067,7 +2068,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             suppressPaymentEvents = false;
         }
     }
-    /// <summary>Loads the selected student's siblings into the Paying For list, all unticked.</summary>
+    /// <summary>Loads siblings and includes those with outstanding posted fees by default.</summary>
     private async Task LoadSiblingsAsync(int version)
     {
         suppressSiblingEvents = true;
@@ -2127,16 +2128,14 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 int pendingEnrollment=eligibility["PendingEnrollmentId"]==DBNull.Value ? 0 : Convert.ToInt32(eligibility["PendingEnrollmentId"]);
                 if(!active && pendingEnrollment<=0) continue;
                 int memberEnrollmentId = GetInt(row, "EnrollmentId");
-                if(!active && pendingEnrollment>0) memberEnrollmentId=pendingEnrollment;
+                if((!active || memberEnrollmentId<=0) && pendingEnrollment>0) memberEnrollmentId=pendingEnrollment;
                 string name = GetText(row, "StudentName");
                 string placement = GetText(row, "ClassName");
                 if (!string.IsNullOrWhiteSpace(GetText(row, "SectionName"))) placement += $" - {GetText(row, "SectionName")}";
                 // The family read includes EnrollmentId. Without an enrollment there is nothing to collect for that child, so they are shown as unavailable rather than silently omitted.
                 string label = $"{AdmissionNumbers.ForId(memberAdmissionId)} · {name}\n" +
                     (memberEnrollmentId > 0 ? $"{placement} · {(active ? "Sibling" : "Pending fees")}" : "No active placement");
-                payingFor[memberAdmissionId] = (memberEnrollmentId, GetText(row, "StudentName"));
-                /* A CheckedListBox sorts its items by default, so Items[i] is NOT the i-th thing added. Storing the id on the item removes the assumption entirely. */
-                siblings.Items.Add(new SiblingChoice(memberAdmissionId, label), false);
+                AddSiblingChoice(memberAdmissionId, memberEnrollmentId, name, label, pendingEnrollment > 0);
             }
             selectAllSiblings.Enabled = siblings.Items.Count > 0;
             SetSiblingHint(siblings.Items.Count == 0
@@ -2152,6 +2151,19 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             suppressSiblingEvents = false;
             updateSiblingLayout?.Invoke();
         }
+    }
+    private void AddSiblingChoice(int memberAdmissionId, int memberEnrollmentId, string name, string label, bool hasOutstanding)
+    {
+        payingFor[memberAdmissionId] = (memberEnrollmentId, name);
+        // Keep the stable student key on the row; display order can change.
+        siblings.Items.Add(new SiblingChoice(memberAdmissionId, label),
+            counterIds is null && hasOutstanding && memberEnrollmentId > 0);
+    }
+    private async Task ReloadFamilyChargesAsync(int version)
+    {
+        await LoadSiblingsAsync(version);
+        if (IsDisposed || version != loadVersion) return;
+        await LoadChargesAsync(version);
     }
     private void SetSiblingHint(string message)
     {
@@ -2253,7 +2265,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             : 0;
     private async Task OpenSiblingStudentAsync(int targetAdmissionId)
     {
-        if (targetAdmissionId <= 0 || targetAdmissionId == admissionId ||
+        if (targetAdmissionId <= 0 || targetAdmissionId == admissionId || !payingFor.ContainsKey(targetAdmissionId) ||
             counterIds is not null || IsBusy || switchingSibling)
             return;
         int anchor = admissionId;
@@ -2265,7 +2277,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             await Task.Yield();
             await siblingLoadTask;
             if (IsDisposed || counterIds is not null || IsBusy || siblingBusy ||
-                anchor != admissionId || version != loadVersion)
+                anchor != admissionId || version != loadVersion || !payingFor.ContainsKey(targetAdmissionId))
                 return;
             await LoadStudentByAdmissionId(targetAdmissionId);
         }
@@ -3545,11 +3557,10 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             collectionResult.Visible = true;
             RememberCounterReceipt(result,singleReceipt);
             int refreshVersion = ++loadVersion;
-            // These refreshes read independent views of the same committed transaction.
+            // Rebuild family inclusion before loading the charges represented by its checks.
             await Task.WhenAll(
-                LoadChargesAsync(refreshVersion),
-                LoadRecentPaymentsAsync(refreshVersion),
-                LoadSiblingsAsync(refreshVersion));
+                ReloadFamilyChargesAsync(refreshVersion),
+                LoadRecentPaymentsAsync(refreshVersion));
             if(counterIds is not null)await RestoreCounterSelectionAsync();
             charges.ClearSelection();
             recentPayments.ClearSelection();
@@ -3826,7 +3837,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             form.ShowDialog(FindForm());
             if(!form.Changed)return;
             int version=++loadVersion;
-            await Task.WhenAll(LoadChargesAsync(version),LoadSiblingsAsync(version));
+            await ReloadFamilyChargesAsync(version);
             SyncPaymentFieldToGrid();UpdateCollectionTotals();SetStatus("Reviewed bill terms saved. Balances and available credit have been refreshed.");
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
@@ -3880,9 +3891,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         if (!dialog.Reversed)
             return;
         int refreshVersion = ++loadVersion;
-        await Task.WhenAll(
-            LoadChargesAsync(refreshVersion),
-            LoadSiblingsAsync(refreshVersion));
+        await ReloadFamilyChargesAsync(refreshVersion);
         SyncPaymentFieldToGrid();
         UpdateCollectionTotals();
         SetStatus(

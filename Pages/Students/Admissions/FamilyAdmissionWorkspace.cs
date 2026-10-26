@@ -24,7 +24,17 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         internal bool Busy=>Registration?.IsBusy==true || (Editor as IBusyPage)?.IsBusy==true || Assignments?.IsBusy==true;
         internal bool Dirty=>(Editor as IUnsavedChanges)?.HasUnsavedChanges==true;
         internal string DisplayName=>Registration?.WorkspaceName is {Length:>0} value?value:Name;
-        public override string ToString()=> $"{(Id>0?FieldText(Record,"Reference"):"NEW")} · {DisplayName}\n{Status}"+
+        private string PlacementLabel
+        {
+            get
+            {
+                string className=FieldText(Record,"ClassName").Trim(),section=FieldText(Record,"SectionName").Trim(),campus=FieldText(Record,"CampusName").Trim();
+                string placement=string.Join(" - ",new[]{className,section}.Where(value=>value.Length>0));
+                if(campus.Length>0)placement+=(placement.Length>0?" ":"")+$"({campus})";
+                return placement.Length>0?$" · {placement}":"";
+            }
+        }
+        public override string ToString()=> $"{(Id>0?FieldText(Record,"Reference"):"NEW")} · {DisplayName}{PlacementLabel}\n{Status}"+
             (CurrentUser.HasPermission("Fees.View") && Record?.Table.Columns.Contains("Outstanding")==true && !Record.IsNull("Outstanding")
                 ?$" · Rs. {Convert.ToDecimal(Record["Outstanding"]):N0} due":"")+$" · {Outcome}";
     }
