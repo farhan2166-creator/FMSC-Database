@@ -46,7 +46,10 @@ internal static partial class FeeBillDataBuilder
             foreach(var month in student.GroupBy(r=>r["BillingMonth"] is DateTime date?new DateTime(date.Year,date.Month,1):new DateTime(1,1,1)).OrderBy(g=>g.Key)){
                 AddLine("  "+(month.Key.Year==1?"One-time fees":month.Key.ToString("MMM yyyy")),0m,"Month");
                 foreach(var fee in month.OrderBy(r=>charges.Columns.Contains("FeeDisplayOrder")?Convert.ToInt32(r["FeeDisplayOrder"]):0).ThenBy(r=>Convert.ToString(r["FeeTypeName"])))
-                    AddLine(FeeConcessionLabels.FeeText(Convert.ToString(fee["FeeTypeName"])??""),Convert.ToDecimal(fee["Due"]),"Fee",month.Key.Year==1?"One-time fees":month.Key.ToString("MMM yyyy"),fee);
+                {
+                    string name=FeeDocumentData.FeeName(Convert.ToString(fee["FeeTypeName"])??"");
+                    AddLine(name,Convert.ToDecimal(fee["Due"]),"Fee",month.Key.Year==1?"One-time fees":month.Key.ToString("MMM yyyy"),fee);
+                }
             }
         }
         return data;

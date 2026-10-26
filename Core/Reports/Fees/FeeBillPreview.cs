@@ -109,7 +109,7 @@ internal static class FeeBillPreview
         var charges = await ReadChargesAsync(admissionId,ids,wholeFamily:selected is null);
         if (!Current()) return;
         string notice = FamilyBillingData.IncompleteNotice(members, ids);
-        if (charges.Rows.Count == 0)
+        if (charges.Rows.Count == 0 || charges.AsEnumerable().Sum(row=>Convert.ToDecimal(row["Due"]))<=0m)
         {
             ModernMessageDialog.ShowInfo(owner, "There are no posted outstanding charges for the selected children." +
                 (notice.Length > 0 ? "\n\n" + notice : ""), "Print Bill");

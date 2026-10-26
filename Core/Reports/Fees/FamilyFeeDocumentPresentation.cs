@@ -52,7 +52,10 @@ internal static class FamilyFeeDocumentPresentation
                         row["ChildShowSettlement"]=row["ShowSettlement"];
                     }
                 }
-                bool visible=Money(identity,"ChildCashReceived")>0m||Money(identity,"ChildCreditApplied")>0m
+                bool visible=Money(identity,"ChildDiscountApplied")>0m||Money(identity,"ChildFeesCovered")>0m
+                    ||child.Any(line=>Convert.ToString(line["FeePeriod"])=="Plan")
+                    ||child.Any(line=>(Convert.ToString(line["FeeDescription"])??"").Contains("Cancelled",StringComparison.OrdinalIgnoreCase))
+                    ||Money(identity,"ChildCashReceived")>0m||Money(identity,"ChildCreditApplied")>0m
                     ||Money(identity,"ChildBalanceRemaining")>0m||Money(identity,"ChildCreditRetained")>0m
                     ||Money(identity,"ChildNetPaid")>0m||Money(identity,"ChildOriginalPaid")>0m;
                 foreach(var row in child)
@@ -105,13 +108,13 @@ internal static class FamilyFeeDocumentPresentation
                 string name=heading.StartsWith(reference+" · ",StringComparison.Ordinal)?heading[(reference.Length+3)..]:heading;
                 foreach(var row in child)
                 {
-                    row["FeeDescription"]=(Convert.ToString(row["FeeDescription"])??"").Replace(" — Waived","");
                     row["ShowChildDocument"]=childDue>0m||childDiscount>0m;
                     row["ChildAdmissionNumberText"]=reference;row["ChildStudentName"]=name;
                     // New snapshots retain the parent and campus per child. Old
                     // family snapshots only retained the common parent heading.
                     if(string.IsNullOrWhiteSpace(Convert.ToString(row["ChildFatherName"])))row["ChildFatherName"]=row["StudentName"];
                     row["ChildFeesCovered"]=childTotal;row["ChildDiscountApplied"]=childDiscount;
+                    row["FeeDescription"]=FeeDocumentData.FeeName(Convert.ToString(row["FeeDescription"])??"");
                     row["ChildPayable"]=childTotal-childDiscount;row["ChildTotalPaid"]=childDue;
                     row["ChildBillPreviouslySettled"]=childSettled;row["ChildShowBillPreviouslySettled"]=childSettled>0m;
                     row["ChildShowDiscount"]=childDiscount>0m;

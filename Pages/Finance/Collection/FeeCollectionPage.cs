@@ -112,6 +112,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private ModernButton? studentFeesMenuButton;
     private ModernButton? studentCreditButton;
     private ModernButton? printBillButton;
+    private readonly Dictionary<int,string> receiptReviewTokens=new();
     private readonly Dictionary<int, decimal> availableCreditByStudent = new();
     private readonly CheckBox useAvailableCredit = new() { Text = "Use student advance", Checked = true, AutoSize = true };
     private readonly Label availableCredit = new();
@@ -348,6 +349,15 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         };
         var futureFeesItem = studentFeesMenu.Items.Add("Future Fees", null, (_, _) => futureFeesButton?.PerformClick());
         var statementItem = studentFeesMenu.Items.Add("Account Statement", null, (_, _) => historyButton?.PerformClick());
+        var feeChangesItem=studentFeesMenu.Items.Add("Print Fee Changes",null,async(_,_)=> {
+            if(IsBusy||siblingBusy||admissionId<=0||!CurrentUser.HasPermission("Fees.Collect"))return;
+            if(!charges.EndEdit())return;
+            if(HasDraftBillDiscounts()||HasEnteredAmount(paymentAmount.Text)){Warn("Finish or clear the payment draft before printing saved fee changes.");return;}
+            int anchor=admissionId,version=loadVersion;int[] selected=SelectedBillStudents();
+            try {using var busy=BeginBusy("Preparing fee-change acknowledgement…",this);
+                await FeeReceiptDocuments.ShowFeeChangesAsync(FindForm(),anchor,selected,()=>!IsDisposed&&anchor==admissionId&&version==loadVersion&&selected.SequenceEqual(SelectedBillStudents()));}
+            catch(Exception ex){if(!IsDisposed)Fail(ex);}
+        });
         var startTransportItem=studentFeesMenu.Items.Add("Start / Restart Transport…",null,async(_,_)=>await OpenTransportAsync(true));
         var stopTransportItem=studentFeesMenu.Items.Add("Stop Transport…",null,async(_,_)=>await OpenTransportAsync(false));
         studentFeesMenu.Items.Add(new ToolStripSeparator());
@@ -363,6 +373,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         studentFeesMenu.Opening += (_, _) => {
             futureFeesItem.Enabled = futureFeesButton?.Enabled == true;
             statementItem.Enabled = historyButton?.Enabled == true;
+            feeChangesItem.Enabled=admissionId>0&&CurrentUser.HasPermission("Fees.Collect")&&!siblingBusy;
             startTransportItem.Available=stopTransportItem.Available=CurrentUser.HasPermission("Fees.Adjust");
             startTransportItem.Enabled=stopTransportItem.Enabled=admissionId>0 && enrollmentId>0 && CanChangeFeeTerms;
             familyReturnsItem.Available=CurrentUser.HasPermission("Students.Family");
@@ -1830,6 +1841,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     {
         if (forAdmissionId <= 0 || forEnrollmentId <= 0)
             return 0;
+        string reviewBefore=await CollectionDiscountWriter.ReadReviewTokenAsync(forAdmissionId);
         var chargesTask = DatabaseHelper.QueryUserAsync(
             "GetOutstandingCharges",
             DatabaseHelper.Int("@AdmissionId", forAdmissionId),
@@ -1841,6 +1853,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var creditTask = DatabaseHelper.QueryUserAsync("GetStudentCredit", DatabaseHelper.Int("@AdmissionId", forAdmissionId));
         var settlementTask = ReadSettlementMetadataAsync(forAdmissionId);
         await Task.WhenAll(chargesTask, feeOrderTask, creditTask, settlementTask);
+        string reviewAfter=await CollectionDiscountWriter.ReadReviewTokenAsync(forAdmissionId);
+        if(reviewBefore!=reviewAfter)throw new InvalidOperationException("Fees or payments changed while loading. Reload the family before collecting.");
         DataTable raw = await chargesTask;
         var feeOrderRows = await feeOrderTask;
         var feeOrder=feeOrderRows.AsEnumerable().ToDictionary(row=>GetInt(row,"FeeTypeId"),row=>GetInt(row,"DisplayOrder"));
@@ -1859,6 +1873,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             return 0;
         }
         var creditRows = await creditTask;
+        receiptReviewTokens[forAdmissionId]=reviewAfter;
         availableCreditByStudent[forAdmissionId] = creditRows.Rows.Count > 0 ? GetDecimal(creditRows.Rows[0], "AvailableCredit") : 0m;
         var settlement=await settlementTask;
         /* Preserve the existing tuition tag for discount ties; payment order has its own metadata. */
@@ -3400,7 +3415,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                         receiptDiscounts.GetValueOrDefault(GetLong(row.Cells["BillingChargeId"].Value)),
                         row.Tag is true?GetDecimal(row.Cells["Amount"].Value):0m,
                         creditMap.GetValueOrDefault(GetLong(row.Cells["BillingChargeId"].Value))))
-                    .Where(line=>line.Cash>0 || line.Credit>0 || line.Discount>0).ToArray());
+                    .Where(line=>line.Cash>0 || line.Credit>0 || line.Discount>0).ToArray(),new Dictionary<int,string>(receiptReviewTokens));
             if (allocationLines.Count == 0 && amount == 0m)
             {
                 result = await CollectionDiscountWriter.CollectWithReceiptAsync(null, billDiscountEdits, creditEdits,

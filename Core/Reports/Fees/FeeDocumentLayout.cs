@@ -112,6 +112,13 @@ internal static class FeeDocumentLayout
     private static string MeasureValue(string expression,DataRow record,string? name)
     {
         if(!expression.StartsWith('='))return expression;
+        if(name is "ReceiptHeading" or "ThankYou" && expression.Contains("\"Fee changes\"",StringComparison.Ordinal))
+        {
+            bool acknowledgement=Convert.ToString(record["PaymentMethod"])=="Fee changes";
+            return name=="ReceiptHeading"
+                ?acknowledgement?"FEE CHANGE ACKNOWLEDGEMENT":"STUDENT PAYMENT RECEIPT"
+                :acknowledgement?"Fee changes recorded; no payment received":"Thank you for your payment";
+        }
         if(expression.Contains("Now()",StringComparison.Ordinal))
             return DateTime.Now.ToString("dd-MM-yyyy hh:mm tt",CultureInfo.CurrentCulture);
         string key=Regex.Match(expression,@"Fields!(\w+)\.Value").Groups[1].Value;

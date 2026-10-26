@@ -31,7 +31,7 @@ internal static class FeeBillPresentation
             decimal settled=breakdown?rows.Sum(row=>Convert.ToDecimal(row["BillGrossAmount"])-Convert.ToDecimal(row["BillLineDiscount"])-Convert.ToDecimal(row["Amount"])):0m;
             foreach(var row in rows)
             {
-                row["FeeDescription"]=(Convert.ToString(row["FeeDescription"])??"").Replace(" — Waived","");
+                row["FeeDescription"]=FeeDocumentData.FeeName(Convert.ToString(row["FeeDescription"])??"");
                 row["BillDisplayAmount"]=breakdown?row["BillGrossAmount"]:oldWaiver?discount:row["Amount"];
                 row["BillPreviouslySettled"]=settled;
                 row["ShowBillPreviouslySettled"]=settled>0m;

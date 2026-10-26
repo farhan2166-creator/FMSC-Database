@@ -7,14 +7,74 @@ internal static class FeeReceiptDocuments
     {
         using var result=await DatabaseHelper.QueryUserSetAsync("GetCollectionReceipt",DatabaseHelper.P("@ReceiptNumber",receiptNumber));
         if(result.Tables.Count<3 || result.Tables[0].Rows.Count==0)return false;
-        bool latest=await RefreshBalancesAsync(result.Tables[0].Rows[0],result.Tables[1],receiptNumber:receiptNumber);
+        bool complete=IsCompleteSnapshot(result.Tables[0].Rows[0]);
         await ReadChildCashReceivedAsync(receiptNumber,result.Tables[0].Rows[0],result.Tables[1]);
         using var printableLines=result.Tables[2].Copy();
-        await RefreshChargeConcessionsAsync(result.Tables[0].Rows[0],result.Tables[1],printableLines,latest);
-        if(latest)await AddUnpaidChildFeesAsync(result.Tables[0].Rows[0],result.Tables[1],printableLines);
+        // Issued documents never acquire today's fees, concessions or balances.
+        // Legacy snapshots remain reproducible, with their limitation disclosed.
+        if(!complete)
+            result.Tables[0].Rows[0]["ReceiptStatus"]=(Convert.ToString(result.Tables[0].Rows[0]["ReceiptStatus"])+
+                " Legacy receipt: saved fee details may exclude earlier discounts or waivers. See the account statement.").Trim();
         using var data=BuildData(institution,result.Tables[0].Rows[0],result.Tables[1],printableLines);
+        if(complete&&result.Tables.Count>3&&Convert.ToString(result.Tables[0].Rows[0]["PaymentMethod"])=="Fee changes")
+            AddAgreementNotes(data,result.Tables[3],result.Tables[1]);
         Show(owner,data);
         return true;
+    }
+
+    internal static bool IsCompleteSnapshot(DataRow header)=>header.Table.Columns.Contains("SnapshotVersion")
+        && !header.IsNull("SnapshotVersion") && Convert.ToInt32(header["SnapshotVersion"])>=2;
+
+    internal static void AddAgreementNotes(DataTable document,DataTable agreements,DataTable students)
+    {
+        bool family=document.Columns.Contains("ReceiptStudentKey");
+        foreach(var child in agreements.AsEnumerable().GroupBy(row=>Convert.ToInt32(row["AdmissionId"])))
+        {
+            // Grouped receipt student keys are positional. Admission references
+            // come from the saved student block, never today's family membership.
+            string reference=Convert.ToString(students.AsEnumerable().First(row=>Convert.ToInt32(row["AdmissionId"])==child.Key)["AdmissionNumber"])??"";
+            var template=family?document.AsEnumerable().FirstOrDefault(row=>Convert.ToString(row["ChildAdmissionNumberText"])==reference)
+                :document.Rows.Cast<DataRow>().FirstOrDefault();
+            if(template is null)continue;
+            if(family)foreach(var row in document.AsEnumerable().Where(row=>Convert.ToString(row["ChildAdmissionNumberText"])==reference))row["ShowChildDocument"]=true;
+            foreach(var agreement in child)
+            {
+                var row=document.NewRow();row.ItemArray=(object[])template.ItemArray.Clone();
+                string Text(string field)=>Convert.ToString(agreement[field])??"";
+                string Period(string field)=>agreement.IsNull(field)?"":Convert.ToDateTime(agreement[field]).ToString("MMM yyyy");
+                string dates=Period("EffectiveFrom");if(!agreement.IsNull("EffectiveTo"))dates+=" through "+Period("EffectiveTo");
+                row["FeeDescription"]=$"Fee plan: {Text("FeeTypeName")} — Rs. {Convert.ToDecimal(agreement["Amount"]):N0}; discount/waived Rs. {Convert.ToDecimal(agreement["DiscountAmount"]):N0}; {Text("Frequency")}"+
+                    (dates.Length>0?"; "+dates:"")+(!agreement.IsNull("CancelledAt")?"; Cancelled":"");
+                row["Amount"]=0m;row["FeePeriod"]="Plan";
+                if(family){row["FamilyRowKind"]="Fee";row["FamilyAmountText"]="";row["ShowChildDocument"]=true;}
+                document.Rows.Add(row);
+            }
+        }
+    }
+
+    internal static async Task ShowFeeChangesAsync(Form? owner,int admissionId,int[] students,Func<bool>? isCurrent=null)
+    {
+        int user=CurrentUser.UserId;
+        bool Current()=>owner?.IsDisposed!=true&&CurrentUser.UserId==user&&CurrentUser.HasPermission("Fees.Collect")&&(isCurrent?.Invoke()??true);
+        if(!Current())return;
+        var institution=await InstitutionProfile.GetPrintIdentityAsync();
+        if(!Current())return;
+        if(string.IsNullOrWhiteSpace(institution.Name))throw new InvalidOperationException("Check School Profile before printing fee changes.");
+        using var issued=await DatabaseHelper.QuerySqlAsync("""
+            SET XACT_ABORT ON;
+            BEGIN TRY
+             BEGIN TRAN;
+             DECLARE @Lock int;
+             EXEC @Lock=sys.sp_getapplock @Resource=N'FMSC.MonthlyBilling',@LockMode=N'Exclusive',@LockOwner=N'Transaction',@LockTimeout=10000;
+             IF @Lock<0 THROW 54901,'Billing is busy. Try again.',1;
+             EXEC dbo.IssueCollectionReceipt @UserId,@Admission,@Date,N'Fee changes',N'Parent fee-change acknowledgement',
+              @Ids,N'[]',N'[]',0,0,0,1;
+             COMMIT;
+            END TRY
+            BEGIN CATCH IF @@TRANCOUNT>0 ROLLBACK; THROW; END CATCH;
+            """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Admission",admissionId),
+            DatabaseHelper.P("@Date",DateTime.Now),DatabaseHelper.P("@Ids",System.Text.Json.JsonSerializer.Serialize(students)));
+        if(Current())await TryShowAsync(owner,institution,Convert.ToString(issued.Rows[0]["ReceiptNumber"])!);
     }
 
     // A concession saved after collection changes live dues without changing the

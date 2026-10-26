@@ -137,7 +137,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>STUDENT PAYMENT RECEIPT</Value>
+                              <Value>=IIf(First(Fields!PaymentMethod.Value, "ReceiptPageGroup") = "Fee changes", "FEE CHANGE ACKNOWLEDGEMENT", "STUDENT PAYMENT RECEIPT")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.25pt</FontSize>
@@ -881,7 +881,77 @@
                 </TablixCell>
               </TablixCells>
             </TablixRow>
+
             <TablixRow>
+              <Height>0.16in</Height>
+              <TablixCells>
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="DiscountLabel">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>Less: Discount / Waived</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Left</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                    <ColSpan>2</ColSpan>
+                  </CellContents>
+                </TablixCell>
+                <TablixCell />
+                <TablixCell>
+                  <CellContents>
+                    <Textbox Name="DiscountApplied">
+                      <CanGrow>true</CanGrow>
+                      <CanShrink>true</CanShrink>
+                      <Paragraphs>
+                        <Paragraph>
+                          <TextRuns>
+                            <TextRun>
+                              <Value>=Format(-First(Fields!DiscountApplied.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Style>
+                                <FontFamily>Segoe UI</FontFamily>
+                                <FontSize>7pt</FontSize>
+                              </Style>
+                            </TextRun>
+                          </TextRuns>
+                          <Style>
+                            <TextAlign>Center</TextAlign>
+                          </Style>
+                        </Paragraph>
+                      </Paragraphs>
+                      <Style>
+                        <Border>
+                          <Style>None</Style>
+                        </Border>
+                        <PaddingLeft>2pt</PaddingLeft>
+                        <PaddingRight>2pt</PaddingRight>
+                        <PaddingTop>1pt</PaddingTop>
+                        <PaddingBottom>1pt</PaddingBottom>
+                      </Style>
+                    </Textbox>
+                  </CellContents>
+                </TablixCell>
+              </TablixCells>
+            </TablixRow><TablixRow>
               <Height>0.16in</Height>
               <TablixCells>
                 <TablixCell>
@@ -893,7 +963,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Total</Value>
+                              <Value>Net payable</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -930,7 +1000,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(First(Fields!FeesCovered.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Value>=Format(First(Fields!Payable.Value, "ReceiptPageGroup"), "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -951,76 +1021,6 @@
                           <Style>Solid</Style>
                           <Width>0.5pt</Width>
                         </TopBorder>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-              </TablixCells>
-            </TablixRow>
-            <TablixRow>
-              <Height>0.16in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="DiscountLabel">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>Discount</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7pt</FontSize>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Left</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                    <ColSpan>2</ColSpan>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell />
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="DiscountApplied">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=Format(First(Fields!DiscountApplied.Value, "ReceiptPageGroup"), "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7pt</FontSize>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Center</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <Border>
-                          <Style>None</Style>
-                        </Border>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
                         <PaddingTop>1pt</PaddingTop>
@@ -1683,7 +1683,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Outstanding</Value>
+                              <Value>Balance due</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1901,7 +1901,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Thank you for your payment</Value>
+                              <Value>=IIf(First(Fields!PaymentMethod.Value, "ReceiptPageGroup") = "Fee changes", "Fee changes recorded; no payment received", "Thank you for your payment")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1943,7 +1943,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Payment Date: </Value>
+                              <Value>Document Date: </Value>
                               <Style>
                                 <FontStyle>Italic</FontStyle>
                                 <FontFamily>Segoe UI</FontFamily>
@@ -2036,14 +2036,14 @@
                 <TablixMember>
                   <Group Name="ReceiptFeeDetail" />
                 </TablixMember>
-                <TablixMember>
-                  <Visibility>
-                    <Hidden>=Not First(Fields!ShowSettlement.Value, "ReceiptPageGroup")</Hidden>
-                  </Visibility>
-                </TablixMember>
+
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Not First(Fields!ShowDiscount.Value, "ReceiptPageGroup")</Hidden>
+                  </Visibility>
+                </TablixMember><TablixMember>
+                  <Visibility>
+                    <Hidden>=Not First(Fields!ShowSettlement.Value, "ReceiptPageGroup")</Hidden>
                   </Visibility>
                 </TablixMember>
                 <TablixMember>
@@ -2277,7 +2277,7 @@
         <Field Name="ShowAdjustments">
           <DataField>ShowAdjustments</DataField>
         </Field>
-      </Fields>
+      <Field Name="Payable"><DataField>Payable</DataField></Field></Fields>
     </DataSet>
   </DataSets>
   <ConsumeContainerWhitespace>true</ConsumeContainerWhitespace>
