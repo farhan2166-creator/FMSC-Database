@@ -35,20 +35,6 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         AutoEllipsis = true,
         Margin = new Padding(0)
     };
-    private readonly Label selectedStudent =
-        CreateDetailLabel();
-    private readonly Label selectedFather =
-        CreateDetailLabel();
-    private readonly Label selectedAdmissionId =
-        CreateDetailLabel();
-    private readonly Label selectedRegistration =
-        CreateDetailLabel();
-    private readonly Label selectedClass =
-        CreateDetailLabel();
-    private readonly Label selectedSection =
-        CreateDetailLabel();
-    private readonly Label selectedStatus =
-        CreateDetailLabel();
     private readonly HashSet<int> currentFamilyIds = new();
     private int? currentFamilyId;
     public bool AddedSibling { get; private set; }
@@ -78,21 +64,21 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         closeButton.Click += (_, _) =>
             Close();
         resultsGrid.SelectionChanged += (_, _) =>
-            ShowSelectedDetails();
+            UpdateSelection();
+        resultsGrid.CurrentCellChanged += (_, _) => UpdateSelection();
         resultsGrid.CellDoubleClick += (_, e) => {
             if (e.RowIndex >= 0)
                 AddSelectedSibling();
         };
         var searchCard = BuildSearchCard();
         var resultsCard = BuildResultsCard();
-        var selectedCard = (HumanCard)BuildSelectedCard();
         var actionRow = HumanUi.ButtonRow(addButton, closeButton);
         actionRow.Dock = DockStyle.Fill;
         actionRow.Margin = Padding.Empty;
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4,
+            RowCount = 3,
             Padding = new Padding(
                 AppMetrics.PagePadding,
                 AppMetrics.PagePadding,
@@ -111,25 +97,17 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         root.RowStyles.Add(
             new RowStyle(
                 SizeType.Absolute,
-                selectedCard.Padding.Vertical + selectedCard.Header.Height +
-                selectedCard.Content.Padding.Vertical +
-                2 * (AppMetrics.TextHeight(AppTheme.ButtonFont) +
-                AppMetrics.TextHeight(AppTheme.NormalFont) + AppMetrics.SpacingMd * 2)));
-        root.RowStyles.Add(
-            new RowStyle(
-                SizeType.Absolute,
                 AppMetrics.ButtonRowHeight +
                 AppScale.Scale(8, AppScale.ControlSizeScale)));
         root.Controls.Add(searchCard, 0, 0);
         root.Controls.Add(resultsCard, 0, 1);
-        root.Controls.Add(selectedCard, 0, 2);
-        root.Controls.Add(actionRow, 0, 3);
+        root.Controls.Add(actionRow, 0, 2);
         Controls.Add(root);
         CancelButton = closeButton;
         addButton.Enabled = false;
         status.Text =
             "Enter a search value, or use the father's name already entered on the admission.";
-        ClearSelectedDetails();
+        ClearSelectionState();
         Shown += (_, _) =>
             Search();
     }
@@ -202,84 +180,6 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         root.Controls.Add(resultsGrid, 0, 0);
         card.Content.Controls.Add(root);
         return card;
-    }
-    private Control BuildSelectedCard()
-    {
-        var card = HumanUi.Card(
-            "Selected Student",
-            "Verify the student details before adding the sibling relationship.",
-            AppTheme.ModuleAccent("Students"));
-        var details = new TableLayoutPanel {
-            Dock = DockStyle.Fill,
-            ColumnCount = 4,
-            RowCount = 2,
-            Margin = new Padding(0),
-            Padding = new Padding(0)
-        };
-        for (int column = 0; column < 4; column++)
-            details.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-        details.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-        details.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-        details.Controls.Add(
-            BuildDetailBlock("Adm. No.", selectedAdmissionId), 0, 0);
-        details.Controls.Add(
-            BuildDetailBlock("Student", selectedStudent), 1, 0);
-        details.Controls.Add(
-            BuildDetailBlock("Father", selectedFather), 2, 0);
-        details.Controls.Add(
-            BuildDetailBlock("Registration", selectedRegistration), 3, 0);
-        details.Controls.Add(
-            BuildDetailBlock("Class", selectedClass), 0, 1);
-        details.Controls.Add(
-            BuildDetailBlock("Section", selectedSection), 1, 1);
-        details.Controls.Add(
-            BuildDetailBlock("Status", selectedStatus), 2, 1);
-        card.Content.Controls.Add(details);
-        return card;
-    }
-    private static Control BuildDetailBlock(string caption, Label value)
-    {
-        var root = new TableLayoutPanel {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 2,
-            Margin = new Padding(
-                0,
-                0,
-                AppScale.Scale(10, AppScale.ControlSizeScale), 0), Padding = new Padding(0)
-        };
-        root.RowStyles.Add(
-            new RowStyle(
-                SizeType.Absolute,
-                AppMetrics.TextHeight(AppTheme.ButtonFont) + AppMetrics.SpacingXs));
-        root.RowStyles.Add(
-            new RowStyle(SizeType.Percent, 100));
-        var captionLabel = new Label {
-            Dock = DockStyle.Fill,
-            Text = caption,
-            Font = AppTheme.ButtonFont,
-            ForeColor = AppTheme.MutedText,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Margin = new Padding(0)
-        };
-        value.Dock = DockStyle.Fill;
-        value.TextAlign =
-            ContentAlignment.MiddleLeft;
-        value.Margin = new Padding(0);
-        root.Controls.Add(captionLabel, 0, 0);
-        root.Controls.Add(value, 0, 1);
-        return root;
-    }
-    private static Label CreateDetailLabel()
-    {
-        return new Label {
-            Dock = DockStyle.Fill,
-            Font = AppTheme.NormalFont,
-            ForeColor = AppTheme.Text,
-            TextAlign = ContentAlignment.MiddleLeft,
-            AutoEllipsis = true,
-            Margin = new Padding(0)
-        };
     }
     private void ConfigureGrid()
     {
@@ -384,7 +284,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
                 !AdmissionNumbers.TryNormalize(text, out _))
             {
                 resultsGrid.DataSource = null;
-                ClearSelectedDetails();
+                ClearSelectionState();
                 status.Text =
                     "Enter at least 2 characters for a student/father name, or an Admission Number such as 1 or 1a.";
                 return;
@@ -404,6 +304,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
                 DatabaseHelper.Bit("@IncludeFormerStudents", true));
             List<DataRow> matches = HumanUi.FindStudentMatches(raw, text);
             var display = new DataTable();
+            display.Columns.Add("Admission Number", typeof(string));
             display.Columns.Add("Student Name", typeof(string));
             display.Columns.Add("Father Name", typeof(string));
             display.Columns.Add(UiText.Fields.RegistrationNumber, typeof(string));
@@ -428,6 +329,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
                 }
                 candidateIds.Add(id);
                 display.Rows.Add(
+                    AdmissionNumbers.Read(row),
                     GetText(row, "StudentName"),
                     GetText(
                         row,
@@ -474,7 +376,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
                     UiText.Fields.RegistrationNumber].Visible = false;
             }
             ConfigureGridColumns();
-            ClearSelectedDetails();
+            ClearSelectionState();
             resultsGrid.ClearSelection();
             status.Text =
                 display.Rows.Count > 0
@@ -484,13 +386,13 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
             {
                 resultsGrid.Rows[0].Selected =
                     true;
-                ShowSelectedDetails();
+                UpdateSelection();
             }
         }
         catch (Exception ex)
         {
             resultsGrid.DataSource = null;
-            ClearSelectedDetails();
+            ClearSelectionState();
             status.Text =
                 "Unable to search for possible siblings right now.";
             ModernMessageDialog.Show(this, DbMessage.UserMessage(ex), "Sibling Search", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -498,6 +400,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
     }
     private void ConfigureGridColumns()
     {
+        SetColumnWeight("Admission Number", 110);
         SetColumnWeight("Student Name", 180);
         SetColumnWeight("Father Name", 175);
         SetColumnWeight("Class", 95);
@@ -518,12 +421,12 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
             .DefaultCellStyle.Alignment =
             DataGridViewContentAlignment.MiddleLeft;
     }
-    private void ShowSelectedDetails()
+    private void UpdateSelection()
     {
         if (resultsGrid.CurrentRow is null ||
             !resultsGrid.Columns.Contains("AdmissionId"))
         {
-            ClearSelectedDetails();
+            ClearSelectionState();
             return;
         }
         var row =
@@ -537,51 +440,13 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
                 : Convert.ToInt32(rawId);
         if (id <= 0)
         {
-            ClearSelectedDetails();
+            ClearSelectionState();
             return;
         }
-        selectedAdmissionId.Text = AdmissionNumbers.ForId(id);
-        selectedStudent.Text =
-            Convert.ToString(
-                row.Cells[
-                    "Student Name"].Value)
-            ?? string.Empty;
-        selectedFather.Text =
-            Convert.ToString(
-                row.Cells[
-                    "Father Name"].Value)
-            ?? string.Empty;
-        selectedRegistration.Text =
-            Convert.ToString(
-                row.Cells[
-                    UiText.Fields.RegistrationNumber].Value)
-            ?? string.Empty;
-        selectedClass.Text =
-            Convert.ToString(
-                row.Cells[
-                    "Class"].Value)
-            ?? string.Empty;
-        selectedSection.Text =
-            Convert.ToString(
-                row.Cells[
-                    "Section"].Value)
-            ?? string.Empty;
-        selectedStatus.Text =
-            Convert.ToString(
-                row.Cells[
-                    "Status"].Value)
-            ?? string.Empty;
         addButton.Enabled = true;
     }
-    private void ClearSelectedDetails()
+    private void ClearSelectionState()
     {
-        selectedAdmissionId.Text = "—";
-        selectedStudent.Text = "—";
-        selectedFather.Text = "—";
-        selectedRegistration.Text = "—";
-        selectedClass.Text = "—";
-        selectedSection.Text = "—";
-        selectedStatus.Text = "—";
         addButton.Enabled = false;
     }
     private void AddSelectedSibling()
@@ -607,7 +472,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
                 return;
             }
             string studentName =
-                selectedStudent.Text;
+                Convert.ToString(resultsGrid.CurrentRow.Cells["Student Name"].Value) ?? string.Empty;
             int? siblingFamilyId = null;
             object? siblingFamilyIdValue =
                 resultsGrid.CurrentRow.Cells[

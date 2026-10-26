@@ -40,6 +40,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private bool suppressSiblingEvents;
     /// <summary>Prevent overlapping sibling charge loads.</summary>
     private bool siblingBusy;
+    private Task siblingLoadTask = Task.CompletedTask;
+    private bool switchingSibling;
     private bool focusAmountAfterSiblingLoad;
     /// <summary>Report multiple receipts after refreshes finish updating status.</summary>
     private string? multiStudentReceiptNote;
@@ -597,7 +599,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var siblingsCard =
             HumanUi.Card(
                 "Paying For",
-                "Select children to pay for.");
+                "Select children to pay for. Double-click a name to open their account.");
         var siblingPanel =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -672,8 +674,21 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             familyProposal,
             0,
             4);
-        siblings.ItemCheck +=
-            async (_, e) => await SiblingCheckedAsync(e);
+        siblings.ItemCheck += async (_, e) => {
+            if (siblingBusy)
+            {
+                await SiblingCheckedAsync(e);
+                return;
+            }
+            siblingLoadTask = SiblingCheckedAsync(e);
+            await siblingLoadTask;
+        };
+        siblings.MouseDoubleClick += async (_, e) => {
+            if (e.Button != MouseButtons.Left) return;
+            int index = siblings.IndexFromPoint(e.Location);
+            if (index < 0 || ((FamilyStudentList)siblings).CheckBoxBounds(index).Contains(e.Location)) return;
+            await OpenSiblingStudentAsync(SiblingAdmissionIdAt(index));
+        };
         siblings.ItemCheck += (_, _) => {
             if (IsHandleCreated && !IsDisposed) BeginInvoke(new Action(() => { if (!IsDisposed) SetSiblingHint(""); }));
         };
@@ -2236,6 +2251,27 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         siblings.Items[index] is SiblingChoice choice
             ? choice.AdmissionId
             : 0;
+    private async Task OpenSiblingStudentAsync(int targetAdmissionId)
+    {
+        if (targetAdmissionId <= 0 || targetAdmissionId == admissionId ||
+            counterIds is not null || IsBusy || switchingSibling)
+            return;
+        int anchor = admissionId;
+        int version = loadVersion;
+        switchingSibling = true;
+        try
+        {
+            // Finish the native double-click and any fee read started by its first click.
+            await Task.Yield();
+            await siblingLoadTask;
+            if (IsDisposed || counterIds is not null || IsBusy || siblingBusy ||
+                anchor != admissionId || version != loadVersion)
+                return;
+            await LoadStudentByAdmissionId(targetAdmissionId);
+        }
+        catch (Exception ex) { if (!IsDisposed) Fail(ex); }
+        finally { switchingSibling = false; }
+    }
     private int CountChargesFor(int forAdmissionId)
     {
         int count = 0;
