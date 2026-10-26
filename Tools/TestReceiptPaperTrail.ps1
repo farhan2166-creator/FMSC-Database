@@ -14,6 +14,9 @@ function Query([string]$sql){
 }
 try{
  $cn.Open()
+ if([int](Query 'SELECT TOP(1) VersionNumber FROM FMSC_DB.dbo.DatabaseVersion ORDER BY VersionId DESC;').Tables[0].Rows[0][0] -eq 56){
+  $cn.Close();& (Join-Path $PSScriptRoot 'TestFeeVisits.ps1') -Instance $Instance;return
+ }
  [void](Query ("BACKUP DATABASE FMSC_DB TO DISK=N'"+$backup.Replace("'","''")+"' WITH COPY_ONLY,CHECKSUM,INIT;"))
  $list=Query ("RESTORE FILELISTONLY FROM DISK=N'"+$backup.Replace("'","''")+"';")
  $moves=@();$n=0

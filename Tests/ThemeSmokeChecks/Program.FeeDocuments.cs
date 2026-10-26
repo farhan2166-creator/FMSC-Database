@@ -182,6 +182,7 @@ internal static partial class Program
         }
         CheckReceiptConcessions(school,(name,data)=>Render(name,data));
         CheckReceiptPaperTrail(school,(name,data)=>Render(name,data));
+        CheckFeeVisitDocuments(school,(name,data)=>Render(name,data));
         using var header=new DataTable();
         foreach(string name in new[]{"ReceiptNumber","PaymentMethod","ReceiptStatus"})header.Columns.Add(name);
         header.Columns.Add("TransactionDate",typeof(DateTime));

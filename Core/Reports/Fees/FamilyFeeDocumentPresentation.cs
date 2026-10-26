@@ -53,6 +53,7 @@ internal static class FamilyFeeDocumentPresentation
                     }
                 }
                 bool visible=Money(identity,"ChildDiscountApplied")>0m||Money(identity,"ChildFeesCovered")>0m
+                    ||child.Any(line=>Convert.ToInt32(line["SnapshotVersion"])>=3&&Money(line,"Amount")!=0m)
                     ||child.Any(line=>Convert.ToString(line["FeePeriod"])=="Plan")
                     ||child.Any(line=>(Convert.ToString(line["FeeDescription"])??"").Contains("Cancelled",StringComparison.OrdinalIgnoreCase))
                     ||Money(identity,"ChildCashReceived")>0m||Money(identity,"ChildCreditApplied")>0m
@@ -103,12 +104,14 @@ internal static class FamilyFeeDocumentPresentation
                 decimal childTotal=child.Sum(row=>breakdown?Money(row,"BillGrossAmount"):Money(row,"Amount"));
                 decimal childDiscount=breakdown?child.Sum(row=>Money(row,"BillLineDiscount")):0m;
                 decimal childSettled=childTotal-childDiscount-childDue;
+                bool visitActivity=child.Any(row=>row.Table.Columns.Contains("BillIsVisit")&&!row.IsNull("BillIsVisit")&&Convert.ToBoolean(row["BillIsVisit"]))
+                    &&child.Any(row=>row.Table.Columns.Contains("BillDisplayOverride")&&!row.IsNull("BillDisplayOverride")&&Money(row,"BillDisplayOverride")!=0m);
                 string heading=Convert.ToString(first["BillStudentName"])??"";
                 string reference=Convert.ToString(first["BillStudentKey"])??"";
                 string name=heading.StartsWith(reference+" · ",StringComparison.Ordinal)?heading[(reference.Length+3)..]:heading;
                 foreach(var row in child)
                 {
-                    row["ShowChildDocument"]=childDue>0m||childDiscount>0m;
+                    row["ShowChildDocument"]=childDue>0m||childDiscount>0m||visitActivity;
                     row["ChildAdmissionNumberText"]=reference;row["ChildStudentName"]=name;
                     // New snapshots retain the parent and campus per child. Old
                     // family snapshots only retained the common parent heading.
@@ -122,7 +125,7 @@ internal static class FamilyFeeDocumentPresentation
                     row["ChildBillDiscountText"]=(-childDiscount).ToString("N0");
                     row["ChildBillPaymentPrompt"]=childDue>0m?"Please pay at the fee counter":"No payment required";
                 }
-                if(childDue>0m||childDiscount>0m){total+=childTotal;discount+=childDiscount;due+=childDue;settled+=childSettled;}
+                if(childDue>0m||childDiscount>0m||visitActivity){total+=childTotal;discount+=childDiscount;due+=childDue;settled+=childSettled;}
             }
             foreach(var row in page)
             {
@@ -133,7 +136,8 @@ internal static class FamilyFeeDocumentPresentation
         }
         // The line display field is used by the individual bill rows too.
         data.Columns.Add("BillDisplayAmount",typeof(decimal));
-        foreach(DataRow row in data.Rows)row["BillDisplayAmount"]=data.Columns.Contains("BillGrossAmount")&&!row.IsNull("BillGrossAmount")?row["BillGrossAmount"]:row["Amount"];
+        foreach(DataRow row in data.Rows)row["BillDisplayAmount"]=data.Columns.Contains("BillDisplayOverride")&&!row.IsNull("BillDisplayOverride")?row["BillDisplayOverride"]:
+            data.Columns.Contains("BillGrossAmount")&&!row.IsNull("BillGrossAmount")?row["BillGrossAmount"]:row["Amount"];
         return data;
     }
 

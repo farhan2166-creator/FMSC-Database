@@ -9,6 +9,10 @@ internal static class FeeBillPresentation
         var data=FeeDocumentData.Create();
         data.Columns.Add("BillGrossAmount",typeof(decimal));
         data.Columns.Add("BillLineDiscount",typeof(decimal));
+        data.Columns.Add("BillDisplayOverride",typeof(decimal));
+        data.Columns.Add("BillIsVisit",typeof(bool)).DefaultValue=false;
+        data.Columns.Add("BillAccountGross",typeof(decimal));
+        data.Columns.Add("BillAccountDiscount",typeof(decimal));
         return data;
     }
 
@@ -32,7 +36,8 @@ internal static class FeeBillPresentation
             foreach(var row in rows)
             {
                 row["FeeDescription"]=FeeDocumentData.FeeName(Convert.ToString(row["FeeDescription"])??"");
-                row["BillDisplayAmount"]=breakdown?row["BillGrossAmount"]:oldWaiver?discount:row["Amount"];
+                row["BillDisplayAmount"]=data.Columns.Contains("BillDisplayOverride")&&!row.IsNull("BillDisplayOverride")?row["BillDisplayOverride"]:
+                    breakdown?row["BillGrossAmount"]:oldWaiver?discount:row["Amount"];
                 row["BillPreviouslySettled"]=settled;
                 row["ShowBillPreviouslySettled"]=settled>0m;
                 row["BillDiscountCaption"]=breakdown||oldWaiver

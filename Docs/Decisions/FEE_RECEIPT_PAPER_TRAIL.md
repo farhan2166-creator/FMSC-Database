@@ -1,5 +1,37 @@
 # Fee documents and the parent paper trail — 26 October 2026
 
+## Visit-based clarification — 27 October 2026
+
+Migration 56 supersedes the cumulative presentation below. A visit begins with
+each fee's closing outstanding on the previous relevant receipt. Only subsequent
+fees, rate/payment adjustments and further concessions affect the new document.
+Settled fees and their earlier concessions remain in history. Bills use the same
+position as receipts; printing a bill does not consume the receipt baseline.
+
+New version-3 snapshots save both the visit's printable lines and the underlying
+account state. A monotonic visit sequence makes same-second and backdated visits
+unambiguous. Existing version-2 snapshots are projected from their saved data and
+earlier receipts when read; their stored financial records are never rewritten.
+
+Document student order follows the existing allocator exactly: configured class
+catalog order, then numeric admission number and suffix. It does not change cash
+or credit already allocated to children. New student-order metadata is saved with
+the receipt, keeping its order stable on reprint.
+
+The owner's actual receipts FR-2026-00012, 00013 and 00014 verify family due
+14,400 -> 7,400 -> 0. Visit three shows Shayan's opening 600 less a further 200,
+payment 400; Abdullah's opening 6,800 less a further 5,200, payment 1,600. Faryal's
+fees, settled on visit two, no longer appear.
+
+`Tools/TestFeeVisits.ps1` tests migration preservation, the actual three visits,
+new fees, partial payments, additional discounts, waivers, rate increases,
+withdrawn concessions, bill issuance and concurrent acknowledgements in an owned
+COPY_ONLY clone. It exports actual reader data for RDLC rendering checks.
+`Tools/ApplyFeeVisits.ps1 -Apply` verifies a backup and unchanged business records
+before committing schema 55 -> 56.
+
+## Earlier cumulative snapshot implementation
+
 The receipt previously saved only charges receiving cash, credit or an additional
 collection discount. A waiver saved before collection could disappear; an existing
 discount appeared only as an already reduced fee. Admission 17 exposed both cases.
