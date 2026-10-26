@@ -5,6 +5,7 @@ internal static partial class Program
 {
     private static void CheckFeeVisitDocuments(InstitutionProfile.PrintIdentity school,Func<string,DataTable,int> render)
     {
+        var genders=new Dictionary<string,string>{{"3944","Male"},{"4623","Male"},{"5239","Female"}};
         using var header=new DataTable();
         foreach(string field in new[]{"ReceiptNumber","PaymentMethod","ReceiptStatus"})header.Columns.Add(field);
         header.Columns.Add("TransactionDate",typeof(DateTime));header.Columns.Add("SnapshotVersion",typeof(int));
@@ -38,7 +39,11 @@ internal static partial class Program
         Fee(5239,"Admission Fee",10,4600,400,3000);Fee(5239,"Tuition Fee",10,1000,0,1000);
         using(var data=FeeReceiptDocuments.BuildData(school,first,students,lines))
         {
+            FeeDocumentParents.Apply(data,genders);
             using var display=FamilyFeeDocumentPresentation.Receipt(data);
+            Check(display.AsEnumerable().Where(row=>row.Field<string>("ChildAdmissionNumberText")=="5239").All(row=>row.Field<string>("ParentRelationLabel")=="D/O")
+                &&display.AsEnumerable().Where(row=>row.Field<string>("ChildAdmissionNumberText")=="3944").All(row=>row.Field<string>("ParentRelationLabel")=="S/O"),
+                "Mixed-family print labels use each student's recorded gender");
             Check(display.AsEnumerable().Select(row=>row.Field<string>("ChildAdmissionNumberText")).Distinct().SequenceEqual(new[]{"5239","3944","4623"}),
                 "Receipt children follow the exact allocator class sequence, placing the paid junior first");
             Check(display.Rows[0].Field<decimal>("GroupFeeTotal")==23800m&&display.Rows[0].Field<decimal>("GroupDiscount")==5400m
@@ -51,6 +56,7 @@ internal static partial class Program
         Fee(4623,"Admission Fee",10,5200,0,0,true);Fee(4623,"Tuition Fee",11,1600,0,0,true);Fee(5239,"Admission Fee",10,1200,0,1200,true);
         using(var data=FeeReceiptDocuments.BuildData(school,second,students,lines))
         {
+            FeeDocumentParents.Apply(data,genders);
             using var display=FamilyFeeDocumentPresentation.Receipt(data);
             Check(display.Rows[0].Field<decimal>("GroupFeeTotal")==14400m&&display.Rows[0].Field<decimal>("GroupDiscount")==0m
                 &&display.Rows[0].Field<decimal>("GroupDue")==7400m,"Second visit carries outstanding only, with no repeated concession");
@@ -62,6 +68,7 @@ internal static partial class Program
         Fee(3944,"Admission Fee",10,600,200,400,true);Fee(4623,"Admission Fee",10,5200,5200,0,true);Fee(4623,"Tuition Fee",11,1600,0,1600,true);
         using(var data=FeeReceiptDocuments.BuildData(school,third,students,lines))
         {
+            FeeDocumentParents.Apply(data,genders);
             using var display=FamilyFeeDocumentPresentation.Receipt(data);
             Check(display.Rows[0].Field<decimal>("GroupFeeTotal")==7400m&&display.Rows[0].Field<decimal>("GroupDiscount")==5400m
                 &&display.Rows[0].Field<decimal>("GroupPayable")==2000m&&display.Rows[0].Field<decimal>("GroupDue")==0m,"Third visit shows only the further 200 and 5200 concessions");
@@ -82,6 +89,7 @@ internal static partial class Program
         }
         using(var bill=FamilyBillReport.BuildData(school.Name,school.ContactNumber,school.Address,"Khan Muhammad",charges))
         {
+            FeeDocumentParents.Apply(bill,genders);
             using var display=FamilyFeeDocumentPresentation.Bill(bill);
             Check(display.Rows[0].Field<decimal>("GroupFeeTotal")==7400m&&display.Rows[0].Field<decimal>("GroupDiscount")==5400m
                 &&display.Rows[0].Field<decimal>("GroupDue")==2000m&&!display.Rows[0].Field<bool>("ShowGroupPreviouslySettled"),"A bill before visit three uses the same carry-forward and further concessions");
@@ -119,6 +127,7 @@ internal static partial class Program
             {
                 using var saved=new DataSet();saved.ReadXml(Path.Combine(folder,$"actual-visit-{visit}.xml"),XmlReadMode.ReadSchema);
                 using var actual=FeeReceiptDocuments.BuildData(school,saved.Tables[0].Rows[0],saved.Tables[1],saved.Tables[2]);
+                FeeDocumentParents.Apply(actual,genders);
                 using var display=FamilyFeeDocumentPresentation.Receipt(actual);
                 string[] expected=visit==3?new[]{"3944","4623"}:new[]{"5239","3944","4623"};
                 Check(display.AsEnumerable().Where(row=>row.Field<bool>("ShowChildDocument")).Select(row=>row.Field<string>("ChildAdmissionNumberText")).Distinct().SequenceEqual(expected),

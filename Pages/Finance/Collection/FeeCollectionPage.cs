@@ -4539,6 +4539,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         }
         await FeeReceiptQueries.ApplyCurrentBalanceAsync(reportData);
         using var combined=FamilyReceiptReport.CombineLegacyData(reportData);
+        await FeeDocumentParents.ApplyAsync(combined);
         ShowReceiptReport(combined);
     }
     private async Task PrintPaymentReceipt(
@@ -4592,6 +4593,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 paymentEnrollmentId: paymentEnrollmentId);
         }
         if (showActualAmount) await FeeReceiptQueries.ApplyCurrentBalanceAsync(reportData);
+        await FeeDocumentParents.ApplyAsync(reportData);
         ShowReceiptReport(reportData);
     }
 

@@ -52,6 +52,7 @@ internal static class FeeDocumentData
         table.Columns.Add("PaymentEnrollmentId", typeof(int)).DefaultValue = 0;
         table.Columns.Add("SnapshotVersion",typeof(int)).DefaultValue=1;
         table.Columns.Add("DocumentKind",typeof(string)).DefaultValue="Receipt";
+        table.Columns.Add("ParentRelationLabel",typeof(string)).DefaultValue="Father";
         foreach(string field in new[] {"FeesCovered","Payable","CashReceived","CreditApplied","CreditRemaining","CreditRetained"})
             table.Columns.Add(field,typeof(decimal)).DefaultValue=0m;
         table.Columns.Add("ShowSettlement",typeof(bool)).DefaultValue=false;

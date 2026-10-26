@@ -18,6 +18,8 @@ internal static class FeeReceiptDocuments
         using var data=BuildData(institution,result.Tables[0].Rows[0],result.Tables[1],printableLines);
         if(complete&&result.Tables.Count>3&&Convert.ToString(result.Tables[0].Rows[0]["PaymentMethod"])=="Fee changes")
             AddAgreementNotes(data,result.Tables[3],result.Tables[1]);
+        await FeeDocumentParents.ApplyAsync(data);
+        if(owner?.IsDisposed==true)return true;
         Show(owner,data);
         return true;
     }

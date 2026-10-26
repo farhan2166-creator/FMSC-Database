@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
   <Body>
     <ReportItems>
@@ -6,10 +6,10 @@
         <TablixBody>
           <TablixColumns>
             <TablixColumn>
-              <Width>0.7in</Width>
+              <Width>0.52in</Width>
             </TablixColumn>
             <TablixColumn>
-              <Width>0.85in</Width>
+              <Width>1.03in</Width>
             </TablixColumn>
             <TablixColumn>
               <Width>0.5in</Width>
@@ -273,7 +273,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Adm. No(s)</Value>
+                              <Value>Admn#</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -340,7 +340,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Student</Value>
+                              <Value>Name</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -408,7 +408,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Father Name</Value>
+                              <Value>=First(Fields!ParentRelationLabel.Value, "ReceiptPageGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -2277,7 +2277,7 @@
         <Field Name="ShowAdjustments">
           <DataField>ShowAdjustments</DataField>
         </Field>
-      <Field Name="Payable"><DataField>Payable</DataField></Field></Fields>
+      <Field Name="Payable"><DataField>Payable</DataField></Field><Field Name="ParentRelationLabel"><DataField>ParentRelationLabel</DataField></Field></Fields>
     </DataSet>
   </DataSets>
   <ConsumeContainerWhitespace>true</ConsumeContainerWhitespace>
