@@ -21,7 +21,7 @@ void Check(bool condition,string message){if(!condition)throw new Exception(mess
 int admin=Number("SELECT TOP(1) U.UserId FROM dbo.Users U JOIN dbo.Roles R ON R.RoleId=U.RoleId WHERE R.RoleName=N'Administrator' ORDER BY U.UserId;");
 CurrentUser.UserId=admin;
 using(var c=new SqlConnection(connection)){c.Open();DatabaseCompatibility.Validate(c);checks++;}
-if(args.Contains("--contract-only")){Console.WriteLine("PASS: schema 53 startup and restore compatibility contract.");return;}
+if(args.Contains("--contract-only")){Console.WriteLine("PASS: schema 54 startup and restore compatibility contract.");return;}
 string suffix=Guid.NewGuid().ToString("N");
 int admission=Convert.ToInt32(Query("INSERT dbo.Students(AdmissionNumber,RegistrationNumber,AdmissionDate,AdmissionCampusId,StudentName,FatherName,DateOfBirth,Status,LegacySetupPending) VALUES(@Number,@Registration,CONVERT(date,GETDATE()),(SELECT MIN(CampusId) FROM dbo.Campuses),N'Certificate Test Student',N'Certificate Test Parent','2001-01-02',N'Active',0);SELECT CONVERT(int,SCOPE_IDENTITY());",
     DatabaseHelper.P("@Number","8"+DateTime.UtcNow.Ticks),DatabaseHelper.P("@Registration","CERT-"+suffix)).Rows[0][0]);

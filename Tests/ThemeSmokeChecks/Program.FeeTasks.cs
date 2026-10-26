@@ -28,7 +28,9 @@ internal static partial class Program
                 captured=args;
                 decimal gross=Arg("@NewAmount") is DBNull?10000m:Convert.ToDecimal(Arg("@NewAmount"));
                 decimal discount=(bool)Arg("@FullFeeWaiver")?gross:Convert.ToDecimal(Arg("@DiscountAmount"));
-                decimal before=10000m-oldDiscount,net=(bool)Arg("@ApplyToBills")?gross-discount:before,
+                decimal before=10000m-oldDiscount;
+                if(Arg("@NewAmount") is DBNull)discount=Math.Min(discount,gross-Math.Min(paid,before));
+                decimal net=(bool)Arg("@ApplyToBills")?gross-discount:before,
                     released=Math.Max(0,Math.Min(paid,before)-net);
                 var plan=new DataSet();var summary=plan.Tables.Add();
                 summary.Columns.Add("Snapshot");summary.Columns.Add("Difference",typeof(decimal));summary.Columns.Add("ReleasedPaidAmount",typeof(decimal));summary.Columns.Add("IssuedBills",typeof(int));
@@ -80,11 +82,11 @@ internal static partial class Program
                     "Remove Discount clears both fixed concessions and full-waiver labels explicitly.");
                 Field<ModernComboBox>(form,"action").SelectedIndex=0;paid=10000;
                 Click(form,"review");
-                Check(Field<ModernComboBox>(form,"paidReduction").Visible&&Field<Label>(form,"impact").Text.Contains("Excess already paid: Rs. 2,000"),
-                    "Only an actual overpayment reveals the excess-payment decision.");
+                Check(!Field<ModernComboBox>(form,"paidReduction").Visible&&!Field<Label>(form,"impact").Text.Contains("Excess already paid"),
+                    "Concessions retain recorded payments and never offer refund or advance credit.");
                 Field<ModernComboBox>(form,"paidReduction").SelectedIndex=1;
                 Check(!Field<ModernButton>(form,"save").Enabled,"Refund selection invalidates the earlier credit review.");
-                Click(form,"review");Check((string)Arg("@PaidReductionAction")=="Refund","Refund intent reaches the financial preview.");
+                Click(form,"review");Check((string)Arg("@PaidReductionAction")=="Credit","A concession cannot submit a refund choice left from another action.");
                 Capture(form,"discount-paid");
                 Click(form,"save");Check(saves==1&&form.Changed&&(string)Arg("@ExpectedSnapshot")=="fee-task-snapshot",
                     "Confirmation uses the reviewed snapshot and submits once.");

@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--collection-fee-actions"))
+        {
+            CheckCollectionFeeActions();
+            Console.WriteLine($"PASS: {checks} collection fee shortcut and shared concession checks (no database writes).");
+            return;
+        }
         if(args.Contains("--collection-inline-amounts"))
         {
             CheckCollectionInlineAmounts();

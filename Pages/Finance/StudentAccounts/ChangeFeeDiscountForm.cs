@@ -23,7 +23,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     private readonly TableLayoutPanel fields = new() { Dock=DockStyle.Top, AutoSize=true, ColumnCount=2 };
     private readonly Func<SqlParameter[],Task<DataSet>> query;
     private readonly Func<SqlParameter[],Task<MutationWriteResult>> submit;
-    private readonly string initial;
+    private string initial;
     private DataSet? reviewed;
     private MutationIntent? pending;
     private bool busy, blocked, monthly, validContext, reviewStage;
@@ -40,7 +40,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     private decimal ChosenDiscount => FullWaiver || RemoveAction ? 0m : RateAction ? originalDiscount :
         decimal.Parse(string.IsNullOrWhiteSpace(amount.Text)?"0":amount.Text);
     private string? ChosenLabel => RemoveAction ? null : RateAction ? (string.IsNullOrWhiteSpace(originalLabel)||originalLabel=="None"?null:originalLabel) :
-        concession.Text=="None"?null:concession.Text;
+        Convert.ToString(concession.SelectedItem)=="None"?null:Convert.ToString(concession.SelectedItem);
     internal bool Changed { get; private set; }
 
     public ChangeFeeDiscountForm(int id,string fee,decimal rate,decimal discount,DataRow? periodContext=null)
@@ -71,6 +71,8 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         scope.SelectedIndex=0;
         concession.Items.AddRange(new object[]{"Scholarship","None"});
         concession.SelectedItem=originalLabel=="Scholarship"?"Scholarship":"None";
+        concession.FormattingEnabled=true;
+        concession.Format+=(_,e)=>e.Value=FeeConcessionLabels.Display(Convert.ToString(e.ListItem)??"");
         paidReduction.Items.AddRange(new object[]{"Keep as advance credit","Refund the excess payment"}); paidReduction.SelectedIndex=0;
         if(context is not null)
         {
@@ -111,11 +113,30 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         ReadPending(); State();
     }
     private static DateTime First(DateTime value)=>new(value.Year,value.Month,1);
+    internal void ConfigureCollectionShortcut(bool siblingConcession,DateTime chargeMonth)
+    {
+        action.SelectedIndex=siblingConcession?1:0;
+        if(siblingConcession)concession.SelectedItem="Free";
+        if(billId is null && agreementAllowed)scope.SelectedIndex=1;
+        if(billId is null && agreementAllowed)
+        {
+            scope.Items[0]="Do not apply to existing charges";
+            scope.Items[1]="Apply to existing charges";
+            scope.Items[2]="Existing charges only";
+        }
+        DateTime month=First(chargeMonth);
+        if(month>=fromMonth.MinDate && month<=fromMonth.MaxDate)
+        {
+            fromMonth.Value=month;
+            throughMonth.Value=siblingConcession && monthly?throughMonth.MaxDate:month;
+        }
+        initial=Draft();State();
+    }
     private string Draft()=>string.Join("|",action.SelectedIndex,scope.SelectedIndex,amount.Text,concession.Text,
         First(fromMonth.Value),First(throughMonth.Value),paidReduction.Text,reason.Text,newRate.Text);
     private void ConfigureConcession()
     {
-        string previous=concession.Text;
+        string previous=Convert.ToString(concession.SelectedItem)??"";
         concession.Items.Clear();
         concession.Items.AddRange(WaiverAction?new object[]{"Waived","Free","Scholarship"}:new object[]{"Scholarship","None"});
         concession.SelectedItem=concession.Items.Contains(previous)?previous:
@@ -166,7 +187,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         DatabaseHelper.Date("@EffectiveFrom",First(fromMonth.Value)),DatabaseHelper.Date("@EffectiveThrough",First(throughMonth.Value)),
         DatabaseHelper.P("@NewAmount",RateAction?decimal.Parse(newRate.Text):null),
         DatabaseHelper.Bit("@ApplyAvailableCredit",false),DatabaseHelper.Bit("@UpdateAgreement",UpdateAgreement),DatabaseHelper.P("@BillingChargeId",billId),DatabaseHelper.Bit("@FullFeeWaiver",FullWaiver),
-        DatabaseHelper.Bit("@ApplyToBills",ApplyBills),DatabaseHelper.P("@PaidReductionAction",paidReduction.SelectedIndex==1?"Refund":"Credit"),
+        DatabaseHelper.Bit("@ApplyToBills",ApplyBills),DatabaseHelper.P("@PaidReductionAction",RateAction&&paidReduction.SelectedIndex==1?"Refund":"Credit"),
         DatabaseHelper.P("@Reason",reason.Text.Trim()),DatabaseHelper.Bit("@Preview",preview),
         DatabaseHelper.P("@ExpectedSnapshot",preview?null:Convert.ToString(reviewed!.Tables[0].Rows[0]["Snapshot"]))};
     private async Task ReviewAsync()
@@ -220,7 +241,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
             summary+=$"\r\n{row["IssuedBills"]} bill(s): {(delta<0?"decrease":"increase")} of Rs. {Math.Abs(delta):N0}.";
         }
         if(DiscountAction) summary+=$" Discount: Rs. {ChosenDiscount:N0}.";
-        else if(WaiverAction) summary+=" Full fee waived.";
+        else if(WaiverAction) summary+=" Full concession applied, limited to unpaid dues on existing charges.";
         else if(RemoveAction) summary+=" The discount or full waiver is removed.";
         else summary+=$" Full fee: Rs. {standardAmount:N0} → Rs. {decimal.Parse(newRate.Text):N0}. " +
             (originalWaiver?"The existing full waiver is retained.":$"Existing discount retained: Rs. {originalDiscount:N0}.");

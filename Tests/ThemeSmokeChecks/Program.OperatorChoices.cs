@@ -27,7 +27,7 @@ internal static partial class Program
             bool RefusesClose(){var args=new FormClosingEventArgs(CloseReason.UserClosing,false);typeof(Form).GetMethod("OnFormClosing",flags)!.Invoke(form,new object[]{args});return args.Cancel;}
             DataSet Plan()
             {
-                var data=new DataSet();var summary=data.Tables.Add();summary.Columns.Add("Snapshot");summary.Columns.Add("Difference",typeof(decimal));summary.Columns.Add("ReleasedPaidAmount",typeof(decimal));summary.Columns.Add("IssuedBills",typeof(int));summary.Rows.Add("reviewed-concession",-1000m,500m,1);
+                var data=new DataSet();var summary=data.Tables.Add();summary.Columns.Add("Snapshot");summary.Columns.Add("Difference",typeof(decimal));summary.Columns.Add("ReleasedPaidAmount",typeof(decimal));summary.Columns.Add("IssuedBills",typeof(int));summary.Rows.Add("reviewed-concession",-1000m,0m,1);
                 var bills=data.Tables.Add();bills.Columns.Add("Month",typeof(DateTime));bills.Columns.Add("Bill Change",typeof(decimal));bills.Rows.Add(new DateTime(year,5,1),-1000m);
                 var schedule=data.Tables.Add();schedule.Columns.Add("From",typeof(DateTime));schedule.Columns.Add("New Concession",typeof(decimal));schedule.Rows.Add(new DateTime(year,5,1),1000m);return data;
             }
@@ -44,8 +44,8 @@ internal static partial class Program
             PumpUntil(()=>Field<ModernButton>("review").Enabled,"Stale concession review settles");
             Check(!Field<ModernButton>("save").Enabled,"Changing the period invalidates an in-flight financial review");
             Click(Field<ModernButton>("review"));replies.Dequeue().SetResult(Plan());PumpUntil(()=>Field<ModernButton>("save").Enabled,"Current concession review settles");
-            Check(Field<DataGridView>("bills").ReadOnly&&Field<Label>("impact").Text.Contains("500"),"The review presents paid money released and a read-only bill comparison");
-            Check(Field<ModernComboBox>("paidReduction").Visible,"Credit/refund choice appears only after an overpayment is found");
+            Check(Field<DataGridView>("bills").ReadOnly&&Field<Label>("impact").Text.Contains("1 bill"),"The review presents the concession and a read-only bill comparison");
+            Check(!Field<ModernComboBox>("paidReduction").Visible,"Concessions preserve paid money without offering a credit/refund choice");
             Field<ModernComboBox>("paidReduction").SelectedIndex=1;
             Check(!Field<ModernButton>("save").Enabled,"Changing the excess-payment decision requires a new review");
             Click(Field<ModernButton>("review"));replies.Dequeue().SetResult(Plan());PumpUntil(()=>Field<ModernButton>("save").Enabled,"Refund review settles");

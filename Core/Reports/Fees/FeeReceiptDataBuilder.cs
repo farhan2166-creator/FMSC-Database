@@ -63,7 +63,7 @@ internal static partial class FeeReceiptDataBuilder
             foreach(var month in child.GroupBy(row=>Convert.ToDateTime(row["FeePeriod"]).ToString("MMM yyyy")))
             {
                 if(family) Add("  "+month.Key,"",0,"Month");
-                foreach(var line in month) Add((family?"    ":"")+Text(line,"FeeTypeName"),month.Key,Money(line,"AmountBefore"),"Fee",line);
+                foreach(var line in month) Add((family?"    ":"")+FeeConcessionLabels.FeeText(Text(line,"FeeTypeName")),month.Key,Money(line,"AmountBefore"),"Fee",line);
             }
             if(family)
             {

@@ -348,6 +348,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         };
         var futureFeesItem = studentFeesMenu.Items.Add("Future Fees", null, (_, _) => futureFeesButton?.PerformClick());
         var statementItem = studentFeesMenu.Items.Add("Account Statement", null, (_, _) => historyButton?.PerformClick());
+        var startTransportItem=studentFeesMenu.Items.Add("Start / Restart Transport…",null,async(_,_)=>await OpenTransportAsync(true));
+        var stopTransportItem=studentFeesMenu.Items.Add("Stop Transport…",null,async(_,_)=>await OpenTransportAsync(false));
         studentFeesMenu.Items.Add(new ToolStripSeparator());
         // Bills cover current unpaid charges. Paid transactions are reprinted as receipts.
         printBillButton = AddBusyAction("Print Outstanding", PrintSelectedFamilyBillAsync, "Secondary");
@@ -361,12 +363,15 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         studentFeesMenu.Opening += (_, _) => {
             futureFeesItem.Enabled = futureFeesButton?.Enabled == true;
             statementItem.Enabled = historyButton?.Enabled == true;
+            startTransportItem.Available=stopTransportItem.Available=CurrentUser.HasPermission("Fees.Adjust");
+            startTransportItem.Enabled=stopTransportItem.Enabled=admissionId>0 && enrollmentId>0 && CanChangeFeeTerms;
             familyReturnsItem.Available=CurrentUser.HasPermission("Students.Family");
             familyReturnsItem.Enabled=admissionId>0 && !IsBusy && !siblingBusy && CurrentUser.HasPermission("Students.Family") && CurrentUser.HasPermission("Students.View");
             familyReturnsItem.ToolTipText="Review family readiness and individual returns. Requires family and student-view access.";
         };
         studentFeesMenuButton.Click += (_, _) =>
             studentFeesMenu.Show(studentFeesMenuButton, new Point(0, studentFeesMenuButton.Height));
+        studentFeesMenu.Opening+=async(_,_)=>await RefreshTransportMenuAsync(startTransportItem,stopTransportItem);
         var clear =
             AddAction(
                 UiText.Certificates.NextStudent,
@@ -1191,6 +1196,18 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         header.Enabled = false;
         chargeMenu.Items.Add(
             new ToolStripSeparator());
+        var waive=chargeMenu.Items.Add("Waive once");
+        waive.Enabled=CanChangeFeeTerms && GetDecimal(row.Cells["Balance"].Value)>0;
+        waive.ToolTipText="Immediately discount this charge's remaining dues. Recorded payments and other months stay unchanged.";
+        waive.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,0);
+        var discount=chargeMenu.Items.Add("Discount…");
+        discount.Enabled=CanChangeFeeTerms;
+        discount.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,1);
+        if(row.Cells["FeeTypeName"].Tag is true)
+        {
+            var sibling=chargeMenu.Items.Add("Sibling concession…");sibling.Enabled=CanChangeFeeTerms;
+            sibling.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,2);
+        }
         var terms=chargeMenu.Items.Add("Review bill terms...");
         terms.ToolTipText="Change the fee or discount on this bill after reviewing its effect. Example: reducing a Rs. 1,000 fee to Rs. 800 is different from reducing its recorded payment.";
         terms.Enabled=!IsBusy&&CurrentUser.HasPermission("Fees.Adjust");

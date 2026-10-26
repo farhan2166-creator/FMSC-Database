@@ -1678,7 +1678,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                 false));
         var concessionColumn = new DataGridViewComboBoxColumn { Name = "ConcessionLabel", DataPropertyName = "ConcessionLabel",
             HeaderText = "Concession", Width = 120, FlatStyle = FlatStyle.Flat };
-        concessionColumn.Items.AddRange("None", "Free", "Scholarship", "Waived");
+        FeeConcessionLabels.Configure(concessionColumn);
         feeGrid.Columns.Insert(feeGrid.Columns["NetAmount"].Index, concessionColumn);
         feeGrid.CurrentCellDirtyStateChanged += (_, _) => {
             if (feeGrid.IsCurrentCellDirty && feeGrid.CurrentCell is DataGridViewComboBoxCell)
