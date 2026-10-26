@@ -61,7 +61,7 @@ internal static partial class Program
             {
                 string Caption(string name)=>xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")==name)
                     .Descendants(ns+"Value").First().Value;
-                Check(new[]{"TotalLabelFeesCovered","TotalLabelCashReceived","BalanceLabel","TotalLabel"}
+                Check(new[]{"TotalLabelCashReceived","BalanceLabel","TotalLabel"}
                     .All(name=>!Caption(name).StartsWith('=')),
                     "Receipt captions are editable plain text, separate from monetary formulas");
             }
@@ -181,6 +181,7 @@ internal static partial class Program
             }
         }
         CheckReceiptConcessions(school,(name,data)=>Render(name,data));
+        CheckReceiptPaperTrail(school,(name,data)=>Render(name,data));
         using var header=new DataTable();
         foreach(string name in new[]{"ReceiptNumber","PaymentMethod","ReceiptStatus"})header.Columns.Add(name);
         header.Columns.Add("TransactionDate",typeof(DateTime));

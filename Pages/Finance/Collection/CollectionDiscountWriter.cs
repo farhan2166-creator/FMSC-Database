@@ -12,7 +12,14 @@ internal static class CollectionDiscountWriter
     internal sealed record ReceiptLine(long ChargeId, int AdmissionId, int EnrollmentId,
         decimal AmountBefore, decimal Discount, decimal Cash, decimal Credit);
     internal sealed record ReceiptDraft(int PrimaryAdmissionId, int[] StudentIds, DateTime TransactionDate,
-        string PaymentMethod, string Remarks, decimal CashReceived, decimal DiscountApplied, IReadOnlyList<ReceiptLine> Lines);
+        string PaymentMethod, string Remarks, decimal CashReceived, decimal DiscountApplied, IReadOnlyList<ReceiptLine> Lines,
+        IReadOnlyDictionary<int,string>? ReviewTokens=null);
+
+    internal static async Task<string> ReadReviewTokenAsync(int admissionId)
+    {
+        using var data=await DatabaseHelper.QueryUserAsync("GetCollectionReviewState",DatabaseHelper.Int("@AdmissionId",admissionId));
+        return Convert.ToString(data.Rows[0]["ReviewToken"])!;
+    }
     public static Task<DataTable> CollectAsync(string procedure, IReadOnlyList<Edit> edits, string recoverySummary,
         params SqlParameter[] parameters) => CollectWithCreditAsync(procedure, edits, Array.Empty<CreditEdit>(), DateTime.Today, recoverySummary, parameters);
 
@@ -35,6 +42,18 @@ internal static class CollectionDiscountWriter
             var previousPayments = new HashSet<int>();
             if (receipt is not null)
             {
+                if(receipt.ReviewTokens is not null)
+                {
+                    foreach(int student in receipt.StudentIds.Distinct().OrderBy(id=>id))
+                    {
+                        if(!receipt.ReviewTokens.TryGetValue(student,out string? token))
+                            throw new InvalidOperationException("Reload the selected family before collecting; its reviewed fee details are incomplete.");
+                        using var review=new SqlCommand("dbo.GetCollectionReviewState",connection,transaction) {CommandType=CommandType.StoredProcedure};
+                        review.Parameters.AddRange(new[]{DatabaseHelper.Int("@UserId",CurrentUser.UserId),
+                            DatabaseHelper.Int("@AdmissionId",student),DatabaseHelper.P("@ExpectedToken",token)});
+                        review.ExecuteNonQuery();
+                    }
+                }
                 foreach (int student in receipt.StudentIds.Distinct().OrderBy(id => id))
                 {
                     using var accountLock = new SqlCommand("DECLARE @L int,@R nvarchar(255)=CONCAT(N'FMSC.StudentCredit.',@Id); EXEC @L=sys.sp_getapplock @Resource=@R,@LockMode=N'Exclusive',@LockOwner=N'Transaction',@LockTimeout=10000; IF @L<0 THROW 54901,'Student credit is busy. Try again.',1;",connection,transaction);

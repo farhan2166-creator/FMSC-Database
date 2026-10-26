@@ -54,7 +54,7 @@ try{
                 try{[void]$command.ExecuteNonQuery()}finally{$command.Dispose()}
             };$tx.Commit()
         }catch{$tx.Rollback();throw}
-    }elseif([int]$version.Tables[0].Rows[0][0] -ne 54){throw 'The fixture requires schema 53 or 54.'}
+    }elseif([int]$version.Tables[0].Rows[0][0] -notin @(54,55)){throw 'The fixture requires schema 53, 54 or 55.'}
     $setup=Query @'
 DECLARE @Enrollment int,@Admission int,@From date,@Through date,@Actor int;
 SELECT TOP(1) @Enrollment=E.EnrollmentId,@Admission=E.AdmissionId,

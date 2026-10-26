@@ -5,6 +5,8 @@ internal static partial class FeeReceiptDataBuilder
     internal static DataTable BuildGrouped(InstitutionProfile.PrintIdentity institution,DataRow header,DataTable students,DataTable lines,bool family)
     {
         var data=FeeDocumentData.Create();
+        bool complete=FeeReceiptDocuments.IsCompleteSnapshot(header);
+        bool acknowledgement=Text(header,"PaymentMethod")=="Fee changes";
 
         if(family) {data.Columns.Add("FamilyRowKind",typeof(string));data.Columns.Add("FamilyAmountText",typeof(string));FamilyFeeDocumentPresentation.AddChildColumns(data);}
         decimal Money(DataRow row,string name)=>Convert.ToDecimal(row[name]);
@@ -25,6 +27,9 @@ internal static partial class FeeReceiptDataBuilder
                 Text(header,"ReceiptStatus"),Money(header,"DiscountApplied")>0,true,institution.ContactNumber,institution.Address,
                 family?campusHeading:detail is null?"":Text(detail,"CampusName"),family?"":parent,period);
             row["NetPaid"]=settled;row["FeesCovered"]=lines.AsEnumerable().Sum(line=>Money(line,"AmountBefore"));
+            row["Payable"]=Convert.ToDecimal(row["FeesCovered"])-Money(header,"DiscountApplied");
+            row["SnapshotVersion"]=complete?2:1;
+            if(acknowledgement)row["DocumentTitle"]="FEE CHANGE ACKNOWLEDGEMENT";
             row["ShowSettlement"]=true;row["CashReceived"]=Money(header,"CashReceived");row["CreditApplied"]=Money(header,"CreditApplied");
             row["CreditRemaining"]=Money(header,"CreditRemaining");row["CreditRetained"]=Money(header,"CashReceived")-Money(header,"CashApplied");
             row["ShowCreditRemaining"]=Money(header,"CreditApplied")>0 || Money(header,"CreditRemaining")>0;
@@ -63,15 +68,26 @@ internal static partial class FeeReceiptDataBuilder
             foreach(var month in child.GroupBy(row=>Convert.ToDateTime(row["FeePeriod"]).ToString("MMM yyyy")))
             {
                 if(family) Add("  "+month.Key,"",0,"Month");
-                foreach(var line in month) Add((family?"    ":"")+FeeConcessionLabels.FeeText(Text(line,"FeeTypeName")),month.Key,Money(line,"AmountBefore"),"Fee",line);
+                foreach(var line in month)
+                {
+                    string fee=FeeDocumentData.FeeName(Text(line,"FeeTypeName"));
+                    if(complete)
+                    {
+                        string kind=Text(line,"ConcessionKind");
+                        if(kind=="Cancelled")fee+=$" — Cancelled (Rs. {Money(line,"CancelledAmount"):N0} removed)";
+                    }
+                    Add((family?"    ":"")+fee,month.Key,complete?Money(line,"GrossAmount"):Money(line,"AmountBefore"),"Fee",line);
+                }
             }
+            decimal previouslyPaid=complete?child.Sum(line=>Money(line,"PreviouslyPaid")):0m;
+            if(previouslyPaid>0m)Add("Less: Previously paid","",-previouslyPaid,"Fee",child.FirstOrDefault());
             if(family)
             {
                 Add("  Student total","",Money(student,"CashApplied")+Money(student,"CreditApplied"),"Summary");
                 if(Money(student,"BalanceRemaining")>0) Add("  Outstanding","",Money(student,"BalanceRemaining"),"Summary");
             }
         }
-        if(data.Rows.Count==0) Add("Advance retained as student credit","",0m,"Fee");
+        if(data.Rows.Count==0) Add(acknowledgement?"No billed charges":"Advance retained as student credit","",0m,"Fee");
         return data;
     }
 

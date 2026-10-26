@@ -28,11 +28,32 @@ internal static class AnnualReceiptPreview
             }
             using var receipts = FeeDocumentData.Create();
             int pageKey = 0;
+            var printedSnapshots=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var receipt in data.AsEnumerable().GroupBy(row => Convert.ToString(row["ReceiptNumber"]) ?? "")
                 .OrderBy(group => Convert.ToDateTime(group.First()["PaymentDate"]))
                 .ThenBy(group => Convert.ToInt32(group.First()["FeePaymentId"])))
             {
                 if (string.IsNullOrWhiteSpace(receipt.Key)) continue;
+                using var saved=await DatabaseHelper.QueryUserSetAsync("GetCollectionReceipt",DatabaseHelper.P("@ReceiptNumber",receipt.Key),DatabaseHelper.P("@ReadPermission","Fees.Statement.View"));
+                if(!Current())return;
+                if(saved.Tables.Count>=3&&saved.Tables[0].Rows.Count>0&&FeeReceiptDocuments.IsCompleteSnapshot(saved.Tables[0].Rows[0]))
+                {
+                    // Cash and credit movements can have different internal
+                    // numbers while sharing one issued collection receipt.
+                    if(!printedSnapshots.Add(Convert.ToString(saved.Tables[0].Rows[0]["ReceiptNumber"])!))continue;
+                    using var child=saved.Tables[1].Clone();
+                    foreach(var member in saved.Tables[1].AsEnumerable().Where(row=>Convert.ToInt32(row["AdmissionId"])==admissionId))child.ImportRow(member);
+                    if(child.Rows.Count==0)continue;
+                    using var childLines=saved.Tables[2].Clone();
+                    foreach(var line in saved.Tables[2].AsEnumerable().Where(row=>Convert.ToInt32(row["AdmissionId"])==admissionId))childLines.ImportRow(line);
+                    var h=saved.Tables[0].Rows[0];var c=child.Rows[0];
+                    foreach(string field in new[]{"CashApplied","CreditApplied","DiscountApplied","BalanceRemaining","CreditRemaining"})h[field]=c[field];
+                    h["CashReceived"]=c["CashReceived"];
+                    using var document=StudentReceiptReport.BuildData(institution,h,child,childLines);
+                    pageKey++;
+                    foreach(DataRow row in document.Rows){row["ReceiptPageKey"]=pageKey;row["SnapshotVersion"]=2;receipts.ImportRow(row);}
+                    continue;
+                }
                 var header = receipt.First();
                 using var lines = await FeeReceiptQueries.QueryLinesAsync(receipt.Key,"Fees.Statement.View");
                 if(!Current())return;
@@ -61,7 +82,13 @@ internal static class AnnualReceiptPreview
                 notify("No printable receipts were found for this academic year.");
                 return;
             }
-            await FeeReceiptQueries.ApplyCurrentBalanceAsync(receipts,"Fees.Statement.View");
+            // Complete snapshots retain their recorded balances on annual reprints.
+            using var legacy=receipts.Clone();
+            foreach(var row in receipts.AsEnumerable().Where(row=>row.Field<int>("SnapshotVersion")<2))legacy.ImportRow(row);
+            await FeeReceiptQueries.ApplyCurrentBalanceAsync(legacy,"Fees.Statement.View");
+            foreach(DataRow original in legacy.Rows)
+                foreach(var row in receipts.AsEnumerable().Where(row=>row.Field<int>("ReceiptPageKey")==original.Field<int>("ReceiptPageKey")))
+                    foreach(string field in new[]{"BalanceRemaining","OriginalPaid","RefundAmount","CorrectionAmount","ReversedAmount","NetPaid","ShowAdjustments","ReceiptStatus","ShowBalance"})row[field]=original[field];
             if(!Current())return;
             StudentReceiptReport.Show(owner,receipts,annualSheet:true);
 

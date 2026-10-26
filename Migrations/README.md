@@ -1,7 +1,12 @@
 # Apply the database changes later
 
-The application requires **schema 51**. SQL changes are checked in here;
+The application requires **schema 55**. SQL changes are checked in here;
 merging the code does not execute them against your database.
+
+For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,
+`54.sql`, then `55.sql`. A database already at 54 needs only `55.sql`.
+Migration 55 preserves existing financial records and introduces complete,
+immutable receipt snapshots. See `Docs/Decisions/FEE_RECEIPT_PAPER_TRAIL.md`.
 
 | Current database version | Files to apply, in order |
 |---|---|

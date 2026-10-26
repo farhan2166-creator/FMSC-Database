@@ -6,6 +6,12 @@ internal static class FeeDocumentData
 {
     // Stable XML table name for already saved bill snapshots; RDLC datasets have their own document names.
     internal const string SnapshotTableName="FeeReceiptData";
+    // Concessions remain in the saved breakdown and the summary deduction.
+    // Printed fee lines use the plain fee name, including older saved bills.
+    internal static string FeeName(string value)=>System.Text.RegularExpressions.Regex.Replace(
+        FeeConcessionLabels.FeeText(value),
+        @"\s+(?:—\s+(?:Discount|Waived|Free|Scholarship|Sibling concession)(?:\s*:[^\r\n]*)?|\((?:Free|Scholarship|Waived|Sibling concession)\))\s*$",
+        "",System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     internal static string CampusHeading(DataTable source)
     {
         if (!source.Columns.Contains("CampusName")) return "";
@@ -44,8 +50,9 @@ internal static class FeeDocumentData
             table.Columns.Add(field, typeof(decimal)).DefaultValue = 0m;
         table.Columns.Add("ShowAdjustments", typeof(bool)).DefaultValue = false;
         table.Columns.Add("PaymentEnrollmentId", typeof(int)).DefaultValue = 0;
+        table.Columns.Add("SnapshotVersion",typeof(int)).DefaultValue=1;
         table.Columns.Add("DocumentKind",typeof(string)).DefaultValue="Receipt";
-        foreach(string field in new[] {"FeesCovered","CashReceived","CreditApplied","CreditRemaining","CreditRetained"})
+        foreach(string field in new[] {"FeesCovered","Payable","CashReceived","CreditApplied","CreditRemaining","CreditRetained"})
             table.Columns.Add(field,typeof(decimal)).DefaultValue=0m;
         table.Columns.Add("ShowSettlement",typeof(bool)).DefaultValue=false;
         table.Columns.Add("ShowCreditRemaining",typeof(bool)).DefaultValue=false;
