@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--collection-inline-amounts"))
+        {
+            CheckCollectionInlineAmounts();
+            Console.WriteLine($"PASS: {checks} sibling total/pay labels and allocation checks (no database connection).");
+            return;
+        }
         if(args.Contains("--collection-sibling-navigation"))
         {
             CheckCollectionSiblingNavigation();

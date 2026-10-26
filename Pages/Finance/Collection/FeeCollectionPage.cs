@@ -27,6 +27,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private readonly CheckedListBox siblings = new FamilyStudentList() {
         Dock = DockStyle.Fill,
         CheckBoxOnly = true,
+        CompactRows = true,
         CheckOnClick = true,
         IntegralHeight = false,
         BorderStyle = BorderStyle.None,
@@ -600,22 +601,21 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 Margin = new Padding(0)
             };
         counterSiblingCard=siblingsCard;counterSiblingPanel=siblingPanel;
-        // The current student is already identified in the collection header.
-        // Keep this row collapsed so the sibling choices get the available space.
+        // The current student's compact summary appears above the sibling choices.
         siblingPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
         primaryPayer.Visible = false;
         siblingPanel.RowStyles.Add(
             new RowStyle(
                 SizeType.Percent,
-                55f));
+                100f));
         siblingPanel.RowStyles.Add(
             new RowStyle(
                 SizeType.Absolute,
-                AppScale.Scale(48)));
+                AppMetrics.TextHeight(AppTheme.NormalFont)+AppScale.Scale(8)));
         siblingPanel.RowStyles.Add(
             new RowStyle(
                 SizeType.Absolute,
-                AppMetrics.ButtonHeight + AppScale.Scale(8)));
+                AppMetrics.ButtonHeight + AppScale.Scale(4)));
         siblingPanel.Controls.Add(
             siblings,
             0,
@@ -661,10 +661,10 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         siblingPanel.RowStyles.Add(
             proposalRow);
         ConfigureProposalGrid();
-        siblingPanel.Controls.Add(
-            familyProposal,
-            0,
-            4);
+        ConfigureInlineAmounts();
+        siblingPanel.Controls.Add(currentStudentAmounts,0,0);
+        // The separate counter keeps its fixed-group split editor.
+        // Normal collection renders these amounts directly beneath each student.
         siblings.ItemCheck += async (_, e) => {
             if (siblingBusy)
             {
@@ -678,6 +678,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             if (e.Button != MouseButtons.Left) return;
             int index = siblings.IndexFromPoint(e.Location);
             if (index < 0 || ((FamilyStudentList)siblings).CheckBoxBounds(index).Contains(e.Location)) return;
+            if(e.Y>=((FamilyStudentList)siblings).PaymentBounds(index).Top)return;
             await OpenSiblingStudentAsync(SiblingAdmissionIdAt(index));
         };
         siblings.ItemCheck += (_, _) => {
@@ -2076,6 +2077,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         {
             siblings.Items.Clear();
             payingFor.Clear();
+            siblingBaseOwed.Clear();
             selectAllSiblings.Enabled = false;
             if (admissionId <= 0)
                 return;
@@ -2095,6 +2097,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             var eligible = await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Fees.View';
                 SELECT S.AdmissionId,P.ClassId,
+                    (SELECT COALESCE(SUM(dbo.GetFeeChargeBalance(B.BillingChargeId)),0) FROM dbo.BillingCharges B
+                     WHERE B.AdmissionId=S.AdmissionId AND B.Status<>N'Cancelled') Outstanding,
                     CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.Enrollments E WHERE E.AdmissionId=S.AdmissionId AND E.Status=N'Active') THEN 1 ELSE 0 END AS bit) IsActive,
                     (SELECT TOP(1) B.EnrollmentId FROM dbo.BillingCharges B
                      WHERE B.AdmissionId=S.AdmissionId AND B.Status<>N'Cancelled' AND dbo.GetFeeChargeBalance(B.BillingChargeId)>0
@@ -2124,6 +2128,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                     continue;
                 var eligibility=eligible.AsEnumerable().FirstOrDefault(item=>Convert.ToInt32(item["AdmissionId"])==memberAdmissionId);
                 if(eligibility==null) continue;
+                siblingBaseOwed[memberAdmissionId]=GetDecimal(eligibility,"Outstanding");
                 bool active=Convert.ToBoolean(eligibility["IsActive"]);
                 int pendingEnrollment=eligibility["PendingEnrollmentId"]==DBNull.Value ? 0 : Convert.ToInt32(eligibility["PendingEnrollmentId"]);
                 if(!active && pendingEnrollment<=0) continue;
@@ -2771,11 +2776,11 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             /* One child is the ordinary case, and the Payment field already says everything about it. */
             bool isFamily =
                 children.Count > 1;
-            proposalRow.SizeType=SizeType.Percent;
-            proposalRow.Height=isFamily ? 45 : 0;
+            proposalRow.SizeType=counterIds is null?SizeType.Absolute:SizeType.Percent;
+            proposalRow.Height=counterIds is not null && isFamily ? 100 : 0;
             familyProposal.Visible =
-                isFamily;
-            if (!isFamily)
+                counterIds is not null && isFamily;
+            if (!isFamily && counterIds is not null)
             {
                 familyProposal.Rows.Clear();
                 return;
@@ -2826,6 +2831,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         finally
         {
             suppressProposalEvents = false;
+            RefreshInlineAmounts();
         }
     }
     /// <summary>Process Collection is the button that takes money, so it is enabled only while the charges grid holds a charge that still has a balance.</summary>
