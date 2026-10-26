@@ -7,10 +7,10 @@ internal static class FeeReceiptDocuments
     {
         using var result=await DatabaseHelper.QueryUserSetAsync("GetCollectionReceipt",DatabaseHelper.P("@ReceiptNumber",receiptNumber));
         if(result.Tables.Count<3 || result.Tables[0].Rows.Count==0)return false;
-        await RefreshBalancesAsync(result.Tables[0].Rows[0],result.Tables[1]);
+        bool latest=await RefreshBalancesAsync(result.Tables[0].Rows[0],result.Tables[1],receiptNumber:receiptNumber);
         await ReadChildCashReceivedAsync(receiptNumber,result.Tables[0].Rows[0],result.Tables[1]);
         using var printableLines=result.Tables[2].Copy();
-        await AddUnpaidChildFeesAsync(result.Tables[1],printableLines);
+        if(latest)await AddUnpaidChildFeesAsync(result.Tables[1],printableLines);
         using var data=BuildData(institution,result.Tables[0].Rows[0],result.Tables[1],printableLines);
         Show(owner,data);
         return true;
@@ -88,19 +88,29 @@ internal static class FeeReceiptDocuments
         }
     }
 
-    // Refresh only the printable data; the original collection snapshot stays intact.
-    internal static async Task RefreshBalancesAsync(DataRow header,DataTable students,Func<int,Task<decimal>>? loadBalance=null)
+    // Latest collections use live dues. Historical collections retain their
+    // recorded child balances and never acquire charges from later months.
+    internal static async Task<bool> RefreshBalancesAsync(DataRow header,DataTable students,Func<int,Task<decimal>>? loadBalance=null,
+        Func<string,Task<FeeReceiptQueries.ReceiptBalanceState>>? loadState=null,string? receiptNumber=null)
     {
         loadBalance ??= admissionId=>FeeReceiptQueries.QueryCurrentBalanceAsync(admissionId);
+        loadState ??= receipt=>FeeReceiptQueries.QueryBalanceStateAsync(receipt);
+        var state=await loadState(receiptNumber??Convert.ToString(header["ReceiptNumber"])??"");
         var balances=new Dictionary<int,decimal>();
         foreach(DataRow student in students.Rows)
         {
             int admissionId=Convert.ToInt32(student["AdmissionId"]);
             if(!balances.TryGetValue(admissionId,out decimal balance))
-                balances[admissionId]=balance=await loadBalance(admissionId);
+            {
+                if(state.IsLatest)balance=await loadBalance(admissionId);
+                else if(!state.RecordedBalances.TryGetValue(admissionId,out balance))
+                    throw new InvalidOperationException("This older receipt has no recorded outstanding balance. Its original figure cannot be confirmed; today's balance has not been substituted.");
+                balances[admissionId]=balance;
+            }
             student["BalanceRemaining"]=balance;
         }
         header["BalanceRemaining"]=balances.Values.Sum();
+        return state.IsLatest;
     }
 
     internal static DataTable BuildData(InstitutionProfile.PrintIdentity institution,DataRow header,DataTable students,DataTable lines) =>

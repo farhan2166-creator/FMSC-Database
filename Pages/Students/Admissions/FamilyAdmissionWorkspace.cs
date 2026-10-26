@@ -43,10 +43,10 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
     private readonly bool initialize;
     private readonly StudentPicker find=new();
     private readonly ModernTextBox familyParent=HumanUi.TextBox(false,500),familyPhone=HumanUi.TextBox(false,30),familyAddress=HumanUi.TextBox(false,500);
-    private readonly FamilyStudentList children=new(){Dock=DockStyle.Fill,CheckOnClick=true,CheckBoxOnly=true,IntegralHeight=false,BorderStyle=BorderStyle.None,BackColor=AppTheme.Surface};
+    private readonly FamilyStudentList children=new(){Dock=DockStyle.Fill,CheckOnClick=true,CheckBoxOnly=true,CompactRows=true,IntegralHeight=false,BorderStyle=BorderStyle.None,BackColor=AppTheme.Surface};
     private readonly Panel editorHost=new(){Dock=DockStyle.Fill,AutoScroll=true};
-    private readonly Label familyContext=new(){AutoSize=false,Dock=DockStyle.Fill,Font=AppTheme.BodyBoldFont,Padding=new Padding(6),AutoEllipsis=true,Text="Find a student or start a new family."};
-    private readonly Label summary=new(){Dock=DockStyle.Fill,AutoSize=true,Padding=new Padding(8),Font=AppTheme.NormalFont};
+    private readonly Label familyContext=new(){AutoSize=false,Dock=DockStyle.Fill,Font=AppTheme.BodyBoldFont,Padding=new Padding(4,2,4,2),AutoEllipsis=true,Text="Find a student or start a new family."};
+    private readonly Label summary=new(){Dock=DockStyle.Fill,AutoSize=true,Padding=new Padding(6,4,6,4),Font=AppTheme.NormalFont};
     private readonly List<Child> members=new();
     private readonly ModernButton addChild,process,print,collect,refresh,newFamily,removeDraft,reviewFees,reviewAdmission,pendingRegistrations,recover;
     private bool recoveryPending;
@@ -87,20 +87,28 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         var familyCard=HumanUi.Card("Family","Load one student to include their siblings. New children join the same family.");
         familyCard.Name="FamilyDetailsCard";
         familyCard.Header.Visible=false;
+        familyCard.Padding=new Padding(AppMetrics.SpacingSm);
+        familyCard.Content.Padding=Padding.Empty;
+        int compactFieldHeight=Math.Max(16,AppMetrics.TextHeight(UiDesignSystem.Typography.Caption))+
+            AppMetrics.InputControlHeight+AppMetrics.SpacingXs;
+        int contextHeight=AppMetrics.TextHeight(AppTheme.BodyBoldFont)+familyContext.Padding.Vertical;
         var familyFields=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=4,Margin=Padding.Empty};
         familyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
         familyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
-        familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.TextHeight(AppTheme.NormalFont)+AppScale.Scale(12)));
-        familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
+        familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,compactFieldHeight));
+        familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,contextHeight));
+        familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,compactFieldHeight));
+        familyFields.RowStyles.Add(new RowStyle(SizeType.Absolute,compactFieldHeight));
         var searchField=HumanUi.Field("Find student / family",find);familyFields.Controls.Add(searchField,0,0);familyFields.SetColumnSpan(searchField,2);
         familyFields.Controls.Add(familyContext,0,1);familyFields.SetColumnSpan(familyContext,2);
         familyFields.Controls.Add(HumanUi.Field("Parent name",familyParent,true),0,2);
         familyFields.Controls.Add(HumanUi.Field("Phone (optional)",familyPhone),1,2);
         var homeField=HumanUi.Field("Address",familyAddress);familyFields.Controls.Add(homeField,0,3);familyFields.SetColumnSpan(homeField,2);
         foreach(var field in familyFields.Controls.OfType<TableLayoutPanel>())
+        {
             field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            field.Padding=new Padding(field.Padding.Left,field.Padding.Top,field.Padding.Right,AppMetrics.SpacingXs);
+        }
         foreach(var input in new[]{familyParent,familyPhone,familyAddress})input.TextChanged+=(_,_)=>{
             if(syncingFamily || anchor>0 || IsBusy)return;
             father=familyParent.Text.Trim();phone=familyPhone.Text.Trim();address=familyAddress.Text.Trim();
@@ -120,12 +128,12 @@ public sealed partial class FamilyAdmissionWorkspace : V2Page,IUnsavedChanges,IB
         editorCard.Name="FamilyEditorCard";
         editorCard.Header.Visible=false;
         editorCard.Content.Controls.Add(editorHost);
+        familyCard.Margin=new Padding(0,0,0,AppScale.Scale(8));
         var left=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Margin=Padding.Empty};
         left.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight*3+
-            AppMetrics.TextHeight(AppTheme.NormalFont)+AppScale.Scale(20)+familyCard.Padding.Vertical+familyCard.Content.Padding.Vertical));
+        left.RowStyles.Add(new RowStyle(SizeType.Absolute,compactFieldHeight*3+contextHeight+
+            familyCard.Padding.Vertical+familyCard.Content.Padding.Vertical+familyCard.Margin.Vertical));
         left.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-        familyCard.Margin=new Padding(0,0,0,AppScale.Scale(8));
         left.Controls.Add(familyCard,0,0);left.Controls.Add(childCard,0,1);
         var root=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,40));root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,60));

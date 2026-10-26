@@ -21,6 +21,8 @@ public sealed partial class FeeCollectionPage
         if(counterIds is not null || selected.Length==0 || selected.Any(id=>id<=0) || selected.Distinct().Count()!=selected.Length)
             throw new ArgumentException("Select the saved children for this counter visit.",nameof(selected));
         counterIds=selected.ToArray();counterLoading=true;
+        currentStudentAmounts.Visible=false;
+        if(counterSiblingPanel is not null)counterSiblingPanel.RowStyles[0].Height=0;
         counterContextCard?.SetHeaderText("Selected Children","Close to return to this family's preparation and fee review.");
         counterSiblingCard?.SetHeaderText(counterIds.Length>1?"Payment Split":"Paying For",
             counterIds.Length>1?"Edit each child's Pay.":"Selected child for this visit.");
@@ -29,6 +31,7 @@ public sealed partial class FeeCollectionPage
         selectAllSiblings.Visible=false;
         if(counterIds.Length>1 && counterSiblingPanel is not null)
         {
+            counterSiblingPanel.Controls.Add(familyProposal,0,4);
             if(counterSiblingCard?.Parent is TableLayoutPanel work)
             {work.ColumnStyles[0].Width=32;work.ColumnStyles[1].Width=68;}
             primaryPayer.Visible=siblings.Visible=siblingHint.Visible=false;
