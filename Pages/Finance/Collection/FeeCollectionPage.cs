@@ -676,7 +676,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             if (IsHandleCreated && !IsDisposed) BeginInvoke(new Action(() => { if (!IsDisposed) SetSiblingHint(""); }));
         };
         enrollment.SelectedIndexChanged += (_, _) => {
-            if (admissionId > 0) primaryPayer.Text = $"☑ {AdmissionNumbers.ForId(admissionId)} · {StudentNameFor(admissionId)}\n    {enrollment.Text} · Always included";
+            if (admissionId > 0) primaryPayer.Text = $"{AdmissionNumbers.ForId(admissionId)} - {StudentNameFor(admissionId)}\n{enrollment.Text}";
         };
         siblingsCard.Content.Controls.Add(
             siblingPanel);
@@ -1503,7 +1503,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         lastCollectionReceipt = null;
         lastGroupReceiptNumber = null;
         if (printReceiptButton is not null) printReceiptButton.Enabled = false;
-        primaryPayer.Text=selectedAdmissionId>0 ? $"☑ {AdmissionNumbers.ForId(selectedAdmissionId)} · {StudentNameFor(selectedAdmissionId)}\n    Current student · Always included" : "";
+        primaryPayer.Text=selectedAdmissionId>0 ? $"☑ {AdmissionNumbers.ForId(selectedAdmissionId)} · {StudentNameFor(selectedAdmissionId)}\n Current student" : "";
         enrollmentId = 0;
         enrollment.ClearLookup();
         charges.Rows.Clear();

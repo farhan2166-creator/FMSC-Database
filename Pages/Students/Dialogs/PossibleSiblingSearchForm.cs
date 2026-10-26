@@ -428,14 +428,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
                 }
                 candidateIds.Add(id);
                 display.Rows.Add(
-                    HumanUi.StudentDisplay(
-                        id,
-                        GetText(row, "StudentName"),
-                        GetText(row, "FatherName"),
-                        GetText(row, "Gender"),
-                        GetText(row, "RegistrationNumber"),
-                        GetText(row, "ClassName"),
-                        GetText(row, "SectionName")),
+                    GetText(row, "StudentName"),
                     GetText(
                         row,
                         "FatherName"),

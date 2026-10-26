@@ -426,6 +426,8 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
                 editedDetails[key] = editedDetails[key] with { Frequency = Convert.ToString(grid.Rows[e.RowIndex].Cells[FrequencyColumnName].Value) ?? "Monthly" };
         };
         HumanUi.ApplyGridStyle(grid, AppTheme.Primary);
+        // Columns own their widths; bypass the shared content/viewport fitting pass.
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         rootPanel = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
@@ -586,6 +588,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
             HeaderText = UiText.Fees.FeeType,
             ReadOnly = true,
             Frozen = true,
+            AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
             Width = AppScale.Scale(190),
             DefaultCellStyle = { BackColor = AppTheme.SurfaceSecondary, Font = AppTheme.ButtonFont }
         });
@@ -593,6 +596,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
             Name = FrequencyColumnName,
             HeaderText = UiText.Fees.Frequency,
             Frozen = true,
+            AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
             Width = AppScale.Scale(120),
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox,
@@ -605,6 +609,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
             grid.Columns.Add(new DataGridViewTextBoxColumn {
                 Name = "CL_" + classColumn.ClassId,
                 HeaderText = classColumn.ClassName,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
                 Width = AppScale.Scale(120),
                 DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleRight }
             });
