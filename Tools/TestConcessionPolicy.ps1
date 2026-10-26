@@ -45,16 +45,18 @@ try{
     [void](Query ("RESTORE DATABASE [$catalog] FROM DISK=N'"+$backup.Replace("'","''")+"' WITH "+($moves -join ',')+",CHECKSUM,RECOVERY;"))
     $cn.ChangeDatabase($catalog)
     $version=Query 'SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC;'
-    if([int]$version.Tables[0].Rows[0][0] -eq 53){
+    $currentVersion=[int]$version.Tables[0].Rows[0][0]
+    if($currentVersion -notin @(53,54,55,56)){throw 'The fixture requires schema 53 through 56.'}
+    foreach($migration in 54..56 | Where-Object {$_ -gt $currentVersion}){
         $tx=$cn.BeginTransaction()
         try{
-            foreach($batch in [regex]::Split((Get-Content (Join-Path $root 'Migrations/54.sql') -Raw),'(?im)^GO\s*$')){
+            foreach($batch in [regex]::Split((Get-Content (Join-Path $root "Migrations/$migration.sql") -Raw),'(?im)^GO\s*$')){
                 if([string]::IsNullOrWhiteSpace($batch)){continue}
                 $command=$cn.CreateCommand();$command.Transaction=$tx;$command.CommandText=$batch;$command.CommandTimeout=120
                 try{[void]$command.ExecuteNonQuery()}finally{$command.Dispose()}
             };$tx.Commit()
         }catch{$tx.Rollback();throw}
-    }elseif([int]$version.Tables[0].Rows[0][0] -notin @(54,55)){throw 'The fixture requires schema 53, 54 or 55.'}
+    }
     $setup=Query @'
 DECLARE @Enrollment int,@Admission int,@From date,@Through date,@Actor int;
 SELECT TOP(1) @Enrollment=E.EnrollmentId,@Admission=E.AdmissionId,
@@ -103,7 +105,7 @@ SELECT @Assignment AssignmentId,@Admission AdmissionId,@From FromMonth,@Through 
     $bill=New-Object System.Data.DataTable;$adapter=New-Object System.Data.SqlClient.SqlDataAdapter $command
     try{[void]$adapter.Fill($bill)}finally{$adapter.Dispose();$command.Dispose()}
     $fixtureLines=@($bill.Rows | Where-Object {([string]$_['FeeTypeName']).StartsWith('Concession fixture') -and [long]$_['BillingChargeId'] -gt 0})
-    Check ($fixtureLines.Count -eq 2 -and @($fixtureLines|Where-Object {[decimal]$_['GrossAmount'] -ne 500 -or [decimal]$_['Due'] -ne 0}).Count -eq 0) 'The normal bill query retains the waived charges with full fee, discount and zero due; a fully paid charge is omitted.'
+    Check ($fixtureLines.Count -eq 2 -and @($fixtureLines|Where-Object {[decimal]$_['BaseAmount'] -ne 500 -or [decimal]$_['Due'] -ne 0}).Count -eq 0) 'The normal bill query retains newly waived charges and their prior settlements; a fully paid fee without new changes is omitted.'
 }finally{
     if($cn){
         if($created -and $catalog -eq ('FMSC_ConcessionChecks_'+$owner) -and $owner -match '^[0-9a-f]{32}$'){

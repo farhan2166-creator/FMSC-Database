@@ -12,7 +12,7 @@ internal static partial class FeeBillDataBuilder
         FamilyFeeDocumentPresentation.AddChildColumns(data);
         decimal total=charges.AsEnumerable().Sum(r=>Convert.ToDecimal(r["Due"]));
         decimal discount=charges.AsEnumerable().Sum(r=>Convert.ToDecimal(r["DiscountAmount"]));
-        string references=string.Join(", ",charges.AsEnumerable().Select(r=>Convert.ToString(r["Reference"])).Distinct());
+        string references=string.Join(", ",FeeStudentOrder.Rows(charges,"Reference").Select(r=>Convert.ToString(r["Reference"])).Distinct());
         bool multipleStudents=charges.AsEnumerable().Select(r=>Convert.ToString(r["Reference"])).Distinct().Count()>1;
         string studentKey="",studentHeading="",studentPlacement="";
         string campusHeading=FeeDocumentData.CampusHeading(charges);
@@ -36,10 +36,15 @@ internal static partial class FeeBillDataBuilder
                 if(charges.Columns.Contains("CampusName"))line["ChildCampusName"]=charge["CampusName"];
                 if(charges.Columns.Contains("BillingChargeId"))line["BillChargeId"]=charge["BillingChargeId"];
                 if(charges.Columns.Contains("AdmissionId"))line["BillAdmissionId"]=charge["AdmissionId"];
+                if(charges.Columns.Contains("IsVisitBill")&&Convert.ToBoolean(charge["IsVisitBill"]))
+                {
+                    line["BillIsVisit"]=true;line["BillAccountGross"]=charge["AccountGrossAmount"];line["BillAccountDiscount"]=charge["AccountDiscountAmount"];
+                    line["BillDisplayOverride"]=charge["BaseAmount"];
+                }
             }
         }
         // Group by the reference, never by name: siblings can share a name.
-        foreach(var student in charges.AsEnumerable().GroupBy(r=>Convert.ToString(r["Reference"]))){
+        foreach(var student in FeeStudentOrder.Rows(charges,"Reference").GroupBy(r=>Convert.ToString(r["Reference"]))){
             studentKey=student.Key??"";studentHeading=$"{student.Key} · {student.First()["StudentName"]}";
             studentPlacement=string.Join(" / ",student.Select(PlacementText).Where(value=>value.Length>0).Distinct(StringComparer.OrdinalIgnoreCase));
             AddLine(studentHeading,0m,"Student");
@@ -48,7 +53,16 @@ internal static partial class FeeBillDataBuilder
                 foreach(var fee in month.OrderBy(r=>charges.Columns.Contains("FeeDisplayOrder")?Convert.ToInt32(r["FeeDisplayOrder"]):0).ThenBy(r=>Convert.ToString(r["FeeTypeName"])))
                 {
                     string name=FeeDocumentData.FeeName(Convert.ToString(fee["FeeTypeName"])??"");
+                    bool visit=charges.Columns.Contains("IsVisitBill")&&Convert.ToBoolean(fee["IsVisitBill"]);
+                    if(visit&&Convert.ToBoolean(fee["IsCarriedForward"])&&Convert.ToDecimal(fee["OpeningBalance"])>0m)name+=" (outstanding)";
                     AddLine(name,Convert.ToDecimal(fee["Due"]),"Fee",month.Key.Year==1?"One-time fees":month.Key.ToString("MMM yyyy"),fee);
+                    if(visit)
+                        foreach(var (field,caption) in new[]{("RateAdjustment","Fee adjustment"),("DiscountReversed","Discount withdrawn"),("SettlementAdjustment","Payment adjustment")})
+                        {
+                            decimal adjustment=Convert.ToDecimal(fee[field]);if(adjustment==0m)continue;
+                            AddLine(caption+" - "+FeeDocumentData.FeeName(Convert.ToString(fee["FeeTypeName"])??""),0m,"Fee",month.Key.Year==1?"One-time fees":month.Key.ToString("MMM yyyy"));
+                            var extra=data.Rows[^1];extra["BillGrossAmount"]=0m;extra["BillLineDiscount"]=0m;extra["BillDisplayOverride"]=adjustment;
+                        }
                 }
             }
         }

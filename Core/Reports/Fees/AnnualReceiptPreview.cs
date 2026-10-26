@@ -51,7 +51,7 @@ internal static class AnnualReceiptPreview
                     h["CashReceived"]=c["CashReceived"];
                     using var document=StudentReceiptReport.BuildData(institution,h,child,childLines);
                     pageKey++;
-                    foreach(DataRow row in document.Rows){row["ReceiptPageKey"]=pageKey;row["SnapshotVersion"]=2;receipts.ImportRow(row);}
+                    foreach(DataRow row in document.Rows){row["ReceiptPageKey"]=pageKey;receipts.ImportRow(row);}
                     continue;
                 }
                 var header = receipt.First();
