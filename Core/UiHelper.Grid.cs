@@ -69,8 +69,14 @@ namespace FMSC_SMS.Core
             public Color Accent;
             public bool HasAccent;
             public int HoverRow = -1;
+            public bool CompactMoneyHeaders;
         }
         private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DataGridView, GridLook> GridLooks = new();
+        internal static void UseCompactMoneyHeaders(DataGridView grid)
+        {
+            GridLooks.GetOrCreateValue(grid).CompactMoneyHeaders = true;
+            ApplyGridColumnPresentation(grid);
+        }
         private static Color GridAccent(DataGridView grid) =>
             GridLooks.TryGetValue(grid, out GridLook? look) && look.HasAccent
                 ? look.Accent
@@ -463,6 +469,8 @@ namespace FMSC_SMS.Core
                 }
                 column.HeaderText =
                     HumanizeColumnHeader(column.HeaderText, feeGrid);
+                if (GridLooks.TryGetValue(grid,out var look) && look.CompactMoneyHeaders)
+                    column.HeaderText = column.HeaderText.Replace(" (Rs.)",string.Empty);
                 if (name == "AdmissionNumber")
                     column.SortMode = DataGridViewColumnSortMode.Programmatic;
                 if (string.IsNullOrEmpty(column.DefaultCellStyle.Format) &&

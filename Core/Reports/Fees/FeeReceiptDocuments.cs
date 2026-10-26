@@ -10,15 +10,63 @@ internal static class FeeReceiptDocuments
         bool latest=await RefreshBalancesAsync(result.Tables[0].Rows[0],result.Tables[1],receiptNumber:receiptNumber);
         await ReadChildCashReceivedAsync(receiptNumber,result.Tables[0].Rows[0],result.Tables[1]);
         using var printableLines=result.Tables[2].Copy();
-        if(latest)await AddUnpaidChildFeesAsync(result.Tables[1],printableLines);
+        await RefreshChargeConcessionsAsync(result.Tables[0].Rows[0],result.Tables[1],printableLines,latest);
+        if(latest)await AddUnpaidChildFeesAsync(result.Tables[0].Rows[0],result.Tables[1],printableLines);
         using var data=BuildData(institution,result.Tables[0].Rows[0],result.Tables[1],printableLines);
         Show(owner,data);
         return true;
     }
 
+    // A concession saved after collection changes live dues without changing the
+    // original receipt. Reflect that change only in the latest printout, and only
+    // for its saved fee lines; other charges and payments are not discounts.
+    internal static async Task RefreshChargeConcessionsAsync(DataRow header,DataTable students,DataTable lines,bool latest,
+        Func<string,Task<DataTable>>? loadChanges=null)
+    {
+        if(!latest)return;
+        loadChanges ??= QueryChargeConcessionChangesAsync;
+        using var changes=await loadChanges(Convert.ToString(header["ReceiptNumber"])??"");
+        var byCharge=changes.AsEnumerable().ToDictionary(row=>Convert.ToInt64(row["ChargeId"]));
+        foreach(DataRow student in students.Rows)
+        {
+            decimal difference=0m;
+            foreach(var line in lines.AsEnumerable().Where(row=>Convert.ToInt32(row["AdmissionId"])==Convert.ToInt32(student["AdmissionId"])))
+            {
+                if(!byCharge.TryGetValue(Convert.ToInt64(line["ChargeId"]),out var change))continue;
+                decimal original=Convert.ToDecimal(line["Discount"]);
+                decimal discount=original+Convert.ToDecimal(change["DiscountChange"]);
+                // AmountBefore already excluded concessions predating this
+                // collection. Restore that part of the fee if one is removed.
+                if(discount<0m)line["AmountBefore"]=Convert.ToDecimal(line["AmountBefore"])-discount;
+                line["Discount"]=Math.Max(0m,discount);
+                difference+=Convert.ToDecimal(line["Discount"])-original;
+            }
+            student["DiscountApplied"]=Convert.ToDecimal(student["DiscountApplied"])+difference;
+            header["DiscountApplied"]=Convert.ToDecimal(header["DiscountApplied"])+difference;
+        }
+    }
+
+    private static Task<DataTable> QueryChargeConcessionChangesAsync(string receiptNumber) => DatabaseHelper.QuerySqlAsync("""
+        EXEC dbo.RequirePermission @UserId,N'Fees.View';
+        SELECT L.ChargeId,
+            COALESCE(CurrentTerms.NewDiscount,B.DiscountAmount)
+                -COALESCE(IssueTerms.NewDiscount,B.GrossAmount-FirstTerms.PreviousNet,B.DiscountAmount) DiscountChange
+        FROM dbo.CollectionReceipts R
+        CROSS APPLY OPENJSON(R.SnapshotJson,'$.Lines') WITH(ChargeId bigint) L
+        JOIN dbo.BillingCharges B ON B.BillingChargeId=L.ChargeId
+        OUTER APPLY(SELECT TOP(1) C.PreviousNet FROM dbo.FeeBillCorrections C
+            WHERE C.BillingChargeId=L.ChargeId ORDER BY C.FeeBillCorrectionId) FirstTerms
+        OUTER APPLY(SELECT TOP(1) C.NewDiscount FROM dbo.FeeBillCorrections C
+            WHERE C.BillingChargeId=L.ChargeId AND C.CreatedAt<=R.CreatedAt
+            ORDER BY C.FeeBillCorrectionId DESC) IssueTerms
+        OUTER APPLY(SELECT TOP(1) C.NewDiscount FROM dbo.FeeBillCorrections C
+            WHERE C.BillingChargeId=L.ChargeId ORDER BY C.FeeBillCorrectionId DESC) CurrentTerms
+        WHERE R.ReceiptNumber=@ReceiptNumber;
+        """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.P("@ReceiptNumber",receiptNumber));
+
     // Unallocated children have no saved receipt lines. Show their current dues
     // alongside the current balance, without changing the saved payment snapshot.
-    internal static async Task AddUnpaidChildFeesAsync(DataTable students,DataTable lines,
+    internal static async Task AddUnpaidChildFeesAsync(DataRow header,DataTable students,DataTable lines,
         Func<int,Task<DataTable>>? loadFees=null)
     {
         if(students.Rows.Count<2)return;
@@ -35,14 +83,20 @@ internal static class FeeReceiptDocuments
                     if(fees.Columns.Contains(column.ColumnName))row[column.ColumnName]=fee[column.ColumnName];
                 lines.Rows.Add(row);
             }
+            decimal discount=fees.AsEnumerable().Sum(row=>FamilyFeeDocumentPresentation.Money(row,"Discount"));
+            if(discount!=0m)
+            {
+                student["DiscountApplied"]=Convert.ToDecimal(student["DiscountApplied"])+discount;
+                header["DiscountApplied"]=Convert.ToDecimal(header["DiscountApplied"])+discount;
+            }
         }
     }
 
     private static Task<DataTable> QueryUnpaidFeesAsync(int admissionId) => DatabaseHelper.QuerySqlAsync("""
         EXEC dbo.RequirePermission @UserId,N'Fees.View';
         SELECT B.BillingChargeId ChargeId,B.AdmissionId,B.EnrollmentId,
-            dbo.GetFeeChargeBalance(B.BillingChargeId) AmountBefore,
-            CONVERT(decimal(12,2),0) Discount,CONVERT(decimal(12,2),0) Cash,CONVERT(decimal(12,2),0) Credit,
+            dbo.GetFeeChargeBalance(B.BillingChargeId)+B.DiscountAmount AmountBefore,
+            B.DiscountAmount Discount,CONVERT(decimal(12,2),0) Cash,CONVERT(decimal(12,2),0) Credit,
             F.FeeTypeName,COALESCE(B.BillingMonth,B.ChargeDate) FeePeriod,
             C.ClassName,SEC.SectionName,CA.CampusName,dbo.GetFeeChargeBalance(B.BillingChargeId) BalanceAfter
         FROM dbo.BillingCharges B

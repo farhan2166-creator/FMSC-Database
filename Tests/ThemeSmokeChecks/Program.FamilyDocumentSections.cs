@@ -83,9 +83,10 @@ internal static partial class Program
             Check(first.Field<decimal>("ChildFeesCovered")==2500m&&first.Field<decimal>("ChildDiscountApplied")==500m
                 &&first.Field<decimal>("ChildBillPreviouslySettled")==1500m&&first.Field<decimal>("ChildTotalPaid")==500m,
                 "A child's bill keeps previous settlements separate from discounts and actual due");
-            Check(!zero.Field<bool>("ShowChildDocument")&&zero.Field<decimal>("Amount")==0m,
-                "A zero-due child bill is hidden without changing its saved amount");
-            Check(first.Field<decimal>("GroupFeeTotal")==5500m&&first.Field<decimal>("GroupDiscount")==500m
+            Check(zero.Field<bool>("ShowChildDocument")&&zero.Field<decimal>("Amount")==0m
+                &&zero.Field<decimal>("ChildFeesCovered")==2100m&&zero.Field<decimal>("ChildDiscountApplied")==2100m,
+                "A fully discounted child stays visible with the full fee and discount, preserving the zero due");
+            Check(first.Field<decimal>("GroupFeeTotal")==7600m&&first.Field<decimal>("GroupDiscount")==2600m
                 &&first.Field<decimal>("GroupDue")==3500m&&first.Field<decimal>("GroupPreviouslySettled")==1500m,
                 "The family bill summary totals the visible child bills and preserves their unpaid total");
         }

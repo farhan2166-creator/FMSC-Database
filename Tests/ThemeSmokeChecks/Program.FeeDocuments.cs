@@ -180,6 +180,7 @@ internal static partial class Program
                 Check(Render(name+"-"+label,cash)==1,"Credit visibility scenario prints on one page");
             }
         }
+        CheckReceiptConcessions(school,(name,data)=>Render(name,data));
         using var header=new DataTable();
         foreach(string name in new[]{"ReceiptNumber","PaymentMethod","ReceiptStatus"})header.Columns.Add(name);
         header.Columns.Add("TransactionDate",typeof(DateTime));
@@ -263,8 +264,8 @@ internal static partial class Program
                 dues.Rows.Add(2,"Tuition Fee","Class 2","B","Campus Boys",new DateTime(2026,11,1),2200m,0m,0m);
                 return Task.FromResult(dues);
             }
-            FeeReceiptDocuments.AddUnpaidChildFeesAsync(familyStudents,familyLines,UnpaidFees).GetAwaiter().GetResult();
-            FeeReceiptDocuments.AddUnpaidChildFeesAsync(familyStudents,familyLines,UnpaidFees).GetAwaiter().GetResult();
+            FeeReceiptDocuments.AddUnpaidChildFeesAsync(payment,familyStudents,familyLines,UnpaidFees).GetAwaiter().GetResult();
+            FeeReceiptDocuments.AddUnpaidChildFeesAsync(payment,familyStudents,familyLines,UnpaidFees).GetAwaiter().GetResult();
             Check(unpaidReads==1 && familyLines.Rows.Count==4,"Outstanding lines are added once without duplicating saved fees");
             using(var withDues=FeeReceiptDocuments.BuildData(school,payment,familyStudents,familyLines))
             {
@@ -359,7 +360,7 @@ internal static partial class Program
                 Check(row.Field<decimal>("Amount")==0m && row.Field<decimal>("BillDisplayAmount")==2100m
                     && row.Field<string>("BillDiscountText")==(-2100m).ToString("N0") && row.Field<decimal>("TotalPaid")==0m,
                     "Free bill displays original fee and negative concession while preserving its zero unpaid amount");
-                Check(row.Field<string>("BillDiscountCaption")=="Less: Free concession" && row.Field<string>("BillPaymentPrompt")=="No payment required",
+                Check(row.Field<string>("BillDiscountCaption")=="Less: Discount / Waived" && row.Field<string>("BillPaymentPrompt")=="No payment required",
                     "Free bills explain the concession and never request payment");
             }
             Check(FeeBillDocuments.Snapshot(waived)==saved,"Preparing the printable bill does not rewrite the financial snapshot");

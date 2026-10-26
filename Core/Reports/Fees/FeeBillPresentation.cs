@@ -29,15 +29,14 @@ internal static class FeeBillPresentation
             // to recover the original fee without consulting today's fee plan.
             bool oldWaiver=!breakdown && rows.Length==1 && Convert.ToDecimal(rows[0]["Amount"])==0m && discount>0m;
             decimal settled=breakdown?rows.Sum(row=>Convert.ToDecimal(row["BillGrossAmount"])-Convert.ToDecimal(row["BillLineDiscount"])-Convert.ToDecimal(row["Amount"])):0m;
-            bool free=rows.All(row=>(Convert.ToString(row["FeeDescription"])??"").EndsWith("— Free",StringComparison.OrdinalIgnoreCase));
-            bool scholarship=rows.All(row=>(Convert.ToString(row["FeeDescription"])??"").EndsWith("— Scholarship",StringComparison.OrdinalIgnoreCase));
             foreach(var row in rows)
             {
+                row["FeeDescription"]=(Convert.ToString(row["FeeDescription"])??"").Replace(" — Waived","");
                 row["BillDisplayAmount"]=breakdown?row["BillGrossAmount"]:oldWaiver?discount:row["Amount"];
                 row["BillPreviouslySettled"]=settled;
                 row["ShowBillPreviouslySettled"]=settled>0m;
                 row["BillDiscountCaption"]=breakdown||oldWaiver
-                    ?free?"Less: Free concession":scholarship?"Less: Scholarship":"Less: Discount / concession"
+                    ?"Less: Discount / Waived"
                     :"Concessions included";
                 row["BillDiscountText"]=(breakdown||oldWaiver?-discount:discount).ToString("N0");
                 row["BillPaymentPrompt"]=Convert.ToDecimal(row["TotalPaid"])<=0m?"No payment required":"Please pay at the fee counter";

@@ -1028,7 +1028,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 ReadOnly = true
             });
         charges.Columns.Add(new DataGridViewTextBoxColumn {
-            Name = "AppliedDiscount", HeaderText = UiText.Fees.Discount, ReadOnly = true, Visible = false,
+            Name = "AppliedDiscount", HeaderText = UiText.Fees.Discount, ReadOnly = true, Visible = true,
             DefaultCellStyle = new DataGridViewCellStyle {
                 Format = "0.##", Alignment = DataGridViewContentAlignment.MiddleCenter
             }
@@ -1041,6 +1041,17 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         });
         charges.Columns["StudentName"].DisplayIndex=1;
         charges.Columns.Add(new DataGridViewTextBoxColumn { Name="FeeDisplayOrder", Visible=false, ReadOnly=true });
+        UiHelper.UseCompactMoneyHeaders(charges);
+        // Separate student blocks in the existing rows, preserving selection,
+        // keyboard navigation and payment allocation.
+        charges.RowPostPaint += (_, e) => {
+            if(e.RowIndex<=0)return;
+            int current=GetInt(charges.Rows[e.RowIndex].Cells["AdmissionId"].Value);
+            int previous=GetInt(charges.Rows[e.RowIndex-1].Cells["AdmissionId"].Value);
+            if(current<=0 || previous<=0 || current==previous)return;
+            using var brush=new SolidBrush(AppTheme.Primary);
+            e.Graphics.FillRectangle(brush,e.RowBounds.Left,e.RowBounds.Top,e.RowBounds.Width,AppScale.Scale(2));
+        };
         // Retained for later use: charge remarks column.
         // charges.Columns.Add(new DataGridViewTextBoxColumn {
         //     Name = "ChargeRemarks", HeaderText = "Remarks", ReadOnly = true,
