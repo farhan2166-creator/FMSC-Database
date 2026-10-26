@@ -607,8 +607,10 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 Margin = new Padding(0)
             };
         counterSiblingCard=siblingsCard;counterSiblingPanel=siblingPanel;
-        siblingPanel.RowStyles.Add(new RowStyle(SizeType.Absolute,AppScale.Scale(78)));
-        siblingPanel.Controls.Add(primaryPayer,0,0);
+        // The current student is already identified in the collection header.
+        // Keep this row collapsed so the sibling choices get the available space.
+        siblingPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
+        primaryPayer.Visible = false;
         siblingPanel.RowStyles.Add(
             new RowStyle(
                 SizeType.Percent,
@@ -1837,15 +1839,22 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             charges.Rows[index].Cells["FeeTypeName"].ToolTipText=$"{GetText(row,"FeeTypeName")} · Due {FormatDueDate(row["DueDate"])}";
             added++;
         }
-        if (added > 0) charges.Sort(new StudentChargeComparer());
+        if (added > 0) charges.Sort(new StudentChargeComparer(admissionId));
         return added;
     }
-    private sealed class StudentChargeComparer : System.Collections.IComparer
+    private sealed class StudentChargeComparer(int primaryAdmissionId) : System.Collections.IComparer
     {
         public int Compare(object? x, object? y)
         {
             var left = (DataGridViewRow)x!;
             var right = (DataGridViewRow)y!;
+            int priority = (GetInt(left.Cells["AdmissionId"].Value) == primaryAdmissionId ? 0 : 1)
+                .CompareTo(GetInt(right.Cells["AdmissionId"].Value) == primaryAdmissionId ? 0 : 1);
+            if (priority != 0) return priority;
+            int classOrder = SettlementKey(right).Class.CompareTo(SettlementKey(left).Class);
+            if (classOrder != 0) return classOrder;
+            int studentOrder = GetInt(left.Cells["AdmissionId"].Value).CompareTo(GetInt(right.Cells["AdmissionId"].Value));
+            if (studentOrder != 0) return studentOrder;
             return SettlementKey(left).CompareTo(SettlementKey(right));
         }
     }
@@ -2028,17 +2037,29 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             DataTable members = family;
             var eligible = await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Fees.View';
-                SELECT S.AdmissionId,
+                SELECT S.AdmissionId,P.ClassId,
                     CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.Enrollments E WHERE E.AdmissionId=S.AdmissionId AND E.Status=N'Active') THEN 1 ELSE 0 END AS bit) IsActive,
                     (SELECT TOP(1) B.EnrollmentId FROM dbo.BillingCharges B
                      WHERE B.AdmissionId=S.AdmissionId AND B.Status<>N'Cancelled' AND dbo.GetFeeChargeBalance(B.BillingChargeId)>0
                      ORDER BY B.EnrollmentId DESC) PendingEnrollmentId
-                FROM dbo.Students S WHERE S.AdmissionId IN (SELECT CONVERT(int,[value]) FROM OPENJSON(@Ids));
+                FROM dbo.Students S
+                OUTER APPLY(SELECT TOP(1) E.ClassSectionId FROM dbo.Enrollments E WHERE E.AdmissionId=S.AdmissionId
+                    ORDER BY CASE WHEN E.Status=N'Active' THEN 0 WHEN E.Status=N'Pending' THEN 1 ELSE 2 END,E.EnrollmentId DESC) E
+                LEFT JOIN dbo.CampusClassSections P ON P.ClassSectionId=E.ClassSectionId
+                WHERE S.AdmissionId IN (SELECT CONVERT(int,[value]) FROM OPENJSON(@Ids));
                 """, DatabaseHelper.Int("@UserId",CurrentUser.UserId), DatabaseHelper.P("@Ids",
                     System.Text.Json.JsonSerializer.Serialize(members.AsEnumerable().Select(row=>GetInt(row,"AdmissionId")).ToArray())));
             if (IsDisposed || version != loadVersion)
                 return;
-            foreach (DataRow row in members.Rows)
+            var classCatalog = LookupDisplayOrder.ForBinding(await DatabaseHelper.QueryUserAsync("GetClasses"), "ClassId");
+            if (IsDisposed || version != loadVersion) return;
+            var classPositions = classCatalog.AsEnumerable().Select((row, index) => (Id: GetInt(row, "ClassId"), Position: index))
+                .ToDictionary(item => item.Id, item => item.Position);
+            int ClassPosition(DataRow member) => classPositions.GetValueOrDefault(
+                eligible.AsEnumerable().Where(item => GetInt(item, "AdmissionId") == GetInt(member, "AdmissionId"))
+                    .Select(item => GetInt(item, "ClassId")).FirstOrDefault(), -1);
+            siblings.Sorted = false;
+            foreach (DataRow row in members.AsEnumerable().OrderByDescending(ClassPosition).ThenBy(row => GetInt(row, "AdmissionId")))
             {
                 int memberAdmissionId = GetInt(row, "AdmissionId");
                 // Never list the student being collected from as their own sibling.

@@ -100,6 +100,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
     private DataTable? yearTable;
     /* Derive destination classes from the cached same-program class list. */
     private DataTable? classTable;
+    private int classLoadVersion;
     /* > 0 while a load or a promotion runs; ApplyState locks the whole page meanwhile. */
     private int busyCount;
     /// <param name="navigate">The shell's navigate delegate, so the step after promoting (Confirm Return Admission) can open the next screen.</param>
@@ -146,8 +147,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         if (initialize) Defer(async () => {
             await Task.WhenAll(
                 BindCampuses(),
-                BindYears(),
-                LoadClasses());
+                BindYears());
             ClearForm();
         });
         BuildPage();
@@ -518,16 +518,34 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
     }
     private async Task LoadClasses()
     {
+        int version = ++classLoadVersion;
+        int campusId = sourceCampus.SelectedId;
+        classTable = null;
+        sourceClass.ClearLookup();
+        destinationClass.ClearLookup();
+        ApplyState();
+        if (campusId <= 0) return;
         try
         {
-            var raw = await Task.Run(() => DatabaseHelper.QueryUser("GetClasses"));
-            if (IsDisposed) return;
-            classTable = raw;
-            sourceClass.Bind(raw, "ClassId", "ClassName");
+            var catalogTask = DatabaseHelper.QueryUserAsync("GetClasses");
+            var assignmentsTask = DatabaseHelper.QueryUserAsync("GetClassSections",
+                DatabaseHelper.Int("@CampusId", campusId), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0));
+            await Task.WhenAll(catalogTask, assignmentsTask);
+            if (IsDisposed || version != classLoadVersion || campusId != sourceCampus.SelectedId) return;
+            classTable = CampusClasses(await catalogTask, await assignmentsTask);
+            sourceClass.Bind(classTable, "ClassId", "ClassName");
             /* The destination list depends on the source class, so it stays empty until one is chosen. */
             destinationClass.ClearLookup();
         }
         catch (Exception ex) { Fail(ex); }
+    }
+    internal static DataTable CampusClasses(DataTable catalog, DataTable assignments)
+    {
+        var assignedIds = assignments.AsEnumerable().Select(row => Convert.ToInt32(row["ClassId"])).ToHashSet();
+        var result = catalog.Clone();
+        foreach (DataRow row in LookupDisplayOrder.ForBinding(catalog, "ClassId").Rows)
+            if (assignedIds.Contains(Convert.ToInt32(row["ClassId"]))) result.ImportRow(row);
+        return result;
     }
     /// <summary>Offer later years, preselecting the earliest and its start date.</summary>
     private void BuildDestinationYears()
@@ -669,13 +687,11 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
     private async Task OnSourceCampusChanged()
     {
         InvalidateCandidates();
-        /* Sections belong to a campus, so both section lists are stale the moment it changes. */
+        /* Class and section choices belong to the selected campus. */
         sourceSection.ClearLookup();
         destinationSection.ClearLookup();
         ApplyState();
-        await Task.WhenAll(
-            LoadSourceSections(),
-            LoadDestinationSections());
+        await LoadClasses();
         ApplyStateAndHint();
     }
     private void OnSourceYearChanged()
@@ -1155,9 +1171,11 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
     /// <summary>Puts the whole page back to its opening state.</summary>
     private void ClearForm()
     {
+        classLoadVersion++;
+        classTable = null;
         ResetToBlank(sourceCampus);
         ResetToBlank(sourceYear);
-        ResetToBlank(sourceClass);
+        sourceClass.ClearLookup();
         sourceSection.ClearLookup();
         destinationYear.ClearLookup();
         destinationClass.ClearLookup();

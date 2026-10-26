@@ -247,13 +247,36 @@ internal static partial class Program
                 && family.Rows[0].Field<decimal>("StudentOutstanding")==4300m && family.Rows[0].Field<decimal>("BalanceRemaining")==6500m,
                 "Receipt fees, payment, child debt and family debt retain their separate financial scopes");
             var unpaidChild=family.AsEnumerable().Single(row=>row.Field<string>("ReceiptStudentName")=="1002 · Sara Example");
-            Check(unpaidChild.Field<string>("FeeDescription")=="No fees paid in this receipt"
+            Check(unpaidChild.Field<string>("FeeDescription")=="No payment applied to this child"
                 && unpaidChild.Field<decimal>("Amount")==0m && unpaidChild.Field<decimal>("StudentSettled")==0m
                 && unpaidChild.Field<decimal>("StudentOutstanding")==2200m,
                 "A listed sibling without fee allocations remains visible with zero paid and their own balance");
             Check(family.Rows[0].Field<string>("AdmissionNumberText")=="1001, 1002",
                 "Family receipt admission numbers match the children shown in its body");
             Check(Render("family-partial-payment",family)==1,"A partial family payment fits with explicit student and family balance labels");
+            int unpaidReads=0;
+            Task<DataTable> UnpaidFees(int id)
+            {
+                Check(id==2,"Only the child without saved receipt lines needs outstanding fee details");
+                unpaidReads++;
+                var dues=familyLines.Clone();
+                dues.Rows.Add(2,"Tuition Fee","Class 2","B","Campus Boys",new DateTime(2026,11,1),2200m,0m,0m);
+                return Task.FromResult(dues);
+            }
+            FeeReceiptDocuments.AddUnpaidChildFeesAsync(familyStudents,familyLines,UnpaidFees).GetAwaiter().GetResult();
+            FeeReceiptDocuments.AddUnpaidChildFeesAsync(familyStudents,familyLines,UnpaidFees).GetAwaiter().GetResult();
+            Check(unpaidReads==1 && familyLines.Rows.Count==4,"Outstanding lines are added once without duplicating saved fees");
+            using(var withDues=FeeReceiptDocuments.BuildData(school,payment,familyStudents,familyLines))
+            {
+                var child=withDues.AsEnumerable().Single(row=>row.Field<string>("ReceiptStudentName")=="1002 · Sara Example");
+                Check(child.Field<string>("FeeDescription")=="Tuition Fee" && child.Field<string>("FeePeriod")=="Nov-2026"
+                    && child.Field<decimal>("Amount")==2200m && child.Field<decimal>("ChildPayable")==2200m
+                    && child.Field<decimal>("ChildTotalPaid")==0m && child.Field<decimal>("ChildBalanceRemaining")==2200m,
+                    "An unpaid child shows their fee and month, zero payment, and current balance");
+                Check(withDues.Rows[0].Field<decimal>("CashReceived")==3000m && withDues.Rows[0].Field<decimal>("FeesCovered")==7000m,
+                    "Showing unpaid fees increases displayed fee totals without changing money received");
+                Check(Render("family-unpaid-child-fees",withDues)==1,"Unpaid child fee details render on the family receipt");
+            }
             string sourcePath=Path.Combine(AppContext.BaseDirectory,"Reports",FamilyReceiptReport.TemplateFile);
             var editable=XDocument.Load(sourcePath);XNamespace editableNs=editable.Root!.Name.Namespace;
             editable.Descendants(editableNs+"Textbox").Single(box=>(string?)box.Attribute("Name")=="DocumentDateFooter")

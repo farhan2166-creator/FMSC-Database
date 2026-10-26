@@ -9,10 +9,52 @@ internal static class FeeReceiptDocuments
         if(result.Tables.Count<3 || result.Tables[0].Rows.Count==0)return false;
         await RefreshBalancesAsync(result.Tables[0].Rows[0],result.Tables[1]);
         await ReadChildCashReceivedAsync(receiptNumber,result.Tables[0].Rows[0],result.Tables[1]);
-        using var data=BuildData(institution,result.Tables[0].Rows[0],result.Tables[1],result.Tables[2]);
+        using var printableLines=result.Tables[2].Copy();
+        await AddUnpaidChildFeesAsync(result.Tables[1],printableLines);
+        using var data=BuildData(institution,result.Tables[0].Rows[0],result.Tables[1],printableLines);
         Show(owner,data);
         return true;
     }
+
+    // Unallocated children have no saved receipt lines. Show their current dues
+    // alongside the current balance, without changing the saved payment snapshot.
+    internal static async Task AddUnpaidChildFeesAsync(DataTable students,DataTable lines,
+        Func<int,Task<DataTable>>? loadFees=null)
+    {
+        if(students.Rows.Count<2)return;
+        loadFees ??= QueryUnpaidFeesAsync;
+        foreach(DataRow student in students.Rows)
+        {
+            int id=Convert.ToInt32(student["AdmissionId"]);
+            if(lines.AsEnumerable().Any(row=>Convert.ToInt32(row["AdmissionId"])==id))continue;
+            using var fees=await loadFees(id);
+            foreach(DataRow fee in fees.Rows)
+            {
+                var row=lines.NewRow();
+                foreach(DataColumn column in lines.Columns)
+                    if(fees.Columns.Contains(column.ColumnName))row[column.ColumnName]=fee[column.ColumnName];
+                lines.Rows.Add(row);
+            }
+        }
+    }
+
+    private static Task<DataTable> QueryUnpaidFeesAsync(int admissionId) => DatabaseHelper.QuerySqlAsync("""
+        EXEC dbo.RequirePermission @UserId,N'Fees.View';
+        SELECT B.BillingChargeId ChargeId,B.AdmissionId,B.EnrollmentId,
+            dbo.GetFeeChargeBalance(B.BillingChargeId) AmountBefore,
+            CONVERT(decimal(12,2),0) Discount,CONVERT(decimal(12,2),0) Cash,CONVERT(decimal(12,2),0) Credit,
+            F.FeeTypeName,COALESCE(B.BillingMonth,B.ChargeDate) FeePeriod,
+            C.ClassName,SEC.SectionName,CA.CampusName,dbo.GetFeeChargeBalance(B.BillingChargeId) BalanceAfter
+        FROM dbo.BillingCharges B
+        JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
+        JOIN dbo.Enrollments E ON E.EnrollmentId=B.EnrollmentId
+        JOIN dbo.CampusClassSections CCS ON CCS.ClassSectionId=E.ClassSectionId
+        JOIN dbo.Classes C ON C.ClassId=CCS.ClassId
+        JOIN dbo.Sections SEC ON SEC.SectionId=CCS.SectionId
+        JOIN dbo.Campuses CA ON CA.CampusId=CCS.CampusId
+        WHERE B.AdmissionId=@AdmissionId AND B.Status<>N'Cancelled' AND dbo.GetFeeChargeBalance(B.BillingChargeId)>0
+        ORDER BY COALESCE(B.BillingMonth,B.ChargeDate),F.DisplayOrder,B.BillingChargeId;
+        """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@AdmissionId",admissionId));
 
     // The collection snapshot stores each child's fee allocation. The linked
     // original payments identify who actually received any retained advance.
