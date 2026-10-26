@@ -13,7 +13,34 @@ internal static partial class Program
         charges.Rows.Add("A-41","Same name","Books",DateTime.Today,0m,200m,12L,41);
         charges.Rows.Add("A-42","Same name","Annual",DateTime.Today,0m,300m,13L,42);
         charges.Rows.Add("A-42","Same name","Waived plan",DateTime.Today,100m,0m,-7L,42);
+        charges.Columns.Add("ClassName");charges.Columns.Add("SectionName");
+        foreach(DataRow row in charges.Rows)
+        {
+            row["ClassName"]=row.Field<int>("AdmissionId")==41?"Six":"Three";
+            row["SectionName"]="F";
+        }
         using var family=FamilyBillReport.BuildData("School","","","Parent",charges);
+        Check(family.AsEnumerable().All(row=>row.Field<string>("ChildClassSection")==
+            (row.Field<int>("BillAdmissionId")==41?"Six - F":"Three - F")),
+            "Collection family bills retain the correct class and section for each child");
+        using(var display=FamilyFeeDocumentPresentation.Bill(family))
+            Check(display.AsEnumerable().All(row=>row.Field<string>("ChildClassSection")==
+                (row.Field<int>("BillAdmissionId")==41?"Six - F":"Three - F")),
+                "The family bill print presentation keeps each child's placement");
+        using(var oneChild=charges.AsEnumerable().Where(row=>row.Field<int>("AdmissionId")==41).CopyToDataTable())
+        {
+            using(var bill=StudentBillReport.BuildData("School","","","Parent",oneChild))
+                Check(bill.AsEnumerable().All(row=>row.Field<string>("ClassSection")=="Six - F"),
+                    "A single-child collection bill shows class and section like the admission bill");
+            oneChild.Rows[1]["ClassName"]="Five";oneChild.Rows[1]["SectionName"]="";
+            using(var bill=StudentBillReport.BuildData("School","","","Parent",oneChild))
+                Check(bill.Rows[0].Field<string>("ClassSection")=="Six - F / Five",
+                    "Bills covering earlier placements retain both classes without a dangling separator");
+            oneChild.Columns.Remove("ClassName");oneChild.Columns.Remove("SectionName");
+            using(var bill=StudentBillReport.BuildData("School","","","Parent",oneChild))
+                Check(bill.Rows[0].Field<string>("ClassSection")=="",
+                    "Older charge data without placement columns remains printable");
+        }
         Check(family.Rows.Count==4&&family.AsEnumerable().Select(r=>r.Field<long>("BillChargeId")).OrderBy(x=>x).SequenceEqual(new[]{-7L,11L,12L,13L}),
             "Family bill retains one source identity per printed fee, including virtual waiver evidence");
         Check(family.AsEnumerable().All(r=>r.Field<int>("BillAdmissionId")== (r.Field<long>("BillChargeId") is 11 or 12?41:42)),
@@ -26,6 +53,9 @@ internal static partial class Program
         Check(direct.Rows[0].Field<long>("BillChargeId")==11L&&direct.Rows[0].Field<int>("BillAdmissionId")==41,
             "Admission and charge-printer bill lines carry the same source identities");
         using var restored=FeeBillDocuments.ReadSnapshot(FeeBillDocuments.Snapshot(family));
+        Check(restored.AsEnumerable().Select(row=>row.Field<string>("ChildClassSection"))
+            .SequenceEqual(family.AsEnumerable().Select(row=>row.Field<string>("ChildClassSection"))),
+            "Issued bill snapshots preserve per-child class and section for reprinting");
         Check(restored.AsEnumerable().Select(r=>r.Field<long>("BillChargeId")).SequenceEqual(family.AsEnumerable().Select(r=>r.Field<long>("BillChargeId"))),
             "Saved XML preserves per-line identities for issue-time validation");
         using var legacy=direct.Copy();legacy.Columns.Remove("BillChargeId");legacy.Columns.Remove("BillAdmissionId");
