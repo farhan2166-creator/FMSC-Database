@@ -17,7 +17,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private readonly ContextMenuStrip studentFeesMenu = new StyledContextMenu();
     private readonly DataGridView recentPayments =
         HumanUi.Grid();
-    private Label? paymentHistoryDetails;
+    private TableLayoutPanel? paymentHistoryDetails;
     /* Show one proposal row per child only for family collections. */
     private readonly DataGridView familyProposal =
         HumanUi.Grid(true);
@@ -1344,7 +1344,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var row = recentPayments.CurrentRow;
         if (row is null)
         {
-            paymentHistoryDetails.Text = "Select a payment to see its amounts and adjustments.";
+            ShowPaymentHistoryDetails(new[] { ("Select a payment to see its amounts and adjustments.", "") });
             return;
         }
         // Reuse values already loaded for the history grid. No extra financial reads
@@ -1352,20 +1352,61 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         string reference = row.Cells["ReceiptNumber"].Tag as string ?? GetText(row.Cells["ReceiptNumber"].Value);
         string Money(string column) => decimal.TryParse(Convert.ToString(row.Cells[column].Value), out decimal value)
             ? value.ToString("#,0.##") : "—";
-        var lines = new List<string> {
-            $"Reference: {reference}",
-            $"Student amount: Rs. {Money("Amount")}   ·   Adjustments: Rs. {Money("Adjusted")}   ·   Net student amount: Rs. {Money("NetPaid")}" };
+        var details = new List<(string Label, string Value)> {
+            ("Receipt / reference", reference),
+            ("This student's amount", $"Rs. {Money("Amount")}"),
+            ("This student's adjustments", $"Rs. {Money("Adjusted")}"),
+            ("After adjustments", $"Rs. {Money("NetPaid")}") };
         string split = row.Cells["Amount"].ToolTipText;
-        if (split.StartsWith("New money applied:", StringComparison.Ordinal)) lines.Add(split);
+        if (split.StartsWith("New money applied:", StringComparison.Ordinal))
+        {
+            foreach (string part in split.TrimEnd('.').Split(';'))
+            {
+                int separator = part.IndexOf(':');
+                if (separator < 0) continue;
+                string label = part[..separator].Trim();
+                details.Add((label == "New money applied" ? "New payment applied to this student" : "Credit used for this student",
+                    part[(separator + 1)..].Trim()));
+            }
+        }
         else
         {
             string adjustment = row.Cells["Adjusted"].ToolTipText;
             if (adjustment.StartsWith("Refunds:", StringComparison.Ordinal) || adjustment.StartsWith("Reversed:", StringComparison.Ordinal))
-                lines.Add(adjustment);
+                foreach (string part in adjustment.Split(';'))
+                {
+                    int separator = part.IndexOf(':');
+                    if (separator >= 0) details.Add((part[..separator].Trim(), part[(separator + 1)..].Trim()));
+                }
         }
         if (row.Cells["ReceiptTotal"].Value is not null and not DBNull)
-            lines.Add($"Whole family receipt: Rs. {Money("ReceiptTotal")}");
-        paymentHistoryDetails.Text = string.Join(Environment.NewLine, lines);
+            details.Add(("Whole family receipt total", $"Rs. {Money("ReceiptTotal")}"));
+        ShowPaymentHistoryDetails(details);
+    }
+    private void ShowPaymentHistoryDetails(IEnumerable<(string Label, string Value)> details)
+    {
+        if (paymentHistoryDetails is not { IsDisposed: false } panel) return;
+        var entries = details.ToArray();
+        panel.SuspendLayout();
+        try
+        {
+            foreach (Control control in panel.Controls.Cast<Control>().ToArray()) control.Dispose();
+            panel.Controls.Clear(); panel.RowStyles.Clear();
+            panel.RowCount = (entries.Length + 1) / 2;
+            panel.Text = string.Join(Environment.NewLine, entries.Select(entry => $"{entry.Label}: {entry.Value}"));
+            for (int i = 0; i < panel.RowCount; i++) panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            for (int i = 0; i < entries.Length; i++)
+            {
+                int column = (i % 2) * 2;
+                panel.Controls.Add(new Label { AutoSize = true, Dock = DockStyle.Fill, Font = AppTheme.NormalFont,
+                    Text = entries[i].Label, TextAlign = ContentAlignment.MiddleLeft,
+                    Margin = new Padding(0, 2, 8, 2) }, column, i / 2);
+                panel.Controls.Add(new Label { AutoSize = true, Dock = DockStyle.Fill, Font = AppTheme.ButtonFont,
+                    Text = entries[i].Value, TextAlign = ContentAlignment.MiddleRight,
+                    Margin = new Padding(0, 2, AppScale.Scale(24), 2) }, column + 1, i / 2);
+            }
+        }
+        finally { panel.ResumeLayout(true); }
     }
     /// <summary>Only collected payment entries can be reprinted as receipts.</summary>
     private void UpdateReprintAvailability()
@@ -3667,11 +3708,14 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             new RowStyle(
                 SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        paymentHistoryDetails = new Label {
+        paymentHistoryDetails = new TableLayoutPanel {
+            ColumnCount = 4,
             AutoSize = true, Dock = DockStyle.Fill, Font = AppTheme.NormalFont,
             ForeColor = AppTheme.Text, BackColor = AppTheme.SurfaceSecondary,
             Padding = new Padding(8), Margin = new Padding(0, 6, 0, 6)
         };
+        foreach (float width in new[] { 28f, 22f, 28f, 22f })
+            paymentHistoryDetails.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, width));
         // Bound wrapping keeps the details readable without widening the dialog.
         root.SizeChanged += (_, _) => {
             if (paymentHistoryDetails is not null)
