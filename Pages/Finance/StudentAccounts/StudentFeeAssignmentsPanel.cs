@@ -109,6 +109,10 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         grid.Columns.Add("ConfiguredOrder", "ConfiguredOrder");
         grid.Columns["ConfiguredOrder"].Visible = false;
         grid.Columns.Add("ConcessionLabel", "Concession");
+        grid.CellFormatting+=(_,e)=>{
+            if(e.ColumnIndex>=0 && grid.Columns[e.ColumnIndex].Name=="ConcessionLabel" && e.Value is string label)
+            {e.Value=FeeConcessionLabels.Display(label);e.FormattingApplied=true;}
+        };
         grid.Columns["ConcessionLabel"].DisplayIndex = 3;
         foreach (var name in new[] { "StandardAmount", "DiscountAmount", "NetAmount" })
         {
@@ -226,7 +230,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
                     string frequency=Value("Frequency")=="OneTime"?"One-time":Value("Frequency");
                     e.Value=Value("FeeTypeName")+(string.IsNullOrWhiteSpace(frequency)?"":" ("+frequency+")");break;
                 case "DiscountAmount":
-                    string concession=Value("ConcessionLabel");
+                    string concession=FeeConcessionLabels.Display(Value("ConcessionLabel"));
                     e.Value=Convert.ToDecimal(row.Cells["DiscountAmount"].Value??0).ToString("0.##")+
                         (string.IsNullOrWhiteSpace(concession)||concession=="None"?"":"\n"+concession);break;
                 case "FamilyPeriod":

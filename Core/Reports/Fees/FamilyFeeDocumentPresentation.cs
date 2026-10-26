@@ -105,7 +105,7 @@ internal static class FamilyFeeDocumentPresentation
                 string name=heading.StartsWith(reference+" · ",StringComparison.Ordinal)?heading[(reference.Length+3)..]:heading;
                 foreach(var row in child)
                 {
-                    row["ShowChildDocument"]=childDue>0m;
+                    row["ShowChildDocument"]=childDue>0m||childDiscount>0m;
                     row["ChildAdmissionNumberText"]=reference;row["ChildStudentName"]=name;
                     // New snapshots retain the parent and campus per child. Old
                     // family snapshots only retained the common parent heading.
@@ -116,9 +116,9 @@ internal static class FamilyFeeDocumentPresentation
                     row["ChildShowDiscount"]=childDiscount>0m;
                     row["ChildBillDiscountCaption"]="Less: Discount / concession";
                     row["ChildBillDiscountText"]=(-childDiscount).ToString("N0");
-                    row["ChildBillPaymentPrompt"]="Please pay at the fee counter";
+                    row["ChildBillPaymentPrompt"]=childDue>0m?"Please pay at the fee counter":"No payment required";
                 }
-                if(childDue>0m){total+=childTotal;discount+=childDiscount;due+=childDue;settled+=childSettled;}
+                if(childDue>0m||childDiscount>0m){total+=childTotal;discount+=childDiscount;due+=childDue;settled+=childSettled;}
             }
             foreach(var row in page)
             {

@@ -136,7 +136,7 @@ public sealed partial class ChangeFeeDiscountForm
             if(!InputParse.TryWholeAmount(newRate.Text,out rate)||rate<0||!originalWaiver&&discount>rate)return "";
             if(originalWaiver)discount=rate;
         }
-        else if(WaiverAction)discount=rate;
+        else if(WaiverAction)return "Full discount for the selected months. Existing charges retain paid money and discount only remaining dues.";
         else if(RemoveAction)discount=0;
         else return "";
         return $"Selected fee after this change: Rs. {rate-discount:N0}. Review confirms the effect on each bill or period.";
@@ -155,7 +155,7 @@ public sealed partial class ChangeFeeDiscountForm
         concession.AccessibleName=WaiverAction?"Waiver type":"Discount type";
         fields.SetColumn(concessionField,WaiverAction?0:1);fields.SetColumnSpan(concessionField,WaiverAction?2:1);
         taskNote.Visible=!reviewStage&&HasAction;
-        taskNote.Text=WaiverAction?"The full fee will be waived for the chosen bill or period."
+        taskNote.Text=WaiverAction?"The concession fully discounts the chosen bill or period, up to unpaid dues on issued charges."
             : RemoveAction?"The discount or full waiver will be removed. The full fee becomes payable."
             : RateAction?originalWaiver?"The existing full waiver will be kept."
                 : $"The existing Rs. {originalDiscount:N0} discount will be kept."
@@ -166,7 +166,7 @@ public sealed partial class ChangeFeeDiscountForm
         periodNote.Visible=!reviewStage&&HasAction&&!choosePeriod;
         periodNote.Text=billId is not null?$"Bill period: {fromMonth.Value:MMMM yyyy}.":$"Fee period: {fromMonth.Value:MMM yyyy} through {throughMonth.Value:MMM yyyy}.";
         reasonField.Visible=!reviewStage&&HasAction;
-        paidField.Visible=HasAction&&ApplyBills&&releasedPayment>0;
+        paidField.Visible=RateAction&&ApplyBills&&releasedPayment>0;
         comparisons.Visible=reviewed is not null;
         if(ApplyBills&&!comparisons.TabPages.Contains(billTab))comparisons.TabPages.Add(billTab);
         if(!ApplyBills&&comparisons.TabPages.Contains(billTab))comparisons.TabPages.Remove(billTab);

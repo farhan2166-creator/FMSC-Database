@@ -204,6 +204,8 @@ public class ModernComboBox : Panel, IValidationTarget, IAccessibleInput
             _inner.DisplayMember =
                 value;
     }
+    public bool FormattingEnabled { get=>_inner.FormattingEnabled; set=>_inner.FormattingEnabled=value; }
+    public event ListControlConvertEventHandler? Format { add=>_inner.Format+=value; remove=>_inner.Format-=value; }
     public object? SelectedItem
     {
         get =>

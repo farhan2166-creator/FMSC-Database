@@ -40,11 +40,15 @@ internal static class FeeBillPreview
                 AND S.AdmissionId NOT IN(SELECT CONVERT(int,[value]) FROM OPENJSON(@Ids)))
             THROW 51000,'The family has new members. Refresh before printing the whole family bill.',1;
         SELECT COALESCE(S.AdmissionNumber,S.QuickReference) Reference,S.StudentName,
-            CASE WHEN A.ConcessionLabel IS NULL THEN F.FeeTypeName ELSE CONCAT(F.FeeTypeName,N' — ',A.ConcessionLabel) END FeeTypeName,F.DisplayOrder FeeDisplayOrder,B.BillingMonth,B.DiscountAmount,
+            CASE WHEN Correction.Reason=N'One-time fee waiver from Fee Collection'
+                THEN CONCAT(F.FeeTypeName,N' — Waived')
+                WHEN A.ConcessionLabel IS NULL THEN F.FeeTypeName ELSE CONCAT(F.FeeTypeName,N' — ',A.ConcessionLabel) END FeeTypeName,F.DisplayOrder FeeDisplayOrder,B.BillingMonth,B.DiscountAmount,
             dbo.GetFeeChargeBalance(B.BillingChargeId) Due,B.BillingChargeId,S.AdmissionId,CAMP.CampusName,B.GrossAmount,
             C.ClassName,SEC.SectionName
         FROM dbo.Students S JOIN dbo.BillingCharges B ON B.AdmissionId=S.AdmissionId
         JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
+        OUTER APPLY(SELECT TOP(1) W.Reason,W.Difference,W.NewDiscount FROM dbo.FeeBillCorrections W
+            WHERE W.BillingChargeId=B.BillingChargeId ORDER BY W.FeeBillCorrectionId DESC) Correction
         LEFT JOIN dbo.StudentFeeAssignments A ON A.StudentFeeAssignmentId=B.StudentFeeAssignmentId
         LEFT JOIN dbo.Enrollments E ON E.EnrollmentId=B.EnrollmentId
         LEFT JOIN dbo.CampusClassSections CCS ON CCS.ClassSectionId=E.ClassSectionId
@@ -53,7 +57,8 @@ internal static class FeeBillPreview
         LEFT JOIN dbo.Sections SEC ON SEC.SectionId=CCS.SectionId
         WHERE S.AdmissionId IN(SELECT CONVERT(int,[value]) FROM OPENJSON(@Ids))
             AND B.Status<>N'Cancelled' AND (dbo.GetFeeChargeBalance(B.BillingChargeId)>0 OR
-             (B.NetAmount=0 AND A.ConcessionLabel IS NOT NULL AND B.BillingMonth=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1)))
+             (B.NetAmount=0 AND B.DiscountAmount>0) OR
+             (Correction.Difference<0 AND Correction.NewDiscount>0))
         UNION ALL
         SELECT COALESCE(S.AdmissionNumber,S.QuickReference),S.StudentName,
             CONCAT(F.FeeTypeName,N' — ',A.ConcessionLabel),F.DisplayOrder,

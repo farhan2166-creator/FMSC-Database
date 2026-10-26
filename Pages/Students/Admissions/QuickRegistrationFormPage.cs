@@ -106,7 +106,7 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
         Disposed+=(_,_)=>feeMenu.Dispose();
         var concessionColumn = new DataGridViewComboBoxColumn { Name="ConcessionLabel", DataPropertyName="ConcessionLabel",
             HeaderText="Concession", Width=120, FlatStyle=FlatStyle.Flat };
-        concessionColumn.Items.AddRange("None","Free","Scholarship","Waived");
+        FeeConcessionLabels.Configure(concessionColumn);
         fees.Columns.Add(concessionColumn);
         fees.Columns["Amount"].DefaultCellStyle.Format=fees.Columns["Discount"].DefaultCellStyle.Format=fees.Columns["NetAmount"].DefaultCellStyle.Format="N0";
         fees.CellValidating+=(_,e)=>{
