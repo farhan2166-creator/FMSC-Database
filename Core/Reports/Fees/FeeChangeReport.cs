@@ -53,10 +53,20 @@ internal static class FeeChangeReport
         report.DataSources.Add(new ReportDataSource(DataSetName,data));
         int Pages(double height)
         {
-            string deviceInfo=new XElement("DeviceInfo",new XElement("PageHeight",height.ToString("0.00",CultureInfo.InvariantCulture)+"in")).ToString();
-            using var stream=new MemoryStream(report.Render("PDF",deviceInfo));
+            var deviceInfo=new XElement("DeviceInfo",new XElement("PageHeight",height.ToString("0.00",CultureInfo.InvariantCulture)+"in"));
+            using var stream=new MemoryStream(report.Render("PDF",deviceInfo.ToString()));
             using var pdf=PdfReader.Open(stream,PdfDocumentOpenMode.Import);
-            return pdf.PageCount;
+            deviceInfo.Add(new XElement("OutputFormat","EMF"),new XElement("StartPage",0),new XElement("EndPage",0));
+            var printedPages=new List<MemoryStream>();
+            try
+            {
+                report.Render("IMAGE",deviceInfo.ToString(),(name,extension,encoding,mimeType,willSeek)=>{
+                    var page=new MemoryStream();printedPages.Add(page);return page;
+                },out _);
+                if(printedPages.Count==0)throw new InvalidOperationException("The fee-change note did not produce a printable page.");
+                return Math.Max(pdf.PageCount,printedPages.Count);
+            }
+            finally{foreach(var page in printedPages)page.Dispose();}
         }
         int pages=Pages(estimated);
         if(pages==1)return definition;
