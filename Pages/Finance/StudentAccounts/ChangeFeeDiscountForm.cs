@@ -32,6 +32,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     private int? fixedBillAction;
     private decimal billBalance;
     private bool recoveryOnly;
+    private bool DirectBillChange=>fixedBillAction is not null&&!recoveryOnly;
     private bool HasAction => action.SelectedIndex>=0;
     private bool DiscountAction => action.SelectedIndex==0;
     private bool WaiverAction => action.SelectedIndex==1;
@@ -142,8 +143,9 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         Text=$"{(removeDiscount?"Remove Discount":originalDiscount>0m?"Change Discount":"Give Discount")} — {feeName}";
         review.Text=removeDiscount?"Review Removal":"Review Discount";
         save.Text=removeDiscount?"Confirm Removal":"Confirm Discount";
-        MinimumSize=new Size(AppScale.Scale(620),AppScale.Scale(500));
-        Size=new Size(AppScale.Scale(700),AppScale.Scale(560));
+        MinimumSize=new Size(AppScale.Scale(620),AppScale.Scale(440));
+        Size=new Size(AppScale.Scale(700),AppScale.Scale(460));
+        impact.Text="";
         initial=Draft();State();
     }
     private string Draft()=>string.Join("|",action.SelectedIndex,scope.SelectedIndex,amount.Text,concession.Text,
@@ -164,7 +166,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         if(!keepPaidDecision){releasedPayment=0;reviewStage=false;}
         if(!busy&&!blocked) impact.Text=keepPaidDecision
             ? $"Excess already paid: Rs. {releasedPayment:N0}. Review again to confirm the {(paidReduction.SelectedIndex==1?"refund":"advance credit")} choice."
-            : "Review the selected change to see its effect before confirming.";
+            : DirectBillChange?"":"Review the selected change to see its effect before confirming.";
         State(updateChoices||stageChanged);
     }
     private void State(bool updateChoices=true)
@@ -174,12 +176,12 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         fields.Enabled=canChange;
         fields.Visible=!recoveryOnly;
         if(updateChoices)UpdateVisibleFields();
-        review.Enabled=canChange&&HasAction; save.Enabled=canChange&&reviewed is not null;
-        review.Visible=!reviewStage||reviewed is null;
+        review.Enabled=canChange&&HasAction; save.Enabled=canChange&&HasAction&&(DirectBillChange||reviewed is not null);
+        review.Visible=!DirectBillChange&&(!reviewStage||reviewed is null);
         review.Text=reviewStage?"Review Again":fixedBillAction is not null
             ?RemoveAction?"Review Removal":"Review Discount":"Review Fee Change";
-        save.Visible=reviewStage;
-        editChoices.Visible=reviewStage;editChoices.Enabled=canChange;
+        save.Visible=DirectBillChange||reviewStage;
+        editChoices.Visible=!DirectBillChange&&reviewStage;editChoices.Enabled=canChange;
         check.Visible=blocked; check.Enabled=!busy;
         if(updateChoices)UpdateQuickControls(canChange);
     }
@@ -222,6 +224,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         DatabaseHelper.P("@ExpectedSnapshot",preview?null:Convert.ToString(reviewed!.Tables[0].Rows[0]["Snapshot"]))};
     private async Task ReviewAsync()
     {
+        if(DirectBillChange)return;
         if(busy||blocked||Changed||!ValidateChoices())return;
         int version=++generation; busy=true; State(); impact.Text="Reviewing the fee change…";
         try
@@ -289,10 +292,35 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     }
     private async Task SaveAsync()
     {
-        if(busy||blocked||Changed||reviewed is null||!ValidateChoices())return;
-        var args=Args(false);busy=true;State();
+        if(busy||blocked||Changed||!ValidateChoices()||(!DirectBillChange&&reviewed is null))return;
+        int version=++generation;busy=true;State();
         try
         {
+            if(DirectBillChange)
+            {
+                impact.Text=RemoveAction?"Removing the discount…":"Saving the discount…";
+                var result=await query(Args(true));
+                if(IsDisposed||version!=generation)
+                {
+                    result.Dispose();
+                    if(!IsDisposed)impact.Text="The fee choices changed. Check the amount and confirm again.";
+                    return;
+                }
+                reviewed?.Dispose();reviewed=result;
+                if(result.Tables.Count<3||result.Tables[0].Rows.Count!=1||result.Tables[1].Rows.Count!=1
+                    ||!result.Tables[0].Columns.Contains("Snapshot")||string.IsNullOrWhiteSpace(Convert.ToString(result.Tables[0].Rows[0]["Snapshot"]))
+                    ||!result.Tables[0].Columns.Contains("IssuedBills")||!result.Tables[0].Columns.Contains("ReleasedPaidAmount")
+                    ||!result.Tables[1].Columns.Contains("Current Bill")||!result.Tables[1].Columns.Contains("Proposed Bill"))
+                {impact.Text="The bill check is incomplete. Close and reload the fees before confirming.";return;}
+                var summary=result.Tables[0].Rows[0];var bill=result.Tables[1].Rows[0];
+                // Never silently apply a smaller discount or release paid money
+                // if another collection changed the bill while this window was open.
+                if(Convert.ToInt32(summary["IssuedBills"])!=1||Convert.ToDecimal(summary["ReleasedPaidAmount"])!=0m
+                    ||Convert.ToDecimal(bill["Current Bill"])!=standardAmount-originalDiscount
+                    ||Convert.ToDecimal(bill["Proposed Bill"])!=standardAmount-ChosenDiscount)
+                {impact.Text="This bill changed while the window was open. Close and reload the fees before confirming the discount.";return;}
+            }
+            var args=Args(false);
             var outcome=await submit(args);
             if(outcome.Outcome==MutationOutcome.Unconfirmed){blocked=true;impact.Text="The save outcome is uncertain. Use Check Save Outcome before another fee change.";return;}
             if(outcome.Outcome==MutationOutcome.Saved)Changed=true;

@@ -1,6 +1,6 @@
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Finance.StudentAccounts;
-/// <summary>Read-only contextual dialog on the currently selected enrollment, opened from FeeCollectionPage - shows 's GetStudentFeeProjection, i.e. recurring fee charges the student WILL owe over the next N months.</summary>
+/// <summary>Read-only recurring fee estimates through the selected enrollment's academic year end.</summary>
 public sealed class FutureFeesDialog : ApplicationWindowForm
 {
     private readonly int enrollmentId;
@@ -12,7 +12,6 @@ public sealed class FutureFeesDialog : ApplicationWindowForm
         Font = AppTheme.NormalFont,
         ForeColor = AppTheme.MutedText
     };
-    private readonly ModernComboBox monthsAhead = HumanUi.Combo();
     private readonly ModernButton refreshButton = new() {
         Text = UiText.Actions.Refresh,
         Width = AppScale.Scale(100),
@@ -21,7 +20,7 @@ public sealed class FutureFeesDialog : ApplicationWindowForm
     };
     public FutureFeesDialog(int enrollmentId, string studentDisplay)
     {
-        FinanceHelp.Attach(this,monthsAhead,"Choose how many coming months to estimate. This screen only previews fees; it creates no bills or payments.","Rs. 400 tuition for two coming months is an estimate of Rs. 800. The preview does not add Rs. 800 to outstanding.");
+        FinanceHelp.Attach(this,grid,"Preview recurring fees through the academic year’s end. This screen creates no bills or payments.","Rs. 400 tuition for two remaining months is an estimate of Rs. 800. The preview does not add Rs. 800 to outstanding.");
         this.enrollmentId = enrollmentId;
         this.studentDisplay = studentDisplay;
         Text = "Future Fees";
@@ -48,35 +47,12 @@ public sealed class FutureFeesDialog : ApplicationWindowForm
             ForeColor = AppTheme.Text
         };
         var note = new Label {
-            Text = "Estimated charges - not yet billed",
+            Text = "Estimated charges through the academic year's end - not yet billed",
             Dock = DockStyle.Top,
             Height = AppMetrics.TextHeight(AppTheme.SmallFont) + AppMetrics.SpacingSm,
             Font = AppTheme.SmallFont,
             ForeColor = AppTheme.MutedText
         };
-        monthsAhead.DropDownStyle = ComboBoxStyle.DropDownList;
-        monthsAhead.Items.AddRange(new object[] { "3 months", "6 months", "12 months", "24 months" });
-        monthsAhead.SelectedIndex = 1;
-        monthsAhead.SelectedIndexChanged += (_, _) => LoadGrid();
-        var filterRow = new TableLayoutPanel {
-            Dock = DockStyle.Top,
-            Height = AppMetrics.InputControlHeight + AppMetrics.SpacingSm,
-            ColumnCount = 3,
-            RowCount = 1,
-            Margin = new Padding(0, AppMetrics.SpacingXs, 0, AppMetrics.SpacingSm)
-        };
-        filterRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
-        filterRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160));
-        filterRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        filterRow.Controls.Add(new Label {
-            Text = "Window",
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Font = AppTheme.NormalFont,
-            ForeColor = AppTheme.Text
-        }, 0, 0);
-        monthsAhead.Dock = DockStyle.Fill;
-        filterRow.Controls.Add(monthsAhead, 1, 0);
         grid.Dock = DockStyle.Fill;
         grid.AutoGenerateColumns = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
@@ -112,21 +88,17 @@ public sealed class FutureFeesDialog : ApplicationWindowForm
         buttons.Dock = DockStyle.Bottom;
         buttons.Margin = new Padding(0, 10, 0, 0);
         var header = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2,
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
             Margin = Padding.Empty
         };
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, AppScale.Scale(260)));
         header.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         header.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
         title.Font = AppTheme.ButtonFont;
         title.Dock = DockStyle.Fill;
         subtitle.Dock = DockStyle.Fill;
-        filterRow.Dock = DockStyle.Fill;
         header.Controls.Add(title, 0, 0);
         header.Controls.Add(subtitle, 0, 1);
-        header.Controls.Add(filterRow, 1, 0);
-        header.SetRowSpan(filterRow, 2);
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
@@ -146,13 +118,6 @@ public sealed class FutureFeesDialog : ApplicationWindowForm
         AcceptButton = null;
         CancelButton = closeButton;
     }
-    private int SelectedMonthsAhead => monthsAhead.SelectedIndex switch {
-        0 => 3,
-        1 => 6,
-        2 => 12,
-        3 => 24,
-        _ => 6
-    };
     private void LoadGrid()
     {
         try
@@ -160,7 +125,8 @@ public sealed class FutureFeesDialog : ApplicationWindowForm
             var dt = DatabaseHelper.QueryUser(
                 "GetStudentFeeProjection",
                 DatabaseHelper.Int("@EnrollmentId", enrollmentId),
-                DatabaseHelper.Int("@MonthsAhead", SelectedMonthsAhead));
+                // Request the full supported horizon; the projection caps it at academic year end.
+                DatabaseHelper.Int("@MonthsAhead", 24));
             grid.Rows.Clear();
             foreach (DataRow row in dt.Rows)
             {
