@@ -2472,7 +2472,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             int selectedAdmission = admissionId;
             var summaries = await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Fees.View';
-                SELECT P.FeePaymentId,P.TotalAmount,P.Status,P.PaymentMethod,
+                SELECT P.FeePaymentId,P.ReceiptNumber,P.TotalAmount,P.Status,P.PaymentMethod,
                     (SELECT SUM(R.TotalAmount) FROM dbo.FeePayments R WHERE R.ReceiptNumber=P.ReceiptNumber AND R.RelatedFeePaymentId IS NULL) ReceiptTotal,
                     (SELECT COUNT(DISTINCT R.AdmissionId) FROM dbo.FeePayments R WHERE R.ReceiptNumber=P.ReceiptNumber AND R.RelatedFeePaymentId IS NULL) ReceiptStudents,
                     C.EntryKind AS CreditKind,
@@ -2503,12 +2503,13 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             {
                 decimal settled=GetDecimal(receipt,"CashApplied")+GetDecimal(receipt,"CreditApplied");
                 int index=recentPayments.Rows.Add(FormatDate(receipt,"TransactionDate"),GetText(receipt,"ReceiptNumber"),"Fees",
-                    GetInt(receipt,"StudentCount")>1?"Family payment":GetDecimal(receipt,"CreditApplied")>0 && GetDecimal(receipt,"CashApplied")==0?"Credit settlement":"Payment",
+                    SavedReceiptActivity(receipt,summaries),
                     settled,GetText(receipt,"PaymentMethod"),0);
                 recentPayments.Rows[index].Cells["Adjusted"].Value=GetDecimal(receipt,"Adjusted");
                 recentPayments.Rows[index].Cells["NetPaid"].Value=GetDecimal(receipt,"NetSettled");
                 recentPayments.Rows[index].Cells["ReceiptTotal"].Value=GetInt(receipt,"StudentCount")>1?receipt["TotalSettled"]:null;
                 recentPayments.Rows[index].Cells["Amount"].ToolTipText=$"New money applied: Rs. {GetDecimal(receipt,"CashApplied"):N0}; credit used: Rs. {GetDecimal(receipt,"CreditApplied"):N0}.";
+                recentPayments.Rows[index].Cells["TransactionType"].ToolTipText="Status applies to this student's share of the original receipt.";
                 recentPayments.Rows[index].Tag=true;
             }
             var rows = raw.AsEnumerable()
@@ -2590,6 +2591,17 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             if (!IsDisposed && version == loadVersion)
                 Fail(ex);
         }
+    }
+    private static string SavedReceiptActivity(DataRow receipt,DataTable studentPayments)
+    {
+        // The summaries contain only the selected student's payments. A sibling's
+        // payment on the same receipt must not determine this row's status.
+        var shares=studentPayments.AsEnumerable().Where(row=>string.Equals(
+            GetText(row,"ReceiptNumber"),GetText(receipt,"ReceiptNumber"),StringComparison.OrdinalIgnoreCase)).ToArray();
+        int reversed=shares.Count(row=>GetText(row,"Status")=="Reversed");
+        if(reversed>0)return reversed==shares.Length?"Reversed":"Partially reversed";
+        return GetInt(receipt,"StudentCount")>1?"Family payment":
+            GetDecimal(receipt,"CreditApplied")>0&&GetDecimal(receipt,"CashApplied")==0?"Credit settlement":"Payment";
     }
     private static string? LatestPrintableReceipt(DataTable statement, DataTable issued, DataTable payments)
     {
