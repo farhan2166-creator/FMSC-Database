@@ -176,6 +176,14 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
             var student = await DatabaseHelper.QueryUserAsync("GetStudentDetails", DatabaseHelper.Int("@AdmissionId", admission));
             legacySetupPending = student.Rows.Count > 0 && Convert.ToBoolean(student.Rows[0]["LegacySetupPending"]);
             enrollments = await DatabaseHelper.QueryUserAsync("GetStudentEnrollmentsForLifecycle", DatabaseHelper.Int("@AdmissionId", admission));
+            var repeatDecisions=await DatabaseHelper.QuerySqlAsync("""
+                EXEC dbo.RequirePermission @UserId,N'Students.View';
+                SELECT OldEnrollmentId FROM dbo.PromotionBatchStudents
+                WHERE AdmissionId=@Admission AND Decision=N'HOLD';
+                """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Admission",admission));
+            var repeated=repeatDecisions.AsEnumerable().Select(row=>Convert.ToInt32(row["OldEnrollmentId"])).ToHashSet();
+            enrollments.Columns.Add("RepeatedClass",typeof(bool));
+            foreach(DataRow row in enrollments.Rows)row["RepeatedClass"]=repeated.Contains(Convert.ToInt32(row["EnrollmentId"]));
             var years = await DatabaseHelper.QueryUserAsync("GetAcademicYears");
             academicYearStarts.Clear();
             foreach(DataRow row in years.Rows)
@@ -245,7 +253,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
     {
         var choices = new DataTable(); choices.Columns.Add("Id", typeof(int)); choices.Columns.Add("Display");
         foreach (DataRow row in enrollments.Rows)
-            choices.Rows.Add(row["EnrollmentId"], $"{row["YearName"]} · {row["ClassName"]} · {row["SectionName"]} ({row["Status"]})");
+            choices.Rows.Add(row["EnrollmentId"], $"{row["YearName"]} · {row["ClassName"]} · {row["SectionName"]} ({HistoryStatus(row)})");
         record.DataSource = null;
         record.ValueMember = "Id"; record.DisplayMember = "Display";
         record.DataSource = choices;
@@ -256,6 +264,8 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         else record.SelectedIndex = -1;
     }
     private DataRow? SelectedRecord() => enrollments.AsEnumerable().FirstOrDefault(r => Convert.ToInt32(r["EnrollmentId"]) == SelectedEnrollmentId);
+    private static string HistoryStatus(DataRow row)=>Convert.ToString(row["Status"])=="Promoted"
+        &&row.Table.Columns.Contains("RepeatedClass")&&row["RepeatedClass"] is true?"Repeated Class":Convert.ToString(row["Status"])??"";
     private void LoadSelected()
     {
         if (loading) return;
@@ -316,7 +326,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         }
         string DateText(string column) => current[column] is DateTime date ? date.ToString("dd MMM yyyy") : "Not recorded";
         impact.Text = $"{record.Text}\r\n{(Confirmed ? "Confirmed placement" : "Unconfirmed placement")}\r\n\r\n" +
-            $"Placement starts: {DateText("EnrollmentDate")}\r\nBilling starts: {DateText("BillingStartDate")}\r\nLeaving / promotion date: {DateText("LeavingDate")}\r\n\r\n" +
+            $"Placement starts: {DateText("EnrollmentDate")}\r\nBilling starts: {DateText("BillingStartDate")}\r\n{(HistoryStatus(current)=="Repeated Class"?"Moved to next year":"Leaving / promotion date")}: {DateText("LeavingDate")}\r\n\r\n" +
             (Confirmed ? "To fix a date error, choose Correct Dates.\r\n\r\nUse Promotion for a new academic year, Transfer to change campus/class/section, or Re-admission after leaving."
             : "Choose Complete Placement to review this draft and its effect on fees, then confirm the saved placement. Activation of a legacy student uses Activate Current Student in Admission.");
         if (missingWindows.Rows.Count == 0) impact.Text += "\r\n\r\nNo missing historical placement can be added: no eligible gaps are available.";

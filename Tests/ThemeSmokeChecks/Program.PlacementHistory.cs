@@ -75,6 +75,10 @@ internal static partial class Program
             "Missing history requires review before applying and cannot recursively open history entry.");
         Capture(editor, "missing-history");
         editor.Close();
+        history.Columns.Add("RepeatedClass",typeof(bool));history.Rows[0]["RepeatedClass"]=true;history.Rows[0]["Status"]="Promoted";
+        Seed(browser,history);list.SelectedValue=1;
+        Check(list.Text.Contains("Repeated Class")&&Field<ModernTextBox>(browser,"impact").Text.Contains("Moved to next year")
+            &&history.Rows[0].Field<string>("Status")=="Promoted","A recorded repeat is labelled clearly in placement history while its saved lifecycle status stays unchanged.");
         Seed(browser, history.Clone());
         Check(list.Items.Count == 0 && !Field<ModernButton>(browser, "dates").Visible && !Field<ModernButton>(browser, "edit").Visible,
             "Empty history offers no correction of a nonexistent record.");
