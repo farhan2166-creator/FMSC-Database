@@ -25,11 +25,21 @@ internal static partial class Program
             =>lines.Rows.Add(child,id,name,child==542?"Four":"Nine","F",child==542?"Campus Boys":"Campus Girls",kind,reason,"Paid",new DateTime(2026,10,1),true,
                 before,before+rate+withdrawn+settlement,before+rate+withdrawn+settlement,discount,rate,withdrawn,settlement,after,0m);
         string folder=Path.GetFullPath("artifacts/fee-changes");Directory.CreateDirectory(folder);
-        void Render(string name,DataTable data)
+        void Render(string name,DataTable data,bool underestimate=false)
         {
             FeeDocumentParents.Apply(data,new Dictionary<string,string>{{"542","Female"},{"249","Male"}});
             string path=Path.Combine(AppContext.BaseDirectory,"Reports",FeeChangeReport.TemplateFile);
-            string definition=FeeDocumentLayout.SizeToContent(path,data);
+            string definition=FeeChangeReport.CreateDefinition(path,data);
+            if(underestimate)
+            {
+                var shortPaper=XDocument.Parse(definition);XNamespace schema=shortPaper.Root!.Name.Namespace;
+                shortPaper.Root.Element(schema+"Page")!.Element(schema+"PageHeight")!.Value="1in";
+                using var shortReport=new LocalReport();shortReport.LoadReportDefinition(new StringReader(shortPaper.ToString()));
+                shortReport.DataSources.Add(new ReportDataSource(FeeChangeReport.DataSetName,data));
+                using var shortPdf=PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(shortReport.Render("PDF")),PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+                Check(shortPdf.PageCount>1,"The regression fixture really overflows its estimated paper length");
+                definition=FeeChangeReport.FitSinglePage(shortPaper.ToString(),data);
+            }
             var xml=XDocument.Parse(definition);XNamespace ns=xml.Root!.Name.Namespace;
             Check(!xml.Descendants(ns+"Value").Any(value=>value.Value.Contains("Payment received")||value.Value.Contains("Net payable")),"Fee-change notes do not borrow payment-receipt settlement labels");
             Check(xml.Descendants(ns+"Value").Any(value=>value.Value=="No payment was received."),"The note clearly states that no payment was received");
@@ -41,6 +51,10 @@ internal static partial class Program
             File.WriteAllBytes(Path.Combine(folder,name+".png"),png);
             using var parsed=PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdf),PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
             Check(parsed.PageCount==1&&png.Length>1000,"Fee changes render as one complete thermal PDF/PNG");
+            var settings=report.GetDefaultPageSettings();
+            using var printDocument=RdlcReportPrinter.CreateDocument(report,new System.Drawing.Printing.PageSettings {
+                PaperSize=settings.PaperSize,Margins=settings.Margins,Landscape=settings.IsLandscape },"Fee Change Note");
+            Check(printDocument.PageCount==1,"The actual printer renderer also keeps the whole note on one page");
             string csv=System.Text.Encoding.UTF8.GetString(report.Render("CSV"));File.WriteAllText(Path.Combine(folder,name+".csv"),csv);
             Check(csv.Contains("Dues now")||csv.Contains("Plan net amount")||csv.Contains("Charge cancelled")||csv.Contains("No new posted fee changes"),"The reporting engine renders the change explanations");
         }
@@ -118,7 +132,7 @@ internal static partial class Program
             Fee(200+index,"Examination and practical assessment materials fee "+index,600m,600m,0m,"Waived",
                 reason:string.Join(" ",Enumerable.Repeat("Approved concession for examination materials, reviewed by the school office.",index%5+1)));
         Fee(300,"Library Fee",600m,200m,400m,"Discount",reason:"Approved concession",child:249);
-        using(var data=FeeChangeReport.BuildData(school,h,students,lines))Render("family-many-wrapped-fee-changes",data);
+        using(var data=FeeChangeReport.BuildData(school,h,students,lines))Render("family-many-wrapped-fee-changes",data,underestimate:true);
         h["CashReceived"]=1m;bool refused=false;
         try{using var invalid=FeeChangeReport.BuildData(school,h,students,lines);}catch(InvalidOperationException){refused=true;}
         Check(refused,"An actual payment cannot be presented as a fee-change note");
