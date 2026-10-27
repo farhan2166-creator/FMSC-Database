@@ -130,6 +130,7 @@ public static class HumanUi
     public static Panel Field(string caption, Control control, bool required = false, bool fillHeight = true)
     {
         RecordTextPolicy.WireField(control,caption);
+        WholeNumberInput.WireField(control,caption);
         var panel = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
@@ -358,6 +359,7 @@ public static class HumanUi
     }
     public static void ApplyGridStyle(DataGridView grid, Color accent)
     {
+        WholeNumberInput.WireGrid(grid);
         grid.BackgroundColor = AppTheme.Surface;
         grid.BorderStyle = BorderStyle.None;
         grid.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal;

@@ -43,8 +43,9 @@ closingAmounts.Rows[0]["Actual Amount"] = 90.25m;
 Assert((decimal)DailyClosingSummary.CreatePrintable(closingAmounts).Rows[3]["Actual Amount"] == 90.25m, "Historical closing amounts remain exact without silent rounding");
 
 DataTable Fees(){var t=new DataTable();t.Columns.Add("FeeTypeId",typeof(int));t.Columns.Add("Amount",typeof(decimal));t.Columns.Add("Frequency",typeof(string));t.Columns.Add("IsMandatory",typeof(bool));t.Columns.Add("IsTransportLinked",typeof(bool));t.Rows.Add(1,2000m,"Monthly",true,false);t.Rows.Add(2,500m,"Yearly",false,false);return t;}
-Assert(InputParse.TryWholeAmount("Rs. 1000.00",out decimal parsedWhole)&&parsedWhole==1000m,"Whole-rupee UI parsing accepts currency prefixes");
-Assert(!InputParse.TryWholeAmount("999.50",out decimal fractionalDraft)&&fractionalDraft==999.50m,"Fractional UI draft is rejected without rounding");
+Assert(InputParse.TryWholeAmount("1,000",out decimal parsedWhole)&&parsedWhole==1000m,"Whole-number UI parsing accepts formatted thousands");
+Assert(!InputParse.TryWholeAmount("Rs. 1000.00",out _),"Numeric UI input rejects currency text and decimal points");
+Assert(!InputParse.TryWholeAmount("999.50",out _),"Fractional UI input is rejected without rounding");
 Assert(!InputParse.TryWholeAmount("999.999",out _),"Sub-paisa input cannot round into an accepted fee");
 var original=Fees();string quote=QuickRegistrationQuote.Create(original);
 Assert(QuickRegistrationQuote.Create(original.Copy())==quote,"Unchanged rates accepted");

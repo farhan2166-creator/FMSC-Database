@@ -27,6 +27,7 @@ internal sealed class DateSelectionPanel : UserControl
             AccessibleName = "Year",
             AccessibleDescription = "Type the year directly, for example 1985."
         };
+        WholeNumberInput.Attach(year);
         month = new ComboBox {
             DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill,
             Font = AppTheme.NormalFont, AccessibleName = "Month",

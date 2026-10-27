@@ -19,7 +19,7 @@ namespace FMSC_SMS.Core
             RefreshDisplay();
             GotFocus += (_, _) => PlaceholderText = "";
             LostFocus += (_, _) => UpdatePlaceholder();
-            KeyPress += FilterKeyPress;
+            WholeNumberInput.Attach(this,()=>Minimum<0);
             Leave += (_, _) => CommitFromText();
             TextChanged += (_, _) => { if (!_refreshingDisplay) _textEdited = true; };
             Disposed += (_, _) => _invalidValueTip.Dispose();
@@ -51,7 +51,7 @@ namespace FMSC_SMS.Core
             get => _decimalPlaces;
             set
             {
-                _decimalPlaces = Math.Max(0, value);
+                _decimalPlaces = 0;
                 RefreshDisplay();
             }
         }
@@ -65,7 +65,7 @@ namespace FMSC_SMS.Core
             }
         }
         // Preserve a fractional draft so write validation can reject it, never round it.
-        public bool WholeRupeesOnly { get; set; }
+        public bool WholeRupeesOnly { get; set; } = true;
         public decimal Increment { get; set; } = 1m;
         public bool TrimTrailingZeros
         {
@@ -96,7 +96,7 @@ namespace FMSC_SMS.Core
                 v = _minimum;
             if (v > _maximum)
                 v = _maximum;
-            return WholeRupeesOnly ? v : Math.Round(v, _decimalPlaces, MidpointRounding.AwayFromZero);
+            return v;
         }
         private void RefreshDisplay()
         {
@@ -112,30 +112,8 @@ namespace FMSC_SMS.Core
             string format = _thousandsSeparator ? "#,0" : "0";
             if (_decimalPlaces > 0)
                 format += "." + new string(_trimTrailingZeros ? '#' : '0', _decimalPlaces);
-            if (WholeRupeesOnly && !WholeRupees.IsWhole(v)) format = _thousandsSeparator ? "#,0.############################" : "0.############################";
+            if (!WholeRupees.IsWhole(v)) format = _thousandsSeparator ? "#,0.############################" : "0.############################";
             return v.ToString(format, CultureInfo.InvariantCulture);
-        }
-        private void FilterKeyPress(object? sender, KeyPressEventArgs e)
-        {
-            char ch = e.KeyChar;
-            if (char.IsControl(ch))
-                return;
-            if (char.IsDigit(ch))
-                return;
-            if (ch == '-' &&
-                _minimum < 0 &&
-                SelectionStart == 0 &&
-                !Text.Contains('-'))
-            {
-                return;
-            }
-            if (ch == '.' &&
-                (_decimalPlaces > 0 || WholeRupeesOnly) &&
-                !Text.Contains('.'))
-            {
-                return;
-            }
-            e.Handled = true;
         }
         private void CommitFromText()
         {
@@ -147,7 +125,7 @@ namespace FMSC_SMS.Core
             if (!decimal.TryParse(raw, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal parsed))
             {
                 parsed = _value;
-                // Pasted text can bypass the keystroke filter above and land here as something unparseable (e.g. "abc" or "$100").
+                // Programmatic text assignments also need a safe parsing fallback.
                 if (raw.Length > 0)
                 {
                     try

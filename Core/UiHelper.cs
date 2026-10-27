@@ -473,6 +473,7 @@ namespace FMSC_SMS.Core
         };
         private static void StyleGridAppearance(DataGridView grid)
         {
+            WholeNumberInput.WireGrid(grid);
             grid.BackgroundColor =
                 AppTheme.Surface;
             grid.BorderStyle =

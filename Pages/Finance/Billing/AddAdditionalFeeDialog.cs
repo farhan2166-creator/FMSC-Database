@@ -43,11 +43,11 @@ public sealed class AdditionalFeeEntry : UserControl
     private readonly ModernButton checkSave = new() { Text="Check Save Outcome", Width=AppScale.Scale(180), Height=AppMetrics.ButtonHeight, ThemeRole="Secondary", Visible=false };
     private readonly LookupBox feeType = new();
     private readonly ModernNumericTextBox amount = new() {
-        Minimum = 0, Maximum = 100000000, WholeRupeesOnly = true, DecimalPlaces = 2,
+        Minimum = 0, Maximum = 100000000, WholeRupeesOnly = true, DecimalPlaces = 0,
         ThousandsSeparator = true, TrimTrailingZeros = true, Dock = DockStyle.Fill
     };
     private readonly ModernNumericTextBox discount = new() {
-        Minimum = 0, Maximum = 100000000, WholeRupeesOnly = true, DecimalPlaces = 2,
+        Minimum = 0, Maximum = 100000000, WholeRupeesOnly = true, DecimalPlaces = 0,
         ThousandsSeparator = true, TrimTrailingZeros = true, Dock = DockStyle.Fill
     };
     private readonly ModernDatePicker chargeDate = HumanUi.Date();

@@ -4,18 +4,18 @@ internal static partial class Program
 {
     private static void CheckNumericPlaceholders()
     {
-        using var form = new Form();
+        using var form = new Form {ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)};
         using var number = new ModernNumericTextBox { DecimalPlaces = 2, Dock = DockStyle.Top };
         using var other = new ModernTextBox { Dock = DockStyle.Bottom };
         form.Controls.Add(number); form.Controls.Add(other);
         form.Show(); other.Focus(); Application.DoEvents();
-        Check(number.Text == "" && number.Value == 0 && number.PlaceholderText == "0.00", "Zero is a cue rather than editable text");
+        Check(number.Text == "" && number.Value == 0 && number.PlaceholderText == "0", "Whole-number zero is a cue rather than editable text");
         number.Focus(); Application.DoEvents();
         Check(number.PlaceholderText == "", "The zero cue disappears on focus");
         number.Value = 125; number.Text = "";
         Check(number.Value == 0, "Clearing a previous amount resets it instead of restoring the old amount");
         number.Value = 450;
-        Check(number.Text == "450.00" && number.Value == 450, "Nonzero loaded amounts remain visible and unchanged");
+        Check(number.Text == "450" && number.Value == 450, "Nonzero loaded whole amounts remain visible without decimal places");
         number.WholeRupeesOnly = true; number.Text = "12.5";
         Check(number.Value == 12.5m, "Fractional drafts remain available for whole-rupee validation");
         other.ZeroAsPlaceholder = true; other.Text = "0.00";

@@ -5,7 +5,7 @@ namespace FMSC_SMS.Pages.Finance.Configuration;
 /// <summary>Edits one matrix cell; the matrix's Save Grid owns the database write.</summary>
 internal sealed class FeeRateDetailsDialog : ApplicationWindowForm
 {
-    private readonly ModernNumericTextBox amount = new() { Minimum = 0, Maximum = 1000000000, WholeRupeesOnly = true, DecimalPlaces = 2, ThousandsSeparator = true, Dock = DockStyle.Fill };
+    private readonly ModernNumericTextBox amount = new() { Minimum = 0, Maximum = 1000000000, WholeRupeesOnly = true, DecimalPlaces = 0, ThousandsSeparator = true, Dock = DockStyle.Fill };
     private readonly ModernComboBox frequency = HumanUi.Combo();
     private readonly ModernTextBox remarks = HumanUi.TextBox(false, 500);
     internal decimal Amount => amount.Value;

@@ -176,7 +176,9 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
     private Task<DataTable> RunAsync(string? expected = null)
     {
         if (admissionFeeHandling.SelectedIndex < 0) throw new InvalidOperationException("Choose whether the admission fee was already paid before system billing or should be charged now.");
-        fees.EndEdit(); ((CurrencyManager?)fees.BindingContext?[feeRows])?.EndCurrentEdit();
+        if(!fees.EndEdit())throw new InvalidOperationException("Correct the fee amounts before reviewing activation.");
+        ((CurrencyManager?)fees.BindingContext?[feeRows])?.EndCurrentEdit();
+        foreach(DataRow row in feeRows.Rows){WholeRupees.Require(Convert.ToDecimal(row["Amount"]));WholeRupees.Require(Convert.ToDecimal(row["DiscountAmount"]));}
         string json = JsonSerializer.Serialize(feeRows.AsEnumerable().Where(r => Convert.ToBoolean(r["Selected"])).Select(r => new {
             FeeTypeId = Convert.ToInt32(r["FeeTypeId"]), Amount = Convert.ToDecimal(r["Amount"]), DiscountAmount = Convert.ToDecimal(r["DiscountAmount"]), Frequency = Convert.ToString(r["Frequency"]) }));
         return DatabaseHelper.QueryUserAsync("ActivateStudentBilling", DatabaseHelper.Int("@AdmissionId", admission), DatabaseHelper.Int("@EnrollmentId", enrollment),
