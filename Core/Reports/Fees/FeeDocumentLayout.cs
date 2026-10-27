@@ -73,6 +73,8 @@ internal static class FeeDocumentLayout
                             MeasureValue(run.Element(ns+"Value")!.Value,record,(string?)textBox.Attribute("Name"))));
                         float points = float.Parse(textBox.Descendants(ns + "FontSize").First().Value.Replace("pt", ""), CultureInfo.InvariantCulture);
                         bool bold=textBox.Descendants(ns + "FontWeight").Any(weight => weight.Value == "Bold")
+                            || (data.Columns.Contains("ChangeStrong")&&(string?)textBox.Attribute("Name") is "ChangeLabel" or "ChangeAmount"
+                                &&Convert.ToBoolean(record["ChangeStrong"]))
                             || (data.Columns.Contains("FamilyRowKind")&&(string?)textBox.Attribute("Name")=="FeeDescription"&&Convert.ToString(record["FamilyRowKind"])!="Fee");
                         FontStyle fontStyle = bold ? FontStyle.Bold : FontStyle.Regular;
                         if (textBox.Descendants(ns + "FontStyle").Any(style => style.Value == "Italic"))

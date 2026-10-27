@@ -34,6 +34,18 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--fee-change-documents"))
+        {
+            CheckFeeChangeDocuments();
+            Console.WriteLine($"PASS: {checks} fee-change document checks with PDF/PNG rendering.");
+            return;
+        }
+        if(args.Contains("--collection-waiver-sql"))
+        {
+            CheckCollectionWaiverSql();
+            Console.WriteLine($"PASS: {checks} collection waiver SQL checks in an owned disposable clone.");
+            return;
+        }
         if(args.Contains("--collection-fee-actions"))
         {
             CheckCollectionFeeActions();

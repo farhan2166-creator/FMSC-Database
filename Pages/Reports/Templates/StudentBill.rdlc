@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
   <Body>
     <ReportItems>
@@ -17,7 +17,7 @@
           </TablixColumns>
           <TablixRows>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.12in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -126,7 +126,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -160,8 +160,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -192,15 +192,15 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
                 </TablixCell>
               </TablixCells>
             </TablixRow><TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -256,8 +256,8 @@
                         <BackgroundColor>#f0f0f0</BackgroundColor>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.75pt</PaddingTop>
+                        <PaddingBottom>0.75pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>3</ColSpan>
@@ -269,7 +269,7 @@
             </TablixRow>
 
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -296,8 +296,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -326,8 +326,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -337,7 +337,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -364,8 +364,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -394,8 +394,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -405,7 +405,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -432,8 +432,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -462,8 +462,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -473,7 +473,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -500,8 +500,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -530,8 +530,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -540,7 +540,7 @@
                 <TablixCell />
               </TablixCells>
             </TablixRow><TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -567,8 +567,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -597,8 +597,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -608,7 +608,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -635,8 +635,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -665,8 +665,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -677,7 +677,7 @@
             </TablixRow>
 
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -709,8 +709,8 @@
                         <BackgroundColor>#f0f0f0</BackgroundColor>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -745,8 +745,8 @@
                         <BackgroundColor>#f0f0f0</BackgroundColor>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -784,8 +784,8 @@
                         <BackgroundColor>#f0f0f0</BackgroundColor>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -793,7 +793,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -819,8 +819,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -849,8 +849,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -882,8 +882,8 @@
                         </Border>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -891,7 +891,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -917,8 +917,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -952,8 +952,8 @@
                         </Border>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -961,7 +961,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -987,8 +987,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -1022,8 +1022,8 @@
                         </Border>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -1031,7 +1031,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.15in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -1062,8 +1062,8 @@
                         </TopBorder>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.75pt</PaddingTop>
+                        <PaddingBottom>0.75pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -1102,8 +1102,8 @@
                         </TopBorder>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.75pt</PaddingTop>
+                        <PaddingBottom>0.75pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -1111,7 +1111,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -1137,8 +1137,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -1172,8 +1172,8 @@
                         </Border>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -1181,7 +1181,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -1208,8 +1208,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                   </CellContents>
@@ -1238,8 +1238,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>2</ColSpan>
@@ -1249,7 +1249,7 @@
               </TablixCells>
             </TablixRow>
             <TablixRow>
-              <Height>0.16in</Height>
+              <Height>0.14in</Height>
               <TablixCells>
                 <TablixCell>
                   <CellContents>
@@ -1279,8 +1279,8 @@
                         </TopBorder>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>3</ColSpan>
@@ -1326,8 +1326,8 @@
                       <Style>
                         <PaddingLeft>2pt</PaddingLeft>
                         <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
+                        <PaddingTop>0.5pt</PaddingTop>
+                        <PaddingBottom>0.5pt</PaddingBottom>
                       </Style>
                     </Textbox>
                     <ColSpan>3</ColSpan>

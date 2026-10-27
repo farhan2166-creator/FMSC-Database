@@ -9,6 +9,14 @@ internal static class FeeReceiptDocuments
         if(result.Tables.Count<3 || result.Tables[0].Rows.Count==0)return false;
         bool complete=IsCompleteSnapshot(result.Tables[0].Rows[0]);
         await ReadChildCashReceivedAsync(receiptNumber,result.Tables[0].Rows[0],result.Tables[1]);
+        if(complete&&FeeChangeReport.IsAcknowledgement(result.Tables[0].Rows[0]))
+        {
+            using var previousPlans=await FeeChangeReport.ReadPreviousPlansAsync(result.Tables[0].Rows[0]);
+            using var changes=FeeChangeReport.BuildData(institution,result.Tables[0].Rows[0],result.Tables[1],result.Tables[2],result.Tables.Count>3?result.Tables[3]:null,previousPlans);
+            await FeeDocumentParents.ApplyAsync(changes);
+            if(owner?.IsDisposed!=true)FeeChangeReport.Show(owner,changes);
+            return true;
+        }
         using var printableLines=result.Tables[2].Copy();
         // Issued documents never acquire today's fees, concessions or balances.
         // Legacy snapshots remain reproducible, with their limitation disclosed.
@@ -16,8 +24,6 @@ internal static class FeeReceiptDocuments
             result.Tables[0].Rows[0]["ReceiptStatus"]=(Convert.ToString(result.Tables[0].Rows[0]["ReceiptStatus"])+
                 " Legacy receipt: saved fee details may exclude earlier discounts or waivers. See the account statement.").Trim();
         using var data=BuildData(institution,result.Tables[0].Rows[0],result.Tables[1],printableLines);
-        if(complete&&result.Tables.Count>3&&Convert.ToString(result.Tables[0].Rows[0]["PaymentMethod"])=="Fee changes")
-            AddAgreementNotes(data,result.Tables[3],result.Tables[1]);
         await FeeDocumentParents.ApplyAsync(data);
         if(owner?.IsDisposed==true)return true;
         Show(owner,data);

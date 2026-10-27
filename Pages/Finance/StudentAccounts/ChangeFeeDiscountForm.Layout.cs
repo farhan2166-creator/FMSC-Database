@@ -16,6 +16,7 @@ public sealed partial class ChangeFeeDiscountForm
     private TableLayoutPanel footer=null!;
     private ModernButton[] footerButtons=Array.Empty<ModernButton>();
     private Panel actionField=null!;
+    private Label currentTerms=null!;
     private Panel amountField=null!, rateField=null!, concessionField=null!, fromField=null!, throughField=null!, paidField=null!, reasonField=null!, scopeField=null!;
 
     private string ScopeText() => billId is not null
@@ -89,15 +90,15 @@ public sealed partial class ChangeFeeDiscountForm
         content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         for(int row=0;row<5;row++)content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         var heading=new Label { Text=$"{feeName} · {identity}",AutoSize=true,Dock=DockStyle.Fill,Padding=new Padding(4),Font=AppTheme.ButtonFont };
-        var current=new Label { AutoSize=true,Dock=DockStyle.Fill,Padding=new Padding(6),BackColor=AppTheme.SurfaceSecondary,
+        currentTerms=new Label { AutoSize=true,Dock=DockStyle.Fill,Padding=new Padding(6),BackColor=AppTheme.SurfaceSecondary,
             Text=$"Fee: Rs. {standardAmount:N0}     •     Discount: Rs. {originalDiscount:N0}     •     Net fee: Rs. {(originalWaiver?0:standardAmount-originalDiscount):N0}" };
-        content.Controls.Add(heading,0,0);content.Controls.Add(current,0,1);
+        content.Controls.Add(heading,0,0);content.Controls.Add(currentTerms,0,1);
         content.Controls.Add(fields,0,2);content.Controls.Add(impact,0,3);content.Controls.Add(comparisons,0,4);
         reviewScroll.Controls.Add(content);root.Controls.Add(reviewScroll,0,0);root.Controls.Add(footer,0,1);Controls.Add(root);
         reviewScroll.SizeChanged+=(_,_)=>{
             int width=Math.Max(200,reviewScroll.ClientSize.Width-SystemInformation.VerticalScrollBarWidth-6);
             content.MinimumSize=new Size(width,0);content.MaximumSize=new Size(width,0);
-            foreach(var label in new[]{heading,current,scopeNote,taskNote,periodNote,impact,fixedScope})
+            foreach(var label in new[]{heading,currentTerms,scopeNote,taskNote,periodNote,impact,fixedScope})
                 label.MaximumSize=new Size(width-12,0);
         };
         FinanceHelp.Attach(this,amount,FinanceHelp.Topic.Discount);FinanceHelp.Attach(this,newRate,FinanceHelp.Topic.FeeRate);
@@ -110,14 +111,14 @@ public sealed partial class ChangeFeeDiscountForm
     {
         for(int index=0;index<taskButtons.Length;index++)
         {
-            taskButtons[index].Enabled=canChange;
+            taskButtons[index].Enabled=canChange&&fixedBillAction is null&&!recoveryOnly;
             taskButtons[index].ThemeRole=action.SelectedIndex==index?"TabActive":"TabInactive";
             taskButtons[index].AccessibleDescription=action.SelectedIndex==index?"Selected action":"Choose this action";
         }
         for(int index=0;index<footerButtons.Length;index++)
         {
             var button=footerButtons[index];
-            bool visible=index switch { 0=>!blocked&&(!reviewStage||reviewed is null), 1 or 2=>!blocked&&reviewStage, 3=>blocked, _=>true };
+            bool visible=index switch { 0=>!recoveryOnly&&!blocked&&(!reviewStage||reviewed is null), 1 or 2=>!recoveryOnly&&!blocked&&reviewStage, 3=>blocked, _=>true };
             button.Visible=visible;
             footer.ColumnStyles[index+1].Width=visible
                 ? Math.Max(AppScale.Scale(120),TextRenderer.MeasureText(button.Text,AppTheme.ButtonFont).Width+AppScale.Scale(32)) : 0;
@@ -126,6 +127,12 @@ public sealed partial class ChangeFeeDiscountForm
 
     private string DraftNetText()
     {
+        if(fixedBillAction is not null)
+        {
+            decimal proposed=0m;
+            if(DiscountAction&&(!InputParse.TryWholeAmount(amount.Text,out proposed)||proposed<0m))return "";
+            return $"Remaining dues after this change: Rs. {Math.Max(0m,billBalance+originalDiscount-proposed):N0}. Earlier payments remain recorded.";
+        }
         decimal rate=standardAmount,discount=originalDiscount;
         if(DiscountAction)
         {
@@ -144,26 +151,30 @@ public sealed partial class ChangeFeeDiscountForm
 
     private void UpdateVisibleFields()
     {
-        actionField.Visible=!reviewStage;
+        actionField.Visible=!reviewStage&&fixedBillAction is null;
         scopeField.Visible=!reviewStage&&HasAction&&scope.Items.Count>1;
-        fixedScope.Visible=!reviewStage&&HasAction&&scope.Items.Count==1;
+        fixedScope.Visible=!reviewStage&&HasAction&&scope.Items.Count==1&&fixedBillAction is null;
         fixedScope.Text=$"Apply to: {scope.Text}";
-        scopeNote.Visible=!reviewStage&&HasAction;scopeNote.Text=ScopeText();
+        scopeNote.Visible=!reviewStage&&HasAction;
+        scopeNote.Text=fixedBillAction is not null?$"This bill only · {fromMonth.Value:MMM yyyy}. Fee plan unchanged.":ScopeText();
         amountField.Visible=!reviewStage&&DiscountAction;rateField.Visible=!reviewStage&&RateAction;
-        concessionField.Visible=!reviewStage&&(DiscountAction||WaiverAction);
+        concessionField.Visible=!reviewStage&&fixedBillAction is null&&(DiscountAction||WaiverAction);
+        fields.SetColumnSpan(amountField,fixedBillAction is not null?2:1);
         concessionField.Controls.OfType<Label>().Single().Text=WaiverAction?"Waiver type *":"Discount type *";
         concession.AccessibleName=WaiverAction?"Waiver type":"Discount type";
         fields.SetColumn(concessionField,WaiverAction?0:1);fields.SetColumnSpan(concessionField,WaiverAction?2:1);
         taskNote.Visible=!reviewStage&&HasAction;
         taskNote.Text=WaiverAction?"The concession fully discounts the chosen bill or period, up to unpaid dues on issued charges."
-            : RemoveAction?"The discount or full waiver will be removed. The full fee becomes payable."
+            : RemoveAction?fixedBillAction is not null?"Remove the discount from this bill.":"The discount or full waiver will be removed. The full fee becomes payable."
             : RateAction?originalWaiver?"The existing full waiver will be kept."
                 : $"The existing Rs. {originalDiscount:N0} discount will be kept."
-            : "Enter the discount to subtract from the fee.";
+            : fixedBillAction is not null
+                ? $"Current unpaid dues: Rs. {billBalance:N0}. Enter the total discount for this bill."
+                : "Enter the discount to subtract from the fee.";
         string net=DraftNetText();if(net.Length>0)taskNote.Text+="\r\n"+net;
         bool choosePeriod=!reviewStage&&HasAction&&monthly&&billId is null;
         fromField.Visible=throughField.Visible=choosePeriod;
-        periodNote.Visible=!reviewStage&&HasAction&&!choosePeriod;
+        periodNote.Visible=!reviewStage&&HasAction&&!choosePeriod&&fixedBillAction is null;
         periodNote.Text=billId is not null?$"Bill period: {fromMonth.Value:MMMM yyyy}.":$"Fee period: {fromMonth.Value:MMM yyyy} through {throughMonth.Value:MMM yyyy}.";
         reasonField.Visible=!reviewStage&&HasAction;
         paidField.Visible=RateAction&&ApplyBills&&releasedPayment>0;
