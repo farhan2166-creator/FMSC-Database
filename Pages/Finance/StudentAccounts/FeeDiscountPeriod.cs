@@ -34,7 +34,8 @@ internal static class FeeDiscountPeriod
                 WHEN G.GrossAmount>X.NetAmount THEN N'Scholarship' END ConcessionLabel,
             S.Frequency,A.StartDate,A.EndDate,E.EnrollmentDate,E.Status,ST.StudentName,ST.AdmissionNumber,A.YearName,
             B.BillingChargeId,COALESCE(B.BillingMonth,DATEFROMPARTS(YEAR(B.ChargeDate),MONTH(B.ChargeDate),1)) BillingMonth,
-            F.FeeTypeName,G.GrossAmount StandardAmount,G.GrossAmount-X.NetAmount DiscountAmount
+            F.FeeTypeName,G.GrossAmount StandardAmount,G.GrossAmount-X.NetAmount DiscountAmount,
+            X.NetAmount-X.Balance SettledAmount,X.Balance Balance
         FROM dbo.BillingCharges Selected
         JOIN dbo.BillingCharges B ON B.BillingChargeId=COALESCE(Selected.CorrectionOfBillingChargeId,Selected.BillingChargeId)
         JOIN dbo.StudentFeeAssignments S ON S.StudentFeeAssignmentId=B.StudentFeeAssignmentId
@@ -44,7 +45,7 @@ internal static class FeeDiscountPeriod
         JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
         OUTER APPLY(SELECT TOP(1) NewGross FROM dbo.FeeBillCorrections WHERE BillingChargeId=B.BillingChargeId ORDER BY FeeBillCorrectionId DESC) C
         CROSS APPLY(SELECT COALESCE(C.NewGross,B.GrossAmount) GrossAmount) G
-        CROSS APPLY(SELECT SUM(Q.NetAmount) NetAmount FROM dbo.BillingCharges Q
+        CROSS APPLY(SELECT SUM(Q.NetAmount) NetAmount,SUM(dbo.GetFeeChargeBalance(Q.BillingChargeId)) Balance FROM dbo.BillingCharges Q
             WHERE (Q.BillingChargeId=B.BillingChargeId OR Q.CorrectionOfBillingChargeId=B.BillingChargeId) AND Q.Status<>N'Cancelled') X
         WHERE Selected.BillingChargeId=@Id AND B.Status<>N'Cancelled'
         """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.P("@Id",id)).Rows[0];

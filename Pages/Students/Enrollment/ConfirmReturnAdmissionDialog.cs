@@ -4,15 +4,17 @@ namespace FMSC_SMS.Pages.Students.Enrollment;
 
 internal sealed class ConfirmReturnAdmissionDialog : ApplicationWindowForm
 {
-    internal ConfirmReturnAdmissionDialog(int admissionId)
+    internal ConfirmReturnAdmissionDialog(int admissionId):this(admissionId,true) { }
+    internal ConfirmReturnAdmissionDialog(int admissionId,bool initialize)
     {
         Text = "Confirm Return";
         StartPosition = FormStartPosition.CenterParent;
         ShowInTaskbar = false;
-        MinimizeBox = MaximizeBox = false;
-        Size = new Size(AppScale.Scale(760), AppScale.Scale(610));
-        MinimumSize = Size;
-        var workflow = new ConfirmReturnAdmissionPage(preselectAdmissionId: admissionId, compactDialog: true) { Dock = DockStyle.Fill };
+        MinimizeBox = false;
+        MaximizeBox = true;
+        ClientSize = new Size(AppScale.Scale(960), AppScale.Scale(720));
+        MinimumSize = new Size(AppScale.Scale(820), AppScale.Scale(640));
+        var workflow = new ConfirmReturnAdmissionPage(null,admissionId,true,initialize) { Dock = DockStyle.Fill };
         Controls.Add(workflow);
         bool completed=false;
         ModalPageCloseGuard.Attach(this,workflow,()=>completed);

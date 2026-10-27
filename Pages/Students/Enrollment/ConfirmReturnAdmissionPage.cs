@@ -109,6 +109,10 @@ public sealed partial class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges
             Name = "DiscountAmount", HeaderText = UiText.Fees.Discount, DataPropertyName = "DiscountAmount",
             ReadOnly = false, FillWeight = 22
         });
+        fees.Columns["FeeTypeName"].MinimumWidth=AppScale.Scale(190);
+        fees.Columns["Frequency"].MinimumWidth=AppScale.Scale(105);
+        fees.Columns["Amount"].MinimumWidth=AppScale.Scale(125);
+        fees.Columns["DiscountAmount"].MinimumWidth=AppScale.Scale(140);
         fees.CellValueChanged += (_, _) => UpdateTotal();
         var fields = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2,
@@ -129,7 +133,7 @@ public sealed partial class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges
         studentCard.Content.Controls.Add(fields);
         var feeCard = HumanUi.Card(
             "Opening Fee Setup",
-            "Edit the amounts and waivers before confirming return.");
+            "Review each fee. Edit Amount and Discount before confirming return.");
         feeCard.Content.Controls.Add(fees);
         var totalsGrid = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 2,
@@ -179,6 +183,13 @@ public sealed partial class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges
         if (compactDialog)
         {
             PrepareForEmbedding();
+            root.Padding=new Padding(AppScale.Scale(16));
+            foreach(var card in new[]{studentCard,feeCard,summaryCard})card.Margin=new Padding(0,0,0,AppScale.Scale(10));
+            fees.RowTemplate.Height=Math.Max(AppMetrics.GridRowHeight,AppMetrics.TextHeight(AppTheme.NormalFont)+AppScale.Scale(18));
+            fees.DefaultCellStyle.Padding=new Padding(AppScale.Scale(8),AppScale.Scale(5),AppScale.Scale(8),AppScale.Scale(5));
+            fees.ColumnHeadersHeight=Math.Max(fees.ColumnHeadersHeight,AppMetrics.TextHeight(AppTheme.ButtonFont)+AppScale.Scale(20));
+            fields.ColumnStyles[0].Width=60;fields.ColumnStyles[1].Width=40;
+            transport.Padding=new Padding(AppScale.Scale(18),0,0,0);
             pendingStudent.Enabled = false;
             studentField.Visible = false;
             fields.SetCellPosition(studentField, new TableLayoutPanelCellPosition(0, 2));
@@ -189,26 +200,41 @@ public sealed partial class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges
             selectedStudentSummary.AutoSize = false;
             selectedStudentSummary.Font = AppTheme.NormalFont;
             selectedStudentSummary.Margin = Padding.Empty;
-            int identityHeight = AppMetrics.TextHeight(selectedStudentSummary.Font) * 2 + UiDesignSystem.Spacing.Sm;
+            int identityHeight = AppMetrics.TextHeight(selectedStudentSummary.Font) * 2 + AppScale.Scale(16);
             fields.RowStyles[0].Height = identityHeight;
             root.RowStyles[0].Height = identityHeight + AppMetrics.FieldRowHeight +
-                studentCard.Padding.Vertical + studentCard.Content.Padding.Vertical;
+                studentCard.Padding.Vertical + studentCard.Content.Padding.Vertical+studentCard.Margin.Vertical;
             root.RowStyles[1].SizeType = SizeType.Absolute;
             root.RowStyles[1].Height = 0;
             nextSteps.Visible = false;
             summaryCard.Header.Visible = false;
             root.RowStyles[3].Height = amountFieldHeight + totalsGuidanceHeight + totalsGrid.Padding.Vertical +
-                summaryCard.Padding.Vertical + summaryCard.Content.Padding.Vertical;
+                summaryCard.Padding.Vertical + summaryCard.Content.Padding.Vertical+summaryCard.Margin.Vertical;
             root.Controls.Remove(buttonRow);
+            confirm.Parent?.Controls.Remove(confirm);
+            buttonRow.Dispose();
             var cancel = new ModernButton { Text = UiText.Actions.Cancel, ThemeRole = "Secondary" };
             cancel.Click += (_, _) => FindForm()?.Close();
-            buttonRow.Controls.Add(cancel);
-            var footer = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 2 };
-            StatusLabel.AutoSize = true;
-            StatusLabel.Dock = DockStyle.Fill;
-            StatusLabel.MaximumSize = new Size(AppScale.Scale(700), 0);
-            footer.Controls.Add(StatusLabel, 0, 0);
-            footer.Controls.Add(buttonRow, 0, 1);
+            var actions=new FlowLayoutPanel { Dock=DockStyle.Fill,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,
+                FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=Padding.Empty,Padding=Padding.Empty };
+            foreach(var action in new[]{confirm,cancel})
+            {
+                action.AutoSize=false;action.Width=AppScale.Scale(action==confirm?170:110);
+                action.Height=AppMetrics.ButtonHeight;action.Margin=new Padding(AppScale.Scale(8),AppScale.Scale(6),0,0);
+                actions.Controls.Add(action);
+            }
+            var footer = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 2,
+                Margin=Padding.Empty,Padding=Padding.Empty };
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            footer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            footer.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            var feedback=new Label {AutoSize=true,Dock=DockStyle.Fill,Margin=Padding.Empty,
+                Font=AppTheme.NormalFont,ForeColor=AppTheme.MutedText,BackColor=AppTheme.Surface,
+                MaximumSize=new Size(AppScale.Scale(920),0),Text=StatusLabel.Text,
+                Visible=!string.IsNullOrWhiteSpace(StatusLabel.Text)};
+            StatusLabel.TextChanged+=(_,_)=>{feedback.Text=StatusLabel.Text;feedback.Visible=!string.IsNullOrWhiteSpace(feedback.Text);};
+            footer.Controls.Add(feedback, 0, 0);
+            footer.Controls.Add(actions, 0, 1);
             root.RowStyles[4].SizeType = SizeType.AutoSize;
             root.Controls.Add(footer, 0, 4);
         }

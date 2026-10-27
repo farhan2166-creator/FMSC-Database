@@ -109,12 +109,13 @@ internal static partial class Program
             CurrentUser.SignIn(7781,"Reason fixture","Administrator",false,Array.Empty<string>());
             using var rows=new DataTable();
             foreach(string column in new[]{"Frequency","Status","StudentName","AdmissionNumber","YearName"})rows.Columns.Add(column);
-            foreach(string column in new[]{"StartDate","EndDate","EnrollmentDate"})rows.Columns.Add(column,typeof(DateTime));
-            rows.Rows.Add("Monthly","Active","Fixture child","1001","Fixture year",new DateTime(DateTime.Today.Year,1,1),new DateTime(DateTime.Today.Year,12,31),new DateTime(DateTime.Today.Year,1,1));
+            foreach(string column in new[]{"StartDate","EndDate","EnrollmentDate","BillingMonth"})rows.Columns.Add(column,typeof(DateTime));
+            rows.Columns.Add("BillingChargeId",typeof(long));rows.Columns.Add("Balance",typeof(decimal));
+            rows.Rows.Add("Monthly","Active","Fixture child","1001","Fixture year",new DateTime(DateTime.Today.Year,1,1),new DateTime(DateTime.Today.Year,12,31),new DateTime(DateTime.Today.Year,1,1),DateTime.Today,321L,500m);
             using var form=new ChangeFeeDiscountForm(41,"Tuition",500,0,rows.Rows[0]);
             T Field<T>(string name)=>(T)typeof(ChangeFeeDiscountForm).GetField(name,flags)!.GetValue(form)!;
             var amount=Field<ModernTextBox>("amount");var reason=Field<ModernTextBox>("reason");
-            form.ConfigureCollectionShortcut(false,DateTime.Today);amount.Text="100";
+            form.ConfigureCollectionBill();amount.Text="100";
             form.StartPosition=FormStartPosition.Manual;form.Location=new Point(-30000,-30000);form.Show();Application.DoEvents();
             bool Valid()=>(bool)typeof(ChangeFeeDiscountForm).GetMethod("ValidateChoices",flags)!.Invoke(form,null)!;
             string Reason()=>(string)((Microsoft.Data.SqlClient.SqlParameter[])typeof(ChangeFeeDiscountForm).GetMethod("Args",flags)!.Invoke(form,new object[]{true})!).Single(p=>p.ParameterName=="@Reason").Value;

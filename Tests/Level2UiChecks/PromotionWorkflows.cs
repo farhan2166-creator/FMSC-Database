@@ -48,7 +48,7 @@ internal static class PromotionWorkflows
         },"History opens for the committed promotion and closes back to promotion details.");
         if(!report.Passed("L2-PRO-03"))return;
         report.Run("L2-PRO-05",ui,()=>{
-            ui.Click("Load Candidates",ControlType.Button);
+            Identity.Check(!ui.Find("Load Candidates",ControlType.Button).IsEnabled,"An empty source class remained available after processing.");
             Desktop.Wait(()=>!ui.Find("Process Ticked",ControlType.Button).IsEnabled?new object():null,"no repeat promotion candidates");
             Identity.Check(Identity.Count("SELECT COUNT(*) FROM dbo.Enrollments;")==2&&Identity.Count("SELECT COUNT(*) FROM dbo.PromotionBatchStudents;")==1,"Repeated promotion changed history or enrollment count.");
         },"Promoted source student is no longer processable; two enrollments and one history row remain.");

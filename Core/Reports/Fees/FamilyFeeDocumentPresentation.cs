@@ -1,7 +1,7 @@
 namespace FMSC_SMS.Core;
 
-// Values used only by the continuous family printout. Saved bills, collection
-// snapshots and individual receipt calculations keep their original values.
+// Values used only by the continuous family printout. Saved bills and collection
+// snapshots keep their original values.
 internal static class FamilyFeeDocumentPresentation
 {
     internal static readonly string[] IdentityFields={"AdmissionNumberText","StudentName","FatherName","ClassSection","CampusName"};
@@ -83,6 +83,8 @@ internal static class FamilyFeeDocumentPresentation
             }
             SetGroupDisplay(page);
         }
+        FeeReceiptPresentation.Apply(data,"Child");
+        FeeReceiptPresentation.Apply(data,"Group");
         return data;
     }
 

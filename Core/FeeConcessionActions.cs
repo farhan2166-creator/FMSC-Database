@@ -22,7 +22,7 @@ internal static class FeeConcessionActions
     internal static async Task WaiveOnceAsync(long chargeId)
     {
         if(MutationRecoveryJournal.ReadPending(MutationKind.FeeConcession) is not null)
-            throw new InvalidOperationException("An earlier fee change needs checking. Open Review bill terms and use Check Save Outcome first.");
+            throw new InvalidOperationException("An earlier fee change needs checking. Use Student Fees > Check Fee Change Save first.");
         int actor=CurrentUser.UserId;
         var context=await Task.Run(()=>FeeDiscountPeriod.BillContext(chargeId));
         using var review=await DatabaseHelper.QueryUserSetAsync("SaveStudentFeeDiscount",WaiverArgs(context,true));
@@ -39,7 +39,7 @@ internal static class FeeConcessionActions
             RecoverableMutationWriter.PayloadHash(MutationKind.FeeConcession,actor,args),$"One-time waiver for charge {chargeId}");
         var saved=await RecoverableMutationWriter.SaveAsync(journal.Intent,args);
         if(saved.Outcome==MutationOutcome.Unconfirmed)
-            throw new InvalidOperationException("The waiver save needs checking. Open Review bill terms and use Check Save Outcome before repeating it.");
+            throw new InvalidOperationException("The waiver save needs checking. Use Student Fees > Check Fee Change Save before repeating it.");
         journal.Dispose();
         MutationRecoveryJournal.ClearVerified(journal.Intent);
         if(saved.Outcome==MutationOutcome.Rejected)throw saved.Error??new InvalidOperationException("The waiver was not saved.");

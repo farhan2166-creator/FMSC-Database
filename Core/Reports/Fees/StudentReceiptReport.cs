@@ -8,7 +8,7 @@ internal static partial class StudentReceiptReport
 
     internal static void Show(Form? owner,DataTable source,bool annualSheet=false)
     {
-        using var data=source.Copy();
+        using var data=FeeReceiptPresentation.Prepare(source);
         FeeDocumentData.GroupPeriods(data);
         string path=Path.Combine(AppContext.BaseDirectory,"Reports",TemplateFile);
         RdlcReportPreview.Show(owner,annualSheet?"Student Annual Fee Receipts":"Student Payment Receipt",

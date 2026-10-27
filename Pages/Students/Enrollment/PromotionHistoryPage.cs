@@ -125,6 +125,9 @@ public sealed class PromotionHistoryPage : V2Page
                     DatabaseHelper.Int("@SourceSectionId", section.SelectedId)
                 });
             Bind(data);
+            foreach(DataColumn column in data.Columns)
+                if(Grid.Columns.Contains(column.ColumnName)&&column.ColumnName is "ProcessedCount" or "PromotedCount" or "HeldBackCount")
+                    Grid.Columns[column.ColumnName].HeaderText=CountLabel(column.ColumnName);
             UpdateSummary(data);
             /* The load is synchronous, so the filters cannot move while the query runs: a successful load belongs to the filters now selected. */
             _appliedFilterSignature = FilterSignature();
@@ -151,9 +154,12 @@ public sealed class PromotionHistoryPage : V2Page
         string countsText = string.Join(
             "   ",
             countColumns.Select(c =>
-                $"{c.ColumnName}: {data.AsEnumerable().Sum(r => r[c] == DBNull.Value ? 0 : Convert.ToInt64(r[c])):N0}"));
+                $"{CountLabel(c.ColumnName)}: {data.AsEnumerable().Sum(r => r[c] == DBNull.Value ? 0 : Convert.ToInt64(r[c])):N0}"));
         summary.Text = $"{data.Rows.Count:N0} batch(es).   {countsText}";
     }
+    private static string CountLabel(string name)=>name switch {
+        "ProcessedCount"=>"Processed","PromotedCount"=>"Promoted","HeldBackCount"=>"Repeated class",_=>name
+    };
     private void ClearForm()
     {
         year.SelectedIndex = -1;
