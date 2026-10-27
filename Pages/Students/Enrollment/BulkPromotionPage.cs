@@ -80,8 +80,8 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         Width = AppScale.Scale(145)
     };
     private readonly ModernButton holdAllButton = new() {
-        Text = "Ticked: Hold",
-        Width = AppScale.Scale(130)
+        Text = "Ticked: Repeat Class",
+        Width = AppScale.Scale(185)
     };
     private readonly ModernButton promoteSelectedButton = new() {
         Text = "Process Ticked",
@@ -98,8 +98,10 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
     /* Start date of every academic year, read once. */
     private readonly Dictionary<int, DateTime> yearStarts = new();
     private DataTable? yearTable;
-    /* Derive destination classes from the cached same-program class list. */
+    /* Keep the full catalog so an unassigned next class cannot be skipped. */
     private DataTable? classTable;
+    private DataTable? campusAssignments;
+    private DataTable? sourcePlacements;
     private int classLoadVersion;
     /* > 0 while a load or a promotion runs; ApplyState locks the whole page meanwhile. */
     private int busyCount;
@@ -107,9 +109,14 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
     public BulkPromotionPage(Action<Func<Control>, string, string>? navigate = null)
         : this(navigate, initialize: true) { }
     internal BulkPromotionPage(Action<Func<Control>, string, string>? navigate, bool initialize)
-        : base(PageTitles.StudentPromotion, "Move a class or selected students to their next class.")
+        : base(PageTitles.StudentPromotion, "Promote one class or repeat in the next year.")
     {
         nextSteps = new NextStepBar(navigate, Fail);
+        SetToolTip(promoteAllButton,"Promote ticked students to the immediate next class in the destination year.");
+        SetToolTip(holdAllButton,"Repeat the same class and section in the destination year. Untick a student to leave their placement unchanged.");
+        SetToolTip(sourceClass,"Only classes with active students in the selected campus and academic year are shown.");
+        SetToolTip(sourceSection,"Only sections with active students in the selected source class and year are shown.");
+        SetToolTip(destinationClass,"Only the immediate next class in the same program is offered, when configured at the source campus.");
         SetToolTip(carryConcessions,"Unchecked: reset monthly concessions for return review. Checked: carry the final prior agreement, capped at the new fee; full concessions cover the new rate.");
         historyButton = AddAction("View Promotion History", (_, _) => OpenHistory(), "Secondary");
         RelocateFromActions(historyButton);
@@ -138,7 +145,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         ConfigureButtons();
         /* Parent selections reset dependent source and destination choices. */
         sourceCampus.UserSelectionChanged += async (_, _) => await OnSourceCampusChanged();
-        sourceYear.UserSelectionChanged += (_, _) => OnSourceYearChanged();
+        sourceYear.UserSelectionChanged += async (_, _) => await OnSourceYearChanged();
         sourceClass.UserSelectionChanged += async (_, _) => await OnSourceClassChanged();
         sourceSection.UserSelectionChanged += (_, _) => OnSourceSectionChanged();
         destinationYear.UserSelectionChanged += (_, _) => OnDestinationYearChanged();
@@ -284,6 +291,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             new DataGridViewCheckBoxColumn {
                 Name = "Selected",
                 HeaderText = "Select",
+                ToolTipText = "Tick to process this student. Unticked students keep their existing placement.",
                 DataPropertyName = "Selected",
                 Width = AppScale.Scale(65),
                 MinimumWidth = AppScale.Scale(65),
@@ -353,14 +361,13 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                 Name = "Decision",
                 HeaderText = "Decision",
                 DataPropertyName = "Decision",
-                Width = AppScale.Scale(110),
-                MinimumWidth = AppScale.Scale(105),
+                Width = AppScale.Scale(145),
+                MinimumWidth = AppScale.Scale(135),
                 FlatStyle = FlatStyle.Flat,
-                Items =
-                {
-                    "PROMOTE",
-                    "HOLD"
-                }
+                DataSource = PromotionChoices.Decisions(),
+                ValueMember = "Value",
+                DisplayMember = "Label",
+                ToolTipText = "Promote: next class in the next year. Repeat Class: same class and section in the next year."
             });
         HumanUi.ApplyGridStyle(candidatesGrid, AppTheme.ModuleAccent("Students"));
         candidatesGrid.AutoSizeRowsMode =
@@ -391,7 +398,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         var setupCard =
             HumanUi.Card(
                 "Promotion Details",
-                "Choose the current class, next class and promotion date.",
+                "Choose the source campus, year and class, then the destination year.",
                 accessory: historyButton);
         // Reserve the full right-hand header area before docking its text labels.
         historyButton.SendToBack();
@@ -399,7 +406,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         var candidatesCard =
             HumanUi.Card(
                 "Students to Process",
-                "Select the students to promote. You can promote the others later.");
+                "Promote advances one class. Repeat Class keeps the class and section. Untick students to skip.");
         candidatesCard.Content.Controls.Add(candidatesGrid);
         candidatesCard.Content.Controls.Add(BuildCandidateActionBar());
         var root =
@@ -428,44 +435,25 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         root.Controls.Add(candidatesCard, 0, 2);
         SetContent(
             root,
-            "Choose the current and next class, then review the selected students before promoting them.");
+            "Choose students, then review whether each will advance or repeat their class in the destination year.");
     }
     private Control BuildCandidateActionBar()
     {
         var row =
-            new TableLayoutPanel {
+            new FlowLayoutPanel {
                 Dock = DockStyle.Bottom,
-                Height = AppMetrics.ButtonRowHeight,
-                ColumnCount = 7,
-                RowCount = 1,
+                AutoSize=true,
+                AutoSizeMode=AutoSizeMode.GrowAndShrink,
+                WrapContents=true,
                 Margin = new Padding(0),
                 Padding = new Padding(0)
             };
-        float[] widths =
-        {
-            17f,
-            12f,
-            17f,
-            16f,
-            12f,
-            18f,
-            8f
-        };
-        for (int i = 0; i < widths.Length; i++)
-        {
-            row.ColumnStyles.Add(
-                new ColumnStyle(SizeType.Percent, widths[i]));
-        }
-        row.Controls.Add(loadButton, 0, 0);
-        row.Controls.Add(selectAllButton, 1, 0);
-        row.Controls.Add(clearSelectionButton, 2, 0);
-        row.Controls.Add(promoteAllButton, 3, 0);
-        row.Controls.Add(holdAllButton, 4, 0);
-        row.Controls.Add(promoteSelectedButton, 5, 0);
-        row.Controls.Add(clearButton, 6, 0);
+        row.Controls.AddRange(new Control[]{loadButton,selectAllButton,clearSelectionButton,promoteAllButton,
+            holdAllButton,promoteSelectedButton,clearButton});
         foreach (Control control in row.Controls)
         {
-            control.Dock = DockStyle.Fill;
+            control.Width=Math.Max(AppScale.Scale(90),AppMetrics.TextWidth(control.Text,control.Font,AppScale.Scale(24)));
+            control.Height=AppMetrics.ButtonHeight;
             control.Margin =
                 new Padding(4, 6, 4, 6);
         }
@@ -516,26 +504,49 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         }
         sourceYear.Bind(dt, "AcademicYearId", "YearName");
     }
-    private async Task LoadClasses()
+    private async Task LoadClasses(bool preserveSelection=false)
     {
         int version = ++classLoadVersion;
         int campusId = sourceCampus.SelectedId;
+        int yearId = sourceYear.SelectedId;
+        int previousClass=preserveSelection?sourceClass.SelectedId:0;
+        int previousSection=preserveSelection?sourceSection.SelectedId:0;
+        int previousDestinationSection=preserveSelection?destinationSection.SelectedId:0;
         classTable = null;
+        campusAssignments=null;
+        sourcePlacements=null;
         sourceClass.ClearLookup();
+        sourceSection.ClearLookup();
         destinationClass.ClearLookup();
+        destinationSection.ClearLookup();
         ApplyState();
-        if (campusId <= 0) return;
+        if (campusId <= 0||yearId<=0) return;
         try
         {
             var catalogTask = DatabaseHelper.QueryUserAsync("GetClasses");
             var assignmentsTask = DatabaseHelper.QueryUserAsync("GetClassSections",
                 DatabaseHelper.Int("@CampusId", campusId), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0));
-            await Task.WhenAll(catalogTask, assignmentsTask);
-            if (IsDisposed || version != classLoadVersion || campusId != sourceCampus.SelectedId) return;
-            classTable = CampusClasses(await catalogTask, await assignmentsTask);
-            sourceClass.Bind(classTable, "ClassId", "ClassName");
-            /* The destination list depends on the source class, so it stays empty until one is chosen. */
-            destinationClass.ClearLookup();
+            var sourcesTask=PromotionChoices.ReadSourcesAsync(campusId,yearId);
+            await Task.WhenAll(catalogTask, assignmentsTask,sourcesTask);
+            if (IsDisposed || version != classLoadVersion || campusId != sourceCampus.SelectedId||yearId!=sourceYear.SelectedId) return;
+            classTable = await catalogTask;
+            campusAssignments=await assignmentsTask;
+            sourcePlacements=await sourcesTask;
+            using var sources=CampusClasses(classTable,sourcePlacements);
+            sourceClass.Bind(sources, "ClassId", "ClassName");
+            if(previousClass>0&&sources.AsEnumerable().Any(row=>Convert.ToInt32(row["ClassId"])==previousClass))
+            {
+                sourceClass.SelectedValue=previousClass;
+                BuildDestinationClasses();
+                await LoadSourceSections();
+                if(sourcePlacements.AsEnumerable().Any(row=>Convert.ToInt32(row["ClassId"])==previousClass
+                    &&Convert.ToInt32(row["SectionId"])==previousSection)) sourceSection.SelectedValue=previousSection;
+                await LoadDestinationSections();
+                if(!IsDisposed&&version==classLoadVersion&&destinationSection.DataSource is DataTable destinations
+                    &&destinations.AsEnumerable().Any(row=>Convert.ToInt32(row["ClassSectionId"])==previousDestinationSection))
+                    destinationSection.SelectedValue=previousDestinationSection;
+            }
+            if(sources.Rows.Count==0) SetStatus("No active students are available at this campus in the selected academic year.",true);
         }
         catch (Exception ex) { Fail(ex); }
     }
@@ -575,99 +586,70 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             ApplyDefaultEffectiveDate();
         }
     }
-    /// <summary>Use GetLeaveCertificatePromotionClasses rules for destination classes.</summary>
+    /// <summary>Offer the immediate next class only when assigned to this campus.</summary>
     private void BuildDestinationClasses()
     {
         destinationClass.ClearLookup();
         destinationSection.ClearLookup();
         int sourceId = sourceClass.SelectedId;
-        if (sourceId <= 0 || classTable is null)
+        if (sourceId <= 0 || classTable is null||campusAssignments is null)
             return;
-        DataRow? source = classTable.AsEnumerable().FirstOrDefault(r => Convert.ToInt32(r["ClassId"]) == sourceId);
-        if (source is null)
-            return;
-        bool canOrder = classTable.Columns.Contains("DisplayOrder") && classTable.Columns.Contains("AcademicProgramId");
-        static int Order(DataRow r) => r["DisplayOrder"] == DBNull.Value ? 0 : Convert.ToInt32(r["DisplayOrder"]);
-        var later = new List<DataRow>();
-        foreach (DataRow row in classTable.Rows)
-        {
-            int id = Convert.ToInt32(row["ClassId"]);
-            if (id == sourceId)
-                continue;
-            if (!canOrder)
-            {
-                later.Add(row);
-                continue;
-            }
-            bool sameProgram = Convert.ToInt32(row["AcademicProgramId"]) == Convert.ToInt32(source["AcademicProgramId"]);
-            bool higher = Order(row) > Order(source) || (Order(row) == Order(source) && id > sourceId);
-            if (sameProgram && higher)
-                later.Add(row);
-        }
-        if (canOrder)
-        {
-            later = later
-                .OrderBy(r => Order(r))
-                .ThenBy(r => Convert.ToString(r["ClassName"]), StringComparer.OrdinalIgnoreCase)
-                .ThenBy(r => Convert.ToInt32(r["ClassId"]))
-                .ToList();
-        }
-        var dt = new DataTable();
-        dt.Columns.Add("ClassId", typeof(int));
-        dt.Columns.Add("ClassName", typeof(string));
-        foreach (DataRow row in later)
-            dt.Rows.Add(Convert.ToInt32(row["ClassId"]), Convert.ToString(row["ClassName"]));
+        using var dt=PromotionChoices.DestinationClasses(classTable,campusAssignments,sourceId);
         destinationClass.Bind(dt, "ClassId", "ClassName");
-        if (later.Count == 0)
+        if (dt.Rows.Count == 0)
         {
-            SetStatus($"No later class in this program after '{sourceClass.Text}'. Only Hold Back is available.", true);
+            SetStatus(PromotionChoices.NextClass(classTable,sourceId) is DataRow next
+                ? $"Configure '{next["ClassName"]}' at this campus before promoting. Repeat Class remains available."
+                : $"No next class exists in this program after '{sourceClass.Text}'. Repeat Class remains available.", true);
             return;
         }
-        destinationClass.SelectedValue = Convert.ToInt32(later[0]["ClassId"]);
+        destinationClass.SelectedValue = Convert.ToInt32(dt.Rows[0]["ClassId"]);
     }
-    private async Task LoadSourceSections()
+    private Task LoadSourceSections()
     {
         sourceSection.ClearLookup();
-        if (sourceCampus.SelectedId <= 0 || sourceClass.SelectedId <= 0) return;
-        var campusId = sourceCampus.SelectedId;
+        if (sourceCampus.SelectedId <= 0 || sourceClass.SelectedId <= 0||sourcePlacements is null) return Task.CompletedTask;
         var classId = sourceClass.SelectedId;
-        try
-        {
-            var raw = await Task.Run(() => DatabaseHelper.QueryUser("GetClassSections", DatabaseHelper.Int("@CampusId", campusId), DatabaseHelper.Int("@ClassId", classId), DatabaseHelper.Int("@SectionId", 0)));
-            if (IsDisposed || campusId != sourceCampus.SelectedId || classId != sourceClass.SelectedId) return;
-            var dt = new DataTable();
-            dt.Columns.Add("SectionId", typeof(int)); dt.Columns.Add("Display", typeof(string));
-            foreach (DataRow row in raw.Rows) dt.Rows.Add(Convert.ToInt32(row["SectionId"]), Convert.ToString(row["SectionName"]));
-            /* The empty choice is a real one - every section of the class - so it says so instead of "-- Select --". */
-            sourceSection.Bind(dt, "SectionId", "Display", "All sections");
-            if (dt.Rows.Count == 0)
-                SetStatus("No sections for this class at this campus. Check campus and class.", true);
-        }
-        catch (Exception ex) { Fail(ex); }
+        using var sections=PromotionChoices.SourceSections(sourcePlacements,classId);
+        sourceSection.Bind(sections,"SectionId","SectionName","All sections");
+        return Task.CompletedTask;
     }
-    private async Task LoadDestinationSections()
+    private Task LoadDestinationSections()
     {
         destinationSection.ClearLookup();
-        if (sourceCampus.SelectedId <= 0 || destinationClass.SelectedId <= 0) return;
-        var campusId = sourceCampus.SelectedId;
+        if (sourceCampus.SelectedId <= 0 || destinationClass.SelectedId <= 0||campusAssignments is null) return Task.CompletedTask;
         var classId = destinationClass.SelectedId;
-        try
-        {
-            var raw = await Task.Run(() => DatabaseHelper.QueryUser("GetClassSections", DatabaseHelper.Int("@CampusId", campusId), DatabaseHelper.Int("@ClassId", classId), DatabaseHelper.Int("@SectionId", 0)));
-            if (IsDisposed || campusId != sourceCampus.SelectedId || classId != destinationClass.SelectedId) return;
-            var dt = new DataTable();
-            dt.Columns.Add("ClassSectionId", typeof(int)); dt.Columns.Add("Display", typeof(string));
-            foreach (DataRow row in raw.Rows) dt.Rows.Add(Convert.ToInt32(row["ClassSectionId"]), $"{row["ClassName"]} — {row["SectionName"]}");
-            if (dt.Rows.Count>0) dt.Rows.Add(-1,"All sections — keep matching sections");
-            if (raw.Rows.Count>0) dt.Rows.Add(-2,"Choose destination sections…");
-            destinationSection.Bind(dt, "ClassSectionId", "Display");
-            /* Say why the list is empty instead of leaving a blank combo: the class is real but has no section placed at this campus yet. */
-            if (dt.Rows.Count == 0)
-                Warn($"The chosen destination class has no section at this campus. Add one under {PageTitles.CampusAssignments}, or choose another class.");
-            else if (raw.Rows.Count == 1)
-                destinationSection.SelectedValue = Convert.ToInt32(dt.Rows[0]["ClassSectionId"]);
-        }
-        catch (Exception ex) { Fail(ex); }
+        var raw=campusAssignments.AsEnumerable().Where(row=>Convert.ToInt32(row["ClassId"])==classId).ToArray();
+        using var dt = new DataTable();
+        dt.Columns.Add("ClassSectionId", typeof(int)); dt.Columns.Add("Display", typeof(string));
+        foreach (DataRow row in raw) dt.Rows.Add(Convert.ToInt32(row["ClassSectionId"]), $"{row["ClassName"]} — {row["SectionName"]}");
+        if (dt.Rows.Count>0) dt.Rows.Add(-1,"All sections — keep matching sections");
+        if (raw.Length>0) dt.Rows.Add(-2,"Choose destination sections…");
+        destinationSection.Bind(dt, "ClassSectionId", "Display");
+        if (dt.Rows.Count == 0)
+            Warn($"The next class has no section at this campus. Configure one under {PageTitles.CampusAssignments}, then reload promotion.");
+        else if (raw.Length == 1)
+            destinationSection.SelectedValue = Convert.ToInt32(dt.Rows[0]["ClassSectionId"]);
+        return Task.CompletedTask;
+    }
+    private bool DestinationIsCurrentYear()=>yearTable?.AsEnumerable().Any(row=>
+        Convert.ToInt32(row["AcademicYearId"])==destinationYear.SelectedId
+        &&row["StartDate"] is DateTime start&&row["EndDate"] is DateTime end
+        &&DateTime.Today>=start.Date&&DateTime.Today<=end.Date)==true;
+
+    private async Task<bool> ValidateDestinationAsync()
+    {
+        var catalog=DatabaseHelper.QueryUserAsync("GetClasses");
+        var assignments=DatabaseHelper.QueryUserAsync("GetClassSections",DatabaseHelper.Int("@CampusId",sourceCampus.SelectedId),
+            DatabaseHelper.Int("@ClassId",0),DatabaseHelper.Int("@SectionId",0));
+        await Task.WhenAll(catalog,assignments);
+        using var allowed=PromotionChoices.DestinationClasses(await catalog,await assignments,sourceClass.SelectedId);
+        if(allowed.AsEnumerable().Any(row=>Convert.ToInt32(row["ClassId"])==destinationClass.SelectedId)
+            &&(destinationSection.SelectedId<0||(await assignments).AsEnumerable().Any(row=>
+                Convert.ToInt32(row["ClassId"])==destinationClass.SelectedId
+                &&Convert.ToInt32(row["ClassSectionId"])==destinationSection.SelectedId)))return true;
+        Warn("The next class or its campus sections changed. Reload and review the destination before processing.");
+        return false;
     }
     /// <summary>The latest 1 April that is not in the future: the opening value of the effective date.</summary>
     private static DateTime CurrentYearStart()
@@ -694,10 +676,11 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         await LoadClasses();
         ApplyStateAndHint();
     }
-    private void OnSourceYearChanged()
+    private async Task OnSourceYearChanged()
     {
         InvalidateCandidates();
         BuildDestinationYears();
+        await LoadClasses();
         ApplyStateAndHint();
     }
     private async Task OnSourceClassChanged()
@@ -755,8 +738,8 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         bool hasRows = candidateData is not null && candidateData.Rows.Count > 0;
         sourceCampusField.Enabled = idle;
         sourceYearField.Enabled = idle;
-        sourceClassField.Enabled = idle && campus;
-        sourceSectionField.Enabled = idle && campus && sourceClassChosen;
+        sourceClassField.Enabled = idle && campus && sourceYearChosen && classTable is not null;
+        sourceSectionField.Enabled = idle && campus && sourceClassChosen && sourcePlacements is not null;
         destinationYearField.Enabled = idle && sourceYearChosen;
         destinationClassField.Enabled = idle && sourceClassChosen;
         destinationSectionField.Enabled = idle && campus && destinationClassChosen;
@@ -781,8 +764,8 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         var (ticked, promote, hold) = CountTicked();
         string? reason = PromoteBlockReason();
         SetStatus(
-            $"{ticked:N0} of {candidateData.Rows.Count:N0} ticked ({promote:N0} to promote, {hold:N0} to hold back). " +
-            (reason ?? "Ready to promote."));
+            $"{ticked:N0} of {candidateData.Rows.Count:N0} ticked ({promote:N0} to promote, {hold:N0} to repeat class). " +
+            (reason ?? "Ready to process."));
     }
     private (int Ticked, int Promote, int Hold) CountTicked()
     {
@@ -828,7 +811,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         candidateData = null;
         candidatesGrid.DataSource = null;
         nextSteps.Dismiss();
-        SetStatus("Source context changed. Load the candidates again before promoting.", true);
+        SetStatus("Source changed. Load the candidates again before processing.", true);
     }
     private async Task LoadCandidates()
     {
@@ -958,6 +941,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             }
             else if (!ValidateRequiredInputs(requiredDestination))
                 return;
+            if(promoteCount>0&&!await ValidateDestinationAsync()) return;
             /* The effective date is checked here so the refusal is plain. */
             DateTime effective = effectiveDate.Value.Date;
             if (effective > DateTime.Today)
@@ -1001,9 +985,9 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             }
             if (missingFeeMessages.Count > 0)
             {
-                Warn("Promotion cannot proceed because required fee rates are missing:\n\n" +
+                Warn("Students cannot be processed because required fee rates are missing:\n\n" +
                     string.Join("\n", missingFeeMessages) +
-                    $"\n\nOpen {PageTitles.FeeRateSetup}, configure these fees for the listed campus and classes, then retry promotion.");
+                    $"\n\nOpen {PageTitles.FeeRateSetup}, configure these fees for the listed campus and classes, then retry.");
                 return;
             }
             Dictionary<int,int> sectionMapping=new();
@@ -1029,11 +1013,12 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                     ("To", promoteCount > 0 ? $"{destinationClass.Text} · {destinationSection.Text} · {destinationYear.Text}" : destinationYear.Text),
                     ("Effective date", effective.ToString("dd-MMM-yyyy")),
                     ("Promote", promoteCount.ToString("N0")),
-                    ("Hold back", holdCount.ToString("N0")),
+                    ("Repeat Class", holdCount.ToString("N0")),
                     ("Monthly concessions",carryConcessions.Checked?"Carry the final prior-placement agreement, capped at the new fee":"Reset; review when confirming return"),
                     ("Section mapping", string.IsNullOrWhiteSpace(mappingSummary) ? "As selected above" : mappingSummary.Trim())
                 },
-                Notice: "Each student gets a new placement in the destination year. Held-back students keep their class. Confirm return admission before billing.");
+                Notice: "Each ticked student moves into the destination year. Promote advances one class; Repeat Class keeps the same class and section. Unticked students stay unchanged. "+
+                    (DestinationIsCurrentYear()?"Confirm Return before billing.":"Past-year placements record history without generating bills."));
             var confirm = ModernMessageDialog.Show(FindForm(), confirmation,
                 "Confirm Student Promotion", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (confirm !=
@@ -1120,7 +1105,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                 ? 0
                 : Convert.ToInt32(serverResult["HeldBackCount"]);
             string outcome =
-                $"Processed {processed:N0}/{attempted:N0} · Promoted: {promoted:N0} · Held back: {heldBack:N0}.";
+                $"Processed {processed:N0}/{attempted:N0} · Promoted: {promoted:N0} · Repeated class: {heldBack:N0}.";
             Action reportOutcome;
             if (processed < attempted)
             {
@@ -1142,24 +1127,25 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             }
             reportOutcome();
             /* Capture promoted IDs before reload replaces candidates; carry a single student into return confirmation. */
-            int promotedAdmissionId = promoted == 1
-                ? selected
-                    .Where(r => string.Equals(Convert.ToString(r["Decision"]), "PROMOTE", StringComparison.OrdinalIgnoreCase))
-                    .Select(r => Convert.ToInt32(r["AdmissionId"]))
-                    .FirstOrDefault()
-                : 0;
+            int returnAdmissionId = processed == 1 ? Convert.ToInt32(selected[0]["AdmissionId"]):0;
             string destinationName = destinationClass.Text;
-            await LoadCandidates();
+            string repeatedClassName=sourceClass.Text;
+            bool confirmCurrentReturn=DestinationIsCurrentYear();
+            candidateData=null;candidatesGrid.DataSource=null;nextSteps.Dismiss();
+            await LoadClasses(preserveSelection:true);
+            if(!IsDisposed&&sourceClass.SelectedId>0) await LoadCandidates();
             /* The outcome is stated again so it is what the operator is left looking at. */
             if (!IsDisposed)
                 reportOutcome();
-            if (!IsDisposed && promoted > 0)
+            if (!IsDisposed && processed > 0&&processed==attempted&&promoted+heldBack==processed&&confirmCurrentReturn)
             {
                 nextSteps.Offer(
-                    promoted == 1
+                    heldBack==processed
+                        ? $"Repeat Class saved: {repeatedClassName} in {destinationYear.Text}. Confirm Return to start billing."
+                        : promoted == 1&&heldBack==0
                         ? $"Promoted to {destinationName}. Confirm Return to start billing."
-                        : $"{promoted:N0} promoted to {destinationName}. Confirm each return to start billing.",
-                    promotedAdmissionId,
+                        : $"{promoted:N0} promoted; {heldBack:N0} repeated class. Confirm each return to start billing.",
+                    returnAdmissionId,
                     StudentFlow.ConfirmReturn(primary: true));
             }
         }
@@ -1173,6 +1159,7 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
     {
         classLoadVersion++;
         classTable = null;
+        campusAssignments=null;sourcePlacements=null;
         ResetToBlank(sourceCampus);
         ResetToBlank(sourceYear);
         sourceClass.ClearLookup();

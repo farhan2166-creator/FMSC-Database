@@ -26,6 +26,27 @@ internal static partial class Program
             assignments.Clear();
             using var empty = BulkPromotionPage.CampusClasses(catalog, assignments);
             Check(empty.Rows.Count == 0, "A campus without assignments cannot fall back to every class");
+            catalog.Rows.Add(10,"Ten",10,1);catalog.Rows.Add(20,"First Year",1,2);
+            assignments.Rows.Add(4);assignments.Rows.Add(10);assignments.Rows.Add(20);
+            using var missingNext=PromotionChoices.DestinationClasses(catalog,assignments,4);
+            Check(missingNext.Rows.Count==0,"A missing next campus class cannot cause a jump from Four to Ten");
+            assignments.Rows.Add(5);
+            using var next=PromotionChoices.DestinationClasses(catalog,assignments,4);
+            Check(next.Rows.Count==1&&next.Rows[0].Field<int>("ClassId")==5,"The only promotion destination is the immediate next catalog class at the campus");
+            using var finalClass=PromotionChoices.DestinationClasses(catalog,assignments,10);
+            Check(finalClass.Rows.Count==0,"The final program class does not jump into another program");
+            using var sources=new DataTable();sources.Columns.Add("ClassId",typeof(int));sources.Columns.Add("SectionId",typeof(int));
+            sources.Columns.Add("SectionName");sources.Columns.Add("SectionDisplayOrder",typeof(int));
+            sources.Rows.Add(4,2,"B",2);sources.Rows.Add(4,1,"A",1);sources.Rows.Add(4,1,"A",1);sources.Rows.Add(5,3,"C",3);
+            using var occupied=BulkPromotionPage.CampusClasses(catalog,sources);
+            Check(occupied.AsEnumerable().Select(row=>row.Field<int>("ClassId")).SequenceEqual(new[]{4,5}),
+                "Source classes contain only classes represented by the year's active placements");
+            using var occupiedSections=PromotionChoices.SourceSections(sources,4);
+            Check(occupiedSections.AsEnumerable().Select(row=>row.Field<int>("SectionId")).SequenceEqual(new[]{1,2}),
+                "Source sections contain only populated sections in that class, without duplicates, in display order");
+            sources.Clear();
+            using var noSources=BulkPromotionPage.CampusClasses(catalog,sources);
+            Check(noSources.Rows.Count==0,"An empty source year cannot fall back to campus classes");
         }
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var previous = (CurrentUser.UserId, CurrentUser.Username, CurrentUser.RoleName,
@@ -58,6 +79,8 @@ internal static partial class Program
             }
             var years = Lookup("AcademicYearId", "YearName", (103, "Fixture source year"), (104, "Fixture next year"));
             var classes = Lookup("ClassId", "ClassName", (606, "Fixture Class 6"), (607, "Fixture Class 7"));
+            classes.Columns.Add("DisplayOrder",typeof(int));classes.Columns.Add("AcademicProgramId",typeof(int));
+            for(int index=0;index<classes.Rows.Count;index++){classes.Rows[index]["DisplayOrder"]=index+6;classes.Rows[index]["AcademicProgramId"]=1;}
             var sections = Lookup("SectionId", "SectionName", (17, "Fixture Section A"));
             foreach (var item in new[] { (Field: "sourceYear", Data: years, Key: "AcademicYearId", Text: "YearName", Id: 103),
                 (Field: "sourceClass", Data: classes, Key: "ClassId", Text: "ClassName", Id: 606),
@@ -65,12 +88,39 @@ internal static partial class Program
             {
                 var lookup = Field<LookupBox>(item.Field); lookup.Bind(item.Data, item.Key, item.Text); lookup.SelectedValue = item.Id;
             }
+            Field<LookupBox>("sourceCampus").Bind(Lookup("CampusId","CampusName",(21,"Fixture campus")),"CampusId","CampusName");
+            Field<LookupBox>("sourceCampus").SelectedValue=21;
+            var placements=new DataTable();placements.Columns.Add("ClassId",typeof(int));placements.Columns.Add("SectionId",typeof(int));
+            placements.Columns.Add("SectionName");placements.Columns.Add("SectionDisplayOrder",typeof(int));placements.Rows.Add(606,17,"Fixture Section A",1);
+            var assigned=placements.Copy();assigned.Columns.Add("ClassSectionId",typeof(int));assigned.Columns.Add("ClassName");
+            assigned.Rows[0]["ClassSectionId"]=71;assigned.Rows[0]["ClassName"]="Fixture Class 6";
+            assigned.Rows.Add(607,18,"Fixture Section B",2,72,"Fixture Class 7");
+            promotionType.GetField("classTable",flags)!.SetValue(promotion,classes);
+            promotionType.GetField("campusAssignments",flags)!.SetValue(promotion,assigned);
+            promotionType.GetField("sourcePlacements",flags)!.SetValue(promotion,placements);
+            Invoke("BuildDestinationClasses");
+            promotionType.GetMethod("LoadSourceSections",flags)!.Invoke(promotion,null);
+            Field<LookupBox>("sourceSection").SelectedValue=17;
+            promotionType.GetMethod("LoadDestinationSections",flags)!.Invoke(promotion,null);
+            Check(Field<LookupBox>("destinationClass").SelectedId==607&&Field<LookupBox>("destinationClass").Items.Count==2,
+                "The actual form offers and selects only its immediate next campus class");
+            Check(Field<LookupBox>("sourceSection").Items.Count==2&&Field<LookupBox>("destinationSection").SelectedId==72,
+                "The form's populated source section and configured destination section remain distinct");
             var candidates = new DataTable(); candidates.Columns.Add("Selected", typeof(bool));
             candidates.Columns.Add("Decision", typeof(string)); candidates.Rows.Add(true, "PROMOTE");
             promotionType.GetField("candidateData", flags)!.SetValue(promotion, candidates);
+            Field<DataGridView>("candidatesGrid").DataSource=candidates;
             Field<ModernTextBox>("remarks").Text = "Retain this promotion draft";
             using var parent = new Form { ClientSize = new Size(1080, 650), AutoScaleMode = AutoScaleMode.None };
             parent.Controls.Add(promotion); parent.Show(); Application.DoEvents(); Invoke("ApplyState");
+            candidates.Rows[0]["Decision"]="HOLD";Application.DoEvents();
+            Check(Convert.ToString(Field<DataGridView>("candidatesGrid").Rows[0].Cells["Decision"].FormattedValue)=="Repeat Class"
+                &&candidates.Rows[0].Field<string>("Decision")=="HOLD","Repeat Class is displayed while the established saved decision stays compatible");
+            Invoke("ApplyStateAndHint");
+            Check(((Label)typeof(V2Page).GetField("StatusLabel",flags)!.GetValue(promotion)!).Text.Contains("1 to repeat class"),
+                "The live selection message explains Repeat Class");
+            candidates.Rows[0]["Decision"]="PROMOTE";
+            Check(Field<ModernButton>("holdAllButton").Text=="Ticked: Repeat Class","The batch action names Repeat Class explicitly");
             var historyButton = Field<ModernButton>("historyButton");
             Check(promotion.NavigationTitle == PageTitles.StudentPromotion, "The actual page title agrees with navigation");
             Check(historyButton.Visible && historyButton.Enabled && historyButton.Parent is Panel,
@@ -78,12 +128,19 @@ internal static partial class Program
             var header = historyButton.Parent!;
             foreach (int width in new[] { 1280, 1080, 850 })
             {
-                parent.ClientSize = new Size(width, 650); Application.DoEvents();
+                parent.ClientSize = new Size(width, 850); Application.DoEvents();
                 Check(historyButton.Left >= 0 && historyButton.Right <= header.ClientSize.Width &&
                     historyButton.Top >= 0 && historyButton.Bottom <= header.ClientSize.Height,
                     "The history accessory fits the shared header at different client widths");
                 Check(header.Controls.OfType<Label>().All(l => !l.Bounds.IntersectsWith(historyButton.Bounds)),
                     "The history accessory leaves header wording readable");
+                var repeat=Field<ModernButton>("holdAllButton");
+                Check(repeat.Right<=repeat.Parent!.ClientSize.Width&&repeat.Width>=AppMetrics.TextWidth(repeat.Text,repeat.Font,AppScale.Scale(20)),
+                    "Repeat Class remains fully readable when the promotion action bar wraps");
+                Directory.CreateDirectory("artifacts/promotion-wording");
+                using var capture=new Bitmap(parent.ClientSize.Width,parent.ClientSize.Height);
+                parent.DrawToBitmap(capture,new Rectangle(Point.Empty,parent.ClientSize));
+                capture.Save($"artifacts/promotion-wording/promotion-{width}.png");
             }
             Invoke("BeginBusy"); Check(!historyButton.Enabled, "Loading or processing disables the history shortcut");
             Invoke("OpenHistory"); Invoke("EndBusy");
@@ -115,7 +172,7 @@ internal static partial class Program
                 Check(procedure == "GetPromotionBatchesFiltered", "History retains its production read-only procedure contract");
                 reads.Add(parameters);
                 var batches = new DataTable(); batches.Columns.Add("PromotionBatchId", typeof(int));
-                batches.Columns.Add("PromotedCount", typeof(int)); batches.Rows.Add(201, 2); return batches;
+                batches.Columns.Add("PromotedCount", typeof(int));batches.Columns.Add("HeldBackCount",typeof(int)); batches.Rows.Add(201, 2,1); return batches;
             };
             PromotionHistoryPage History(int year, int cls, int section) => (PromotionHistoryPage)Activator.CreateInstance(
                 typeof(PromotionHistoryPage), flags, null, new object[] { year, cls, section, query }, null)!;
@@ -129,6 +186,9 @@ internal static partial class Program
             T HistoryField<T>(string name) => (T)historyType.GetField(name, flags)!.GetValue(history)!;
             var export = HistoryField<ModernButton>("exportButton");
             Check(export.Enabled && HistoryField<Label>("summary").Text.Contains("1 batch"), "Loaded history retains summary and export availability");
+            Check(HistoryField<Label>("summary").Text.Contains("Repeated class: 1")
+                &&((DataGridView)typeof(V2Page).GetField("Grid",flags)!.GetValue(history)!).Columns["HeldBackCount"].HeaderText=="Repeated class",
+                "Promotion history gives repeat decisions a clear label in both the grid and summary");
             HistoryField<LookupBox>("year").SelectedValue = 104;
             Check(!export.Enabled && reads.Count == 1, "Changing history filters requires a fresh Load before export");
             historyType.GetMethod("LoadData", flags)!.Invoke(history, null);
