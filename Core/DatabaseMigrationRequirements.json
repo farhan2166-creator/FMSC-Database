@@ -234,6 +234,26 @@
       "schema": "dbo",
       "name": "UpdateLeavingCertificateCopy",
       "type": "P "
+    },
+    {
+      "schema": "dbo",
+      "name": "TransportServiceRequests",
+      "type": "U "
+    },
+    {
+      "schema": "dbo",
+      "name": "GetTransportBillingMonth",
+      "type": "FN"
+    },
+    {
+      "schema": "dbo",
+      "name": "TransportMonthlyCharges",
+      "type": "IF"
+    },
+    {
+      "schema": "dbo",
+      "name": "ManageStudentTransport",
+      "type": "P "
     }
   ],
   "columns": [
@@ -1208,6 +1228,162 @@
       "isNullable": false,
       "isIdentity": false,
       "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SchoolProfile",
+      "name": "TransportCutoffDay",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "RequestId",
+      "type": "uniqueidentifier",
+      "maxLength": 16,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "PayloadHash",
+      "type": "varchar",
+      "maxLength": 64,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "UserId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "EnrollmentId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "FeeTypeId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "IsStart",
+      "type": "bit",
+      "maxLength": 1,
+      "precision": 1,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "FromMonth",
+      "type": "date",
+      "maxLength": 3,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "AssignmentId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "ChargesCreated",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "ChargesCancelled",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "CancelledAmount",
+      "type": "decimal",
+      "maxLength": 9,
+      "precision": 12,
+      "scale": 2,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "CompletedAt",
+      "type": "datetime2",
+      "maxLength": 8,
+      "precision": 27,
+      "scale": 7,
+      "isNullable": false,
+      "isIdentity": false,
+      "isComputed": false
     }
   ],
   "uniqueIndexes": [
@@ -1286,6 +1462,12 @@
       "objectName": "CharacterCertificates",
       "name": "UX_CharacterCertificates_AdmissionExam",
       "keys": "AdmissionId,ExamType"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportServiceRequests",
+      "name": "PK_TransportServiceRequests",
+      "keys": "RequestId"
     }
   ],
   "foreignKeys": [
@@ -1541,6 +1723,11 @@
       "schema": "dbo",
       "objectName": "StudentPostingDecisions",
       "name": "CK_StudentPostingDecisions_Json"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SchoolProfile",
+      "name": "CK_SchoolProfile_TransportCutoff"
     }
   ],
   "triggers": [
@@ -2043,6 +2230,126 @@
       "type": "int",
       "maxLength": 4,
       "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "SaveSchoolProfile",
+      "name": "@TransportCutoffDay",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "GetTransportBillingMonth",
+      "name": "@Date",
+      "type": "date",
+      "maxLength": 3,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "TransportMonthlyCharges",
+      "name": "@EnrollmentId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "ManageStudentTransport",
+      "name": "@UserId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "ManageStudentTransport",
+      "name": "@EnrollmentId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "ManageStudentTransport",
+      "name": "@IsStart",
+      "type": "bit",
+      "maxLength": 1,
+      "precision": 1,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "ManageStudentTransport",
+      "name": "@FeeTypeId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "ManageStudentTransport",
+      "name": "@FromMonth",
+      "type": "date",
+      "maxLength": 3,
+      "precision": 10,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "ManageStudentTransport",
+      "name": "@Reason",
+      "type": "nvarchar",
+      "maxLength": 1000,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "ManageStudentTransport",
+      "name": "@Preview",
+      "type": "bit",
+      "maxLength": 1,
+      "precision": 1,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "ManageStudentTransport",
+      "name": "@ExpectedSnapshot",
+      "type": "varchar",
+      "maxLength": 64,
+      "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "ManageStudentTransport",
+      "name": "@RequestId",
+      "type": "uniqueidentifier",
+      "maxLength": 16,
+      "precision": 0,
       "scale": 0,
       "isOutput": false
     }

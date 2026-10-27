@@ -1,15 +1,19 @@
 # Apply the database changes later
 
-The application requires **schema 56**. SQL changes are checked in here;
+The application requires **schema 58**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,
-`54.sql`, `55.sql`, then `56.sql`. A database already at 55 needs only `56.sql`.
+`54.sql`, `55.sql`, `56.sql`, `57.sql`, then `58.sql`. A database already at 57
+needs only `58.sql`; one at 56 needs `57.sql` and `58.sql`.
 Migration 55 preserves existing financial records and introduces complete,
 immutable receipt snapshots. See `Docs/Decisions/FEE_RECEIPT_PAPER_TRAIL.md`.
 Migration 56 changes the printable breakdown to each visit: carry outstanding,
 add subsequent fees/adjustments, deduct subsequent concessions, and retain only
 current payments and closing balances. Original snapshots remain unchanged.
+Migration 57 corrects pending-return classification for historical admissions.
+Migration 58 adds the independent Transport Cutoff Day and the shared transport
+start/stop rules. It preserves paid months and existing financial history.
 
 | Current database version | Files to apply, in order |
 |---|---|
@@ -45,7 +49,14 @@ current payments and closing balances. Original snapshots remain unchanged.
 | 48 | `49.sql`, `50.sql`, `51.sql` |
 | 49 | `50.sql`, `51.sql` |
 | 50 | `51.sql` |
-| 51 | None |
+| 51 | `52.sql`, `53.sql`, `54.sql`, `55.sql`, `56.sql`, `57.sql`, `58.sql` |
+| 52 | `53.sql`, `54.sql`, `55.sql`, `56.sql`, `57.sql`, `58.sql` |
+| 53 | `54.sql`, `55.sql`, `56.sql`, `57.sql`, `58.sql` |
+| 54 | `55.sql`, `56.sql`, `57.sql`, `58.sql` |
+| 55 | `56.sql`, `57.sql`, `58.sql` |
+| 56 | `57.sql`, `58.sql` |
+| 57 | `58.sql` |
+| 58 | None |
 
 Check your version first:
 
@@ -92,7 +103,7 @@ transaction, which the installer normally provides.
 For a schema-19 database, save this wrapper **outside this directory**, change the
 include paths to your checkout, and run it with SQLCMD. For a newer supported
 database, omit every include up to and including its current version. For example,
-schema 48 needs migrations 49 and 50. Schema 49 needs only migration 50.
+schema 56 needs migrations 57 and 58. Schema 57 needs only migration 58.
 
 ```sql
 :ON ERROR EXIT

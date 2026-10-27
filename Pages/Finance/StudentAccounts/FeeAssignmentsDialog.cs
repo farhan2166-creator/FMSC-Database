@@ -60,11 +60,10 @@ public sealed class FeeAssignmentsDialog : ApplicationWindowForm
         CancelButton = closeButton;
     }
 }
-/// <summary>Add recurring fees or start transport using the protected restart workflow.</summary>
+/// <summary>Add a recurring non-transport fee. Transport uses the shared transport dialog.</summary>
 public sealed class AddFeeAssignmentForm : ApplicationWindowForm
 {
     private readonly int enrollmentId;
-    private readonly bool transportOnly;
     private readonly ModernComboBox feeType = HumanUi.Combo();
     /* UX - field problems are marked on the fields, all at once, not shown in message boxes. */
     private readonly FormValidator validator = new();
@@ -82,12 +81,10 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Success"
     };
-    public AddFeeAssignmentForm(int enrollmentId, bool transportOnly = false)
+    public AddFeeAssignmentForm(int enrollmentId)
     {
         this.enrollmentId = enrollmentId;
-        this.transportOnly=transportOnly;
-        Text = transportOnly ? "Start / Restart Transport" : "Add Fee";
-        if(transportOnly) addButton.Text="Start Transport";
+        Text = "Add Fee";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -111,9 +108,8 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
             DialogResult = DialogResult.Cancel
         };
         var card = HumanUi.Card(
-            transportOnly ? "Start / Restart Transport" : "Add Fee",
-            transportOnly ? "Starts after paid months and previous transport periods. Existing bills stay unchanged."
-                : "Recurring class fees. Use Start / Restart Transport for transport and Fee Collection for purchases.",
+            "Add Fee",
+            "Recurring class fees. Use Start Transport for transport and Fee Collection for purchases.",
             AppTheme.ModuleAccent("Finance"));
         var fields = new TableLayoutPanel {
             Dock = DockStyle.Fill,
@@ -174,7 +170,7 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
                 foreach (DataRow row in configured.Rows)
                 {
                     bool isTransport=row.Table.Columns.Contains("IsTransportLinked") && Convert.ToBoolean(row["IsTransportLinked"]);
-                    if(isTransport!=transportOnly) continue;
+                    if(isTransport) continue;
                     if (configured.Columns.Contains("Frequency") &&
                         string.Equals(Convert.ToString(row["Frequency"]), "As Needed",
                             StringComparison.OrdinalIgnoreCase))
@@ -202,8 +198,7 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
             {
                 /* UX - nothing to add is a state, not an event: said under the field, with Add Fee already disabled above, and no message box to dismiss. */
                 availabilityNote.Text =
-                    transportOnly ? "Transport is already assigned, or no monthly transport rate is configured for this class."
-                    : configured != null
+                    configured != null
                         ? "Every recurring class fee is already assigned. Use Add Charge in Fee Collection for books, examinations, and other purchases."
                         : "Every fee type is already assigned to this placement.";
             }
@@ -251,180 +246,6 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
             feeType.Focus();
-        }
-        finally
-        {
-            submitting = false;
-        }
-    }
-}
-/// <summary>Stops transport through the existing writer. An optional note supplements the recorded action summary.</summary>
-public sealed class DiscontinueFeeAssignmentForm : ApplicationWindowForm
-{
-    /* UX - field problems are marked on the fields, all at once, not shown in message boxes. */
-    private readonly FormValidator validator = new();
-    private readonly int studentFeeAssignmentId;
-    private sealed record StopMonth(DateTime Month) {
-        public override string ToString() => Month.ToString("MMMM yyyy");
-    }
-    private readonly ModernComboBox effectiveTo = HumanUi.Combo();
-    private readonly DataTable stopContext;
-    private DateTime SelectedStopMonth => ((StopMonth)effectiveTo.SelectedItem!).Month;
-    private readonly ModernTextBox reason = HumanUi.TextBox(true, 500);
-    /* The chosen month is the assignment's LAST active month. */
-    private readonly Label effectiveConsequence = ConsequenceLabel();
-    private readonly ModernButton discontinueButton = new() {
-        Text = "Stop Transport",
-        Width = AppScale.Scale(120),
-        Height = AppMetrics.ButtonHeight,
-        ThemeRole = "Warning"
-    };
-    /* Prevent a queued click from repeating a completed save. */
-    private bool savedSuccessfully;
-    public DiscontinueFeeAssignmentForm(int studentFeeAssignmentId, string feeTypeName, DateTime? effectiveFrom)
-    {
-        this.studentFeeAssignmentId = studentFeeAssignmentId;
-        stopContext = TransportStop.Context(studentFeeAssignmentId);
-        if (stopContext.Rows.Count == 0) throw new InvalidOperationException("Transport has changed. Reload the student fees.");
-        DataRow context = stopContext.Rows[0];
-        DateTime first = FirstOfMonth(Convert.ToDateTime(context["BillingStartDate"] == DBNull.Value
-            ? context["EnrollmentDate"] : context["BillingStartDate"]));
-        if (context["LastProtectedMonth"] != DBNull.Value)
-            first = new[] { first, FirstOfMonth(Convert.ToDateTime(context["LastProtectedMonth"])).AddMonths(1) }.Max();
-        DateTime last = FirstOfMonth(Convert.ToDateTime(context["EndDate"])).AddMonths(1);
-        for (DateTime month = first; month <= last; month = month.AddMonths(1))
-            effectiveTo.Items.Add(new StopMonth(month));
-        if (effectiveTo.Items.Count > 0) effectiveTo.SelectedIndex = 0;
-        discontinueButton.Enabled = effectiveTo.Items.Count > 0;
-        Text = "Stop Transport";
-        StartPosition = FormStartPosition.CenterParent;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
-        MinimizeBox = false;
-        ShowInTaskbar = false;
-        ClientSize = new Size(AppScale.Scale(500, AppScale.ControlSizeScale), AppScale.Scale(420, AppScale.ControlSizeScale));
-        BackColor = AppTheme.PageBackground;
-        Font = AppTheme.NormalFont;
-        BuildLayout(feeTypeName);
-        FinanceHelp.Attach(this,effectiveTo,FinanceHelp.Topic.StopFee);
-        FinanceHelp.Attach(this,discontinueButton,FinanceHelp.Topic.StopFee);
-        UpdateEffectiveConsequence();
-        effectiveTo.SelectedIndexChanged += (_, _) => UpdateEffectiveConsequence();
-        discontinueButton.Click += (_, _) => Save();
-        /* Block closing only while a write is running. */
-        FormClosing += (_, e) => {
-            if (e.CloseReason == CloseReason.UserClosing)
-                e.Cancel = submitting;
-        };
-    }
-    private void UpdateEffectiveConsequence()
-    {
-        if (effectiveTo.SelectedItem is not StopMonth selected)
-        {
-            effectiveConsequence.Text = "No stopping month is available. Paid or partially paid months require a financial correction first.";
-            return;
-        }
-        var charges = stopContext.AsEnumerable().Where(r => r["BillingMonth"] != DBNull.Value &&
-            Convert.ToDateTime(r["BillingMonth"]) >= selected.Month && Convert.ToString(r["Status"]) != "Cancelled").ToArray();
-        effectiveConsequence.Text = $"No transport charges from {selected.Month:MMMM yyyy}.\r\n"
-            + $"{charges.Length} unpaid charge(s), Rs. {charges.Sum(r => Convert.ToDecimal(r["NetAmount"])):N0}, will be cancelled.\r\n"
-            + "Paid and partially paid months are excluded. Already cancelled charges stay cancelled.";
-    }
-    private static DateTime FirstOfMonth(DateTime value) =>
-        new(value.Year, value.Month, 1);
-    /* AutoSize so a wrapped consequence sentence is never clipped. */
-    private static Label ConsequenceLabel() => new() {
-        Dock = DockStyle.Fill,
-        AutoSize = true,
-        MaximumSize = new Size(AppScale.Scale(640), 0),
-        Margin = new Padding(0, 0, 0, AppScale.Scale(6)),
-        Font = AppTheme.SmallFont,
-        ForeColor = AppTheme.MutedText
-    };
-    private void BuildLayout(string feeTypeName)
-    {
-        var cancel = new ModernButton {
-            Text = UiText.Actions.Cancel,
-            Width = AppScale.Scale(105),
-            Height = AppMetrics.ButtonHeight,
-            ThemeRole = "Secondary"
-        };
-        /* Keep Cancel from closing the dialog during a save. */
-        cancel.Click += (_, _) => {
-            if (submitting)
-                return;
-            DialogResult = DialogResult.Cancel;
-            Close();
-        };
-        var card = HumanUi.Card(
-            $"Stop: {feeTypeName}",
-            "Stop service and cancel unpaid transport charges from the selected month onward.",
-            AppTheme.ModuleAccent("Finance"));
-        var fields = new TableLayoutPanel {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 3,
-            Margin = new Padding(0),
-            Padding = new Padding(0)
-        };
-        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        fields.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
-        fields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        fields.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        /* caption and consequence both use the field's real meaning - the selected month is the last month that stays active. */
-        fields.Controls.Add(HumanUi.Field("Stop Transport From", effectiveTo, true), 0, 0);
-        fields.Controls.Add(effectiveConsequence, 0, 1);
-        fields.Controls.Add(HumanUi.Field("Remarks (optional)", reason), 0, 2);
-        card.Content.Controls.Add(fields);
-        var buttons = HumanUi.ButtonRow(discontinueButton, cancel);
-        buttons.Dock = DockStyle.Fill;
-        buttons.Margin = new Padding(0);
-        var root = new TableLayoutPanel {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 2,
-            Padding = new Padding(AppScale.Scale(16))
-        };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.Controls.Add(card, 0, 0);
-        root.Controls.Add(buttons, 0, 1);
-        Controls.Add(root);
-        AcceptButton = discontinueButton;
-        CancelButton = cancel;
-        FormFlow.EnterMovesToNext(this);
-        Disposed += (_, _) => validator.Dispose();
-    }
-    private bool submitting;
-    private void Save()
-    {
-        if (submitting || savedSuccessfully)
-            return;
-        validator.Begin();
-        validator.Rule(effectiveTo, () => effectiveTo.SelectedItem is StopMonth, "Choose a stopping month");
-        if (!validator.Finish())
-            return;
-        submitting = true;
-        try
-        {
-            string recordedReason = reason.Text.Trim();
-            if (recordedReason.Length == 0)
-                recordedReason = $"Stop transport from {SelectedStopMonth:MMMM yyyy}.";
-            TransportStop.Save(studentFeeAssignmentId, SelectedStopMonth, recordedReason);
-            /* The write committed, so this close is not a discard. */
-            savedSuccessfully = true;
-            DialogResult = DialogResult.OK;
-        }
-        catch (Exception ex)
-        {
-            ModernMessageDialog.Show(
-                this,
-                DbMessage.UserMessage(ex),
-                "Discontinue Fee",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Warning);
-            reason.Focus();
         }
         finally
         {

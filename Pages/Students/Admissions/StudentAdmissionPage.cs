@@ -429,8 +429,9 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             new System.Text.StringBuilder();
         foreach (Control control in ControlsRecursive(this))
         {
-            /* Exclude quick-find text from the admission draft. */
-            if (ReferenceEquals(control,monthlyConcessionsFromAdmission) || IsWithinQuickFind(control) || IsWithinFeePreviewMonth(control))
+            // Grids display saved records or use the explicit fee-row model below.
+            // Their lazily created native editors are not admission draft fields.
+            if (ReferenceEquals(control,monthlyConcessionsFromAdmission) || IsWithinQuickFind(control) || IsWithinFeePreviewMonth(control) || IsWithinGrid(control))
                 continue;
             /* Treat inaccessible fields as empty when comparing drafts. */
             bool editable =
@@ -563,6 +564,12 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             ModernTextBox modern => !modern.ReadOnly,
             _ => true
         };
+    }
+    private static bool IsWithinGrid(Control control)
+    {
+        for (Control? current = control; current is not null; current = current.Parent)
+            if (current is DataGridView) return true;
+        return false;
     }
     /// <summary>The unselected value for this control type.</summary>
     private static string UnchosenValue(Control control) =>

@@ -110,6 +110,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private ModernButton? historyButton;
     private ModernButton? paymentHistoryButton;
     private ModernButton? studentFeesMenuButton;
+    private ModernButton? transportButton;
     private ModernButton? studentCreditButton;
     private ModernButton? printBillButton;
     private readonly Dictionary<int,string> receiptReviewTokens=new();
@@ -360,8 +361,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 if(!IsDisposed&&anchor==admissionId&&version==loadVersion)await ReloadFamilyChargesAsync(++loadVersion);}
             catch(Exception ex){if(!IsDisposed)Fail(ex);}
         });
-        var startTransportItem=studentFeesMenu.Items.Add("Start / Restart Transport…",null,async(_,_)=>await OpenTransportAsync(true));
-        var stopTransportItem=studentFeesMenu.Items.Add("Stop Transport…",null,async(_,_)=>await OpenTransportAsync(false));
+        transportButton=new ModernButton{Text="Start Transport",ThemeRole="Secondary",Enabled=false,AutoSize=true};
+        transportButton.Click+=async(_,_)=>await OpenTransportAsync(transportStarts);
         var recoveryItem=studentFeesMenu.Items.Add("Check Fee Change Save",null,async(_,_)=>await CheckFeeChangeSaveAsync());
         studentFeesMenu.Items.Add(new ToolStripSeparator());
         // Bills cover current unpaid charges. Paid transactions are reprinted as receipts.
@@ -380,15 +381,12 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             try{recoveryItem.Available=CurrentUser.HasPermission("Fees.Adjust")&&MutationRecoveryJournal.ReadPending(MutationKind.FeeConcession) is not null;}
             catch{recoveryItem.Available=CurrentUser.HasPermission("Fees.Adjust");}
             recoveryItem.Enabled=!IsBusy&&!siblingBusy;
-            startTransportItem.Available=stopTransportItem.Available=CurrentUser.HasPermission("Fees.Adjust");
-            startTransportItem.Enabled=stopTransportItem.Enabled=admissionId>0 && enrollmentId>0 && CanChangeFeeTerms;
             familyReturnsItem.Available=CurrentUser.HasPermission("Students.Family");
             familyReturnsItem.Enabled=admissionId>0 && !IsBusy && !siblingBusy && CurrentUser.HasPermission("Students.Family") && CurrentUser.HasPermission("Students.View");
             familyReturnsItem.ToolTipText="Review family readiness and individual returns. Requires family and student-view access.";
         };
         studentFeesMenuButton.Click += (_, _) =>
             studentFeesMenu.Show(studentFeesMenuButton, new Point(0, studentFeesMenuButton.Height));
-        studentFeesMenu.Opening+=async(_,_)=>await RefreshTransportMenuAsync(startTransportItem,stopTransportItem);
         var clear =
             AddAction(
                 UiText.Certificates.NextStudent,
@@ -860,7 +858,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             Padding = Padding.Empty, Margin = Padding.Empty
         };
         paymentHistoryButton!.Text = "Recent Payments";
-        foreach (Control button in new Control[] { studentFeesMenuButton!, addChargeButton!, printBillButton!, studentCreditButton!, paymentHistoryButton })
+        foreach (Control button in new Control[] { studentFeesMenuButton!, transportButton!, addChargeButton!, printBillButton!, studentCreditButton!, paymentHistoryButton })
         {
             button.AutoSize = false;
             button.Dock = DockStyle.None;
@@ -1615,6 +1613,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             student.SelectedId;
         admissionId =
             selectedAdmissionId;
+        transportKnown=false;UpdateTransportButton();
         ResetReturnAvailability();
         lastCollectionReceipt = null;
         lastGroupReceiptNumber = null;
@@ -1657,6 +1656,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         if (admissionId <= 0)
         {
             UpdateCollectionTotals();
+            await RefreshTransportButtonAsync();
             return;
         }
         /* Clearing enrollment triggers loads that advance loadVersion. */
@@ -1849,6 +1849,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 }
             }
             UpdateCollectionTotals();
+            await RefreshTransportButtonAsync();
         }
         catch (Exception ex)
         {
@@ -2912,6 +2913,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     /// <summary>Process Collection is the button that takes money, so it is enabled only while the charges grid holds a charge that still has a balance.</summary>
     private void UpdateProcessCollectionAvailability()
     {
+        UpdateTransportButton();
         if(printBillButton is not null)
         {
             bool waiverOnly=HasPendingWaiverRows()&&!HasOutstandingCharges();
