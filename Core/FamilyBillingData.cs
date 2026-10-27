@@ -6,8 +6,12 @@ internal static class FamilyBillingData
         && !row.IsNull(column) ? Convert.ToString(row[column]) ?? "" : "";
     private static bool Flag(DataRow row, string column) => row.Table.Columns.Contains(column)
         && !row.IsNull(column) && Convert.ToBoolean(row[column]);
+    internal static bool IsPreviousYear(DataRow row)=>row.Table.Columns.Contains("AcademicYearEndDate")
+        &&row["AcademicYearEndDate"] is DateTime end&&end.Date<DateTime.Today;
+    private static bool IsFutureYear(DataRow row)=>row.Table.Columns.Contains("AcademicYearStartDate")
+        &&row["AcademicYearStartDate"] is DateTime start&&start.Date>DateTime.Today;
 
-    internal static bool AwaitsReturn(DataRow row) => !Flag(row, "IsOnHold") && Text(row, "Status") == "Active"
+    internal static bool AwaitsReturn(DataRow row) => !IsPreviousYear(row)&&!IsFutureYear(row)&&!Flag(row, "IsOnHold") && Text(row, "Status") == "Active"
         && Text(row, "EnrollmentStatus") == "Active" && !Flag(row, "BillingReady")
         && row.Table.Columns.Contains("PlacementConfirmedAt") && !row.IsNull("PlacementConfirmedAt");
 
@@ -15,6 +19,11 @@ internal static class FamilyBillingData
     {
         if (Flag(row, "IsOnHold")) return "On Hold";
         if (Text(row, "Status") == "Pending") return "Pending Registration";
+        if(Text(row,"Status")=="Active"&&Text(row,"EnrollmentStatus")=="Active")
+        {
+            if(IsPreviousYear(row))return "Previous Academic Year";
+            if(IsFutureYear(row))return "Future Academic Year";
+        }
         if (AwaitsReturn(row)) return "Awaiting Return";
         if (Text(row, "Status") == "Active" && Text(row, "EnrollmentStatus") == "Active"
             && Flag(row, "BillingReady")) return "Ready for Billing";
@@ -23,7 +32,7 @@ internal static class FamilyBillingData
 
     // A hold stops new posting; retained charges can still be collected.
     internal static bool CanCollectPostedFees(DataRow row) => Text(row, "Status") == "Pending"
-        || Readiness(row) is "Ready for Billing" or "On Hold";
+        || Readiness(row) is "Ready for Billing" or "On Hold" or "Previous Academic Year";
 
     internal static int[] SelectMembers(DataTable members, IEnumerable<int>? selected)
     {

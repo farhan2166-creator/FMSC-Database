@@ -56,12 +56,12 @@ public sealed partial class FeeCollectionPage
     }
 
     private IEnumerable<DataGridViewRow> SettlementRows(Dictionary<long,decimal>? discounts=null,Dictionary<long,decimal>? credits=null) =>
-        charges.Rows.Cast<DataGridViewRow>().Where(row=>!row.IsNewRow).OrderBy(row=>SettlementKey(row,discounts,credits));
+        charges.Rows.Cast<DataGridViewRow>().Where(row=>!row.IsNewRow&&!IsWaiverReviewRow(row)).OrderBy(row=>SettlementKey(row,discounts,credits));
 
     // Keep discount distribution independent: largest balance first, with its
     // established tuition/date tie order. This change is to payment allocation.
     private IEnumerable<DataGridViewRow> DiscountTieRows() => charges.Rows.Cast<DataGridViewRow>()
-        .Where(row=>!row.IsNewRow)
+        .Where(row=>!row.IsNewRow&&!IsWaiverReviewRow(row))
         .OrderBy(row=>row.Cells["BillingChargeId"].Tag is int rank?rank:12)
         .ThenBy(ChargePeriod).ThenBy(row=>GetLong(row.Cells["BillingChargeId"].Value));
 }

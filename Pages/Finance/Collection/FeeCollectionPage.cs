@@ -361,14 +361,16 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var feeChangesItem=studentFeesMenu.Items.Add("Print Fee Changes",null,async(_,_)=> {
             if(IsBusy||siblingBusy||admissionId<=0||!CurrentUser.HasPermission("Fees.Collect"))return;
             if(!charges.EndEdit())return;
-            if(HasDraftBillDiscounts()||HasEnteredAmount(paymentAmount.Text)){Warn("Finish or clear the payment draft before printing saved fee changes.");return;}
+            if(HasCollectionDraft()){Warn("Finish or clear the payment draft before printing saved fee changes. Your entries have been retained.");return;}
             int anchor=admissionId,version=loadVersion;int[] selected=SelectedBillStudents();
             try {using var busy=BeginBusy("Preparing fee-change acknowledgement…",this);
-                await FeeReceiptDocuments.ShowFeeChangesAsync(FindForm(),anchor,selected,()=>!IsDisposed&&anchor==admissionId&&version==loadVersion&&selected.SequenceEqual(SelectedBillStudents()));}
+                await FeeReceiptDocuments.ShowFeeChangesAsync(FindForm(),anchor,selected,()=>!IsDisposed&&anchor==admissionId&&version==loadVersion&&selected.SequenceEqual(SelectedBillStudents()));
+                if(!IsDisposed&&anchor==admissionId&&version==loadVersion)await ReloadFamilyChargesAsync(++loadVersion);}
             catch(Exception ex){if(!IsDisposed)Fail(ex);}
         });
         var startTransportItem=studentFeesMenu.Items.Add("Start / Restart Transport…",null,async(_,_)=>await OpenTransportAsync(true));
         var stopTransportItem=studentFeesMenu.Items.Add("Stop Transport…",null,async(_,_)=>await OpenTransportAsync(false));
+        var recoveryItem=studentFeesMenu.Items.Add("Check Fee Change Save",null,async(_,_)=>await CheckFeeChangeSaveAsync());
         studentFeesMenu.Items.Add(new ToolStripSeparator());
         // Bills cover current unpaid charges. Paid transactions are reprinted as receipts.
         printBillButton = AddBusyAction("Print Outstanding", PrintSelectedFamilyBillAsync, "Secondary");
@@ -383,6 +385,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             futureFeesItem.Enabled = futureFeesButton?.Enabled == true;
             statementItem.Enabled = historyButton?.Enabled == true;
             feeChangesItem.Enabled=admissionId>0&&CurrentUser.HasPermission("Fees.Collect")&&!siblingBusy;
+            try{recoveryItem.Available=CurrentUser.HasPermission("Fees.Adjust")&&MutationRecoveryJournal.ReadPending(MutationKind.FeeConcession) is not null;}
+            catch{recoveryItem.Available=CurrentUser.HasPermission("Fees.Adjust");}
+            recoveryItem.Enabled=!IsBusy&&!siblingBusy;
             startTransportItem.Available=stopTransportItem.Available=CurrentUser.HasPermission("Fees.Adjust");
             startTransportItem.Enabled=stopTransportItem.Enabled=admissionId>0 && enrollmentId>0 && CanChangeFeeTerms;
             familyReturnsItem.Available=CurrentUser.HasPermission("Students.Family");
@@ -1072,6 +1077,10 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         });
         charges.Columns["StudentName"].DisplayIndex=1;
         charges.Columns.Add(new DataGridViewTextBoxColumn { Name="FeeDisplayOrder", Visible=false, ReadOnly=true });
+        charges.Columns.Add(new DataGridViewTextBoxColumn { Name="PendingWaiver", Visible=false, ReadOnly=true });
+        charges.CellBeginEdit+=(_,e)=>{
+            if(e.RowIndex>=0&&IsWaiverReviewRow(charges.Rows[e.RowIndex]))e.Cancel=true;
+        };
         UiHelper.UseCompactMoneyHeaders(charges);
         // Separate student blocks in the existing rows, preserving selection,
         // keyboard navigation and payment allocation.
@@ -1109,6 +1118,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             }
             var row =
                 charges.Rows[e.RowIndex];
+            if(GetDecimal(row.Cells["Balance"].Value)<=0m)return;
             bool selected =
                 row.Tag is bool value && value;
             selected =
@@ -1238,29 +1248,33 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         header.Enabled = false;
         chargeMenu.Items.Add(
             new ToolStripSeparator());
-        var waive=chargeMenu.Items.Add("Waive once");
-        waive.Enabled=CanChangeFeeTerms && GetDecimal(row.Cells["Balance"].Value)>0;
-        waive.ToolTipText="Immediately discount this charge's remaining dues. Recorded payments and other months stay unchanged.";
-        waive.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,0);
-        var discount=chargeMenu.Items.Add("Discount…");
-        discount.Enabled=CanChangeFeeTerms;
-        discount.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,1);
-        if(row.Cells["FeeTypeName"].Tag is true)
+        if(GetDecimal(row.Cells["Balance"].Value)>0m && counterIds is null && CurrentUser.HasPermission("Fees.Adjust"))
         {
-            var sibling=chargeMenu.Items.Add("Sibling concession…");sibling.Enabled=CanChangeFeeTerms;
-            sibling.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,2);
+            bool discounted=GetDecimal(row.Cells["AppliedDiscount"].Value)>0m;
+            var discount=chargeMenu.Items.Add(discounted?"Change Discount…":"Give Discount…");
+            discount.Enabled=CanChangeFeeTerms;
+            discount.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,ChargeConcessionAction.Discount);
+            if(discounted)
+            {
+                var remove=chargeMenu.Items.Add("Remove Discount…");remove.Enabled=CanChangeFeeTerms;
+                remove.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,ChargeConcessionAction.RemoveDiscount);
+            }
+            var waive=chargeMenu.Items.Add("Waive Remaining Dues");waive.Enabled=CanChangeFeeTerms;
+            waive.ToolTipText="Save a waiver for this charge's unpaid dues. Recorded payments and other months stay unchanged.";
+            waive.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,ChargeConcessionAction.Waive);
         }
-        var terms=chargeMenu.Items.Add("Review bill terms...");
-        terms.ToolTipText="Change the fee or discount on this bill after reviewing its effect. Example: reducing a Rs. 1,000 fee to Rs. 800 is different from reducing its recorded payment.";
-        terms.Enabled=!IsBusy&&CurrentUser.HasPermission("Fees.Adjust");
-        terms.Click+=async(_,_)=>await ReviewBillTermsAsync(chargeId);
-        var reverse =
-            chargeMenu.Items.Add(
-                "Cancel this unpaid charge...");
-        reverse.ToolTipText="Cancel an eligible unpaid fee, with no refund. Example: cancelling an unpaid Rs. 400 charge reduces dues by Rs. 400. Payment history can block cancellation.";
-        /* Hold all charge inputs while their allocation is being submitted. */
-        reverse.Enabled = !transactionBusy;
-        reverse.Click += async (_, _) => await ReverseChargeAsync(rowIndex);
+        var details=chargeMenu.Items.Add("View Fee Details");
+        details.Enabled=!IsBusy&&!siblingBusy&&CurrentUser.HasPermission("Fees.View");
+        details.Click+=async(_,_)=>await ViewFeeDetailsAsync(chargeId);
+        if(GetDecimal(row.Cells["Balance"].Value)>0m && counterIds is null
+            &&GetDecimal(row.Cells["NetAmount"].Value)==GetDecimal(row.Cells["Balance"].Value)
+            &&CurrentUser.HasPermission("Fees.Adjust"))
+        {
+            chargeMenu.Items.Add(new ToolStripSeparator());
+            var cancel=chargeMenu.Items.Add("Cancel This Unpaid Charge…");
+            cancel.Enabled=CanChangeFeeTerms;
+            cancel.Click+=async(_,_)=>await ReverseChargeAsync(rowIndex);
+        }
         return true;
     }
     private void ConfigurePaymentsGrid()
@@ -1535,8 +1549,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         {
             if (row.IsNewRow)
                 continue;
-            row.Cells["Pay"].ReadOnly = !manualAllocation;
-            row.Cells["Amount"].ReadOnly = !manualAllocation;
+            row.Cells["Pay"].ReadOnly = IsWaiverReviewRow(row)||!manualAllocation;
+            row.Cells["Amount"].ReadOnly = IsWaiverReviewRow(row)||!manualAllocation;
         }
         charges.Enabled = true;
         method.Enabled = true;
@@ -1864,11 +1878,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         if (forAdmissionId <= 0 || forEnrollmentId <= 0)
             return 0;
         string reviewBefore=await CollectionDiscountWriter.ReadReviewTokenAsync(forAdmissionId);
-        var chargesTask = DatabaseHelper.QueryUserAsync(
-            "GetOutstandingCharges",
-            DatabaseHelper.Int("@AdmissionId", forAdmissionId),
-            DatabaseHelper.Int("@EnrollmentId", 0),
-            DatabaseHelper.Date("@AsOfDate", DateTime.Today));
+        var chargesTask = DatabaseHelper.QuerySqlAsync(CollectionChargeReview.Query,
+            DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@AdmissionId", forAdmissionId));
         // Same Fees.View permission as the former direct query; stable catalog
         // data can use the existing user-scoped cache across sibling accounts.
         var feeOrderTask = DatabaseHelper.QueryUserAsync("GetFeeTypes");
@@ -1960,6 +1971,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             charges.Rows[index].Cells["FeeDisplayOrder"].Value=feeOrder.GetValueOrDefault(GetInt(row,"FeeTypeId"),int.MaxValue);
             charges.Rows[index].Cells["StudentName"].ToolTipText=$"{StudentNameFor(forAdmissionId)} · Admission {AdmissionNumbers.ForId(forAdmissionId)}";
             charges.Rows[index].Cells["FeeTypeName"].ToolTipText=$"{GetText(row,"FeeTypeName")} · Due {FormatDueDate(row["DueDate"])}";
+            ApplyWaiverReviewState(charges.Rows[index],row);
             added++;
         }
         if (added > 0) charges.Sort(new StudentChargeComparer(admissionId));
@@ -2054,7 +2066,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                     continue;
                 row.Cells["Amount"].Value = 0m;
                 row.Tag = false;
-                row.Cells["Pay"].Value = "+";
+                row.Cells["Pay"].Value = IsWaiverReviewRow(row)?"—":"+";
             }
         }
         finally
@@ -2161,12 +2173,15 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             DataTable members = family;
             var eligible = await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Fees.View';
+                DECLARE @Before bigint=(SELECT COALESCE(MAX(VisitSequence),0)+1 FROM dbo.CollectionReceipts);
+                DECLARE @Accounts nvarchar(max)=(SELECT * FROM dbo.FeeDocumentAccounts(@Ids,N'[]',N'[]') FOR JSON PATH);
                 SELECT S.AdmissionId,P.ClassId,
                     (SELECT COALESCE(SUM(dbo.GetFeeChargeBalance(B.BillingChargeId)),0) FROM dbo.BillingCharges B
                      WHERE B.AdmissionId=S.AdmissionId AND B.Status<>N'Cancelled') Outstanding,
                     CAST(CASE WHEN EXISTS(SELECT 1 FROM dbo.Enrollments E WHERE E.AdmissionId=S.AdmissionId AND E.Status=N'Active') THEN 1 ELSE 0 END AS bit) IsActive,
                     (SELECT TOP(1) B.EnrollmentId FROM dbo.BillingCharges B
-                     WHERE B.AdmissionId=S.AdmissionId AND B.Status<>N'Cancelled' AND dbo.GetFeeChargeBalance(B.BillingChargeId)>0
+                     WHERE B.AdmissionId=S.AdmissionId AND B.Status<>N'Cancelled' AND (dbo.GetFeeChargeBalance(B.BillingChargeId)>0
+                       OR EXISTS(SELECT 1 FROM dbo.FeeVisitLines(@Accounts,@Before) V WHERE V.ChargeId=B.BillingChargeId AND V.Discount>0 AND V.BalanceAfter=0))
                      ORDER BY B.EnrollmentId DESC) PendingEnrollmentId
                 FROM dbo.Students S
                 OUTER APPLY(SELECT TOP(1) E.ClassSectionId FROM dbo.Enrollments E WHERE E.AdmissionId=S.AdmissionId
@@ -2786,7 +2801,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 row.Tag =
                     give > 0m;
                 row.Cells["Pay"].Value =
-                    give > 0m
+                    IsWaiverReviewRow(row)?"—":give > 0m
                         ? "−"
                         : "+";
                 remaining -=
@@ -2903,6 +2918,13 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     /// <summary>Process Collection is the button that takes money, so it is enabled only while the charges grid holds a charge that still has a balance.</summary>
     private void UpdateProcessCollectionAvailability()
     {
+        if(printBillButton is not null)
+        {
+            bool waiverOnly=HasPendingWaiverRows()&&!HasOutstandingCharges();
+            printBillButton.Text=waiverOnly?"Print Fee Changes":"Print Outstanding";
+            printBillButton.Enabled=historyButton?.Enabled==true&&CurrentUser.HasPermission("Fees.View")
+                &&(!waiverOnly||CurrentUser.HasPermission("Fees.Collect"));
+        }
         if (fullAmountButton is not null)
             fullAmountButton.Enabled = !transactionBusy && HasOutstandingCharges();
         if (executeButton is null)
@@ -3891,26 +3913,21 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         using var dialog = new FeeHistoryDialog(admissionId);
         dialog.ShowDialog(FindForm());
     }
-    /// <summary>Reverse one charge through dbo.ReverseBillingCharge; SQL decides eligibility, then dependent views reload.</summary>
-    private async Task ReviewBillTermsAsync(long chargeId)
+    /// <summary>Show saved fee figures without exposing editing choices.</summary>
+    private async Task ViewFeeDetailsAsync(long chargeId)
     {
         using var returnFocus = new DialogReturnFocus(this);
-        if(IsBusy||!CurrentUser.HasPermission("Fees.Adjust"))return;
-        if(!charges.EndEdit())return;
-        if(HasDraftBillDiscounts()||HasEnteredAmount(paymentAmount.Text)||!string.IsNullOrWhiteSpace(reference.Text)||!string.IsNullOrWhiteSpace(remarks.Text))
-        {Warn("Finish or clear the current payment draft before reviewing bill terms. Your entered payment has been retained.");return;}
+        if(IsBusy||siblingBusy||!CurrentUser.HasPermission("Fees.View"))return;
         billBusy=true;
         try
         {
-            using var busy=BeginBusy("Reviewing bill terms…",this);
-            var context=FeeDiscountPeriod.BillContext(chargeId);
-            using var form=new ChangeFeeDiscountForm(Convert.ToInt32(context["StudentFeeAssignmentId"]),Convert.ToString(context["FeeTypeName"])??"Fee",
-                Convert.ToDecimal(context["StandardAmount"]),Convert.ToDecimal(context["DiscountAmount"]),context);
-            form.ShowDialog(FindForm());
-            if(!form.Changed)return;
-            int version=++loadVersion;
-            await ReloadFamilyChargesAsync(version);
-            SyncPaymentFieldToGrid();UpdateCollectionTotals();SetStatus("Reviewed bill terms saved. Balances and available credit have been refreshed.");
+            using var busy=BeginBusy("Loading fee details…",this);
+            var context=await Task.Run(()=>FeeDiscountPeriod.BillContext(chargeId));
+            if(IsDisposed)return;
+            ModernMessageDialog.ShowInfo(FindForm(),
+                $"{context["AdmissionNumber"]} · {context["StudentName"]}\n{context["FeeTypeName"]} · {Convert.ToDateTime(context["BillingMonth"]):MMM yyyy}\n\n"+
+                $"Fee amount: Rs. {Convert.ToDecimal(context["StandardAmount"]):N0}\nDiscount / waived: Rs. {Convert.ToDecimal(context["DiscountAmount"]):N0}\n"+
+                $"Settled by payments / credit: Rs. {Convert.ToDecimal(context["SettledAmount"]):N0}\nRemaining dues: Rs. {Convert.ToDecimal(context["Balance"]):N0}","Fee Details");
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
         finally{billBusy=false;}
@@ -4351,6 +4368,16 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         billBusy=true;
         try
         {
+            if(HasPendingWaiverRows()&&!HasOutstandingCharges())
+            {
+                if(HasCollectionDraft())
+                {Warn("Finish or clear the payment draft before printing saved fee changes. Your entries have been retained.");return;}
+                using var acknowledgementBusy=BeginBusy("Preparing fee-change acknowledgement…",this);
+                await FeeReceiptDocuments.ShowFeeChangesAsync(FindForm(),anchor,selected,()=>!IsDisposed&&admissionId==anchor
+                    &&enrollmentId==placement&&loadVersion==version&&selected.SequenceEqual(SelectedBillStudents()));
+                if(!IsDisposed&&admissionId==anchor&&loadVersion==version)await ReloadFamilyChargesAsync(++loadVersion);
+                return;
+            }
             using var busy=BeginBusy("Preparing outstanding bill…",this);
             await FeeBillPreview.ShowAsync(FindForm(),anchor,selected,()=>!IsDisposed && admissionId==anchor
                 && enrollmentId==placement && loadVersion==version && selected.SequenceEqual(SelectedBillStudents()));

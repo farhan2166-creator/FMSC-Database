@@ -11,7 +11,8 @@ internal static class FeeBillPreview
         DECLARE @Family int=(SELECT FamilyId FROM dbo.FamilyMembers WHERE AdmissionId=@Admission);
         SELECT FM.FamilyId,FM.FamilyMemberId,S.AdmissionId,S.StudentName,S.FatherName,S.Gender,
             S.AdmissionNumber,S.QuickReference,S.RegistrationNumber,S.Status,E.EnrollmentId,E.Status EnrollmentStatus,
-            E.BillingReady,E.PlacementConfirmedAt,E.ReturnConfirmedAt,AY.YearName AcademicYear,C.ClassName,SEC.SectionName,
+            E.BillingReady,E.PlacementConfirmedAt,E.ReturnConfirmedAt,AY.YearName AcademicYear,
+            AY.StartDate AcademicYearStartDate,AY.EndDate AcademicYearEndDate,C.ClassName,SEC.SectionName,
             CONVERT(bit,CASE WHEN EXISTS(SELECT 1 FROM dbo.StudentPostingHolds H
                 WHERE H.AdmissionId=S.AdmissionId AND H.ResumeDate IS NULL) THEN 1 ELSE 0 END) IsOnHold
         FROM dbo.Students S
