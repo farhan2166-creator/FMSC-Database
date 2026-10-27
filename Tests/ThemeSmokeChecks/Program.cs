@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--historical-return-sql"))
+        {
+            CheckHistoricalReturnSql();
+            Console.WriteLine($"PASS: {checks} historical admission and return SQL checks in an owned clone.");
+            return;
+        }
         if(args.Contains("--fee-change-documents"))
         {
             CheckFeeChangeDocuments();
