@@ -140,6 +140,7 @@ internal static class RdlcReportPreview
             Font = AppTheme.NormalFont, AccessibleName = "Go to page", TextAlign = HorizontalAlignment.Center,
             Margin = new Padding(0, AppScale.Scale(4), AppScale.Scale(4), 0)
         };
+        foreach(var editor in pageNumber.Controls.OfType<TextBox>())WholeNumberInput.Attach(editor);
         var go = Button("Go", 52);
         var zoom = new ModernComboBox {
             Width = AppScale.Scale(132),

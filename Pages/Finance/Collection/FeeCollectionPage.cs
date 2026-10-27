@@ -161,9 +161,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     {
         string value = text.Trim();
         amount = 0m;
-        return value.Length > 0 && value.All(c => c >= '0' && c <= '9') &&
-            decimal.TryParse(value, System.Globalization.NumberStyles.None,
-                System.Globalization.CultureInfo.InvariantCulture, out amount);
+        return InputParse.TryWholeAmount(value,out amount) && amount>=0;
     }
     private static void WholeAmountKeyPress(object? sender, KeyPressEventArgs e)
     {
@@ -186,13 +184,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     }
     private static void ConfigureDecimalInput(ModernTextBox textBox)
     {
-        textBox.KeyPress += (_, e) => {
-            if (char.IsControl(e.KeyChar) || char.IsDigit(e.KeyChar))
-                return;
-            if (e.KeyChar == '.' && !textBox.Text.Contains('.'))
-                return;
-            e.Handled = true;
-        };
+        WholeNumberInput.Attach(textBox);
     }
     private readonly bool initialize;
     private sealed class DialogReturnFocus(FeeCollectionPage page) : IDisposable
@@ -2139,7 +2131,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         suppressPaymentEvents = true;
         try
         {
-            paymentAmount.Text = applied.ToString("0.##");
+            paymentAmount.Text = applied.ToString("0.############################",System.Globalization.CultureInfo.InvariantCulture);
         }
         finally
         {
@@ -3111,8 +3103,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             {
                 string raw = input.Text.Trim();
                 if (raw.Length > 0 &&
-                    (!decimal.TryParse(raw, System.Globalization.NumberStyles.Number,
-                        System.Globalization.CultureInfo.InvariantCulture, out decimal entered) || entered < 0m || !WholeRupees.IsWhole(entered)))
+                    (!InputParse.TryWholeAmount(raw,out decimal entered) || entered < 0m))
                 {
                     MarkCollectionField(input, "Enter a whole-rupee amount of zero or more");
                     return;

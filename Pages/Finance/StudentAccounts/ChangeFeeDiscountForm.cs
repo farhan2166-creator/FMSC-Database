@@ -41,7 +41,9 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     private bool ApplyBills => billId is not null || !agreementAllowed || scope.SelectedIndex is 1 or 2;
     private bool FullWaiver => WaiverAction || RateAction && originalWaiver;
     private decimal ChosenDiscount => FullWaiver || RemoveAction ? 0m : RateAction ? originalDiscount :
-        decimal.Parse(string.IsNullOrWhiteSpace(amount.Text)?"0":amount.Text);
+        ParseWholeAmount(string.IsNullOrWhiteSpace(amount.Text)?"0":amount.Text);
+    private static decimal ParseWholeAmount(string text)=>InputParse.TryWholeAmount(text,out decimal value)
+        ?value:throw new ArgumentException("Enter a whole-rupee amount using digits only.");
     private string? ChosenLabel => RemoveAction ? null : RateAction ? (string.IsNullOrWhiteSpace(originalLabel)||originalLabel=="None"?null:originalLabel) :
         Convert.ToString(concession.SelectedItem)=="None"?null:Convert.ToString(concession.SelectedItem);
     internal bool Changed { get; private set; }
@@ -58,7 +60,8 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         Text=$"Review Fee Terms — {fee}"; StartPosition=FormStartPosition.CenterParent;
         Size=new Size(AppScale.Scale(940),AppScale.Scale(700)); MinimumSize=new Size(AppScale.Scale(850),AppScale.Scale(650));
         amount.ZeroAsPlaceholder=newRate.ZeroAsPlaceholder=true;
-        amount.Text=discount.ToString("0.##"); newRate.Text=rate.ToString("0.##");
+        amount.Text=discount.ToString("0.############################",System.Globalization.CultureInfo.InvariantCulture);
+        newRate.Text=rate.ToString("0.############################",System.Globalization.CultureInfo.InvariantCulture);
         context??=id>0?FeeDiscountPeriod.Context(id):null;
         monthly=context is not null && Convert.ToString(context["Frequency"])=="Monthly";
         validContext=context is not null;
@@ -198,7 +201,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         }
         if(fixedBillAction is not null && DiscountAction)
         {
-            decimal proposed=decimal.Parse(amount.Text);
+            decimal proposed=ParseWholeAmount(amount.Text);
             if(proposed==originalDiscount){impact.Text="Enter a different discount amount.";amount.Focus();return false;}
             if(proposed>=originalDiscount+billBalance)
             {impact.Text="To clear all remaining dues, close and choose Waive Remaining Dues on this fee.";amount.Focus();return false;}
@@ -212,7 +215,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         DatabaseHelper.Int("@StudentFeeAssignmentId",assignment),DatabaseHelper.P("@DiscountAmount",ChosenDiscount),
         DatabaseHelper.P("@ConcessionLabel",ChosenLabel),
         DatabaseHelper.Date("@EffectiveFrom",First(fromMonth.Value)),DatabaseHelper.Date("@EffectiveThrough",First(throughMonth.Value)),
-        DatabaseHelper.P("@NewAmount",RateAction?decimal.Parse(newRate.Text):null),
+        DatabaseHelper.P("@NewAmount",RateAction?ParseWholeAmount(newRate.Text):null),
         DatabaseHelper.Bit("@ApplyAvailableCredit",false),DatabaseHelper.Bit("@UpdateAgreement",UpdateAgreement),DatabaseHelper.P("@BillingChargeId",billId),DatabaseHelper.Bit("@FullFeeWaiver",FullWaiver),
         DatabaseHelper.Bit("@ApplyToBills",ApplyBills),DatabaseHelper.P("@PaidReductionAction",RateAction&&paidReduction.SelectedIndex==1?"Refund":"Credit"),
         DatabaseHelper.P("@Reason",string.IsNullOrWhiteSpace(reason.Text)?"Concession revised":reason.Text.Trim()),DatabaseHelper.Bit("@Preview",preview),
@@ -278,7 +281,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         if(DiscountAction) summary+=$" Discount: Rs. {ChosenDiscount:N0}.";
         else if(WaiverAction) summary+=" Full concession applied, limited to unpaid dues on existing charges.";
         else if(RemoveAction) summary+=fixedBillAction is not null?" The bill discount is removed. Earlier payments remain recorded.":" The discount or full waiver is removed.";
-        else summary+=$" Full fee: Rs. {standardAmount:N0} → Rs. {decimal.Parse(newRate.Text):N0}. " +
+        else summary+=$" Full fee: Rs. {standardAmount:N0} → Rs. {ParseWholeAmount(newRate.Text):N0}. " +
             (originalWaiver?"The existing full waiver is retained.":$"Existing discount retained: Rs. {originalDiscount:N0}.");
         if(monthly&&billId is null) summary+=$"\r\nPeriod: {fromMonth.Value:MMM yyyy} through {throughMonth.Value:MMM yyyy}.";
         if(releasedPayment>0) summary+=$"\r\nExcess already paid: Rs. {releasedPayment:N0}, {(paidReduction.SelectedIndex==1?"to refund":"to keep as advance credit")}.";

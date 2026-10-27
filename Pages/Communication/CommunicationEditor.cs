@@ -36,6 +36,12 @@ internal sealed class CommunicationEditor : ApplicationWindowForm, IBusyPage, IU
     public void TextField(string key,string label,string value="",bool multiline=false,bool password=false)
     {
         var input=HumanUi.TextBox(multiline,2000);input.Text=value;input.UseSystemPasswordChar=password;
+        if(key is "delay" or "limit" or "batch" or "approval" or "hour" or "day" or "daily" or "monthly" or "sms" or "wa" or "start" or "end" or "offset")
+        {
+            WholeNumberInput.Attach(input,()=>key=="offset");
+            if(decimal.TryParse(value,System.Globalization.NumberStyles.Number,System.Globalization.CultureInfo.InvariantCulture,out decimal number)&&WholeRupees.IsWhole(number))
+                input.Text=number.ToString("0",System.Globalization.CultureInfo.InvariantCulture);
+        }
         if(multiline){input.Height=AppScale.Scale(130);input.MinimumSize=new Size(0,AppScale.Scale(130));}
         Add(key,label,input,multiline?AppScale.Scale(170):AppMetrics.FieldRowHeight);
     }
@@ -54,6 +60,6 @@ internal sealed class CommunicationEditor : ApplicationWindowForm, IBusyPage, IU
     public string Value(string key)=>inputs[key].Text.Trim();
     public bool Checked(string key)=>((CheckBox)inputs[key]).Checked;
     public int Integer(string key)=>int.TryParse(Value(key),out int value)?value:throw new ArgumentException("Enter a whole number for "+key+".");
-    public decimal? Cost(string key)=>Value(key).Length==0?null:decimal.TryParse(Value(key),System.Globalization.NumberStyles.Number,System.Globalization.CultureInfo.InvariantCulture,out decimal value)?value:throw new ArgumentException("Enter a cost estimate using a decimal point.");
+    public decimal? Cost(string key)=>Value(key).Length==0?null:InputParse.TryWholeAmount(Value(key),out decimal value)&&value>=0?value:throw new ArgumentException("Enter a cost estimate in whole rupees.");
     private string Snapshot()=>string.Join("\u001f",inputs.Select(x=>x.Value is CheckBox c?c.Checked.ToString():x.Value.Text));
 }

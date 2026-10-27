@@ -396,17 +396,17 @@ public sealed partial class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges
         foreach (DataGridViewRow gridRow in fees.Rows) gridRow.ErrorText = "";
         foreach (DataRow row in feeRows.Rows)
         {
-            if (!decimal.TryParse(Convert.ToString(row["Amount"]), out decimal amount) ||
-                !decimal.TryParse(Convert.ToString(row["DiscountAmount"]), out decimal discount) ||
+            if (!InputParse.TryWholeValue(row["Amount"], out decimal amount) ||
+                !InputParse.TryWholeValue(row["DiscountAmount"], out decimal discount) ||
                 amount < 0 || discount < 0 || discount > amount)
             {
                 var invalid = fees.Rows.Cast<DataGridViewRow>().FirstOrDefault(item => item.DataBoundItem is DataRowView view && ReferenceEquals(view.Row, row));
                 if (invalid is not null)
                 {
-                    invalid.ErrorText = "Enter valid amounts; discount must be between zero and the fee amount.";
+                    invalid.ErrorText = "Enter whole-rupee amounts; discount must be between zero and the fee amount.";
                     fees.CurrentCell = invalid.Cells["DiscountAmount"];
                 }
-                Warn($"Check {Convert.ToString(row["FeeTypeName"])}: enter valid amounts and a discount no greater than the fee.");
+                Warn($"Check {Convert.ToString(row["FeeTypeName"])}: enter whole rupees and a discount no greater than the fee.");
                 return false;
             }
             choices.Add((Convert.ToInt32(row["FeeTypeId"]), amount, discount));

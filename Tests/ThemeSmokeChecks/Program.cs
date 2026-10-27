@@ -34,6 +34,18 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--whole-number-inputs"))
+        {
+            CheckWholeNumberInputs();CheckNumericPlaceholders();CheckClosingWholeAmounts();
+            Console.WriteLine($"PASS: {checks} shared whole-number typing, paste, matrix and closing checks (no database connection).");
+            return;
+        }
+        if(args.Contains("--sibling-father-search"))
+        {
+            CheckSiblingFatherSearch();
+            Console.WriteLine($"PASS: {checks} exact father-name sibling search checks (no database connection).");
+            return;
+        }
         if(args.Contains("--collection-returns"))
         {
             CheckCollectionReturns();CheckOptionalFeeReason();

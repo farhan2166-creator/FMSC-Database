@@ -203,13 +203,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
     }
     private static void ConfigureDecimalInput(ModernTextBox box)
     {
-        box.KeyPress += (_, e) => {
-            if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '.')
-                e.Handled = true;
-            if (e.KeyChar == '.' && box.Text.Contains('.'))
-                e.Handled = true;
-        };
-
+        WholeNumberInput.Attach(box);
     }
     private const string NoStudentGridMessage =
         "Select a student above to see the payments recorded for them.";
@@ -373,7 +367,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         {"Correction"=>"Amount to keep as paid","Refund"=>"Amount to refund","Reversal"=>"Whole payment to undo",_=>"Amount"};
         actionAmount.ReadOnly = reversal;
         if (reversal)
-            actionAmount.Text = selectedPaymentAmount.ToString("0.##");
+            actionAmount.Text = selectedPaymentAmount.ToString("0.############################",System.Globalization.CultureInfo.InvariantCulture);
         else if (string.IsNullOrWhiteSpace(actionAmount.Text))
             actionAmount.Text = "0";
         string hint = SelectedOperation switch {
@@ -453,9 +447,9 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
             }
             else
             {
-                if (!decimal.TryParse(actionAmount.Text.Trim(), out amount))
+                if (!InputParse.TryWholeAmount(actionAmount.Text, out amount))
                 {
-                    Warn("Enter a valid amount.");
+                    Warn("Enter a valid whole-rupee amount.");
                     actionAmount.Focus();
                     return;
                 }

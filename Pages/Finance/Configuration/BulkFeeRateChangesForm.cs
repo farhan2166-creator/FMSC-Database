@@ -46,7 +46,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
     private readonly ModernNumericTextBox adjustmentValue = new() {
         Minimum = 0,
         Maximum = 1000000,
-        DecimalPlaces = 2,
+        DecimalPlaces = 0,
         Dock = DockStyle.Fill,
         Height = AppMetrics.InputControlHeight,
         Font = AppTheme.NormalFont
@@ -428,6 +428,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
                 : Convert.ToInt32(feeTypeScope.SelectedValue);
             string frequencyFilter = frequencyScope.SelectedItem?.ToString() ?? "All Frequencies";
             decimal magnitude = adjustmentValue.Value;
+            if(!WholeRupees.IsWhole(magnitude))throw new ArgumentException("Enter a whole-number percentage or adjustment amount.");
             if (magnitude <= 0)
             {
                 summaryLabel.Text = "Enter an adjustment value greater than zero.";

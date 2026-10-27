@@ -25,7 +25,7 @@ internal static class FamilyWorkflows
             Desktop.Wait(()=>ui.Find("Save",ControlType.Button).IsEnabled?new object():null,"sibling admission refresh");
             ui.Click("Fees & Siblings",ControlType.Button);ui.Click("Find Possible Siblings",ControlType.Button);
             var dialog=ui.Window("Find Possible Sibling");
-            ui.Fill("Search","Fictional Example Student",dialog);ui.Click("Find",ControlType.Button,dialog);
+            ui.Fill("Father Name","Fictional Example Parent",dialog);ui.Click("Find",ControlType.Button,dialog);
             Desktop.Wait(()=>ui.Find("Add as Sibling",ControlType.Button,dialog) is {IsEnabled:true} b?b:null,"selected sibling result");
             ui.Click("Add as Sibling",ControlType.Button,dialog);
             ui.Click("Yes",ControlType.Button,ui.Window("Confirm Sibling"));

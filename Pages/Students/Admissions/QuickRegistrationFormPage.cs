@@ -94,6 +94,7 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
         registrationContent.Controls.Add(familyField,0,0);
         var fields=Fields(("Student name",name,true,1),("Joining date",joining,true,1),("Academic year",year,true,1),("Campus / Class / Section",placement,true,1),("Parent name",parent,true,1),("Primary phone (optional)",contact,false,1),("Address",address,false,2));
         fields.TabIndex=1;registrationContent.Controls.Add(fields,0,1);registrationCard.Content.Controls.Add(registrationContent);
+        WholeNumberInput.WireGrid(fees);
         fees.Columns.Add(new DataGridViewCheckBoxColumn { Name="Include",DataPropertyName="Include",HeaderText="Include",Width=65 });
         fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Fee",DataPropertyName="FeeTypeName",HeaderText=UiText.Fees.FeeType,ReadOnly=true,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill });
         fees.Columns.Add(new DataGridViewTextBoxColumn { Name="Frequency",DataPropertyName="Frequency",HeaderText=UiText.Fees.Frequency,ReadOnly=true,Width=100 });
@@ -111,7 +112,7 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
         fees.Columns["Amount"].DefaultCellStyle.Format=fees.Columns["Discount"].DefaultCellStyle.Format=fees.Columns["NetAmount"].DefaultCellStyle.Format="N0";
         fees.CellValidating+=(_,e)=>{
             if(e.RowIndex<0||fees.Columns[e.ColumnIndex].Name!="Discount")return;
-            bool valid=fees.Rows[e.RowIndex].DataBoundItem is DataRowView row&&decimal.TryParse(Convert.ToString(e.FormattedValue),out decimal discount)&&WholeRupees.IsWhole(discount)&&discount>=0&&discount<=Convert.ToDecimal(row["Amount"]);
+            bool valid=fees.Rows[e.RowIndex].DataBoundItem is DataRowView row&&InputParse.TryWholeAmount(Convert.ToString(e.FormattedValue),out decimal discount)&&discount>=0&&discount<=Convert.ToDecimal(row["Amount"]);
             e.Cancel=!valid;if(!valid)SetStatus("Enter a whole-rupee discount between zero and its fee amount.");
         };
         fees.DataError+=(_,e)=>{e.ThrowException=false;SetStatus("Enter a valid discount amount.");};

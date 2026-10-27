@@ -55,7 +55,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         ForeColor = AppTheme.Text;
         Font = AppTheme.NormalFont;
         searchBox.PlaceholderText =
-            "Admission Number, student name or father name";
+            "Enter the father's full name";
         searchBox.Text = fatherName;
         ConfigureGrid();
         searchButton.Click += (_, _) => Search();
@@ -106,7 +106,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         CancelButton = closeButton;
         addButton.Enabled = false;
         status.Text =
-            "Enter a search value, or use the father's name already entered on the admission.";
+            "Enter the father's full name, or use the name already entered on the admission. Only exact father-name matches are shown.";
         ClearSelectionState();
         Shown += (_, _) =>
             Search();
@@ -137,7 +137,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
     {
         var card = HumanUi.Card(
             "Find Possible Sibling",
-            "Search by student name, father name or Admission Number.",
+            "Search by the father's full name. Only exact matches are shown.",
             AppTheme.ModuleAccent("Students"));
         var searchRoot = new TableLayoutPanel {
             Dock = DockStyle.Fill,
@@ -154,7 +154,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
                 AppScale.Scale(120, AppScale.ControlSizeScale)));
         searchRoot.RowStyles.Add(
             new RowStyle(SizeType.Percent, 100));
-        var searchField = HumanUi.Field("Search", searchBox);
+        var searchField = HumanUi.Field("Father Name", searchBox);
         searchField.Margin = new Padding(
             0,
             0,
@@ -280,13 +280,12 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         {
             string text =
                 searchBox.Text.Trim();
-            if (text.Length < 2 &&
-                !AdmissionNumbers.TryNormalize(text, out _))
+            if (text.Length == 0)
             {
                 resultsGrid.DataSource = null;
                 ClearSelectionState();
                 status.Text =
-                    "Enter at least 2 characters for a student/father name, or an Admission Number such as 1 or 1a.";
+                    "Enter the father's full name to find exact matches.";
                 return;
             }
             LoadCurrentFamilyIds();
@@ -302,7 +301,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
                     "@Search",
                     null),
                 DatabaseHelper.Bit("@IncludeFormerStudents", true));
-            List<DataRow> matches = HumanUi.FindStudentMatches(raw, text);
+            List<DataRow> matches = FindFatherMatches(raw, text);
             var display = new DataTable();
             display.Columns.Add("Admission Number", typeof(string));
             display.Columns.Add("Student Name", typeof(string));
@@ -381,7 +380,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
             status.Text =
                 display.Rows.Count > 0
                     ? $"{display.Rows.Count} possible student(s) found. Select one to verify."
-                    : "No matching students were found. Try the student name, father name, or Admission Number.";
+                    : "No students were found with this exact father name. Check the full name and spelling.";
             if (display.Rows.Count > 0)
             {
                 resultsGrid.Rows[0].Selected =
@@ -535,6 +534,13 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         {
             ModernMessageDialog.Show(this, DbMessage.UserMessage(ex), "Sibling Search", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
+    }
+    internal static List<DataRow> FindFatherMatches(DataTable students, string? fatherName)
+    {
+        string term = fatherName?.Trim() ?? string.Empty;
+        if (term.Length == 0) return new();
+        return students.AsEnumerable().Where(row => string.Equals(
+            GetText(row, "FatherName").Trim(), term, StringComparison.OrdinalIgnoreCase)).ToList();
     }
     private static string GetText(DataRow row, string columnName)
     {

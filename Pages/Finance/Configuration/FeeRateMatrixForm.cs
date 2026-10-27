@@ -96,7 +96,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         if (savingGrid || grid.CurrentCell is not { } source || !source.OwningColumn.Name.StartsWith("CL_", StringComparison.Ordinal)) return;
         if (!grid.EndEdit()) return;
         string text = Convert.ToString(source.Value)?.Trim() ?? "";
-        if (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount) || amount < 0 || !WholeRupees.IsWhole(amount))
+        if (!InputParse.TryWholeAmount(text, out decimal amount) || amount < 0)
         {
             source.ErrorText = "Enter a whole-rupee amount of zero or more before filling selected cells.";
             return;
@@ -671,7 +671,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         }
     }
     private static string FormatAmount(decimal amount) =>
-        amount.ToString("0.##", CultureInfo.InvariantCulture);
+        amount.ToString("0.############################", CultureInfo.InvariantCulture);
     /// <summary>every editable cell value as one comparable snapshot, so the guard asks about a grid that really differs from the data it was loaded with rather than about a cell that was…</summary>
     private string GridState()
     {
@@ -725,7 +725,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         editedDetails.TryGetValue(key, out var details);
         string text = Convert.ToString(cell.Value)?.Trim() ?? "";
         decimal value = 0;
-        if (text.Length > 0 && (!decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out value) || value < 0 || value > 1000000000 || !WholeRupees.IsWhole(value)))
+        if (text.Length > 0 && (!InputParse.TryWholeAmount(text, out value) || value < 0 || value > 1000000000))
         {
             cell.ErrorText = "Enter a whole-rupee amount between 0 and 1,000,000,000.";
             grid.Focus();
@@ -850,12 +850,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
                             existingCell.Amount,existingCell.Frequency,existingCell.Remarks));
                     continue;
                 }
-                if (!decimal.TryParse(
-                        text,
-                        NumberStyles.Number,
-                        CultureInfo.InvariantCulture,
-                        out decimal amount) ||
-                    amount < 0 || !WholeRupees.IsWhole(amount))
+                if (!InputParse.TryWholeAmount(text,out decimal amount) || amount < 0)
                 {
                     cell.Style.BackColor = AppTheme.Tint(AppTheme.Danger, 0.85f);
                     cell.ErrorText = "Enter a non-negative whole-rupee amount or leave blank.";

@@ -356,7 +356,8 @@ public sealed class FormValidator : IDisposable
                 !string.IsNullOrWhiteSpace(combo.Text),
             ModernDatePicker date => !date.ShowCheckBox || date.Checked,
             CheckBox check => check.Checked,
-            ModernNumericTextBox number => number.Value >= number.Minimum && number.Value <= number.Maximum,
+            ModernNumericTextBox number => (string.IsNullOrWhiteSpace(number.Text) || InputParse.TryWholeAmount(number.Text,out _)) &&
+                WholeRupees.IsWhole(number.Value) && number.Value >= number.Minimum && number.Value <= number.Maximum,
             ModernTextBox text => !string.IsNullOrWhiteSpace(text.Text),
             _ => !string.IsNullOrWhiteSpace(control.Text)
         };

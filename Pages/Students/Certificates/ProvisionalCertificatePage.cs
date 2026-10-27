@@ -120,10 +120,8 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         examYear.MaxLength = 4;
         marksObtained.MaxLength = marksOutOf.MaxLength = 6;
         foreach (var input in new[] { examYear, marksObtained, marksOutOf })
-            input.KeyPress += (_, e) => { if (!char.IsControl(e.KeyChar) && !char.IsAsciiDigit(e.KeyChar)) e.Handled = true; };
-        rollNumber.KeyPress += (_, e) => {
-            if (IsPeshawarBoard && !char.IsControl(e.KeyChar) && !char.IsAsciiDigit(e.KeyChar)) e.Handled = true;
-        };
+            WholeNumberInput.Attach(input);
+        WholeNumberInput.Attach(rollNumber,active:()=>IsPeshawarBoard);
         /* Hold the synchronous handler through queued clicks to prevent duplicate saves. */
         createCertificateButton.Click += async (_, _) => await RunCreateCertificateAsync();
         updateCertificateButton.Click +=

@@ -16,7 +16,7 @@ namespace FMSC_SMS.Core
         public bool ZeroAsPlaceholder
         {
             get => _zeroAsPlaceholder;
-            set { _zeroAsPlaceholder = value; Text = Text; UpdateNumericPlaceholder(); }
+            set { _zeroAsPlaceholder = value; if(value && this is not ModernNumericTextBox)WholeNumberInput.Attach(this); Text = Text; UpdateNumericPlaceholder(); }
         }
         private void UpdateNumericPlaceholder()
         {

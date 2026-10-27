@@ -40,6 +40,11 @@ internal static partial class Program
         Check(Count(plan,0)==1&&Count(plan,1)==0,"An explicit zero remains an upsert, distinct from an unconfigured cell");
         saved.Value="500";blank.Value="";plan=Plan();
         Check(Count(plan,0)==0&&Count(plan,1)==0,"An unchanged amount and an already empty cell require no write");
+        foreach(string invalid in new[]{"abc","500x","12.5","500.00","-1"})
+        {
+            blank.Value=invalid;plan=Plan();
+            Check((int)plan[2]! ==1&&Count(plan,0)==0,"The matrix save plan rejects invalid numeric input before SQL: "+invalid);
+        }
         blank.Value="250";saved.Value=null;plan=Plan();
         Check(Count(plan,0)==1&&Count(plan,1)==1,"A removal and a new rate are assembled into one save plan");
         using var host=new Form { ClientSize=new Size(900,500),ShowInTaskbar=false,

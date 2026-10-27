@@ -113,6 +113,12 @@ internal static partial class Program
         lines.Rows[0]["FeeTypeName"]="Examination and practical assessment materials fee";
         lines.Rows[0]["ChangeReason"]=string.Join(" ",Enumerable.Repeat("Approved concession for examination materials, reviewed by the school office.",5));
         using(var data=FeeChangeReport.BuildData(school,h,students,lines))Render("family-long-fee-and-reason",data);
+        lines.Rows.Clear();
+        for(int index=0;index<30;index++)
+            Fee(200+index,"Examination and practical assessment materials fee "+index,600m,600m,0m,"Waived",
+                reason:string.Join(" ",Enumerable.Repeat("Approved concession for examination materials, reviewed by the school office.",index%5+1)));
+        Fee(300,"Library Fee",600m,200m,400m,"Discount",reason:"Approved concession",child:249);
+        using(var data=FeeChangeReport.BuildData(school,h,students,lines))Render("family-many-wrapped-fee-changes",data);
         h["CashReceived"]=1m;bool refused=false;
         try{using var invalid=FeeChangeReport.BuildData(school,h,students,lines);}catch(InvalidOperationException){refused=true;}
         Check(refused,"An actual payment cannot be presented as a fee-change note");

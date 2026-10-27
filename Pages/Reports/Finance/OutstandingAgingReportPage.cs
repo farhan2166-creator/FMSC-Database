@@ -14,6 +14,7 @@ public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
         Array.Empty<string>(), false, true, false, false, classOutstandingPrint: true)
     {
         minimumDays.PlaceholderText = "Any"; maximumDays.PlaceholderText = "Any";
+        WholeNumberInput.Attach(minimumDays);WholeNumberInput.Attach(maximumDays);
         overdueOnly.CheckedChanged += (_, _) => FiltersChanged();
         minimumBalance.TextChanged += (_, _) => FiltersChanged();
         minimumDays.TextChanged += (_, _) => FiltersChanged(); maximumDays.TextChanged += (_, _) => FiltersChanged();

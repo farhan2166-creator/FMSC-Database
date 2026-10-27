@@ -378,8 +378,8 @@ public partial class MasterPage
                 return new ModernNumericTextBox {
                     Minimum = 0,
                     Maximum = 1000000000,
-                    DecimalPlaces = 2,
-                    Increment = 0.01M,
+                    DecimalPlaces = 0,
+                    Increment = 1M,
                     Dock = DockStyle.Fill,
                     Font = AppTheme.NormalFont,
                     ThousandsSeparator = true,

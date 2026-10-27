@@ -3,6 +3,7 @@ namespace FMSC_SMS.Core;
 /// <summary>Tab visits editable cells; readonly grids behave as a single keyboard stop.</summary>
 internal class KeyboardDataGridView : DataGridView
 {
+    internal KeyboardDataGridView()=>WholeNumberInput.WireGrid(this);
     protected override bool ProcessDialogKey(Keys keyData) =>
         (keyData & Keys.KeyCode) == Keys.Tab ? MoveTab(keyData) : base.ProcessDialogKey(keyData);
     protected override bool ProcessDataGridViewKey(KeyEventArgs e) =>
