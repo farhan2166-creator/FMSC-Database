@@ -235,12 +235,21 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         }));
     }
     public FeeCollectionPage() : this(true) { }
-    internal FeeCollectionPage(bool initialize)
+    internal FeeCollectionPage(bool initialize) : this(initialize,
+        id => FeeBillPreview.ReadMembersAsync(id,"Fees.View"), null, null) { }
+    internal FeeCollectionPage(bool initialize, Func<int,Task<DataTable>> readReturnMembers,
+        Func<int, Task<bool>>? confirmReturn, Func<int, Task>? reloadReturnAccount)
         : base(
             "Fee Collection",
             "Record student and family fee payments.")
     {
         this.initialize=initialize;
+        this.readReturnMembers=readReturnMembers;
+        this.confirmReturn=confirmReturn ?? (id => {
+            using var dialog=new FMSC_SMS.Pages.Students.Enrollment.ConfirmReturnAdmissionDialog(id);
+            return Task.FromResult(dialog.ShowDialog(FindForm())==DialogResult.OK);
+        });
+        this.reloadReturnAccount=reloadReturnAccount ?? LoadStudentByAdmissionId;
         BuildStudentSearch();
     }
     public FeeCollectionPage(int preloadAdmissionId)
@@ -665,10 +674,18 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             }
         };
         /* Attach the panel after its button exists. */
-        siblingPanel.Controls.Add(
-            selectAllSiblings,
-            0,
-            3);
+        confirmReturnButton=new ModernButton {
+            Text="Confirm Return", ThemeRole="Primary", Dock=DockStyle.Bottom,
+            Width=AppScale.Scale(140), Height=AppTheme.CompactButtonHeight,
+            Visible=false, Enabled=false
+        };
+        UiAccessibility.Describe(confirmReturnButton,"Confirm Return",
+            "Review the current student's return after promotion, billing start, transport and opening fees.");
+        confirmReturnButton.Click+=async(_,_)=>await ConfirmSelectedReturnAsync();
+        confirmReturnButton.EnabledChanged+=(_,_)=>{
+            if(confirmReturnButton.Enabled&&!CanConfirmSelectedReturn)confirmReturnButton.Enabled=false;
+        };
+        siblingPanel.Controls.Add(selectAllSiblings,0,3);
         /* Show the per-child proposal only during family allocation. */
         proposalRow =
             new RowStyle(
@@ -678,7 +695,10 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             proposalRow);
         ConfigureProposalGrid();
         ConfigureInlineAmounts();
-        siblingPanel.Controls.Add(currentStudentAmounts,0,0);
+        var currentStudentHost=new Panel { Dock=DockStyle.Fill, Margin=Padding.Empty };
+        currentStudentHost.Controls.Add(currentStudentAmounts);
+        currentStudentHost.Controls.Add(confirmReturnButton);
+        siblingPanel.Controls.Add(currentStudentHost,0,0);
         // The separate counter keeps its fixed-group split editor.
         // Normal collection renders these amounts directly beneath each student.
         siblings.ItemCheck += async (_, e) => {
@@ -1589,6 +1609,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             student.SelectedId;
         admissionId =
             selectedAdmissionId;
+        ResetReturnAvailability();
         lastCollectionReceipt = null;
         lastGroupReceiptNumber = null;
         if (printReceiptButton is not null) printReceiptButton.Enabled = false;
@@ -1638,6 +1659,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         {
             // Family and enrollment data are independent, so both can start as soon as the student is known.
             Task siblingsTask = LoadSiblingsAsync(version);
+            Task returnTask = RefreshReturnAvailabilityAsync();
             var placementTask = ReportClassSectionLookup.QueryAsync();
             Task<DataTable> enrollmentsTask =
                 DatabaseHelper.QueryUserAsync(
@@ -1645,7 +1667,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                     DatabaseHelper.Int(
                         "@AdmissionId",
                         admissionId));
-            await Task.WhenAll(siblingsTask, enrollmentsTask, placementTask);
+            await Task.WhenAll(siblingsTask, enrollmentsTask, placementTask, returnTask);
             var raw = await enrollmentsTask;
             var placements = (await placementTask).AsEnumerable()
                 .ToDictionary(row => GetInt(row,"ClassSectionId"),row => GetText(row,"CampusName"));
@@ -2282,6 +2304,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             finally
             {
                 siblingBusy = false;
+                UpdateReturnAction();
                 SetSiblingHint("");
                 if(focusAmountAfterSiblingLoad) {
                     focusAmountAfterSiblingLoad=false;
@@ -3968,6 +3991,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         }
         collectionValidator?.ClearAll();
         admissionId = 0;
+        ResetReturnAvailability();
         enrollmentId = 0;
         lastCollectionReceipt = null;
         lastGroupReceiptNumber = null;

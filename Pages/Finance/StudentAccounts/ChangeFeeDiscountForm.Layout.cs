@@ -33,7 +33,7 @@ public sealed partial class ChangeFeeDiscountForm
         for(int row=0;row<8;row++)fields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         Panel AddField(string title,Control input,int col,int row)
         {
-            var panel=HumanUi.Field(title,input,true);panel.Height=AppMetrics.FieldRowHeight;
+            var panel=HumanUi.Field(title,input,input!=reason);panel.Height=AppMetrics.FieldRowHeight;
             fields.Controls.Add(panel,col,row);return panel;
         }
         void Wide(Control input,int row)
@@ -67,7 +67,7 @@ public sealed partial class ChangeFeeDiscountForm
         Wide(periodNote,3);
         scopeField=AddField("Apply this change to",scope,0,4);fields.SetColumnSpan(scopeField,2);
         Wide(fixedScope,4);Wide(scopeNote,5);
-        reasonField=AddField("Reason for this change",reason,0,6);fields.SetColumnSpan(reasonField,2);
+        reasonField=AddField("Reason (optional)",reason,0,6);fields.SetColumnSpan(reasonField,2);
         paidField=AddField("Excess payment: choose what happens to it",paidReduction,0,7);fields.SetColumnSpan(paidField,2);
 
         bills.Dock=schedule.Dock=DockStyle.Fill;billTab.Controls.Add(bills);planTab.Controls.Add(schedule);
@@ -111,7 +111,8 @@ public sealed partial class ChangeFeeDiscountForm
         for(int index=0;index<taskButtons.Length;index++)
         {
             taskButtons[index].Enabled=canChange;
-            taskButtons[index].ThemeRole=action.SelectedIndex==index?"TabActive":"TabInactive";
+            string role=action.SelectedIndex==index?"TabActive":"TabInactive";
+            if(taskButtons[index].ThemeRole!=role)taskButtons[index].ThemeRole=role;
             taskButtons[index].AccessibleDescription=action.SelectedIndex==index?"Selected action":"Choose this action";
         }
         for(int index=0;index<footerButtons.Length;index++)
@@ -155,12 +156,12 @@ public sealed partial class ChangeFeeDiscountForm
         concession.AccessibleName=WaiverAction?"Waiver type":"Discount type";
         fields.SetColumn(concessionField,WaiverAction?0:1);fields.SetColumnSpan(concessionField,WaiverAction?2:1);
         taskNote.Visible=!reviewStage&&HasAction;
-        taskNote.Text=WaiverAction?"The concession fully discounts the chosen bill or period, up to unpaid dues on issued charges."
+        string note=WaiverAction?"The concession fully discounts the chosen bill or period, up to unpaid dues on issued charges."
             : RemoveAction?"The discount or full waiver will be removed. The full fee becomes payable."
             : RateAction?originalWaiver?"The existing full waiver will be kept."
                 : $"The existing Rs. {originalDiscount:N0} discount will be kept."
             : "Enter the discount to subtract from the fee.";
-        string net=DraftNetText();if(net.Length>0)taskNote.Text+="\r\n"+net;
+        string net=DraftNetText();taskNote.Text=net.Length>0?note+"\r\n"+net:note;
         bool choosePeriod=!reviewStage&&HasAction&&monthly&&billId is null;
         fromField.Visible=throughField.Visible=choosePeriod;
         periodNote.Visible=!reviewStage&&HasAction&&!choosePeriod;

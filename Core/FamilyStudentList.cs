@@ -7,6 +7,12 @@ namespace FMSC_SMS.Core;
 internal sealed class FamilyStudentList : CheckedListBox
 {
     private Func<int,(decimal Total,decimal Pay)>? paymentAmounts;
+    private Func<int,string>? statusText;
+    internal void SetStatusRows(Func<int,string>? status)
+    {
+        statusText=status;FitRows();Invalidate();
+    }
+    private int StatusHeight=>statusText is null?0:AppTheme.SmallFont.Height+AppScale.Scale(3);
     internal void SetPaymentRows(Func<int,(decimal Total,decimal Pay)> amounts)
     {
         paymentAmounts=amounts;FitRows();Invalidate();
@@ -15,7 +21,7 @@ internal sealed class FamilyStudentList : CheckedListBox
     {
         var row=GetItemRectangle(index);int inset=AppScale.Scale(CompactRows?6:8);
         int width=Math.Min(AppScale.Scale(90),Math.Max(AppScale.Scale(65),row.Width/3));
-        return new Rectangle(row.Right-inset-width,row.Top+inset+2*(LineHeight+LineGap),width,AppTheme.SmallFont.Height+AppScale.Scale(4));
+        return new Rectangle(row.Right-inset-width,row.Top+inset+2*(LineHeight+LineGap)+StatusHeight,width,AppTheme.SmallFont.Height+AppScale.Scale(4));
     }
     private int LineHeight=>Font.Height+(CompactRows?2:4);
     private int LineGap=>CompactRows?0:2;
@@ -68,8 +74,8 @@ internal sealed class FamilyStudentList : CheckedListBox
     private void FitRows()
     {
         if (IsHandleCreated) SendMessage(Handle, 0x01A0, IntPtr.Zero, (IntPtr)(paymentAmounts is null
-            ?Font.Height*2+AppScale.Scale(CompactRows?18:24)
-            :2*(LineHeight+LineGap)+AppTheme.SmallFont.Height+AppScale.Scale(CompactRows?16:24)));
+            ?Font.Height*2+StatusHeight+AppScale.Scale(CompactRows?18:24)
+            :2*(LineHeight+LineGap)+StatusHeight+AppTheme.SmallFont.Height+AppScale.Scale(CompactRows?16:24)));
     }
     protected override void OnDrawItem(DrawItemEventArgs e)
     {
@@ -91,6 +97,14 @@ internal sealed class FamilyStudentList : CheckedListBox
             var second = new Rectangle(first.Left, first.Bottom + LineGap, first.Width, LineHeight);
             TextRenderer.DrawText(e.Graphics, lines[1], Font, second, selected?AppTheme.SelectionText:AppTheme.MutedText,
                 TextFormatFlags.Left | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        }
+        if(statusText is not null)
+        {
+            string status=statusText(e.Index);
+            var statusBounds=new Rectangle(first.Left,first.Top+2*(LineHeight+LineGap),first.Width,StatusHeight);
+            var color=selected?AppTheme.SelectionText:status=="Awaiting Return"?AppTheme.Warning:AppTheme.MutedText;
+            TextRenderer.DrawText(e.Graphics,status,AppTheme.SmallFont,statusBounds,color,
+                TextFormatFlags.Left|TextFormatFlags.VerticalCenter|TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix);
         }
         if(paymentAmounts is not null)
         {

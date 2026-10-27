@@ -21,6 +21,9 @@ public sealed partial class FeeCollectionPage
         if(counterIds is not null || selected.Length==0 || selected.Any(id=>id<=0) || selected.Distinct().Count()!=selected.Length)
             throw new ArgumentException("Select the saved children for this counter visit.",nameof(selected));
         counterIds=selected.ToArray();counterLoading=true;
+        ResetReturnAvailability();
+        currentStudentAmounts.SetStatusRows(null);
+        ((FamilyStudentList)siblings).SetStatusRows(null);
         currentStudentAmounts.Visible=false;
         if(counterSiblingPanel is not null)counterSiblingPanel.RowStyles[0].Height=0;
         counterContextCard?.SetHeaderText("Selected Children","Close to return to this family's preparation and fee review.");

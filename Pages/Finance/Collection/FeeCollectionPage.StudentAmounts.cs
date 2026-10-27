@@ -14,8 +14,10 @@ public sealed partial class FeeCollectionPage
     {
         currentStudentAmounts.ItemCheck+=(_,e)=>e.NewValue=CheckState.Checked;
         currentStudentAmounts.SetPaymentRows(_=>InlinePaymentInfo(admissionId));
+        currentStudentAmounts.SetStatusRows(_=>returnStatusByStudent.GetValueOrDefault(admissionId,""));
         ((FamilyStudentList)siblings).SetPaymentRows(
         index=>InlinePaymentInfo(SiblingAdmissionIdAt(index)));
+        ((FamilyStudentList)siblings).SetStatusRows(index=>returnStatusByStudent.GetValueOrDefault(SiblingAdmissionIdAt(index),""));
     }
 
     private void RefreshInlineAmounts()
@@ -29,7 +31,8 @@ public sealed partial class FeeCollectionPage
         }
         else currentStudentAmounts.Items.Clear();
         if(counterSiblingPanel is not null)
-            counterSiblingPanel.RowStyles[0].Height=admissionId>0?currentStudentAmounts.GetItemRectangle(0).Height:0;
+            counterSiblingPanel.RowStyles[0].Height=admissionId>0?currentStudentAmounts.GetItemRectangle(0).Height+
+                (ReturnActionAvailable && confirmReturnButton is not null?confirmReturnButton.Height+AppScale.Scale(4):0):0;
         currentStudentAmounts.Invalidate();siblings.Invalidate();
     }
 

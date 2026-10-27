@@ -48,7 +48,7 @@ internal static partial class Program
                 "The current student's compact summary appears above the siblings");
             Check(current.ClientSize.Height>=current.GetItemRectangle(0).Height && current.PaymentBounds(0).Bottom<=current.ClientSize.Height,
                 "The current student's name, placement and amounts fit completely inside the restored row");
-            Check(list.CompactRows && current.CompactRows && list.GetItemRectangle(0).Height<list.Font.Height*3+AppScale.Scale(38)
+            Check(list.CompactRows && current.CompactRows && list.GetItemRectangle(0).Height<list.Font.Height*4+AppScale.Scale(38)
                 && AppTheme.SmallFont.Size<list.Font.Size,
                 "Compact student rows reserve a smaller font for total and pay labels");
             (decimal Total,decimal Pay) Info(int id)=>((decimal,decimal))type.GetMethod("InlinePaymentInfo",flags)!.Invoke(page,new object[]{id})!;

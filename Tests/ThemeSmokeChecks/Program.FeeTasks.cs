@@ -55,10 +55,11 @@ internal static partial class Program
                 ClickTask(form,0);
                 Check(Field<ModernComboBox>(form,"action").SelectedIndex==0&&Field<ModernComboBox>(form,"concession").Text=="None",
                     "Give Discount opens its fields without classifying an ordinary discount as Scholarship.");
-                Field<ModernTextBox>(form,"amount").Text="2000";Field<ModernTextBox>(form,"reason").Text="Approved admission discount";
+                Field<ModernTextBox>(form,"amount").Text="2000";
                 Check(Field<Label>(form,"taskNote").Text.Contains("Rs. 8,000"),"The draft immediately shows the selected fee's resulting net amount.");
                 Check(!Field<ModernTextBox>(form,"newRate").Visible,"A discount does not display the fee-rate correction input.");
                 Click(form,"review");
+                Check((string)Arg("@Reason")=="Concession revised","A discount can be reviewed with no reason entered, using the existing neutral record description.");
                 Check(!(bool)Arg("@UpdateAgreement")&&(bool)Arg("@ApplyToBills")&&(long)Arg("@BillingChargeId")==321L,
                     "Opening a bill changes only that bill and preserves its saved fee plan.");
                 Check(!(bool)Arg("@ApplyAvailableCredit"),"Fee changes never spend advance credit.");

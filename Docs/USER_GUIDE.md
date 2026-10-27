@@ -29,7 +29,9 @@ Confirmation dialogs show the question first, then important consequences and th
 
 ## Family counter: returning students and new siblings
 
-In **Fee Collection**, find any child and open **Student Fees → Family / Returns**. The existing Family / Siblings window shows each child's year, placement and readiness. Select an **Awaiting Return** child and choose **Confirm Selected Return**. Review that child's date, transport and opening fees in the existing dialog. After confirmation, readiness refreshes and the next waiting child is selected; they are not confirmed automatically. Pending new registrations use their own registration review, not return confirmation.
+In **Fee Collection**, the Paying For panel shows each child's status, such as **Awaiting Return**, **Return Confirmed**, **Ready for Billing** or **On Hold**. For the loaded child awaiting return after promotion, **Confirm Return** appears beneath their details. Review their billing start date, transport and opening fees in the existing dialog. Closing the dialog refreshes the account. Checked siblings are included only in the payment; each return is confirmed separately. Double-click a sibling's name to load that child's account. Pending new registrations use their own registration review.
+
+**Student Fees → Family / Returns** also opens the existing family window, with each child's year, placement and readiness. Select an **Awaiting Return** child and choose **Confirm Selected Return**. After confirmation, the next waiting child is selected for a separate review.
 
 Close the family window to reload the selected student's placement and fees. Tick the siblings to include, then use **Student Fees → Print Outstanding Bill**. The bill includes all posted unpaid charges for those children, including older periods. It is separate from **Print Receipt**, which follows a saved payment. Finish or clear an entered payment draft before opening Family / Returns; unsaved discount changes must be reviewed before printing a saved-charge bill.
 

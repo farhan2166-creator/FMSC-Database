@@ -96,7 +96,8 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         Build();
         action.SelectedIndexChanged+=(_,_)=>{ConfigureConcession();InvalidateReview();};
         scope.SelectedIndexChanged+=(_,_)=>InvalidateReview();
-        amount.TextChanged+=(_,_)=>InvalidateReview(); reason.TextChanged+=(_,_)=>InvalidateReview();
+        amount.TextChanged+=(_,_)=>InvalidateReview();
+        reason.TextChanged+=(_,_)=>InvalidateReview(updateChoices:false);
         newRate.TextChanged+=(_,_)=>InvalidateReview(); concession.SelectedIndexChanged+=(_,_)=>InvalidateReview();
         fromMonth.ValueChanged+=(_,_)=>InvalidateReview(); throughMonth.ValueChanged+=(_,_)=>InvalidateReview();
         paidReduction.SelectedIndexChanged+=(_,_)=>InvalidateReview(keepPaidDecision:true);
@@ -142,28 +143,30 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         concession.SelectedItem=concession.Items.Contains(previous)?previous:
             WaiverAction?"Waived":originalLabel=="Scholarship"?"Scholarship":"None";
     }
-    private void InvalidateReview(bool keepPaidDecision=false)
+    private void InvalidateReview(bool keepPaidDecision=false,bool updateChoices=true)
     {
-        generation++; bills.DataSource=schedule.DataSource=null; reviewed?.Dispose(); reviewed=null;
+        bool stageChanged=reviewStage&&!keepPaidDecision;
+        generation++;
+        if(reviewed is not null){bills.DataSource=schedule.DataSource=null;reviewed.Dispose();reviewed=null;}
         if(!keepPaidDecision){releasedPayment=0;reviewStage=false;}
         if(!busy&&!blocked) impact.Text=keepPaidDecision
             ? $"Excess already paid: Rs. {releasedPayment:N0}. Review again to confirm the {(paidReduction.SelectedIndex==1?"refund":"advance credit")} choice."
             : "Review the selected change to see its effect before confirming.";
-        State();
+        State(updateChoices||stageChanged);
     }
-    private void State()
+    private void State(bool updateChoices=true)
     {
         if(IsDisposed)return;
         bool canChange=validContext&&!busy&&!blocked&&!Changed&&CurrentUser.HasPermission("Fees.Adjust");
         fields.Enabled=canChange;
-        UpdateVisibleFields();
+        if(updateChoices)UpdateVisibleFields();
         review.Enabled=canChange&&HasAction; save.Enabled=canChange&&reviewed is not null;
         review.Visible=!reviewStage||reviewed is null;
         review.Text=reviewStage?"Review Again":"Review Fee Change";
         save.Visible=reviewStage;
         editChoices.Visible=reviewStage;editChoices.Enabled=canChange;
         check.Visible=blocked; check.Enabled=!busy;
-        UpdateQuickControls(canChange);
+        if(updateChoices)UpdateQuickControls(canChange);
     }
     private bool ValidateChoices()
     {
@@ -178,7 +181,6 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         if(RateAction&&!originalWaiver&&originalDiscount>rate)
         {impact.Text=$"The new fee is below the existing Rs. {originalDiscount:N0} discount. Review or remove that discount first.";return false;}
         if(First(fromMonth.Value)>First(throughMonth.Value)){impact.Text="The through month must be on or after the from month.";return false;}
-        if(string.IsNullOrWhiteSpace(reason.Text)){impact.Text="Enter the reason for this fee change.";reason.Focus();return false;}
         return true;
     }
     private SqlParameter[] Args(bool preview)=>new[]{
@@ -188,7 +190,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         DatabaseHelper.P("@NewAmount",RateAction?decimal.Parse(newRate.Text):null),
         DatabaseHelper.Bit("@ApplyAvailableCredit",false),DatabaseHelper.Bit("@UpdateAgreement",UpdateAgreement),DatabaseHelper.P("@BillingChargeId",billId),DatabaseHelper.Bit("@FullFeeWaiver",FullWaiver),
         DatabaseHelper.Bit("@ApplyToBills",ApplyBills),DatabaseHelper.P("@PaidReductionAction",RateAction&&paidReduction.SelectedIndex==1?"Refund":"Credit"),
-        DatabaseHelper.P("@Reason",reason.Text.Trim()),DatabaseHelper.Bit("@Preview",preview),
+        DatabaseHelper.P("@Reason",string.IsNullOrWhiteSpace(reason.Text)?"Concession revised":reason.Text.Trim()),DatabaseHelper.Bit("@Preview",preview),
         DatabaseHelper.P("@ExpectedSnapshot",preview?null:Convert.ToString(reviewed!.Tables[0].Rows[0]["Snapshot"]))};
     private async Task ReviewAsync()
     {
