@@ -1,3 +1,8 @@
+using System.Globalization;
+using System.Xml.Linq;
+using Microsoft.Reporting.WinForms;
+using PdfSharp.Pdf.IO;
+
 namespace FMSC_SMS.Core;
 
 // A fee-change acknowledgement has its own paper. Normal bills and payment
@@ -29,7 +34,50 @@ internal static class FeeChangeReport
     {
         string path=Path.Combine(AppContext.BaseDirectory,"Reports",TemplateFile);
         RdlcReportPreview.Show(owner,"Fee Change Note",path,DataSetName,data,
-            reportDefinition:FeeDocumentLayout.SizeToContent(path,data));
+            reportDefinition:CreateDefinition(path,data),allowMultiplePages:false);
+    }
+
+    internal static string CreateDefinition(string path,DataTable data)
+    {
+        // Match the names and other display text used by the preview and printer.
+        using var printData=RecordTextPolicy.PrintCopy(data);
+        return FitSinglePage(FeeDocumentLayout.SizeToContent(path,printData),printData);
+    }
+
+    internal static string FitSinglePage(string definition,DataTable data)
+    {
+        var document=XDocument.Parse(definition);XNamespace ns=document.Root!.Name.Namespace;
+        var pageHeight=document.Root.Element(ns+"Page")!.Element(ns+"PageHeight")!;
+        double estimated=double.Parse(pageHeight.Value.Replace("in",""),CultureInfo.InvariantCulture);
+        using var report=new LocalReport();report.LoadReportDefinition(new StringReader(definition));
+        report.DataSources.Add(new ReportDataSource(DataSetName,data));
+        int Pages(double height)
+        {
+            string deviceInfo=new XElement("DeviceInfo",new XElement("PageHeight",height.ToString("0.00",CultureInfo.InvariantCulture)+"in")).ToString();
+            using var stream=new MemoryStream(report.Render("PDF",deviceInfo));
+            using var pdf=PdfReader.Open(stream,PdfDocumentOpenMode.Import);
+            return pdf.PageCount;
+        }
+        int pages=Pages(estimated);
+        if(pages==1)return definition;
+
+        // GDI text measurements can differ from RDLC's wrapped rows. Verify the
+        // complete rendered note, then find its paper length without shrinking text.
+        double tooShort=estimated,enough=estimated;
+        for(int attempt=0;pages>1&&attempt<8;attempt++)
+        {
+            tooShort=enough;enough=Math.Ceiling((enough*Math.Max(2,pages)+0.1)*100)/100;
+            pages=Pages(enough);
+        }
+        if(pages!=1)throw new InvalidOperationException("The complete fee-change note could not fit on continuous paper. Close and try printing again.");
+        while(enough-tooShort>0.10)
+        {
+            double middle=Math.Floor((tooShort+enough)*50)/100;
+            if(Pages(middle)==1)enough=middle;else tooShort=middle;
+        }
+        // Keep a little clearance for the printer's hundredth-inch page settings.
+        pageHeight.Value=(enough+0.05).ToString("0.00",CultureInfo.InvariantCulture)+"in";
+        return document.ToString();
     }
 
     internal static DataTable BuildData(InstitutionProfile.PrintIdentity institution,DataRow header,
