@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
   <Body>
     <ReportItems>
@@ -903,7 +903,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Less: Discount / Waived</Value>
+                              <Value>=First(Fields!ChildReceiptDeductionCaption.Value, "ReceiptStudentGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -935,7 +935,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(-First(Fields!ChildDiscountApplied.Value, "ReceiptStudentGroup"), "N0")</Value>
+                              <Value>=Format(-First(Fields!ChildReceiptDeductionAmount.Value, "ReceiptStudentGroup"), "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -1010,7 +1010,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(First(Fields!ChildPayable.Value, "ReceiptStudentGroup"), "N0")</Value>
+                              <Value>=Format(First(Fields!ChildReceiptNetPayable.Value, "ReceiptStudentGroup"), "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1121,86 +1121,7 @@
                 </TablixCell>
               </TablixCells>
             </TablixRow>
-            <TablixRow>
-              <Height>0.16in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="TotalLabelCreditApplied">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>Account credit used</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Left</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <TopBorder>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </TopBorder>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                    <ColSpan>2</ColSpan>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell />
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="TotalPaidCreditApplied">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=Format(First(Fields!ChildCreditApplied.Value, "ReceiptStudentGroup"), "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Center</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <Border>
-                          <Style>None</Style>
-                        </Border>
-                        <TopBorder>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </TopBorder>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>1pt</PaddingTop>
-                        <PaddingBottom>1pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-              </TablixCells>
-            </TablixRow>
+
             <TablixRow>
               <Height>0.16in</Height>
               <TablixCells>
@@ -2143,7 +2064,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Net discount</Value>
+                              <Value>=First(Fields!GroupReceiptSummaryDeductionCaption.Value, "ReceiptPageGroup")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>
@@ -2176,7 +2097,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(First(Fields!GroupDiscount.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Value>=Format(First(Fields!GroupReceiptDeductionAmount.Value, "ReceiptPageGroup"), "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>
@@ -2245,7 +2166,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(First(Fields!GroupPayable.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Value>=Format(First(Fields!GroupReceiptNetPayable.Value, "ReceiptPageGroup"), "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>
@@ -2338,75 +2259,7 @@
                 </TablixCell>
               </TablixCells>
             </TablixRow>
-            <TablixRow>
-              <Height>0.12in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="GroupCreditAppliedLabel">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>Account credit used</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>6.5pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Left</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                    <ColSpan>2</ColSpan>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell />
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="GroupCreditAppliedAmount">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=Format(First(Fields!GroupCreditApplied.Value, "ReceiptPageGroup"), "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>6.5pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Center</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-              </TablixCells>
-            </TablixRow>
+
             <TablixRow>
               <Height>0.12in</Height>
               <TablixCells>
@@ -2547,7 +2400,7 @@
 
                     <TablixMember>
                       <Visibility>
-                        <Hidden>=Not First(Fields!ChildShowDiscount.Value, "ReceiptStudentGroup")</Hidden>
+                        <Hidden>=Not First(Fields!ChildShowReceiptDeduction.Value, "ReceiptStudentGroup")</Hidden>
                       </Visibility>
                     </TablixMember>
                     <TablixMember>
@@ -2560,11 +2413,7 @@
                         <Hidden>=Not First(Fields!ChildShowSettlement.Value, "ReceiptStudentGroup")</Hidden>
                       </Visibility>
                     </TablixMember>
-                    <TablixMember>
-                      <Visibility>
-                        <Hidden>=Not CBool(First(Fields!ChildCreditApplied.Value, "ReceiptStudentGroup")) Or Not First(Fields!ChildShowSettlement.Value, "ReceiptStudentGroup")</Hidden>
-                      </Visibility>
-                    </TablixMember>
+
                     <TablixMember>
                       <Visibility>
                         <Hidden>=Not CBool(First(Fields!ChildCreditRetained.Value, "ReceiptStudentGroup"))</Hidden>
@@ -2643,11 +2492,7 @@
                     <Hidden>=Not First(Fields!ShowGroupSummary.Value, "ReceiptPageGroup")</Hidden>
                   </Visibility>
                 </TablixMember>
-                <TablixMember>
-                  <Visibility>
-                    <Hidden>=Not First(Fields!ShowGroupSummary.Value, "ReceiptPageGroup") Or Not First(Fields!ShowGroupCreditApplied.Value, "ReceiptPageGroup")</Hidden>
-                  </Visibility>
-                </TablixMember>
+
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Not First(Fields!ShowGroupSummary.Value, "ReceiptPageGroup")</Hidden>
@@ -2953,7 +2798,7 @@
         <Field Name="ShowGroupSummary">
           <DataField>ShowGroupSummary</DataField>
         </Field>
-      <Field Name="ParentRelationLabel"><DataField>ParentRelationLabel</DataField></Field></Fields>
+      <Field Name="ParentRelationLabel"><DataField>ParentRelationLabel</DataField></Field><Field Name="ChildReceiptDeductionCaption"><DataField>ChildReceiptDeductionCaption</DataField></Field><Field Name="ChildReceiptSummaryDeductionCaption"><DataField>ChildReceiptSummaryDeductionCaption</DataField></Field><Field Name="ChildReceiptDeductionAmount"><DataField>ChildReceiptDeductionAmount</DataField></Field><Field Name="ChildReceiptNetPayable"><DataField>ChildReceiptNetPayable</DataField></Field><Field Name="ChildShowReceiptDeduction"><DataField>ChildShowReceiptDeduction</DataField></Field><Field Name="GroupReceiptDeductionCaption"><DataField>GroupReceiptDeductionCaption</DataField></Field><Field Name="GroupReceiptSummaryDeductionCaption"><DataField>GroupReceiptSummaryDeductionCaption</DataField></Field><Field Name="GroupReceiptDeductionAmount"><DataField>GroupReceiptDeductionAmount</DataField></Field><Field Name="GroupReceiptNetPayable"><DataField>GroupReceiptNetPayable</DataField></Field><Field Name="GroupShowReceiptDeduction"><DataField>GroupShowReceiptDeduction</DataField></Field></Fields>
     </DataSet>
   </DataSets>
   <ConsumeContainerWhitespace>true</ConsumeContainerWhitespace>

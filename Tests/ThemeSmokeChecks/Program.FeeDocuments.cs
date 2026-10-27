@@ -24,7 +24,7 @@ internal static partial class Program
         {
             bool bill=Convert.ToString(data.Rows[0]["DocumentKind"])=="Bill";
             // Match StudentReceiptReport.Show: group months before sizing or rendering.
-            using var individualRows=!bill&&!data.Columns.Contains("FamilyRowKind")?data.Copy():null;
+            using var individualRows=!bill&&!data.Columns.Contains("FamilyRowKind")?FeeReceiptPresentation.Prepare(data):null;
             if(individualRows is not null)
             {
                 FeeDocumentData.GroupPeriods(individualRows);
@@ -102,7 +102,7 @@ internal static partial class Program
                     .Parent!.Element(ns+"Visibility")!.Value.Contains("ShowChildDocument"),"Each complete child slip follows its own visibility rule");
                 Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="GroupSummaryHeading")
                     .Descendants(ns+"Value").First().Value=="GROUP SUMMARY","The family printout has one final group summary");
-                foreach(var (labelName,caption) in new[]{("GroupFeeTotalLabel","Net total"),("GroupDiscountLabel","Net discount"),("GroupPayableLabel","Net payable"),("GroupDueLabel","Net due")})
+                foreach(var (labelName,caption) in new[]{("GroupFeeTotalLabel","Net total"),("GroupPayableLabel","Net payable"),("GroupDueLabel","Net due")})
                     Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")==labelName).Descendants(ns+"Value").First().Value==caption,
                         "Family summary uses the agreed net captions");
             }
@@ -141,8 +141,8 @@ internal static partial class Program
             string file=source.Columns.Contains("FamilyRowKind")?"FamilyReceipt.rdlc":"StudentReceipt.rdlc";
             string path=Path.Combine(AppContext.BaseDirectory,"Reports",file);
             XNamespace ns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";
-            using var fullData=source.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Receipt(source):source.Copy();
-            using var compactData=cash.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Receipt(cash):cash.Copy();
+            using var fullData=source.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Receipt(source):FeeReceiptPresentation.Prepare(source);
+            using var compactData=cash.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Receipt(cash):FeeReceiptPresentation.Prepare(cash);
             var full=XDocument.Parse(FeeDocumentLayout.SizeToContent(path,fullData));
             var compact=XDocument.Parse(FeeDocumentLayout.SizeToContent(path,compactData));
             double Height(XDocument document)=>double.Parse(document.Descendants(ns+"PageHeight").Single().Value.Replace("in",""),System.Globalization.CultureInfo.InvariantCulture);
@@ -151,10 +151,12 @@ internal static partial class Program
             var rows=table.Descendants(ns+"TablixRow").ToArray();
             var members=table.Element(ns+"TablixRowHierarchy")!.Descendants(ns+"TablixMember")
                 .Where(member=>member.Element(ns+"TablixMembers") is null).ToArray();
-            foreach(string textbox in new[]{"TotalPaidCreditApplied","TotalPaidCreditRemaining"})
+            Check(!compact.Descendants(ns+"Textbox").Any(box=>(string?)box.Attribute("Name")=="TotalPaidCreditApplied"),
+                "Applied credit is included once in the deduction instead of a second settlement row");
+            foreach(string textbox in new[]{"TotalPaidCreditRemaining"})
             {
                 int index=Array.FindIndex(rows,row=>row.Descendants(ns+"Textbox").Any(box=>(string?)box.Attribute("Name")==textbox));
-                string field=textbox=="TotalPaidCreditApplied"?"CreditApplied":"ShowCreditRemaining";
+                string field="ShowCreditRemaining";
                 Check(members[index].Element(ns+"Visibility")!.Element(ns+"Hidden")!.Value.Contains(field),"Credit visibility is applied to the complete table row");
             }
             Check(Render(name,cash)==1,"A cash-only receipt renders with credit rows collapsed");
@@ -173,13 +175,14 @@ internal static partial class Program
                         row["ChildCashReceived"]=Convert.ToDecimal(row["ChildTotalPaid"])-(firstChild?applied:0m);
                     }
                 }
-                using var visibleData=cash.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Receipt(cash):cash.Copy();
+                using var visibleData=cash.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Receipt(cash):FeeReceiptPresentation.Prepare(cash);
                 var visible=XDocument.Parse(FeeDocumentLayout.SizeToContent(path,visibleData));
                 Check(applied==0m?Height(visible)>Height(compact)&&Height(visible)<Height(full):Height(visible)>Height(compact),
-                    "Remaining-only credit occupies one row; credit used occupies both rows even when exhausted");
+                    "Remaining-only credit occupies one row; used credit adds the deduction and remaining-credit rows even when exhausted");
                 Check(Render(name+"-"+label,cash)==1,"Credit visibility scenario prints on one page");
             }
         }
+        CheckFeeDocumentConsistency(school,(name,data)=>Render(name,data));
         CheckReceiptConcessions(school,(name,data)=>Render(name,data));
         CheckReceiptPaperTrail(school,(name,data)=>Render(name,data));
         CheckFeeVisitDocuments(school,(name,data)=>Render(name,data));
