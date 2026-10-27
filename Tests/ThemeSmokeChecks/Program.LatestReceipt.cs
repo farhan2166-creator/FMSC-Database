@@ -19,6 +19,7 @@ internal static partial class Program
         issued.Columns.Add("CollectionReceiptId", typeof(int));
         issued.Columns.Add("ReceiptNumber");
         issued.Columns.Add("TransactionDate", typeof(DateTime));
+        issued.Columns.Add("PaymentMethod");
         using var payments = new DataTable();
         payments.Columns.Add("FeePaymentId", typeof(int));
         payments.Columns.Add("Status");
@@ -46,6 +47,11 @@ internal static partial class Program
         issued.Rows.Add(2,"FMSC-2026-0007",day.AddMinutes(6));
         Payment(7,"FMSC-CR-2026-0007",day.AddMinutes(6),kind:"Application",method:"Account Credit");
         Check(Latest()=="FMSC-2026-0007", "Unified receipt wins over its linked payment reference at the same time");
+        issued.Rows.Add(3,"FEE-CHANGE-NOTE",day.AddMinutes(7),"Fee changes");
+        Check(Latest()=="FMSC-2026-0007","A newer fee-change note never replaces Print Receipt's latest payment");
+        var visible=(IEnumerable<DataRow>)typeof(FeeCollectionPage).GetMethod("PaymentReceiptRows",flags)!.Invoke(null,new object[]{issued})!;
+        Check(visible.All(row=>Convert.ToString(row["ReceiptNumber"])!="FEE-CHANGE-NOTE")&&issued.Rows.Count==3,
+            "Recent Payments excludes fee-change notes while preserving their saved records");
 
         using var page = new FeeCollectionPage(false);
         const BindingFlags instance = BindingFlags.Instance | BindingFlags.NonPublic;

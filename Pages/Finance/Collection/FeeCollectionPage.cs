@@ -2498,7 +2498,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 if(printReceiptButton is not null) printReceiptButton.Enabled=lastGroupReceiptNumber is not null;
             }
             var linkedPayments=issued.Tables.Count>1?issued.Tables[1].AsEnumerable().Select(row=>GetInt(row,"FeePaymentId")).ToHashSet():new HashSet<int>();
-            foreach(DataRow receipt in issued.Tables[0].Rows)
+            foreach(DataRow receipt in PaymentReceiptRows(issued.Tables[0]))
             {
                 decimal settled=GetDecimal(receipt,"CashApplied")+GetDecimal(receipt,"CreditApplied");
                 int index=recentPayments.Rows.Add(FormatDate(receipt,"TransactionDate"),GetText(receipt,"ReceiptNumber"),"Fees",
@@ -2595,7 +2595,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var byPayment = payments.AsEnumerable().ToDictionary(row => GetInt(row,"FeePaymentId"));
         DateTime ReceiptDate(DataRow row) => DateTime.TryParse(GetText(row,"TransactionDate"), out var date)
             ? date : DateTime.MinValue;
-        var candidates = issued.AsEnumerable()
+        var candidates = PaymentReceiptRows(issued)
             .Where(row => !string.IsNullOrWhiteSpace(GetText(row,"ReceiptNumber")))
             .Select(row => (Number:GetText(row,"ReceiptNumber"), Date:ReceiptDate(row),
                 Issued:true, Id:GetInt(row,"CollectionReceiptId")))
@@ -2609,6 +2609,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         return candidates.OrderByDescending(row => row.Date).ThenByDescending(row => row.Issued)
             .ThenByDescending(row => row.Id).Select(row => row.Number).FirstOrDefault();
     }
+    private static IEnumerable<DataRow> PaymentReceiptRows(DataTable issued)=>issued.AsEnumerable()
+        .Where(row=>!string.Equals(GetText(row,"PaymentMethod"),"Fee changes",StringComparison.OrdinalIgnoreCase));
     private static bool IsPrintablePayment(DataRow row) =>
         string.Equals(GetText(row,"TransactionType"),"PAYMENT",StringComparison.OrdinalIgnoreCase)
         && !string.Equals(GetText(row,"PaymentMethod"),"Correction",StringComparison.OrdinalIgnoreCase)

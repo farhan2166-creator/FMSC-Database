@@ -51,10 +51,14 @@ internal static class FeeBillPreview
             DatabaseHelper.Int("@Admission", admissionId), DatabaseHelper.P("@Permission", permission));
     }
 
-    internal static Task<DataTable> ReadChargesAsync(int admissionId,int[] selected,bool wholeFamily=false) =>
-        DatabaseHelper.QuerySqlAsync(ChargesSql, DatabaseHelper.Int("@UserId",CurrentUser.UserId),
+    internal static async Task<DataTable> ReadChargesAsync(int admissionId,int[] selected,bool wholeFamily=false)
+    {
+        var charges=await DatabaseHelper.QuerySqlAsync(ChargesSql, DatabaseHelper.Int("@UserId",CurrentUser.UserId),
             DatabaseHelper.Int("@Admission",admissionId),
             DatabaseHelper.P("@Ids",System.Text.Json.JsonSerializer.Serialize(selected)),DatabaseHelper.Bit("@WholeFamily",wholeFamily));
+        try{await FeeCarryForwardLabels.ApplyAsync(charges);return charges;}
+        catch{charges.Dispose();throw;}
+    }
 
     internal static async Task ShowAsync(Form? owner, int admissionId, int[]? selected = null, Func<bool>? isCurrent = null)
     {

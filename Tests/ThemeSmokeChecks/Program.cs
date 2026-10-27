@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--receipt-carry-labels"))
+        {
+            CheckReceiptCarryLabels();CheckLatestReceipt();
+            Console.WriteLine($"PASS: {checks} payment-history filtering and carried-balance label checks (no database connection).");
+            return;
+        }
         if(args.Contains("--whole-number-inputs"))
         {
             CheckWholeNumberInputs();CheckNumericPlaceholders();CheckClosingWholeAmounts();
