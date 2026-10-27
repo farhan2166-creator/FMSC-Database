@@ -6,6 +6,7 @@ internal static partial class Program
 {
     private static void CheckLatestReceipt()
     {
+        CheckRecentReceiptActivity();
         const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
         var select = typeof(FeeCollectionPage).GetMethod("LatestPrintableReceipt", flags)!;
         using var statement = new DataTable();
@@ -62,5 +63,33 @@ internal static partial class Program
         clear.GetAwaiter().GetResult();
         Check(!button.Enabled && typeof(FeeCollectionPage).GetField("lastGroupReceiptNumber",instance)!.GetValue(page) is null,
             "Changing the student clears the previous receipt before loading anything else");
+    }
+
+    private static void CheckRecentReceiptActivity()
+    {
+        var activity=typeof(FeeCollectionPage).GetMethod("SavedReceiptActivity",BindingFlags.NonPublic|BindingFlags.Static)!;
+        using var receipts=new DataTable();
+        receipts.Columns.Add("ReceiptNumber");receipts.Columns.Add("StudentCount",typeof(int));
+        receipts.Columns.Add("CashApplied",typeof(decimal));receipts.Columns.Add("CreditApplied",typeof(decimal));
+        var family=receipts.Rows.Add("FR-2026-00007",3,7600m,0m);
+        var single=receipts.Rows.Add("R-2026-00001",1,2800m,0m);
+        var credit=receipts.Rows.Add("R-CREDIT",1,0m,500m);
+        using var payments=new DataTable();payments.Columns.Add("ReceiptNumber");payments.Columns.Add("Status");
+        string Label(DataRow row)=>(string)activity.Invoke(null,new object[]{row,payments})!;
+        var selected=payments.Rows.Add("FR-2026-00007","Completed");
+        payments.Rows.Add("R-2026-00001","Reversed");
+        Check(Label(family)=="Family payment","An untouched student share stays a family payment despite an unrelated reversed receipt");
+        selected["Status"]="Reversed";
+        Check(Label(family)=="Reversed","A fully reversed student share is labelled Reversed even though siblings still have completed payments");
+        Check(Label(single)=="Reversed","A saved individual receipt also displays its reversal");
+        var remaining=payments.Rows.Add("FR-2026-00007","Completed");
+        Check(Label(family)=="Partially reversed","Multiple payment parts for this student distinguish a partial reversal from a full reversal");
+        remaining["Status"]="Reversed";
+        Check(Label(family)=="Reversed","All reversed payment parts show a full reversal");
+        selected["Status"]="Completed";remaining["Status"]="Completed";
+        Check(Label(family)=="Family payment","Another sibling's current view remains a family payment when their own shares are completed");
+        payments.Rows[1]["Status"]="Completed";
+        Check(Label(single)=="Payment"&&Label(credit)=="Credit settlement","Unchanged individual and credit settlement labels remain intact");
+        Check((decimal)family["CashApplied"]==7600m&&(int)family["StudentCount"]==3,"Activity labels preserve saved receipt amounts and family scope");
     }
 }
