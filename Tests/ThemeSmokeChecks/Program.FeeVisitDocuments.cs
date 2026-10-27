@@ -39,6 +39,7 @@ internal static partial class Program
         Fee(5239,"Admission Fee",10,4600,400,3000);Fee(5239,"Tuition Fee",10,1000,0,1000);
         using(var data=FeeReceiptDocuments.BuildData(school,first,students,lines))
         {
+            Check(!data.AsEnumerable().Any(row=>row.Field<string>("FeeDescription")!.EndsWith(" - Due")),"First-time fees never receive the carried-balance Due suffix");
             FeeDocumentParents.Apply(data,genders);
             using var display=FamilyFeeDocumentPresentation.Receipt(data);
             Check(display.AsEnumerable().Where(row=>row.Field<string>("ChildAdmissionNumberText")=="5239").All(row=>row.Field<string>("ParentRelationLabel")=="D/O")
@@ -56,6 +57,7 @@ internal static partial class Program
         Fee(4623,"Admission Fee",10,5200,0,0,true);Fee(4623,"Tuition Fee",11,1600,0,0,true);Fee(5239,"Admission Fee",10,1200,0,1200,true);
         using(var data=FeeReceiptDocuments.BuildData(school,second,students,lines))
         {
+            Check(data.AsEnumerable().Count(row=>row.Field<string>("FeeDescription")!.EndsWith(" - Due"))==5,"Both wholly unpaid and partially paid carried fees receive the Due suffix on the next receipt");
             FeeDocumentParents.Apply(data,genders);
             using var display=FamilyFeeDocumentPresentation.Receipt(data);
             Check(display.Rows[0].Field<decimal>("GroupFeeTotal")==14400m&&display.Rows[0].Field<decimal>("GroupDiscount")==0m

@@ -18,6 +18,7 @@ internal static class FeeReceiptDocuments
             return true;
         }
         using var printableLines=result.Tables[2].Copy();
+        await FeeCarryForwardLabels.ApplyAsync(printableLines,receiptNumber);
         // Issued documents never acquire today's fees, concessions or balances.
         // Legacy snapshots remain reproducible, with their limitation disclosed.
         if(!complete)
