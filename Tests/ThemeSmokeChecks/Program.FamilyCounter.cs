@@ -28,6 +28,16 @@ internal static partial class Program
             members.Columns.Add("IsOnHold",typeof(bool));
             var held=members.Rows[0];
             Check(!FamilyBillingData.CanCollectPostedFees(held),"An unconfirmed return remains blocked from the counter");
+            members.Columns.Add("AcademicYearStartDate",typeof(DateTime));members.Columns.Add("AcademicYearEndDate",typeof(DateTime));
+            held["AcademicYearStartDate"]=DateTime.Today.AddYears(-2);held["AcademicYearEndDate"]=DateTime.Today.AddDays(-1);
+            Check(!FamilyBillingData.AwaitsReturn(held)&&FamilyBillingData.Readiness(held)=="Previous Academic Year",
+                "A previous-year admission is historical placement, not an unconfirmed promoted return");
+            Check(FamilyBillingData.CanCollectPostedFees(held),"Historical placement still permits collection of any retained old dues");
+            held["AcademicYearStartDate"]=DateTime.Today.AddDays(1);held["AcademicYearEndDate"]=DateTime.Today.AddYears(1);
+            Check(!FamilyBillingData.AwaitsReturn(held)&&FamilyBillingData.Readiness(held)=="Future Academic Year","Future placements do not offer early return confirmation");
+            held["AcademicYearStartDate"]=DateTime.Today;held["AcademicYearEndDate"]=DateTime.Today;
+            Check(FamilyBillingData.AwaitsReturn(held),"Return eligibility includes both boundaries of the current academic year");
+            held["AcademicYearStartDate"]=held["AcademicYearEndDate"]=DBNull.Value;
             held["IsOnHold"]=true;
             Check(FamilyBillingData.CanCollectPostedFees(held) && !FamilyBillingData.AwaitsReturn(held),
                 "A held student with billing paused may pay retained posted dues");

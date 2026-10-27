@@ -7,7 +7,7 @@ internal static class FamilyAdmissionData
     internal static bool CanUse(Func<string,bool> permission)=>permission("Students.View") &&
         (permission("Students.Admit") || permission("Students.Administer"));
 
-    internal static Task<DataTable> ReadAsync(int admission)=>DatabaseHelper.QuerySqlAsync("""
+    internal const string ReadQuery="""
         EXEC dbo.RequirePermission @UserId,N'Students.View';
         IF @Fees=1 EXEC dbo.RequirePermission @UserId,N'Fees.View';
         DECLARE @Family int=(SELECT FamilyId FROM dbo.FamilyMembers WHERE AdmissionId=@Admission);
@@ -15,7 +15,8 @@ internal static class FamilyAdmissionData
           CONVERT(bit,CASE WHEN EXISTS(SELECT 1 FROM dbo.StudentPostingHolds H WHERE H.AdmissionId=S.AdmissionId AND H.ResumeDate IS NULL) THEN 1 ELSE 0 END) IsOnHold,
           COALESCE(S.AdmissionNumber,S.QuickReference) Reference,FM.FamilyId,
           E.EnrollmentId,E.Status EnrollmentStatus,E.BillingReady,E.PlacementConfirmedAt,
-          Y.YearName AcademicYear,CP.CampusName,C.ClassName,SE.SectionName,
+          Y.YearName AcademicYear,Y.StartDate AcademicYearStartDate,Y.EndDate AcademicYearEndDate,
+          CP.CampusName,C.ClassName,SE.SectionName,
           CASE WHEN @Fees=1 THEN (SELECT COALESCE(SUM(dbo.GetFeeChargeBalance(B.BillingChargeId)),0)
             FROM dbo.BillingCharges B WHERE B.AdmissionId=S.AdmissionId AND B.Status<>N'Cancelled') ELSE NULL END Outstanding
         FROM dbo.Students S LEFT JOIN dbo.FamilyMembers FM ON FM.AdmissionId=S.AdmissionId
@@ -27,7 +28,9 @@ internal static class FamilyAdmissionData
         LEFT JOIN dbo.Classes C ON C.ClassId=P.ClassId LEFT JOIN dbo.Sections SE ON SE.SectionId=P.SectionId
         WHERE S.AdmissionId=@Admission OR (@Family IS NOT NULL AND FM.FamilyId=@Family)
         ORDER BY C.DisplayOrder DESC,S.StudentName,S.AdmissionId;
-        """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Admission",admission),
+        """;
+    internal static Task<DataTable> ReadAsync(int admission)=>DatabaseHelper.QuerySqlAsync(ReadQuery,
+        DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@Admission",admission),
         DatabaseHelper.Bit("@Fees",CurrentUser.HasPermission("Fees.View")));
 
     // Extend the standard bill read with fully waived charges from the selected
