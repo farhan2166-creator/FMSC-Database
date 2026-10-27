@@ -119,7 +119,11 @@ public sealed partial class ChangeFeeDiscountForm
         for(int index=0;index<footerButtons.Length;index++)
         {
             var button=footerButtons[index];
-            bool visible=index switch { 0=>!recoveryOnly&&!blocked&&(!reviewStage||reviewed is null), 1 or 2=>!recoveryOnly&&!blocked&&reviewStage, 3=>blocked, _=>true };
+            bool visible=index switch {
+                0=>!DirectBillChange&&!recoveryOnly&&!blocked&&(!reviewStage||reviewed is null),
+                1=>!recoveryOnly&&!blocked&&(DirectBillChange||reviewStage),
+                2=>!DirectBillChange&&!recoveryOnly&&!blocked&&reviewStage,
+                3=>blocked, _=>true };
             button.Visible=visible;
             footer.ColumnStyles[index+1].Width=visible
                 ? Math.Max(AppScale.Scale(120),TextRenderer.MeasureText(button.Text,AppTheme.ButtonFont).Width+AppScale.Scale(32)) : 0;
@@ -179,7 +183,7 @@ public sealed partial class ChangeFeeDiscountForm
         periodNote.Text=billId is not null?$"Bill period: {fromMonth.Value:MMMM yyyy}.":$"Fee period: {fromMonth.Value:MMM yyyy} through {throughMonth.Value:MMM yyyy}.";
         reasonField.Visible=!reviewStage&&HasAction;
         paidField.Visible=RateAction&&ApplyBills&&releasedPayment>0;
-        comparisons.Visible=reviewed is not null;
+        comparisons.Visible=!DirectBillChange&&reviewed is not null;
         if(ApplyBills&&!comparisons.TabPages.Contains(billTab))comparisons.TabPages.Add(billTab);
         if(!ApplyBills&&comparisons.TabPages.Contains(billTab))comparisons.TabPages.Remove(billTab);
         if(UpdateAgreement&&!comparisons.TabPages.Contains(planTab))comparisons.TabPages.Add(planTab);
