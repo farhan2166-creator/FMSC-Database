@@ -29,6 +29,9 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     private bool busy, blocked, monthly, validContext, reviewStage;
     private int generation;
     private decimal releasedPayment;
+    private int? fixedBillAction;
+    private decimal billBalance;
+    private bool recoveryOnly;
     private bool HasAction => action.SelectedIndex>=0;
     private bool DiscountAction => action.SelectedIndex==0;
     private bool WaiverAction => action.SelectedIndex==1;
@@ -62,6 +65,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         identity=context?.Table.Columns.Contains("StudentName")==true?$"{context["AdmissionNumber"]} · {context["StudentName"]} · {context["YearName"]}":"";
         agreementAllowed=context is not null && (!context.Table.Columns.Contains("Status") || Convert.ToString(context["Status"]) is "Active" or "Pending");
         billId=context?.Table.Columns.Contains("BillingChargeId")==true?Convert.ToInt64(context["BillingChargeId"]):null;
+        billBalance=context?.Table.Columns.Contains("Balance")==true?Convert.ToDecimal(context["Balance"]):rate-discount;
         originalLabel=context?.Table.Columns.Contains("ConcessionLabel")==true?Convert.ToString(context["ConcessionLabel"])??"None":"None";
         originalWaiver=originalLabel is "Free" or "Waived" || originalLabel=="Scholarship" && discount==rate;
         action.Items.AddRange(new object[]{"Give Discount","Waive Fee","Correct Fee Amount","Remove Discount"});
@@ -113,23 +117,29 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         ReadPending(); State();
     }
     private static DateTime First(DateTime value)=>new(value.Year,value.Month,1);
-    internal void ConfigureCollectionShortcut(bool siblingConcession,DateTime chargeMonth)
+    internal void ConfigureRecoveryOnly()
     {
-        action.SelectedIndex=siblingConcession?1:0;
-        if(siblingConcession)concession.SelectedItem="Free";
-        if(billId is null && agreementAllowed)scope.SelectedIndex=1;
-        if(billId is null && agreementAllowed)
-        {
-            scope.Items[0]="Do not apply to existing charges";
-            scope.Items[1]="Apply to existing charges";
-            scope.Items[2]="Existing charges only";
-        }
-        DateTime month=First(chargeMonth);
-        if(month>=fromMonth.MinDate && month<=fromMonth.MaxDate)
-        {
-            fromMonth.Value=month;
-            throughMonth.Value=siblingConcession && monthly?throughMonth.MaxDate:month;
-        }
+        recoveryOnly=true;Text="Check Fee Change Save";
+        currentTerms.Visible=false;
+        MinimumSize=new Size(AppScale.Scale(620),AppScale.Scale(350));
+        Size=new Size(AppScale.Scale(680),AppScale.Scale(400));
+        if(!blocked)impact.Text="No earlier fee change needs checking.";
+        State();
+    }
+    internal void ConfigureCollectionBill(bool removeDiscount=false)
+    {
+        if(billId is null || billBalance<=0m)
+            throw new InvalidOperationException("Only an unpaid bill can be changed here. Reload the fees.");
+        if(removeDiscount && originalDiscount<=0m)
+            throw new InvalidOperationException("This bill has no discount to remove. Reload the fees.");
+        fixedBillAction=removeDiscount?3:0;
+        action.SelectedIndex=fixedBillAction.Value;
+        concession.SelectedItem="None";
+        Text=$"{(removeDiscount?"Remove Discount":originalDiscount>0m?"Change Discount":"Give Discount")} — {feeName}";
+        review.Text=removeDiscount?"Review Removal":"Review Discount";
+        save.Text=removeDiscount?"Confirm Removal":"Confirm Discount";
+        MinimumSize=new Size(AppScale.Scale(620),AppScale.Scale(500));
+        Size=new Size(AppScale.Scale(700),AppScale.Scale(560));
         initial=Draft();State();
     }
     private string Draft()=>string.Join("|",action.SelectedIndex,scope.SelectedIndex,amount.Text,concession.Text,
@@ -154,12 +164,14 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     private void State()
     {
         if(IsDisposed)return;
-        bool canChange=validContext&&!busy&&!blocked&&!Changed&&CurrentUser.HasPermission("Fees.Adjust");
+        bool canChange=!recoveryOnly&&validContext&&!busy&&!blocked&&!Changed&&CurrentUser.HasPermission("Fees.Adjust");
         fields.Enabled=canChange;
+        fields.Visible=!recoveryOnly;
         UpdateVisibleFields();
         review.Enabled=canChange&&HasAction; save.Enabled=canChange&&reviewed is not null;
         review.Visible=!reviewStage||reviewed is null;
-        review.Text=reviewStage?"Review Again":"Review Fee Change";
+        review.Text=reviewStage?"Review Again":fixedBillAction is not null
+            ?RemoveAction?"Review Removal":"Review Discount":"Review Fee Change";
         save.Visible=reviewStage;
         editChoices.Visible=reviewStage;editChoices.Enabled=canChange;
         check.Visible=blocked; check.Enabled=!busy;
@@ -169,12 +181,25 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     {
         if(!validContext){impact.Text="This fee has no valid review period. Close and reload its bill or fee plan.";return false;}
         if(!CurrentUser.HasPermission("Fees.Adjust")){impact.Text="Your permission to change fees is no longer available.";return false;}
+        if(fixedBillAction is int fixedAction && action.SelectedIndex!=fixedAction)
+        {impact.Text="Close and choose the intended fee action again.";return false;}
         if(!HasAction){impact.Text="Choose Give Discount, Waive Fee, Correct Fee Amount or Remove Discount.";action.Focus();return false;}
         decimal rate=standardAmount;
         if(RateAction&&(!InputParse.TryWholeAmount(newRate.Text,out rate)||rate<0))
         {impact.Text="Enter a non-negative fee in whole rupees.";newRate.Focus();return false;}
         if(DiscountAction&&(!InputParse.TryWholeAmount(amount.Text,out decimal value)||value<=0||value>rate))
-        {impact.Text=$"Enter a discount above zero and no more than Rs. {rate:N0}. To clear it, choose Remove Discount.";amount.Focus();return false;}
+        {
+            impact.Text=fixedBillAction is not null?"Enter a positive discount in whole rupees. Use Waive Remaining Dues to clear all unpaid dues."
+                :$"Enter a discount above zero and no more than Rs. {rate:N0}. To clear it, choose Remove Discount.";
+            amount.Focus();return false;
+        }
+        if(fixedBillAction is not null && DiscountAction)
+        {
+            decimal proposed=decimal.Parse(amount.Text);
+            if(proposed==originalDiscount){impact.Text="Enter a different discount amount.";amount.Focus();return false;}
+            if(proposed>=originalDiscount+billBalance)
+            {impact.Text="To clear all remaining dues, close and choose Waive Remaining Dues on this fee.";amount.Focus();return false;}
+        }
         if(RateAction&&!originalWaiver&&originalDiscount>rate)
         {impact.Text=$"The new fee is below the existing Rs. {originalDiscount:N0} discount. Review or remove that discount first.";return false;}
         if(First(fromMonth.Value)>First(throughMonth.Value)){impact.Text="The through month must be on or after the from month.";return false;}
@@ -215,6 +240,12 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
             bills.DataSource=result.Tables[1]; schedule.DataSource=result.Tables[2];
             foreach(var grid in new[]{bills,schedule}) foreach(DataGridViewColumn column in grid.Columns)
                 if(column.ValueType==typeof(decimal))column.DefaultCellStyle.Format="N0"; else if(column.ValueType==typeof(DateTime))column.DefaultCellStyle.Format="MMM yyyy";
+            if(fixedBillAction is not null)
+                foreach(DataGridViewColumn column in bills.Columns)
+                {
+                    column.Visible=column.Name is "Current Bill" or "Proposed Bill";
+                    if(column.Visible)column.AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill;
+                }
             releasedPayment=ApplyBills?Convert.ToDecimal(result.Tables[0].Rows[0]["ReleasedPaidAmount"]):0;
             impact.Text=ReviewText(result);
         }
@@ -228,7 +259,9 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     private string ReviewText(DataSet result)
     {
         var row=result.Tables[0].Rows[0];
-        string summary=$"3. Review the change\r\n{action.Text}: {feeName}. {ScopeText()}";
+        string summary=fixedBillAction is not null
+            ?$"{(RemoveAction?"Review Discount Removal":"Review Discount")}\r\n{feeName} · {fromMonth.Value:MMM yyyy}. This bill only."
+            :$"3. Review the change\r\n{action.Text}: {feeName}. {ScopeText()}";
         if(ApplyBills && result.Tables[1].Rows.Count>0 && result.Tables[1].Columns.Contains("Current Bill") && result.Tables[1].Columns.Contains("Proposed Bill"))
         {
             decimal before=result.Tables[1].AsEnumerable().Sum(b=>Convert.ToDecimal(b["Current Bill"])),
@@ -242,7 +275,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         }
         if(DiscountAction) summary+=$" Discount: Rs. {ChosenDiscount:N0}.";
         else if(WaiverAction) summary+=" Full concession applied, limited to unpaid dues on existing charges.";
-        else if(RemoveAction) summary+=" The discount or full waiver is removed.";
+        else if(RemoveAction) summary+=fixedBillAction is not null?" The bill discount is removed. Earlier payments remain recorded.":" The discount or full waiver is removed.";
         else summary+=$" Full fee: Rs. {standardAmount:N0} → Rs. {decimal.Parse(newRate.Text):N0}. " +
             (originalWaiver?"The existing full waiver is retained.":$"Existing discount retained: Rs. {originalDiscount:N0}.");
         if(monthly&&billId is null) summary+=$"\r\nPeriod: {fromMonth.Value:MMM yyyy} through {throughMonth.Value:MMM yyyy}.";
@@ -283,6 +316,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     }
     private async Task CheckOutcomeAsync()
     {
+        if(!CurrentUser.HasPermission("Fees.Adjust")){impact.Text="Your permission to review fee changes is no longer available.";return;}
         if(busy)return;ReadPending();if(pending is null){State();return;}
         busy=true;State();
         try
