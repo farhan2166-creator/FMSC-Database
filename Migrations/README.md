@@ -173,11 +173,25 @@ GO
 GO
 :r "C:\FMSC-Database\Migrations\51.sql"
 GO
+:r "C:\FMSC-Database\Migrations\52.sql"
+GO
+:r "C:\FMSC-Database\Migrations\53.sql"
+GO
+:r "C:\FMSC-Database\Migrations\54.sql"
+GO
+:r "C:\FMSC-Database\Migrations\55.sql"
+GO
+:r "C:\FMSC-Database\Migrations\56.sql"
+GO
+:r "C:\FMSC-Database\Migrations\57.sql"
+GO
+:r "C:\FMSC-Database\Migrations\58.sql"
+GO
 IF XACT_STATE() <> 1
     THROW 51000, 'The upgrade transaction cannot be committed.', 1;
 IF ISNULL((SELECT TOP (1) TRY_CONVERT(int, VersionNumber)
-           FROM dbo.DatabaseVersion ORDER BY VersionId DESC), -1) <> 51
-    THROW 51000, 'The upgrade did not reach schema 51.', 1;
+           FROM dbo.DatabaseVersion ORDER BY VersionId DESC), -1) <> 58
+    THROW 51000, 'The upgrade did not reach schema 58.', 1;
 COMMIT TRANSACTION;
 GO
 ```
