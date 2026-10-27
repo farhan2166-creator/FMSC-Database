@@ -96,4 +96,43 @@ internal static partial class Program
             Check(!certificate.IsHandleCreated, "Certificate date fixtures never start database loaders");
         }
     }
+
+    private static void CheckAdmissionSiblingBaseline()
+    {
+        const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        using var page = new StudentAdmissionPage();
+        var type = page.GetType();
+        T Field<T>(string field) => (T)type.GetField(field, flags)!.GetValue(page)!;
+        void Set(string field, object value) => type.GetField(field, flags)!.SetValue(page, value);
+        void Capture() => type.GetMethod("CaptureAdmissionBaseline", flags)!.Invoke(page, null);
+        Set("currentAdmissionId", 41); Set("_editEnrollmentId", 71);
+        var name = Field<ModernTextBox>("name"); name.Text = "Saved student";
+        Capture();
+        type.GetMethod("EnsureDetailsTabBuilt", flags)!.Invoke(page, null);
+        Check(!page.HasUnsavedChanges, "Opening Fees & Siblings does not invent an admission edit");
+        var siblings = Field<DataGridView>("siblingsGrid");
+        using var data = new System.Data.DataTable();
+        data.Columns.Add("Student Name"); data.Rows.Add("Saved sibling");
+        siblings.DataSource = data;
+        // WinForms creates child editors as grids are first used. Their lifetime
+        // and displayed text must not change the personal-details draft.
+        using var editor = new TextBox { Text = "Saved sibling" };
+        siblings.Controls.Add(editor);
+        Check(!page.HasUnsavedChanges, "Saved sibling rows and newly created grid editors leave admission clean");
+        name.Text = "Unsaved personal correction";
+        data.Rows.Add("Another saved sibling"); editor.Text = "Another saved sibling";
+        Check(page.HasUnsavedChanges, "Refreshing saved siblings preserves genuine unsaved personal changes");
+        name.Text = "Saved student";
+        Check(!page.HasUnsavedChanges, "Restoring personal details stays clean after sibling refresh without resetting the baseline");
+        var feeGrid = Field<DataGridView>("feeGrid");
+        using var feeEditor = new TextBox { Text = "100" }; feeGrid.Controls.Add(feeEditor);
+        Check(!page.HasUnsavedChanges, "A saved fee grid's native editor is not an admission draft field");
+        Set("currentAdmissionId", 0); Set("_editEnrollmentId", 0);
+        var fees = Field<System.Collections.IList>("_selectedFees");
+        var feeType = fees.GetType().GetGenericArguments()[0];
+        var fee = Activator.CreateInstance(feeType, true)!; fees.Add(fee); Capture();
+        feeType.GetProperty("DiscountAmount")!.SetValue(fee, 100m);
+        Check(page.HasUnsavedChanges, "A new admission's actual fee discount remains protected independently of native editors");
+        Check(!page.IsHandleCreated, "Sibling draft checks do not start database loaders or change school records");
+    }
 }

@@ -556,7 +556,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
     private void StartTransport()
     {
         if(enrollmentId<=0 || hasOpenTransport) return;
-        using var form=new AddFeeAssignmentForm(enrollmentId,transportOnly:true);
+        using var form=new TransportServiceDialog(enrollmentId,true);
         if(form.ShowDialog(this)==DialogResult.OK)
         {
             AnnounceChange();
@@ -567,10 +567,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
     {
         var row = SelectedRow;
         if (row == null || row.Tag is true || !IsTransport(row)) return;
-        int id = Convert.ToInt32(row.Cells["StudentFeeAssignmentId"].Value);
-        string feeTypeName = Convert.ToString(row.Cells["FeeTypeName"].Value) ?? "";
-        DateTime? starts = row.Cells["EffectiveFrom"].Tag is DateTime date ? date : null;
-        using var form = new DiscontinueFeeAssignmentForm(id, feeTypeName, starts);
+        using var form = new TransportServiceDialog(enrollmentId,false,Convert.ToInt32(row.Cells["FeeTypeId"].Value));
         if (form.ShowDialog(this) == DialogResult.OK)
         {
             AnnounceChange();

@@ -99,7 +99,7 @@ internal static class FinanceHelp
             "Reprint a Rs. 200 receipt: the recorded payment stays Rs. 200."),
         Topic.Closing=>("Compare recorded money with the amounts actually counted or confirmed. Advance money used to pay fees is not new cash received.",
             "Fees of Rs. 1,000 settled with Rs. 700 cash and Rs. 300 existing advance add Rs. 700 new cash."),
-        Topic.StopFee=>("Stop the student's fee plan using the reviewed end date. Existing bills and money already paid need separate review.",
+        Topic.StopFee=>("Choose the stopping month under the School Profile transport cutoff. Wholly unpaid posted transport fees from that month are cancelled; months with any payment remain charged.",
             "Stopping a transport plan does not by itself refund an earlier transport payment."),
         Topic.TransferFees=>("Review when the new class fees begin and the effect on bills already issued. A class transfer does not erase earlier dues.",
             "The old class fee was Rs. 400 and the new fee is Rs. 500. Review the Rs. 100 difference and its starting month."),

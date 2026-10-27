@@ -34,6 +34,21 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--admission-sibling-baseline"))
+        {
+            CheckAdmissionSiblingBaseline();CheckAdmissionPostSaveBaseline();
+            Console.WriteLine($"PASS: {checks} saved-sibling and admission draft protection checks (no database connection).");return;
+        }
+        if(args.Contains("--transport-service"))
+        {
+            CheckTransportService();
+            Console.WriteLine($"PASS: {checks} transport month, paid-month protection, shared-dialog and independent-profile checks (no database connection).");return;
+        }
+        if(args.Contains("--transport-service-sql"))
+        {
+            CheckTransportServiceSql();
+            Console.WriteLine($"PASS: {checks} isolated transport cutoff, posting, cancellation and recovery checks.");return;
+        }
         if(args.Contains("--receipt-carry-labels"))
         {
             CheckReceiptCarryLabels();CheckLatestReceipt();
@@ -312,6 +327,7 @@ internal static partial class Program
         {
             CheckAdmissionCompletion();
             CheckAdmissionPostSaveBaseline();
+            CheckAdmissionSiblingBaseline();
             CheckAdmissionSharedBusy();
             Console.WriteLine($"PASS: {checks} admission confirmation, recovery and review-layout checks (no database writes).");
             return;
@@ -619,6 +635,7 @@ internal static partial class Program
             CheckPaletteDestinations();
             CheckSubmittedInputHolds();
             CheckAdmissionPostSaveBaseline();
+            CheckAdmissionSiblingBaseline();
             CheckMeaningfulCertificateContent();
             CheckSelectiveWorkspaceGuards();
             CheckSetupReadinessActions();

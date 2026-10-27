@@ -15,6 +15,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
         HumanUi.TextBox(false, 250);
     private readonly ModernNumericTextBox feeProrationCutoffDay =
         HumanUi.Number(28);
+    private readonly ModernNumericTextBox transportCutoffDay=HumanUi.Number(28);
     private readonly PictureBox logoPreview = new() {
         Dock = DockStyle.Fill,
         SizeMode = PictureBoxSizeMode.Zoom,
@@ -32,7 +33,8 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
     private string? _logoFileName;
     private string? _logoContentType;
     private bool _logoRemoved;
-    public SchoolProfilePage()
+    public SchoolProfilePage():this(true){}
+    internal SchoolProfilePage(bool initialize)
         : base(PageTitles.SchoolInformation, "Set the school details shown on reports, certificates and receipts.")
     {
         UiHelper.DisposePictureImageOnDispose(logoPreview);
@@ -90,7 +92,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
         logoPanel.Controls.Add(logoInfo, 0, 1);
         logoCard.Content.Controls.Add(logoPanel);
         var feePolicyCard =
-            HumanUi.Card("Fee Policy", "When monthly fees begin for new admissions.");
+            HumanUi.Card("Fee Policy", "Separate cutoffs for admission billing and transport changes.");
         var feePolicyFields =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -107,19 +109,21 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
         feePolicyFields.Controls.Add(
             HumanUi.Field("Fee Proration Cutoff Day", feeProrationCutoffDay), 0, 0);
+        feePolicyFields.Controls.Add(HumanUi.Field("Transport Cutoff Day",transportCutoffDay),1,0);
         const string cutoffExplanation = "New admissions on or after this day start monthly fees next month; earlier admissions start in their admission month. Readmission uses the month chosen during fee review.";
         SetToolTip(feeProrationCutoffDay, cutoffExplanation);
         feePolicyFields.RowCount = 2;
-        int guidanceHeight = AppMetrics.TextHeight(AppTheme.NormalFont) * 3 + 8;
+        int guidanceHeight = AppMetrics.TextHeight(AppTheme.SmallFont) * 4 + 8;
         feePolicyFields.RowStyles.Add(new RowStyle(SizeType.Absolute, guidanceHeight));
         var cutoffGuidance = new Label {
-            Text = cutoffExplanation,
+            Text = "Admission cutoff: earlier admissions start this month; on/after it, next month. Readmission uses its reviewed month.\r\nTransport cutoff: this month before it, next month on/after it. Paid or partially paid months stay charged. Blank allows the current month.",
             Dock = DockStyle.Fill,
-            Font = AppTheme.NormalFont,
+            Font = AppTheme.SmallFont,
             ForeColor = AppTheme.MutedText,
             AutoEllipsis = true
         };
-        SetToolTip(cutoffGuidance, cutoffExplanation);
+        SetToolTip(cutoffGuidance, cutoffGuidance.Text);
+        SetToolTip(transportCutoffDay,"Transport only: 1–28. Before this day use this month; on or after it use next month. Paid and partially paid months remain protected. Blank allows current-month changes throughout the month.");
         feePolicyFields.Controls.Add(cutoffGuidance, 0, 1);
         feePolicyFields.SetColumnSpan(cutoffGuidance, 2);
         feePolicyCard.Content.Controls.Add(feePolicyFields);
@@ -152,7 +156,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             root,
             "Update the school details and click Save. Leave the fee cutoff day blank to start monthly fees in the admission month.");
         FormFlow.EnterMovesToNext(this);
-        Defer(LoadProfile);
+        if(initialize)Defer(LoadProfile);
     }
     /* True only after a read of the profile completed (a profile, or none set up yet). */
     private bool _profileReadCompleted;
@@ -172,6 +176,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
                 contactNumber.Clear();
                 email.Clear();
                 feeProrationCutoffDay.Value = 0;
+                transportCutoffDay.Value=0;
                 ClearLogoState();
                 CaptureBaseline();
                 _profileReadCompleted = true;
@@ -194,6 +199,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
                 row["FeeProrationCutoffDay"] == DBNull.Value
                     ? 0
                     : Convert.ToDecimal(row["FeeProrationCutoffDay"]);
+            transportCutoffDay.Value=row["TransportCutoffDay"] is DBNull?0:Convert.ToDecimal(row["TransportCutoffDay"]);
             if (row["LogoImage"] != DBNull.Value)
             {
                 _logoBytes =
@@ -303,6 +309,8 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             }
             if (!ValidateRequiredInputs())
                 return;
+            if(!WholeRupees.IsWhole(feeProrationCutoffDay.Value)||!WholeRupees.IsWhole(transportCutoffDay.Value))
+            {Warn("Cutoff days must be whole numbers from 1 to 28, or blank.");return;}
             if (string.IsNullOrWhiteSpace(schoolName.Text))
             {
                 Warn("Enter the school name.");
@@ -364,7 +372,8 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
                     "@FeeProrationCutoffDay",
                     feeProrationCutoffDay.Value > 0
                         ? (int?)feeProrationCutoffDay.Value
-                        : null));
+                        : null),
+                DatabaseHelper.NullableInt("@TransportCutoffDay",transportCutoffDay.Value>0?(int?)transportCutoffDay.Value:null));
             _logoRemoved = false;
             Info("School profile saved.");
             LoadProfile();
@@ -388,7 +397,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
         city.Text,
         contactNumber.Text,
         email.Text,
-        feeProrationCutoffDay.Value.ToString()
+        feeProrationCutoffDay.Value.ToString(),transportCutoffDay.Value.ToString()
     };
     private void CaptureBaseline()
     {

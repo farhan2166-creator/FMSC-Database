@@ -1,6 +1,6 @@
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Finance.Billing;
-/// <summary>The Reverse action on one row of Fee Collection's charges grid. Asking here means the operator gets the field focused instead of a round trip, the same trade DiscontinueFeeAssignmentForm makes.</summary>
+/// <summary>The Reverse action on one row of Fee Collection's charges grid, with its reason entered inline.</summary>
 public sealed class ReverseChargeDialog : ApplicationWindowForm
 {
     private readonly long billingChargeId;

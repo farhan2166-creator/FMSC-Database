@@ -75,16 +75,24 @@ public sealed partial class FeeCollectionPage
     }
     private async Task<DataTable> TransportAssignmentsAsync()=>await DatabaseHelper.QueryUserAsync("GetStudentFeeAssignments",DatabaseHelper.Int("@EnrollmentId",enrollmentId));
     private bool SelectedEnrollmentIsOpen=>enrollment.SelectedItem is DataRowView view && GetText(view.Row,"Status") is "Active" or "Pending";
-    private async Task RefreshTransportMenuAsync(ToolStripItem start,ToolStripItem stop)
+    private bool transportStarts=true,transportKnown;
+    private void UpdateTransportButton()
     {
-        start.Enabled=stop.Enabled=false;
-        if(admissionId<=0 || enrollmentId<=0 || !CanChangeFeeTerms || !SelectedEnrollmentIsOpen)return;
+        if(transportButton is null)return;
+        transportButton.Text=transportStarts?"Start Transport":"Stop Transport";
+        transportButton.Enabled=transportKnown&&CanChangeFeeTerms&&SelectedEnrollmentIsOpen;
+        transportButton.Width=TextRenderer.MeasureText(transportButton.Text,transportButton.Font).Width+AppScale.Scale(24);
+    }
+    private async Task RefreshTransportButtonAsync()
+    {
+        transportKnown=false;UpdateTransportButton();
+        if(!initialize||admissionId<=0||enrollmentId<=0||!CurrentUser.HasPermission("Fees.Adjust")||!SelectedEnrollmentIsOpen)return;
         int anchor=admissionId,placement=enrollmentId,version=loadVersion;
         try
         {
             using var rows=await TransportAssignmentsAsync();
-            if(IsDisposed || anchor!=admissionId || placement!=enrollmentId || version!=loadVersion || !CanChangeFeeTerms)return;
-            bool hasOpen=OpenTransportRows(rows).Any();start.Enabled=!hasOpen;stop.Enabled=hasOpen;
+            if(IsDisposed || anchor!=admissionId || placement!=enrollmentId || version!=loadVersion)return;
+            transportStarts=!OpenTransportRows(rows).Any();transportKnown=true;UpdateTransportButton();
         }
         catch(Exception ex){AppExceptionHandler.LogNonFatal(ex,"Transport menu eligibility");}
     }
@@ -101,32 +109,13 @@ public sealed partial class FeeCollectionPage
             using var returnFocus=new DialogReturnFocus(this);
             using var assignments=await TransportAssignmentsAsync();
             var open=OpenTransportRows(assignments).ToArray();
-            bool changed;
-            if(start)
-            {
-                if(open.Length>0){Info("Transport is already active. Use Stop Transport to change its stopping month.");return;}
-                using var dialog=new AddFeeAssignmentForm(enrollmentId,transportOnly:true);
-                changed=dialog.ShowDialog(FindForm())==DialogResult.OK;
-            }
-            else
-            {
-                if(open.Length==0){Info("No open transport fee plan is available to stop.");return;}
-                if(open.Length>1)
-                {
-                    using var dialog=new FeeAssignmentsDialog(enrollmentId,admissionId,StudentNameFor(admissionId));
-                    dialog.ShowDialog(FindForm());changed=dialog.ChangesMade;
-                }
-                else
-                {
-                    var row=open[0];
-                    using var dialog=new DiscontinueFeeAssignmentForm(Convert.ToInt32(row["StudentFeeAssignmentId"]),Convert.ToString(row["FeeTypeName"])??"Transport",
-                        row["EffectiveFrom"] is DateTime date?date:null);
-                    changed=dialog.ShowDialog(FindForm())==DialogResult.OK;
-                }
-            }
+            if(start&&open.Length>0){Info("Transport is already active. Reload the fees to stop it.");return;}
+            if(!start&&open.Length==0){Info("No open transport fee plan is available to stop. Reload the fees to start it.");return;}
+            using var dialog=new TransportServiceDialog(enrollmentId,start);
+            bool changed=dialog.ShowDialog(FindForm())==DialogResult.OK;
             if(changed){await ReloadFamilyChargesAsync(++loadVersion);RefreshEnteredPaymentAllocation();SetStatus("Transport changes saved. Family fees have been refreshed.");}
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
-        finally{billBusy=false;}
+        finally{billBusy=false;await RefreshTransportButtonAsync();UpdateTransportButton();}
     }
 }
