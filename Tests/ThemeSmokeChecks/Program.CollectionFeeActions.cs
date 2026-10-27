@@ -57,8 +57,8 @@ internal static partial class Program
                 var child=display.AsEnumerable().First(row=>Convert.ToString(row["ChildAdmissionNumberText"])=="1001");
                 Check(Convert.ToBoolean(child["ShowChildDocument"]) && Convert.ToDecimal(child["ChildFeesCovered"])==500m &&
                     Convert.ToDecimal(child["ChildDiscountApplied"])==500m && Convert.ToDecimal(child["ChildTotalPaid"])==0m &&
-                    Convert.ToString(child["FeeDescription"])!.Contains("Sibling concession") && Convert.ToString(child["ChildBillPaymentPrompt"])=="No payment required",
-                    "A fully discounted child stays on the family bill with the original fee, full discount, sibling wording and zero due");
+                    Convert.ToString(child["FeeDescription"])=="Tuition" && Convert.ToString(child["ChildBillPaymentPrompt"])=="No payment required",
+                    "A fully discounted child stays on the family bill with the original fee, full discount, plain fee name and zero due");
             }
             using(var page=new FeeCollectionPage(false))
             {

@@ -9,7 +9,8 @@ about an individual student.
 
 From Fee Discounts & Transport, select a fee and open Review Fee Terms.
 Choose a revised rate if needed, a fixed or full concession, the first and last
-month for a monthly fee, and a reason. Decide whether to update the agreement,
+month for a monthly fee, and an optional reason. If omitted, the saved financial
+record uses the neutral description “Concession revised”. Decide whether to update the agreement,
 issued bills, or both. Review the issued-bill
 and agreed-period tabs before confirming. Future scheduled rates and concessions
 outside the chosen dates are retained; a temporary concession restores the

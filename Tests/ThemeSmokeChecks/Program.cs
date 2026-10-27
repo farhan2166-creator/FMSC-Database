@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--collection-returns"))
+        {
+            CheckCollectionReturns();CheckOptionalFeeReason();
+            Console.WriteLine($"PASS: {checks} collection return status, one-child review and optional-reason typing checks (no database connection).");
+            return;
+        }
         if(args.Contains("--collection-fee-actions"))
         {
             CheckCollectionFeeActions();
