@@ -122,7 +122,7 @@ internal static class FeeChangeReport
                 decimal listed=unpaid.Sum(fee=>Money(fee,"BalanceAfter"));
                 if(listed>other)throw new InvalidOperationException("The saved unpaid fees do not match this note's balance.");
                 var entries=unpaid.Select(fee=>(FeeDocumentData.FeeName(Text(fee,"FeeTypeName"))+" · "+Convert.ToDateTime(fee["FeePeriod"]).ToString("MMM-yyyy"),(decimal?)Money(fee,"BalanceAfter"),false)).ToList();
-                if(listed<other)entries.Add(("Other outstanding",other-listed,false));
+                if(listed<other)entries.Add(("Other dues",other-listed,false));
                 Section("OTHER UNPAID FEES",entries,"These fees were not changed by this note.");
             }
             if(agreements is not null)
