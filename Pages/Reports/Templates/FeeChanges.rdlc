@@ -790,7 +790,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>OUTSTANDING</Value>
+                              <Value>BALANCE DUE</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -905,7 +905,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>FAMILY OUTSTANDING</Value>
+                              <Value>FAMILY DUES</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
