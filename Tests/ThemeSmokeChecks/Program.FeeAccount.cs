@@ -27,7 +27,7 @@ internal static partial class Program
             return table;
         }
         Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>> read=(id,_,_)=>Task.FromResult((Statement(id),0m));
-        using var page=new StudentAccountStatementPage(false,read,false,true){Dock=DockStyle.Fill,BindingContext=new BindingContext()};
+        using var page=new StudentAccountStatementPage(false,read,true){Dock=DockStyle.Fill,BindingContext=new BindingContext()};
         T Field<T>(string name)=>(T)type.GetField(name,flags)!.GetValue(page)!;
         object? Invoke(string name,params object[] args)=>type.GetMethod(name,flags)!.Invoke(page,args);
         void Wait(Task task){PumpUntil(()=>task.IsCompleted,"Account asynchronous read finishes");task.GetAwaiter().GetResult();}
@@ -55,7 +55,7 @@ internal static partial class Program
             using(var reports=new ReportsHomePage((Action<Func<Control>,string,string>)((_,_,_)=>{})))
             {
                 Check(!DescendantControls(reports).Any(c=>c.Text==PageTitles.StudentFeeAccount),"Reports no longer duplicates the operational account workspace");
-                Check(DescendantControls(reports).Any(c=>c.Text==PageTitles.FamilyGroupStatements)&&DescendantControls(reports).Any(c=>c.Text==PageTitles.AnnualFeeReceipts),"Distinct batch statement and annual receipt reports remain available");
+                Check(!DescendantControls(reports).Any(c=>c.Text=="Family / Group Statements")&&DescendantControls(reports).Any(c=>c.Text==PageTitles.AnnualFeeReceipts),"Retired group statements stay absent while annual receipts remain available");
             }
             page.ReadAccount=id=>Task.FromResult(Snapshot(id));
             using var owner=new Form{ClientSize=new Size(1180,800),ShowInTaskbar=false};owner.Controls.Add(page);owner.Show();Application.DoEvents();
@@ -83,7 +83,7 @@ internal static partial class Program
             Wait((Task)Invoke("RefreshAccountAsync")!);Invoke("UpdateAccountActions");
             Check(!Field<ModernButton>("correctPayment").Visible,"Read-only operator is not offered corrections");
             CurrentUser.SignIn(923,"Collections operator","Operator",false,new[]{"Fees.Collect","Fees.View","Fees.Adjust"});
-            using(var restricted=new StudentAccountStatementPage(false,(_,_,_)=>throw new Exception("Report reader must not run for collection-only access"),false,true){BindingContext=new BindingContext()})
+            using(var restricted=new StudentAccountStatementPage(false,(_,_,_)=>throw new Exception("Report reader must not run for collection-only access"),true){BindingContext=new BindingContext()})
             {
                 restricted.ReadAccount=id=>Task.FromResult(Snapshot(id));
                 using(var shell=new MainDashboardForm((_,_)=>{}))
@@ -146,7 +146,7 @@ internal static partial class Program
                 foreach(int dpi in new[]{96,120,144,192})
                 {
                     var size=new Size(1280*dpi/96,850*dpi/96);AppScale.Recompute(size,dpi);
-                    using var scaled=new StudentAccountStatementPage(false,read,false,true){Dock=DockStyle.Fill};
+                    using var scaled=new StudentAccountStatementPage(false,read,true){Dock=DockStyle.Fill};
                     using var window=new Form{ClientSize=size,ShowInTaskbar=false};window.Controls.Add(scaled);window.Show();Application.DoEvents();
                     var tabs=(TabControl)type.GetField("accountViews",flags)!.GetValue(scaled)!;
                     Check(tabs.Width>AppScale.Scale(500)&&tabs.Height>AppScale.Scale(130),"Account layout has usable space with synthetic "+dpi+" DPI geometry");window.Close();

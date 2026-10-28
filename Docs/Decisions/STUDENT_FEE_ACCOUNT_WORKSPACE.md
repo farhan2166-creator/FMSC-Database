@@ -33,7 +33,7 @@ Switching views preserves student, scope and statement dates.
   Opening a receipt shows original student shares, original fee details and plans,
   plus a separate Payments & Later Changes view. Eligible originals can open the
   established correction form without another student search.
-- **Reports menu:** existing family/group statement, annual receipts and current
+- **Reports menu:** annual receipts and current
   unpaid-bill report shortcuts. Their scope and permissions remain distinct.
 
 Current all-date dues/credit and receipt history are explicitly distinguished
@@ -45,7 +45,7 @@ Reports-hub account card is removed. Statement access uses existing `Reports.Vie
 matching the old statement reader.
 Receipt/payment/credit readers additionally require `Fees.View`. Corrections
 require `Fees.Adjust` in the UI and the existing SQL/writer authorization.
-Annual/group reports retain `Fees.Statement.View` checks.
+Annual receipts retain `Fees.Statement.View` checks.
 
 The standalone corrections destination and its page title are removed. Its form
 is now the internal `PaymentCorrectionReview` component, opened only as a payment
@@ -53,7 +53,8 @@ review or recovery dialog. Operators with `Fees.Collect` retain account access
 without gaining `Reports.View`: their account opens Receipts, and statement SQL,
 date filters and export remain unavailable. An independent Check Save Outcome
 action preserves recovery when the original payment is no longer eligible.
-The shared statement component, group/year reporting and collection's read-only
+Family / Group Statements was retired on 28 October 2026. Arbitrary group selection is removed; Include Siblings remains within the student account.
+The shared statement component, annual reporting and collection's read-only
 history wrapper are still live dependencies, not duplicate standalone pages.
 The aging report's contextual account link now opens the consolidated workspace.
 

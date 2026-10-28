@@ -30,7 +30,7 @@ public sealed partial class StudentAccountStatementPage
     internal static bool CanOpenAccount=>CurrentUser.HasPermission("Reports.View")||CurrentUser.HasPermission("Fees.Collect");
     public static StudentAccountStatementPage CreateAccount(int admissionId=0)
     {
-        var page=new StudentAccountStatementPage(true,null,false,true);
+        var page=new StudentAccountStatementPage(true,null,true);
         if(admissionId>0)page.Defer(()=>page.PreloadAdmissionIdAsync(admissionId));
         return page;
     }

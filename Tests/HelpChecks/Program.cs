@@ -97,7 +97,9 @@ foreach (string path in Directory.GetFiles(Path.Combine(root, "Pages/Help"), "*.
 }
 string dashboard = File.ReadAllText(Path.Combine(root, "MainDashboardForm.cs"));
 Check(dashboard.Contains("new HelpCenterPage()"), "Existing navigation integration retained");
-Check(dashboard.Contains("AddMainNav(flow, \"dashboard.png\", \"Help & FAQ\""), "Help remains an unconditional navigation destination");
+Check(dashboard.Contains("(_, _) => OpenHelpCenterAfterAccountMenuCloses()") &&
+    dashboard.Contains("NavigateTo(() => new HelpCenterPage(), \"Account\", \"Help & FAQ\")"),
+    "Help remains available through the existing account menu");
 Check(File.ReadAllText(Path.Combine(root, "Docs/HELP_CENTER.md")).Contains($"{entries.Count} questions"), "Documented catalog count stays aligned");
 string matrix = File.ReadAllText(Path.Combine(root, "Docs/FAQ_COVERAGE_MATRIX.md"));
 foreach (var entry in entries) Check(matrix.Contains($"| {entry.Id} | {entry.Question} |"), entry.Id + " coverage inventory matches current question");

@@ -57,7 +57,7 @@
 		<Content Include="Assets\students.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
-		<Content Include="Pages\Reports\Templates\*.rdlc" Exclude="Pages\Reports\Templates\FeeReminder.rdlc">
+		<Content Include="Pages\Reports\Templates\*.rdlc">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 			<Link>Reports\%(Filename)%(Extension)</Link>
 			<Visible>false</Visible>
