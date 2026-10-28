@@ -12,7 +12,7 @@ the DACPAC and receipt issuance/printing implementations are unchanged.
 | Existing component | Account use |
 |---|---|
 | `StudentAccountStatementPage` / `GetFeeStatementTransactions` | Existing date filters, family selection, verified opening/period totals, fee balances and PDF/CSV export. Raw reader rows also appear chronologically; no running balance is invented. |
-| `StudentFeeAdjustmentsPage` | Existing payment history reader, allocation details, eligibility, reduction/refund/reversal form and confirmation. A contextual constructor pins the original student and payment. |
+| `PaymentCorrectionReview` | Existing payment history reader, allocation details, eligibility, reduction/refund/reversal form and confirmation. A contextual constructor pins the original student and payment. |
 | `PaymentAdjustmentState` | The same remaining-payment and eligible-action rules drive both account display and correction availability. |
 | `RecoverableMutationWriter` / `MutationRecoveryJournal` | Existing authorization, transactions, exact request identity, recovery, rejected saves and unknown outcomes. No alternate financial writer is introduced. |
 | `GetStudentCollectionReceipts` | Original document inventory; a family document is deduplicated by receipt number. Per-child figures are hidden in this list rather than presented as family totals. |
@@ -40,16 +40,22 @@ Current all-date dues/credit and receipt history are explicitly distinguished
 from the date-filtered period totals above them. Individual fee balances are
 not described as running ledger balances.
 
-The account is available under Daily Work, the welcome shortcuts and the Reports
-hub using existing `Reports.View` access, matching the old statement reader.
+The account is available under Daily Work and the welcome shortcuts. The duplicate
+Reports-hub account card is removed. Statement access uses existing `Reports.View`,
+matching the old statement reader.
 Receipt/payment/credit readers additionally require `Fees.View`. Corrections
 require `Fees.Adjust` in the UI and the existing SQL/writer authorization.
 Annual/group reports retain `Fees.Statement.View` checks.
 
-The redundant corrections menu is hidden for operators who can use the account;
-the original route is retained for collect-only operators without report access.
-Old statement and correction implementations remain available to existing callers.
-School-wide reports and collection's history dialog keep their existing behavior.
+The standalone corrections destination and its page title are removed. Its form
+is now the internal `PaymentCorrectionReview` component, opened only as a payment
+review or recovery dialog. Operators with `Fees.Collect` retain account access
+without gaining `Reports.View`: their account opens Receipts, and statement SQL,
+date filters and export remain unavailable. An independent Check Save Outcome
+action preserves recovery when the original payment is no longer eligible.
+The shared statement component, group/year reporting and collection's read-only
+history wrapper are still live dependencies, not duplicate standalone pages.
+The aging report's contextual account link now opens the consolidated workspace.
 
 ## Safeguards and tradeoffs
 

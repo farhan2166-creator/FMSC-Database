@@ -19,7 +19,7 @@ public sealed partial class StudentAccountStatementPage
         public bool IsBusy=>Printing;
         public string BusyMessage=>"The original receipt preview is being prepared. Wait for it before closing.";
     }
-    private ModernButton? feeChanges,relatedPayment;
+    private ModernButton? feeChanges,relatedPayment,recoverPayment;
     private readonly Label accountSummary=new(){AutoSize=true,Dock=DockStyle.Fill,Padding=new Padding(6),Font=AppTheme.ButtonFont};
     private TabControl? accountViews;
     private ModernButton? accountFamily,receiptDetails,paymentDetails,correctPayment,entryDetails;
@@ -27,7 +27,13 @@ public sealed partial class StudentAccountStatementPage
     private Dictionary<int,string> accountStudentNames=new();
     private int accountUser;
 
-    public static StudentAccountStatementPage CreateAccount()=>new(true,null,false,true);
+    internal static bool CanOpenAccount=>CurrentUser.HasPermission("Reports.View")||CurrentUser.HasPermission("Fees.Collect");
+    public static StudentAccountStatementPage CreateAccount(int admissionId=0)
+    {
+        var page=new StudentAccountStatementPage(true,null,false,true);
+        if(admissionId>0)page.Defer(()=>page.PreloadAdmissionIdAsync(admissionId));
+        return page;
+    }
 
     private void InitializeAccount()
     {
@@ -53,6 +59,12 @@ public sealed partial class StudentAccountStatementPage
             arrangeStatement?.Invoke();
         }
         Grid.SelectionChanged+=(_,_)=>UpdateAccountActions();
+        if(!CurrentUser.HasPermission("Reports.View"))
+        {
+            accountViews!.SelectedIndex=1;
+            from.Enabled=to.Enabled=false;exportButton.Visible=false;
+            if(generateStatementButton is not null)generateStatementButton.Text="View Account";
+        }
         InvalidateAccount();
     }
 
@@ -102,13 +114,20 @@ public sealed partial class StudentAccountStatementPage
         paymentDetails.Click+=async(_,_)=>await AccountActionAsync(ShowAccountPaymentDetailsAsync);
         correctPayment=CreateFilterButton("Review Correction…",AppTheme.MutedText);
         correctPayment.Click+=async(_,_)=>await AccountActionAsync(()=>ReviewAccountPaymentAsync(SelectedAccountRow(accountPayments)));
+        recoverPayment=CreateFilterButton("Check Save Outcome…",AppTheme.MutedText);
+        recoverPayment.Click+=async(_,_)=>await AccountActionAsync(async()=>{
+            if(!CanOpenAccount||!CurrentUser.HasPermission("Fees.Adjust"))return;
+            using(var dialog=CreateRelatedReportDialog("Payment Save Recovery",PaymentCorrectionReview.CreateRecoveryReview()))dialog.ShowDialog(FindForm());
+            if(!IsDisposed)await LoadStatement();
+        });
         var payments=new TabPage("Payments & Adjustments");
-        payments.Controls.Add(AccountLayout(accountPayments,HumanUi.ButtonRow(paymentDetails,correctPayment)));
+        payments.Controls.Add(AccountLayout(accountPayments,HumanUi.ButtonRow(paymentDetails,correctPayment,recoverPayment)));
         var credit=new TabPage("Account Credit");accountCredits.Dock=DockStyle.Fill;
         accountCredits.DataBindingComplete+=(_,_)=>StyleAccountGrid(accountCredits);credit.Controls.Add(accountCredits);
         receiptViews.TabPages.AddRange(new[]{documents,payments,credit});receipts.Controls.Add(receiptViews);
         accountViews.TabPages.AddRange(new[]{statement,receipts});
-        accountViews.SelectedIndexChanged+=(_,_)=>{exportButton.Visible=accountViews.SelectedIndex==0&&statementViews.SelectedIndex==0;UpdateAccountActions();};
+        accountViews.Selecting+=(_,e)=>{if(e.TabPageIndex==0&&!CurrentUser.HasPermission("Reports.View"))e.Cancel=true;};
+        accountViews.SelectedIndexChanged+=(_,_)=>{exportButton.Visible=CurrentUser.HasPermission("Reports.View")&&accountViews.SelectedIndex==0&&statementViews.SelectedIndex==0;UpdateAccountActions();};
         foreach(var grid in new[]{accountReceipts,accountPayments})
         {
             grid.Dock=DockStyle.Fill;grid.ReadOnly=true;grid.MultiSelect=false;grid.AutoGenerateColumns=true;
@@ -129,7 +148,7 @@ public sealed partial class StudentAccountStatementPage
     }
 
     private bool AccountCurrent=>!IsDisposed&&accountSignature.Length>0&&accountSignature==FilterSignature()
-        &&accountUser==CurrentUser.UserId&&CurrentUser.HasPermission("Reports.View")&&CurrentUser.HasPermission("Fees.View");
+        &&accountUser==CurrentUser.UserId&&CanOpenAccount&&CurrentUser.HasPermission("Fees.View");
     private static DataRow? SelectedAccountRow(DataGridView grid)=>(grid.CurrentRow?.DataBoundItem as DataRowView)?.Row;
     private async Task AccountActionAsync(Func<Task> action)
     {
@@ -151,7 +170,7 @@ public sealed partial class StudentAccountStatementPage
     private async Task RefreshAccountAsync()
     {
         InvalidateAccount(false);
-        if(!CurrentUser.HasPermission("Reports.View")||!CurrentUser.HasPermission("Fees.View"))
+        if(!CanOpenAccount||!CurrentUser.HasPermission("Fees.View"))
         {accountSummary.Text="Receipt, payment and current credit details require Fees.View permission. Statement access is unchanged.";return;}
         var request=accountReads.Begin();string signature=FilterSignature();int user=CurrentUser.UserId;
         var ids=GetSelectedAdmissionIds();var receipts=new DataTable();var payments=new DataTable();var credits=new DataTable();
@@ -165,6 +184,8 @@ public sealed partial class StudentAccountStatementPage
                 using(data.CreditEntries)
                 {
                     if(IsDisposed||!accountReads.IsCurrent(request)||signature!=FilterSignature()||user!=CurrentUser.UserId)return;
+                    if(!accountStudentNames.ContainsKey(id)&&data.Payments.Rows.Count>0)
+                        accountStudentNames[id]=StudentFeeAccountData.Text(data.Payments.Rows[0],"StudentName");
                     MergeAccountRows(receipts,data.Receipts,id);MergeAccountRows(payments,data.Payments,id);
                     if(data.CreditEntries is not null)MergeAccountRows(credits,data.CreditEntries,id);
                     outstanding+=data.Outstanding;credit+=data.Credit;
@@ -182,7 +203,8 @@ public sealed partial class StudentAccountStatementPage
             UiHelper.SetGridEmptyMessage(accountCredits,"No account credit movements for this account.");
             foreach(string column in new[]{"CashApplied","CreditApplied","DiscountApplied","Adjusted","NetSettled"})
                 if(accountReceipts.Columns.Contains(column))accountReceipts.Columns[column].Visible=false;
-            accountSummary.Text=$"{(ids.Count==1?"Student":"Family")} account · {ids.Count} student(s) · Current outstanding: Rs. {outstanding:N0} · Available credit: Rs. {credit:N0}\r\nCurrent totals and receipt history cover all dates; the statement totals above use the selected dates.";
+            accountSummary.Text=$"{(ids.Count==1?"Student":"Family")} account · {ids.Count} student(s) · Current outstanding: Rs. {outstanding:N0} · Available credit: Rs. {credit:N0}\r\n"+
+                (CurrentUser.HasPermission("Reports.View")?"Current totals and receipt history cover all dates; the statement totals above use the selected dates.":"Current totals and receipt history cover all dates. Statement access requires report permission.");
             statementContext.Text=$"{studentSearch.Text} · {(ids.Count==1?"Student account":$"Family account · {ids.Count} students")}";
             UpdateAccountActions();
         }
@@ -232,6 +254,7 @@ public sealed partial class StudentAccountStatementPage
         if(receiptDetails is not null)receiptDetails.Enabled=AccountCurrent&&SelectedAccountRow(accountReceipts) is not null;
         if(paymentDetails is not null)paymentDetails.Enabled=AccountCurrent&&payment is not null;
         if(correctPayment is not null){correctPayment.Visible=CurrentUser.HasPermission("Fees.Adjust");correctPayment.Enabled=AccountCurrent&&payment is not null&&StudentFeeAccountData.Eligibility(payment).Actions.Length>0;}
+        if(recoverPayment is not null){recoverPayment.Visible=CurrentUser.HasPermission("Fees.Adjust");recoverPayment.Enabled=CanOpenAccount&&CurrentUser.HasPermission("Fees.Adjust");}
         if(entryDetails is not null)entryDetails.Enabled=(statementViews?.SelectedIndex==1?accountTransactions:Grid).CurrentRow?.DataBoundItem is DataRowView&&_appliedFilterSignature==FilterSignature();
         if(feeChanges is not null){feeChanges.Visible=CurrentUser.HasPermission("Fees.View")&&CurrentUser.HasPermission("Fees.Statement.View");feeChanges.Enabled=feeChanges.Visible&&SelectedStatementAdmission()>0&&_appliedFilterSignature==FilterSignature();}
         if(relatedPayment is not null){var entry=SelectedAccountRow(statementViews?.SelectedIndex==1?accountTransactions:Grid);relatedPayment.Enabled=AccountCurrent&&entry is not null&&StudentFeeAccountData.Number(entry,"FeePaymentId")>0;}
@@ -242,7 +265,7 @@ public sealed partial class StudentAccountStatementPage
         if(!AccountCurrent||!CurrentUser.HasPermission("Fees.Adjust")||payment is null||StudentFeeAccountData.Eligibility(payment).Actions.Length==0)return;
         int admission=StudentFeeAccountData.Number(payment,"AccountAdmissionId"),id=StudentFeeAccountData.Number(payment,"FeePaymentId");
         string receipt=SelectedAccountRow(accountReceipts) is DataRow document?StudentFeeAccountData.Text(document,"ReceiptNumber"):"";
-        using(var dialog=CreateRelatedReportDialog("Review Payment · "+StudentFeeAccountData.Text(payment,"ReceiptNumber"),new StudentFeeAdjustmentsPage(admission,id)))dialog.ShowDialog(FindForm());
+        using(var dialog=CreateRelatedReportDialog("Review Payment · "+StudentFeeAccountData.Text(payment,"ReceiptNumber"),new PaymentCorrectionReview(admission,id)))dialog.ShowDialog(FindForm());
         // Includes recovery resolution and a cancelled review. Never replay the financial operation.
         if(!IsDisposed)await LoadStatement();
         SelectAccountPayment(id);
@@ -262,7 +285,7 @@ public sealed partial class StudentAccountStatementPage
     {
         var row=SelectedAccountRow(accountPayments);if(!AccountCurrent||row is null)return;
         int user=CurrentUser.UserId;string signature=accountSignature;
-        using var data=await StudentFeeAdjustmentsPage.ReadPaymentDetailsAsync(user,StudentFeeAccountData.Number(row,"FeePaymentId"),StudentFeeAccountData.Number(row,"AccountAdmissionId"));
+        using var data=await PaymentCorrectionReview.ReadPaymentDetailsAsync(user,StudentFeeAccountData.Number(row,"FeePaymentId"),StudentFeeAccountData.Number(row,"AccountAdmissionId"));
         if(!AccountCurrent||user!=CurrentUser.UserId||signature!=accountSignature||!ReferenceEquals(row,SelectedAccountRow(accountPayments)))return;
         ShowAccountTable("Payment fee allocations",data);
     }

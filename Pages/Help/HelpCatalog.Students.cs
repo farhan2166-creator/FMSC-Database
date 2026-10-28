@@ -38,7 +38,7 @@ internal static partial class HelpCatalog
             new[] { "Pages/Students/Admissions/StudentAdmissionPage.cs#StudentAdmissionPage", "Pages/Students/Admissions/StudentPostingHoldDialog.cs#StudentPostingHoldDialog", "Migrations/30.sql#SaveStudentPostingDecision" }, new[] { "FAQ-027", "FAQ-106" }, ""),
         new("FAQ-017", "Admissions", "Why can’t I cancel a pending registration with paid charges?",
             "Paid allocations must be addressed through an authorized fee correction/refund workflow first. Cancellation can reverse eligible unpaid bills, but it cannot silently discard money already received.",
-            "cancel,pending,paid,refund,charge", "Quick Registration / Student Fee Corrections",
+            "cancel,pending,paid,refund,charge", "Quick Registration / Student Fee Account",
             new[] { HelpRule.System }, HelpOwner.SQL | HelpOwner.CSharp,
             new[] { "Pages/Students/Admissions/QuickRegistrationFormPage.cs#QuickRegistrationFormPage", "Pages/Students/Admissions/QuickRegistrationWriter.cs#QuickRegistrationWriter", "fmsc.dacpac#CloseStudentAdmission" }, System.Array.Empty<string>(), ""),
         new("FAQ-018", "Admissions", "Why was a possible duplicate student flagged?",

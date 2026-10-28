@@ -2,8 +2,8 @@ using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Reports;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.StudentAccounts;
-/// <summary>Complete student payment history with eligibility-aware adjustment controls.</summary>
-public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChanges
+/// <summary>Account-hosted payment review and recovery using the established adjustment safeguards.</summary>
+internal sealed class PaymentCorrectionReview : V2Page, IBusyPage, IUnsavedChanges
 {
     private readonly LatestReadScope detailReads=new();
     private readonly int contextAdmissionId;
@@ -11,6 +11,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
     private readonly Func<int,int,int,Task<DataTable>> readPaymentDetails;
     private readonly Action<DataTable>? showPaymentDetails;
     private bool recoveryBlocked;
+    private bool recoveryOnly;
     private MutationIntent? pendingAdjustment;
     private readonly ModernButton checkOutcome;
     private bool adjusting;
@@ -54,15 +55,20 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
     private bool updatingOperation;
     private readonly Label eligibilityNote=new() { AutoSize=true,Dock=DockStyle.Fill,
         Font=AppTheme.SmallFont,ForeColor=AppTheme.MutedText,Padding=new Padding(6) };
-    public StudentFeeAdjustmentsPage() : this(true) { }
-    internal StudentFeeAdjustmentsPage(bool initialize) : this(initialize,null,null) { }
-    internal StudentFeeAdjustmentsPage(bool initialize,Func<int,int,int,Task<DataTable>>? readPaymentDetails,Action<DataTable>? showPaymentDetails)
+    internal static PaymentCorrectionReview CreateRecoveryReview()
+    {
+        var review=new PaymentCorrectionReview(true){recoveryOnly=true};
+        review.student.Enabled=false;review.executeButton.Visible=false;review.ApplyActionAvailability();
+        return review;
+    }
+    internal PaymentCorrectionReview(bool initialize) : this(initialize,null,null) { }
+    internal PaymentCorrectionReview(bool initialize,Func<int,int,int,Task<DataTable>>? readPaymentDetails,Action<DataTable>? showPaymentDetails)
         : this(initialize,readPaymentDetails,showPaymentDetails,0,0) { }
-    internal StudentFeeAdjustmentsPage(int admissionId,int paymentId)
+    internal PaymentCorrectionReview(int admissionId,int paymentId)
         : this(true,null,null,admissionId,paymentId) { }
-    private StudentFeeAdjustmentsPage(bool initialize,Func<int,int,int,Task<DataTable>>? readPaymentDetails,Action<DataTable>? showPaymentDetails,int contextAdmissionId,int contextPaymentId)
+    private PaymentCorrectionReview(bool initialize,Func<int,int,int,Task<DataTable>>? readPaymentDetails,Action<DataTable>? showPaymentDetails,int contextAdmissionId,int contextPaymentId)
         : base(
-            PageTitles.StudentFeeCorrections,
+            "Review Payment",
             "Review payments, reduce recorded collections, or record refunds.")
     {
         this.contextAdmissionId=contextAdmissionId;
@@ -201,6 +207,11 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
             root,
             "Payment History");
         Defer(() => {
+            if(recoveryOnly)
+            {
+                SetStatus(recoveryBlocked?"Use Check Save Outcome to verify the earlier payment adjustment. This recovery review cannot submit a new correction.":"No unresolved payment adjustment was found.");
+                return Task.CompletedTask;
+            }
             // The page opens with nothing selected and no guidance otherwise, and its whole purpose is the reverse of the collection screen.
             SetStatus(
                 "Type an Admission Number or student name. " +
@@ -415,7 +426,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
     private bool ExecuteIsAvailable() =>
         (contextPaymentId==0||CurrentUser.HasPermission("Fees.Adjust"))&&
         (contextPaymentId==0||(admissionId==contextAdmissionId&&selectedPaymentId==contextPaymentId))&&
-        !recoveryBlocked&&admissionId > 0 && selectedPaymentId > 0 && payments.CurrentRow?.Tag is PaymentAdjustmentState state &&
+        !recoveryOnly&&!recoveryBlocked&&admissionId > 0 && selectedPaymentId > 0 && payments.CurrentRow?.Tag is PaymentAdjustmentState state &&
         state.Actions.Contains(SelectedOperation);
     /// <summary>derives the enabled state of Execute Adjustment from the current selection, so an unavailable action is not offered as a normal operation.</summary>
     private void ApplyActionAvailability()

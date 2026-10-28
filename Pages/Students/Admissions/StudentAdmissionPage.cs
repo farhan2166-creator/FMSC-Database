@@ -1730,7 +1730,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             cell.Value = "";
             cell.ReadOnly = true;
             cell.ToolTipText = hasPayments
-                ? "This fee already has a posted charge. In Fee Collection, right-click the unpaid charge and choose 'Reverse this charge…'. If money was collected, review it in Student Fee Corrections first."
+                ? "This fee already has a posted charge. In Fee Collection, right-click the unpaid charge and choose 'Reverse this charge…'. If money was collected, review it in Student Fee Account first."
                 : isMandatory
                     ? "This fee is mandatory and can't be removed here."
                     : isTransportLinked

@@ -110,11 +110,6 @@ public sealed class ReportsHomePage : V2Page
                         new("Student Credit Balance Register", "Current advance balances by student or family, with latest credit activity.",
                             "Finance", () => new CreditBalanceReportPage())
                     } : Array.Empty<ReportDefinition>()),
-                    new(
-                        PageTitles.StudentFeeAccount,
-                        "Student or family statements, original receipts and authorized payment corrections.",
-                        "Finance",
-                        () => StudentAccountStatementPage.CreateAccount()),
                     ..(CurrentUser.HasPermission("Fees.Statement.View") ? new ReportDefinition[] {
                         new(PageTitles.FamilyGroupStatements,"Choose students or families and view their statements together.",
                             "Finance",() => StudentAccountStatementPage.CreateFamilyGroupStatements()),

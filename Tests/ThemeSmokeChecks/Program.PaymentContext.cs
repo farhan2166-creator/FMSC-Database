@@ -8,7 +8,7 @@ internal static partial class Program
     private static void CheckPaymentDetailsGrid()
     {
         const BindingFlags flags=BindingFlags.Static|BindingFlags.NonPublic;
-        var create=typeof(StudentFeeAdjustmentsPage).GetMethod("CreatePaymentDetailsGrid",flags)!;
+        var create=typeof(PaymentCorrectionReview).GetMethod("CreatePaymentDetailsGrid",flags)!;
         var data=new DataTable();
         data.Columns.Add("Fee");data.Columns.Add("Billing Month",typeof(DateTime));
         data.Columns.Add("Amount (Rs.)",typeof(decimal));data.Columns.Add("Reason");
@@ -30,7 +30,7 @@ internal static partial class Program
     private static void CheckPaymentAdjustmentContext()
     {
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
-        var type=typeof(StudentFeeAdjustmentsPage);using var page=(StudentFeeAdjustmentsPage)Activator.CreateInstance(type,flags,null,new object[]{false},null)!;
+        var type=typeof(PaymentCorrectionReview);using var page=(PaymentCorrectionReview)Activator.CreateInstance(type,flags,null,new object[]{false},null)!;
         T Field<T>(string n)=>(T)type.GetField(n,flags)!.GetValue(page)!;
         type.GetField("admissionId",flags)!.SetValue(page,41);
         var grid=Field<DataGridView>("payments");var rows=new DataTable();rows.Columns.Add("FeePaymentId",typeof(int));rows.Columns.Add("EnrollmentId",typeof(int));rows.Rows.Add(1,10);rows.Rows.Add(2,20);type.GetField("paymentRows",flags)!.SetValue(page,rows);
@@ -52,13 +52,16 @@ internal static partial class Program
         Field<ModernTextBox>("reason").Text="Old student";type.GetField("admissionId",flags)!.SetValue(page,42);Select(0);
         Check(Field<ModernTextBox>("reason").Text=="","A student-context change also clears payment-specific draft inputs");
         Check(!page.IsHandleCreated,"Adjustment selection fixture starts no SQL lookup or financial write");
+        Check((bool)type.GetMethod("ExecuteIsAvailable",flags)!.Invoke(page,null)!,"An ordinary review retains its eligible correction action");
+        type.GetField("recoveryOnly",flags)!.SetValue(page,true);
+        Check(!(bool)type.GetMethod("ExecuteIsAvailable",flags)!.Invoke(page,null)!,"A recovery-only review cannot submit a new correction even for an eligible payment");
     }
     private static void CheckPaymentDetailGeneration()
     {
-        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(StudentFeeAdjustmentsPage);
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(PaymentCorrectionReview);
         var pending=new Queue<TaskCompletionSource<DataTable>>();int previews=0;
         Func<int,int,int,Task<DataTable>> read=(_,_,_)=>{var reply=new TaskCompletionSource<DataTable>();pending.Enqueue(reply);return reply.Task;};Action<DataTable> show=_=>previews++;
-        using var page=(StudentFeeAdjustmentsPage)Activator.CreateInstance(type,flags,null,new object[]{false,read,show},null)!;
+        using var page=(PaymentCorrectionReview)Activator.CreateInstance(type,flags,null,new object[]{false,read,show},null)!;
         var rows=new DataTable();rows.Columns.Add("FeePaymentId",typeof(int));rows.Rows.Add(1);rows.Rows.Add(2);type.GetField("paymentRows",flags)!.SetValue(page,rows);type.GetField("admissionId",flags)!.SetValue(page,41);
         void Select(int id){type.GetField("selectedPaymentId",flags)!.SetValue(page,id);type.GetMethod("ResetAdjustmentDraftForSelection",flags)!.Invoke(page,null);}
         Task Start()=>(Task)type.GetMethod("ViewPaymentDetailsAsync",flags)!.Invoke(page,null)!;
@@ -70,8 +73,8 @@ internal static partial class Program
 
     private static void CheckAdjustmentRecoveryGuard()
     {
-        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(StudentFeeAdjustmentsPage);
-        using var page=(StudentFeeAdjustmentsPage)Activator.CreateInstance(type,flags,null,new object[]{false},null)!;
+        const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(PaymentCorrectionReview);
+        using var page=(PaymentCorrectionReview)Activator.CreateInstance(type,flags,null,new object[]{false},null)!;
         type.GetField("recoveryBlocked",flags)!.SetValue(page,true);type.GetMethod("ApplyActionAvailability",flags)!.Invoke(page,null);
         var check=(ModernButton)type.GetField("checkOutcome",flags)!.GetValue(page)!;var execute=(ModernButton)type.GetField("executeButton",flags)!.GetValue(page)!;
         Check(check.Enabled&&!execute.Enabled&&page.HasUnsavedChanges,"An unresolved adjustment exposes its exact outcome check and blocks another financial write");
