@@ -1320,6 +1320,12 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
     {
         if(accountMode)InvalidateAccount();
         try{await RunBusyAsync("Generating statement…",async()=>{
+            if(accountMode&&!CurrentUser.HasPermission("Reports.View"))
+            {
+                Grid.DataSource=null;_appliedFilterSignature=string.Empty;SetReportActionsEnabled(false);
+                openingBalance.Text=chargesTotal.Text=paymentsTotal.Text=closingBalance.Text="—";
+                await RefreshAccountAsync();return;
+            }
             await LoadStatementCoreAsync();
             if(accountMode&&!string.IsNullOrEmpty(_appliedFilterSignature))await RefreshAccountAsync();
         },this);}

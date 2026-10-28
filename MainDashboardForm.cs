@@ -647,13 +647,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 () => StudentAccountStatementPage.CreateAccount(),
                 "Finance",
                 PageTitles.StudentFeeAccount,
-                "Reports.View"),
-            new(
-                PageTitles.StudentFeeCorrections,
-                () => new StudentFeeAdjustmentsPage(),
-                "Finance",
-                PageTitles.StudentFeeCorrections,
-                "Fees.Collect"),
+                CurrentUser.HasPermission("Reports.View")?"Reports.View":"Fees.Collect"),
             new(
                 "Daily Collection Closing",
                 () => new DailyCollectionClosingPage(),
@@ -680,8 +674,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     "Certificates",
                     PageTitles.StudentCertificates,
                     "Certificates.Create")
-            }.Where(item => (item.Title != PageTitles.FamilyAdmission || FamilyAdmissionData.CanUse(CurrentUser.HasPermission))
-                && (item.Title != PageTitles.StudentFeeCorrections || !CurrentUser.HasPermission("Reports.View"))).ToArray(),
+            }.Where(item => item.Title != PageTitles.FamilyAdmission || FamilyAdmissionData.CanUse(CurrentUser.HasPermission)).ToArray(),
             expandInitially: true);
         AddModule(
             flow,

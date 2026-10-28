@@ -10,7 +10,7 @@ internal sealed record StudentFeeAccountData(DataTable Receipts,DataTable Paymen
         var outstanding=await FeeReceiptQueries.QueryCurrentBalanceAsync(admissionId);
         using var credit=await DatabaseHelper.QueryUserSetAsync("GetStudentCredit",DatabaseHelper.Int("@AdmissionId",admissionId));
         using var receipts=await DatabaseHelper.QueryUserSetAsync("GetStudentCollectionReceipts",DatabaseHelper.Int("@AdmissionId",admissionId));
-        var payments=await StudentFeeAdjustmentsPage.ReadPaymentHistoryAsync(CurrentUser.UserId,admissionId);
+        var payments=await PaymentCorrectionReview.ReadPaymentHistoryAsync(CurrentUser.UserId,admissionId);
         DescribePayments(payments);
         return new(receipts.Tables[0].Copy(),payments,outstanding,Convert.ToDecimal(credit.Tables[0].Rows[0]["AvailableCredit"]),credit.Tables[1].Copy());
     }
@@ -32,7 +32,7 @@ internal sealed record StudentFeeAccountData(DataTable Receipts,DataTable Paymen
         var ids=links.AsEnumerable().Select(row=>Number(row,"FeePaymentId")).ToHashSet();
         foreach(int admission in links.AsEnumerable().Select(row=>Number(row,"AdmissionId")).Distinct())
         {
-            using var history=await StudentFeeAdjustmentsPage.ReadPaymentHistoryAsync(CurrentUser.UserId,admission);
+            using var history=await PaymentCorrectionReview.ReadPaymentHistoryAsync(CurrentUser.UserId,admission);
             var matching=history.Clone();matching.Columns.Add("AccountAdmissionId",typeof(int));
             foreach(var row in history.AsEnumerable().Where(row=>ids.Contains(Number(row,"FeePaymentId"))||ids.Contains(Number(row,"RelatedFeePaymentId"))))
             {var added=matching.NewRow();foreach(DataColumn c in history.Columns)added[c.ColumnName]=row[c];added["AccountAdmissionId"]=admission;matching.Rows.Add(added);}

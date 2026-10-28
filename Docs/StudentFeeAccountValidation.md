@@ -63,3 +63,28 @@ Before rollout, an operator should walk a representative real account read-only,
 check a historical receipt preview and confirm the layout on the intended monitor
 and printer. Financial correction behavior has been tested only with fictional
 records in the disposable database.
+
+## Redundant-page retirement follow-up
+
+The standalone correction destination and its obsolete title are removed; its
+implementation is renamed to the internal `PaymentCorrectionReview` component.
+The duplicate operational account card is removed from Reports, and the aging
+report's contextual link opens Student Fee Account. Help links are updated,
+including one admission help sentence; admission behavior is unchanged.
+
+Collect-only operators use the same account destination with Receipts available
+under existing fee permissions. Report SQL, date filters and exports remain
+restricted by report permission. The independent Check Save Outcome action opens
+a recovery-only review that cannot submit a fresh correction, even when the
+original payment has become ineligible. Native checks cover these access paths.
+
+The shared statement implementation and Fee Collection history wrapper remain
+because they are active dependencies. Multi-family group statements and annual
+receipt printing retain capabilities beyond the operational account and remain
+available. Fee Collection source files and financial SQL remain unchanged.
+
+Follow-up verification: build succeeded with zero warnings/errors; the account
+suite passed 65 checks, payment adjustment/recovery 19, original statement actions
+61, and finance help/transaction safety 98. SQL integration was not repeated for
+this navigation/component retirement; the earlier 22-assertion disposable run is
+reported above for the consolidation implementation, not claimed as a new run.

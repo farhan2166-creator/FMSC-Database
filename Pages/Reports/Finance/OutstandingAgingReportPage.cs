@@ -94,9 +94,10 @@ public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
         if (IsDisposed || CurrentUser.UserId != actor || !CurrentReportAvailable || signature != ReportFilterSignature() || !CurrentUser.HasPermission("Fees.Statement.View")
             || Grid.CurrentRow?.DataBoundItem is not DataRowView current || Convert.ToString(current.Row["Adm. / QR No."]) != reference) return;
         if (rows.Rows.Count != 1) { Warn("The selected student's account could not be identified. Refresh the report."); return; }
-        using var dialog = new ApplicationWindowForm { Text = "Student Account Statement", StartPosition = FormStartPosition.CenterParent,
+        using var dialog = new ApplicationWindowForm { Text = PageTitles.StudentFeeAccount, StartPosition = FormStartPosition.CenterParent,
             ClientSize = new Size(AppScale.Scale(1250),AppScale.Scale(760)), ShowInTaskbar = false };
-        var statement = new StudentAccountStatementPage(Convert.ToInt32(rows.Rows[0]["AdmissionId"])) { Dock = DockStyle.Fill };
+        var statement = StudentAccountStatementPage.CreateAccount(Convert.ToInt32(rows.Rows[0]["AdmissionId"]));
+        statement.Dock=DockStyle.Fill;
         dialog.Controls.Add(statement);
         dialog.FormClosing += (_, e) => { if (statement.IsBusy) e.Cancel=true; };
         dialog.ShowDialog(FindForm());
