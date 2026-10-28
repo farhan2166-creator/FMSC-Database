@@ -34,6 +34,16 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--fee-account"))
+        {
+            CheckFeeAccountWorkspace();CheckPaymentAdjustmentContext();CheckPaymentDetailGeneration();CheckAdjustmentRecoveryGuard();
+            Console.WriteLine($"PASS: {checks} account scope, receipts, permissions, stale reads, layouts and existing correction recovery checks.");return;
+        }
+        if(args.Contains("--fee-account-sql"))
+        {
+            var task=CheckFeeAccountSqlAsync();PumpUntil(()=>task.IsCompleted,"Owned account SQL scenarios finish",TimeSpan.FromMinutes(5));task.GetAwaiter().GetResult();
+            Console.WriteLine($"PASS: {checks} owned fictional account readers, receipts and correction SQL checks.");return;
+        }
         if(args.Contains("--receipt-breakdown"))
         {
             CheckReceiptBreakdown();

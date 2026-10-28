@@ -2,6 +2,7 @@ using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Finance.Collection;
 using FMSC_SMS.Pages.Finance.Billing;
 using FMSC_SMS.Pages.Reports;
+using FMSC_SMS.Pages.Reports.Finance;
 using FMSC_SMS.Pages.Reports.Students;
 using FMSC_SMS.Pages.Setup;
 using FMSC_SMS.Pages.Students.Admissions;
@@ -314,6 +315,7 @@ public sealed class WelcomePage : UserControl
         {
         (PageTitles.Admissions, "Students", () => AdmissionsWorkspace.Create(Navigate), () => CurrentUser.HasPermission("Students.Admit")),
         ("Fee Collection", "Finance", () => new FeeCollectionPage(), () => CurrentUser.HasPermission("Fees.Collect")),
+        (PageTitles.StudentFeeAccount, "Finance", () => StudentAccountStatementPage.CreateAccount(), () => CurrentUser.HasPermission("Reports.View")),
         (PageTitles.FeePosting, "Finance", () => FeePostingWorkspace.Create(Navigate), () => CurrentUser.HasPermission("Fees.Collect")),
         ("Student Profile", "Students", () => new StudentProfilePage(Navigate), () => CurrentUser.HasPermission("Students.View")),
         (PageTitles.FamilyAdmission, "Students", () => new FamilyAdmissionWorkspace(Navigate), () => FamilyAdmissionData.CanUse(CurrentUser.HasPermission)),

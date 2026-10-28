@@ -5,7 +5,8 @@ param(
     [switch]$PreflightOnly,
     [switch]$StartupOnly,
     [switch]$AdmissionsOnly,
-    [switch]$FamilyCounterOnly
+    [switch]$FamilyCounterOnly,
+    [switch]$FeeAccountOnly
 )
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
@@ -85,7 +86,7 @@ function BlockedReport([string]$Reason) {
     $summary | Set-Content -LiteralPath (Join-Path $script:evidence 'summary.md') -Encoding utf8
 }
 try {
-    if([int][bool]$PreflightOnly+[int][bool]$StartupOnly+[int][bool]$AdmissionsOnly+[int][bool]$FamilyCounterOnly -gt 1) {throw 'Choose only one scoped mode.'}
+    if([int][bool]$PreflightOnly+[int][bool]$StartupOnly+[int][bool]$AdmissionsOnly+[int][bool]$FamilyCounterOnly+[int][bool]$FeeAccountOnly -gt 1) {throw 'Choose only one scoped mode.'}
     if(-not $IsWindows -and $PSVersionTable.PSEdition -ne 'Desktop') {throw 'Windows is required.'}
     $desktopGate=[Threading.Mutex]::new($false,'Local\FMSC_SMS.Level2Desktop')
     try {$ownsDesktopGate=$desktopGate.WaitOne(0)}
@@ -126,7 +127,7 @@ try {
         & dotnet build (Join-Path $repo "Tests/$project/$project.csproj") -c Release -o (Join-Path $run $project) -v quiet
         Native "$project build"
     }
-    if($FamilyCounterOnly) {
+    if($FamilyCounterOnly -or $FeeAccountOnly) {
         & dotnet build (Join-Path $repo 'Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj') -c Release '-p:FmscLevel2=true' -o (Join-Path $run 'FamilyCounterChecks') -v quiet
         Native 'Family counter native/SQL harness build'
     }
@@ -179,18 +180,19 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
     & dotnet (Join-Path $run 'Level2Fixture/Level2Fixture.dll')
     Native 'Reference fixture'
     VerifyTarget
-    if($FamilyCounterOnly) {
-        Stage 'Family counter SQL scenarios (no operator UI or physical printing)'
-        & dotnet (Join-Path $run 'FamilyCounterChecks/ThemeSmokeChecks.dll') '--family-counter-sql'
+    if($FamilyCounterOnly -or $FeeAccountOnly) {
+        Stage $(if($FeeAccountOnly){'Student fee account SQL scenarios (fictional records only)'}else{'Family counter SQL scenarios (no operator UI or physical printing)'})
+        $scenario=if($FeeAccountOnly){'--fee-account-sql'}else{'--family-counter-sql'}
+        & dotnet (Join-Path $run 'FamilyCounterChecks/ThemeSmokeChecks.dll') $scenario
         $exitCode=$LASTEXITCODE
         # These explicitly named files contain only this owned fictional scenario.
-        foreach($artifact in @('family-bill.pdf','family-bill.png','free-student-bill.pdf','free-student-bill.png','family-receipt.pdf','family-receipt.png','workspace.png','collection.png')) {
+        foreach($artifact in @('family-bill.pdf','family-bill.png','free-student-bill.pdf','free-student-bill.png','family-receipt.pdf','family-receipt.png','workspace.png','collection.png','account-original-receipt.pdf')) {
             $source=Join-Path $run ('counter-evidence/'+$artifact)
             if(Test-Path -LiteralPath $source){Copy-Item -LiteralPath $source -Destination (Join-Path $evidence $artifact)}
         }
         [ordered]@{sourceCommit=$env:FMSC_LEVEL2_COMMIT;status=if($exitCode -eq 0){'Pass'}else{'Fail'};
-            scope='Owned fictional family SQL scenarios only; no Level 2 interactive acceptance claimed.'} |
-            ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'family-counter-results.json') -Encoding utf8
+            scope=if($FeeAccountOnly){'Owned fictional account SQL scenarios only; no physical operator acceptance claimed.'}else{'Owned fictional family SQL scenarios only; no Level 2 interactive acceptance claimed.'}} |
+            ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence $(if($FeeAccountOnly){'fee-account-results.json'}else{'family-counter-results.json'})) -Encoding utf8
     } else {
         Stage 'Interactive operator workflows'
         & dotnet (Join-Path $run 'Level2UiChecks/Level2UiChecks.dll') (Join-Path $appOutput 'FMSC_SMS.exe') $evidence
