@@ -1456,6 +1456,11 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     }
     private void NavigateTo(Func<Control> factory, string module = "Dashboard", string title = "Overview")
     {
+        if (InvokeRequired)
+        {
+            BeginInvoke(new MethodInvoker(() => NavigateTo(factory, module, title)));
+            return;
+        }
         if (factory is null || IsDisposed || Disposing || content.IsDisposed || _navigationInProgress) return;
         if (!ConfirmLeaveCurrentPage()) return;
         var previous = (Page: _currentPageControl, Factory: _currentFactory, Module: _currentModule,
@@ -1554,10 +1559,19 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         }
         catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex, "Navigation initial focus"); }
     }
-    private static void DisposeNavigationPage(Control? page, string context)
+    private void DisposeNavigationPage(Control? page, string context)
     {
         if (page is null || page.IsDisposed) return;
-        try { page.Dispose(); }
+        if (InvokeRequired)
+        {
+            BeginInvoke(new MethodInvoker(() => DisposeNavigationPage(page, context)));
+            return;
+        }
+        try
+        {
+            ControlToolTips.DetachTree(page);
+            page.Dispose();
+        }
         catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex, context); }
     }
     private void SaveCurrentWorkspaceState()

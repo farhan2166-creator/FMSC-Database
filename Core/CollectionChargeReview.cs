@@ -12,10 +12,13 @@ internal static class CollectionChargeReview
         DECLARE @Accounts nvarchar(max)=(SELECT * FROM dbo.FeeDocumentAccounts(@Ids,N'[]',N'[]') FOR JSON PATH);
         SELECT B.BillingChargeId,B.StudentFeeAssignmentId,B.EnrollmentId,B.AdmissionId,
           F.FeeTypeId,F.FeeTypeCode,F.FeeTypeName,B.BillingMonth,B.ChargeKind,B.Remarks,B.ChargeDate,B.DueDate,
-          B.GrossAmount,B.DiscountAmount,B.NetAmount,
+          COALESCE(T.NewGross,B.GrossAmount) GrossAmount,
+          CONVERT(decimal(12,2),COALESCE(T.NewGross,B.GrossAmount)-B.NetAmount) DiscountAmount,B.NetAmount,
           B.NetAmount-Q.Balance PaidAmount,Q.Balance,B.Status,
           CONVERT(bit,CASE WHEN Q.Balance=0 AND V.Discount>0 THEN 1 ELSE 0 END) PendingWaiver
         FROM dbo.BillingCharges B JOIN dbo.FeeTypes F ON F.FeeTypeId=B.FeeTypeId
+        OUTER APPLY(SELECT TOP(1) C.NewGross FROM dbo.FeeBillCorrections C
+          WHERE C.BillingChargeId=B.BillingChargeId ORDER BY C.FeeBillCorrectionId DESC) T
         CROSS APPLY(SELECT dbo.GetFeeChargeBalance(B.BillingChargeId) Balance) Q
         LEFT JOIN dbo.FeeVisitLines(@Accounts,@Before) V ON V.ChargeId=B.BillingChargeId
         WHERE B.AdmissionId=@AdmissionId AND B.Status<>N'Cancelled'

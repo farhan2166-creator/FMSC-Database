@@ -5,7 +5,7 @@ namespace FMSC_SMS.Pages.Finance.Collection;
 
 public sealed partial class FeeCollectionPage
 {
-    private enum ChargeConcessionAction { Waive, Discount, RemoveDiscount }
+    private enum ChargeConcessionAction { Discount=0, Waive=1, CorrectAmount=2, RemoveDiscount=3 }
     private static bool IsWaiverReviewRow(DataGridViewRow row)=>row.Cells["PendingWaiver"].Value is true;
     private bool HasPendingWaiverRows()=>charges.Rows.Cast<DataGridViewRow>().Any(row=>!row.IsNewRow&&IsWaiverReviewRow(row));
     private bool HasCollectionDraft()=>HasDraftBillDiscounts()||HasEnteredAmount(paymentAmount.Text)
@@ -55,20 +55,19 @@ public sealed partial class FeeCollectionPage
         {
             using var busy=BeginBusy("Reviewing fee concession…",this);
             using var returnFocus=new DialogReturnFocus(this);
-            if(action==ChargeConcessionAction.Waive)await FeeConcessionActions.WaiveOnceAsync(chargeId);
-            else
             {
                 var bill=await Task.Run(()=>FeeDiscountPeriod.BillContext(chargeId));
-                using var dialog=new ChangeFeeDiscountForm(Convert.ToInt32(bill["StudentFeeAssignmentId"]),Convert.ToString(bill["FeeTypeName"])??"Fee",
-                    Convert.ToDecimal(bill["StandardAmount"]),Convert.ToDecimal(bill["DiscountAmount"]),bill);
-                dialog.ConfigureCollectionBill(removeDiscount:action==ChargeConcessionAction.RemoveDiscount);
+                int assignmentId=Convert.ToInt32(bill["StudentFeeAssignmentId"]);
+                var context=await Task.Run(()=>FeeDiscountPeriod.Context(assignmentId));
+                using var dialog=new ChangeFeeDiscountForm(assignmentId,Convert.ToString(context["FeeTypeName"])??"Fee",
+                    Convert.ToDecimal(context["StandardAmount"]),Convert.ToDecimal(context["DiscountAmount"]),context);
+                dialog.ConfigureCollectionAction((int)action);
                 dialog.ShowDialog(FindForm());
                 if(!dialog.Changed)return;
             }
             await ReloadFamilyChargesAsync(++loadVersion);
             RefreshEnteredPaymentAllocation();
-            SetStatus(action==ChargeConcessionAction.Waive?"Remaining dues waived and saved. Use Print Fee Changes to document the waiver, or include it with the next payment receipt."
-                :action==ChargeConcessionAction.RemoveDiscount?"The selected bill's discount was removed. Balances have been refreshed.":"The selected bill's discount was saved. Balances have been refreshed.");
+            SetStatus("Fee changes saved for the selected scope and period. Balances have been refreshed.");
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
         finally{billBusy=false;}

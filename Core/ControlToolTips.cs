@@ -13,6 +13,18 @@ internal static class ControlToolTips
     }
     private static readonly ConditionalWeakTable<Control, Hint> Hints = new();
 
+    // Stop native tooltip timers while every target still has a live handle.
+    // Child Disposed events occur too late for an active tooltip's Hide callback.
+    internal static void DetachTree(Control root)
+    {
+        if (Hints.TryGetValue(root, out var hint))
+        {
+            hint.ActiveOwner?.SetToolTip(root, null);
+            Hints.Remove(root);
+        }
+        foreach (Control child in root.Controls) DetachTree(child);
+    }
+
     internal static void SetDescription(ToolTip owner, Control target, string? text)
     {
         if (target.IsDisposed || target.Disposing) return;

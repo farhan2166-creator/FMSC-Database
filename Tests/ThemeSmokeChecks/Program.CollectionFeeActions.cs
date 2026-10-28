@@ -24,6 +24,25 @@ internal static partial class Program
             context.Columns.Add("Balance",typeof(decimal));
             int year=DateTime.Today.Year;var month=new DateTime(year,3,1);
             var row=context.Rows.Add("Monthly","Active",DBNull.Value,"Preview Student","542","Preview year",new DateTime(year,1,1),new DateTime(year,12,31),new DateTime(year,1,1),month,41,321L,300m);
+            using(var plan=context.Copy())
+            {
+                plan.Columns.Remove("BillingChargeId");
+                for(int choice=0;choice<4;choice++)
+                {
+                    using var form=new ChangeFeeDiscountForm(41,"Tuition Fee",700m,0m,plan.Rows[0],
+                        _=>Task.FromResult(new DataSet()),_=>throw new InvalidOperationException("Unexpected write"));
+                    form.ConfigureCollectionAction(choice);form.Show();Application.DoEvents();
+                    Check(!Field<Panel>(form,"actionField").Visible,"Collection action dialogs hide the four action tabs");
+                    Check(Field<ModernComboBox>(form,"action").SelectedIndex==choice,"Each collection dialog selects its menu action");
+                    var current=new DateTime(DateTime.Today.Year,DateTime.Today.Month,1);
+                    Check(Field<ModernDatePicker>(form,"fromMonth").Value==current&&Field<ModernDatePicker>(form,"throughMonth").Value==current,
+                        "Collection defaults both editable months to the current month");
+                    Check(Field<ModernComboBox>(form,"scope").Items.Count==3,"Collection retains the shared fee-plan and existing-bill scopes");
+                }
+                using var admission=new ChangeFeeDiscountForm(41,"Tuition Fee",700m,0m,plan.Rows[0],
+                    _=>Task.FromResult(new DataSet()),_=>throw new InvalidOperationException("Unexpected write"));
+                Check(Field<ModernDatePicker>(admission,"throughMonth").Value==new DateTime(year,12,1),"Admission retains the academic-year end default");
+            }
             SqlParameter[]? captured=null;int reads=0,writes=0;bool stale=false;
             Task<DataSet> Review(SqlParameter[] args)
             {
@@ -185,10 +204,11 @@ internal static partial class Program
                 var menu=Field<ContextMenuStrip>(page,"chargeMenu");
                 string[] Menu(){Call(page,"BuildChargeMenu",fee.Index);return menu.Items.OfType<ToolStripMenuItem>().Where(item=>item.Enabled).Select(item=>item.Text??"").ToArray();}
                 var items=Menu();
-                Check(items.Contains("Give Discount…")&&items.Contains("Waive Remaining Dues")&&items.Contains("View Fee Details"),"Unpaid fees expose the three focused actions");
-                Check(!items.Any(text=>text.Contains("Sibling")||text.Contains("Review bill terms")||text.Contains("Remove Discount")),"Collection does not duplicate fee-plan and generic term-editing choices");
+                Check(new[]{"Give Discount…","Waive Fee…","Correct Fee Amount…","View Fee Details"}.All(items.Contains),"Unpaid fees expose applicable separate fee actions and details");
+                Check(!items.Contains("Remove Discount…"),"Fees without a discount do not offer Remove Discount");
+                Check(!items.Any(text=>text.Contains("Sibling")||text.Contains("Review bill terms")),"Collection has no generic action-picker entry");
                 fee.Cells["AppliedDiscount"].Value=200m;fee.Cells["GrossAmount"].Tag=200m;items=Menu();
-                Check(items.Contains("Change Discount…")&&items.Contains("Remove Discount…")&&!items.Contains("Give Discount…"),"An existing discount offers change and remove rather than another give action");
+                Check(items.Contains("Give Discount…")&&items.Contains("Remove Discount…")&&items.Contains("Correct Fee Amount…"),"The four action entries remain available with an existing discount");
                 fee.Cells["Balance"].Value=0m;fee.Cells["AppliedDiscount"].Value=700m;fee.Cells["GrossAmount"].Tag=700m;
                 using var source=new DataTable();source.Columns.Add("PendingWaiver",typeof(bool));source.Columns.Add("PaidAmount",typeof(decimal));var waived=source.Rows.Add(true,0m);
                 typeof(FeeCollectionPage).GetMethod("ApplyWaiverReviewState",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,new object[]{fee,waived});

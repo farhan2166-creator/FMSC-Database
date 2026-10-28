@@ -1239,18 +1239,17 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             new ToolStripSeparator());
         if(GetDecimal(row.Cells["Balance"].Value)>0m && counterIds is null && CurrentUser.HasPermission("Fees.Adjust"))
         {
-            bool discounted=GetDecimal(row.Cells["AppliedDiscount"].Value)>0m;
-            var discount=chargeMenu.Items.Add(discounted?"Change Discount…":"Give Discount…");
-            discount.Enabled=CanChangeFeeTerms;
-            discount.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,ChargeConcessionAction.Discount);
-            if(discounted)
+            foreach(var (label,choice) in new[]{
+                ("Give Discount…",ChargeConcessionAction.Discount),
+                ("Waive Fee…",ChargeConcessionAction.Waive),
+                ("Correct Fee Amount…",ChargeConcessionAction.CorrectAmount),
+                ("Remove Discount…",ChargeConcessionAction.RemoveDiscount)})
             {
-                var remove=chargeMenu.Items.Add("Remove Discount…");remove.Enabled=CanChangeFeeTerms;
-                remove.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,ChargeConcessionAction.RemoveDiscount);
+                if(choice==ChargeConcessionAction.RemoveDiscount && GetDecimal(row.Cells["AppliedDiscount"].Value)<=0m)
+                    continue;
+                var item=chargeMenu.Items.Add(label);item.Enabled=CanChangeFeeTerms;
+                item.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,choice);
             }
-            var waive=chargeMenu.Items.Add("Waive Remaining Dues");waive.Enabled=CanChangeFeeTerms;
-            waive.ToolTipText="Save a waiver for this charge's unpaid dues. Recorded payments and other months stay unchanged.";
-            waive.Click+=async(_,_)=>await ChangeChargeConcessionAsync(chargeId,ChargeConcessionAction.Waive);
         }
         var details=chargeMenu.Items.Add("View Fee Details");
         details.Enabled=!IsBusy&&!siblingBusy&&CurrentUser.HasPermission("Fees.View");

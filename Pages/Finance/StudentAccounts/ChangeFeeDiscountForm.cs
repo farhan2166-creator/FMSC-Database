@@ -30,6 +30,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     private int generation;
     private decimal releasedPayment;
     private int? fixedBillAction;
+    private int? collectionAction;
     private decimal billBalance;
     private bool recoveryOnly;
     private bool DirectBillChange=>fixedBillAction is not null&&!recoveryOnly;
@@ -122,6 +123,18 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         ReadPending(); State();
     }
     private static DateTime First(DateTime value)=>new(value.Year,value.Month,1);
+    internal void ConfigureCollectionAction(int choice)
+    {
+        if(choice is <0 or >3 || billId is not null)
+            throw new ArgumentException("Choose a fee-plan action.",nameof(choice));
+        collectionAction=choice;
+        action.SelectedIndex=choice;
+        DateTime current=First(DateTime.Today);
+        current=current<fromMonth.MinDate?fromMonth.MinDate:current>fromMonth.MaxDate?fromMonth.MaxDate:current;
+        fromMonth.Value=throughMonth.Value=current;
+        Text=$"{action.Items[choice]} — {feeName}";
+        initial=Draft();State();
+    }
     internal void ConfigureRecoveryOnly()
     {
         recoveryOnly=true;Text="Check Fee Change Save";
@@ -189,6 +202,8 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     {
         if(!validContext){impact.Text="This fee has no valid review period. Close and reload its bill or fee plan.";return false;}
         if(!CurrentUser.HasPermission("Fees.Adjust")){impact.Text="Your permission to change fees is no longer available.";return false;}
+        if(collectionAction is int selected && action.SelectedIndex!=selected)
+        {impact.Text="Close and choose the intended fee action again.";return false;}
         if(fixedBillAction is int fixedAction && action.SelectedIndex!=fixedAction)
         {impact.Text="Close and choose the intended fee action again.";return false;}
         if(!HasAction){impact.Text="Choose Give Discount, Waive Fee, Correct Fee Amount or Remove Discount.";action.Focus();return false;}

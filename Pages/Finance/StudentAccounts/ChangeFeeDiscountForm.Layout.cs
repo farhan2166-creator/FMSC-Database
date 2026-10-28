@@ -111,7 +111,7 @@ public sealed partial class ChangeFeeDiscountForm
     {
         for(int index=0;index<taskButtons.Length;index++)
         {
-            taskButtons[index].Enabled=canChange&&fixedBillAction is null&&!recoveryOnly;
+            taskButtons[index].Enabled=canChange&&fixedBillAction is null&&collectionAction is null&&!recoveryOnly;
             string role=action.SelectedIndex==index?"TabActive":"TabInactive";
             if(taskButtons[index].ThemeRole!=role)taskButtons[index].ThemeRole=role;
             taskButtons[index].AccessibleDescription=action.SelectedIndex==index?"Selected action":"Choose this action";
@@ -156,7 +156,7 @@ public sealed partial class ChangeFeeDiscountForm
 
     private void UpdateVisibleFields()
     {
-        actionField.Visible=!reviewStage&&fixedBillAction is null;
+        actionField.Visible=!reviewStage&&fixedBillAction is null&&collectionAction is null;
         scopeField.Visible=!reviewStage&&HasAction&&scope.Items.Count>1;
         fixedScope.Visible=!reviewStage&&HasAction&&scope.Items.Count==1&&fixedBillAction is null;
         fixedScope.Text=$"Apply to: {scope.Text}";
