@@ -1384,6 +1384,42 @@
       "isNullable": false,
       "isIdentity": false,
       "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "BillingCharges",
+      "name": "CancellationReason",
+      "type": "nvarchar",
+      "maxLength": 1000,
+      "precision": 0,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "BillingCharges",
+      "name": "CancelledAt",
+      "type": "datetime2",
+      "maxLength": 8,
+      "precision": 27,
+      "scale": 7,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "BillingCharges",
+      "name": "CancelledByUserId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
+      "scale": 0,
+      "isNullable": true,
+      "isIdentity": false,
+      "isComputed": false
     }
   ],
   "uniqueIndexes": [
@@ -1690,6 +1726,16 @@
       "columns": "PreviousIssueId",
       "schema": "dbo",
       "objectName": "DateOfBirthCertificateIssueSnapshots"
+    },
+    {
+      "schema": "dbo",
+      "objectName": "BillingCharges",
+      "referencedSchema": "dbo",
+      "referencedObject": "Users",
+      "columns": "CancelledByUserId",
+      "referencedColumns": "UserId",
+      "deleteAction": 0,
+      "updateAction": 0
     }
   ],
   "databaseProperties": [
@@ -2350,6 +2396,16 @@
       "type": "uniqueidentifier",
       "maxLength": 16,
       "precision": 0,
+      "scale": 0,
+      "isOutput": false
+    },
+    {
+      "schema": "dbo",
+      "objectName": "PostEnrollmentOpeningCharges",
+      "name": "@UserId",
+      "type": "int",
+      "maxLength": 4,
+      "precision": 10,
       "scale": 0,
       "isOutput": false
     }

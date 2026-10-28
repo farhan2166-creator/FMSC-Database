@@ -131,7 +131,7 @@ internal sealed class LeaveFeeReviewBar : TableLayoutPanel
         if(Convert.ToString(row["EnrollmentStatus"])!="Active") return "Placement is already closed";
         if(Convert.ToDecimal(row["NetAmount"])<=0) return "Zero amount — nothing to reverse";
         if(Convert.ToBoolean(row["HasPaymentHistory"])) return "Payment history exists";
-        if(!CurrentUser.HasPermission("Fees.Collect")) return "Fee collection permission required";
+        if(!FeeChargeCancellation.CanCancel) return "Fee collection and adjustment permissions required";
         return Convert.ToBoolean(row["CanReverse"]) ? "Eligible — wholly unpaid, no payment history" : "Use payment review for this charge";
     }
     internal ApplicationWindowForm CreateReviewDialog()
@@ -140,9 +140,9 @@ internal sealed class LeaveFeeReviewBar : TableLayoutPanel
             Size=new Size(AppScale.Scale(1000),AppScale.Scale(620)),MinimumSize=new Size(780,520)};
         var keep=new RadioButton {Name="KeepCharges",Text="Keep outstanding dues and continue — the balance remains payable",AutoSize=true};
         var reverse=new RadioButton {Name="ReverseCharges",Text="Reverse selected eligible charges — reduce the outstanding balance",AutoSize=true,
-            Enabled=CurrentUser.HasPermission("Fees.Collect") && displayCharges.AsEnumerable().Any(row=>Convert.ToBoolean(row["CanReverse"]) && Convert.ToDecimal(row["NetAmount"])>0)};
-        if(!reverse.Enabled) reverse.Text=CurrentUser.HasPermission("Fees.Collect")
-            ? "Reverse selected charges (unavailable — see each charge's reason below)" : "Reverse selected charges (fee collection permission required)";
+            Enabled=FeeChargeCancellation.CanCancel && displayCharges.AsEnumerable().Any(row=>Convert.ToBoolean(row["CanReverse"]) && Convert.ToDecimal(row["NetAmount"])>0)};
+        if(!reverse.Enabled) reverse.Text=FeeChargeCancellation.CanCancel
+            ? "Reverse selected charges (unavailable — see each charge's reason below)" : "Reverse selected charges (fee collection and adjustment permissions required)";
         var payments=new RadioButton {Name="ReviewPayments",Text="Open Fee Collection before deciding — no certificate is created yet",AutoSize=true,Enabled=CurrentUser.HasPermission("Fees.Collect")};
         var choices=new FlowLayoutPanel {Dock=DockStyle.Top,AutoSize=true,FlowDirection=FlowDirection.TopDown,WrapContents=false};
         choices.Controls.Add(keep); choices.Controls.Add(reverse); choices.Controls.Add(payments);

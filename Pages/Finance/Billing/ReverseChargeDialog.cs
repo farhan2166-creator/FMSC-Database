@@ -113,10 +113,11 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
         FinanceHelp.Attach(this,reverseButton,FinanceHelp.Topic.CancelCharge);
         FinanceHelp.Attach(this,reason,FinanceHelp.Topic.CancelCharge);
         Disposed += (_, _) => validator.Dispose();
+        reverseButton.Enabled=FeeChargeCancellation.CanCancel;
     }
     private async Task SaveAsync()
     {
-        if (!reverseButton.Enabled)
+        if (!reverseButton.Enabled || !FeeChargeCancellation.CanCancel)
             return;
         validator.Begin();
         validator.Required(reason, "Give a reason - it is recorded");
@@ -154,7 +155,7 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
                 "Reverse Charge",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning);
-            reverseButton.Enabled = true;
+            reverseButton.Enabled = FeeChargeCancellation.CanCancel;
             cancelButton.Enabled = true;
         }
     }

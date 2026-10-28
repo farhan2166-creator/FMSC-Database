@@ -74,7 +74,7 @@ public sealed partial class FeeCollectionPage
         finally{billBusy=false;}
     }
     private async Task<DataTable> TransportAssignmentsAsync()=>await DatabaseHelper.QueryUserAsync("GetStudentFeeAssignments",DatabaseHelper.Int("@EnrollmentId",enrollmentId));
-    private bool SelectedEnrollmentIsOpen=>enrollment.SelectedItem is DataRowView view && GetText(view.Row,"Status") is "Active" or "Pending";
+    private bool SelectedEnrollmentIsOpen=>enrollment.SelectedItem is DataRowView view && GetText(view.Row,"Status")=="Active";
     private bool transportStarts=true,transportKnown;
     private void UpdateTransportButton()
     {
@@ -101,7 +101,7 @@ public sealed partial class FeeCollectionPage
     private async Task OpenTransportAsync(bool start)
     {
         if(enrollmentId<=0 || !CanOpenFeeChange())return;
-        if(!SelectedEnrollmentIsOpen){Info("Transport changes require the student's active or pending placement. Select that placement first.");return;}
+        if(!SelectedEnrollmentIsOpen){Info("Transport changes require completed admission and an active placement. Edit a pending registration's transport fee in its registration fee plan.");return;}
         billBusy=true;
         try
         {

@@ -1,14 +1,22 @@
+using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Core;
 
 internal sealed record AdmissionSubmission(string Number, string Student, string Parent, DateTime Date,
     int CampusId, bool Historical, int DiscountCount);
 internal sealed record ConfirmedAdmission(int Id, string RegistrationNumber);
 internal sealed record AdmissionConfirmation(ConfirmedAdmission? Admission, bool Reconciled,
-    Exception? WriteError = null, Exception? ReadError = null);
+    Exception? WriteError = null, Exception? ReadError = null, bool Rejected = false);
 
 /// <summary>A submitted admission is never retried automatically, including after a lost reply.</summary>
 internal static class AdmissionSaveConfirmation
 {
+    // Migration 60 uses this state only after a verified rollback and before
+    // its own admission commit. Ordinary SQL errors/timeouts remain uncertain.
+    internal const byte VerifiedRollbackState = 60;
+    internal static bool IsVerifiedRejection(Exception error) => error is SqlException sql
+        && sql.Errors.Cast<SqlError>().Any(item=>item.Class>=11)
+        && sql.Errors.Cast<SqlError>().Where(item=>item.Class>=11)
+            .All(item=>item.Number>=50000 && item.State==VerifiedRollbackState);
     internal static ConfirmedAdmission? ReadResponse(DataSet response, string number)
     {
         // Fee procedures may emit earlier tables; select the documented admission response.
@@ -53,7 +61,10 @@ internal static class AdmissionSaveConfirmation
             using var response = await write();
             if (ReadResponse(response, submitted.Number) is { } confirmed) return new(confirmed, false);
         }
-        catch (Exception ex) { writeError = ex; }
+        catch (Exception ex) {
+            if(IsVerifiedRejection(ex))return new(null,false,ex,Rejected:true);
+            writeError = ex;
+        }
         // A malformed response or exception can follow a server commit. Read; never repeat the write.
         return await RecheckAsync(submitted, read, writeError);
     }
@@ -76,7 +87,10 @@ internal static class AdmissionSaveConfirmation
     {
         Exception? writeError = null;
         try { await write(); }
-        catch (Exception ex) { writeError = ex; }
+        catch (Exception ex) {
+            if(IsVerifiedRejection(ex))return new(null,false,ex,Rejected:true);
+            writeError = ex;
+        }
         var result = await RecheckAsync(submitted, read, writeError);
         return result with {
             Admission = result.Admission?.Id == admissionId ? result.Admission : null,

@@ -558,8 +558,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         };
         counterReverseButton=reverseChargeButton;
         void UpdateReverseChargeButton() => reverseChargeButton.Enabled =
-            !transactionBusy && charges.Enabled && charges.CurrentRow is { } row &&
-            GetLong(row.Cells["BillingChargeId"].Value) > 0;
+            charges.Enabled && charges.CurrentRow is { } row && CanCancelCharge(row);
         charges.SelectionChanged += (_, _) => UpdateReverseChargeButton();
         charges.EnabledChanged += (_, _) => UpdateReverseChargeButton();
         charges.DataBindingComplete += (_, _) => UpdateReverseChargeButton();
@@ -1256,9 +1255,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var details=chargeMenu.Items.Add("View Fee Details");
         details.Enabled=!IsBusy&&!siblingBusy&&CurrentUser.HasPermission("Fees.View");
         details.Click+=async(_,_)=>await ViewFeeDetailsAsync(chargeId);
-        if(GetDecimal(row.Cells["Balance"].Value)>0m && counterIds is null
-            &&GetDecimal(row.Cells["NetAmount"].Value)==GetDecimal(row.Cells["Balance"].Value)
-            &&CurrentUser.HasPermission("Fees.Adjust"))
+        if(CanCancelCharge(row))
         {
             chargeMenu.Items.Add(new ToolStripSeparator());
             var cancel=chargeMenu.Items.Add("Cancel This Unpaid Charge…");
@@ -3952,6 +3949,12 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
         finally{billBusy=false;}
     }
+    private bool CanCancelCharge(DataGridViewRow row) => !IsBusy && !siblingBusy && counterIds is null
+        && FeeChargeCancellation.CanCancel && !row.IsNewRow
+        && GetLong(row.Cells["BillingChargeId"].Value)>0
+        && GetDecimal(row.Cells["Balance"].Value)>0
+        && GetDecimal(row.Cells["Balance"].Value)==GetDecimal(row.Cells["NetAmount"].Value);
+
     private async Task ReverseChargeAsync(int rowIndex)
     {
         using var returnFocus = new DialogReturnFocus(this);
@@ -3968,6 +3971,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             Warn("That row is not a posted charge, so there is nothing to reverse.");
             return;
         }
+        if(!CanCancelCharge(row))return;
         // Closed enrollment does not make an erroneous unpaid charge permanent.
         // The audited procedure checks payment state and requires a reason.
         string chargeName =

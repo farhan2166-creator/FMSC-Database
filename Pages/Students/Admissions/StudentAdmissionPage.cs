@@ -4525,6 +4525,13 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
     {
         if (confirmation.WriteError is { } writeError) AppExceptionHandler.LogNonFatal(writeError, "Admission write response");
         if (confirmation.ReadError is { } readError) AppExceptionHandler.LogNonFatal(readError, "Checking admission after an uncertain write");
+        if(confirmation.Rejected)
+        {
+            unconfirmedAdmission=null;
+            UpdateStudentWorkspace();
+            Warn(confirmation.WriteError is { } refusal ? DbMessage.UserMessage(refusal) : "Admission was not saved. Review the entries and try again.");
+            return;
+        }
         if (confirmation.Admission is not { } admitted)
         {
             unconfirmedAdmission = submitted;

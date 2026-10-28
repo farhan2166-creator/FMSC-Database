@@ -34,6 +34,15 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--admission-fee-flow-sql-compat"))
+        {
+            CheckAdmissionFeeFlowSqlCompatibility();Console.WriteLine($"PASS: {checks} owned schema-60 compatibility check.");return;
+        }
+        if(args.Contains("--admission-fee-flow-fixes"))
+        {
+            CheckAdmissionFeeFlowFixes();
+            Console.WriteLine($"PASS: {checks} admission/fee flow permission, status, account and refusal checks.");return;
+        }
         if(args.Contains("--fee-account"))
         {
             CheckFeeAccountWorkspace();CheckPaymentAdjustmentContext();CheckPaymentDetailGeneration();CheckAdjustmentRecoveryGuard();

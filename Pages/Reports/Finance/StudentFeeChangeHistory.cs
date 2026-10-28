@@ -113,7 +113,7 @@ internal static class StudentFeeChangeHistory
         foreach (DataRow r in data.Tables[2].Rows)
             rows.Rows.Add(Text(r,"Status")=="PartiallyPaid" ? "Partially paid" : Text(r,"Status")=="Open" ? "Unpaid" : Text(r,"Status"),Text(r,"FeeTypeName"),
                 $"Gross Rs. {Money(r["GrossAmount"])}\nDiscount Rs. {Money(r["DiscountAmount"])}\nNet Rs. {Money(r["NetAmount"])}",
-                Month(r["BillingMonth"],"Not recorded"),"—",$"Charge #{r["BillingChargeId"]}\n{Text(r,"Remarks")}");
+                Month(r["BillingMonth"],"Not recorded"),"—",$"Charge #{r["BillingChargeId"]}\n{ChargeNote(r)}");
         if (charges.Count == 0) rows.Rows.Add("—","No posted charges","—","—","—","No charges were found.");
         AddSection("CHANGE TIMELINE", "Oldest first. Recorded date/time is separate from the effective month. Only recorded values are shown.");
         int events = 0, incomplete = 0;
@@ -185,6 +185,8 @@ internal static class StudentFeeChangeHistory
         void AddSection(string title,string note) => rows.Rows.Add("SECTION",title,"","","",note);
     }
 
+    private static string ChargeNote(DataRow row) => Text(row,"CancellationReason") is { Length: > 0 } reason
+        ? Text(row,"Remarks")+"\nCancellation: "+reason : Text(row,"Remarks");
     private static string Text(DataRow row,string key) => row.Table.Columns.Contains(key) && row[key]!=DBNull.Value ? Convert.ToString(row[key]) ?? "" : "";
     private static string Money(object value) => Convert.ToDecimal(value).ToString("N0");
     private static string Month(object value,string blank) => value==DBNull.Value ? blank : Convert.ToDateTime(value).ToString("MMM yyyy");

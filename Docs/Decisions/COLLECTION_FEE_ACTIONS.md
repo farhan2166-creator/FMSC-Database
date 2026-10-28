@@ -1,5 +1,7 @@
 # Focused collection fee actions — 27 October 2026
 
+28 October follow-up: cancelling an unpaid charge requires both collection and adjustment permission through every UI route and at the SQL write. Migration 60 retains a full cancellation reason, actor and timestamp separately from the bill's existing notes; it does not delete the bill or its history. See [the admission/fee flow fixes](ADMISSION_FEE_FLOW_FIXES.md).
+
 The collection grid shows unpaid fees and newly waived posted fees awaiting a
 receipt or fee-change acknowledgement. A zero balance alone cannot distinguish
 payment from waiver: the existing visit/snapshot baseline supplies that evidence.

@@ -304,6 +304,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         hint.Text = "Select a student to see the fees assigned to them.";
     }
     private bool enrollmentHasLeft;
+    private bool enrollmentPending;
     private void LoadGrid(bool chooseLatestPostedMonth = false)
     {
         try
@@ -312,6 +313,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
                 EXEC dbo.RequirePermission @UserId,N'Students.View';
                 SELECT Status FROM dbo.Enrollments WHERE EnrollmentId=@EnrollmentId;
                 """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@EnrollmentId",enrollmentId));
+            enrollmentPending=placement.Rows.Count>0 && Convert.ToString(placement.Rows[0]["Status"])=="Pending";
             enrollmentHasLeft=placement.Rows.Count>0 && Convert.ToString(placement.Rows[0]["Status"]) is not ("Active" or "Pending");
             var dt = DatabaseHelper.QueryUser(
                 "GetStudentFeeAssignments",
@@ -425,6 +427,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             : grid.Rows.Cast<DataGridViewRow>().Any(r => r.Tag is true)
                 ? "Some fee periods overlap. Review these before making further changes."
                 : FeeAssignmentPresentation.CompactSummary(assignments, ReferenceMonth);
+        if(enrollmentPending) hint.Text+=" Edit pending transport in the registration fee plan; Start/Stop Transport is available after admission.";
         if(enrollmentHasLeft) hint.Text="Student has left. These are preserved fee records. Existing charges and balances remain in Fee Collection.";
         reviewButton.Enabled = !enrollmentHasLeft && !IsBusy && enrollmentId > 0 && CurrentUser.HasPermission("Fees.Collect");
     }
@@ -484,9 +487,9 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             return;
         }
         bool isOpenRowSelected = row != null && row.Tag is not true && row.Cells["IsOpen"].Value is bool b && b;
-        discontinueButton.Enabled = isOpenRowSelected && IsTransport(row!);
+        discontinueButton.Enabled = CurrentUser.HasPermission("Fees.Adjust") && !enrollmentPending && isOpenRowSelected && IsTransport(row!);
         discountButton.Enabled = row != null && row.Tag is not true && CurrentUser.HasPermission("Fees.Adjust");
-        startTransportButton.Enabled = enrollmentId>0 && addButton.Enabled && !hasOpenTransport;
+        startTransportButton.Enabled = !enrollmentPending && enrollmentId>0 && addButton.Enabled && !hasOpenTransport;
     }
     /// <summary>Fills the fee row menu and says whether it should open at all. A historical row therefore opens the menu with everything greyed out rather than pretending the actions apply.</summary>
     private bool BuildRowMenu(DataGridViewRow? row)
@@ -512,7 +515,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         if(IsTransport(row))
         {
             var stop=rowMenu.Items.Add("Stop Transport...");
-            stop.Enabled=!enrollmentHasLeft&&isOpenRowSelected;
+            stop.Enabled=CurrentUser.HasPermission("Fees.Adjust")&&!enrollmentHasLeft&&!enrollmentPending&&isOpenRowSelected;
             stop.Click += (_, _) => Discontinue();
         }
         return true;
@@ -555,7 +558,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
     }
     private void StartTransport()
     {
-        if(enrollmentId<=0 || hasOpenTransport) return;
+        if(enrollmentId<=0 || hasOpenTransport || enrollmentPending) return;
         using var form=new TransportServiceDialog(enrollmentId,true);
         if(form.ShowDialog(this)==DialogResult.OK)
         {
@@ -566,7 +569,7 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
     private void Discontinue()
     {
         var row = SelectedRow;
-        if (row == null || row.Tag is true || !IsTransport(row)) return;
+        if (row == null || row.Tag is true || !IsTransport(row) || enrollmentPending) return;
         using var form = new TransportServiceDialog(enrollmentId,false,Convert.ToInt32(row.Cells["FeeTypeId"].Value));
         if (form.ShowDialog(this) == DialogResult.OK)
         {

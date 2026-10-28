@@ -23,8 +23,7 @@ public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
     }
     protected override IEnumerable<ModernButton> AdditionalReportActions()
     {
-        openStatement = AddBusyAction("Open Statement", OpenStatementAsync, "Secondary");
-        GateAction(openStatement, "Fees.Statement.View");
+        openStatement = AddBusyAction("Open Student Account", OpenStatementAsync, "Secondary");
         openStatement.Enabled = false;
         return new[] { openStatement };
     }
@@ -73,25 +72,28 @@ public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
     protected override bool CanPrintClassOutstanding => ViewName == "Aging" ||
         (TryDays(out int from,out int? to) && !overdueOnly.Checked && from==0 && to is null && NumericFilterSignature(minimumBalance.Text)=="0");
     protected override void ReportAvailabilityChanged() { base.ReportAvailabilityChanged(); UpdateStatementAction(); }
+    internal static bool CanOpenStudentAccount => StudentAccountStatementPage.CanOpenAccount
+        && CurrentUser.HasPermission("Fees.View");
     private void UpdateStatementAction()
     {
         if (openStatement is null) return;
         openStatement.Enabled = CurrentReportAvailable && ViewName is "Students" or "Charges"
-            && CurrentUser.HasPermission("Fees.Statement.View") && Grid.CurrentRow?.DataBoundItem is DataRowView;
+            && CanOpenStudentAccount && Grid.CurrentRow?.DataBoundItem is DataRowView;
     }
     private async Task OpenStatementAsync()
     {
-        if (!CurrentReportAvailable || !CurrentUser.HasPermission("Fees.Statement.View") || ViewName is not ("Students" or "Charges")
+        if (!CurrentReportAvailable || !CanOpenStudentAccount || ViewName is not ("Students" or "Charges")
             || Grid.CurrentRow?.DataBoundItem is not DataRowView selected) return;
         string reference = Convert.ToString(selected.Row["Adm. / QR No."]) ?? "";
         string signature = ReportFilterSignature();
         int actor = CurrentUser.UserId;
         var rows = await Task.Run(() => DatabaseHelper.QuerySql("""
-            EXEC dbo.RequirePermission @UserId,N'Fees.Statement.View';
+            EXEC dbo.RequireAnyPermission @UserId,N'Reports.View',N'Fees.Collect';
+            EXEC dbo.RequirePermission @UserId,N'Fees.View';
             SELECT AdmissionId FROM dbo.Students
             WHERE COALESCE(NULLIF(AdmissionNumber,N''),NULLIF(QuickReference,N''),CONCAT(N'ID-',AdmissionId))=@Reference;
             """, DatabaseHelper.Int("@UserId",actor), DatabaseHelper.P("@Reference",reference)));
-        if (IsDisposed || CurrentUser.UserId != actor || !CurrentReportAvailable || signature != ReportFilterSignature() || !CurrentUser.HasPermission("Fees.Statement.View")
+        if (IsDisposed || CurrentUser.UserId != actor || !CurrentReportAvailable || signature != ReportFilterSignature() || !CanOpenStudentAccount
             || Grid.CurrentRow?.DataBoundItem is not DataRowView current || Convert.ToString(current.Row["Adm. / QR No."]) != reference) return;
         if (rows.Rows.Count != 1) { Warn("The selected student's account could not be identified. Refresh the report."); return; }
         using var dialog = new ApplicationWindowForm { Text = PageTitles.StudentFeeAccount, StartPosition = FormStartPosition.CenterParent,
