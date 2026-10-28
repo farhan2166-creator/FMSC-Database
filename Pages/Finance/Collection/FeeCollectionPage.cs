@@ -832,7 +832,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             if (!suppressPaymentEvents) RefreshEnteredPaymentAllocation();
         };
         // Keep transaction feedback in the page status, not below Next Student.
-        Disposed += (_, _) => collectionResult.Dispose();
+        Disposed += (_, _) => {collectionResult.Dispose();familyPaymentBreakdowns.Dispose();};
         foreach (ModernButton button in new[] { fullAmountButton!, printReceiptButton!, executeButton!, clear })
         {
             button.AutoSize = false;
@@ -1420,6 +1420,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         // Reuse values already loaded for the history grid. No extra financial reads
         // or reconstructed discounts/balances belong in this presentation panel.
         string reference = row.Cells["ReceiptNumber"].Tag as string ?? GetText(row.Cells["ReceiptNumber"].Value);
+        if(ShowFamilyPaymentBreakdown(reference))return;
         string Money(string column) => decimal.TryParse(Convert.ToString(row.Cells[column].Value), out decimal value)
             ? value.ToString("#,0.##") : "—";
         var details = new List<(string Label, string Value)> {
@@ -1457,11 +1458,14 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     {
         if (paymentHistoryDetails is not { IsDisposed: false } panel) return;
         var entries = details.ToArray();
+        // Preserve the existing scroll access for the longer individual summary.
+        SetPaymentHistoryMinimum(entries.Length>1?480:380);
         panel.SuspendLayout();
         try
         {
             foreach (Control control in panel.Controls.Cast<Control>().ToArray()) control.Dispose();
             panel.Controls.Clear(); panel.RowStyles.Clear();
+            panel.Tag=null;
             panel.RowCount = (entries.Length + 1) / 2;
             panel.Text = string.Join(Environment.NewLine, entries.Select(entry => $"{entry.Label}: {entry.Value}"));
             for (int i = 0; i < panel.RowCount; i++) panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -2456,6 +2460,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private async Task LoadRecentPayments() => await LoadRecentPaymentsAsync(++loadVersion);
     private async Task LoadRecentPaymentsAsync(int version)
     {
+        familyPaymentBreakdowns.Clear();
         recentPayments.Rows.Clear();
         if (admissionId <= 0)
             return;
@@ -2489,6 +2494,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 """,DatabaseHelper.Int("@UserId",userId),DatabaseHelper.Int("@AdmissionId",selectedAdmission));
             if (IsDisposed || version != loadVersion) return;
             using var issued=await DatabaseHelper.QueryUserSetAsync("GetStudentCollectionReceipts",DatabaseHelper.Int("@AdmissionId",admissionId));
+            if(IsDisposed || version!=loadVersion) return;
+            await LoadFamilyPaymentBreakdownsAsync(selectedAdmission,version);
             if(IsDisposed || version!=loadVersion) return;
             var byPayment = summaries.AsEnumerable().ToDictionary(row => GetInt(row,"FeePaymentId"));
             if(lastCollectionReceipt is null && lastGroupReceiptNumber is null)
@@ -2585,6 +2592,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 recentPayments.Rows[index].Tag = !reversed && (IsPrintablePayment(row) || (creditKind=="Application" && !string.IsNullOrWhiteSpace(GetText(row,"ReceiptNumber"))));
             }
             UpdateReprintAvailability();
+            UpdatePaymentHistoryDetails();
         }
         catch (Exception ex)
         {
@@ -3814,7 +3822,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var card =
             HumanUi.Card(
                 $"Recent Payments · {StudentNameFor(admissionId)} · Admission {AdmissionNumbers.ForId(admissionId)}",
-                "Select a payment for its details below. Family totals cover all included students; negative amounts are money returned.");
+                "Select a payment. Family breakdown and original totals appear below.");
+        // The window caption identifies the student; keep room for both tables.
+        card.Header.Visible=false;card.Padding=Padding.Empty;card.Content.Padding=Padding.Empty;
         recentPayments.Dock =
             DockStyle.Fill;
         card.Content.Controls.Add(
@@ -3867,7 +3877,11 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         // Bound wrapping keeps the details readable without widening the dialog.
         root.SizeChanged += (_, _) => {
             if (paymentHistoryDetails is not null)
+            {
                 paymentHistoryDetails.MaximumSize = new Size(Math.Max(1, root.ClientSize.Width - root.Padding.Horizontal), 0);
+                foreach(var grid in paymentHistoryDetails.Controls.OfType<DataGridView>())FitFamilyPaymentBreakdown(grid);
+            }
+            UiHelper.FitColumnsToWidth(recentPayments);
         };
         root.Controls.Add(
             card,
@@ -3875,8 +3889,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             0);
         root.Controls.Add(paymentHistoryDetails, 0, 1);
         root.Controls.Add(buttons, 0, 2);
-        dialog.Controls.Add(
-            root);
+        dialog.Controls.Add(new ResponsiveViewport(root,new Size(AppScale.Scale(680),AppScale.Scale(380))));
         dialog.CancelButton =
             closeButton;
         // The hidden grid can receive its size before it has a handle, when the

@@ -34,6 +34,16 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--receipt-breakdown"))
+        {
+            CheckReceiptBreakdown();
+            Console.WriteLine($"PASS: {checks} sibling receipt breakdown, original totals and layout checks (no database connection).");return;
+        }
+        if(args.Contains("--receipt-breakdown-sql"))
+        {
+            CheckReceiptBreakdownSql();
+            Console.WriteLine($"PASS: {checks} read-only sibling receipt and existing-formula consistency checks.");return;
+        }
         if(args.Contains("--admission-sibling-baseline"))
         {
             CheckAdmissionSiblingBaseline();CheckAdmissionPostSaveBaseline();
