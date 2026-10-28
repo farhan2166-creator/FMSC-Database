@@ -5,6 +5,7 @@ using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Reports.Finance;
 using FMSC_SMS.Pages.Security;
 using FMSC_SMS.Pages.Finance.StudentAccounts;
+using FMSC_SMS.Pages.Reports;
 
 internal static partial class Program
 {
@@ -48,8 +49,13 @@ internal static partial class Program
             using(var shell=new MainDashboardForm((_,_)=>{}))
             {
                 var commands=(List<NavigationCommand>)typeof(MainDashboardForm).GetField("navigationCommands",flags)!.GetValue(shell)!;
-                Check(commands.Any(c=>c.Caption==PageTitles.StudentFeeAccount)&&!commands.Any(c=>c.Caption==PageTitles.StudentFeeCorrections),"Full-access navigation consolidates statements and corrections into the account");
+                Check(commands.Any(c=>c.Caption==PageTitles.StudentFeeAccount)&&!commands.Any(c=>c.Caption=="Student Fee Corrections"),"Full-access navigation consolidates statements and corrections into the account");
                 Check(commands.Count(c=>c.Caption=="Fee Collection")==1,"The existing collection destination remains intact");
+            }
+            using(var reports=new ReportsHomePage((Action<Func<Control>,string,string>)((_,_,_)=>{})))
+            {
+                Check(!DescendantControls(reports).Any(c=>c.Text==PageTitles.StudentFeeAccount),"Reports no longer duplicates the operational account workspace");
+                Check(DescendantControls(reports).Any(c=>c.Text==PageTitles.FamilyGroupStatements)&&DescendantControls(reports).Any(c=>c.Text==PageTitles.AnnualFeeReceipts),"Distinct batch statement and annual receipt reports remain available");
             }
             page.ReadAccount=id=>Task.FromResult(Snapshot(id));
             using var owner=new Form{ClientSize=new Size(1180,800),ShowInTaskbar=false};owner.Controls.Add(page);owner.Show();Application.DoEvents();
@@ -76,7 +82,28 @@ internal static partial class Program
             Invoke("UpdateAccountActions");Check(!Field<ModernButton>("correctPayment").Enabled,"A different signed-in user cannot act on the preceding user's financial rows");
             Wait((Task)Invoke("RefreshAccountAsync")!);Invoke("UpdateAccountActions");
             Check(!Field<ModernButton>("correctPayment").Visible,"Read-only operator is not offered corrections");
-            using(var context=(StudentFeeAdjustmentsPage)Activator.CreateInstance(typeof(StudentFeeAdjustmentsPage),flags,null,new object?[]{false,null,null,41,101},null)!)
+            CurrentUser.SignIn(923,"Collections operator","Operator",false,new[]{"Fees.Collect","Fees.View","Fees.Adjust"});
+            using(var restricted=new StudentAccountStatementPage(false,(_,_,_)=>throw new Exception("Report reader must not run for collection-only access"),false,true){BindingContext=new BindingContext()})
+            {
+                restricted.ReadAccount=id=>Task.FromResult(Snapshot(id));
+                using(var shell=new MainDashboardForm((_,_)=>{}))
+                {
+                    var commands=(List<NavigationCommand>)typeof(MainDashboardForm).GetField("navigationCommands",flags)!.GetValue(shell)!;
+                    Check(commands.Any(c=>c.Caption==PageTitles.StudentFeeAccount)&&!commands.Any(c=>c.Caption=="Student Fee Corrections"),"Collection-only operators reach the consolidated account without a redundant correction page");
+                }
+                using var restrictedWindow=new Form{ClientSize=new Size(1100,800),ShowInTaskbar=false};restrictedWindow.Controls.Add(restricted);restricted.Dock=DockStyle.Fill;restrictedWindow.Show();Application.DoEvents();
+                var restrictedPicker=(StudentPicker)type.GetField("studentSearch",flags)!.GetValue(restricted)!;restrictedPicker.SetStudent(41,"Student 41");
+                type.GetMethod("SelectSingleStudent",flags)!.Invoke(restricted,null);
+                Wait((Task)type.GetMethod("LoadStatement",flags)!.Invoke(restricted,null)!);
+                var restrictedViews=(TabControl)type.GetField("accountViews",flags)!.GetValue(restricted)!;
+                Check(restrictedViews.SelectedIndex==1,"Collection-only account opens receipts instead of unauthorized statements");
+                restrictedViews.SelectedIndex=0;Check(restrictedViews.SelectedIndex==1,"Statement tab does not bypass report authorization");
+                Check(((DataGridView)type.GetField("accountPayments",flags)!.GetValue(restricted)!).Rows.Count==1,"Existing authorized payment history remains accessible without report permission");
+                Check(((ModernButton)type.GetField("recoverPayment",flags)!.GetValue(restricted)!).Enabled,"Save recovery remains reachable independently of payment eligibility");
+                restrictedWindow.Close();
+            }
+            CurrentUser.SignIn(921,"Read only","Operator",false,new[]{"Reports.View","Fees.View"});
+            using(var context=(PaymentCorrectionReview)Activator.CreateInstance(typeof(PaymentCorrectionReview),flags,null,new object?[]{false,null,null,41,101},null)!)
             {
                 var adjustmentType=context.GetType();
                 adjustmentType.GetField("admissionId",flags)!.SetValue(context,42);
