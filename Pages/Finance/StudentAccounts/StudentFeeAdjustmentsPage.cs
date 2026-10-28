@@ -6,6 +6,8 @@ namespace FMSC_SMS.Pages.Finance.StudentAccounts;
 public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChanges
 {
     private readonly LatestReadScope detailReads=new();
+    private readonly int contextAdmissionId;
+    private readonly int contextPaymentId;
     private readonly Func<int,int,int,Task<DataTable>> readPaymentDetails;
     private readonly Action<DataTable>? showPaymentDetails;
     private bool recoveryBlocked;
@@ -55,10 +57,16 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
     public StudentFeeAdjustmentsPage() : this(true) { }
     internal StudentFeeAdjustmentsPage(bool initialize) : this(initialize,null,null) { }
     internal StudentFeeAdjustmentsPage(bool initialize,Func<int,int,int,Task<DataTable>>? readPaymentDetails,Action<DataTable>? showPaymentDetails)
+        : this(initialize,readPaymentDetails,showPaymentDetails,0,0) { }
+    internal StudentFeeAdjustmentsPage(int admissionId,int paymentId)
+        : this(true,null,null,admissionId,paymentId) { }
+    private StudentFeeAdjustmentsPage(bool initialize,Func<int,int,int,Task<DataTable>>? readPaymentDetails,Action<DataTable>? showPaymentDetails,int contextAdmissionId,int contextPaymentId)
         : base(
             PageTitles.StudentFeeCorrections,
             "Review payments, reduce recorded collections, or record refunds.")
     {
+        this.contextAdmissionId=contextAdmissionId;
+        this.contextPaymentId=contextPaymentId;
         this.readPaymentDetails=readPaymentDetails??ReadPaymentDetailsAsync;
         this.showPaymentDetails=showPaymentDetails;
         Disposed+=(_,_)=>detailReads.Dispose();
@@ -187,6 +195,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
             studentBar.Height + studentCard.Padding.Vertical + studentCard.Header.Height + studentCard.Content.Padding.Vertical));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
         root.Controls.Add(studentCard, 0, 0);
+        if(contextPaymentId>0){studentCard.Visible=false;root.RowStyles[0].Height=0;}
         root.Controls.Add(paymentLayout, 0, 1);
         SetContent(
             root,
@@ -198,7 +207,13 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                 "Select the student from the results to see their payment history.");
             return Task.CompletedTask;
         });
-        if(initialize){ReadAdjustmentRecovery();if(recoveryBlocked)Defer(CheckAdjustmentOutcomeAsync);}
+        if(initialize){ReadAdjustmentRecovery();if(recoveryBlocked&&contextPaymentId==0)Defer(CheckAdjustmentOutcomeAsync);}
+        if(initialize&&contextPaymentId>0)Defer(async()=>{
+            var found=await StudentSearchCache.FindByAdmissionIdAsync(contextAdmissionId);
+            if(IsDisposed)return;
+            if(found is not null)student.SetStudent(found);else student.SetStudent(contextAdmissionId,AdmissionNumbers.ForId(contextAdmissionId));
+            await LoadPaymentsAsync();
+        });
 
     }
     private static void ConfigureDecimalInput(ModernTextBox box)
@@ -221,6 +236,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         payments.Columns.Add("Status", "Status");
         payments.Columns.Add("AvailableActions","Available Actions");
         payments.Columns.Add("OriginalReceipt","Original Receipt");
+        if(contextPaymentId>0)payments.Columns.Add("StudentName","Student");
         payments.Columns["PaymentId"].Visible = false;
         foreach(string name in new[]{"OriginalAmount","Amount"}) {
         payments.Columns[name].DefaultCellStyle = new DataGridViewCellStyle {
@@ -271,29 +287,11 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         int userId=CurrentUser.UserId;
         try
         {
-            var history=await Task.Run(() => DatabaseHelper.QuerySql("""
-                EXEC dbo.RequirePermission @UserId,N'Fees.View';
-                SELECT P.FeePaymentId,P.EnrollmentId,P.PaymentDate TransactionDate,
-                    P.ReceiptNumber,P.PaymentMethod,P.TotalAmount PaidAmount,P.Status,
-                    P.RelatedFeePaymentId,O.ReceiptNumber OriginalReceipt,
-                    ISNULL(R.Refunded,0) Refunded,ISNULL(R.Corrected,0) Corrected,
-                    ISNULL(R.ReleasedToCredit,0) ReleasedToCredit,
-                    CONVERT(bit,CASE WHEN P.IsCreditApplication=1 OR EXISTS(
-                        SELECT 1 FROM dbo.StudentCreditEntries C WHERE C.FeePaymentId=P.FeePaymentId)
-                        THEN 1 ELSE 0 END) IsCreditEntry
-                FROM dbo.FeePayments P
-                LEFT JOIN dbo.FeePayments O ON O.FeePaymentId=P.RelatedFeePaymentId
-                OUTER APPLY (SELECT
-                    -SUM(CASE WHEN A.PaymentMethod=N'Refund' THEN A.TotalAmount ELSE 0 END) Refunded,
-                    -SUM(CASE WHEN A.PaymentMethod=N'Correction' THEN A.TotalAmount ELSE 0 END) Corrected,
-                    -SUM(CASE WHEN A.IsCreditApplication=1 THEN A.TotalAmount ELSE 0 END) ReleasedToCredit
-                    FROM dbo.FeePayments A WHERE A.RelatedFeePaymentId=P.FeePaymentId
-                    AND A.Status=N'Completed' AND A.TotalAmount<0) R
-                WHERE P.AdmissionId=@AdmissionId ORDER BY P.PaymentDate DESC,P.FeePaymentId DESC;
-                """,DatabaseHelper.Int("@UserId",userId),DatabaseHelper.Int("@AdmissionId",chosen)));
+            var history=await ReadPaymentHistoryAsync(userId,chosen);
             if(IsDisposed || version!=paymentsLoadVersion || student.SelectedId!=chosen) return;
             paymentRows=history;
             var orderedPayments=history.AsEnumerable()
+                .Where(row=>contextPaymentId==0||GetInt(row,"FeePaymentId")==contextPaymentId)
                 .Select(row=>(Row:row,State:PaymentAdjustmentState.Create(
                     GetText(row,"Status"),GetText(row,"PaymentMethod"),
                     GetDecimal(row,"PaidAmount"),GetInt(row,"RelatedFeePaymentId")>0,
@@ -314,6 +312,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                         action=="Reversal" ? "Reverse" : OperationLabel(action))),
                     GetText(row,"OriginalReceipt"));
                 payments.Rows[index].Tag=state;
+                if(contextPaymentId>0)payments.Rows[index].Cells["StudentName"].Value=GetText(row,"StudentName");
                 payments.Rows[index].Cells["AvailableActions"].ToolTipText=state.Explanation;
             }
             UiHelper.SetGridEmptyMessage(payments,"No payments were found for this student.");
@@ -331,6 +330,30 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
                 else Fail(ex);
             }
         }
+    }
+    internal static async Task<DataTable> ReadPaymentHistoryAsync(int userId,int chosen)
+    {
+        return await Task.Run(() => DatabaseHelper.QuerySql("""
+                EXEC dbo.RequirePermission @UserId,N'Fees.View';
+                SELECT P.FeePaymentId,P.EnrollmentId,P.PaymentDate TransactionDate,
+                    (SELECT StudentName FROM dbo.Students WHERE AdmissionId=P.AdmissionId) StudentName,
+                    P.ReceiptNumber,P.PaymentMethod,P.TotalAmount PaidAmount,P.Status,
+                    P.RelatedFeePaymentId,O.ReceiptNumber OriginalReceipt,
+                    ISNULL(R.Refunded,0) Refunded,ISNULL(R.Corrected,0) Corrected,
+                    ISNULL(R.ReleasedToCredit,0) ReleasedToCredit,
+                    CONVERT(bit,CASE WHEN P.IsCreditApplication=1 OR EXISTS(
+                        SELECT 1 FROM dbo.StudentCreditEntries C WHERE C.FeePaymentId=P.FeePaymentId)
+                        THEN 1 ELSE 0 END) IsCreditEntry
+                FROM dbo.FeePayments P
+                LEFT JOIN dbo.FeePayments O ON O.FeePaymentId=P.RelatedFeePaymentId
+                OUTER APPLY (SELECT
+                    -SUM(CASE WHEN A.PaymentMethod=N'Refund' THEN A.TotalAmount ELSE 0 END) Refunded,
+                    -SUM(CASE WHEN A.PaymentMethod=N'Correction' THEN A.TotalAmount ELSE 0 END) Corrected,
+                    -SUM(CASE WHEN A.IsCreditApplication=1 THEN A.TotalAmount ELSE 0 END) ReleasedToCredit
+                    FROM dbo.FeePayments A WHERE A.RelatedFeePaymentId=P.FeePaymentId
+                    AND A.Status=N'Completed' AND A.TotalAmount<0) R
+                WHERE P.AdmissionId=@AdmissionId ORDER BY P.PaymentDate DESC,P.FeePaymentId DESC;
+                """,DatabaseHelper.Int("@UserId",userId),DatabaseHelper.Int("@AdmissionId",chosen)));
     }
     private void OnPaymentSelected()
     {
@@ -390,6 +413,8 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
     }
     /// <summary>The two preconditions ExecuteAsync checks at the top of its handler before it will do anything: a student must have been loaded (admissionId) and one recorded payment must be selected (selectedPaymentId).</summary>
     private bool ExecuteIsAvailable() =>
+        (contextPaymentId==0||CurrentUser.HasPermission("Fees.Adjust"))&&
+        (contextPaymentId==0||(admissionId==contextAdmissionId&&selectedPaymentId==contextPaymentId))&&
         !recoveryBlocked&&admissionId > 0 && selectedPaymentId > 0 && payments.CurrentRow?.Tag is PaymentAdjustmentState state &&
         state.Actions.Contains(SelectedOperation);
     /// <summary>derives the enabled state of Execute Adjustment from the current selection, so an unavailable action is not offered as a normal operation.</summary>
@@ -590,6 +615,11 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
             if(saved is null){SetStatus("The earlier adjustment was not recorded. Reload payments and deliberately submit it again only if still needed.",PageStatusKind.Warning);return;}
             LookupDataCache.OperationCompleted("ProcessFeeTransaction");
             reason.Clear();actionAmount.Text="0";
+            if(contextPaymentId>0&&saved.SubjectId!=contextAdmissionId)
+            {
+                await LoadPaymentsAsync("The earlier adjustment for another student is verified. The selected payment has been reloaded; review it before submitting.",contextAdmissionId);
+                return;
+            }
             var found=await StudentSearchCache.FindByAdmissionIdAsync(saved.SubjectId);
             if(IsDisposed)return;
             if(found is not null)student.SetStudent(found);else student.SetStudent(saved.SubjectId,"Recovered student");
@@ -648,7 +678,7 @@ public sealed class StudentFeeAdjustmentsPage : V2Page, IBusyPage, IUnsavedChang
         grid.DataSource=data;
         return grid;
     }
-    private static Task<DataTable> ReadPaymentDetailsAsync(int userId,int paymentId,int studentId)
+    internal static Task<DataTable> ReadPaymentDetailsAsync(int userId,int paymentId,int studentId)
     {
         return Task.Run(()=>DatabaseHelper.QuerySql("""
             EXEC dbo.RequirePermission @UserId,N'Fees.View';

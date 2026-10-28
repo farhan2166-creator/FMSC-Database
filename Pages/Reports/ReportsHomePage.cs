@@ -111,10 +111,10 @@ public sealed class ReportsHomePage : V2Page
                             "Finance", () => new CreditBalanceReportPage())
                     } : Array.Empty<ReportDefinition>()),
                     new(
-                        PageTitles.StudentAccountStatement,
-                        "A student's charges, payments and balance.",
+                        PageTitles.StudentFeeAccount,
+                        "Student or family statements, original receipts and authorized payment corrections.",
                         "Finance",
-                        () => new StudentAccountStatementPage()),
+                        () => StudentAccountStatementPage.CreateAccount()),
                     ..(CurrentUser.HasPermission("Fees.Statement.View") ? new ReportDefinition[] {
                         new(PageTitles.FamilyGroupStatements,"Choose students or families and view their statements together.",
                             "Finance",() => StudentAccountStatementPage.CreateFamilyGroupStatements()),
