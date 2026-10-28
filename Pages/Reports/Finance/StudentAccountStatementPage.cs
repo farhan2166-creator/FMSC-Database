@@ -49,7 +49,6 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         };
     private readonly bool groupMode;
     private Action? arrangeStatement;
-    private ModernButton? familyGroupButton;
     private readonly Label statementContext = new() {
         Dock = DockStyle.Fill, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft,
         Font = AppTheme.ButtonFont, ForeColor = AppTheme.Text,
@@ -226,15 +225,13 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         if(groupMode)modeBar.Controls.Add(find);
         else
         {
-            familyGroupButton=CreateFilterButton("Family / Group Statements…",AppTheme.MutedText);
-            familyGroupButton.Click+=(_,_)=>OpenFamilyGroupStatements();
             printAmountsDueButton=CreateFilterButton("Outstanding Bills…",AppTheme.MutedText);
             printAmountsDueButton.Click+=async(_,_)=>await PrintDueReport();
             SetToolTip(printAmountsDueButton,"Open current unpaid bills for this student. Statement dates do not limit these bills.");
             annualReceiptsButton=CreateFilterButton("Annual Receipts…",AppTheme.MutedText);
             annualReceiptsButton.Click+=async(_,_)=>await OpenAnnualReceipts();
             SetToolTip(annualReceiptsButton,"Open the separate annual receipts report for this student and choose its academic year.");
-            foreach(var button in new[]{familyGroupButton,printAmountsDueButton,annualReceiptsButton})
+            foreach(var button in new[]{printAmountsDueButton,annualReceiptsButton})
             {
                 AppMetrics.FitButtonWidth(button,minWidth:110);
                 button.Margin=new Padding(4,0,4,0);modeBar.Controls.Add(button);
@@ -409,25 +406,6 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
         return Task.CompletedTask;
-    }
-    public static StudentAccountStatementPage CreateFamilyGroupStatements(int admissionId=0)
-    {
-        var page=new StudentAccountStatementPage(true,null,true);
-        if(admissionId>0)page.Defer(()=>page.PreloadAdmissionIdAsync(admissionId));
-        return page;
-    }
-    private void OpenFamilyGroupStatements()
-    {
-        if(IsBusy||IsDisposed||!CurrentUser.HasPermission("Fees.Statement.View"))return;
-        try
-        {
-            var page=CreateFamilyGroupStatements(studentSearch.SelectedId);
-            page.from.Value=from.Value;page.from.Checked=from.Checked;
-            page.to.Value=to.Value;page.to.Checked=to.Checked;
-            using var dialog=CreateRelatedReportDialog(PageTitles.FamilyGroupStatements,page);
-            dialog.ShowDialog(FindForm());
-        }
-        catch(Exception ex){if(!IsDisposed)Fail(ex);}
     }
     private static ApplicationWindowForm CreateRelatedReportDialog(string title,Control page)
     {
@@ -1162,7 +1140,6 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         bool hasStudents = GetSelectedAdmissionIds().Count > 0;
         if (generateStatementButton is not null) generateStatementButton.Enabled = hasStudents&&!BusyOperationRunning;
         if (printAmountsDueButton is not null) printAmountsDueButton.Enabled = hasStudents && !IsBusy && CurrentUser.HasPermission("Fees.View");
-        if(familyGroupButton is not null)familyGroupButton.Enabled=!IsBusy&&CurrentUser.HasPermission("Fees.Statement.View");
         if (annualReceiptsButton is not null) annualReceiptsButton.Enabled = GetSelectedAdmissionIds().Count == 1
             && !IsBusy && CurrentUser.HasPermission("Fees.Statement.View");
         if (groupMode) statementContext.Text = $"Group statement · {GetSelectedAdmissionIds().Count:N0} student(s) included";

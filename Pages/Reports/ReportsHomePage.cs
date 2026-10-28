@@ -111,8 +111,6 @@ public sealed class ReportsHomePage : V2Page
                             "Finance", () => new CreditBalanceReportPage())
                     } : Array.Empty<ReportDefinition>()),
                     ..(CurrentUser.HasPermission("Fees.Statement.View") ? new ReportDefinition[] {
-                        new(PageTitles.FamilyGroupStatements,"Choose students or families and view their statements together.",
-                            "Finance",() => StudentAccountStatementPage.CreateFamilyGroupStatements()),
                         new(PageTitles.AnnualFeeReceipts,"Choose one student and an academic year to view their receipts.",
                             "Finance",() => new AnnualFeeReceiptsPage())
                     } : Array.Empty<ReportDefinition>()),

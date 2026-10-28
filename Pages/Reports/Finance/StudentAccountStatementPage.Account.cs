@@ -45,17 +45,16 @@ public sealed partial class StudentAccountStatementPage
             await LoadStatement();
         };
         // Reuse the related-report strip; its existing wrapping/DPI arrangement is retained.
-        if(familyGroupButton?.Parent is FlowLayoutPanel reports)
+        if(printAmountsDueButton?.Parent is FlowLayoutPanel reports)
         {
             var menu=new ContextMenuStrip();
-            var groups=menu.Items.Add("Family / Group Statements…",null,(_,_)=>OpenFamilyGroupStatements());
             var due=menu.Items.Add("Outstanding Bills…",null,async(_,_)=>await PrintDueReport());
             var annual=menu.Items.Add("Annual Receipts…",null,async(_,_)=>await OpenAnnualReceipts());
-            menu.Opening+=(_,_)=>{groups.Enabled=familyGroupButton.Enabled;due.Enabled=printAmountsDueButton?.Enabled==true;annual.Enabled=annualReceiptsButton?.Enabled==true;};
-            foreach(var button in new[]{familyGroupButton,printAmountsDueButton,annualReceiptsButton})if(button is not null)reports.Controls.Remove(button);
+            menu.Opening+=(_,_)=>{due.Enabled=printAmountsDueButton?.Enabled==true;annual.Enabled=annualReceiptsButton?.Enabled==true;};
+            foreach(var button in new[]{printAmountsDueButton,annualReceiptsButton})if(button is not null)reports.Controls.Remove(button);
             var related=CreateFilterButton("Reports…",AppTheme.MutedText);related.Click+=(_,_)=>menu.Show(related,new Point(0,related.Height));
             reports.Controls.Add(accountFamily);reports.Controls.Add(related);
-            Disposed+=(_,_)=>{menu.Dispose();familyGroupButton.Dispose();printAmountsDueButton?.Dispose();annualReceiptsButton?.Dispose();};
+            Disposed+=(_,_)=>{menu.Dispose();printAmountsDueButton?.Dispose();annualReceiptsButton?.Dispose();};
             arrangeStatement?.Invoke();
         }
         Grid.SelectionChanged+=(_,_)=>UpdateAccountActions();
