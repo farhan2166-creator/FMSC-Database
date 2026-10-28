@@ -1,11 +1,17 @@
+## Current target: schema 59
+
+Migration `59.sql` retires the remaining 19 generic audit writers after schema 58. Apply it once under an outer transaction using the installer or `sqlcmd -b`. It preserves existing audit rows/readers, permissions, preview snapshots, operational history and recovery markers. This remaining batch is explicitly owner-authorized on 28 October 2026. Validate with `Tools/TestRemainingAuditRetirement.ps1` (owned, record-free fixture).
+
+For any supported starting version from 19 through 58, apply every numbered file greater than that version up to and including 59 in ascending order. Never rerun an applied migration. Historical tables below describe the earlier migration-51 stage; they are not the current complete upgrade list.
+
 # Apply the database changes later
 
-The application requires **schema 58**. SQL changes are checked in here;
+The application requires **schema 59**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,
-`54.sql`, `55.sql`, `56.sql`, `57.sql`, then `58.sql`. A database already at 57
-needs only `58.sql`; one at 56 needs `57.sql` and `58.sql`.
+`54.sql`, `55.sql`, `56.sql`, `57.sql`, `58.sql`, then `59.sql`. A database already at 58
+needs only `59.sql`; one at 57 needs `58.sql` and `59.sql`.
 Migration 55 preserves existing financial records and introduces complete,
 immutable receipt snapshots. See `Docs/Decisions/FEE_RECEIPT_PAPER_TRAIL.md`.
 Migration 56 changes the printable breakdown to each visit: carry outstanding,

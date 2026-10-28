@@ -489,14 +489,9 @@ BEGIN
  BEGIN TRANSACTION;
  DECLARE @RoleName nvarchar(50);SELECT @RoleName=RoleName FROM dbo.Roles WITH(UPDLOCK,HOLDLOCK) WHERE RoleId=@RoleId;
  IF ISNULL(@RoleName,N'')<>N'Accountant' THROW 51001,'Only Accountant permissions are editable; Administrator retains full authority.',1;
- DECLARE @Old nvarchar(max)=N'['+ISNULL((SELECT STRING_AGG(CONVERT(nvarchar(max),PermissionId),N',') WITHIN GROUP(ORDER BY PermissionId) FROM dbo.RolePermissions WHERE RoleId=@RoleId),N'')+N']';
- -- Preserve every baseline permission validation, protected-role rule and audit.
+ -- Preserve every baseline permission validation, protected-role rule.
  DECLARE @Saved TABLE(RoleId int);INSERT @Saved EXEC dbo.SaveRolePermissions @UserId,@RoleId,@Base;
  INSERT dbo.RolePermissions(RoleId,PermissionId) SELECT @RoleId,PermissionId FROM @Optional;
- DECLARE @New nvarchar(max)=N'['+ISNULL((SELECT STRING_AGG(CONVERT(nvarchar(max),PermissionId),N',') WITHIN GROUP(ORDER BY PermissionId) FROM dbo.RolePermissions WHERE RoleId=@RoleId),N'')+N']',@Operation uniqueidentifier=NEWID(),@Record nvarchar(200)=CONVERT(nvarchar(200),@RoleId);
- INSERT dbo.AuditOperations(OperationId,UserId,OperationType,CorrelationNote) VALUES(@Operation,@UserId,N'COMMUNICATION_ROLE_PERMISSIONS_SAVE',@Record);
- EXEC dbo.WriteAuditLog @OperationId=@Operation,@UserId=@UserId,@TableName=N'RolePermissions',@RecordId=@Record,@Action=N'UPDATE',@OldValues=@Old,@NewValues=@New;
- DELETE dbo.AuditOperations WHERE OperationId=@Operation AND NOT EXISTS(SELECT 1 FROM dbo.AuditLogs WHERE OperationId=@Operation);
  INSERT comm.Audit(Actor,Operation,Detail) VALUES(@UserId,'CommunicationGrantsSaved',N'Explicit role edit; original base permission procedure and protected-role checks retained');
  COMMIT;
  SELECT @RoleId RoleId;

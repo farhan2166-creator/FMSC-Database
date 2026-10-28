@@ -22,7 +22,7 @@ internal static partial class Program
         string Token(int enrollment,bool start){using var data=Manage(enrollment,start);return Convert.ToString(data.Tables[0].Rows[0]["Snapshot"])!;}
         bool Rejected(Action action,int code)
         {try{action();return false;}catch(SqlException ex){return ex.Number==code;}}
-        Check(Convert.ToString(Scalar("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC"))=="58","Transport integration uses a migrated schema-58 fixture");
+        Check(Convert.ToString(Scalar("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC"))==FMSC_SMS.DatabaseHelper.RequiredDatabaseSchemaVersion,"Transport integration uses the current migrated schema fixture");
         DatabaseCompatibility.Validate(connection);Check(true,"The migrated database satisfies the application's complete startup and recovery contract");
         string originalProcedure=System.Text.RegularExpressions.Regex.Replace(Convert.ToString(Scalar("SELECT OBJECT_DEFINITION(OBJECT_ID(N'dbo.ManageStudentTransport'))"))!,@"\ACREATE\s+(?:OR\s+ALTER\s+)?PROCEDURE","ALTER PROCEDURE",System.Text.RegularExpressions.RegexOptions.IgnoreCase);
         var month=new DateTime(2026,10,1);

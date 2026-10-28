@@ -1,5 +1,9 @@
 # System redundancy review — 28 October 2026
 
+## Follow-up: migration 59 prepared
+
+The owner subsequently requested work on the remaining audit writers. Migration 59 now revises all 19 inventoried procedures and preserves the historical readers and data. Parser-based business-SQL checks passed for all 19 procedures, isolated SQL tests passed, and the application builds. Application and installer require schema 59. Live application was rejected by automatic approval review pending explicit production-change approval; live schema remains 58. See [the migration decision and validation details](Decisions/REMAINING_AUDIT_RETIREMENT.md). The earlier no-bulk-rewrite status below describes the source-cleanup stage and is superseded by this prepared migration.
+
 ## Cleanup performed after owner authorization
 
 The findings below record the original review. The following status supersedes their proposed/removal language.
