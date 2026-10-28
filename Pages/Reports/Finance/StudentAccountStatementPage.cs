@@ -1,6 +1,6 @@
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Reports.Finance;
-public sealed class StudentAccountStatementPage : V2Page, IBusyPage
+public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
 {
     private readonly LookupBox campus =
         new();
@@ -72,16 +72,24 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         new();
     private readonly LatestReadScope statementReads=new();
     private readonly Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>> readStatement;
-    public bool IsBusy=>BusyOperationRunning||printingDueReport;
+    public bool IsBusy=>BusyOperationRunning||printingDueReport||accountActionBusy;
     public string BusyMessage=>"A financial statement or report is being prepared. Wait for the result before leaving.";
     public StudentAccountStatementPage() : this(true,null) { }
     internal StudentAccountStatementPage(bool initialize,Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>>? readStatement)
         : this(initialize,readStatement,false) { }
     internal StudentAccountStatementPage(bool initialize,Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>>? readStatement,bool groupMode)
-        : base(groupMode?PageTitles.FamilyGroupStatements:PageTitles.StudentAccountStatement,
+        : this(initialize,readStatement,groupMode,false) { }
+    internal StudentAccountStatementPage(bool initialize,Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>>? readStatement,bool groupMode,bool accountMode)
+        : base(accountMode?PageTitles.StudentFeeAccount:groupMode?PageTitles.FamilyGroupStatements:PageTitles.StudentAccountStatement,
             groupMode?"Choose students or families, then view their account statements together.":"See what a student was charged, what was paid and what remains due.")
     {
         this.groupMode=groupMode;
+        this.accountMode=accountMode;
+        Disposed+=(_,_)=>{
+            accountReads.Dispose();
+            foreach(var control in new Control[]{accountReceipts,accountPayments,accountTransactions,accountCredits,accountSummary})
+                if(!control.IsDisposed)control.Dispose();
+        };
         this.readStatement=readStatement??LoadStatementDataAsync;
         FinanceHelp.Attach(this,openingBalance,"The amount already due before the selected statement period. It is carried into this statement, not newly charged.","Rs. 500 was unpaid before October. The October statement starts with Rs. 500 opening dues.");
         FinanceHelp.Attach(this,closingBalance,"The amount still due after the statement's charges, payments and adjustments. This report does not change the student's account.","Opening dues Rs. 500 plus fees Rs. 400 minus payment Rs. 300 leaves Rs. 600 due.");
@@ -166,6 +174,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         Grid.DataBindingComplete += (_, _) => { ConfigureStatementGrid(); FormatStatementAmounts(); };
         BuildStatementLayout();
         ClearForm();
+        if(accountMode)InitializeAccount();
     }
     private void BuildStatementLayout()
     {
@@ -270,9 +279,9 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
         selectionBody.Controls.Add(students, 0, 2);
         if(groupMode)selectionBody.Controls.Add(actions,0,3);
         studentCard.Content.Controls.Add(selectionBody);
-        var statement = HumanUi.Card("Account Details", "Fee charges with allocated payments and remaining amounts.", accessory: exportButton);
+        var statement = HumanUi.Card(accountMode?"Account Activity":"Account Details", accountMode?"Statements, saved receipts and authorized payment corrections.":"Fee charges with allocated payments and remaining amounts.", accessory: exportButton);
         statement.Header.Controls.SetChildIndex(exportButton, statement.Header.Controls.Count - 1);
-        statement.Content.Controls.Add(Grid);
+        statement.Content.Controls.Add(accountMode?BuildAccountViews():Grid);
         var summary = BuildSummary();
         var root = new TableLayoutPanel {
             ColumnCount = 1, RowCount = 6, Margin = Padding.Empty, Padding = Padding.Empty
@@ -353,6 +362,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
                 int fixedHeight = root.RowStyles.Cast<RowStyle>().Where(r => r.SizeType == SizeType.Absolute).Sum(r => (int)r.Height);
                 int statementHeight = statement.Padding.Vertical + statement.Header.Height + statement.Content.Padding.Vertical
                     + Grid.ColumnHeadersHeight + AppMetrics.GridRowHeight * 5 + SystemInformation.HorizontalScrollBarHeight;
+                if(accountMode)statementHeight+=AppScale.Scale(90);
                 root.Size = new Size(width,
                     Math.Max(viewport.ClientSize.Height, fixedHeight + statementHeight));
                 root.ResumeLayout(true);
@@ -739,6 +749,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     /* report the displayed statement as stale the moment the selection or dates no longer match the values that produced it. */
     private void OnFiltersChanged()
     {
+        if(accountMode)InvalidateAccount();
         if(BusyOperationRunning)statementReads.Cancel();
         UpdateSelectionActions();
         if (string.IsNullOrEmpty(_appliedFilterSignature))
@@ -1307,8 +1318,12 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
     }
     private async Task LoadStatement()
     {
-        try{await RunBusyAsync("Generating statement…",LoadStatementCoreAsync,this);}
-        finally{if(!IsDisposed)UpdateSelectionActions();}
+        if(accountMode)InvalidateAccount();
+        try{await RunBusyAsync("Generating statement…",async()=>{
+            await LoadStatementCoreAsync();
+            if(accountMode&&!string.IsNullOrEmpty(_appliedFilterSignature))await RefreshAccountAsync();
+        },this);}
+        finally{if(!IsDisposed){UpdateSelectionActions();if(accountMode)UpdateAccountActions();}}
     }
     private async Task LoadStatementCoreAsync()
     {
@@ -1336,6 +1351,8 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             }
             var combined =
                 CreateStatementTable();
+            var chronological=accountMode?new DataTable():null;
+            var names=accountMode?new Dictionary<int,string>():null;
             decimal combinedOpening = 0m;
             decimal combinedCharges = 0m;
             decimal combinedPayments = 0m;
@@ -1358,6 +1375,8 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
                 return (statement.Transactions,statement.OpeningBalance,Name:name);
             },(id,statement)=>{
                 AppendStudentRows(combined,statement.Transactions,statement.Name);
+                if(chronological is not null)AppendAccountTransactions(chronological,statement.Transactions,id,statement.Name);
+                if(names is not null)names[id]=statement.Name;
                 combinedCharges+=SumDistinctCharges(statement.Transactions);
                 combinedPayments+=SumPayments(statement.Transactions);
                 combinedOpening+=statement.OpeningBalance;
@@ -1367,12 +1386,14 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
                 combined.Columns.Contains("TransactionDate"))
             {
                 combined = await Task.Run(()=>{
-                    combined.DefaultView.Sort="StatementStudent ASC, TransactionDate ASC, TransactionType ASC, TransactionId ASC";
+                    combined.DefaultView.Sort=accountMode?"TransactionDate ASC, StatementStudent ASC, TransactionType ASC, TransactionId ASC":"StatementStudent ASC, TransactionDate ASC, TransactionType ASC, TransactionId ASC";
                     return combined.DefaultView.ToTable();
                 },request.Token);
                 if(IsDisposed||!statementReads.IsCurrent(request)||signature!=FilterSignature())return;
             }
             Bind(combined);
+            if(names is not null)accountStudentNames=names;
+            if(chronological is not null)BindAccountTransactions(chronological);
             UiHelper.SetGridEmptyMessage(Grid, "No account entries for the selected students and dates.");
             ConfigureStatementGrid();
             FormatStatementAmounts();
@@ -1392,6 +1413,7 @@ public sealed class StudentAccountStatementPage : V2Page, IBusyPage
             _appliedFilterSignature =
                 FilterSignature();
             SetReportActionsEnabled(true);
+            if(accountMode)UpdateAccountActions();
         }
         catch(OperationCanceledException) when(!statementReads.IsCurrent(request)) { }
         catch (Exception ex)

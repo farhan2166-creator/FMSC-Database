@@ -7,6 +7,7 @@ using FMSC_SMS.Pages.Finance.Collection;
 using FMSC_SMS.Pages.Finance.Configuration;
 using FMSC_SMS.Pages.Finance.StudentAccounts;
 using FMSC_SMS.Pages.Reports;
+using FMSC_SMS.Pages.Reports.Finance;
 using FMSC_SMS.Pages.Setup;
 using FMSC_SMS.Pages.Setup.Academics;
 using FMSC_SMS.Pages.Staff;
@@ -642,6 +643,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     PageTitles.FeePosting,
                     "Fees.Collect"),
             new(
+                PageTitles.StudentFeeAccount,
+                () => StudentAccountStatementPage.CreateAccount(),
+                "Finance",
+                PageTitles.StudentFeeAccount,
+                "Reports.View"),
+            new(
                 PageTitles.StudentFeeCorrections,
                 () => new StudentFeeAdjustmentsPage(),
                 "Finance",
@@ -673,7 +680,8 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     "Certificates",
                     PageTitles.StudentCertificates,
                     "Certificates.Create")
-            }.Where(item => item.Title != PageTitles.FamilyAdmission || FamilyAdmissionData.CanUse(CurrentUser.HasPermission)).ToArray(),
+            }.Where(item => (item.Title != PageTitles.FamilyAdmission || FamilyAdmissionData.CanUse(CurrentUser.HasPermission))
+                && (item.Title != PageTitles.StudentFeeCorrections || !CurrentUser.HasPermission("Reports.View"))).ToArray(),
             expandInitially: true);
         AddModule(
             flow,
