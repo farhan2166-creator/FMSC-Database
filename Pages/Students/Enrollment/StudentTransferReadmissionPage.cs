@@ -634,7 +634,8 @@ public sealed class StudentTransferReadmissionPage : V2Page
         /* The destination lists are derived FROM the operation: LoadDestinationLists excludes the student's current campus / class / section for every operation except Re-Admit (1243-1244). */
         if (!string.Equals(previousOperation, name, StringComparison.Ordinal))
         {
-            LoadDestinationLists();
+            if(name!="Re-Admit"&&enrollment.SelectedId>0)LoadCurrentPlacement();
+            else LoadDestinationLists();
         }
     }
     private string? SelectedEnrollmentStatus()
@@ -679,6 +680,16 @@ public sealed class StudentTransferReadmissionPage : V2Page
                 .FirstOrDefault(r => Convert.ToInt32(r["EnrollmentId"]) == enrollment.SelectedId);
             if (row is not null)
             {
+                if (fixedOperation != "Re-Admit" && selectedOperation != "Re-Admit"
+                    && row.Table.Columns.Contains("PlacementYearEnd") && row["PlacementYearEnd"] is DateTime end
+                    && row["EnrollmentDate"] is DateTime start)
+                {
+                    date.MinDate=start.Date;
+                    date.MaxDate=end.Date<DateTime.Today?end.Date:DateTime.Today;
+                    date.Value=date.MaxDate;
+                    date.ShowCheckBox=end.Date<DateTime.Today;
+                    date.Checked=!date.ShowCheckBox;
+                }
                 currentCampusDisplay.Text =
                     Convert.ToString(row["CampusName"]);
                 currentClassDisplay.Text =
@@ -1005,6 +1016,13 @@ public sealed class StudentTransferReadmissionPage : V2Page
             selectedOperation == "Transfer Campus";
         bool reAdmit =
             selectedOperation == "Re-Admit";
+        if(reAdmit&&(date.ShowCheckBox||date.MinDate!=DateTimePicker.MinimumDateTime))
+        {
+            date.ShowCheckBox=false;date.Checked=true;
+            date.MinDate=DateTimePicker.MinimumDateTime;
+            date.MaxDate=DateTime.Today;
+            date.Value=DateTime.Today;
+        }
         UiHelper.SetFieldCaption(dateField, "Effective Date");
         UiHelper.SetFieldCaption(remarksField, "Remarks", false);
         var fields =
@@ -1052,6 +1070,8 @@ public sealed class StudentTransferReadmissionPage : V2Page
     {
         if (isExecuting)
             return;
+        if(selectedOperation!="Re-Admit"&&date.ShowCheckBox&&!date.Checked)
+        {Warn("Select the actual historical transfer date within the recorded academic year.");return;}
         if (selectedOperation == "Re-Admit" && enrollmentsRaw.AsEnumerable().Any(row =>
             string.Equals(Convert.ToString(row["Status"]), "Active", StringComparison.OrdinalIgnoreCase)))
         {
@@ -1093,6 +1113,14 @@ public sealed class StudentTransferReadmissionPage : V2Page
             Warn("Transfer date cannot be before the placement date.");
             return;
         }
+        bool currentTransferPlacement=selectedEnrollment is not null
+            && selectedEnrollment.Table.Columns.Contains("PlacementYearStart")
+            && selectedEnrollment["PlacementYearStart"] is DateTime yearStart
+            && selectedEnrollment["PlacementYearEnd"] is DateTime yearEnd
+            && DateTime.Today>=yearStart.Date && DateTime.Today<=yearEnd.Date;
+        bool canSyncTransferFees=currentTransferPlacement && selectedEnrollment!["BillingReady"] is bool ready && ready;
+        if(operation!="Re-Admit" && !currentTransferPlacement && string.IsNullOrWhiteSpace(remarks.Text))
+        { Warn("Enter a reason for recording this historical transfer. Its date must be within the recorded academic year; existing fees will be preserved."); return; }
         string remarksText = remarks.Text.Trim();
         bool usesTransport = reAdmitTransport.Checked;
         bool allotNewAdmissionNumber = readmissionNumberChoice.SelectedIndex == 1;
@@ -1202,25 +1230,28 @@ public sealed class StudentTransferReadmissionPage : V2Page
                 string toLabel = operation == "Transfer Class"
                     ? $"{currentCampusDisplay.Text} — {destinationClassName}"
                     : $"{destinationCampusName} — {currentClassDisplay.Text}";
-                using var dialog = new TransferFeeSyncDialog(
-                    student.Text,
-                    fromLabel,
-                    toLabel,
-                    transferDate,
-                    enrollmentId,
-                    feeCampusId,
-                    feeClassId);
-                if (dialog.HasFeeDifference)
+                if (canSyncTransferFees)
                 {
-                    if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+                    using var dialog = new TransferFeeSyncDialog(
+                        student.Text,
+                        fromLabel,
+                        toLabel,
+                        transferDate,
+                        enrollmentId,
+                        feeCampusId,
+                        feeClassId);
+                    if (dialog.HasFeeDifference)
                     {
-                        // Cancel: nothing happens - no transfer, no fee change.
-                        return;
+                        if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
+                        {
+                            // Cancel: nothing happens - no transfer, no fee change.
+                            return;
+                        }
+                        feeDecision = dialog.Decision;
+                        feeEffectiveMonth = dialog.EffectiveMonth;
+                        replaceScheduledFees = dialog.ReplaceScheduledFees;
+                        paidReductionAction = dialog.PaidReductionAction;
                     }
-                    feeDecision = dialog.Decision;
-                    feeEffectiveMonth = dialog.EffectiveMonth;
-                    replaceScheduledFees = dialog.ReplaceScheduledFees;
-                    paidReductionAction = dialog.PaidReductionAction;
                 }
             }
             catch (Exception ex)

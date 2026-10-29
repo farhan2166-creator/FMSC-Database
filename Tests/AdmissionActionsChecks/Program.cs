@@ -26,4 +26,9 @@ var transferOnly=State(admin:false);Check(transferOnly.Transfer&&!transferOnly.H
 var adminOnly=State(enroll:false);Check(adminOnly.History&&adminOnly.Hold&&!adminOnly.Transfer,"Student administrators do not gain transfer permission implicitly");
 Check(State("active").Hold&&State("LEFT").Readmit,"Status casing cannot create misleading alternatives");
 Check(!State(legacy:true,held:true).Setup,"An existing hold cannot be bypassed through legacy activation");
+var historical=AdmissionWorkflowActions.For(1,"Active",false,false,0,false,false,true,true,false);
+Check(historical.History&&historical.Transfer&&historical.Departure,"Historical students retain history-building transfers and departure");
+Check(!historical.Hold&&!historical.Resume,"Historical placement cannot enter routine hold or resume");
+var historicalHeld=AdmissionWorkflowActions.For(1,"Left",false,false,0,true,false,true,true,false);
+Check(!historicalHeld.Resume&&!historicalHeld.ReviewLeft&&historicalHeld.History,"Historical hold needs a current placement before return; history stays available");
 Console.WriteLine($"PASS: {checks} focused admission workflow action checks; no database or financial writes.");

@@ -34,11 +34,13 @@ public sealed partial class StudentAdmissionPage
         enrollmentActionsMenu.Opening+=(_,_)=>{
             var state=AdmissionWorkflowActions.For(currentAdmissionId,_workspaceStudentStatus,IsPendingRegistration,legacySetupPending,
                 pendingPlacementId,studentPostingHeld,IsBusy || unconfirmedAdmission is not null,
-                CurrentUser.HasPermission("Students.Administer"),CurrentUser.HasPermission("Enrollment.Manage"));
+                CurrentUser.HasPermission("Students.Administer"),CurrentUser.HasPermission("Enrollment.Manage"),HasCurrentPlacement);
             void Show(ToolStripItem item,bool visible) {item.Visible=visible;item.Enabled=visible && state.Enabled;}
             Show(setup,state.Setup);Show(complete,state.CompleteDraft);Show(history,state.History);
             Show(hold,state.Hold);Show(resume,state.Resume);Show(departure,state.Departure);Show(readmit,state.Readmit);
             Show(transfer,state.Transfer);foreach(ToolStripItem item in transfer.DropDownItems)item.Enabled=transfer.Enabled;
+            transfer.ToolTipText=HasCurrentPlacement?"Transfer within this academic year.":"Record a historical transfer within the recorded academic year, with a reason. Existing fees are preserved.";
+            departure.ToolTipText=HasCurrentPlacement?"Record the student's departure.":"Record the actual historical leaving date within this placement's academic year.";
             Show(advanced,state.ReviewLeft);Show(adopt,state.ReviewLeft);
             section.Visible=state.History && (state.Hold || state.Resume || state.Departure || state.Readmit || state.Transfer || state.ReviewLeft);
             hint.Visible=!(state.Setup || state.CompleteDraft || state.History || state.Hold || state.Resume || state.Departure || state.Readmit || state.Transfer || state.ReviewLeft);

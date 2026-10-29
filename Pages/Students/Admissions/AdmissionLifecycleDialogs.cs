@@ -16,15 +16,23 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
     private bool busy;
     private int reviewGeneration;
     internal bool Changed {get;private set;}
-    internal CloseAdmissionDialog(int admission,string student,bool cancel,Func<string,SqlParameter[],Task<DataTable>>? query=null)
+    internal CloseAdmissionDialog(int admission,string student,bool cancel,Func<string,SqlParameter[],Task<DataTable>>? query=null,
+        DateTime? placementStart=null,DateTime? placementEnd=null)
     {
         this.admission=admission;this.cancel=cancel;
         this.query=query??((procedure,parameters)=>DatabaseHelper.QueryUserAsync(procedure,parameters));
+        if(placementStart is DateTime start)date.MinDate=start;
+        date.MaxDate=placementEnd is DateTime end && end<DateTime.Today?end:DateTime.Today;
+        date.Value=date.MaxDate;
+        if(placementEnd is DateTime pastEnd && pastEnd<DateTime.Today)
+        {date.ShowCheckBox=true;date.Checked=false;}
         Text=cancel?"Cancel Registration":"Record Departure";StartPosition=FormStartPosition.CenterParent;
         ClientSize=new Size(AppScale.Scale(820),AppScale.Scale(740));MinimumSize=new Size(AppScale.Scale(680),AppScale.Scale(580));
         ShowInTaskbar=false;MinimizeBox=false;
         impact.ReadOnly=true;impact.Dock=DockStyle.Fill;impact.ScrollBars=ScrollBars.Vertical;
-        impact.Text="Enter the date and reason, then select Review to see the effect before saving.";
+        impact.Text=placementEnd is DateTime last && last<DateTime.Today
+            ? $"Historical placement ending {last:dd MMM yyyy}. Enter the actual leaving date and reason before Review. Existing financial history is retained."
+            : "Enter the date and reason, then select Review to see the effect before saving.";
         monthlyPolicy.Items.AddRange(new object[]{"Use the school cutoff","Keep all issued monthly bills","Waive monthly bills from a selected month"});monthlyPolicy.SelectedIndex=0;
         paidReduction.Items.AddRange(new object[]{"Keep excess payment as advance","Refund the excess payment"});paidReduction.SelectedIndex=0;
         FinanceHelp.Attach(this,paidReduction,FinanceHelp.Topic.PaidReduction);
@@ -75,6 +83,7 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
         DatabaseHelper.P("@ExpectedSnapshot",preview?null:Convert.ToString(plan?["Snapshot"]))});
     private async Task ReviewAsync()
     {
+        if(date.ShowCheckBox&&!date.Checked){impact.Text="Select the actual historical leaving date before reviewing departure.";return;}
         if(busy)return;Reset();int generation=reviewGeneration;busy=true;root.Enabled=false;
         impact.Text="Reviewing the placement and financial effect…";
         try

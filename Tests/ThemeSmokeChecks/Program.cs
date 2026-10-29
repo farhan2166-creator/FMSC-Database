@@ -34,6 +34,11 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--individual-outstanding-bill"))
+        {
+            CheckHistoricalLifecycleControls();CheckIndividualOutstandingBill();
+            Console.WriteLine($"PASS: {checks} individual/family bill scope, alignment, permission and stale-preview checks (no database connection).");return;
+        }
         if(args.Contains("--windows-print-dialog")||args.Contains("--windows-print-dialog-preview"))
         {
             CheckWindowsPrintDialog(args.Contains("--windows-print-dialog-preview"));

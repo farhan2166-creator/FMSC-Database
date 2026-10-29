@@ -113,6 +113,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private ModernButton? transportButton;
     private ModernButton? studentCreditButton;
     private ModernButton? printBillButton;
+    private ModernButton? printStudentBillButton;
+    private Func<Form?,int,int[]?,Func<bool>?,bool,Task> showOutstandingBill = FeeBillPreview.ShowAsync;
     private readonly ModernComboBox billGrouping=HumanUi.Combo();
     private readonly Dictionary<int,string> receiptReviewTokens=new();
     private readonly Dictionary<int, decimal> availableCreditByStudent = new();
@@ -368,10 +370,15 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         studentFeesMenu.Items.Add(new ToolStripSeparator());
         // Bills cover current unpaid charges. Paid transactions are reprinted as receipts.
         billGrouping.Items.AddRange(new object[]{"Individual","By family"});billGrouping.SelectedIndex=0;
-        printBillButton = AddBusyAction("Print Outstanding", PrintSelectedFamilyBillAsync, "Secondary");
+        printBillButton = AddBusyAction("Print Family Bill", PrintSelectedFamilyBillAsync, "Secondary");
+        printStudentBillButton = AddBusyAction("Print Student Bill", () => PrintOutstandingBillAsync(true), "Secondary");
         printBillButton.Enabled = false;
+        printStudentBillButton.Enabled = false;
+        UiAccessibility.Describe(printBillButton,"Print family outstanding bill","Print saved outstanding charges for the selected children.");
+        UiAccessibility.Describe(printStudentBillButton,"Print selected student's outstanding bill","Print saved outstanding charges for the main selected student only, regardless of sibling selections.");
         historyButton.EnabledChanged += (_, _) => {
             printBillButton.Enabled = historyButton.Enabled && CurrentUser.HasPermission("Fees.View");
+            printStudentBillButton.Enabled = printBillButton.Enabled;
         };
         var familyReturnsItem=new ToolStripMenuItem("Family / Returns");
         familyReturnsItem.Click+=async(_,_)=>await OpenFamilyReturnsAsync();
@@ -400,6 +407,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             printReceiptButton,
             feeAssignmentsButton,
             printBillButton,
+            printStudentBillButton,
             addChargeButton,
             futureFeesButton,
             historyButton,
@@ -861,7 +869,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             Padding = Padding.Empty, Margin = Padding.Empty
         };
         paymentHistoryButton!.Text = "Recent Payments";
-        foreach (Control button in new Control[] { studentFeesMenuButton!, transportButton!, addChargeButton!, printBillButton!, studentCreditButton!, paymentHistoryButton })
+        foreach (Control button in new Control[] { studentFeesMenuButton!, transportButton!, addChargeButton!, printBillButton!, printStudentBillButton!, studentCreditButton!, paymentHistoryButton })
         {
             button.AutoSize = false;
             button.Dock = DockStyle.None;
@@ -870,6 +878,10 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             button.Margin = new Padding(0, 0, 8, 0);
             actions.Controls.Add(button);
         }
+        int printWidth=new[]{"Print Family Bill","Print Student Bill","Print Fee Changes"}
+            .Max(caption=>TextRenderer.MeasureText(caption,printBillButton!.Font).Width)+AppScale.Scale(24);
+        foreach(var button in new[]{printBillButton!,printStudentBillButton!})
+        {button.Width=printWidth;button.TextAlign=ContentAlignment.MiddleCenter;}
         var workspace = new TableLayoutPanel {
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
             Padding = new Padding(0, 8, 0, 0), Margin = new Padding(0)
@@ -2937,10 +2949,12 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         if(printBillButton is not null)
         {
             bool waiverOnly=HasPendingWaiverRows()&&!HasOutstandingCharges();
-            printBillButton.Text=waiverOnly?"Print Fee Changes":"Print Outstanding";
+            printBillButton.Text=waiverOnly?"Print Fee Changes":"Print Family Bill";
             printBillButton.Enabled=historyButton?.Enabled==true&&CurrentUser.HasPermission("Fees.View")
                 &&(!waiverOnly||CurrentUser.HasPermission("Fees.Collect"));
         }
+        if(printStudentBillButton is not null)
+            printStudentBillButton.Enabled=historyButton?.Enabled==true&&CurrentUser.HasPermission("Fees.View");
         if (fullAmountButton is not null)
             fullAmountButton.Enabled = !transactionBusy && HasOutstandingCharges();
         if (executeButton is null)
@@ -4401,7 +4415,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         finally{billBusy=false;}
     }
 
-    private async Task PrintSelectedFamilyBillAsync()
+    private Task PrintSelectedFamilyBillAsync() => PrintOutstandingBillAsync(false);
+    private int[] OutstandingBillStudents(bool individual) => individual ? new[]{admissionId} : SelectedBillStudents();
+    private async Task PrintOutstandingBillAsync(bool individual)
     {
         using var returnFocus = new DialogReturnFocus(this);
         if(IsBusy || siblingBusy || admissionId<=0 || !CurrentUser.HasPermission("Fees.View"))return;
@@ -4412,12 +4428,12 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             return;
         }
         int anchor=admissionId, placement=enrollmentId, version=loadVersion;
-        int[] selected=SelectedBillStudents();
-        bool byFamily=billGrouping.SelectedIndex==1;
+        int[] selected=OutstandingBillStudents(individual);
+        bool byFamily=!individual && billGrouping.SelectedIndex==1;
         billBusy=true;
         try
         {
-            if(HasPendingWaiverRows()&&!HasOutstandingCharges())
+            if(!individual && HasPendingWaiverRows()&&!HasOutstandingCharges())
             {
                 if(HasCollectionDraft())
                 {Warn("Finish or clear the payment draft before printing saved fee changes. Your entries have been retained.");return;}
@@ -4428,9 +4444,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 return;
             }
             using var busy=BeginBusy("Preparing outstanding bill…",this);
-            await FeeBillPreview.ShowAsync(FindForm(),anchor,selected,()=>!IsDisposed && admissionId==anchor
-                && enrollmentId==placement && loadVersion==version && selected.SequenceEqual(SelectedBillStudents())
-                &&byFamily==(billGrouping.SelectedIndex==1),byFamily);
+            await showOutstandingBill(FindForm(),anchor,selected,()=>!IsDisposed && admissionId==anchor
+                && enrollmentId==placement && loadVersion==version && selected.SequenceEqual(OutstandingBillStudents(individual))
+                &&(individual || byFamily==(billGrouping.SelectedIndex==1)),byFamily);
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
         finally{billBusy=false;}

@@ -70,6 +70,16 @@ internal static partial class Program
         name.Text = "Unsaved without a successful reload";
         page.Enabled = false; page.Enabled = true;
         Check(page.HasUnsavedChanges, "Ordinary disabling and enabling never authorizes a fresh clean baseline");
+        var number = Field<ModernTextBox>("admissionIdValue");
+        number.Text = "6590";
+        number.Enabled = false;
+        Capture();
+        number.Enabled = true;
+        Check(!page.HasUnsavedChanges, "Saved admission 6590 stays clean when its editor reopens");
+        number.Text = "6590a";
+        Check(page.HasUnsavedChanges, "A genuine correction to the saved admission number remains protected");
+        number.Text = "6590";
+        Check(!page.HasUnsavedChanges, "Restoring the saved admission number clears its real edit");
         Capture();
         using var image = new Bitmap(16, 16);
         using var bytes = new MemoryStream(); image.Save(bytes, System.Drawing.Imaging.ImageFormat.Jpeg);
@@ -110,6 +120,11 @@ internal static partial class Program
         Capture();
         type.GetMethod("EnsureDetailsTabBuilt", flags)!.Invoke(page, null);
         Check(!page.HasUnsavedChanges, "Opening Fees & Siblings does not invent an admission edit");
+        var editorParent = name.Parent!;
+        int editorIndex = editorParent.Controls.GetChildIndex(name);
+        editorParent.Controls.SetChildIndex(name, 0);
+        Check(!page.HasUnsavedChanges, "Reordering displayed controls does not change the saved admission draft");
+        editorParent.Controls.SetChildIndex(name, editorIndex);
         var siblings = Field<DataGridView>("siblingsGrid");
         using var data = new System.Data.DataTable();
         data.Columns.Add("Student Name"); data.Rows.Add("Saved sibling");
