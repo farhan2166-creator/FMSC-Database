@@ -134,6 +134,11 @@ internal static class FeeDocumentLayout
             return (Convert.ToDecimal(record[key])*(expression.StartsWith("=Format(-",StringComparison.Ordinal)?-1:1))
                 .ToString(expression.Contains("\"N2\"")?"N2":"N0",CultureInfo.CurrentCulture);
         string text=Convert.ToString(record[key])??"";
+        if(name=="ReceiptNumber" && expression.Contains("Fields!PaymentMethod.Value",StringComparison.Ordinal))
+        {
+            string method=(Convert.ToString(record["PaymentMethod"])??"").Trim();
+            text+=method.Length==0?"":" ("+method+")";
+        }
         if(name=="SchoolAddress")
         {
             string campus=Convert.ToString(record["CampusName"])??"";

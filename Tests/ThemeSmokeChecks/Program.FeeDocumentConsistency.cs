@@ -32,7 +32,7 @@ internal static partial class Program
                         "Campus and class rows each collapse according to their own value");
                 }
             }
-            foreach(string name in new[]{"ReceiptNumber","PaymentMethod","PeriodHeader","FeeHeader","AmountHeader","FeePeriod","FeeDescription","LineAmount"})
+            foreach(string name in new[]{"ReceiptNumber","PeriodHeader","FeeHeader","AmountHeader","FeePeriod","FeeDescription","LineAmount"})
                 Check(XNode.DeepEquals(Box(student,name).Element(ns+"Style"),Box(family,name).Element(ns+"Style")),
                     "Individual and family columns use identical padding, alignment and rules");
         }
