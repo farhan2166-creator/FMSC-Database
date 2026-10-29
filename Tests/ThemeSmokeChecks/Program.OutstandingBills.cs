@@ -28,8 +28,6 @@ internal static partial class Program
         using(var filtered=OutstandingBillSelection.Select(balances,Scope(BillBalanceComparison.AtLeast,6900)))
         {
             Check(filtered.Rows.Count==2,"Balance comparisons select matching students, without changing their balance");
-            OutstandingBillSelection.Search(filtered,"O'Brien [test]%");
-            Check(filtered.DefaultView.Count==0,"Search treats special characters as literal text");
         }
         var previous=(CurrentUser.UserId,CurrentUser.Username,CurrentUser.RoleName,CurrentUser.MustChangePassword,CurrentUser.GetPermissions().ToArray());
         try
@@ -70,43 +68,34 @@ internal static partial class Program
             ClickButton(Button("Clear Selection"));
             Check(grid.Rows.Cast<DataGridViewRow>().All(row=>Equals(row.Cells["Include"].Value,false))&&!Button("Preview Selected Bills").Enabled,
                 "Clear Selection finishes an active checkbox edit and clears the actual preview selection");
-            Field<ModernTextBox>("search").Text="No student matches this search";Application.DoEvents();
-            ClickButton(Button("Select All"));
-            Check(grid.Rows.Count==0&&Field<DataTable>("roster").AsEnumerable().All(row=>row.Field<bool>("Include"))&&Button("Preview Selected Bills").Enabled,
-                "Select All includes the loaded students even when search hides every row");
-            ClickButton(Button("Select Shown"));
-            Check(!Field<DataTable>("roster").AsEnumerable().Any(row=>row.Field<bool>("Include"))&&!Button("Preview Selected Bills").Enabled,
-                "Select Shown clears an existing selection when the search has no matching students");
-            Field<ModernTextBox>("search").Text="";ClickButton(Button("Select All"));
-            Field<ModernTextBox>("search").Text="Bilal";Application.DoEvents();
-            var roster=Field<DataTable>("roster");
-            Check(grid.Rows.Count==1&&roster.AsEnumerable().Count(row=>row.Field<bool>("Include"))==3,"Search retains selected students outside the visible results");
-            ClickButton(Button("Select Shown"));
-            Check(roster.AsEnumerable().Where(row=>row.Field<bool>("Include")).Single().Field<int>("AdmissionId")==2&&Field<Label>("selectedSummary").Text.StartsWith("1 selected"),
-                "Select Shown replaces Select All with just the visible students and updates the count");
-            Field<ModernTextBox>("search").Text="";Application.DoEvents();
-            Check(grid.Rows.Cast<DataGridViewRow>().Count(row=>Equals(row.Cells["Include"].Value,true))==1,
-                "Clearing the search reveals that hidden students were unchecked by Select Shown");
-            Field<ModernTextBox>("search").Text="Bilal";Application.DoEvents();
-            Button("Clear Selection").PerformClick();Check(!Button("Preview Selected Bills").Enabled,"Clearing all selection disables preview");
-            Button("Select Shown").PerformClick();Check(roster.AsEnumerable().Where(row=>row.Field<bool>("Include")).Single().Field<int>("AdmissionId")==2,"Select Shown selects only matching students");
-            Button("Select All").PerformClick();Check(roster.AsEnumerable().All(row=>row.Field<bool>("Include")),"Select All includes matches hidden by search");
+            Button("Select All").PerformClick();
+            Check(Field<DataTable>("roster").AsEnumerable().All(row=>row.Field<bool>("Include")),"Select All checks the complete loaded bulk list");
+            Check(!Walk(page).Any(c=>c.GetType()==typeof(ModernTextBox)),"Bulk bills have no individual admission/name search input");
+            Check(!Walk(page).OfType<ModernButton>().Any(b=>b.Text=="Select Shown"),"No duplicate search-only selection action remains");
+            Control Card(Control control)
+            {
+                while(control.Parent is not null&&control.GetType().Name!="HumanCard")control=control.Parent;
+                return control;
+            }
+            var filterCard=Card(Field<ModernComboBox>("billGrouping"));
+            Check(new Control[]{Field<LookupBox>("campus"),Field<LookupBox>("year"),Field<LookupBox>("cls"),Field<LookupBox>("section"),
+                Field<ModernComboBox>("comparison"),Field<ModernComboBox>("paper"),Field<ModernNumericTextBox>("amount"),Field<ModernNumericTextBox>("through")}
+                .All(c=>ReferenceEquals(Card(c),filterCard)),"Placement, balance, paper and grouping share one filter panel");
             Field<ModernComboBox>("comparison").SelectedIndex=(int)BillBalanceComparison.AtLeast;
             Field<ModernNumericTextBox>("amount").Value=6900;
             Check(!Button("Preview Selected Bills").Enabled,"Changing amount filters invalidates preview until reload");
             var load=(Task)typeof(OutstandingBillsPage).GetMethod("LoadStudentsAsync",flags)!.Invoke(page,null)!;PumpUntil(()=>load.IsCompleted,"Changed balance filter reloads");
             Check(Field<DataTable>("roster").Rows.Count==2,"Reload applies the requested threshold to the complete balances");
-            Field<ModernTextBox>("search").Text="";
             foreach(var size in new[]{new Size(1500,900),new Size(1000,720)})
             {
                 owner.ClientSize=size;owner.PerformLayout();Application.DoEvents();
-                var sequence=new[]{"Select All","Select Shown","Clear Selection","Preview Selected Bills"};
+                var sequence=new[]{"Select All","Clear Selection","Preview Selected Bills"};
                 var selectionButtons=Button("Select All").Parent!;
                 Check(selectionButtons.Controls.Cast<Control>().Select(control=>control.Text).SequenceEqual(sequence),
                     "Selection tools appear before bill preview in natural order");
-                Check(sequence.Select(Button).Select(button=>button.TabIndex).SequenceEqual(Enumerable.Range(0,4)),
+                Check(sequence.Select(Button).Select(button=>button.TabIndex).SequenceEqual(Enumerable.Range(0,3)),
                     "Keyboard navigation follows the selection then preview order");
-                foreach(string caption in new[]{"Load Students","Preview Selected Bills","Select All","Select Shown","Clear Selection"})
+                foreach(string caption in new[]{"Load Students","Preview Selected Bills","Select All","Clear Selection"})
                 {
                     var button=Button(caption);Check(button.Visible,"All bill actions remain visible");
                     Check(button.Right<=button.Parent!.ClientSize.Width && button.Bottom<=button.Parent.ClientSize.Height,"Bill actions fit their container");

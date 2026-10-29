@@ -451,6 +451,10 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} statement action, mode and async safety checks (no database connection).");
             return;
         }
+        if(args.Contains("--bill-roll-heights"))
+        {
+            CheckBillRollHeights();Console.WriteLine($"PASS: {checks} independent bill-height, complete-slip, PDF, printer and preview checks.");return;
+        }
         if(args.Contains("--bill-preparation"))
         {
             CheckBillPreparationChoices();Console.WriteLine($"PASS: {checks} bill grouping, explicit selection, receipt child copy and batch recovery checks.");return;

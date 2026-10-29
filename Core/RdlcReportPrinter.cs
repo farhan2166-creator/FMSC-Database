@@ -105,12 +105,22 @@ internal static class RdlcReportPrinter
     }
 }
 
-internal sealed class RdlcPrintDocument(List<MemoryStream> pages) : PrintDocument
+internal sealed class RdlcPrintDocument(List<MemoryStream> pages,IReadOnlyList<PageSettings>? pageSizes=null) : PrintDocument
 {
     private int pageIndex;
     private int lastPage;
     internal int PageCount => pages.Count;
     internal int PagesPrinted { get; private set; }
+
+    protected override void OnQueryPageSettings(QueryPageSettingsEventArgs e)
+    {
+        if(pageSizes is not null)
+        {
+            e.PageSettings=(PageSettings)pageSizes[pageIndex].Clone();
+            e.PageSettings.PrinterSettings=PrinterSettings;
+        }
+        base.OnQueryPageSettings(e);
+    }
 
     protected override void OnBeginPrint(PrintEventArgs e)
     {

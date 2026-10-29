@@ -17,7 +17,6 @@ internal static partial class FamilyBillReport
     {
         using var display=FamilyFeeDocumentPresentation.Bill(data);
         string path=Path.Combine(AppContext.BaseDirectory,"Reports",TemplateFile);
-        RdlcReportPreview.Show(owner,"Family Fee Bill",path,DataSetName,display,
-            reportDefinition:FeeDocumentLayout.SizeToContent(path,display));
+        FeeBillRollPreview.Show(owner,"Family Fee Bill",path,DataSetName,display);
     }
 }

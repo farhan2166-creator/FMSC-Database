@@ -11,6 +11,7 @@ internal sealed class ReportPageOverview : ScrollableControl
     private int selectedPage = 1;
     private ZoomMode zoomMode = ZoomMode.FullPage;
     private int zoomPercent = 100;
+    private bool singlePage;
     internal event Action<int>? PageSelected;
     internal int EffectiveZoomPercent { get; private set; } = 100;
     internal bool HasPages => pages.Count > 0;
@@ -24,16 +25,22 @@ internal sealed class ReportPageOverview : ScrollableControl
 
     internal void LoadPages(ReportViewer viewer)
     {
-        ClearPages();
         var streams = RdlcReportPrinter.RenderPages(viewer.LocalReport, viewer.GetPageSettings());
+        LoadPages(streams);
+    }
+
+    internal void LoadPages(IEnumerable<MemoryStream> streams,bool clone=false)
+    {
+        ClearPages();
+        var owned=streams.Select(stream=>clone?new MemoryStream(stream.ToArray()):stream).ToList();
         try
         {
-            foreach (var stream in streams) pages.Add((stream, new Metafile(stream)));
+            foreach (var stream in owned){stream.Position=0;pages.Add((stream, new Metafile(stream)));}
         }
         catch
         {
             ClearPages();
-            foreach (var stream in streams) stream.Dispose();
+            foreach (var stream in owned) stream.Dispose();
             throw;
         }
         UpdateLayout();
@@ -53,10 +60,13 @@ internal sealed class ReportPageOverview : ScrollableControl
     internal void SelectPage(int page)
     {
         selectedPage = page;
+        if(singlePage)UpdateLayout();
         if (page > 0 && page <= rectangles.Count)
             AutoScrollPosition = new Point(0, Math.Max(0, rectangles[page - 1].Top - AppScale.Scale(24)));
         Invalidate();
     }
+
+    internal void SetSinglePage(bool single){singlePage=single;UpdateLayout();}
 
     protected override void OnResize(EventArgs e) { base.OnResize(e); UpdateLayout(); }
 
@@ -64,12 +74,14 @@ internal sealed class ReportPageOverview : ScrollableControl
     {
         if (pages.Count == 0 || ClientSize.Width <= 0) return;
         int gap = AppScale.Scale(24), labelHeight = AppScale.Scale(24);
-        float maxWidth = pages.Max(page => page.Image.Width / page.Image.HorizontalResolution * DeviceDpi);
-        float maxHeight = pages.Max(page => page.Image.Height / page.Image.VerticalResolution * DeviceDpi);
-        var arrangement = ReportPageArrangement.Calculate(pages.Count, maxWidth, maxHeight, ClientSize,
+        var indices=Enumerable.Range(0,pages.Count).Where(i=>!singlePage||i==selectedPage-1).ToArray();
+        var sizes=indices.Select(i=>new SizeF(pages[i].Image.Width/pages[i].Image.HorizontalResolution*DeviceDpi,
+            pages[i].Image.Height/pages[i].Image.VerticalResolution*DeviceDpi)).ToArray();
+        var arrangement = ReportPageArrangement.Calculate(sizes, ClientSize,
             gap, labelHeight, SystemInformation.VerticalScrollBarWidth, zoomPercent / 100f,
             zoomMode == ZoomMode.PageWidth, zoomMode == ZoomMode.FullPage);
-        rectangles.Clear(); rectangles.AddRange(arrangement.Pages);
+        rectangles.Clear();rectangles.AddRange(Enumerable.Repeat(Rectangle.Empty,pages.Count));
+        for(int i=0;i<indices.Length;i++)rectangles[indices[i]]=arrangement.Pages[i];
         EffectiveZoomPercent = (int)Math.Round(arrangement.Scale * 100);
         AutoScrollMinSize = arrangement.Extent;
         Invalidate();
@@ -80,6 +92,7 @@ internal sealed class ReportPageOverview : ScrollableControl
         base.OnPaint(e);
         for (int index = 0; index < pages.Count; index++)
         {
+            if(rectangles[index].IsEmpty)continue;
             var rectangle = rectangles[index]; rectangle.Offset(AutoScrollPosition);
             var label = new Rectangle(rectangle.Left, rectangle.Bottom + 3, rectangle.Width, AppScale.Scale(24));
             if (!rectangle.IntersectsWith(e.ClipRectangle) && !label.IntersectsWith(e.ClipRectangle)) continue;
@@ -101,7 +114,7 @@ internal sealed class ReportPageOverview : ScrollableControl
     internal void SelectAt(Point position)
     {
         var location = new Point(position.X - AutoScrollPosition.X, position.Y - AutoScrollPosition.Y);
-        int index = rectangles.FindIndex(rectangle => rectangle.Contains(location));
+        int index = rectangles.FindIndex(rectangle => !rectangle.IsEmpty&&rectangle.Contains(location));
         if (index < 0) return;
         selectedPage = index + 1; Invalidate(); PageSelected?.Invoke(selectedPage);
     }

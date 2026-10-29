@@ -39,6 +39,12 @@ Shared files:
   remain compatible with the database; each RDLC has its own dataset name above.
 - `FeeDocumentLayout`: paper sizing; `FeeDocumentSheetLayout`: A4 sheet flow.
   Annual receipts use `StudentReceiptReport` and `StudentReceipt.rdlc` on a sheet.
+- `FeeBillRollDocument` / `FeeBillRollPreview`: render each numbered thermal bill
+  independently, fit its full text with a small bottom clearance using the actual
+  PDF/EMF renderer, and show the differently sized slips in one preview. Export
+  retains each PDF page's height; printing requests that slip's own paper height
+  for every page, including a selected-page range. The longest bill never sets
+  the paper length of shorter bills. A4 sheet printing remains on its existing path.
 - `AnnualReceiptPreview`: the shared annual receipt loader/preview, used directly
   from Student Account Statement and from the standalone year selector.
 - `OutstandingBillsPreview`: reads selected accounts, checks readiness and prepares
@@ -48,6 +54,9 @@ Shared files:
   layout; every family or standalone bill starts a separate page, while siblings
   remain together. Saved bill numbers, dates and financial amounts stay intact.
   Numbered bills are saved even if the preview is closed without printing.
+  The bulk Outstanding Bills page keeps placement, balance, paper and grouping
+  together in one filter panel. It has no individual-student search; use Fee
+  Collection for that. All loaded matches start selected, with optional row exclusions.
 - `FeeReceiptCopyDialog` / `FeeReceiptChildCopy`: saved family receipts offer the
   original document or a clearly labelled child's share with the original receipt
   number/date. The copy uses saved membership, fees, plans and child cash/credit

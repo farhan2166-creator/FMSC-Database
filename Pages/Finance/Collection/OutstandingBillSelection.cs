@@ -59,12 +59,4 @@ internal static class OutstandingBillSelection
         return result;
     }
 
-    internal static void Search(DataTable source,string text)
-    {
-        if(!source.Columns.Contains("SearchMatch"))source.Columns.Add("SearchMatch",typeof(bool));
-        string term=text.Trim();
-        foreach(DataRow row in source.Rows)row["SearchMatch"]=new[]{"AdmissionNumber","StudentName","FatherName"}
-            .Any(column=>(Convert.ToString(row[column])??"").Contains(term,StringComparison.CurrentCultureIgnoreCase));
-        source.DefaultView.RowFilter=term.Length==0?"":"SearchMatch = true";
-    }
 }

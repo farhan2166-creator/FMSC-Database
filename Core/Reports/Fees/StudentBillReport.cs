@@ -26,6 +26,7 @@ internal static partial class StudentBillReport
     {
         using var display=FeeBillPresentation.Prepare(data);
         string path=Path.Combine(AppContext.BaseDirectory,"Reports",TemplateFile);
+        if(!a4){FeeBillRollPreview.Show(owner,"Student Fee Bill",path,DataSetName,display);return;}
         RdlcReportPreview.Show(owner,"Student Fee Bill",path,DataSetName,display,
             fitPageWidth:a4,reportDefinition:FeeDocumentLayout.SizeToContent(path,display,a4));
     }
