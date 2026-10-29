@@ -64,6 +64,9 @@ internal static partial class Program
                 print.PrinterSettings.PrintRange=PrintRange.SomePages;print.PrinterSettings.FromPage=i+1;print.PrinterSettings.ToPage=i+1;
                 begin.Invoke(print,new object[]{new PrintEventArgs()});var settings=new QueryPageSettingsEventArgs(print.DefaultPageSettings);
                 query.Invoke(print,new object[]{settings});Check(settings.PageSettings.PaperSize.Height==heights[i],"Printing a selected bill uses its own page height");
+                using var dialog=ReportPrintDialog.Create(print,i+1,true);
+                begin.Invoke(print,new object[]{new PrintEventArgs()});settings=new QueryPageSettingsEventArgs(print.DefaultPageSettings);
+                query.Invoke(print,new object[]{settings});Check(settings.PageSettings.PaperSize.Height==heights[i],"The shared current-page print choices retain that bill's own paper height");
             }
         }
         using(var individual=FeeBillDocuments.ReadSavedData(shortBill.Rows[0]))

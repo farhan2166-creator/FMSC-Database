@@ -34,6 +34,11 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--windows-print-dialog")||args.Contains("--windows-print-dialog-preview"))
+        {
+            CheckWindowsPrintDialog(args.Contains("--windows-print-dialog-preview"));
+            Console.WriteLine($"PASS: {checks} Windows print choices and current-page checks (no print job sent).");return;
+        }
         if(args.Contains("--certificate-navigation"))
         {
             CheckCertificateNavigation();

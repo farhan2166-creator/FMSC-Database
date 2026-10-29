@@ -29,19 +29,8 @@ internal static class RdlcReportPrinter
         var pageSettings = viewer.GetPageSettings();
         using var document = CreateDocument(viewer.LocalReport, pageSettings, owner.Text);
         document.PrinterSettings = (PrinterSettings)viewer.PrinterSettings.Clone();
-        document.PrinterSettings.MinimumPage = 1;
-        document.PrinterSettings.MaximumPage = document.PageCount;
-        if (selectedPage.HasValue && (selectedPage.Value < 1 || selectedPage.Value > document.PageCount))
-            throw new InvalidOperationException($"Select a page between 1 and {document.PageCount} before printing.");
-        document.PrinterSettings.FromPage = selectedPage ?? 1;
-        document.PrinterSettings.ToPage = selectedPage ?? document.PageCount;
-        document.PrinterSettings.PrintRange = selectedPage.HasValue ? PrintRange.SomePages : PrintRange.AllPages;
-        using var dialog = new PrintDialog {
-            Document = document,
-            AllowSomePages = true,
-            AllowSelection = false,
-            UseEXDialog = false
-        };
+        int currentPage = selectedPage ?? Math.Clamp(viewer.CurrentPage, 1, document.PageCount);
+        using var dialog = ReportPrintDialog.Create(document, currentPage, selectedPage.HasValue);
         DialogResult result = dialog.ShowDialog(owner);
         // Restore the report before spooling, rather than after the entire job finishes.
         RestoreFocus(owner, viewer);

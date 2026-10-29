@@ -43,10 +43,7 @@ internal static class FeeBillRollPreview
         void Print(bool current)
         {
             using var job=document.CreatePrintDocument(title);job.PrinterSettings=(PrinterSettings)printer.Clone();
-            job.PrinterSettings.MinimumPage=1;job.PrinterSettings.MaximumPage=document.Pages.Count;
-            job.PrinterSettings.FromPage=current?selected:1;job.PrinterSettings.ToPage=current?selected:document.Pages.Count;
-            job.PrinterSettings.PrintRange=current?PrintRange.SomePages:PrintRange.AllPages;
-            using var dialog=new PrintDialog {Document=job,AllowSomePages=true,UseEXDialog=false};
+            using var dialog=ReportPrintDialog.Create(job,selected,current);
             if(dialog.ShowDialog(form)!=DialogResult.OK)return;
             if(!job.PrinterSettings.IsValid)throw new InvalidOperationException("Select an available printer and try again.");
             job.PrintController=new StandardPrintController();job.Print();
