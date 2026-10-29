@@ -41,7 +41,8 @@ internal static partial class Program
             if(billDisplay is not null)data=billDisplay;
             using var receiptDisplay=!bill&&data.Columns.Contains("FamilyRowKind")?FamilyFeeDocumentPresentation.Receipt(data):null;
             if(receiptDisplay is not null)data=receiptDisplay;
-            if(bill) foreach(DataRow row in data.Rows)row["ReceiptNumber"]=data.Columns.Contains("FamilyRowKind")?"FB-2026-00001":"B-2026-00001";
+            if(bill) foreach(DataRow row in data.Rows)
+                if(string.IsNullOrWhiteSpace(Convert.ToString(row["ReceiptNumber"])))row["ReceiptNumber"]=data.Columns.Contains("FamilyRowKind")?"FB-2026-00001":"B-2026-00001";
             string file=data.Columns.Contains("FamilyRowKind")?(bill?"FamilyBill.rdlc":"FamilyReceipt.rdlc"):(bill?"StudentBill.rdlc":"StudentReceipt.rdlc");
             file=templateName??file;
             string path=Path.Combine(AppContext.BaseDirectory,"Reports",file);
@@ -97,7 +98,9 @@ internal static partial class Program
                 int titleRow=Array.FindIndex(printedRows,row=>row.Descendants(ns+"Textbox").Any(box=>(string?)box.Attribute("Name")=="ReceiptHeading"));
                 Check(printedMembers[titleRow].Ancestors(ns+"TablixMember").Any(member=>(string?)member.Element(ns+"Group")?.Attribute("Name")==childGroup),
                     "Document titles, identities and calculations repeat inside the child group");
-                Check(!xml.Descendants(ns+"PageBreak").Any(),"Continuous family slips never force a page break between children");
+                var breaks=xml.Descendants(ns+"PageBreak").ToArray();
+                Check(breaks.Length==(bill?1:0)&&breaks.All(b=>(string?)b.Parent?.Attribute("Name")=="ReceiptPageGroup"),
+                    "Family bill page breaks separate whole documents, never siblings within a family");
                 Check(xml.Descendants(ns+"Group").Single(group=>(string?)group.Attribute("Name")==childGroup)
                     .Parent!.Element(ns+"Visibility")!.Value.Contains("ShowChildDocument"),"Each complete child slip follows its own visibility rule");
                 Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="GroupSummaryHeading")
@@ -419,6 +422,17 @@ internal static partial class Program
             periodCharges.Rows.Add("1001","Other Child","Tuition Fee",new DateTime(2026,11,1),0m,3000m,"Campus Girls",3000m);
             using var family=FamilyBillReport.BuildData(school.Name,school.ContactNumber,school.Address,"Example Parent",periodCharges);
             Check(Render("family-bill-months",family)==1,"Family bill prints both months for each child on one continuous page");
+            DataTable Saved(DataTable data,string number)
+            {
+                var table=new DataTable();table.Columns.Add("BillNumber");table.Columns.Add("IssuedAt",typeof(DateTime));table.Columns.Add("SnapshotXml");
+                table.Rows.Add(number,DateTime.Today,FeeBillDocuments.Snapshot(data));return table;
+            }
+            using var savedFamily1=Saved(family,"FB-TEST-1");using var savedFamily2=Saved(family,"FB-TEST-2");
+            using var savedSingle=Saved(original,"B-TEST-3");
+            using var groupedBatch=OutstandingBillsPreview.CombineSaved(new[]{savedFamily1,savedFamily2,savedSingle},true);
+            Check(Render("family-batch-separate-pages",groupedBatch)==3,"Two families and a standalone student open in one preview with each bill on a separate page");
+            Check(groupedBatch.AsEnumerable().GroupBy(r=>r.Field<int>("ReceiptPageKey")).Select(g=>g.First().Field<string>("ReceiptNumber"))
+                .SequenceEqual(new[]{"FB-TEST-1","FB-TEST-2","B-TEST-3"}),"Grouped batch keeps original bill numbers instead of replacing or combining their totals");
         }
     }
 }

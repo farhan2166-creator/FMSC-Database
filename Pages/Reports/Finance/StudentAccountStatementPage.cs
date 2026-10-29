@@ -3,6 +3,7 @@ namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
 {
     private readonly StudentPicker studentSearch = new();
+    private readonly ModernComboBox billGrouping=HumanUi.Combo();
     private readonly ModernDatePicker from =
         new ModernDatePicker {
             Format = DateTimePickerFormat.Custom,
@@ -140,6 +141,11 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         var modeBar = new FlowLayoutPanel {
             Dock = DockStyle.Fill, WrapContents = true, Margin = Padding.Empty, Padding = Padding.Empty
         };
+        billGrouping.Items.AddRange(new object[]{"Individual","By family"});billGrouping.SelectedIndex=0;
+        billGrouping.Width=AppScale.Scale(140);billGrouping.Margin=new Padding(4,0,4,0);
+        billGrouping.AccessibleName="Bill grouping";
+        modeBar.Controls.Add(new Label {Text="Bill grouping",AutoSize=true,Margin=new Padding(4,8,0,0)});
+        modeBar.Controls.Add(billGrouping);
         printAmountsDueButton=CreateFilterButton("Outstanding Bills…",AppTheme.MutedText);
         printAmountsDueButton.Click+=async(_,_)=>await PrintDueReport();
         SetToolTip(printAmountsDueButton,"Open current unpaid bills for this student. Statement dates do not limit these bills.");
@@ -893,11 +899,12 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         var ids=GetSelectedAdmissionIds();
         if(ids.Count==0){Warn("Select at least one student first.");return;}
         string signature=FilterSignature();
+        bool byFamily=billGrouping.SelectedIndex==1;
         printingDueReport=true;UpdateSelectionActions();
         try
         {
             using var busy=BeginBusy("Preparing outstanding bills…",this);
-            await OutstandingBillsPreview.ShowAsync(FindForm(),ids,()=>!IsDisposed && signature==FilterSignature(),Warn);
+            await OutstandingBillsPreview.ShowAsync(FindForm(),ids,()=>!IsDisposed && signature==FilterSignature()&&byFamily==(billGrouping.SelectedIndex==1),Warn,byFamily:byFamily);
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
         finally{printingDueReport=false;if(!IsDisposed)UpdateSelectionActions();}

@@ -3496,87 +3496,11 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     }
     private async Task PrintAdmissionBill(bool showActualAmount)
     {
-        try
-        {
-            if (currentAdmissionId <= 0)
-            {
-                Warn("Save this admission first, then you can print a bill.");
-                return;
-            }
-            int enrollmentId =
-                await GetActiveEnrollmentIdAsync(currentAdmissionId);
-            if (enrollmentId <= 0)
-            {
-                Warn("No placement was found for this student.");
-                return;
-            }
-            /* Printing must not post fees or modify the ledger. */
-            var raw =
-                await DatabaseHelper.QueryUserAsync(
-                    "GetOutstandingCharges",
-                    DatabaseHelper.Int(
-                        "@AdmissionId",
-                        currentAdmissionId),
-                    DatabaseHelper.Int(
-                        "@EnrollmentId",
-                        enrollmentId),
-                    DatabaseHelper.Date(
-                        "@AsOfDate",
-                        DateTime.Today));
-            var billRows = new List<BillLineItem>();
-            foreach (DataRow row in raw.Rows)
-            {
-                decimal outstanding =
-                    GetDecimalColumn(row, "Balance");
-                if (outstanding <= 0m)
-                    continue;
-                decimal grossAmount = GetDecimalColumn(row, "GrossAmount");
-                decimal netAmount = GetDecimalColumn(row, "NetAmount");
-                decimal discountAmount =
-                    Math.Max(0m, grossAmount - netAmount);
-                // An issued fee bill always states the saved unpaid balance.
-                // A pre-discount fee plan is not an amount currently due.
-                decimal amountToPrint = outstanding;
-                billRows.Add(
-                    new BillLineItem {
-                        ChargeId = Convert.ToInt64(row["BillingChargeId"]),
-                        FeeName = GetTextColumn(row, "FeeTypeName"),
-                        BillingMonth =
-                            row.Table.Columns.Contains("BillingMonth")
-                                ? FormatBillMonth(row["BillingMonth"])
-                                : string.Empty,
-                        Amount = amountToPrint,
-                        GrossAmount = grossAmount,
-                        DiscountAmount = discountAmount
-                    });
-            }
-            if (billRows.Count == 0)
-            {
-                Warn("There is nothing outstanding to bill for this student.");
-                return;
-            }
-            string classSectionText =
-                showActualAmount
-                    ? $"{(string.IsNullOrWhiteSpace(viewClass.Text) ? "-" : viewClass.Text)} - " +
-                      $"{(string.IsNullOrWhiteSpace(viewSection.Text) ? "-" : viewSection.Text)}"
-                    : string.Empty;
-            var institution = await InstitutionProfile.GetPrintIdentityAsync();
-            if (string.IsNullOrWhiteSpace(institution.Name))
-            {
-                Alert("Check School Profile before printing the admission bill.");
-                return;
-            }
-            await StudentBillReport.ShowAsync(FindForm(), institution, name.Text.Trim(), currentAdmissionId,
-                classSectionText, billRows.Select(row => new StudentBillReport.Line(
-                    row.FeeName, row.BillingMonth, row.Amount, row.DiscountAmount,row.ChargeId,currentAdmissionId,row.GrossAmount)).ToList(), showActualAmount,
-                viewCampus.Text == "-" ? string.Empty : viewCampus.Text.Trim(), fatherName.Text.Trim(),
-                string.Join(",",raw.AsEnumerable().Where(row=>GetDecimalColumn(row,"Balance")>0)
-                    .Select(row=>Convert.ToString(row["BillingChargeId"])).OrderBy(value=>value)));
-        }
-        catch (Exception ex)
-        {
-            Fail(ex);
-        }
+        if(currentAdmissionId<=0){Warn("Save this admission first, then you can print a bill.");return;}
+        if(HasUnsavedChanges){Warn("Save admission changes before preparing bills.");return;}
+        int id=currentAdmissionId;
+        try { await FeeBillPreview.ShowAsync(FindForm(),id,isCurrent:()=>!IsDisposed&&currentAdmissionId==id); }
+        catch(Exception ex){Fail(ex);}
     }
     private async Task PrintAdmissionForm()
     {
@@ -4906,5 +4830,3 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
         CaptureAdmissionBaseline();
     }
 }
-
-

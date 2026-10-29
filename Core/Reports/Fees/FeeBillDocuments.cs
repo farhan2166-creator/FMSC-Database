@@ -38,13 +38,13 @@ internal static class FeeBillDocuments
         return saved;
     }
 
-    internal static async Task ShowSavedAsync(Form? owner,DataRow saved)
+    internal static async Task ShowSavedAsync(Form? owner,DataRow saved,bool a4=false)
     {
         using var data=ReadSavedData(saved);
         await FeeDocumentParents.ApplyAsync(data);
         if(owner?.IsDisposed==true)return;
         if(data.Columns.Contains("FamilyRowKind"))FamilyBillReport.ShowData(owner,data);
-        else StudentBillReport.ShowData(owner,data);
+        else StudentBillReport.ShowData(owner,data,a4);
     }
 
     internal static DataTable ReadSavedData(DataRow saved)

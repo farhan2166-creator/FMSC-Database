@@ -5,28 +5,38 @@ internal static class FeeReceiptDocuments
 {
     internal static async Task<bool> TryShowAsync(Form? owner,InstitutionProfile.PrintIdentity institution,string receiptNumber)
     {
+        int user=CurrentUser.UserId;
+        bool Current()=>owner?.IsDisposed!=true&&CurrentUser.UserId==user&&CurrentUser.HasPermission("Fees.View");
+        if(!Current())return true;
         using var result=await DatabaseHelper.QueryUserSetAsync("GetCollectionReceipt",DatabaseHelper.P("@ReceiptNumber",receiptNumber));
+        if(!Current())return true;
         if(result.Tables.Count<3 || result.Tables[0].Rows.Count==0)return false;
         bool complete=IsCompleteSnapshot(result.Tables[0].Rows[0]);
         await ReadChildCashReceivedAsync(receiptNumber,result.Tables[0].Rows[0],result.Tables[1]);
+        if(!Current())return true;
         if(complete&&FeeChangeReport.IsAcknowledgement(result.Tables[0].Rows[0]))
         {
             using var previousPlans=await FeeChangeReport.ReadPreviousPlansAsync(result.Tables[0].Rows[0]);
             using var changes=FeeChangeReport.BuildData(institution,result.Tables[0].Rows[0],result.Tables[1],result.Tables[2],result.Tables.Count>3?result.Tables[3]:null,previousPlans);
             await FeeDocumentParents.ApplyAsync(changes);
-            if(owner?.IsDisposed!=true)FeeChangeReport.Show(owner,changes);
+            if(Current())FeeChangeReport.Show(owner,changes);
             return true;
         }
-        using var printableLines=result.Tables[2].Copy();
+        int? child=complete&&result.Tables[1].Rows.Count>1?FeeReceiptCopyDialog.Choose(owner,result.Tables[1]):0;
+        if(child is null||!Current())return true;
+        using var childCopy=child>0?FeeReceiptChildCopy.Extract(result,child.Value):null;
+        var document=childCopy??result;
+        using var printableLines=document.Tables[2].Copy();
         await FeeCarryForwardLabels.ApplyAsync(printableLines,receiptNumber);
         // Issued documents never acquire today's fees, concessions or balances.
         // Legacy snapshots remain reproducible, with their limitation disclosed.
         if(!complete)
             result.Tables[0].Rows[0]["ReceiptStatus"]=(Convert.ToString(result.Tables[0].Rows[0]["ReceiptStatus"])+
                 " Legacy receipt: saved fee details may exclude earlier discounts or waivers. See the account statement.").Trim();
-        using var data=BuildData(institution,result.Tables[0].Rows[0],result.Tables[1],printableLines);
+        using var data=BuildData(institution,document.Tables[0].Rows[0],document.Tables[1],printableLines);
+        if(child>0)foreach(DataRow row in data.Rows){row["DocumentTitle"]="STUDENT COPY OF FAMILY RECEIPT";row["CopyLabel"]="CHILD COPY";}
         await FeeDocumentParents.ApplyAsync(data);
-        if(owner?.IsDisposed==true)return true;
+        if(!Current())return true;
         Show(owner,data);
         return true;
     }

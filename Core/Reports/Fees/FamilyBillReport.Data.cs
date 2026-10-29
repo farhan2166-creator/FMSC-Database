@@ -10,14 +10,14 @@ internal static partial class FamilyBillReport
     internal static DataTable PrepareData(DataTable grouped)
     {
         var data=grouped.Clone();
-        string previousStudent="",previousPeriod="";
+        string previousStudent="",previousPeriod="";object? previousPage=null;
         foreach(DataRow row in grouped.Rows)
             if(Convert.ToString(row["FamilyRowKind"])=="Fee")
             {
                 data.ImportRow(row);
                 string student=Convert.ToString(row["BillStudentKey"])??"",period=Convert.ToString(row["FeePeriod"])??"";
-                if(student==previousStudent && period==previousPeriod)data.Rows[^1]["FeePeriod"]="";
-                previousStudent=student;previousPeriod=period;
+                if(Equals(previousPage,row["ReceiptPageKey"])&&student==previousStudent && period==previousPeriod)data.Rows[^1]["FeePeriod"]="";
+                previousStudent=student;previousPeriod=period;previousPage=row["ReceiptPageKey"];
             }
         return data;
     }

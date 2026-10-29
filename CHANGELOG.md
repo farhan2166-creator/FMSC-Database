@@ -11,6 +11,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Report improvements
 
+- Add an inline Bill grouping selector (Individual by default, or By family) to collection, outstanding printing and accounts. Open a single preview directly, with each family or standalone bill on its own page. Keep full-balance scope and readiness warnings, saved bill recovery and child-only copies of saved family receipts. Registration/admission print only the current child. Paper options are unchanged; no database migration is required.
 - Add Monthly Fee Reconciliation by billing month and school/campus/class/section/fee type, comparing current signed money allocations, credit applied and unpaid fees; include excess settlement and missing-period charge-date fallback.
 - Add the consolidated Certificate Issue Register with permitted student/staff sources, date/type/recipient/entry/collection/search filters, recorded issue history and explicitly distinguished saved-only records.
 - Add Account Credit filtering and data-only CSV exports for Collections & Receipts; count receipt entries separately from headings/totals and repeat printed group context with numeric subtotals.

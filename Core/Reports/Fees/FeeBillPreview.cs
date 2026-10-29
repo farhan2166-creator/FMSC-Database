@@ -60,33 +60,18 @@ internal static class FeeBillPreview
         catch{charges.Dispose();throw;}
     }
 
-    internal static async Task ShowAsync(Form? owner, int admissionId, int[]? selected = null, Func<bool>? isCurrent = null)
+    internal static async Task ShowAsync(Form? owner, int admissionId, int[]? selected = null, Func<bool>? isCurrent = null, bool byFamily=false)
     {
-        int userId = CurrentUser.UserId;
-        bool Current() => owner?.IsDisposed != true && CurrentUser.UserId == userId
-            && CurrentUser.HasPermission("Fees.View") && (isCurrent?.Invoke() ?? true);
-        if (!Current()) return;
-        var members = await ReadMembersAsync(admissionId, "Fees.View");
-        if (!Current()) return;
-        int[] ids = FamilyBillingData.SelectMembers(members, selected);
-        var charges = await ReadChargesAsync(admissionId,ids,wholeFamily:selected is null);
-        if (!Current()) return;
-        string notice = FamilyBillingData.IncompleteNotice(members, ids);
-        if (charges.Rows.Count == 0 || charges.AsEnumerable().Sum(row=>Convert.ToDecimal(row["Due"]))<=0m)
-        {
-            ModernMessageDialog.ShowInfo(owner, "There are no posted outstanding charges for the selected children." +
-                (notice.Length > 0 ? "\n\n" + notice : ""), "Print Bill");
-            return;
-        }
-        if (notice.Length > 0 && !ModernMessageDialog.Confirm(owner, notice +
-                "\n\nPrint the currently posted charges only?", "Family Billing Readiness", defaultYes: false)) return;
-        if (!Current()) return;
-        var institution = await InstitutionProfile.GetPrintIdentityAsync();
-        if (!Current()) return;
-        string parent = Convert.ToString(members.AsEnumerable().First(row => Convert.ToInt32(row["AdmissionId"]) == admissionId)["FatherName"]) ?? "";
-        int[] billedStudents=charges.AsEnumerable().Select(row=>Convert.ToInt32(row["AdmissionId"])).Distinct().OrderBy(id=>id).ToArray();
-        int primary=billedStudents.Contains(admissionId)?admissionId:billedStudents[0];
-        if(billedStudents.Length>1)await FamilyBillReport.ShowAsync(owner,institution,parent,charges,primary,billedStudents);
-        else await StudentBillReport.ShowChargesAsync(owner,institution,parent,charges,primary);
+        int user=CurrentUser.UserId;
+        bool Current()=>owner?.IsDisposed!=true&&CurrentUser.UserId==user&&CurrentUser.HasPermission("Fees.View")&&(isCurrent?.Invoke()??true);
+        if(!Current())return;
+        using var members=await ReadMembersAsync(admissionId,"Fees.View");
+        if(!Current())return;
+        // Registration prints this child; collection supplies its explicitly checked children.
+        int[] ids=selected??new[]{admissionId};
+        _=FamilyBillingData.SelectMembers(members,ids);
+
+        await OutstandingBillsPreview.ShowAsync(owner,ids,Current,
+            message=>ModernMessageDialog.ShowInfo(owner,message,"Outstanding Bills"),byFamily:byFamily);
     }
 }

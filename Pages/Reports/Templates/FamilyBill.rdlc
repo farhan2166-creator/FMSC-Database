@@ -1772,6 +1772,9 @@
                 <GroupExpressions>
                   <GroupExpression>=Fields!ReceiptPageKey.Value</GroupExpression>
                 </GroupExpressions>
+                <PageBreak>
+                  <BreakLocation>Between</BreakLocation>
+                </PageBreak>
               </Group>
               <TablixMembers>
                 <TablixMember />

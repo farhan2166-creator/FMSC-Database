@@ -43,6 +43,7 @@ internal static partial class Program
             using var page=new OutstandingBillsPage(false,async _=>{await Task.Delay(20);return balances.Copy();});
             using var owner=new Form{ClientSize=new Size(1500,900),AutoScaleMode=AutoScaleMode.None};owner.Controls.Add(page);owner.Show();Application.DoEvents();
             var flags=BindingFlags.Instance|BindingFlags.NonPublic;
+            Check(((ModernComboBox)typeof(OutstandingBillsPage).GetField("billGrouping",flags)!.GetValue(page)!).SelectedIndex==0,"Bill grouping defaults to Individual on the existing page");
             T Field<T>(string name)=>(T)typeof(OutstandingBillsPage).GetField(name,flags)!.GetValue(page)!;
             IEnumerable<Control> Walk(Control root)=>root.Controls.Cast<Control>().SelectMany(c=>new[]{c}.Concat(Walk(c)));
             ModernButton Button(string caption)=>Walk(page).OfType<ModernButton>().Single(button=>button.Text==caption);

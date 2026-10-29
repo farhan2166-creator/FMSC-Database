@@ -350,7 +350,7 @@ public sealed partial class StudentAccountStatementPage
             catch(Exception ex){if(!IsDisposed)Fail(ex);}finally{if(!review.IsDisposed)Availability();}
         };
         laterTab.Controls.Add(AccountLayout(laterGrid,HumanUi.ButtonRow(review)));tabs.TabPages.Add(laterTab);Availability();
-        var print=CreateFilterButton("Reprint Original",AppTheme.MutedText);
+        var print=CreateFilterButton("Reprint / Child Copy",AppTheme.MutedText);
         var root=new ReceiptDetailsHost {Dock=DockStyle.Fill,ColumnCount=1,RowCount=3};
         print.Click+=async(_,_)=>{
             if(!AccountCurrent||!CurrentUser.HasPermission("Fees.View"))return;

@@ -14,9 +14,15 @@ together in each report's `.cs` file.
 
 Shared files:
 
-- `FeeBillPreview`: loads selected students' posted dues. Quick Registration
-  uses the whole linked family; Fee Collection uses the selected children.
-  A settled registration can therefore open a sibling's bill if only that sibling owes money.
+- `FeeBillPreview`: shared bill entry point for registration, admission, returns
+  and the family counter. Registration/admission print this child; Fee Collection
+  supplies its explicitly checked children. Unselected siblings are never added.
+- `FeeBillSelection`: groups only the selected owing students by stored FamilyId.
+  The existing collection, outstanding and account screens expose Bill grouping:
+  Individual (default) or By family. The action opens one document preview directly.
+- `FeeBillBatch`: retains confirmed results on partial failure. Only failures show
+  a recovery message directing the operator to saved Issued Fee Bills; a connection
+  failure can leave an unconfirmed final server commit.
 - `FeeBillDocuments`: saves bill snapshots and numbers, and opens bill history.
 - `FeeReceiptDocuments`: reads saved collections and chooses the receipt type.
 - `FeeBillDataBuilder` / `FeeReceiptDataBuilder`: shared preparation for the
@@ -35,10 +41,18 @@ Shared files:
   Annual receipts use `StudentReceiptReport` and `StudentReceipt.rdlc` on a sheet.
 - `AnnualReceiptPreview`: the shared annual receipt loader/preview, used directly
   from Student Account Statement and from the standalone year selector.
-- `OutstandingBillsPreview`: issues individual outstanding bills from Student
-  Account Statement or Daily Work → Print Outstanding Bills. Thermal and A4
-  previews reuse `StudentBill.rdlc`, keeping each bill's number. Placement and
-  balance filters select students; each bill covers their full posted balance.
+- `OutstandingBillsPreview`: reads selected accounts, checks readiness and prepares
+  saved bills, then opens one combined preview without review/results dialogs.
+  Missing-charge warnings appear only for actual return/placement readiness concerns.
+  Individual Thermal/A4 behavior is unchanged. By family uses the existing family
+  layout; every family or standalone bill starts a separate page, while siblings
+  remain together. Saved bill numbers, dates and financial amounts stay intact.
+  Numbered bills are saved even if the preview is closed without printing.
+- `FeeReceiptCopyDialog` / `FeeReceiptChildCopy`: saved family receipts offer the
+  original document or a clearly labelled child's share with the original receipt
+  number/date. The copy uses saved membership, fees, plans and child cash/credit
+  totals; it does not create payments or issue another receipt. Legacy incomplete
+  snapshots retain their original document path.
 
 The older admission-bill, fee-payment receipt and fee-reminder templates are retired. Build
 and publish cleanup removes their stale output copies. Historical receipts and
