@@ -6,7 +6,7 @@ namespace FMSC_SMS.Core;
 /// <summary>A screen-only view of the original printable pages. Never changes the report definition.</summary>
 internal sealed class ReportPageOverview : ScrollableControl
 {
-    private readonly List<(MemoryStream Stream, Metafile Image)> pages = new();
+    private readonly List<(MemoryStream Stream, Metafile Image, SizeF PaperInches)> pages = new();
     private readonly List<Rectangle> rectangles = new();
     private int selectedPage = 1;
     private ZoomMode zoomMode = ZoomMode.FullPage;
@@ -29,13 +29,19 @@ internal sealed class ReportPageOverview : ScrollableControl
         LoadPages(streams);
     }
 
-    internal void LoadPages(IEnumerable<MemoryStream> streams,bool clone=false)
+    internal void LoadPages(IEnumerable<MemoryStream> streams,bool clone=false,IReadOnlyList<SizeF>? paperSizesInches=null)
     {
         ClearPages();
         var owned=streams.Select(stream=>clone?new MemoryStream(stream.ToArray()):stream).ToList();
         try
         {
-            foreach (var stream in owned){stream.Position=0;pages.Add((stream, new Metafile(stream)));}
+            if(paperSizesInches is not null&&paperSizesInches.Count!=owned.Count)
+                throw new ArgumentException("Each preview page needs its own paper dimensions.",nameof(paperSizesInches));
+            for(int i=0;i<owned.Count;i++)
+            {
+                var stream=owned[i];stream.Position=0;var image=new Metafile(stream);
+                pages.Add((stream,image,paperSizesInches?[i]??new SizeF(image.Width/image.HorizontalResolution,image.Height/image.VerticalResolution)));
+            }
         }
         catch
         {
@@ -75,15 +81,23 @@ internal sealed class ReportPageOverview : ScrollableControl
         if (pages.Count == 0 || ClientSize.Width <= 0) return;
         int gap = AppScale.Scale(24), labelHeight = AppScale.Scale(24);
         var indices=Enumerable.Range(0,pages.Count).Where(i=>!singlePage||i==selectedPage-1).ToArray();
-        var sizes=indices.Select(i=>new SizeF(pages[i].Image.Width/pages[i].Image.HorizontalResolution*DeviceDpi,
-            pages[i].Image.Height/pages[i].Image.VerticalResolution*DeviceDpi)).ToArray();
+        var sizes=indices.Select(i=>new SizeF(pages[i].PaperInches.Width*DeviceDpi,pages[i].PaperInches.Height*DeviceDpi)).ToArray();
         var arrangement = ReportPageArrangement.Calculate(sizes, ClientSize,
             gap, labelHeight, SystemInformation.VerticalScrollBarWidth, zoomPercent / 100f,
             zoomMode == ZoomMode.PageWidth, zoomMode == ZoomMode.FullPage);
         rectangles.Clear();rectangles.AddRange(Enumerable.Repeat(Rectangle.Empty,pages.Count));
         for(int i=0;i<indices.Length;i++)rectangles[indices[i]]=arrangement.Pages[i];
+        var extent=arrangement.Extent;
+        if(singlePage&&indices.Length==1)
+        {
+            var rectangle=rectangles[indices[0]];
+            rectangle.Offset(Math.Max(0,(ClientSize.Width-SystemInformation.VerticalScrollBarWidth-rectangle.Width-gap*2)/2),
+                Math.Max(0,(ClientSize.Height-rectangle.Height-labelHeight-gap*2)/2));
+            rectangles[indices[0]]=rectangle;
+            extent=new Size(Math.Max(extent.Width,rectangle.Right+gap),Math.Max(extent.Height,rectangle.Bottom+labelHeight+gap));
+        }
         EffectiveZoomPercent = (int)Math.Round(arrangement.Scale * 100);
-        AutoScrollMinSize = arrangement.Extent;
+        AutoScrollMinSize = extent;
         Invalidate();
     }
 

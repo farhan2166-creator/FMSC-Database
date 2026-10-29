@@ -45,6 +45,9 @@ Shared files:
   retains each PDF page's height; printing requests that slip's own paper height
   for every page, including a selected-page range. The longest bill never sets
   the paper length of shorter bills. A4 sheet printing remains on its existing path.
+  The screen preview uses those same physical dimensions rather than EMF DPI
+  metadata, which can describe a different scale. Single slips are centered on
+  a contrasting canvas; surrounding screen space is not part of the bill paper.
 - `AnnualReceiptPreview`: the shared annual receipt loader/preview, used directly
   from Student Account Statement and from the standalone year selector.
 - `OutstandingBillsPreview`: reads selected accounts, checks readiness and prepares

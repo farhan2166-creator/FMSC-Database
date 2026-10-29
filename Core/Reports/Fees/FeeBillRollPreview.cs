@@ -17,7 +17,11 @@ internal static class FeeBillRollPreview
         var area=owner is null?Screen.PrimaryScreen!.WorkingArea:Screen.FromControl(owner).WorkingArea;
         using var form=new ApplicationWindowForm {Text=title,StartPosition=FormStartPosition.CenterParent,WindowState=FormWindowState.Maximized,
             Size=new Size(Math.Min(1180,area.Width),Math.Min(820,area.Height)),MinimumSize=new Size(Math.Min(850,area.Width),Math.Min(600,area.Height)),KeyPreview=true};
-        using var overview=new ReportPageOverview();overview.LoadPages(document.Pages.Select(p=>p.Image),clone:true);
+        using var overview=new ReportPageOverview {BackColor=SystemColors.AppWorkspace};
+        // EMF resolution metadata can describe a different scale. Use the same
+        // physical paper geometry as PDF export and the print job instead.
+        overview.LoadPages(document.Pages.Select(p=>p.Image),clone:true,
+            paperSizesInches:document.Pages.Select(p=>new SizeF(p.Settings.PaperSize.Width/100f,p.Settings.PaperSize.Height/100f)).ToArray());
         using var surface=new Panel {Dock=DockStyle.Fill};surface.Controls.Add(overview);
         var toolbar=new FlowLayoutPanel {Dock=DockStyle.Top,AutoSize=true,WrapContents=true,Padding=new Padding(12,9,12,9),BackColor=AppTheme.Surface};
         int selected=1;var printer=new PrinterSettings();

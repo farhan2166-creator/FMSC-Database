@@ -11,6 +11,7 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Report improvements
 
+- Correct thermal bill preview scaling using the PDF/print paper dimensions, center single bills and distinguish the preview background from the paper. PDF and printer sizing remain unchanged.
 - Combine bulk outstanding-bill filters, all actions and the student grid in one compact panel, with narrower filters across two rows on normal windows. Remove individual admission/name search and the redundant Select Shown action; retain bulk placement/balance filters, paper/grouping options and row exclusions.
 - Fit each thermal bill to its own rendered text plus a small margin in preview, PDF export and printing. Keep long family totals on the same slip and preserve independent page heights within mixed-length batches.
 - Add an inline Bill grouping selector (Individual by default, or By family) to collection, outstanding printing and accounts. Open a single preview directly, with each family or standalone bill on its own page. Keep full-balance scope and readiness warnings, saved bill recovery and child-only copies of saved family receipts. Registration/admission print only the current child. Paper options are unchanged; no database migration is required.

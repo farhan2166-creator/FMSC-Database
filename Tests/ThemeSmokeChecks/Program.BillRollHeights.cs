@@ -77,9 +77,21 @@ internal static partial class Program
             try
             {
                 IEnumerable<Control> Walk(Control c)=>c.Controls.Cast<Control>().SelectMany(x=>new[]{x}.Concat(Walk(x)));
-                var overview=Walk(form).OfType<ReportPageOverview>().Single();overview.SetSinglePage(false);overview.SetZoom(ZoomMode.FullPage,100);Application.DoEvents();
-                Walk(form).OfType<ModernComboBox>().Single(c=>c.AccessibleName=="Page view").SelectedIndex=1;
+                var overview=Walk(form).OfType<ReportPageOverview>().Single();overview.SetSinglePage(true);overview.SetZoom(ZoomMode.Percent,100);Application.DoEvents();
                 var rectangles=(List<Rectangle>)typeof(ReportPageOverview).GetField("rectangles",BindingFlags.NonPublic|BindingFlags.Instance)!.GetValue(overview)!;
+                Check(Math.Abs(rectangles[0].Width-roll.Pages[0].Settings.PaperSize.Width/100f*overview.DeviceDpi)<2,
+                    "At 100 percent the preview uses the PDF paper width, ignoring mismatched EMF resolution metadata");
+                Check(Math.Abs(rectangles[0].Height-heights[0]/100f*overview.DeviceDpi)<2,
+                    "At 100 percent the preview uses the same bill height as PDF export and printing");
+                overview.SetZoom(ZoomMode.FullPage,100);Application.DoEvents();
+                var first=rectangles[0];
+                Check(Math.Abs(first.Left+first.Width/2-(overview.ClientSize.Width-SystemInformation.VerticalScrollBarWidth)/2)<3,
+                    "Single thermal bill is centered in the preview instead of leaving a large blank area on one side");
+                Check(overview.BackColor.ToArgb()!=Color.White.ToArgb(),"Preview canvas is visibly separate from the white bill paper");
+                using(var singleImage=new Bitmap(form.Width,form.Height))
+                {form.DrawToBitmap(singleImage,new Rectangle(Point.Empty,singleImage.Size));singleImage.Save(Path.Combine(folder,"preview-single.png"));}
+                overview.SetSinglePage(false);overview.SetZoom(ZoomMode.FullPage,100);Application.DoEvents();
+                Walk(form).OfType<ModernComboBox>().Single(c=>c.AccessibleName=="Page view").SelectedIndex=1;
                 Check(rectangles[0].Height<rectangles[2].Height&&rectangles[2].Height<rectangles[1].Height,"Multiple-page preview draws each bill at its own aspect ratio");
                 using var image=new Bitmap(form.Width,form.Height);form.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(folder,"preview.png"));
                 Walk(form).OfType<ModernButton>().Single(b=>b.Text=="Next").PerformClick();
