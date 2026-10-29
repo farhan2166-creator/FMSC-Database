@@ -3,6 +3,7 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
+    internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, certificateDate);
     private const string MissingBirthDateMessage = "Date of birth is missing. Add it to the student's Admission record, then reselect the student to create this certificate.";
     private DateTime? newCertificateDateBaseline;
     private int newDraftStudent;
@@ -81,6 +82,22 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         createCertificateButton.Click += async (_, _) => {
             if (!createCertificateButton.Enabled)
                 return;
+            if (CanStartCurrentClassCertificate())
+            {
+                // Reviewing an older class must still allow a certificate for the current placement.
+                ClearCertificateSelection();
+                ClearCertificateFields();
+                if (student.SelectedRow is DataRow current)
+                {
+                    className.Text = GetString(current, "ClassName");
+                    dateOfBirth.Text = GetDate(current, "DateOfBirth")?.ToString("dd-MMM-yyyy") ?? "Not on record";
+                }
+                Grid.ClearSelection();
+                Grid.CurrentCell = null;
+                ApplyWorkflowState();
+                certificateDate.Focus();
+                return;
+            }
             /* Finding 10 (D-H3, ported from the Bank page) - the write owns the page until it settles, so the student picker and the records grid are held too. */
             var heldDuringCreate = new List<(Control Control, bool WasEnabled)>
             {
@@ -190,6 +207,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
         records.Content.Controls.Add(Grid);
+        CertificateUi.WireNavigation(this, student, Grid, clearButton, fields, certButtonRow, certificateActions);
         Grid.BringToFront();
         var root =
             new TableLayoutPanel {
@@ -247,7 +265,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
                     GetString(row, "ClassName");
             }
             LoadCertificates(admissionId);
-            SelectCurrentClassCertificate();
+            CertificateUi.FocusHistory(Grid, () => SelectCertificate(0), certificateDate);
         }
         catch (Exception ex)
         {
@@ -318,11 +336,6 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             .Where(row => string.Equals(GetString(row, "ClassName").Trim(), normalizedClass, StringComparison.OrdinalIgnoreCase))
             .Select(row => GetInt(row, "RegularStudentCertificateId"))
             .DefaultIfEmpty(0).Max();
-    }
-    private void SelectCurrentClassCertificate()
-    {
-        int id = ExistingClassCertificateId(certificateResults, className.Text,student.SelectedRow is DataRow row?GetInt(row,"EnrollmentId"):0);
-        if (id > 0) SelectCertificate(id);
     }
     private void FormatCertificateGrid()
     {
@@ -433,8 +446,8 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         className.Enabled = hasStudent && !creatingCertificate;
         createCertificateButton.Enabled =
             hasStudent && HasRecordedBirthDate() &&
-            ((!hasSelection && certificatesLoaded && string.Equals(GetSelectedStudentStatus(),"Active",StringComparison.OrdinalIgnoreCase) && ExistingClassCertificateId(certificateResults, className.Text,enrollmentId) == 0)||editableCopy) && !IsBusy && !reissue.Blocked;
-        createCertificateButton.Text=hasSelection?"Save Changes":UiText.Certificates.Create;
+            ((!hasSelection && certificatesLoaded && string.Equals(GetSelectedStudentStatus(),"Active",StringComparison.OrdinalIgnoreCase) && ExistingClassCertificateId(certificateResults, className.Text,enrollmentId) == 0)||editableCopy||CanStartCurrentClassCertificate()) && !IsBusy && !reissue.Blocked;
+        createCertificateButton.Text=CanStartCurrentClassCertificate()?"New for Current Class":hasSelection?"Save Changes":UiText.Certificates.Create;
         updateCertificateButton.Enabled =
             hasStudent && hasSelection && selectedIssueId>0 && !IsBusy && !reissue.Blocked && CertificateCollectionFlow.Locked(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId));
         checkReissue.Visible=reissue.Blocked;
@@ -446,6 +459,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
             hasSelection && selectedIssueId>0 && !dirty && !IsBusy && CurrentUser.HasPermission("Certificates.Print");
         copyFlow.Available=!IsBusy&&!reissue.Blocked;
         copyFlow.Apply(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId,createCertificateButton,printButton,dirty,certificateDate);
+        if (CanStartCurrentClassCertificate()) createCertificateButton.Enabled = !IsBusy && !reissue.Blocked;
         if(reissue.Blocked){SetStatus("A certificate reissue needs checking. Use Check Reissue before issuing another copy.",true);return;}
         if (!hasStudent)
         {
@@ -455,6 +469,11 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         }
         if (hasSelection)
         {
+            if (CanStartCurrentClassCertificate())
+            {
+                SetStatus("Review the saved copy, or choose New for Current Class to prepare a certificate for the current placement.");
+                return;
+            }
             SetStatus(
                 dirty ? "Save your changes before printing or collecting this certificate."
                     : CertificateCollectionFlow.Locked(CertificateCollectionFlow.Find(certificateResults,"RegularStudentCertificateIssueId",selectedIssueId))?"Collected copy — details are locked. Print this copy or use Issue Again.":"Ready to print. Mark Collected after handing over the certificate.");
@@ -478,6 +497,12 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     }
     private bool HasRecordedBirthDate() =>
         student.SelectedRow is DataRow row && GetDate(row, "DateOfBirth").HasValue;
+
+    private bool CanStartCurrentClassCertificate() => selectedRegularStudentCertificateId > 0 && certificatesLoaded &&
+        student.SelectedRow is DataRow row && HasRecordedBirthDate() &&
+        string.Equals(GetString(row, "Status"), "Active", StringComparison.OrdinalIgnoreCase) &&
+        !string.IsNullOrWhiteSpace(GetString(row, "ClassName")) &&
+        ExistingClassCertificateId(certificateResults, GetString(row, "ClassName"), GetInt(row, "EnrollmentId")) == 0;
 
     /// <summary>Finding 8 - the status of the selected student, from the row the picker was bound from. Empty when it is not known; no query is made.</summary>
     private string GetSelectedStudentStatus()
@@ -637,15 +662,16 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     }
     private void SelectCertificate(int id,int issueId=0)
     {
-        if (id == 0 && certificateResults.Rows.Count > 0)
-            id = certificateResults.AsEnumerable().Max(row => GetInt(row,"RegularStudentCertificateId"));
         foreach (DataGridViewRow row in Grid.Rows)
         {
             if (row.DataBoundItem is not DataRowView view ||
                 (id > 0 && GetInt(view.Row,"RegularStudentCertificateId") != id) ||
                 (issueId>0&&GetInt(view.Row,"RegularStudentCertificateIssueId")!=issueId)) continue;
-            Grid.CurrentCell = row.Cells.Cast<DataGridViewCell>().First(cell => cell.Visible);
+            Grid.ClearSelection();
+            Grid.CurrentCell = row.Cells.Cast<DataGridViewCell>().Where(cell => cell.Visible)
+                .OrderBy(cell => cell.OwningColumn.DisplayIndex).First();
             row.Selected = true;
+            if (Grid.IsHandleCreated) Grid.FirstDisplayedScrollingRowIndex = row.Index;
             GridSelectionChanged(Grid,EventArgs.Empty);
             return;
         }

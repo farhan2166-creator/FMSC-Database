@@ -2,6 +2,46 @@ namespace FMSC_SMS.Core;
 /// <summary>Small shared mechanics used by the certificate screens; certificate-specific business rules stay on their pages.</summary>
 internal static class CertificateUi
 {
+    internal static bool FocusEntry(StudentPicker picker, DataGridView grid, Control firstField) =>
+        picker.SelectedId <= 0 ? picker.Focus() : grid.Rows.Count > 0 ? grid.Focus() : FormFlow.FocusFirstInput(firstField);
+
+    internal static void WireNavigation(Control page, StudentPicker picker, DataGridView grid,
+        Control newButton, Control editor, Control editorActions, Control historyActions,
+        Action<int>? loadHistoryRow = null)
+    {
+        editor.TabIndex = 0;
+        editorActions.TabIndex = 1;
+        grid.TabIndex = 0;
+        historyActions.TabIndex = 1;
+        foreach (Control row in new[] { editorActions, historyActions })
+            foreach (FlowLayoutPanel flow in row.Controls.OfType<FlowLayoutPanel>())
+                for (int index = 0; index < flow.Controls.Count; index++)
+                    flow.Controls[index].TabIndex = index;
+
+        FormFlow.ScheduleInitialFocus(page, picker, () => picker.SelectedId <= 0);
+        // The page's reset handler runs first. A refused discard keeps its focus.
+        newButton.Click += (_, _) => {
+            if (picker.SelectedId <= 0) picker.Focus();
+        };
+        if (loadHistoryRow is not null)
+            grid.KeyUp += (_, e) => {
+                if (e.KeyCode is Keys.Up or Keys.Down or Keys.Home or Keys.End or Keys.PageUp or Keys.PageDown &&
+                    grid.CurrentRow is { IsNewRow: false, Selected: true } row)
+                    loadHistoryRow(row.Index);
+            };
+    }
+
+    internal static void FocusHistory(DataGridView grid, Action selectLatest, Control firstField)
+    {
+        if (grid.Rows.Cast<DataGridViewRow>().Any(row => !row.IsNewRow))
+        {
+            selectLatest();
+            grid.Focus();
+        }
+        else
+            FormFlow.FocusFirstInput(firstField);
+    }
+
     internal static string PromotionClassText(string value)
     {
         // Older certificates saved the picker caption (class name plus class code).

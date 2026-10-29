@@ -34,6 +34,11 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--certificate-navigation"))
+        {
+            CheckCertificateNavigation();
+            Console.WriteLine($"PASS: {checks} certificate launch, reset, history focus and keyboard-order checks (no database connection).");return;
+        }
         if(args.Contains("--admission-fee-flow-sql-compat"))
         {
             CheckAdmissionFeeFlowSqlCompatibility();Console.WriteLine($"PASS: {checks} owned schema-60 compatibility check.");return;

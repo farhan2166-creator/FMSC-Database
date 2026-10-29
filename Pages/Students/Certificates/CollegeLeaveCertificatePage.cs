@@ -3,6 +3,7 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
 {
+    internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, leave);
     private const string CertificateTypeName = "College";
     private const int MaxDuplicateIssues = 2;
     private readonly StudentPicker student = new();
@@ -183,6 +184,8 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
         records.Content.Controls.Add(Grid);
+        CertificateUi.WireNavigation(this, student, Grid, clearButton, fields, certButtonRow, certificateActions,
+            index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
         Grid.BringToFront();
         var root =
             new TableLayoutPanel {
@@ -262,6 +265,8 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
             }
             LoadCertificates(admissionId);
             feeReview.RefreshFees();
+            CaptureDraftBaseline();
+            CertificateUi.FocusHistory(Grid, () => SelectSavedCertificate(0), leave);
         }
         catch (Exception ex)
         {

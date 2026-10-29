@@ -3,6 +3,7 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
 {
+    internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, leave);
     // Owner policy: clearance is optional; preserve Students.Leave and leaving-state validation.
     // A missing clearance checklist must not block withdrawal or certificate issuance.
     private const string CertificateTypeName = "School";
@@ -182,6 +183,8 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
         records.Content.Controls.Add(Grid);
+        CertificateUi.WireNavigation(this, student, Grid, clearButton, fields, certButtonRow, certificateActions,
+            index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
         Grid.BringToFront();
         var root =
             new TableLayoutPanel {
@@ -261,6 +264,8 @@ public sealed class LeaveCertificatePage : V2Page, IUnsavedChanges
             }
             LoadCertificates(admissionId);
             feeReview.RefreshFees();
+            CaptureDraftBaseline();
+            CertificateUi.FocusHistory(Grid, () => SelectSavedCertificate(0), leave);
         }
         catch (Exception ex)
         {

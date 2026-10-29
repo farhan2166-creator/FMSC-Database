@@ -4,6 +4,7 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
+    internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, examType);
     public bool HasUnsavedChanges => HasCertificateEdits;
     public string UnsavedChangesMessage => "Discard the unsaved certificate changes?";
     public bool IsBusy => creatingCertificate;
@@ -368,6 +369,8 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
         records.Content.Controls.Add(Grid);
+        CertificateUi.WireNavigation(this, student, Grid, clearButton, editorBody, certButtonRow, certificateActions,
+            index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
         Grid.BringToFront();
         var root =
             new TableLayoutPanel {
@@ -607,6 +610,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 return;
             }
             LoadCertificates(admissionId);
+            CertificateUi.FocusHistory(Grid, () => SelectSavedCertificate(0), examType);
         }
         catch (Exception ex)
         {

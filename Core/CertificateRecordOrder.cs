@@ -28,13 +28,14 @@ internal static class CertificateRecordOrder
     internal static void Select(DataGridView grid, string key, int id, Action<int> loadRow)
     {
         var rows = grid.Rows.Cast<DataGridViewRow>().Where(row => row.DataBoundItem is DataRowView).ToList();
-        if (id <= 0 && rows.Count > 0)
-            id = rows.Max(row => Convert.ToInt32(((DataRowView)row.DataBoundItem)[key]));
-        var selected = rows.FirstOrDefault(row => Convert.ToInt32(((DataRowView)row.DataBoundItem)[key]) == id);
+        var selected = id <= 0 ? rows.FirstOrDefault()
+            : rows.FirstOrDefault(row => Convert.ToInt32(((DataRowView)row.DataBoundItem)[key]) == id);
         if (selected is null) return;
         grid.ClearSelection();
-        grid.CurrentCell = selected.Cells.Cast<DataGridViewCell>().First(cell => cell.Visible);
+        grid.CurrentCell = selected.Cells.Cast<DataGridViewCell>().Where(cell => cell.Visible)
+            .OrderBy(cell => cell.OwningColumn.DisplayIndex).First();
         selected.Selected = true;
+        if (grid.IsHandleCreated) grid.FirstDisplayedScrollingRowIndex = selected.Index;
         loadRow(selected.Index);
     }
 }

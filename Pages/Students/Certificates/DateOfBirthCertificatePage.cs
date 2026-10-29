@@ -3,6 +3,7 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChanges
 {
+    internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, certificateDate);
     private bool reissuing;
     private bool loadingCertificates;
     private readonly Func<int,DataTable> readCertificates;
@@ -143,6 +144,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
         records.Content.Controls.Add(Grid);
+        CertificateUi.WireNavigation(this, student, Grid, clearButton, fields, certButtonRow, certificateActions);
         Grid.BringToFront();
         var root =
             new TableLayoutPanel {
@@ -201,7 +203,7 @@ public sealed class DateOfBirthCertificatePage : V2Page, IBusyPage, IUnsavedChan
                     ? currentDateOfBirth.Value.ToString("dd-MM-yyyy")
                     : "Not on record";
             LoadCertificates(admissionId);
-            SelectSavedCertificate(0);
+            CertificateUi.FocusHistory(Grid, () => SelectSavedCertificate(0), certificateDate);
         }
         catch (Exception ex)
         {

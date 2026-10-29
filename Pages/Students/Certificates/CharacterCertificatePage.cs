@@ -4,6 +4,7 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
+    internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, certificateDate);
     private readonly StudentPicker student = new();
     private readonly CertificateCollectionFlow copyFlow = new("Character");
     private string? draftBaseline;
@@ -188,6 +189,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         refreshButton.TabIndex = 3;
         records.Content.Controls.Add(certificateActions);
         records.Content.Controls.Add(Grid);
+        CertificateUi.WireNavigation(this, student, Grid, clearButton, fields, certButtonRow, certificateActions);
         Grid.BringToFront();
         var root =
             new TableLayoutPanel {
@@ -270,7 +272,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
                 return;
             }
             LoadCertificates(admissionId);
-            SelectSavedCertificate(0);
+            CertificateUi.FocusHistory(Grid, () => SelectSavedCertificate(0), certificateDate);
         }
         catch (Exception ex)
         {

@@ -53,7 +53,8 @@ internal static partial class Program
             performance.Text="Custom sports achievement";
             Check(performance.Text=="Custom sports achievement","Suggested text remains editable");
             Load();Application.DoEvents();
-            Check(suggestions.SelectedIndex==0&&performance.Text.Length==0,"A fresh student load clears the old sentence choice and wording");
+            Check(suggestions.SelectedIndex==0&&performance.Text=="Saved performance"&&grid.Focused&&grid.CurrentRow?.Index==0,
+                "A fresh student load selects the latest saved certificate and focuses its history row");
             typeof(SportsCertificatePage).GetMethod("Grid_CellMouseClick",flags)!.Invoke(page,new object?[]{grid,new DataGridViewCellMouseEventArgs(0,0,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))});
             Check(performance.Text=="Saved performance"&&suggestions.SelectedIndex==0,"Selecting a saved certificate preserves its stored wording");
             var bound=Field<DataTable>("certificateResults");bound.Rows[0]["CollectedAt"]=DateTime.Now;bound.Rows[0]["CollectionStatus"]="Collected";
@@ -61,6 +62,8 @@ internal static partial class Program
             suggestions.SelectedIndex=1;
             Check(!suggestions.Enabled&&performance.Text=="Saved performance","Suggestions cannot overwrite a collected certificate");
             Check(errors.Count==0&&!page.IsHandleCreated,"Repeated student loads cause no grid errors and start no page SQL loaders");
+            history.Clear();Load();Application.DoEvents();
+            Check(suggestions.SelectedIndex==0&&performance.Text.Length==0,"A student without saved certificates starts with fresh sentence choice and wording");
             host.Close();
         }
         finally {CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Permissions);}

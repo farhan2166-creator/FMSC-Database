@@ -426,8 +426,8 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
                 editedDetails[key] = editedDetails[key] with { Frequency = Convert.ToString(grid.Rows[e.RowIndex].Cells[FrequencyColumnName].Value) ?? "Monthly" };
         };
         HumanUi.ApplyGridStyle(grid, AppTheme.Primary);
-        // Columns own their widths; bypass the shared content/viewport fitting pass.
-        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        // Let the shared content/viewport fitting pass size the matrix columns.
+        grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         rootPanel = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
@@ -589,7 +589,6 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
             ReadOnly = true,
             Frozen = true,
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-            Width = AppScale.Scale(190),
             DefaultCellStyle = { BackColor = AppTheme.SurfaceSecondary, Font = AppTheme.ButtonFont }
         });
         var frequencyColumn = new DataGridViewComboBoxColumn {
@@ -597,7 +596,6 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
             HeaderText = UiText.Fees.Frequency,
             Frozen = true,
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-            Width = AppScale.Scale(120),
             FlatStyle = FlatStyle.Flat,
             DisplayStyle = DataGridViewComboBoxDisplayStyle.ComboBox,
             DefaultCellStyle = { BackColor = AppTheme.SurfaceSecondary }
@@ -610,7 +608,6 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
                 Name = "CL_" + classColumn.ClassId,
                 HeaderText = classColumn.ClassName,
                 AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
-                Width = AppScale.Scale(120),
                 DefaultCellStyle = { Alignment = DataGridViewContentAlignment.MiddleRight }
             });
         }

@@ -3,6 +3,7 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Staff.Certificates;
 public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
 {
+    internal override bool FocusEntryField() => CertificateUi.FocusEntry(staff, Grid, certificateDate);
     private readonly StaffPicker staff = new();
     private readonly CertificateCollectionFlow copyFlow = new("Lecturer");
     private string? _baseline;
@@ -132,6 +133,8 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
         records.Content.Controls.Add(Grid);
+        CertificateUi.WireNavigation(this, staff, Grid, clearButton, fields, certButtonRow, certificateActions,
+            index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
         Grid.BringToFront();
         var root =
             new TableLayoutPanel {
@@ -201,6 +204,7 @@ public sealed class RegularLecturerCertificatePage : V2Page, IUnsavedChanges
             LoadCertificates(staffId);
             ClearCertificateFields();
             ApplyWorkflowState();
+            CertificateUi.FocusHistory(Grid, () => SelectSavedCertificate(0), certificateDate);
         }
         catch (Exception ex)
         {

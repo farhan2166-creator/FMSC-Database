@@ -4,6 +4,7 @@ using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
 public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyPage
 {
+    internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, certificateDate);
     // Short certificate details can be retyped without a discard warning.
     public bool HasUnsavedChanges => false;
     public string UnsavedChangesMessage => "Discard the unsaved certificate changes?";
@@ -127,6 +128,8 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
             DockStyle.Bottom;
         records.Content.Controls.Add(certificateActions);
         records.Content.Controls.Add(Grid);
+        CertificateUi.WireNavigation(this, student, Grid, clearButton, fields, certButtonRow, certificateActions,
+            index => Grid_CellMouseClick(Grid, new DataGridViewCellMouseEventArgs(0,index,0,0,new MouseEventArgs(MouseButtons.Left,1,0,0,0))));
         Grid.BringToFront();
         var root =
             new TableLayoutPanel {
@@ -169,6 +172,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 return;
             }
             LoadCertificates(admissionId);
+            CertificateUi.FocusHistory(Grid, () => SelectSavedCertificate(0), certificateDate);
         }
         catch (Exception ex)
         {
