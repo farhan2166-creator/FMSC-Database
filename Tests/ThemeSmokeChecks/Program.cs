@@ -393,6 +393,7 @@ internal static partial class Program
         if(args.Contains("--certificate-collection-workflow"))
         {
             CheckCertificateCollectionWorkflow();
+            CheckCertificateCollectorDialog();
             CheckCertificateNewDiscard();
             Console.WriteLine($"PASS: {checks} certificate collection, lock, print and unused-copy checks across all ten forms.");
             return;

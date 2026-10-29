@@ -78,7 +78,7 @@ internal sealed class CertificateCollectionFlow(string kind)
     {
         Collect.Click+=(_,_)=>{
             if(busy||!Collect.Enabled||dirty())return;
-            string? name=Prompt(owner,"Mark Certificate Collected","Name of person collecting this certificate:\nCollection permanently locks this copy.",200);
+            string? name=CertificateCollectionDialog.Show(owner);
             if(name is null)return;
             Run(owner,()=>DatabaseHelper.ExecuteUser("CollectCertificateCopy",DatabaseHelper.P("@Kind",kind),DatabaseHelper.Int("@CopyId",selected()),DatabaseHelper.P("@CollectedBy",name),VersionParameter(expectedVersion)),reload,selected());
         };
@@ -99,17 +99,5 @@ internal sealed class CertificateCollectionFlow(string kind)
         try {action();busy=false;reload(id);}
         catch(Exception ex) {busy=false;ModernMessageDialog.Show(owner.FindForm(),DbMessage.UserMessage(ex,"The action could not be confirmed. Refresh the history before trying again."),"Certificate",MessageBoxButtons.OK,MessageBoxIcon.Warning);reload(id);}
         finally {busy=false;owner.Enabled=true;}
-    }
-    internal static string? Prompt(Control owner,string title,string caption,int maxLength)
-    {
-        using var dialog=new ApplicationWindowForm { Text=title,StartPosition=FormStartPosition.CenterParent,ClientSize=new Size(AppScale.Scale(500),AppScale.Scale(220)),MinimizeBox=false,MaximizeBox=false };
-        var input=HumanUi.TextBox(false,maxLength);input.Dock=DockStyle.Top;
-        var label=new Label {Text=caption,Dock=DockStyle.Top,Height=AppScale.Scale(78),Padding=new Padding(12),AutoSize=false};
-        var okay=new ModernButton {Text="Confirm",DialogResult=DialogResult.OK};
-        var cancel=new ModernButton {Text="Cancel",DialogResult=DialogResult.Cancel};
-        var buttons=CertificateButtonRow.Create(okay,cancel);buttons.Dock=DockStyle.Bottom;
-        dialog.Controls.Add(input);dialog.Controls.Add(label);dialog.Controls.Add(buttons);dialog.AcceptButton=okay;dialog.CancelButton=cancel;
-        if(dialog.ShowDialog(owner.FindForm())!=DialogResult.OK)return null;
-        return string.IsNullOrWhiteSpace(input.Text)?null:input.Text.Trim();
     }
 }
