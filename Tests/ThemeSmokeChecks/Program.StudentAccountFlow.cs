@@ -40,7 +40,7 @@ internal static partial class Program
                 calls++; readId = id; return reply.Task;
             };
             var type = typeof(StudentAccountStatementPage);
-            using var page = (StudentAccountStatementPage)Activator.CreateInstance(type, flags, null, new object[] { false, read }, null)!;
+            using var page = new StudentAccountStatementPage(read) { ReadAccount=ReadEmptyFeeAccount };
             T Field<T>(string name) => (T)type.GetField(name, flags)!.GetValue(page)!;
             object? Invoke(string name) => type.GetMethod(name, flags)!.Invoke(page, null);
             using var owner = new Form { ClientSize = new Size(1200, 720), AutoScaleMode = AutoScaleMode.None };
@@ -62,11 +62,10 @@ internal static partial class Program
                 foreach (var date in new[] { Field<ModernDatePicker>("from"), Field<ModernDatePicker>("to") })
                     Check(date.Visible && date.Height >= AppMetrics.InputControlHeight && date.Width > 0,
                         "Optional dates retain visible native input space across client sizes");
-                foreach (var name in new[] { "generateStatementButton", "printAmountsDueButton", "annualReceiptsButton" })
+                foreach (var button in new[] { Field<ModernButton>("generateStatementButton"), Descendants(page).OfType<ModernButton>().Single(button=>button.Text=="Reports…") })
                 {
-                    var button = Field<ModernButton>(name);
                     Check(button.Visible && button.Bounds.Right <= button.Parent!.ClientSize.Width && button.Bounds.Bottom <= button.Parent.ClientSize.Height,
-                        "Account actions fit their row and remain reachable through the scrolling viewport");
+                        "Unified account actions and Reports menu fit their row across client sizes");
                 }
             }
             Check(SynchronizationContext.Current is WindowsFormsSynchronizationContext,

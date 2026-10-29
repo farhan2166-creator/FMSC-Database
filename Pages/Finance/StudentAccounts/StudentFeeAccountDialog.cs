@@ -1,12 +1,14 @@
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Reports.Finance;
 namespace FMSC_SMS.Pages.Finance.StudentAccounts;
-/// <summary>Modal wrapper around the existing, unmodified StudentAccountStatementPage, opened from FeeCollectionPage's new "History" button. update: the limitation above is now closed.</summary>
-public sealed class FeeHistoryDialog : ApplicationWindowForm
+/// <summary>Opens the consolidated student account while retaining the collection page underneath.</summary>
+public sealed class StudentFeeAccountDialog : ApplicationWindowForm
 {
-    public FeeHistoryDialog(int preloadAdmissionId = 0)
+    public StudentFeeAccountDialog(int preloadAdmissionId = 0)
+        : this(StudentAccountStatementPage.CreateAccount(preloadAdmissionId)) { }
+    internal StudentFeeAccountDialog(StudentAccountStatementPage page)
     {
-        Text = "Fee Statement History";
+        Text = PageTitles.StudentFeeAccount;
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.Sizable;
         MaximizeBox = true;
@@ -16,9 +18,7 @@ public sealed class FeeHistoryDialog : ApplicationWindowForm
         MinimumSize = new Size(AppScale.Scale(900), AppScale.Scale(560));
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
-        var page = new StudentAccountStatementPage(preloadAdmissionId) {
-            Dock = DockStyle.Fill
-        };
+        page.Dock = DockStyle.Fill;
         var closeButton = new ModernButton {
             Text = UiText.Actions.Close,
             Width = AppScale.Scale(105),
@@ -41,6 +41,7 @@ public sealed class FeeHistoryDialog : ApplicationWindowForm
         root.Controls.Add(buttons, 0, 1);
         Controls.Add(root);
         CancelButton = closeButton;
+        ModalPageCloseGuard.Attach(this, page);
     }
 }
 

@@ -53,14 +53,11 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
     private readonly Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>> readStatement;
     public bool IsBusy=>BusyOperationRunning||printingDueReport||accountActionBusy;
     public string BusyMessage=>"A financial statement or report is being prepared. Wait for the result before leaving.";
-    public StudentAccountStatementPage() : this(true,null) { }
-    internal StudentAccountStatementPage(bool initialize,Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>>? readStatement)
-        : this(initialize,readStatement,false) { }
-    internal StudentAccountStatementPage(bool initialize,Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>>? readStatement,bool accountMode)
-        : base(accountMode?PageTitles.StudentFeeAccount:PageTitles.StudentAccountStatement,
+    public StudentAccountStatementPage() : this(null) { }
+    internal StudentAccountStatementPage(Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>>? readStatement)
+        : base(PageTitles.StudentFeeAccount,
             "See what a student was charged, what was paid and what remains due.")
     {
-        this.accountMode=accountMode;
         Disposed+=(_,_)=>{
             accountReads.Dispose();
             foreach(var control in new Control[]{accountReceipts,accountPayments,accountTransactions,accountCredits,accountSummary})
@@ -103,7 +100,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         Grid.DataBindingComplete += (_, _) => { ConfigureStatementGrid(); FormatStatementAmounts(); };
         BuildStatementLayout();
         ClearForm();
-        if(accountMode)InitializeAccount();
+        InitializeAccount();
     }
     private void BuildStatementLayout()
     {
@@ -170,9 +167,9 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         filterBody.Controls.Add(actions,0,1);
         filters.Content.Controls.Add(filterBody);
 
-        var statement = HumanUi.Card(accountMode?"Account Activity":"Account Details", accountMode?"Statements, saved receipts and authorized payment corrections.":"Fee charges with allocated payments and remaining amounts.", accessory: exportButton);
+        var statement = HumanUi.Card("Account Activity", "Statements, saved receipts and authorized payment corrections.", accessory: exportButton);
         statement.Header.Controls.SetChildIndex(exportButton, statement.Header.Controls.Count - 1);
-        statement.Content.Controls.Add(accountMode?BuildAccountViews():Grid);
+        statement.Content.Controls.Add(BuildAccountViews());
         var summary = BuildSummary();
         var root = new TableLayoutPanel {
             ColumnCount = 1, RowCount = 5, Margin = Padding.Empty, Padding = Padding.Empty
@@ -237,7 +234,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
                 int fixedHeight = root.RowStyles.Cast<RowStyle>().Where(r => r.SizeType == SizeType.Absolute).Sum(r => (int)r.Height);
                 int statementHeight = statement.Padding.Vertical + statement.Header.Height + statement.Content.Padding.Vertical
                     + Grid.ColumnHeadersHeight + AppMetrics.GridRowHeight * 5 + SystemInformation.HorizontalScrollBarHeight;
-                if(accountMode)statementHeight+=AppScale.Scale(90);
+                statementHeight+=AppScale.Scale(90);
                 root.Size = new Size(width,
                     Math.Max(viewport.ClientSize.Height, fixedHeight + statementHeight));
                 root.ResumeLayout(true);
@@ -292,14 +289,6 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
             MinimumSize=new Size(AppScale.Scale(820),AppScale.Scale(560)),ShowInTaskbar=false,MinimizeBox=false };
         page.Dock=DockStyle.Fill;dialog.Controls.Add(page);ModalPageCloseGuard.Attach(dialog,page);
         return dialog;
-    }
-    public StudentAccountStatementPage(int preloadAdmissionId)
-        : this()
-    {
-        if (preloadAdmissionId > 0)
-        {
-            Defer(() => _ = PreloadAdmissionIdAsync(preloadAdmissionId));
-        }
     }
     private async Task PreloadAdmissionIdAsync(int admissionId)
     {
@@ -360,7 +349,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
     /* report the displayed statement as stale the moment the selection or dates no longer match the values that produced it. */
     private void OnFiltersChanged()
     {
-        if(accountMode)InvalidateAccount();
+        InvalidateAccount();
         if(BusyOperationRunning)statementReads.Cancel();
         UpdateSelectionActions();
         if (string.IsNullOrEmpty(_appliedFilterSignature))
@@ -585,18 +574,18 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
     }
     private async Task LoadStatement()
     {
-        if(accountMode)InvalidateAccount();
+        InvalidateAccount();
         try{await RunBusyAsync("Generating statement…",async()=>{
-            if(accountMode&&!CurrentUser.HasPermission("Reports.View"))
+            if(!CurrentUser.HasPermission("Reports.View"))
             {
                 Grid.DataSource=null;_appliedFilterSignature=string.Empty;SetReportActionsEnabled(false);
                 openingBalance.Text=chargesTotal.Text=paymentsTotal.Text=closingBalance.Text="—";
                 await RefreshAccountAsync();return;
             }
             await LoadStatementCoreAsync();
-            if(accountMode&&!string.IsNullOrEmpty(_appliedFilterSignature))await RefreshAccountAsync();
+            if(!string.IsNullOrEmpty(_appliedFilterSignature))await RefreshAccountAsync();
         },this);}
-        finally{if(!IsDisposed){UpdateSelectionActions();if(accountMode)UpdateAccountActions();}}
+        finally{if(!IsDisposed){UpdateSelectionActions();UpdateAccountActions();}}
     }
     private async Task LoadStatementCoreAsync()
     {
@@ -624,8 +613,8 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
             }
             var combined =
                 CreateStatementTable();
-            var chronological=accountMode?new DataTable():null;
-            var names=accountMode?new Dictionary<int,string>():null;
+            var chronological=new DataTable();
+            var names=new Dictionary<int,string>();
             decimal combinedOpening = 0m;
             decimal combinedCharges = 0m;
             decimal combinedPayments = 0m;
@@ -647,8 +636,8 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
                 return (statement.Transactions,statement.OpeningBalance,Name:name);
             },(id,statement)=>{
                 AppendStudentRows(combined,statement.Transactions,statement.Name);
-                if(chronological is not null)AppendAccountTransactions(chronological,statement.Transactions,id,statement.Name);
-                if(names is not null)names[id]=statement.Name;
+                AppendAccountTransactions(chronological,statement.Transactions,id,statement.Name);
+                names[id]=statement.Name;
                 combinedCharges+=SumDistinctCharges(statement.Transactions);
                 combinedPayments+=SumPayments(statement.Transactions);
                 combinedOpening+=statement.OpeningBalance;
@@ -658,14 +647,14 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
                 combined.Columns.Contains("TransactionDate"))
             {
                 combined = await Task.Run(()=>{
-                    combined.DefaultView.Sort=accountMode?"TransactionDate ASC, StatementStudent ASC, TransactionType ASC, TransactionId ASC":"StatementStudent ASC, TransactionDate ASC, TransactionType ASC, TransactionId ASC";
+                    combined.DefaultView.Sort="TransactionDate ASC, StatementStudent ASC, TransactionType ASC, TransactionId ASC";
                     return combined.DefaultView.ToTable();
                 },request.Token);
                 if(IsDisposed||!statementReads.IsCurrent(request)||signature!=FilterSignature())return;
             }
             Bind(combined);
-            if(names is not null)accountStudentNames=names;
-            if(chronological is not null)BindAccountTransactions(chronological);
+            accountStudentNames=names;
+            BindAccountTransactions(chronological);
             UiHelper.SetGridEmptyMessage(Grid, "No account entries for the selected students and dates.");
             ConfigureStatementGrid();
             FormatStatementAmounts();
@@ -685,7 +674,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
             _appliedFilterSignature =
                 FilterSignature();
             SetReportActionsEnabled(true);
-            if(accountMode)UpdateAccountActions();
+            UpdateAccountActions();
         }
         catch(OperationCanceledException) when(!statementReads.IsCurrent(request)) { }
         catch (Exception ex)

@@ -56,7 +56,7 @@ Permissions remain attached to each existing action. User/role administration re
 | Post Fees to Students | Fee Posting — `FeePostingWorkspace` |
 | Fee Setup | Fee Rate Setup — `FeeConfigurationWorkspace` |
 | Bulk Adjust Fees | Bulk Fee Rate Changes — `BulkFeeRateChangesForm` |
-| Fee Statement | Student Account Statement — `StudentAccountStatementPage` |
+| Student Fee Account | Consolidated account and statement — `StudentAccountStatementPage.CreateAccount` |
 | Student Annual Fee Ledger | Annual Fee Receipts — `AnnualFeeReceiptsPage` |
 | Missing monthly bills / not posted yet | Post Monthly Fees — `FeePostingPage` (month counts and eligible-student preview) |
 | DefineClasses / DefineSections / DefineSubjects / DefineCampuses | ClassesPage / SectionsPage / SubjectsPage / CampusesPage |

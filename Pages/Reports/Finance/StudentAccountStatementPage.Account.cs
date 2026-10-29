@@ -5,7 +5,6 @@ namespace FMSC_SMS.Pages.Reports.Finance;
 
 public sealed partial class StudentAccountStatementPage
 {
-    private readonly bool accountMode;
     private readonly LatestReadScope accountReads=new();
     internal Func<int,Task<StudentFeeAccountData>> ReadAccount=StudentFeeAccountData.ReadAsync;
     private readonly DataGridView accountReceipts=HumanUi.Grid(false),accountPayments=HumanUi.Grid(false);
@@ -30,7 +29,7 @@ public sealed partial class StudentAccountStatementPage
     internal static bool CanOpenAccount=>CurrentUser.HasPermission("Reports.View")||CurrentUser.HasPermission("Fees.Collect");
     public static StudentAccountStatementPage CreateAccount(int admissionId=0)
     {
-        var page=new StudentAccountStatementPage(true,null,true);
+        var page=new StudentAccountStatementPage();
         if(admissionId>0)page.Defer(()=>page.PreloadAdmissionIdAsync(admissionId));
         return page;
     }
@@ -248,7 +247,6 @@ public sealed partial class StudentAccountStatementPage
 
     private void UpdateAccountActions()
     {
-        if(!accountMode)return;
         var payment=SelectedAccountRow(accountPayments);
         if(receiptDetails is not null)receiptDetails.Enabled=AccountCurrent&&SelectedAccountRow(accountReceipts) is not null;
         if(paymentDetails is not null)paymentDetails.Enabled=AccountCurrent&&payment is not null;

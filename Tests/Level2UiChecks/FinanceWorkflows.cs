@@ -63,12 +63,12 @@ internal static class FinanceWorkflows
         },"Settled collection disabled; payment count and total unchanged.");
         report.Run("L2-FIN-07",ui,()=>{
             ui.Click("Student Fees ▾",ControlType.Button);
-            ui.Click("Account Statement",ControlType.MenuItem);
-            ui.Window("Fee Statement History");
+            ui.Click("Student Fee Account",ControlType.MenuItem);
+            ui.Window("Student Fee Account");
             Identity.Check(Charges()==Allocated()&&Paid()==Allocated(),"Statement source totals differ.");
         },"Committed charges, payments and allocations reconcile to a zero balance; inspect statement screenshot.");
         // Close only the known statement dialog, then return to collection.
-        try {ui.Click("Close",ControlType.Button,ui.Window("Fee Statement History"));} catch {return;}
+        try {ui.Click("Close",ControlType.Button,ui.Window("Student Fee Account"));} catch {return;}
         report.Run("L2-FIN-11",ui,()=>{
             Identity.Check(Paid()==Allocated(),"Payments do not reconcile to allocations.");
             Identity.Check(Identity.Count("""

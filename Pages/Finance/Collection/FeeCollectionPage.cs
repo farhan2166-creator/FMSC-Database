@@ -316,7 +316,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             await LoadChargesAsync(loadVersion);
             await LoadRecentPaymentsAsync(loadVersion);
         }, "Secondary");
-        // Reuse existing projection and statement views for Future Fees and History.
+        // Future fees and the consolidated account retain the selected student.
         futureFeesButton =
             AddAction(
                 "Future Fees",
@@ -325,8 +325,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         futureFeesButton.Enabled = false;
         historyButton =
             AddAction(
-                "Account Statement",
-                (_, _) => OpenHistory(),
+                PageTitles.StudentFeeAccount,
+                async (_, _) => await OpenStudentFeeAccountAsync(),
                 "Secondary");
         historyButton.Enabled = false;
         /* Open payment history on demand. */
@@ -351,7 +351,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             AutoSize = true
         };
         var futureFeesItem = studentFeesMenu.Items.Add("Future Fees", null, (_, _) => futureFeesButton?.PerformClick());
-        var statementItem = studentFeesMenu.Items.Add("Account Statement", null, (_, _) => historyButton?.PerformClick());
+        var accountItem = studentFeesMenu.Items.Add(PageTitles.StudentFeeAccount, null, (_, _) => historyButton?.PerformClick());
         var feeChangesItem=studentFeesMenu.Items.Add("Print Fee Changes",null,async(_,_)=> {
             if(IsBusy||siblingBusy||admissionId<=0||!CurrentUser.HasPermission("Fees.Collect"))return;
             if(!charges.EndEdit())return;
@@ -378,7 +378,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         studentFeesMenu.Items.Add(familyReturnsItem);
         studentFeesMenu.Opening += (_, _) => {
             futureFeesItem.Enabled = futureFeesButton?.Enabled == true;
-            statementItem.Enabled = historyButton?.Enabled == true;
+            accountItem.Enabled = historyButton?.Enabled == true;
             feeChangesItem.Enabled=admissionId>0&&CurrentUser.HasPermission("Fees.Collect")&&!siblingBusy;
             try{recoveryItem.Available=CurrentUser.HasPermission("Fees.Adjust")&&MutationRecoveryJournal.ReadPending(MutationKind.FeeConcession) is not null;}
             catch{recoveryItem.Available=CurrentUser.HasPermission("Fees.Adjust");}
@@ -3922,16 +3922,37 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             recentPayments.Enabled = false;
         }
     }
-    private void OpenHistory()
+    private async Task OpenStudentFeeAccountAsync()
     {
         using var returnFocus = new DialogReturnFocus(this);
+        if (IsBusy || siblingBusy || !FMSC_SMS.Pages.Reports.Finance.StudentAccountStatementPage.CanOpenAccount) return;
         if (admissionId <= 0 || enrollmentId <= 0)
         {
             Warn(UiText.Prompts.SelectStudentAndEnrollment);
             return;
         }
-        using var dialog = new FeeHistoryDialog(admissionId);
-        dialog.ShowDialog(FindForm());
+        if (!charges.EndEdit()) return;
+        if (HasCollectionDraft())
+        {
+            Warn("Finish or clear the payment draft before opening Student Fee Account. Your entries have been retained.");
+            return;
+        }
+        int anchor = admissionId, placement = enrollmentId, version = loadVersion;
+        billBusy = true;
+        try
+        {
+            using var busy = BeginBusy("Reviewing student fee account…", this);
+            using (var dialog = new StudentFeeAccountDialog(anchor)) dialog.ShowDialog(FindForm());
+            if (IsDisposed || admissionId != anchor || enrollmentId != placement || loadVersion != version) return;
+            int refreshVersion = ++loadVersion;
+            // Account corrections can change dues, credit and payment history.
+            // Reload the same included children rather than rebuilding their selection.
+            if (counterIds is not null) await RestoreCounterSelectionAsync();
+            else await LoadChargesAsync(refreshVersion);
+            if (!IsDisposed && refreshVersion == loadVersion) await LoadRecentPaymentsAsync(refreshVersion);
+        }
+        catch (Exception ex) { if (!IsDisposed) Fail(ex); }
+        finally { billBusy = false; if (!IsDisposed) UpdateProcessCollectionAvailability(); }
     }
     /// <summary>Show saved fee figures without exposing editing choices.</summary>
     private async Task ViewFeeDetailsAsync(long chargeId)

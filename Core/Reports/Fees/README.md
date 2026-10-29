@@ -49,7 +49,7 @@ Shared files:
   metadata, which can describe a different scale. Single slips are centered on
   a contrasting canvas; surrounding screen space is not part of the bill paper.
 - `AnnualReceiptPreview`: the shared annual receipt loader/preview, used directly
-  from Student Account Statement and from the standalone year selector.
+  from Student Fee Account and from the standalone year selector.
 - `OutstandingBillsPreview`: reads selected accounts, checks readiness and prepares
   saved bills, then opens one combined preview without review/results dialogs.
   Missing-charge warnings appear only for actual return/placement readiness concerns.

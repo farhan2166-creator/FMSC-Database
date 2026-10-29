@@ -54,8 +54,15 @@ without gaining `Reports.View`: their account opens Receipts, and statement SQL,
 date filters and export remain unavailable. An independent Check Save Outcome
 action preserves recovery when the original payment is no longer eligible.
 Family / Group Statements was retired on 28 October 2026. Arbitrary group selection is removed; Include Siblings remains within the student account.
-The shared statement component, annual reporting and collection's read-only
-history wrapper are still live dependencies, not duplicate standalone pages.
+The shared statement component and annual reporting remain live dependencies.
+The obsolete standalone statement mode and its old page title have been removed;
+the shared page always opens the consolidated account, with Statement and Receipts
+tabs and the same permission checks. There is no alternate statement-only screen.
+Fee Collection's contextual Student Fee Account dialog now hosts this same
+consolidated workspace, with the student preselected. Closing it refreshes the
+collection's existing child selection, dues, credit and payment history. The
+dialog cannot close during an account operation; a pending collection draft
+must be finished or cleared before opening it.
 The aging report's contextual account link now opens the consolidated workspace.
 
 ## Safeguards and tradeoffs

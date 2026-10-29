@@ -129,13 +129,13 @@ Promotion History is reached from this button rather than a separate navigation 
 - If a save times out, disconnects or gives uncertain feedback, **do not create a new transaction to test whether it worked**. Use the page's reconciliation action, then ask the administrator if necessary.
 - A printed report or exported CSV/PDF is a copy of selected data; verify filters and avoid sharing student or financial documents with unauthorized recipients.
 
-## Student Account Statement and annual receipts
+## Student Fee Account and annual receipts
 
-Open **Reports > Student Account Statement**, then choose a student by admission number or name. Their account loads without an Include checkbox. The full-width details show fee charges, allocated payments and remaining amounts; the summary shows opening balance, charges, payments and closing balance. Leave the optional dates unchecked for the complete account, or choose a period and click **View Statement**. Changing a student or period makes the old export unavailable until the statement is refreshed.
+Open **Daily Work > Student Fee Account**, then choose a student by admission number or name. From Fee Collection, choose **Student Fees > Student Fee Account** to open the same workspace with the student already selected. Finish or clear a collection draft first. Closing the account returns to Fee Collection and refreshes dues, available credit and payment history for the same selected children.
 
-Choose **Annual Receipts** to open the existing yearly receipt sheet for that student. Select the academic year inside that window; this is a receipt printout, while the statement explains charges and balances. The separate Reports tile has been consolidated into the statement action; the Student Profile receipt shortcut remains available. Existing statement permission is required. When exactly one student is selected in group mode, its explicit academic-year filter is carried into the receipts window; an unavailable year must be chosen again.
+The **Statement** tab shows fee balances and chronological entries. Leave the optional dates unchecked for the complete account, or choose a period and click **View Statement**. Changing a student or period makes the old export unavailable until the statement is refreshed. **Receipts** contains issued documents, payments and adjustments, and account credit. Current dues and credit are shown separately from period totals. Collection-only operators can review authorized receipt history without gaining statement or export access.
 
-For several students, switch on **Group / family statements**, use the placement filters and **Find Students**, then tick **Include** or **Include Family** and click **View Statement**. Existing group selection, due printing and exports remain available. Switching modes clears every selected student and family, including selections outside the visible results, while retaining the chosen date period.
+Choose **Include Siblings** to review the family in the same workspace; **Student Only** restores the individual scope. Under **Reports**, choose **Annual Receipts** for the selected student's yearly receipt sheet or **Outstanding Bills** for current unpaid fees. Annual receipts also remain available from Reports and Student Profile and retain their own permission requirement.
 
 ## Family / Siblings from Student Profile
 

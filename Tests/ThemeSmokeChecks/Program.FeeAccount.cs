@@ -27,7 +27,7 @@ internal static partial class Program
             return table;
         }
         Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>> read=(id,_,_)=>Task.FromResult((Statement(id),0m));
-        using var page=new StudentAccountStatementPage(false,read,true){Dock=DockStyle.Fill,BindingContext=new BindingContext()};
+        using var page=new StudentAccountStatementPage(read){Dock=DockStyle.Fill,BindingContext=new BindingContext()};
         T Field<T>(string name)=>(T)type.GetField(name,flags)!.GetValue(page)!;
         object? Invoke(string name,params object[] args)=>type.GetMethod(name,flags)!.Invoke(page,args);
         void Wait(Task task){PumpUntil(()=>task.IsCompleted,"Account asynchronous read finishes");task.GetAwaiter().GetResult();}
@@ -46,6 +46,28 @@ internal static partial class Program
         }
         try
         {
+            using(var collection=new FMSC_SMS.Pages.Finance.Collection.FeeCollectionPage(false))
+            {
+                var menu=(ContextMenuStrip)collection.GetType().GetField("studentFeesMenu",flags)!.GetValue(collection)!;
+                Check(menu.Items.Cast<ToolStripItem>().Any(item=>item.Text==PageTitles.StudentFeeAccount)
+                    &&!menu.Items.Cast<ToolStripItem>().Any(item=>item.Text=="Account Statement"),
+                    "Fee Collection offers the consolidated Student Fee Account instead of the retired statement shortcut");
+            }
+            using(var contextual=new StudentFeeAccountDialog(new StudentAccountStatementPage(read)))
+            {
+                var account=DescendantControls(contextual).OfType<StudentAccountStatementPage>().Single();
+                Check(contextual.Text==PageTitles.StudentFeeAccount&&type.GetField("accountMode",flags) is null
+                    &&DescendantControls(account).OfType<TabControl>().Any(tabs=>tabs.Name=="accountViews"),
+                    "The account has one consolidated workspace and no obsolete standalone mode");
+                type.GetField("accountActionBusy",flags)!.SetValue(account,true);
+                var closing=new FormClosingEventArgs(CloseReason.UserClosing,false);
+                typeof(Form).GetMethod("OnFormClosing",flags)!.Invoke(contextual,new object[]{closing});
+                Check(closing.Cancel,"The collection account dialog cannot close during an account operation");
+                type.GetField("accountActionBusy",flags)!.SetValue(account,false);
+                closing=new FormClosingEventArgs(CloseReason.UserClosing,false);
+                typeof(Form).GetMethod("OnFormClosing",flags)!.Invoke(contextual,new object[]{closing});
+                Check(!closing.Cancel&&!contextual.IsHandleCreated,"An idle contextual account closes normally without starting database loaders");
+            }
             using(var shell=new MainDashboardForm((_,_)=>{}))
             {
                 var commands=(List<NavigationCommand>)typeof(MainDashboardForm).GetField("navigationCommands",flags)!.GetValue(shell)!;
@@ -83,7 +105,7 @@ internal static partial class Program
             Wait((Task)Invoke("RefreshAccountAsync")!);Invoke("UpdateAccountActions");
             Check(!Field<ModernButton>("correctPayment").Visible,"Read-only operator is not offered corrections");
             CurrentUser.SignIn(923,"Collections operator","Operator",false,new[]{"Fees.Collect","Fees.View","Fees.Adjust"});
-            using(var restricted=new StudentAccountStatementPage(false,(_,_,_)=>throw new Exception("Report reader must not run for collection-only access"),true){BindingContext=new BindingContext()})
+            using(var restricted=new StudentAccountStatementPage((_,_,_)=>throw new Exception("Report reader must not run for collection-only access")){BindingContext=new BindingContext()})
             {
                 restricted.ReadAccount=id=>Task.FromResult(Snapshot(id));
                 using(var shell=new MainDashboardForm((_,_)=>{}))
@@ -146,7 +168,7 @@ internal static partial class Program
                 foreach(int dpi in new[]{96,120,144,192})
                 {
                     var size=new Size(1280*dpi/96,850*dpi/96);AppScale.Recompute(size,dpi);
-                    using var scaled=new StudentAccountStatementPage(false,read,true){Dock=DockStyle.Fill};
+                    using var scaled=new StudentAccountStatementPage(read){Dock=DockStyle.Fill};
                     using var window=new Form{ClientSize=size,ShowInTaskbar=false};window.Controls.Add(scaled);window.Show();Application.DoEvents();
                     var tabs=(TabControl)type.GetField("accountViews",flags)!.GetValue(scaled)!;
                     Check(tabs.Width>AppScale.Scale(500)&&tabs.Height>AppScale.Scale(130),"Account layout has usable space with synthetic "+dpi+" DPI geometry");window.Close();

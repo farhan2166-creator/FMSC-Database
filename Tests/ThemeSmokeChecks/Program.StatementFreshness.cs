@@ -1,14 +1,26 @@
 using System.Data;
 using System.Reflection;
 using FMSC_SMS.Core;
+using FMSC_SMS.Pages.Security;
 using FMSC_SMS.Pages.Reports.Finance;
 
 internal static partial class Program
 {
+    private sealed class StatementCheckIdentity : IDisposable
+    {
+        private readonly (int Id,string Name,string Role,bool MustChange,string[] Permissions) previous=
+            (CurrentUser.UserId,CurrentUser.Username,CurrentUser.RoleName,CurrentUser.MustChangePassword,CurrentUser.GetPermissions().ToArray());
+        internal StatementCheckIdentity()=>CurrentUser.SignIn(924,"Statement fixture","Operator",false,new[]{"Reports.View","Fees.View"});
+        public void Dispose()=>CurrentUser.SignIn(previous.Id,previous.Name,previous.Role,previous.MustChange,previous.Permissions);
+    }
+    private static Task<StudentFeeAccountData> ReadEmptyFeeAccount(int admissionId) =>
+        Task.FromResult(new StudentFeeAccountData(new DataTable(),new DataTable(),0m,0m));
+
     private static void CheckStatementRegenerationFreshness()
     {
+        using var identity=new StatementCheckIdentity();
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(StudentAccountStatementPage);
-        using var page=(StudentAccountStatementPage)Activator.CreateInstance(type,flags,null,new object?[]{false,null},null)!;
+        using var page=new StudentAccountStatementPage(null) { ReadAccount=ReadEmptyFeeAccount };
         var grid=(DataGridView)typeof(V2Page).GetField("Grid",flags)!.GetValue(page)!;
         using var old=new DataTable();old.Columns.Add("Previous statement");old.Rows.Add("Retained snapshot");page.BindingContext=new BindingContext();grid.DataSource=old;
         var export=(ModernButton)type.GetField("exportButton",flags)!.GetValue(page)!;export.Enabled=true;type.GetField("_appliedFilterSignature",flags)!.SetValue(page,"Previously current");
@@ -20,12 +32,13 @@ internal static partial class Program
     }
     private static void CheckAsyncStatementAssembly()
     {
+        using var identity=new StatementCheckIdentity();
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;var type=typeof(StudentAccountStatementPage);
         var pending=new Queue<TaskCompletionSource<(DataTable,decimal)>>();
         Func<int,DateTime?,DateTime?,Task<(DataTable Transactions,decimal OpeningBalance)>> read=(id,_,_)=>{var reply=new TaskCompletionSource<(DataTable,decimal)>();pending.Enqueue(reply);return reply.Task;};
-        using var page=(StudentAccountStatementPage)Activator.CreateInstance(type,flags,null,new object[]{false,read},null)!;page.BindingContext=new BindingContext();
+        using var page=new StudentAccountStatementPage(read) { ReadAccount=ReadEmptyFeeAccount };page.BindingContext=new BindingContext();
         using var dialog=(ApplicationWindowForm)type.GetMethod("CreateRelatedReportDialog",BindingFlags.Static|BindingFlags.NonPublic)!
-            .Invoke(null,new object[]{PageTitles.StudentAccountStatement,page})!;
+            .Invoke(null,new object[]{PageTitles.StudentFeeAccount,page})!;
         var selected=(HashSet<int>)type.GetField("manuallySelectedAdmissionIds",flags)!.GetValue(page)!;selected.Add(1);((Dictionary<int,HashSet<int>>)type.GetField("familySelections",flags)!.GetValue(page)!)[1]=new(){1,2};
         DataTable Rows(int id){var rows=new DataTable();rows.Columns.Add("StudentName");rows.Columns.Add("TransactionType");rows.Columns.Add("TransactionId",typeof(long));rows.Columns.Add("TransactionDate",typeof(DateTime));rows.Columns.Add("DebitAmount",typeof(decimal));rows.Columns.Add("PaidAmount",typeof(decimal));rows.Rows.Add("Student "+id,"CHARGE",id,DateTime.Today,100m,0m);rows.Rows.Add("Student "+id,"PAYMENT",id+10,DateTime.Today,0m,40m);return rows;}
         var task=(Task)type.GetMethod("LoadStatement",flags)!.Invoke(page,null)!;
