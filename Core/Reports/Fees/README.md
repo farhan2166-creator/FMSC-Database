@@ -54,8 +54,9 @@ Shared files:
   layout; every family or standalone bill starts a separate page, while siblings
   remain together. Saved bill numbers, dates and financial amounts stay intact.
   Numbered bills are saved even if the preview is closed without printing.
-  The bulk Outstanding Bills page keeps placement, balance, paper and grouping
-  together in one filter panel. It has no individual-student search; use Fee
+  The bulk Outstanding Bills page keeps placement, balance, paper, grouping,
+  actions and the student grid in one compact card. Filters use up to five
+  narrower columns (two rows on normal windows). It has no individual-student search; use Fee
   Collection for that. All loaded matches start selected, with optional row exclusions.
 - `FeeReceiptCopyDialog` / `FeeReceiptChildCopy`: saved family receipts offer the
   original document or a clearly labelled child's share with the original receipt

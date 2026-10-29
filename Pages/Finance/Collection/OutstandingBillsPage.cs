@@ -22,7 +22,7 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
         :base(PageTitles.OutstandingBills,"Choose students by placement and balance, then preview their bills in the standard format.")
     {
         this.readBalances=readBalances??ReadBalancesAsync;
-        comparison.Items.AddRange(new object[]{"Any outstanding balance","At least (≥)","More than (>)","At most (≤)","Less than (<)","Exactly (=)","Between (inclusive)"});
+        comparison.Items.AddRange(new object[]{"Any outstanding","At least (≥)","More than (>)","At most (≤)","Less than (<)","Exactly (=)","Between (inclusive)"});
         comparison.SelectedIndex=0;
         paper.Items.AddRange(new object[]{"Thermal","A4 sheets"});paper.SelectedIndex=0;
         billGrouping.Items.AddRange(new object[]{"Individual","By family"});billGrouping.SelectedIndex=0;
@@ -54,32 +54,22 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
         comparison.SelectedIndexChanged+=(_,_)=>{UpdateAmountFields();FiltersChanged();};
         amount.TextChanged+=(_,_)=>FiltersChanged();through.TextChanged+=(_,_)=>FiltersChanged();
 
-        var fields=ReportUi.Bar(("Campus",campus),("Academic Year",year),("Class",cls),("Section",section));
-        var amounts=ReportUi.Bar(("Student balance",comparison),("Amount (Rs.)",amount),("Through (Rs.)",through),("Paper format",paper));
-        var filters=HumanUi.Card("Bulk Bill Filters","Choose placement, balance, paper and grouping. Each bill includes the full posted unpaid balance, including future months.");
-        var filterBody=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=Padding.Empty};
-        filterBody.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        filterBody.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        filterBody.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        filterBody.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        var loadActions=HumanUi.ButtonRow(load);loadActions.Dock=DockStyle.Fill;
-        loadActions.Margin=new Padding(0,Math.Max(0,AppMetrics.FieldRowHeight-AppMetrics.ButtonHeight-AppScale.Scale(4)),0,0);
-        var printOptions=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty};
-        printOptions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));printOptions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
-        printOptions.Controls.Add(ReportUi.Bar(("Bill grouping",billGrouping)),0,0);printOptions.Controls.Add(loadActions,1,0);
-        filterBody.Controls.Add(fields,0,0);filterBody.Controls.Add(amounts,0,1);filterBody.Controls.Add(printOptions,0,2);filters.Content.Controls.Add(filterBody);
-        var students=HumanUi.Card("Students to Bill","All matching students start selected. Uncheck any students to exclude before previewing the bulk bills.");
-        var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=Padding.Empty};
+        var card=HumanUi.Card("Bulk Bills","Filter and load students, then preview the selected bills.");
+        var filters=ReportUi.Bar(5,("Campus",campus),("Academic Year",year),("Class",cls),("Section",section),("Bill grouping",billGrouping),
+            ("Student balance",comparison),("Amount (Rs.)",amount),("Through (Rs.)",through),("Paper format",paper));
+        filters.AutoSize=true;filters.AutoSizeMode=AutoSizeMode.GrowAndShrink;filters.Dock=DockStyle.Fill;
+        var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Margin=Padding.Empty};
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        body.RowStyles.Add(new RowStyle(SizeType.AutoSize));body.RowStyles.Add(new RowStyle(SizeType.Percent,100));body.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        var selectActions=HumanUi.ButtonRowInOrder(all,none,preview);selectActions.Dock=DockStyle.Fill;selectActions.Margin=Padding.Empty;
-        body.Controls.Add(selectActions,0,0);body.Controls.Add(Grid,0,1);body.Controls.Add(selectedSummary,0,2);students.Content.Controls.Add(body);
-        var root=new TableLayoutPanel{ColumnCount=1,RowCount=2,Margin=Padding.Empty};
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(3)));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-        root.Controls.Add(filters,0,0);root.Controls.Add(students,0,1);
-        var viewport=new Panel{Dock=DockStyle.Fill,AutoScroll=true};viewport.Controls.Add(root);
-        void Arrange()=>root.Size=new Size(Math.Max(AppScale.Scale(760),viewport.ClientSize.Width-SystemInformation.VerticalScrollBarWidth),Math.Max(AppScale.Scale(650),viewport.ClientSize.Height));
+        body.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        body.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        body.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        body.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        var actions=HumanUi.ButtonRowInOrder(load,all,none,preview);actions.Dock=DockStyle.Fill;actions.Margin=Padding.Empty;
+        body.Controls.Add(filters,0,0);body.Controls.Add(actions,0,1);body.Controls.Add(Grid,0,2);body.Controls.Add(selectedSummary,0,3);
+        card.Content.Controls.Add(body);
+        var viewport=new Panel{Dock=DockStyle.Fill,AutoScroll=true};card.Dock=DockStyle.None;viewport.Controls.Add(card);
+        void Arrange()=>card.Size=new Size(Math.Max(AppScale.Scale(760),viewport.ClientSize.Width-SystemInformation.VerticalScrollBarWidth),
+            Math.Max(AppScale.Scale(500),viewport.ClientSize.Height));
         viewport.SizeChanged+=(_,_)=>Arrange();SetContent(viewport);Arrange();
         UpdateAmountFields();UpdateSummary();
         if(initialize)Defer(BindFiltersAsync);

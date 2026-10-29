@@ -81,6 +81,9 @@ internal static partial class Program
             Check(new Control[]{Field<LookupBox>("campus"),Field<LookupBox>("year"),Field<LookupBox>("cls"),Field<LookupBox>("section"),
                 Field<ModernComboBox>("comparison"),Field<ModernComboBox>("paper"),Field<ModernNumericTextBox>("amount"),Field<ModernNumericTextBox>("through")}
                 .All(c=>ReferenceEquals(Card(c),filterCard)),"Placement, balance, paper and grouping share one filter panel");
+            Check(ReferenceEquals(Card(grid),filterCard)&&new[]{"Load Students","Select All","Clear Selection","Preview Selected Bills"}
+                .All(text=>ReferenceEquals(Card(Button(text)),filterCard)),"The grid, filters and every action share one merged section");
+            Check(Walk(page).OfType<HumanCard>().Count()==1,"Bulk billing has one heading and one panel instead of duplicate sections");
             Field<ModernComboBox>("comparison").SelectedIndex=(int)BillBalanceComparison.AtLeast;
             Field<ModernNumericTextBox>("amount").Value=6900;
             Check(!Button("Preview Selected Bills").Enabled,"Changing amount filters invalidates preview until reload");
@@ -89,11 +92,20 @@ internal static partial class Program
             foreach(var size in new[]{new Size(1500,900),new Size(1000,720)})
             {
                 owner.ClientSize=size;owner.PerformLayout();Application.DoEvents();
-                var sequence=new[]{"Select All","Clear Selection","Preview Selected Bills"};
+                var filterBar=Field<LookupBox>("campus").Parent!.Parent!;
+                var filterBounds=filterBar.RectangleToScreen(filterBar.ClientRectangle);
+                foreach(var control in new Control[]{Field<LookupBox>("campus"),Field<LookupBox>("year"),Field<LookupBox>("cls"),Field<LookupBox>("section"),
+                    Field<ModernComboBox>("comparison"),Field<ModernComboBox>("paper"),Field<ModernComboBox>("billGrouping"),Field<ModernNumericTextBox>("amount"),Field<ModernNumericTextBox>("through")})
+                {
+                    var bounds=control.RectangleToScreen(control.ClientRectangle);
+                    Check(control.Visible&&control.Height>=AppMetrics.InputControlHeight&&bounds.Top>=filterBounds.Top&&bounds.Bottom<=filterBounds.Bottom,
+                        "Every filter remains visible inside the compact panel");
+                }
+                var sequence=new[]{"Load Students","Select All","Clear Selection","Preview Selected Bills"};
                 var selectionButtons=Button("Select All").Parent!;
                 Check(selectionButtons.Controls.Cast<Control>().Select(control=>control.Text).SequenceEqual(sequence),
                     "Selection tools appear before bill preview in natural order");
-                Check(sequence.Select(Button).Select(button=>button.TabIndex).SequenceEqual(Enumerable.Range(0,3)),
+                Check(sequence.Select(Button).Select(button=>button.TabIndex).SequenceEqual(Enumerable.Range(0,4)),
                     "Keyboard navigation follows the selection then preview order");
                 foreach(string caption in new[]{"Load Students","Preview Selected Bills","Select All","Clear Selection"})
                 {
@@ -101,6 +113,7 @@ internal static partial class Program
                     Check(button.Right<=button.Parent!.ClientSize.Width && button.Bottom<=button.Parent.ClientSize.Height,"Bill actions fit their container");
                 }
                 Check(grid.Height>=100,"Bill selection keeps usable grid height");
+                Check(grid.PointToScreen(Point.Empty).Y-page.PointToScreen(Point.Empty).Y<AppScale.Scale(400),"Compact filters leave the grid near the top of the page");
                 var folder=Path.GetFullPath("artifacts/outstanding-bills");Directory.CreateDirectory(folder);
                 using var bitmap=new Bitmap(owner.Width,owner.Height);owner.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save(Path.Combine(folder,$"selection-{size.Width}.png"));
             }
