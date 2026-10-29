@@ -155,6 +155,7 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
         preview.Columns.Add("Class", "Class");
         preview.Columns.Add("FeeType", UiText.Fees.FeeType);
         preview.Columns.Add("Amount", UiText.Fees.Amount);
+        UiHelper.SetGridColumnAlignment(preview.Columns["Amount"],DataGridViewContentAlignment.MiddleCenter);
         preview.Columns.Add("Frequency", UiText.Fees.Frequency);
         preview.Columns.Add("Action", "Result");
         foreach (DataGridViewColumn column in preview.Columns) column.ReadOnly = column.Name != "Include";

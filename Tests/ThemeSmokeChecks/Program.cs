@@ -34,6 +34,11 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--grid-alignment"))
+        {
+            CheckSharedGridAlignment();
+            Console.WriteLine($"PASS: {checks} shared and real-page grid heading/value, resize and data-preservation checks (no database connection).");return;
+        }
         if(args.Contains("--individual-outstanding-bill"))
         {
             CheckHistoricalLifecycleControls();CheckIndividualOutstandingBill();

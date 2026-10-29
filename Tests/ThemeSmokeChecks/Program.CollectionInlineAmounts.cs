@@ -33,12 +33,22 @@ internal static partial class Program
                 row.Cells["AdmissionId"].Value=child;row.Cells["EnrollmentId"].Value=child+100;
                 row.Cells["StudentName"].Value=child==1?"Ahmad Nawaz":"Hadia";row.Cells["StudentName"].Tag=(1,child.ToString());
                 row.Cells["FeeTypeName"].Value="Tuition";row.Cells["BillingMonth"].Tag=DateTime.Today;
+                row.Cells["BillingMonth"].Value=DateTime.Today.ToString("MMM yyyy");
                 row.Cells["Balance"].Value=amount;row.Cells["GrossAmount"].Value=amount;row.Cells["GrossAmount"].Tag=0m;
                 row.Cells["AppliedDiscount"].Value=0m;row.Cells["Amount"].Value=0m;row.Tag=false;
             }
             Bill(11,1,2400m);Bill(12,2,5200m);
             using var form=new Form{ClientSize=new Size(1620,940),ShowInTaskbar=false,StartPosition=FormStartPosition.Manual,Location=new Point(-30000,-30000)};
             form.Controls.Add(page);form.Show();Application.DoEvents();Call("UpdateCollectionTotals");Application.DoEvents();
+            UiHelper.ApplyGridPresentation(grid);UiHelper.FitColumnsToWidth(grid);Application.DoEvents();
+            Check(new[]{"BillingMonth","GrossAmount","AppliedDiscount","Balance","Amount"}.All(name=>
+                grid.Columns[name].HeaderCell.InheritedStyle.Alignment==DataGridViewContentAlignment.MiddleCenter
+                &&grid.Rows[0].Cells[name].InheritedStyle.Alignment==DataGridViewContentAlignment.MiddleCenter),
+                "Rendered collection headings and values remain centered after shared presentation and resizing");
+            Check(new[]{"StudentName","FeeTypeName"}.All(name=>
+                grid.Columns[name].HeaderCell.InheritedStyle.Alignment==DataGridViewContentAlignment.MiddleLeft
+                &&grid.Rows[0].Cells[name].InheritedStyle.Alignment==DataGridViewContentAlignment.MiddleLeft),
+                "Student and fee descriptions retain matching left-aligned headings and values");
             var list=Field<FamilyStudentList>("siblings");
             var current=Field<FamilyStudentList>("currentStudentAmounts");
             var lower=Field<DataGridView>("familyProposal");var panel=Field<TableLayoutPanel>("counterSiblingPanel");

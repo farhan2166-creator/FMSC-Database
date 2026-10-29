@@ -1104,10 +1104,15 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         // });
         charges.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         charges.Columns["Pay"].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
-        foreach (string columnName in new[] { "GrossAmount", "AppliedDiscount", "Balance", "Amount" })
+        // Short periods and amounts share a centered heading/value axis;
+        // names stay left-aligned for easier scanning of longer descriptions.
+        foreach (string columnName in new[] { "BillingMonth", "DueDate", "GrossAmount", "AppliedDiscount", "Balance", "Amount" })
         {
-            charges.Columns[columnName].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            charges.Columns[columnName].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            UiHelper.SetGridColumnAlignment(charges.Columns[columnName],DataGridViewContentAlignment.MiddleCenter);
+        }
+        foreach (string columnName in new[] { "StudentName", "FeeTypeName" })
+        {
+            UiHelper.SetGridColumnAlignment(charges.Columns[columnName],DataGridViewContentAlignment.MiddleLeft);
         }
         /* Shared grid helpers own column fitting. */
         charges.CellClick += (_, e) => {
@@ -1391,7 +1396,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         foreach (string name in new[] { "Amount", "Adjusted", "NetPaid", "ReceiptTotal" })
             recentPayments.Columns[name].DefaultCellStyle.Format = "#,0.##";
         recentPayments.Columns["ReceiptTotal"].DefaultCellStyle.NullValue = "—";
-        foreach (string name in new[] { "Amount", "Adjusted", "NetPaid" })
+        foreach (string name in new[] { "Amount", "Adjusted", "NetPaid", "ReceiptTotal" })
         {
             recentPayments.Columns[name].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
             recentPayments.Columns[name].HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;

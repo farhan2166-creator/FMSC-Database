@@ -72,6 +72,15 @@ namespace FMSC_SMS.Core
             public bool CompactMoneyHeaders;
         }
         private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DataGridView, GridLook> GridLooks = new();
+        private sealed record GridValueAlignment(DataGridViewContentAlignment Value);
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DataGridViewColumn, GridValueAlignment> GridValueAlignments = new();
+        internal static void SetGridColumnAlignment(DataGridViewColumn column, DataGridViewContentAlignment alignment)
+        {
+            GridValueAlignments.Remove(column);
+            GridValueAlignments.Add(column,new GridValueAlignment(alignment));
+            column.DefaultCellStyle.Alignment=alignment;
+            column.HeaderCell.Style.Alignment=alignment;
+        }
         internal static void UseCompactMoneyHeaders(DataGridView grid)
         {
             GridLooks.GetOrCreateValue(grid).CompactMoneyHeaders = true;
@@ -111,8 +120,12 @@ namespace FMSC_SMS.Core
             }
             if (e.RowIndex == -1)
             {
-                ApplyGridValueAlignment(grid.Columns[e.ColumnIndex]);
-                e.Paint(e.ClipBounds, e.PaintParts);
+                var column=grid.Columns[e.ColumnIndex];
+                ApplyGridValueAlignment(column);
+                if(column.SortMode!=DataGridViewColumnSortMode.NotSortable &&
+                    column.HeaderCell.InheritedStyle.Alignment is DataGridViewContentAlignment.MiddleCenter or DataGridViewContentAlignment.MiddleRight)
+                    PaintAlignedSortableHeader(grid,column,e);
+                else e.Paint(e.ClipBounds, e.PaintParts);
                 using (var line = new SolidBrush(GridAccent(grid)))
                 {
                     e.Graphics.FillRectangle(
@@ -134,6 +147,36 @@ namespace FMSC_SMS.Core
                 return;
             }
             PaintBadgeCell(e, text);
+        }
+        private static void PaintAlignedSortableHeader(DataGridView grid,DataGridViewColumn column,DataGridViewCellPaintingEventArgs e)
+        {
+            // Native sortable headers subtract an arrow slot from the text bounds,
+            // shifting their text relative to the values even when styles match.
+            e.Paint(e.ClipBounds,e.PaintParts & ~(DataGridViewPaintParts.ContentForeground|DataGridViewPaintParts.ContentBackground));
+            var style=column.HeaderCell.InheritedStyle;
+            var bounds=e.CellBounds;
+            var padding=style.Padding;
+            var textBounds=new Rectangle(bounds.Left+padding.Left,bounds.Top+padding.Top,
+                Math.Max(1,bounds.Width-padding.Horizontal-1),Math.Max(1,bounds.Height-padding.Vertical-1));
+            var flags=TextFormatFlags.EndEllipsis|TextFormatFlags.NoPrefix|TextFormatFlags.PreserveGraphicsClipping;
+            flags|=style.Alignment==DataGridViewContentAlignment.MiddleRight?TextFormatFlags.Right:TextFormatFlags.HorizontalCenter;
+            if(grid.RightToLeft==RightToLeft.Yes)flags|=TextFormatFlags.RightToLeft;
+            flags|=style.WrapMode==DataGridViewTriState.True?TextFormatFlags.WordBreak:TextFormatFlags.SingleLine;
+            string text=Convert.ToString(e.FormattedValue)??string.Empty;
+            var font=style.Font??grid.Font;
+            int height=Math.Min(textBounds.Height,TextRenderer.MeasureText(e.Graphics!,text,font,new Size(textBounds.Width,int.MaxValue),flags).Height);
+            textBounds.Y+=(textBounds.Height-height)/2;textBounds.Height=height;
+            TextRenderer.DrawText(e.Graphics!,text,font,textBounds,style.ForeColor,flags);
+            if(column.HeaderCell.SortGlyphDirection is SortOrder.Ascending or SortOrder.Descending)
+            {
+                int width=Math.Max(4,UiDpi.Metric(grid,6)),half=width/2;
+                int x=grid.RightToLeft==RightToLeft.Yes?bounds.Left+UiDpi.Metric(grid,2):bounds.Right-UiDpi.Metric(grid,2)-width;
+                int y=bounds.Top+bounds.Height/2;
+                bool ascending=column.HeaderCell.SortGlyphDirection==SortOrder.Ascending;
+                Point[] triangle={new(x,y+(ascending?half:-half)),new(x+width,y+(ascending?half:-half)),new(x+half,y+(ascending?-half:half))};
+                using var brush=new SolidBrush(style.ForeColor);
+                e.Graphics!.FillPolygon(brush,triangle);
+            }
         }
         private const string BadgeColumnTag = "fmsc:badge";
         /// <summary>Category columns that read better as a small coloured label than as plain text.</summary>
@@ -487,29 +530,12 @@ namespace FMSC_SMS.Core
                             ? "dd-MMM-yyyy hh:mm tt"
                             : "dd-MMM-yyyy";
                 }
-                if (name.Contains("Amount", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("Balance", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("Marks", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("Percentage", StringComparison.OrdinalIgnoreCase))
-                {
-                    column.DefaultCellStyle.Alignment =
-                        DataGridViewContentAlignment.MiddleRight;
-                }
                 /* Apply the default money format only when the page has not supplied one. */
                 if (string.IsNullOrEmpty(column.DefaultCellStyle.Format) &&
                     (column.ValueType == typeof(decimal) || column.ValueType == typeof(decimal?)) &&
                     IsMoneyColumnName(name))
                 {
                     column.DefaultCellStyle.Format = "N0";
-                }
-                /* Money and measurements line up on the right. */
-                if (column.DefaultCellStyle.Alignment == DataGridViewContentAlignment.NotSet &&
-                    (column.ValueType == typeof(decimal) ||
-                     column.ValueType == typeof(double) ||
-                     column.ValueType == typeof(float)))
-                {
-                    column.DefaultCellStyle.Alignment =
-                        DataGridViewContentAlignment.MiddleRight;
                 }
                 if (IsStatusColumn(column))
                 {
@@ -527,12 +553,6 @@ namespace FMSC_SMS.Core
                 }
                 /* The heading follows its column, so a right-aligned amount is not headed by left-aligned text. */
                 ApplyGridValueAlignment(column);
-                var cellAlignment = column.DefaultCellStyle.Alignment;
-                if (cellAlignment == DataGridViewContentAlignment.MiddleRight ||
-                    cellAlignment == DataGridViewContentAlignment.MiddleCenter)
-                {
-                    column.HeaderCell.Style.Alignment = cellAlignment;
-                }
                 ApplyContentAwareMinimumWidth(grid, column);
             }
         }
@@ -632,6 +652,8 @@ namespace FMSC_SMS.Core
         }
         private static bool IsCenteredGridValue(DataGridViewColumn column)
         {
+            if (column is DataGridViewCheckBoxColumn or DataGridViewButtonColumn or DataGridViewImageColumn || IsBadgeColumn(column))
+                return true;
             Type? type = Nullable.GetUnderlyingType(column.ValueType ?? typeof(object)) ?? column.ValueType;
             if (type == typeof(DateTime) || type == typeof(DateOnly)) return true;
             if (type is not null && Type.GetTypeCode(type) is TypeCode.Byte or TypeCode.SByte or
@@ -645,6 +667,9 @@ namespace FMSC_SMS.Core
                 name.StartsWith("Date", StringComparison.OrdinalIgnoreCase) ||
                 name.EndsWith("Date", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("BillingMonth", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("Period", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("PostedThrough", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("LastBilledMonth", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("EffectiveFrom", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("EffectiveTo", StringComparison.OrdinalIgnoreCase) ||
                 name.Equals("AssignmentEffectiveFrom", StringComparison.OrdinalIgnoreCase) ||
@@ -668,12 +693,18 @@ namespace FMSC_SMS.Core
                 header.Equals("Admission No.", StringComparison.OrdinalIgnoreCase) ||
                 header.Equals("Admission No", StringComparison.OrdinalIgnoreCase))
                 column.HeaderText = "Adm. No.";
-            if (!IsCenteredGridValue(column)) return;
-            // Keep the right alignment applied to amounts and measurements above,
-            // and preserve alignment supplied by a page for its specific columns.
-            if (column.DefaultCellStyle.Alignment != DataGridViewContentAlignment.NotSet) return;
-            column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            if(GridValueAlignments.TryGetValue(column,out var requested))
+            {
+                column.DefaultCellStyle.Alignment=requested.Value;
+                column.HeaderCell.Style.Alignment=requested.Value;
+                return;
+            }
+            // Infer a default only when the page has not chosen an alignment.
+            // Presentation, resizing and formatting must use the same decision.
+            if (column.DefaultCellStyle.Alignment == DataGridViewContentAlignment.NotSet && IsCenteredGridValue(column))
+                column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            if (column.DefaultCellStyle.Alignment != DataGridViewContentAlignment.NotSet)
+                column.HeaderCell.Style.Alignment = column.DefaultCellStyle.Alignment;
         }
         private static void ApplyContentAwareMinimumWidth(DataGridView grid, DataGridViewColumn column)
         {
@@ -848,13 +879,6 @@ namespace FMSC_SMS.Core
             {
                 if (column.DataGridView!=grid || !column.Visible)
                     continue;
-                Type? valueType = Nullable.GetUnderlyingType(column.ValueType ?? typeof(object)) ?? column.ValueType;
-                if (valueType == typeof(decimal) || valueType == typeof(double) || valueType == typeof(float) ||
-                    valueType == typeof(int) || valueType == typeof(long) || valueType == typeof(short))
-                {
-                    column.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                    column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                }
                 if (IsWidthPinnedColumn(column))
                 {
                     column.AutoSizeMode =
@@ -997,9 +1021,14 @@ namespace FMSC_SMS.Core
                 e.Value=Convert.ToHexString(version);e.FormattingApplied=true;return;
             }
             ApplyGridValueAlignment(column);
-            if (e.CellStyle is not null && (IsCenteredGridValue(column) || e.Value is DateTime ||
+            if(e.CellStyle is not null && column.DefaultCellStyle.Alignment!=DataGridViewContentAlignment.NotSet)
+                e.CellStyle.Alignment=column.DefaultCellStyle.Alignment;
+            else if (e.CellStyle is not null && (IsCenteredGridValue(column) || e.Value is DateTime ||
                 e.Value is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal))
+            {
                 e.CellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                column.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            }
             /* GetRowState reads the state without turning a shared row into an individual one, which Rows[i].Selected would. */
             bool selected =
                 (grid.Rows.GetRowState(e.RowIndex) &

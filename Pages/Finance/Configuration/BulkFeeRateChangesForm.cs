@@ -248,6 +248,8 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         preview.Columns.Add("OldAmount", UiText.Fees.CurrentAmount);
         preview.Columns.Add("NewAmount", UiText.Fees.NewAmount);
         preview.Columns.Add("Change", "Change (Rs.)");
+        foreach (string name in new[] { "OldAmount", "NewAmount", "Change" })
+            UiHelper.SetGridColumnAlignment(preview.Columns[name],DataGridViewContentAlignment.MiddleCenter);
         foreach (DataGridViewColumn column in preview.Columns)
             column.ReadOnly = column.Name != "Include";
         preview.CurrentCellDirtyStateChanged += (_, _) => {
