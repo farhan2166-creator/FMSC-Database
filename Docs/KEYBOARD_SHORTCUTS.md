@@ -21,6 +21,25 @@ and the hints shown while holding Ctrl or Alt use the shared command definitions
 | Scan | Alt+S |
 | Apply / Confirm / Collect / Process | Ctrl+Enter |
 | Delete / Remove | Alt+Delete |
+| Save & New | Alt+W |
+| Next student | Alt+N |
+| Use full payment amount | Alt+U |
+| Recent payments / Payment history | Alt+H |
+| Print / Reprint receipt | Alt+P |
+| Print student bill | Ctrl+B |
+| Print family / selected bill | Alt+B |
+| Advance balance | Alt+V |
+| Student Fees menu | Alt+F |
+| Review fee terms | Alt+T |
+| Review admission / Open Admissions | Alt+D |
+| Pending registrations | Alt+G |
+| Manage photo | Alt+M |
+| Issue certificate again | Alt+I |
+
+Alt+A also opens Additional Charge in Fee Collection. The individual save dialog
+continues to use Ctrl+S. In report previews Alt+P retains its page-setup action;
+Ctrl+P prints the preview. Each command is available only where its corresponding
+action is visible and enabled.
 
 Ctrl+K opens quick navigation and F1 opens shortcut help from the dashboard.
 Normal text editing keys, field navigation and tab navigation retain their usual

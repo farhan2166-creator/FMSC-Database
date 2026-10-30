@@ -21,7 +21,7 @@ internal static class AppHotKeys
         new("Refresh / Reload", "Ctrl+R", Keys.Control | Keys.R, "Reload current data and refresh lookup caches.", "Refresh", "Reload"),
         new("Load", "Ctrl+L", Keys.Control | Keys.L, "Load data using the current selection.", "Load"),
         new("View", "Ctrl+O", Keys.Control | Keys.O, "Open the selected record or view.", "View", "Open"),
-        new("Add item", "Alt+A", Keys.Alt | Keys.A, "Add a draft item or open an Add dialog; use Ctrl+S to save it.", "Add"),
+        new("Add item", "Alt+A", Keys.Alt | Keys.A, "Add a draft item or open an Add dialog, including Additional Charge; use Ctrl+S to save it.", "Add", "Additional Charge"),
         new("Edit", "Ctrl+E", Keys.Control | Keys.E, "Edit the selected record.", "Edit"),
         new("Clear", "Alt+C", Keys.Alt | Keys.C, "Reset the current editor using its Clear action.", "Clear"),
         new("Run", "Alt+R", Keys.Alt | Keys.R, "Run the current operation.", "Run"),
@@ -29,7 +29,21 @@ internal static class AppHotKeys
         new("Scan", "Alt+S", Keys.Alt | Keys.S, "Scan using the page’s Scan action.", "Scan"),
         new("Complete workflow", "Ctrl+Enter", Keys.Control | Keys.Enter, "Apply, confirm, collect or process; normal validation still applies.",
             "Apply", "Confirm", "Execute", "Post", "Process", "Queue", "Collect", "Mark Collected"),
-        new("Delete / Remove", "Alt+Delete", Keys.Alt | Keys.Delete, "Delete the selected item; normal confirmation still applies.", "Delete", "Remove")
+        new("Delete / Remove", "Alt+Delete", Keys.Alt | Keys.Delete, "Delete the selected item; normal confirmation still applies.", "Delete", "Remove"),
+        new("Save & New", "Alt+W", Keys.Alt | Keys.W, "Save the current entry and start the next one using the page action.", "Save & New", "Save && New"),
+        new("Next student", "Alt+N", Keys.Alt | Keys.N, "Use Next Student; normal draft checks still apply.", "Next Student"),
+        new("Use full amount", "Alt+U", Keys.Alt | Keys.U, "Fill the payment amount from the current balance, discount and advance; does not collect payment.", "Use Full Amount"),
+        new("Payment history", "Alt+H", Keys.Alt | Keys.H, "Open recent payments for the current student.", "Recent Payments", "Payment History"),
+        new("Print receipt", "Alt+P", Keys.Alt | Keys.P, "Print the available receipt. In report previews, Alt+P opens page setup.", "Print Receipt", "Reprint Receipt"),
+        new("Print student bill", "Ctrl+B", Keys.Control | Keys.B, "Print the selected student's bill.", "Print Student Bill"),
+        new("Print family bill", "Alt+B", Keys.Alt | Keys.B, "Print the family bill for the selected children.", "Print Family Bill", "Print Selected Bill"),
+        new("Advance balance", "Alt+V", Keys.Alt | Keys.V, "Open the student's advance balance.", "Advance Balance"),
+        new("Student fees menu", "Alt+F", Keys.Alt | Keys.F, "Open Student Fees for account, future-fee and related actions.", "Student Fees"),
+        new("Review fee terms", "Alt+T", Keys.Alt | Keys.T, "Review the current student's fee terms.", "Review Fee Terms"),
+        new("Review admission", "Alt+D", Keys.Alt | Keys.D, "Review the selected admission or open Admissions for the current student.", "Review Admission", "Open Admissions"),
+        new("Pending registrations", "Alt+G", Keys.Alt | Keys.G, "Open pending registrations.", "Pending Registrations"),
+        new("Manage photo", "Alt+M", Keys.Alt | Keys.M, "Open photo management for the current student.", "Manage Photo"),
+        new("Issue certificate again", "Alt+I", Keys.Alt | Keys.I, "Start Issue Again for the selected collected certificate; normal checks still apply.", "Issue Again")
     };
 
     internal const string QuickNavigationAction = "Quick navigation";
