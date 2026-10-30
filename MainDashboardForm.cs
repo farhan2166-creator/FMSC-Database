@@ -656,7 +656,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Fees.Collect"),
             new(
                 PageTitles.StudentPromotion,
-                () => new BulkPromotionPage(
+                () => new StudentPlacementPage(
                     (factory, module, title) => NavigateTo(factory, module, title)),
                 "Promotion",
                 PageTitles.StudentPromotion,

@@ -34,6 +34,10 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--placement-workspace"))
+        {
+            CheckPlacementWorkspace();Console.WriteLine($"PASS: {checks} placement workspace checks.");return;
+        }
         if (args.Contains("--action-shortcuts"))
         {
             CheckActionShortcuts();

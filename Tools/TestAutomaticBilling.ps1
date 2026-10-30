@@ -1,5 +1,5 @@
 # Owns a unique schema-only LocalDB instance. Accepts no live database/connection parameter.
-param([switch]$KeepFixture,[switch]$AdmissionOnly,[switch]$TransferOnly)
+param([switch]$KeepFixture,[switch]$AdmissionOnly,[switch]$TransferOnly,[switch]$PlacementOnly)
 $ErrorActionPreference='Stop'
 $projectRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $owner=[guid]::NewGuid().ToString('N')
@@ -48,6 +48,9 @@ try {
  Native 'Publish data-free schema'
  # DacFx round-trips this recovery identity as varchar. Repair only this owned schema-only fixture.
  [void](Query "DECLARE @Scope uniqueidentifier=NEWID(); EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@Scope;")
+ # Migration 59 defines the optional communication permission wrapper. This
+ # schema-only fixture does not install the communication service itself.
+ [void](Query "IF SCHEMA_ID(N'comm') IS NULL EXEC(N'CREATE SCHEMA comm AUTHORIZATION dbo');")
  # Migration changes run under the same transaction boundary used by deployment.
  foreach($file in @(Get-ChildItem (Join-Path $projectRoot 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql'; Get-ChildItem (Join-Path $projectRoot 'Migrations') -Filter '*.sql') | Sort-Object {[int]$_.BaseName}) {
   $content=Get-Content -LiteralPath $file.FullName -Raw
@@ -67,6 +70,11 @@ try {
  }
  $seed=Get-Content -LiteralPath (Join-Path $projectRoot 'Validation/AutomaticBillingFixture.sql') -Raw
  [void](Query $seed)
+ if($PlacementOnly){
+  . (Join-Path $projectRoot 'Validation/PlacementPlanChecks.ps1')
+  Write-Output "PASS: $checks placement-plan SQL checks."
+  return
+ }
  if($TransferOnly){
   . (Join-Path $projectRoot 'Validation/TransferFeeScopeChecks.ps1')
   Write-Output "PASS: $checks same-year transfer fee SQL checks."

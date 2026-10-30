@@ -1,5 +1,8 @@
 {
   "objects": [
+    { "schema": "dbo", "name": "StudentPlacementPlans", "type": "U " },
+    { "schema": "dbo", "name": "StudentPlacementPlanItems", "type": "U " },
+    { "schema": "dbo", "name": "ApplyStudentPlacementPlan", "type": "P " },
     {
       "schema": "dbo",
       "name": "GetFamilyAdmissionBillWaivers",
