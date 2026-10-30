@@ -55,7 +55,6 @@ internal static partial class Program
             var choice=type.GetNestedType("SiblingChoice",BindingFlags.NonPublic)!;
             siblings.Items.Add(Activator.CreateInstance(choice,new object[]{42,"Fictional sibling"})!,true);
             siblings.Items.Add(Activator.CreateInstance(choice,new object[]{43,"Fictional sibling"})!,false);
-            Field<ModernComboBox>("billGrouping").SelectedIndex=1;
             var family=Field<ModernButton>("printBillButton");var individual=Field<ModernButton>("printStudentBillButton");
             Check(family.Text=="Print Family Bill"&&individual.Text=="Print Student Bill","Print captions explain family and main-student scopes");
             Check(family.Parent==individual.Parent&&family.Parent!.Controls.GetChildIndex(individual)==family.Parent.Controls.GetChildIndex(family)+1,
@@ -67,6 +66,16 @@ internal static partial class Program
                 calls++;printed=ids;grouped=byFamily;stillCurrent=current;return Task.CompletedTask;
             }));
             Task Print(bool one)=>(Task)type.GetMethod("PrintOutstandingBillAsync",flags)!.Invoke(page,new object[]{one})!;
+            Print(false).GetAwaiter().GetResult();
+            Check(calls==1&&printed!.SequenceEqual(new[]{41,42})&&grouped,
+                "Family print combines checked children by default without selecting a grouping option");
+            siblings.SetItemChecked(1,true);
+            Print(false).GetAwaiter().GetResult();
+            Check(calls==2&&printed!.SequenceEqual(new[]{41,42,43})&&grouped,
+                "All three selected family members use one combined family bill");
+            siblings.SetItemChecked(1,false);
+            Check(!stillCurrent!(),"Unchecking a child invalidates the three-member family preview");
+            calls=0;
             Print(true).GetAwaiter().GetResult();
             Check(calls==1&&printed!.SequenceEqual(new[]{41})&&!grouped,"Individual print always uses the main student and individual layout");
             Check(siblings.GetItemChecked(0)&&!siblings.GetItemChecked(1),"Individual print preserves the family's checkbox selections");

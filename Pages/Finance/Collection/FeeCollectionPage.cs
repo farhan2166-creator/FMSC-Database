@@ -115,7 +115,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private ModernButton? printBillButton;
     private ModernButton? printStudentBillButton;
     private Func<Form?,int,int[]?,Func<bool>?,bool,Task> showOutstandingBill = FeeBillPreview.ShowAsync;
-    private readonly ModernComboBox billGrouping=HumanUi.Combo();
     private readonly Dictionary<int,string> receiptReviewTokens=new();
     private readonly Dictionary<int, decimal> availableCreditByStudent = new();
     private readonly CheckBox useAvailableCredit = new() { Text = "Use student advance", Checked = true, AutoSize = true };
@@ -369,7 +368,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var recoveryItem=studentFeesMenu.Items.Add("Check Fee Change Save",null,async(_,_)=>await CheckFeeChangeSaveAsync());
         studentFeesMenu.Items.Add(new ToolStripSeparator());
         // Bills cover current unpaid charges. Paid transactions are reprinted as receipts.
-        billGrouping.Items.AddRange(new object[]{"Individual","By family"});billGrouping.SelectedIndex=0;
         printBillButton = AddBusyAction("Print Family Bill", PrintSelectedFamilyBillAsync, "Secondary");
         printStudentBillButton = AddBusyAction("Print Student Bill", () => PrintOutstandingBillAsync(true), "Secondary");
         printBillButton.Enabled = false;
@@ -521,15 +519,14 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var contextGrid =
             new TableLayoutPanel {
                 Dock = DockStyle.Fill,
-                ColumnCount = 4,
+                ColumnCount = 3,
                 RowCount = 1,
                 Padding = new Padding(2, 3, 2, 0),
                 Margin = new Padding(0)
             };
-        contextGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40f));
+        contextGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 45f));
+        contextGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 30f));
         contextGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
-        contextGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 18f));
-        contextGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 17f));
         contextGrid.RowStyles.Add(
             new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
         contextGrid.Controls.Add(
@@ -553,7 +550,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 true),
             2,
             0);
-        contextGrid.Controls.Add(HumanUi.Field("Bill grouping",billGrouping),3,0);
         context.Content.Controls.Add(contextGrid);
         var allocationButton = new ModernButton {
             Text = "Choose Fees to Pay",
@@ -4434,7 +4430,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         }
         int anchor=admissionId, placement=enrollmentId, version=loadVersion;
         int[] selected=OutstandingBillStudents(individual);
-        bool byFamily=!individual && billGrouping.SelectedIndex==1;
+        bool byFamily=!individual;
         billBusy=true;
         try
         {
@@ -4450,8 +4446,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             }
             using var busy=BeginBusy("Preparing outstanding bill…",this);
             await showOutstandingBill(FindForm(),anchor,selected,()=>!IsDisposed && admissionId==anchor
-                && enrollmentId==placement && loadVersion==version && selected.SequenceEqual(OutstandingBillStudents(individual))
-                &&(individual || byFamily==(billGrouping.SelectedIndex==1)),byFamily);
+                && enrollmentId==placement && loadVersion==version && selected.SequenceEqual(OutstandingBillStudents(individual)),byFamily);
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
         finally{billBusy=false;}

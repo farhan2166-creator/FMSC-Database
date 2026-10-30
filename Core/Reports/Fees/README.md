@@ -18,7 +18,7 @@ Shared files:
   and the family counter. Registration/admission print this child; Fee Collection
   supplies its explicitly checked children. Unselected siblings are never added.
 - `FeeBillSelection`: groups only the selected owing students by stored FamilyId.
-  The existing collection, outstanding and account screens expose Bill grouping:
+  Fee Collection always combines checked children with Print Family Bill; Print Student Bill prints only the loaded student. The outstanding and account screens expose Bill grouping:
   Individual (default) or By family. The action opens one document preview directly.
 - `FeeBillBatch`: retains confirmed results on partial failure. Only failures show
   a recovery message directing the operator to saved Issued Fee Bills; a connection

@@ -11,6 +11,8 @@ Notable user-facing, database, installer, and operational changes will be tracke
 
 ### Report improvements
 
+- Restore Fee Collection's Print Family Bill as one combined bill for the loaded student and checked siblings. Print Student Bill continues to print only the loaded student; remove the redundant grouping selector from Fee Collection.
+
 - Correct thermal bill preview scaling using the PDF/print paper dimensions, center single bills and distinguish the preview background from the paper. PDF and printer sizing remain unchanged.
 - Combine bulk outstanding-bill filters, all actions and the student grid in one compact panel, with narrower filters across two rows on normal windows. Remove individual admission/name search and the redundant Select Shown action; retain bulk placement/balance filters, paper/grouping options and row exclusions.
 - Fit each thermal bill to its own rendered text plus a small margin in preview, PDF export and printing. Keep long family totals on the same slip and preserve independent page heights within mixed-length batches.
