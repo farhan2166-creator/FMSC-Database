@@ -45,7 +45,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
     private int selectedCertificateAdmissionId;
     private bool selectedIssueCollected;
     private readonly ModernButton createCertificateButton = new() {
-        Text = UiText.Certificates.Create,
+        SavesChanges = true, Text = UiText.Certificates.Create,
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton clearButton = new() {

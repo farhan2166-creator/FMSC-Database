@@ -41,7 +41,7 @@ public sealed class BankAccountOpeningCertificatePage : V2Page, IUnsavedChanges,
     private bool suppressStaffChanged;
     private int selectedBankAccountOpeningCertificateId;
     private readonly ModernButton createCertificateButton = new() {
-        Text = UiText.Certificates.Create,
+        SavesChanges = true, Text = UiText.Certificates.Create,
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton updateCertificateButton = new() {

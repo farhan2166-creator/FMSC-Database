@@ -43,7 +43,7 @@ public sealed class SportsCertificatePage : V2Page, IUnsavedChanges, IBusyPage
     private bool suppressStudentChanged;
     private int selectedSportsCertificateId;
     private readonly ModernButton createCertificateButton = new() {
-        Text = UiText.Certificates.Create,
+        SavesChanges = true, Text = UiText.Certificates.Create,
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton updateCertificateButton = new() {

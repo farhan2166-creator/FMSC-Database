@@ -26,7 +26,7 @@ public sealed class NoObjectionCertificatePage : V2Page, IUnsavedChanges, IBusyP
     private bool suppressStudentChanged;
     private int selectedNoObjectionCertificateId;
     private readonly ModernButton createCertificateButton = new() {
-        Text = UiText.Certificates.Create,
+        SavesChanges = true, Text = UiText.Certificates.Create,
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton updateCertificateButton = new() {

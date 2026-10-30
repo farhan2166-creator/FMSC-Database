@@ -88,7 +88,7 @@ internal static class FeeBillRollPreview
         number.KeyDown+=(_,e)=>{if(e.KeyCode==Keys.Enter){Navigate((int)number.Value);e.SuppressKeyPress=true;}};
         foreach(var editor in number.Controls.OfType<TextBox>())WholeNumberInput.Attach(editor);
         void Shortcut(Control control,Keys keys,string hint,Action action)=>form.ShortcutController.RegisterShortcut(control,keys,hint,()=>Execute(hint,action));
-        Shortcut(print,Keys.Control|Keys.P,"Ctrl+P",()=>Print(false));Shortcut(export,Keys.Control|Keys.E,"Ctrl+E",()=>export.PerformClick());
+        Shortcut(print,Keys.Control|Keys.P,"Ctrl+P",()=>Print(false));Shortcut(export,Keys.Alt|Keys.E,"Alt+E",()=>export.PerformClick());
         Shortcut(setup,Keys.Alt|Keys.P,"Alt+P",()=>setup.PerformClick());Shortcut(close,Keys.Escape,"Esc",form.Close);
         Shortcut(previous,Keys.Control|Keys.Left,"Ctrl+Left",()=>Navigate(selected-1));Shortcut(next,Keys.Control|Keys.Right,"Ctrl+Right",()=>Navigate(selected+1));
         Shortcut(go,Keys.Control|Keys.G,"Ctrl+G",()=>{number.Focus();number.Select(0,number.Text.Length);});

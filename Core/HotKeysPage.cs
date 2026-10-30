@@ -68,6 +68,6 @@ public sealed class HotKeysPage : V2Page
         content.Controls.Add(search, 0, 0);
         content.Controls.Add(Grid, 0, 1);
         SetContent(content,
-            "Hold Ctrl or Alt to see available shortcuts. Actions use the active editor; report preview keys work only in the preview.");
+            "Hold Ctrl or Alt to see available shortcuts. Ctrl+S saves, including Add Fee / Add Charge; Alt+A adds a draft item or opens an Add dialog. Actions use the active editor.");
     }
 }

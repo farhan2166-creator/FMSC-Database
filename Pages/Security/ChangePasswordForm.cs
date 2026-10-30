@@ -5,7 +5,7 @@ public sealed class ChangePasswordForm : ApplicationWindowForm
 {
     readonly ModernTextBox p1 = HumanUi.TextBox(false, 100);
     readonly ModernTextBox p2 = HumanUi.TextBox(false, 100);
-    readonly ModernButton save = new() { Text = "Change Password", Dock = DockStyle.Fill };
+    readonly ModernButton save = new() { SavesChanges = true, Text = "Change Password", Dock = DockStyle.Fill };
     /* Keep the dialog open while the password change is being saved. */
     bool savingPassword;
     /* UX - a missing or mismatched password is marked on the field, not shown in a message box. */

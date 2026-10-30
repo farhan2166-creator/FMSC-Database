@@ -3,7 +3,7 @@ namespace FMSC_SMS.Pages.Security;
 public sealed class ChangeUsernameForm : ApplicationWindowForm
 {
     readonly ModernTextBox newUsername = HumanUi.TextBox(false, 100);
-    readonly ModernButton save = new() { Text = "Change Username", Dock = DockStyle.Fill };
+    readonly ModernButton save = new() { SavesChanges = true, Text = "Change Username", Dock = DockStyle.Fill };
     /* True from the moment the rename is sent until it returns. */
     bool savingUsername;
     /* UX - a missing username is marked on the field, not shown in a message box. */

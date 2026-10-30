@@ -34,6 +34,13 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--action-shortcuts"))
+        {
+            CheckActionShortcuts();
+            CheckAdmissionSaveShortcut();
+            Console.WriteLine($"PASS: {checks} action shortcut mapping, focus, hints and save dispatch checks (no database connection).");
+            return;
+        }
         if(args.Contains("--grid-alignment"))
         {
             CheckSharedGridAlignment();

@@ -82,7 +82,7 @@ internal sealed class PageActionShortcutController
             if (matches.Count != 1 || !matches[0].Enabled || !matches[0].Visible)
                 return false;
             Control? previous = FocusedInput(_root);
-            if (shortcut.KeyData == Keys.F5)
+            if (shortcut.Action == "Refresh / Reload")
             {
                 LookupDataCache.Invalidate();
                 StudentSearchCache.Invalidate();
@@ -239,6 +239,11 @@ internal sealed class PageActionShortcutController
         var matches = new List<ModernButton>();
         foreach (string leadingWord in leadingWords)
             CollectButtons(_root, leadingWord, matches);
+        bool saving = leadingWords.SequenceEqual(new[] { "Save" });
+        if (saving)
+            matches.AddRange(AllButtons(_root).Where(button => button.Visible && button.SavesChanges));
+        else
+            matches.RemoveAll(button => button.SavesChanges || ReferenceEquals(button, explicitSaveButton));
         matches = matches.Distinct().ToList();
         if (leadingWords.SequenceEqual(new[] { "Save" }))
         {

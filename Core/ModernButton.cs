@@ -3,6 +3,8 @@ namespace FMSC_SMS.Core
 {
     public class ModernButton : Button
     {
+        // Explicit semantics for commit buttons whose caption is not "Save".
+        internal bool SavesChanges { get; set; }
         private char? _shortcutLetter;
         internal char? ShortcutLetter {
             get=>_shortcutLetter;

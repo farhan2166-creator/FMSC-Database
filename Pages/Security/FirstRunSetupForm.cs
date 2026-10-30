@@ -6,7 +6,7 @@ public sealed class FirstRunSetupForm : ApplicationWindowForm
     private readonly ModernTextBox username = new() { PlaceholderText = "Administrator username", Dock = DockStyle.Fill };
     private readonly ModernTextBox password = new() { PlaceholderText = "Administrator password", UseSystemPasswordChar = true, Dock = DockStyle.Fill };
     private readonly ModernTextBox confirm = new() { PlaceholderText = "Confirm password", UseSystemPasswordChar = true, Dock = DockStyle.Fill };
-    private readonly ModernButton create = new() { Text = "Create Administrator", Dock = DockStyle.Fill };
+    private readonly ModernButton create = new() { SavesChanges = true, Text = "Create Administrator", Dock = DockStyle.Fill };
     private readonly Label status = new() { AutoSize = true, TextAlign = ContentAlignment.MiddleCenter };
     /* The sibling security forms guard typed input on close; this one did not, so the administrator credentials typed here were thrown away by the window's close button. */
     private bool savedSuccessfully;

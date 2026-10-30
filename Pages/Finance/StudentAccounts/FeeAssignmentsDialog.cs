@@ -76,7 +76,7 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
         Padding = new Padding(UiDesignSystem.Spacing.Xs, UiDesignSystem.Spacing.Xs, 0, 0)
     };
     private readonly ModernButton addButton = new() {
-        Text = "Add Fee",
+        SavesChanges = true, Text = "Add Fee",
         Width = AppScale.Scale(110),
         Height = AppMetrics.ButtonHeight,
         ThemeRole = "Success"

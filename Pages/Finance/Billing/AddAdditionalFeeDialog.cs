@@ -53,7 +53,7 @@ public sealed class AdditionalFeeEntry : UserControl
     private readonly ModernDatePicker chargeDate = HumanUi.Date();
     private readonly ModernTextBox reason = HumanUi.TextBox(false, 500);
     private readonly ModernButton post = new() {
-        Text = "Add Charge", Width = AppScale.Scale(130), Height = AppMetrics.ButtonHeight,
+        SavesChanges = true, Text = "Add Charge", Width = AppScale.Scale(130), Height = AppMetrics.ButtonHeight,
         ThemeRole = "Success", Enabled = false
     };
     private DataTable? options;

@@ -38,7 +38,7 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
     private int selectedCertificateAdmissionId;
     private bool selectedIssueCollected;
     private readonly ModernButton createCertificateButton = new() {
-        Text = UiText.Certificates.Create,
+        SavesChanges = true, Text = UiText.Certificates.Create,
         Width = AppScale.Scale(170)
     };
     private readonly ModernButton clearButton = new() {

@@ -7,7 +7,7 @@ internal sealed class ReportShortcutMessageFilter : IMessageFilter, IDisposable
     private bool _disposed;
     private static readonly HashSet<Keys> Shortcuts = new()
     {
-        Keys.Control | Keys.P, Keys.Control | Keys.E, Keys.Alt | Keys.P,
+        Keys.Control | Keys.P, Keys.Alt | Keys.E, Keys.Alt | Keys.P,
         Keys.Control | Keys.Left, Keys.Control | Keys.Right,
         Keys.Control | Keys.D0, Keys.Control | Keys.D1, Keys.Control | Keys.D2,
         Keys.Control | Keys.G, Keys.Control | Keys.Home, Keys.Control | Keys.End,

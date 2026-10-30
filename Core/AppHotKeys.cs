@@ -13,22 +13,22 @@ internal static class AppHotKeys
 
     internal static readonly ActionShortcut[] PageActions =
     {
-        new("Save", "Ctrl+S", Keys.Control | Keys.S, "Save changes in the active editor.", "Save"),
+        new("Save", "Ctrl+S", Keys.Control | Keys.S, "Save changes, including Add Fee / Add Charge, in the active editor.", "Save"),
         new("Print", "Ctrl+P", Keys.Control | Keys.P, "Print or preview the current record or report.", "Print"),
         new("New record", "Ctrl+N", Keys.Control | Keys.N, "Start a new record using the page’s New action.", "New", "Clear / New"),
         new("Find / Search", "Ctrl+F", Keys.Control | Keys.F, "Focus the page search, or run its Find action.", "Find", "Search"),
-        new("Export", "Ctrl+E", Keys.Control | Keys.E, "Export the current records or report.", "Export"),
-        new("Refresh / Reload", "F5", Keys.F5, "Reload current data and refresh lookup caches.", "Refresh", "Reload"),
+        new("Export", "Alt+E", Keys.Alt | Keys.E, "Export the current records or report.", "Export"),
+        new("Refresh / Reload", "Ctrl+R", Keys.Control | Keys.R, "Reload current data and refresh lookup caches.", "Refresh", "Reload"),
         new("Load", "Ctrl+L", Keys.Control | Keys.L, "Load data using the current selection.", "Load"),
-        new("View", "Ctrl+O", Keys.Control | Keys.O, "Open the selected record or view.", "View"),
-        new("Add", "Insert", Keys.Insert, "Add an item to the current list.", "Add"),
-        new("Edit", "F2", Keys.F2, "Edit the selected record.", "Edit"),
+        new("View", "Ctrl+O", Keys.Control | Keys.O, "Open the selected record or view.", "View", "Open"),
+        new("Add item", "Alt+A", Keys.Alt | Keys.A, "Add a draft item or open an Add dialog; use Ctrl+S to save it.", "Add"),
+        new("Edit", "Ctrl+E", Keys.Control | Keys.E, "Edit the selected record.", "Edit"),
         new("Clear", "Alt+C", Keys.Alt | Keys.C, "Reset the current editor using its Clear action.", "Clear"),
-        new("Run", "Ctrl+R", Keys.Control | Keys.R, "Run the current operation.", "Run"),
+        new("Run", "Alt+R", Keys.Alt | Keys.R, "Run the current operation.", "Run"),
         new("Generate", "Ctrl+G", Keys.Control | Keys.G, "Generate results from the current options.", "Generate"),
-        new("Scan", "F8", Keys.F8, "Scan using the page’s Scan action.", "Scan"),
+        new("Scan", "Alt+S", Keys.Alt | Keys.S, "Scan using the page’s Scan action.", "Scan"),
         new("Complete workflow", "Ctrl+Enter", Keys.Control | Keys.Enter, "Apply, confirm, collect or process; normal validation still applies.",
-            "Apply", "Confirm", "Execute", "Post", "Process", "Queue", "Collect"),
+            "Apply", "Confirm", "Execute", "Post", "Process", "Queue", "Collect", "Mark Collected"),
         new("Delete / Remove", "Alt+Delete", Keys.Alt | Keys.Delete, "Delete the selected item; normal confirmation still applies.", "Delete", "Remove")
     };
 

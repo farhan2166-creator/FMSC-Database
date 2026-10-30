@@ -282,7 +282,7 @@ internal static class RdlcReportPreview
         form.ShortcutController.RegisterShortcut(go, Keys.Control | Keys.Home, "Ctrl+Home", () => NavigateTo(1));
         form.ShortcutController.RegisterShortcut(go, Keys.Control | Keys.End, "Ctrl+End", () => NavigateTo(Math.Max(1, viewer.GetTotalPages())));
         BindToolbarAction(form, pageSetup, Keys.Alt | Keys.P, "Alt+P", () => Execute("set up", () => { viewer.PageSetupDialog(); overview.ClearPages(); ApplyPageView(); }));
-        BindToolbarAction(form, exportPdf, Keys.Control | Keys.E, "Ctrl+E", () => {
+        BindToolbarAction(form, exportPdf, Keys.Alt | Keys.E, "Alt+E", () => {
             Execute("export", () => {
                 using var dialog = new SaveFileDialog {
                     Filter = "PDF document (*.pdf)|*.pdf", DefaultExt = "pdf", AddExtension = true,
