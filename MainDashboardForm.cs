@@ -655,13 +655,6 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Daily Collection Closing",
                 "Fees.Collect"),
             new(
-                PageTitles.StudentPromotion,
-                () => new StudentPlacementPage(
-                    (factory, module, title) => NavigateTo(factory, module, title)),
-                "Promotion",
-                PageTitles.StudentPromotion,
-                "Enrollment.Manage"),
-            new(
                 PageTitles.StudentRecordChecks,
                 () => new StudentDataReviewPage((factory, module, title) => NavigateTo(factory, module, title)),
                 "Students",
@@ -676,6 +669,26 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     "Certificates.Create")
             }.Where(item => item.Title != PageTitles.FamilyAdmission || FamilyAdmissionData.CanUse(CurrentUser.HasPermission)).ToArray(),
             expandInitially: true);
+        AddModule(
+            flow,
+            "promotion.png",
+            PageTitles.PlacementManagement,
+            AppTheme.Primary,
+            new NavigationItem[]
+            {
+                new(PageTitles.AnnualPromotion,
+                    () => new StudentPlacementPage(StudentPlacementTask.AnnualPromotion,(factory,module,title)=>NavigateTo(factory,module,title)),
+                    PageTitles.PlacementManagement,PageTitles.AnnualPromotion,"Enrollment.Manage"),
+                new(PageTitles.PlacementTransfers,
+                    () => new StudentPlacementPage(StudentPlacementTask.Transfer,(factory,module,title)=>NavigateTo(factory,module,title)),
+                    PageTitles.PlacementManagement,PageTitles.PlacementTransfers,"Enrollment.Manage"),
+                new(PageTitles.PlacementCorrections,
+                    () => new StudentPlacementPage(StudentPlacementTask.Correction,(factory,module,title)=>NavigateTo(factory,module,title)),
+                    PageTitles.PlacementManagement,PageTitles.PlacementCorrections,"Enrollment.Manage"),
+                new(PageTitles.PlacementHistory,
+                    () => new StudentPlacementPage(StudentPlacementTask.History,(factory,module,title)=>NavigateTo(factory,module,title)),
+                    PageTitles.PlacementManagement,PageTitles.PlacementHistory,"Enrollment.Manage")
+            });
         AddModule(
             flow,
             "students.png",

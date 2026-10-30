@@ -60,10 +60,9 @@ internal static partial class Program
                 CurrentUser.SignIn(910, "Promotion fixture", access.Role, false, access.Permissions);
                 using var shell = new MainDashboardForm((_, _) => { });
                 var commands = (List<NavigationCommand>)typeof(MainDashboardForm).GetField("navigationCommands", flags)!.GetValue(shell)!;
-                Check(commands.Count(c => c.Caption == PageTitles.StudentPromotion) == (access.Allowed ? 1 : 0),
-                    "Student Promotion keeps the established permission and Administrator override");
-                Check(commands.All(c => c.Caption is not ("Promotion History" or "Bulk Promotion")),
-                    "The sidebar and command palette have one promotion destination");
+                foreach(var title in new[]{PageTitles.AnnualPromotion,PageTitles.PlacementTransfers,PageTitles.PlacementCorrections,PageTitles.PlacementHistory})
+                    Check(commands.Count(c=>c.Caption==title)==(access.Allowed?1:0),"Placement pages keep enrollment permissions and the Administrator override.");
+                Check(commands.All(c=>c.Caption is not (PageTitles.StudentPromotion or "Bulk Promotion")),"Separate placement routes replace the former combined promotion destination.");
             }
             CurrentUser.SignIn(911, "Promotion fixture", "Operator", false, new[] { "Enrollment.Manage", "Reports.View" });
             using var promotion = (BulkPromotionPage)Activator.CreateInstance(typeof(BulkPromotionPage), flags, null,

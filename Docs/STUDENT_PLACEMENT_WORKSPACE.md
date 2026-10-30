@@ -1,10 +1,15 @@
 # Student promotion and placement workspace
 
-Student Promotion opens four task tabs: **Annual Promotion**, **Transfers & Sections**,
-**Corrections**, and **History**. Each tab shows only its relevant fields and actions.
-The three planning tabs retain separate student selections, decisions, destinations,
-dates, explanations and fee choices when switching tabs. Drafts last for the current
-page visit; closing the page does not save an unprocessed plan.
+The **Placement Management** sidebar group opens four independent pages:
+**Annual Promotion**, **Transfers & Sections**, **Placement Corrections**, and
+**Placement History**. Each page has its own title, subtitle and full content area,
+without an internal tab strip. Drafts last for the current page visit; navigating
+away does not save an unprocessed plan. An unconfirmed submitted request blocks
+navigation until its result is resolved using Check / Retry Plan.
+
+Source filters are grouped on the left and destination choices on the right.
+The centered action row follows the workflow: load/select students, suggest/assign
+destinations, related student tools, then Review. Spacing separates these groups.
 
 ## Annual promotion
 
@@ -21,12 +26,12 @@ The monthly concession option retains the existing permission and fee-cap rules.
 
 ## Transfers and corrections
 
-Transfers & Sections and Corrections operate within the recorded year. They use
+Transfers & Sections and Placement Corrections operate within the recorded year. They use
 the selected source year without a second academic-year choice. Concession carry
 appears only on Annual Promotion; transfer fee choices appear on Transfers &
-Sections and Corrections. Decision lists also follow the selected task.
+Sections and Placement Corrections. Decision lists also follow the selected task.
 Suggest Destinations uses the selected campus/class and matching section. Highlight
-rows and Assign Highlighted to move groups; individual destination cells allow
+rows and choose Assign to move groups; individual destination cells allow
 section merges, splits, balancing and different destinations within one class.
 The source filters can include several classes and campuses.
 
@@ -37,13 +42,13 @@ credits and fee schedules. More specialized custom-month/refund/schedule decisio
 remain available in the individual transfer dialogs in Admission / Review.
 
 Return / Completion on Annual Promotion opens the related departure and return
-admission dialogs. Student Actions on Corrections also provides readmission and
+admission dialogs. Student Actions on Placement Corrections also provides readmission and
 hold/resume dialogs. Final-class completion is an explicit departure review;
 it does not invent a next class or silently mark students as having left.
 
 ## Review, recovery and correction
 
-Review Promotion, Review Transfers or Review Correction validates the selected plan within a transaction and
+Review validates the selected plan within a transaction and
 rolls it back, then displays source/destination placements, fee agreements and
 bill differences. This preview can consume identity values, but saves no records.
 A dependency snapshot prevents applying a plan if relevant placements, fees,
@@ -55,9 +60,9 @@ saved outcome without applying it twice. After a restart, refresh history and
 reload active source placements before preparing further work. Saved history is
 retained even when a promotion is corrected.
 
-History shows the latest 2,000 student movements from this workspace. Its undo date
-and explanation are separate from all planning drafts. Find Promotion to Undo in
-Corrections opens History and loads the saved movements.
+Placement History loads the latest 2,000 student movements. Its undo date and
+explanation belong to that page. Undo Promotion on Placement Corrections navigates
+to Placement History and loads the saved movements.
 Earlier Promotion History opens the existing historical report, with its report
 permission requirement. Completed annual promotions disappear from their source
 year's active list; skipped students remain for later processing.

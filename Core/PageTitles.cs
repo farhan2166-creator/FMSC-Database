@@ -11,6 +11,11 @@ public static class PageTitles
     public const string StudentCertificates = "Student Certificates";
     public const string StudentTransfers = "Transfers / Re-Admission";
     public const string StudentPromotion = "Student Promotion";
+    public const string PlacementManagement = "Placement Management";
+    public const string AnnualPromotion = "Annual Promotion";
+    public const string PlacementTransfers = "Transfers & Sections";
+    public const string PlacementCorrections = "Placement Corrections";
+    public const string PlacementHistory = "Placement History";
     public const string StudentRecordChecks = "Student Data Review";
     public const string CampusAssignments = "Campus Classes / Sections";
     public const string ClassesSections = "Classes & Sections";
