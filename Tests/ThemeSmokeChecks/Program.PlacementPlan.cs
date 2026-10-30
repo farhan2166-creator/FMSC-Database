@@ -28,10 +28,30 @@ internal static partial class Program
             Check(!Descendants(page).OfType<TabControl>().Any(),"Placement pages use the full content area without an internal tab strip.");
             Check(!page.IsBusy,"An idle placement page permits sidebar navigation.");
             var grid=Field<DataGridView>(page,"students");var data=Field<DataTable>(page,"data");
+            var visibleButtons=Descendants(content).OfType<ModernButton>().Where(button=>button.Visible).ToArray();
+            var shownGrid=task==StudentPlacementTask.History?Field<DataGridView>(page,"history"):grid;
+            int buttonBottom=visibleButtons.Max(button=>button.PointToScreen(new Point(0,button.Height)).Y);
+            var buttonHost=(ScrollableControl)visibleButtons[0].Parent!.Parent!;
+            int scrollSpace=buttonHost.HorizontalScroll.Visible?SystemInformation.HorizontalScrollBarHeight:0;
+            Check(shownGrid.PointToScreen(Point.Empty).Y-buttonBottom<=AppScale.Scale(10)+scrollSpace,"Empty pages do not reserve blank summary or unused scrollbar space below their buttons.");
+            bool Fits(ModernButton button){var text=TextRenderer.MeasureText(button.Text,button.Font,new Size(int.MaxValue,int.MaxValue),TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix);return button.ClientSize.Width-button.Padding.Horizontal-1>=text.Width && button.ClientSize.Height-button.Padding.Vertical>=text.Height;}
+            Check(visibleButtons.All(button=>Fits(button) && !button.Text.EndsWith("…") && !button.Text.EndsWith("...")),"Every action shows its complete caption with room for the actual rendered font.");
+            var longest=visibleButtons.MaxBy(button=>button.Text.Length)!;var originalFont=longest.Font;
+            using(var largerFont=new Font(originalFont.FontFamily,originalFont.Size*1.25f,originalFont.Style,originalFont.Unit)){
+                longest.Font=largerFont;Application.DoEvents();Check(Fits(longest),"Action widths follow larger fonts without clipping their captions.");longest.Font=originalFont;
+            }
             if(task==StudentPlacementTask.History)
             {
                 Check(content.Contains(Field<DataGridView>(page,"history")) && !content.Contains(Field<LookupBox>(page,"sourceYear")),"History contains correction tools without source filters.");
-                var rows=new DataTable();rows.Columns.Add("StudentName");rows.Rows.Add("Fictional History Student");Field<DataGridView>(page,"history").DataSource=rows;Application.DoEvents();
+                var rows=new DataTable();foreach(string name in new[]{"AdmissionNumber","StudentName","Action","PreviousPlacement","DestinationPlacement","Status","FeePolicy","Reason","RecordStatus"})rows.Columns.Add(name);
+                rows.Columns.Add("CreatedAt",typeof(DateTime));rows.Columns.Add("RequestId",typeof(Guid));rows.Columns.Add("ItemId",typeof(int));rows.Columns.Add("UndoneBy",typeof(Guid));
+                var movement=rows.NewRow();movement["AdmissionNumber"]="1001";movement["StudentName"]="Fictional History Student";movement["CreatedAt"]=DateTime.Today.AddHours(9);movement["Action"]="PROMOTE";movement["PreviousPlacement"]="Campus A / One / A";movement["DestinationPlacement"]="Campus A / Two / A";movement["Status"]="Active";movement["Reason"]="Fictional annual promotion";movement["RecordStatus"]="Recorded";movement["RequestId"]=Guid.NewGuid();movement["ItemId"]=41;rows.Rows.Add(movement);
+                Field<DataGridView>(page,"history").DataSource=rows;Application.DoEvents();
+                var historyGrid=Field<DataGridView>(page,"history");
+                var properties=historyGrid.Columns.Cast<DataGridViewColumn>().Where(column=>column.Visible).OrderBy(column=>column.DisplayIndex).Select(column=>column.DataPropertyName).ToArray();
+                Check(properties.SequenceEqual(new[]{"AdmissionNumber","StudentName","CreatedAt","Action","PreviousPlacement","DestinationPlacement","Status","FeePolicy","Reason","RecordStatus"}),"History presents identity, time, action, source/destination, status and notes in reading order.");
+                Check(Convert.ToString(historyGrid.Rows[0].Cells["RecordedAt"].FormattedValue)!.Contains("09:00"),"The recorded movement timestamp includes its time of day.");
+                Check(!historyGrid.Columns.Cast<DataGridViewColumn>().Any(column=>column.Visible && column.DataPropertyName is "RequestId" or "ItemId" or "UndoneBy"),"History retains recovery fields in its data without exposing request IDs as user-facing columns.");
                 var selected=(DataRowView)typeof(StudentPlacementPage).GetMethod("SelectedStudent",flags)!.Invoke(page,null)!;
                 Check(Convert.ToString(selected["StudentName"])=="Fictional History Student","History actions use the selected history student.");
                 Field<ModernTextBox>(page,"historyReason").Text="Fictional undo explanation";
@@ -77,7 +97,7 @@ internal static partial class Program
             destination=null;Call(page,"OpenPlacementHistory");Check(destination is null,"Contextual navigation cannot abandon an unconfirmed result.");
             typeof(StudentPlacementPage).GetField("pending",flags)!.SetValue(page,null);typeof(StudentPlacementPage).GetMethod("SetPendingControls",flags)!.Invoke(page,new object[]{content});
             window.ClientSize=new Size(900,700);Application.DoEvents();Check((task==StudentPlacementTask.History?Field<DataGridView>(page,"history"):grid).Height>=100,"Every page retains a usable grid at a compact window size.");
-            window.ClientSize=new Size(1200,800);Application.DoEvents();string output=Path.GetFullPath(task==StudentPlacementTask.AnnualPromotion?"artifacts/placement-workspace.png":$"artifacts/placement-page-{task}.png");Directory.CreateDirectory(Path.GetDirectoryName(output)!);using var bitmap=new Bitmap(window.ClientSize.Width,window.ClientSize.Height);window.DrawToBitmap(bitmap,window.ClientRectangle);bitmap.Save(output);
+            window.ClientSize=new Size(1600,850);Application.DoEvents();string output=Path.GetFullPath(task==StudentPlacementTask.AnnualPromotion?"artifacts/placement-workspace.png":$"artifacts/placement-page-{task}.png");Directory.CreateDirectory(Path.GetDirectoryName(output)!);using var bitmap=new Bitmap(window.ClientSize.Width,window.ClientSize.Height);window.DrawToBitmap(bitmap,window.ClientRectangle);bitmap.Save(output);
         }
     }
 }

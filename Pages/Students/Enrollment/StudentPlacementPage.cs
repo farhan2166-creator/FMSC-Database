@@ -21,7 +21,7 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
     private readonly CheckBox carry=new(){Text="Carry monthly concessions",AutoSize=true};
     private readonly ModernComboBox fees=HumanUi.Combo();
     private readonly DataGridView students=HumanUi.Grid(true), history=HumanUi.Grid(false);
-    private readonly Label totals=new(){Dock=DockStyle.Fill,AutoEllipsis=true};
+    private readonly Label totals=new(){Dock=DockStyle.Fill,AutoEllipsis=true,Margin=Padding.Empty};
     private readonly TableLayoutPanel body=new(){Dock=DockStyle.Fill,ColumnCount=1,RowCount=4};
     private readonly Control pageContent;
     private readonly TableLayoutPanel fields=new(){Dock=DockStyle.Fill,ColumnCount=2,RowCount=2};
@@ -47,18 +47,18 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         fields.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
         var load=AddAction("Load Students",async(_,_)=>await Guard(LoadStudents),"Secondary");
         var suggest=AddAction("Suggest",(_,_)=>Suggest(),"Secondary");SetToolTip(suggest,"Suggest destination placements for the loaded students.");
-        var assign=AddAction("Assign…",(_,_)=>AssignHighlighted(),"Secondary");SetToolTip(assign,"Assign a decision and destination to highlighted students.");
+        var assign=AddAction("Assign",(_,_)=>AssignHighlighted(),"Secondary");SetToolTip(assign,"Assign a decision and destination to highlighted students.");
         var select=AddAction("Select All",(_,_)=>SelectRows(true),"Secondary");
         var clear=AddAction("Clear",(_,_)=>SelectRows(false),"Secondary");SetToolTip(clear,"Clear the ticked student selection.");
         review=AddAction("Review Promotion",async(_,_)=>await Guard(Process),"Success");
         retry=AddAction("Check / Retry Plan",async(_,_)=>await Guard(Retry),"Warning");
         var records=AddAction("Refresh History",async(_,_)=>await Guard(LoadHistory),"Secondary");
-        var undo=AddAction("Undo Selected Promotion…",async(_,_)=>await Guard(Undo),"Warning");
-        correction=AddAction("History / Dates…",(_,_)=>OpenStudentHistory(),"Secondary");
-        studentActions=AddAction("Student Actions…",(_,_)=>OpenStudentActions(),"Secondary");
-        findUndo=AddAction("Undo Promotion…",(_,_)=>OpenPlacementHistory(),"Secondary");
+        var undo=AddAction("Undo Selected Promotion",async(_,_)=>await Guard(Undo),"Warning");
+        correction=AddAction("History / Dates",(_,_)=>OpenStudentHistory(),"Secondary");
+        studentActions=AddAction("Student Actions",(_,_)=>OpenStudentActions(),"Secondary");
+        findUndo=AddAction("Undo Promotion",(_,_)=>OpenPlacementHistory(),"Secondary");
         SetToolTip(findUndo,"Find a saved promotion in History and review whether it can be undone.");
-        var old=AddAction("Earlier Promotion History…",(_,_)=> {
+        var old=AddAction("Earlier Promotion History",(_,_)=> {
             if(!CurrentUser.HasPermission("Reports.View")){Warn("Report access is required.");return;}
             using var dialog=Window("Earlier Promotion History",new PromotionHistoryPage());dialog.ShowDialog(FindForm());
         },"Secondary");
@@ -83,19 +83,23 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         var historyRoot=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4};
         historyRoot.RowStyles.Add(new RowStyle(SizeType.Absolute,AppScale.Scale(30)));
         historyRoot.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
-        historyRoot.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonRowHeight+SystemInformation.HorizontalScrollBarHeight));historyRoot.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        historyRoot.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonHeight+AppScale.Scale(8)));historyRoot.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         var historyFields=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2};historyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));historyFields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,75));
         historyFields.Controls.Add(HumanUi.Field("Correction Date",historyDate),0,0);historyFields.Controls.Add(HumanUi.Field("Reason for Undoing Promotion",historyReason),1,0);
-        var historyDates=AddAction("Student History / Dates…",(_,_)=>OpenStudentHistory(),"Secondary");RelocateFromActions(historyDates);
+        var historyDates=AddAction("Student History / Dates",(_,_)=>OpenStudentHistory(),"Secondary");RelocateFromActions(historyDates);
         var historyRetry=AddAction("Check / Retry Plan",async(_,_)=>await Guard(Retry),"Warning");RelocateFromActions(historyRetry);historyRetry.Visible=false;
         var historyActions=CenteredActionRow(new Control[]{records,old},new Control[]{historyDates},new Control[]{undo,historyRetry});
         historyRoot.Controls.Add(new Label{Dock=DockStyle.Fill,Text="Review saved movements. To undo an unused promotion, select its record and enter the correction date and reason."},0,0);
         historyRoot.Controls.Add(historyFields,0,1);historyRoot.Controls.Add(historyActions,0,2);historyRoot.Controls.Add(history,0,3);history.Dock=DockStyle.Fill;
+        ConfigureHistoryGrid();
         body.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldCardHeight(2,false)+AppMetrics.FieldRowHeight));
-        body.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonRowHeight+SystemInformation.HorizontalScrollBarHeight));
-        body.RowStyles.Add(new RowStyle(SizeType.Absolute,AppScale.Scale(38)));
+        body.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonHeight+AppScale.Scale(8)));
+        body.RowStyles.Add(new RowStyle(SizeType.Absolute,0));
         body.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         body.Controls.Add(fields,0,0);body.Controls.Add(actions,0,1);body.Controls.Add(totals,0,2);body.Controls.Add(students,0,3);
+        void FitTotals()=>body.RowStyles[2].Height=string.IsNullOrWhiteSpace(totals.Text)?0:
+            AppMetrics.TextHeight(totals.Font)*Math.Min(2,totals.Text.Split('\n').Length)+AppScale.Scale(4);
+        totals.TextChanged+=(_,_)=>FitTotals();totals.FontChanged+=(_,_)=>FitTotals();
         var unusedContent=ViewingHistory?(Control)body:historyRoot;
         unusedContent.Visible=false;
         pageContent=ViewingHistory?historyRoot:body;
@@ -159,9 +163,9 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         carry.Visible=Annual;
         SetToolTip(targetCampus,"Leave blank to keep each student's current campus.");SetToolTip(targetClass,"Leave blank to keep each student's current class.");
         fees.Enabled=!Annual;targetClass.Enabled=!Annual;
-        review.Text="Review…";SetToolTip(review,Annual?"Review the annual promotion plan before processing.":operation==1?"Review the transfer plan before processing.":"Review the placement correction before processing.");
+        review.Text="Review";SetToolTip(review,Annual?"Review the annual promotion plan before processing.":operation==1?"Review the transfer plan before processing.":"Review the placement correction before processing.");
         correction.Visible=operation==2;findUndo.Visible=operation==2;studentActions.Visible=operation!=1;retry.Visible=pending is not null;
-        studentActions.Text=Annual?"Return / Completion…":"Student Actions…";studentActions.Width=AppMetrics.TextWidth(studentActions.Text,studentActions.Font,AppScale.Scale(28));
+        studentActions.Text=Annual?"Return / Completion":"Student Actions";
         var column=(DataGridViewComboBoxColumn)students.Columns["Decision"];
         var choices=column.DataSource is DataView view?view.Table!:(DataTable)column.DataSource!;
         choices.DefaultView.RowFilter=Annual?"Value IN ('PROMOTE','HOLD','SKIP')":operation==1?"Value IN ('MOVE','SKIP')":"Value IN ('CORRECT','SKIP')";
@@ -219,9 +223,14 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         void Arrange(){
             if(arranging || host.IsDisposed)return;arranging=true;
             try{
-                int width=row.GetPreferredSize(Size.Empty).Width;
+                Size needed=row.GetPreferredSize(Size.Empty);
+                int width=needed.Width;
                 host.AutoScrollMinSize=new Size(width,0);
                 row.Location=new Point(Math.Max(0,(host.ClientSize.Width-width)/2)+host.AutoScrollPosition.X,0);
+                if(host.Parent is TableLayoutPanel table && table.GetRow(host) is int rowIndex && rowIndex>=0 && rowIndex<table.RowStyles.Count){
+                    int height=Math.Max(AppMetrics.ButtonHeight+AppScale.Scale(8),needed.Height)+(width>host.ClientSize.Width?SystemInformation.HorizontalScrollBarHeight:0);
+                    if(Math.Abs(table.RowStyles[rowIndex].Height-height)>0.5f)table.RowStyles[rowIndex].Height=height;
+                }
             }finally{arranging=false;}
         }
         int index=0;
@@ -231,14 +240,20 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
             bool sizing=false;
             void SizeButton(){
                 if(sizing)return;sizing=true;
-                try{button.Width=Math.Max(AppScale.Scale(64),AppMetrics.TextWidth(button.Text,button.Font,AppScale.Scale(18)));button.Height=AppMetrics.ButtonHeight;}
+                try{
+                    Size text=TextRenderer.MeasureText(button.Text,button.Font,new Size(int.MaxValue,int.MaxValue),TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix);
+                    button.MinimumSize=new Size(UiDpi.Metric(button,AppMetrics.ActionButtonMinimumWidth),0);
+                    button.Width=Math.Max(button.MinimumSize.Width,text.Width+button.Padding.Horizontal+UiDpi.Metric(button,AppScale.Scale(12))+1);
+                    button.Height=Math.Max(AppMetrics.ButtonHeight,text.Height+button.Padding.Vertical+UiDpi.Metric(button,AppScale.Scale(8)));
+                }
                 finally{sizing=false;}
             }
             SizeButton();row.Controls.Add(button);
             button.TextChanged+=(_,_)=>{SizeButton();Arrange();};button.FontChanged+=(_,_)=>{SizeButton();Arrange();};
             button.SizeChanged+=(_,_)=>{SizeButton();Arrange();};button.VisibleChanged+=(_,_)=>Arrange();
+            button.DpiChangedAfterParent+=(_,_)=>{SizeButton();Arrange();};
         }
-        host.SizeChanged+=(_,_)=>Arrange();host.VisibleChanged+=(_,_)=>Arrange();row.SizeChanged+=(_,_)=>Arrange();
+        host.SizeChanged+=(_,_)=>Arrange();host.VisibleChanged+=(_,_)=>Arrange();host.ParentChanged+=(_,_)=>Arrange();row.SizeChanged+=(_,_)=>Arrange();
         return host;
     }
     private static void Bind(LookupBox box,DataTable source,string value,string display,bool optional,string optionalLabel="All")
@@ -365,11 +380,12 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
     {
         history.DataSource=await DatabaseHelper.QuerySqlAsync("""
             EXEC dbo.RequirePermission @UserId,N'Enrollment.Manage';
-            SELECT TOP(2000) I.ItemId,P.RequestId,P.CreatedAt,S.StudentName,I.AdmissionId,I.Action,
+            SELECT TOP(2000) I.ItemId,P.RequestId,P.CreatedAt,S.AdmissionNumber,S.StudentName,I.AdmissionId,I.Action,
              CONCAT(OC.CampusName,N' / ',OK.ClassName,N' / ',OS.SectionName) PreviousPlacement,
              CONCAT(NC.CampusName,N' / ',NK.ClassName,N' / ',NS.SectionName) DestinationPlacement,
              P.Reason,I.FeePolicy,I.UndoneBy,I.DestinationEnrollmentId,E.AcademicYearId,
-             E.ClassSectionId CurrentPlacementId,CONVERT(varchar(33),E.UpdatedAt,126) CurrentStamp,E.Status
+             E.ClassSectionId CurrentPlacementId,CONVERT(varchar(33),E.UpdatedAt,126) CurrentStamp,E.Status,
+             CASE WHEN I.UndoneBy IS NULL THEN N'Recorded' ELSE N'Undone' END RecordStatus
             FROM dbo.StudentPlacementPlanItems I JOIN dbo.StudentPlacementPlans P ON P.RequestId=I.RequestId
             JOIN dbo.Students S ON S.AdmissionId=I.AdmissionId JOIN dbo.Enrollments E ON E.EnrollmentId=I.DestinationEnrollmentId
             JOIN dbo.CampusClassSections O ON O.ClassSectionId=I.SourcePlacementId
@@ -378,7 +394,37 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
             JOIN dbo.Campuses NC ON NC.CampusId=N.CampusId JOIN dbo.Classes NK ON NK.ClassId=N.ClassId JOIN dbo.Sections NS ON NS.SectionId=N.SectionId
             ORDER BY I.ItemId DESC;
             """,DatabaseHelper.Int("@UserId",CurrentUser.UserId));
-        foreach(var name in new[]{"ItemId","AdmissionId","DestinationEnrollmentId","AcademicYearId","CurrentPlacementId","CurrentStamp"})if(history.Columns.Contains(name))history.Columns[name].Visible=false;
+    }
+    private void ConfigureHistoryGrid()
+    {
+        history.AutoGenerateColumns=false;
+        void Column(string name,string property,string caption,int width,string? format=null){
+            var column=new DataGridViewTextBoxColumn{Name=name,DataPropertyName=property,HeaderText=caption,ReadOnly=true,Width=AppScale.Scale(width)};
+            if(format is not null)column.DefaultCellStyle.Format=format;
+            history.Columns.Add(column);
+        }
+        Column("AdmissionNumber","AdmissionNumber","Adm. No.",100);
+        Column("StudentName","StudentName","Student",170);
+        Column("RecordedAt","CreatedAt","Recorded On",165,"dd-MMM-yyyy hh:mm tt");
+        Column("Action","Action","Action",135);
+        Column("PreviousPlacement","PreviousPlacement","Previous Placement",220);
+        Column("DestinationPlacement","DestinationPlacement","Destination Placement",220);
+        Column("CurrentStatus","Status","Current Status",110);
+        Column("FeePolicy","FeePolicy","Fee Policy",130);
+        Column("Reason","Reason","Reason",220);
+        Column("RecordStatus","RecordStatus","Record Status",110);
+        history.CellFormatting+=(_,e)=>{
+            if(e.RowIndex<0 || e.ColumnIndex<0)return;
+            string name=history.Columns[e.ColumnIndex].Name;
+            if(name=="Action"){
+                e.Value=Convert.ToString(e.Value) switch{"PROMOTE"=>"Promoted","HOLD"=>"Repeated Class","MOVE"=>"Transferred","CORRECT"=>"Placement Corrected","UNDO"=>"Promotion Undone",var text=>text};
+                e.FormattingApplied=true;
+            }
+            else if(name=="FeePolicy"){
+                e.Value=Convert.ToString(e.Value) switch{"NEXT_MONTH"=>"From next month","SCHOOL_CUTOFF"=>"School cutoff",var text=>text};
+                e.FormattingApplied=true;
+            }
+        };
     }
     private async Task Undo()
     {
