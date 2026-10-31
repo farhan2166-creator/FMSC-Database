@@ -113,7 +113,7 @@ Typing an admission number clears Campus, Academic Year, Class and Status. Chang
 
 ## Placement Management
 
-Open **Placement Management** in the sidebar. It contains four separate pages, each with its own workspace and permissions, rather than the old single **Student Promotion** screen:
+Open **Placement Management** in the sidebar. It contains four separate pages under the existing enrollment-management permission, rather than the old single **Student Promotion** screen:
 
 - **Annual Promotion:** Choose a source academic year; blank campus, class or section includes all matching active placements. Choose the destination year, then **Load Students**. Use **Suggest** or assign destinations to selected rows. Each student can **Promote**, **Repeat Class** (same placement in the new year) or **Skip for Now**. Review exceptions such as missing next classes before processing. Newly promoted students still require return-admission confirmation before billing for the new year.
 - **Transfers & Sections:** Move students between sections, classes or campuses **within the recorded academic year**. Use **Load Students**, **Suggest**, **Assign** and row-level destinations. Section-only moves preserve fees; class/campus moves offer current fees, destination fees from next month, or the school cutoff rule.
