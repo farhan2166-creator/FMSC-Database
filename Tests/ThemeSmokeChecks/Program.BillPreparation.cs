@@ -42,6 +42,7 @@ internal static partial class Program
         Check(child.Tables[1].Rows.Count==1&&child.Tables[2].Rows.Count==1&&child.Tables[3].Rows.Count==0,"Child copy excludes siblings' fees and plans");
         Check((string)child.Tables[0].Rows[0]["ReceiptNumber"]=="FR-ORIGINAL"&&(DateTime)child.Tables[0].Rows[0]["TransactionDate"]==new DateTime(2026,10,1),"Child copy retains original receipt reference and date");
         Check((decimal)child.Tables[0].Rows[0]["CashReceived"]==800m&&(decimal)child.Tables[0].Rows[0]["CreditRemaining"]==300m&&(decimal)child.Tables[0].Rows[0]["BalanceRemaining"]==100m,"Child cash, advance and debt totals belong only to that child");
+        Check((string)child.Tables[0].Rows[0]["ReceiptStatus"]=="Later changes recorded", "Child copies preserve actual status without adding a redundant explanatory paragraph");
         Check((decimal)header.Rows[0]["CashReceived"]==1000m&&students.Rows.Count==2,"Copy preparation never mutates the original family snapshot");
         bool rejected=false;try{using var invalid=FeeReceiptChildCopy.Extract(original,999);}catch(InvalidOperationException){rejected=true;}
         Check(rejected,"A child absent from the saved receipt cannot be substituted from today's family");

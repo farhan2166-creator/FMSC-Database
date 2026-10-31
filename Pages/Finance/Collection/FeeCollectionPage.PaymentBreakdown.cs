@@ -5,6 +5,30 @@ namespace FMSC_SMS.Pages.Finance.Collection;
 public sealed partial class FeeCollectionPage
 {
     private DataTable familyPaymentBreakdowns=new();
+    private int historyReceiptChild;
+    private bool changingHistorySelection;
+
+    private void SelectHistoryReceipt(DataGridView? children=null)
+    {
+        if(changingHistorySelection || paymentHistoryDetails is null)return;
+        changingHistorySelection=true;
+        try
+        {
+            historyReceiptChild=children?.CurrentRow?.Tag is int id?id:0;
+            if(children is not null)
+            {
+                recentPayments.ClearSelection();
+                if(children.CurrentRow is not null)children.CurrentRow.Selected=true;
+            }
+            else
+            {
+                foreach(var grid in paymentHistoryDetails.Controls.OfType<DataGridView>())grid.ClearSelection();
+                if(recentPayments.CurrentRow is not null)recentPayments.CurrentRow.Selected=true;
+            }
+            UpdateReprintAvailability();
+        }
+        finally{changingHistorySelection=false;}
+    }
 
     private async Task LoadFamilyPaymentBreakdownsAsync(int selectedAdmission,int version)
     {
@@ -50,9 +74,14 @@ public sealed partial class FeeCollectionPage
         {
             int index=grid.Rows.Add($"{GetText(member,"AdmissionNumber")} · {GetText(member,"StudentName")}",
                 GetDecimal(member,"CashApplied")+GetDecimal(member,"CreditApplied"),GetDecimal(member,"Adjusted"),GetDecimal(member,"NetSettled"),GetText(member,"PaymentStatus"));
+            grid.Rows[index].Tag=GetInt(member,"AdmissionId");
             if(GetInt(member,"AdmissionId")==admissionId)selected=index;
         }
-        if(selected>=0){grid.CurrentCell=grid.Rows[selected].Cells[0];grid.ClearSelection();grid.Rows[selected].Selected=true;}
+        if(selected>=0)grid.CurrentCell=grid.Rows[selected].Cells[0];
+        grid.ClearSelection();
+        grid.Enter+=(_,_)=>SelectHistoryReceipt(grid);
+        grid.CellClick+=(_,e)=>{if(e.RowIndex>=0)SelectHistoryReceipt(grid);};
+        grid.CurrentCellChanged+=(_,_)=>{if(grid.ContainsFocus)SelectHistoryReceipt(grid);};
         grid.Layout+=(_,_)=>FitFamilyPaymentBreakdown(grid);
         string totals=$"Original receipt total: Rs. {original:N0}    Adjustments: Rs. {adjusted:N0}    Still recorded: Rs. {net:N0}";
         string heading=$"{reference} · Original shares and current adjustments";

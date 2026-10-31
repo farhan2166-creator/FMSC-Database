@@ -48,10 +48,15 @@ internal static partial class Program
                     Check(grid.Rows.Count==3&&Convert.ToDecimal(grid.Rows[1].Cells["Original"].Value)==7600m&&Convert.ToDecimal(grid.Rows[1].Cells["Net"].Value)==0m,"A reversed child retains the original share beside the current zero");
                     Check(Convert.ToDecimal(grid.Rows[0].Cells["Net"].Value)==7500m&&Convert.ToDecimal(grid.Rows[2].Cells["Net"].Value)==6900m,"Unaffected siblings keep their own recorded payments");
                     Check(details.Text.Contains("22,000")&&details.Text.Contains("7,600")&&details.Text.Contains("14,400"),"The original receipt total and current family adjustments are distinct");
-                    Check(grid.SelectedRows.Count==1&&grid.SelectedRows[0].Index==1,"The currently loaded student is highlighted within the original receipt participants");
+                    Check(grid.SelectedRows.Count==0,"The breakdown starts without an active child copy");
                     var currentGrid=grid;type.GetMethod("UpdatePaymentHistoryDetails",flags)!.Invoke(page,null);
                     Check(ReferenceEquals(currentGrid,details.Controls.OfType<DataGridView>().Single()),"Repeated selection events reuse the displayed table without flickering");
                     var reprint=Field<ModernButton>("reprintReceiptButton");
+                    grid.CurrentCell=grid.Rows[2].Cells[0];
+                    type.GetMethod("SelectHistoryReceipt",flags)!.Invoke(page,new object?[]{grid});
+                    Check(Field<int>("historyReceiptChild")==43 && history.SelectedRows.Count==0 && reprint.Text=="Reprint Child Receipt", "A child selection targets that saved member and clears the upper highlight");
+                    type.GetMethod("SelectHistoryReceipt",flags)!.Invoke(page,new object?[]{null});
+                    Check(Field<int>("historyReceiptChild")==0 && grid.SelectedRows.Count==0 && history.SelectedRows.Count==1 && reprint.Text=="Reprint Family Receipt", "Returning to the same upper receipt restores the full family target");
                     using(var bitmap=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save($"artifacts/receipt-breakdown/family-{size.Width}.png");}
                     Check(history.Height>70&&details.RectangleToScreen(details.ClientRectangle).Bottom<=reprint.Parent!.RectangleToScreen(reprint.Parent.ClientRectangle).Top,$"The breakdown fits beneath payments without covering actions or removing the payment list (payments {history.Height}, table {grid.Height}, window {size})");
                     Check(reprint.RectangleToScreen(reprint.ClientRectangle).Bottom<=dialog.RectangleToScreen(dialog.ClientRectangle).Bottom&&grid.RectangleToScreen(grid.ClientRectangle).Right<=dialog.RectangleToScreen(dialog.ClientRectangle).Right,"The full sibling table width and receipt actions remain inside the smaller window");

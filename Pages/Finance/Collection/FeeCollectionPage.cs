@@ -1411,8 +1411,10 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         recentPayments.SelectionChanged += OnPaymentHistorySelectionChanged;
         recentPayments.CurrentCellChanged -= OnPaymentHistoryCurrentCellChanged;
         recentPayments.CurrentCellChanged += OnPaymentHistoryCurrentCellChanged;
+        recentPayments.Enter += (_, _) => SelectHistoryReceipt();
+        recentPayments.CellClick += (_, e) => { if(e.RowIndex >= 0) SelectHistoryReceipt(); };
     }
-    private void OnPaymentHistoryCurrentCellChanged(object? sender, EventArgs e) => UpdatePaymentHistoryDetails();
+    private void OnPaymentHistoryCurrentCellChanged(object? sender, EventArgs e) { UpdatePaymentHistoryDetails(); SelectHistoryReceipt(); }
     /// <summary>One subscription for the page's lifetime.</summary>
     private void OnPaymentHistorySelectionChanged(
         object? sender,
@@ -1503,6 +1505,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         {
             return;
         }
+        reprintReceiptButton.Text = historyReceiptChild > 0 ? "Reprint Child Receipt" : recentPayments.CurrentRow?.Cells["ReceiptTotal"].Value is not null and not DBNull ? "Reprint Family Receipt" : "Reprint Receipt";
         reprintReceiptButton.Enabled =
             recentPayments.CurrentRow is not null &&
             recentPayments.CurrentRow.Tag is true &&
@@ -1528,11 +1531,11 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             Warn("Select a recorded payment in the list first, so the receipt number is known.");
             return;
         }
-        await ReprintReceiptAsync(receiptNumber);
+        await ReprintReceiptAsync(receiptNumber, historyReceiptChild);
     }
     /// <summary>Prints any receipt again, by its number - the parent who comes back a week later.</summary>
     private async Task ReprintReceiptAsync(
-        string receiptNumber)
+        string receiptNumber, int? selectedChild = null)
     {
         using var returnFocus = new DialogReturnFocus(this);
         var institution =
@@ -1544,7 +1547,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 "Check School Profile, then try again.");
             return;
         }
-        await PrintGroupReceiptAsync(institution, receiptNumber);
+        await PrintGroupReceiptAsync(institution, receiptNumber, selectedChild);
     }
     /// <summary>Keep collection mode explicit.</summary>
     private void UpdateOperationMode()
@@ -3828,7 +3831,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             new ApplicationWindowForm {
                 Text = $"Recent Payments — {StudentNameFor(admissionId)} · Admission {AdmissionNumbers.ForId(admissionId)}",
                 StartPosition = FormStartPosition.CenterParent,
-                ClientSize = new Size(AppScale.Scale(1180), AppScale.Scale(520)),
+                ClientSize = new Size(AppScale.Scale(1180), AppScale.Scale(680)),
                 MinimumSize = new Size(AppScale.Scale(720), AppScale.Scale(420)),
                 BackColor = AppTheme.PageBackground,
                 Font = AppTheme.NormalFont,
@@ -3856,6 +3859,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var reprintButton =
             new ModernButton {
                 Text = "Reprint Receipt",
+                AutoSize = true,
                 Width = AppScale.Scale(150),
                 Height = AppMetrics.ButtonHeight,
                 ThemeRole = "Secondary"
@@ -3916,6 +3920,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         /* The list is on screen before the button is offered, so its state is derived once here rather than waiting for the first click to set it. */
         UpdateReprintAvailability();
         UpdatePaymentHistoryDetails();
+        SelectHistoryReceipt();
         try
         {
             dialog.ShowDialog(
@@ -3932,6 +3937,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                     recentPayments);
             }
             /* The button, unlike the grid, IS the dialog's - it is disposed with it, so the page must stop pointing at it. */
+            historyReceiptChild = 0;
             reprintReceiptButton = null;
             paymentHistoryDetails = null;
             recentPayments.Enabled = false;
@@ -4546,9 +4552,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     /* A family collection keeps its one database receipt number, while printing one complete physical receipt page per child. */
     private async Task PrintGroupReceiptAsync(
         InstitutionProfile.PrintIdentity institution,
-        string receiptNumber)
+        string receiptNumber, int? selectedChild = null)
     {
-        if(await FeeReceiptDocuments.TryShowAsync(FindForm(),institution,receiptNumber)) return;
+        if(await FeeReceiptDocuments.TryShowAsync(FindForm(),institution,receiptNumber,selectedChild)) return;
         DataSet result =
             await DatabaseHelper.QueryUserSetAsync(
                 "GetFeeReceiptGroup",
@@ -4568,6 +4574,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var rows = new List<FamilyReceiptLine>();
         foreach (DataRow row in lines.Rows)
         {
+            if(selectedChild > 0 && GetInt(row, "AdmissionId") != selectedChild.Value) continue;
             rows.Add(new FamilyReceiptLine {
                 AdmissionId = GetInt(row, "AdmissionId"),
                 EnrollmentId = GetInt(row, "EnrollmentId"),

@@ -58,6 +58,27 @@ internal static partial class Program
                 "Each child retains their own campus beneath the common school heading");
         }
         Check(render("family-separate-child-receipts",receipt)==1,"Child receipts and the final summary render on one continuous page");
+        using(var largeStudents=students.Clone())
+        using(var largeLines=lines.Clone())
+        using(var largeHeader=header.Copy())
+        {
+            for(int i=0;i<6;i++)
+            {
+                largeStudents.Rows.Add(100+i,(6591+i).ToString(),new[]{"Agha Khan","Haris Ali","Ali Test","Naz Ali","Khan Ali","Afnan Niazi"}[i],"Fazal Muhammad Niazi",5000m,0m,0m,0m,0m,5000m);
+                largeLines.Rows.Add(100+i,"Admission Fee","Play Group","F","Campus Girls",new DateTime(2026,10,1),3960m,3960m,0m,0m);
+                largeLines.Rows.Add(100+i,"Tuition Fee","Play Group","F","Campus Girls",new DateTime(2026,11,1),1040m,1040m,0m,0m);
+            }
+            var lh=largeHeader.Rows[0];lh["CashReceived"]=30000m;lh["CashApplied"]=30000m;lh["DiscountApplied"]=0m;lh["BalanceRemaining"]=2761m;lh["CreditRemaining"]=0m;
+            using var largeReceipt=FeeReceiptDocuments.BuildData(school,lh,largeStudents,largeLines);
+            Check(render("family-six-child-receipt",largeReceipt)==1,"Six child slips and the family totals stay on one continuous receipt");
+            using var saved=new DataSet();
+            saved.Tables.Add(largeHeader.Copy());saved.Tables.Add(largeStudents.Copy());saved.Tables.Add(largeLines.Copy());
+            using var copy=FeeReceiptChildCopy.Extract(saved,100);
+            using var childReceipt=FeeReceiptDocuments.BuildData(school,copy.Tables[0].Rows[0],copy.Tables[1],copy.Tables[2]);
+            foreach(DataRow row in childReceipt.Rows)row["CopyLabel"]="CHILD COPY";
+            Check(childReceipt.AsEnumerable().All(row=>string.IsNullOrWhiteSpace(row.Field<string>("ReceiptStatus"))),"A child copy needs no redundant status explanation beside its own payment figures");
+            Check(render("family-child-copy-concise",childReceipt)==1,"The concise child copy renders on one page");
+        }
         using(var advanceStudents=students.Clone())
         using(var advanceHeader=header.Copy())
         using(var emptyLines=lines.Clone())

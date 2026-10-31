@@ -3,7 +3,7 @@ namespace FMSC_SMS.Core;
 /// <summary>Loads saved collections and routes them to the matching receipt report.</summary>
 internal static class FeeReceiptDocuments
 {
-    internal static async Task<bool> TryShowAsync(Form? owner,InstitutionProfile.PrintIdentity institution,string receiptNumber)
+    internal static async Task<bool> TryShowAsync(Form? owner,InstitutionProfile.PrintIdentity institution,string receiptNumber,int? selectedChild=null)
     {
         int user=CurrentUser.UserId;
         bool Current()=>owner?.IsDisposed!=true&&CurrentUser.UserId==user&&CurrentUser.HasPermission("Fees.View");
@@ -22,7 +22,7 @@ internal static class FeeReceiptDocuments
             if(Current())FeeChangeReport.Show(owner,changes);
             return true;
         }
-        int? child=complete&&result.Tables[1].Rows.Count>1?FeeReceiptCopyDialog.Choose(owner,result.Tables[1]):0;
+        int? child=selectedChild ?? (complete&&result.Tables[1].Rows.Count>1?FeeReceiptCopyDialog.Choose(owner,result.Tables[1]):0);
         if(child is null||!Current())return true;
         using var childCopy=child>0?FeeReceiptChildCopy.Extract(result,child.Value):null;
         var document=childCopy??result;

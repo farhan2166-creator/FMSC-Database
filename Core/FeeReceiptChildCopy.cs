@@ -16,7 +16,6 @@ internal static class FeeReceiptChildCopy
             if(!member.Table.Columns.Contains(field)||member.IsNull(field)){result.Dispose();throw new InvalidOperationException("The child's saved amounts cannot be confirmed. Reprint the original family receipt instead.");}
             header[field]=member[field];
         }
-        header["ReceiptStatus"]=(Convert.ToString(header["ReceiptStatus"])+" Child copy — this student's share of the original family receipt only.").Trim();
         return result;
     }
 }

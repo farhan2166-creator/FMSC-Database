@@ -113,6 +113,17 @@ internal static partial class Program
             report.DataSources.Add(new ReportDataSource(xml.Descendants(ns+"DataSet").Single().Attribute("Name")!.Value,data));
             byte[] pdf=report.Render("PDF");File.WriteAllBytes(Path.Combine(folder,name+".pdf"),pdf);
             using var parsed=PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdf),PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+            if(name=="family-six-child-receipt")
+            {
+                var printed=new List<MemoryStream>();
+                try
+                {
+                    report.Render("IMAGE","<DeviceInfo><OutputFormat>EMF</OutputFormat><StartPage>0</StartPage><EndPage>0</EndPage></DeviceInfo>",
+                        (streamName,extension,encoding,mimeType,willSeek)=>{var stream=new MemoryStream();printed.Add(stream);return stream;},out _);
+                    Check(printed.Count==1,"The printer renderer keeps all six children and final totals on one slip");
+                }
+                finally{foreach(var stream in printed)stream.Dispose();}
+            }
             if(name is "batch-outstanding-months" or "family-bill-months")
             {
                 string csv=System.Text.Encoding.UTF8.GetString(report.Render("CSV"));
