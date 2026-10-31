@@ -48,9 +48,11 @@ public sealed partial class StudentAccountStatementPage
         if(printAmountsDueButton?.Parent is FlowLayoutPanel reports)
         {
             var menu=new ContextMenuStrip();
-            var due=menu.Items.Add("Outstanding Bills…",null,async(_,_)=>await PrintDueReport());
+            var due=new ToolStripMenuItem("Outstanding Bills");menu.Items.Add(due);
+            due.DropDownItems.Add("Separate Student Bills",null,async(_,_)=>await PrintDueReport());
+            var familyBills=due.DropDownItems.Add("Combined Family Bills",null,async(_,_)=>await PrintDueReport(true));
             var annual=menu.Items.Add("Annual Receipts…",null,async(_,_)=>await OpenAnnualReceipts());
-            menu.Opening+=(_,_)=>{due.Enabled=printAmountsDueButton?.Enabled==true;annual.Enabled=annualReceiptsButton?.Enabled==true;};
+            menu.Opening+=(_,_)=>{due.Enabled=printAmountsDueButton?.Enabled==true;familyBills.Enabled=GetSelectedAdmissionIds().Count>1;annual.Enabled=annualReceiptsButton?.Enabled==true;};
             foreach(var button in new[]{printAmountsDueButton,annualReceiptsButton})if(button is not null)reports.Controls.Remove(button);
             var related=CreateFilterButton("Reports…",AppTheme.MutedText);related.Click+=(_,_)=>menu.Show(related,new Point(0,related.Height));
             reports.Controls.Add(accountFamily);reports.Controls.Add(related);
@@ -58,6 +60,8 @@ public sealed partial class StudentAccountStatementPage
             arrangeStatement?.Invoke();
         }
         Grid.SelectionChanged+=(_,_)=>UpdateAccountActions();
+        foreach(var grid in new[]{Grid,accountPayments,accountCredits})
+            grid.CellDoubleClick+=async(_,e)=>await OpenRowStudentAsync(grid,e.RowIndex);
         if(!CurrentUser.HasPermission("Reports.View"))
         {
             accountViews!.SelectedIndex=1;
@@ -65,6 +69,21 @@ public sealed partial class StudentAccountStatementPage
             if(generateStatementButton is not null)generateStatementButton.Text="View Account";
         }
         InvalidateAccount();
+    }
+
+    private async Task OpenRowStudentAsync(DataGridView grid,int rowIndex)
+    {
+        if(IsBusy||rowIndex<0||rowIndex>=grid.Rows.Count||GetSelectedAdmissionIds().Count<2)return;
+        if(grid==Grid?_appliedFilterSignature!=FilterSignature():!AccountCurrent)return;
+        if(grid.Rows[rowIndex].DataBoundItem is not DataRowView view)return;
+        var row=view.Row;
+        int id=StudentFeeAccountData.Number(row,row.Table.Columns.Contains("AccountAdmissionId")?"AccountAdmissionId":"AdmissionId");
+        if(id<=0||!GetSelectedAdmissionIds().Contains(id))return;
+        string name=new[]{"StudentName","StatementStudent","Student"}.Select(field=>StudentFeeAccountData.Text(row,field)).FirstOrDefault(text=>!string.IsNullOrWhiteSpace(text))
+            ??accountStudentNames.GetValueOrDefault(id,studentNames.GetValueOrDefault(id,""));
+        if(string.IsNullOrWhiteSpace(name))return;
+        studentSearch.SetStudent(id,name);SelectSingleStudent();
+        await LoadStatement();
     }
 
     private Control BuildAccountViews()

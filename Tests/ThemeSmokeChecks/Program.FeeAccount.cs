@@ -125,6 +125,40 @@ internal static partial class Program
             Check(!receipts.Columns["CashApplied"].Visible,"Deduplicated family list cannot mislabel one child's share as a family total");
             Field<TabControl>("accountViews").SelectedIndex=1;Application.DoEvents();
             Check(picker.SelectedId==41&&Field<Dictionary<int,HashSet<int>>>("familySelections").Count==1,"Switching views preserves student and family scope");
+            Check(!DescendantControls(page).Any(control=>control.AccessibleName=="Bill grouping"),"Bill grouping no longer competes with sibling selection in the account header");
+            Check(Field<ModernButton>("annualReceiptsButton").Enabled,"Annual receipts remain available for the main student while siblings are included");
+            page.ReadAnnualYears=()=>{
+                var years=new DataTable();years.Columns.Add("AcademicYearId",typeof(int));years.Columns.Add("YearName");years.Columns.Add("IsCurrent",typeof(bool));
+                years.Rows.Add(76,"2025-2026",false);years.Rows.Add(77,"2026-2027",true);return Task.FromResult(years);
+            };
+            int annualStudent=0,annualYear=0;
+            page.PreviewAnnualReceipts=(_,id,year,current,_)=>{Check(current(),"Annual preview retains its selected student context");annualStudent=id;annualYear=year;return Task.CompletedTask;};
+            Exception? annualFailure=null;
+            using(var annualTimer=new System.Windows.Forms.Timer {Interval=100})
+            {
+                annualTimer.Tick+=(_,_)=>{
+                    annualTimer.Stop();var dialog=Application.OpenForms.OfType<AnnualReceiptYearDialog>().Single();
+                    try
+                    {
+                        Check(dialog.ClientSize.Height<=AppScale.Scale(240)&&!DescendantControls(dialog).OfType<StudentPicker>().Any(),"Annual receipt selector is compact and keeps the existing student");
+                        var year=DescendantControls(dialog).OfType<LookupBox>().Single();year.SelectedValue=76;
+                        var buttons=DescendantControls(dialog).OfType<ModernButton>().Where(button=>button.Text is "View / Print Receipts" or "Close").ToArray();
+                        var bounds=buttons.Select(button=>dialog.RectangleToClient(button.RectangleToScreen(button.ClientRectangle))).ToArray();
+                        Check(bounds.Select(rect=>rect.Top).Distinct().Count()==1&&Math.Abs((bounds.Min(rect=>rect.Left)+bounds.Max(rect=>rect.Right))/2-dialog.ClientSize.Width/2)<=AppScale.Scale(8),"Annual selector actions are centered on one row: "+string.Join("; ",bounds.Select(rect=>rect.ToString()))+" in "+dialog.ClientSize);
+                        using var image=new Bitmap(dialog.Width,dialog.Height);dialog.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.GetFullPath("artifacts/annual-receipt-year.png"));
+                        Check(year.SelectedId==76&&buttons.Single(button=>button.Text=="View / Print Receipts").Enabled,"Choosing a year enables the annual preview");
+                        buttons.Single(button=>button.Text=="View / Print Receipts").PerformClick();
+                    }
+                    catch(Exception ex){using var failureImage=new Bitmap(dialog.Width,dialog.Height);dialog.DrawToBitmap(failureImage,new Rectangle(Point.Empty,failureImage.Size));failureImage.Save(Path.GetFullPath("artifacts/annual-receipt-year.png"));annualFailure=ex;dialog.Close();}
+                };
+                annualTimer.Start();Wait((Task)Invoke("OpenAnnualReceipts")!);
+            }
+            if(annualFailure is not null)throw annualFailure;
+            Check(annualStudent==41&&annualYear==76,"The compact selector previews only the main student and the chosen year");
+            int siblingRow=payments.Rows.Cast<DataGridViewRow>().Single(row=>Convert.ToInt32(row.Cells["AccountAdmissionId"].Value)==42).Index;
+            Wait((Task)Invoke("OpenRowStudentAsync",payments,siblingRow)!);
+            Check(picker.SelectedId==42&&Field<Dictionary<int,HashSet<int>>>("familySelections").Count==0&&payments.Rows.Count==1,"Opening a sibling row makes that child the main student and reloads their individual account");
+            picker.SetStudent(41,"Student 41");Invoke("SelectSingleStudent");Wait((Task)Invoke("LoadStatement")!);
             CurrentUser.SignIn(921,"Read only","Operator",false,new[]{"Reports.View","Fees.View"});
             Invoke("UpdateAccountActions");Check(!Field<ModernButton>("correctPayment").Enabled,"A different signed-in user cannot act on the preceding user's financial rows");
             Wait((Task)Invoke("RefreshAccountAsync")!);Invoke("UpdateAccountActions");

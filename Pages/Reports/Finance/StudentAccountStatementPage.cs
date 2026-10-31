@@ -3,7 +3,6 @@ namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
 {
     private readonly StudentPicker studentSearch = new();
-    private readonly ModernComboBox billGrouping=HumanUi.Combo();
     private readonly ModernDatePicker from =
         new ModernDatePicker {
             Format = DateTimePickerFormat.Custom,
@@ -138,18 +137,12 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         var modeBar = new FlowLayoutPanel {
             Dock = DockStyle.Fill, WrapContents = true, Margin = Padding.Empty, Padding = Padding.Empty
         };
-        billGrouping.Items.AddRange(new object[]{"Individual","By family"});billGrouping.SelectedIndex=0;
-        billGrouping.Width=AppScale.Scale(140);billGrouping.Margin=new Padding(4,0,4,0);
-        billGrouping.AccessibleName="Bill grouping";
-        SetToolTip(billGrouping,"Choose how Outstanding Bills are printed. This does not change the account tabs or balances.");
-        modeBar.Controls.Add(new Label {Text="Bill grouping",AutoSize=true,Margin=new Padding(4,8,0,0)});
-        modeBar.Controls.Add(billGrouping);
         printAmountsDueButton=CreateFilterButton("Outstanding Bills…",AppTheme.MutedText);
         printAmountsDueButton.Click+=async(_,_)=>await PrintDueReport();
         SetToolTip(printAmountsDueButton,"Open current unpaid bills for this student. Statement dates do not limit these bills.");
         annualReceiptsButton=CreateFilterButton("Annual Receipts…",AppTheme.MutedText);
         annualReceiptsButton.Click+=async(_,_)=>await OpenAnnualReceipts();
-        SetToolTip(annualReceiptsButton,"Open the separate annual receipts report for this student and choose its academic year.");
+        SetToolTip(annualReceiptsButton,"Choose an academic year and print receipts for the selected student.");
         foreach(var button in new[]{printAmountsDueButton,annualReceiptsButton})
         {
             AppMetrics.FitButtonWidth(button,minWidth:110);
@@ -271,18 +264,25 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         SelectSingleStudent();
         SetStatus("Select a student to view their charges, payments and balance.");
     }
-    private Task OpenAnnualReceipts()
+    internal Func<Task<DataTable>> ReadAnnualYears=()=>DatabaseHelper.QueryUserAsync("GetAcademicYears");
+    internal Func<Form?,int,int,Func<bool>,Action<string>,Task> PreviewAnnualReceipts=AnnualReceiptPreview.ShowAsync;
+    private async Task OpenAnnualReceipts()
     {
-        if(IsBusy||IsDisposed||!CurrentUser.HasPermission("Fees.Statement.View"))return Task.CompletedTask;
-        var ids=GetSelectedAdmissionIds();
-        if(ids.Count!=1)return Task.CompletedTask;
+        if(IsBusy||IsDisposed||!CurrentUser.HasPermission("Fees.Statement.View")||studentSearch.SelectedId<=0)return;
+        int admission=studentSearch.SelectedId,user=CurrentUser.UserId;
+        bool Current()=>!IsDisposed&&studentSearch.SelectedId==admission&&CurrentUser.UserId==user&&CurrentUser.HasPermission("Fees.Statement.View");
+        accountActionBusy=true;UpdateSelectionActions();
         try
         {
-            using var dialog=CreateRelatedReportDialog(PageTitles.AnnualFeeReceipts,new AnnualFeeReceiptsPage(ids[0]));
-            dialog.ShowDialog(FindForm());
+            using var years=await ReadAnnualYears();
+            if(!Current())return;
+            using var dialog=new AnnualReceiptYearDialog(studentSearch.Text,years);
+            if(dialog.ShowDialog(FindForm())!=DialogResult.OK||!Current())return;
+            using var busy=BeginBusy("Preparing annual receipts…",this);
+            await PreviewAnnualReceipts(FindForm(),admission,dialog.AcademicYearId,Current,Warn);
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
-        return Task.CompletedTask;
+        finally{accountActionBusy=false;if(!IsDisposed)UpdateSelectionActions();}
     }
     private static ApplicationWindowForm CreateRelatedReportDialog(string title,Control page)
     {
@@ -430,7 +430,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         bool hasStudents = GetSelectedAdmissionIds().Count > 0;
         if (generateStatementButton is not null) generateStatementButton.Enabled = hasStudents&&!BusyOperationRunning;
         if (printAmountsDueButton is not null) printAmountsDueButton.Enabled = hasStudents && !IsBusy && CurrentUser.HasPermission("Fees.View");
-        if (annualReceiptsButton is not null) annualReceiptsButton.Enabled = GetSelectedAdmissionIds().Count == 1
+        if (annualReceiptsButton is not null) annualReceiptsButton.Enabled = studentSearch.SelectedId > 0
             && !IsBusy && CurrentUser.HasPermission("Fees.Statement.View");
     }
     private List<int> GetSelectedAdmissionIds()
@@ -887,18 +887,17 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
     }
     /* One print at a time, and the page must still be alive when the institution name comes back. */
     private bool printingDueReport;
-    private async Task PrintDueReport()
+    private async Task PrintDueReport(bool byFamily=false)
     {
         if(IsBusy || IsDisposed || !CurrentUser.HasPermission("Fees.View"))return;
         var ids=GetSelectedAdmissionIds();
         if(ids.Count==0){Warn("Select at least one student first.");return;}
         string signature=FilterSignature();
-        bool byFamily=billGrouping.SelectedIndex==1;
         printingDueReport=true;UpdateSelectionActions();
         try
         {
             using var busy=BeginBusy("Preparing outstanding bills…",this);
-            await OutstandingBillsPreview.ShowAsync(FindForm(),ids,()=>!IsDisposed && signature==FilterSignature()&&byFamily==(billGrouping.SelectedIndex==1),Warn,byFamily:byFamily);
+            await OutstandingBillsPreview.ShowAsync(FindForm(),ids,()=>!IsDisposed && signature==FilterSignature(),Warn,byFamily:byFamily);
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
         finally{printingDueReport=false;if(!IsDisposed)UpdateSelectionActions();}
