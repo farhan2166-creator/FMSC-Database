@@ -9,7 +9,18 @@ var builder=new SqlConnectionStringBuilder(connectionText);
 if(!builder.InitialCatalog.StartsWith("FMSC_AuditChecks_",StringComparison.Ordinal)||!builder.DataSource.StartsWith("127.0.0.1,",StringComparison.Ordinal)||builder.UserID!="sa")throw new Exception("Only a disposable loopback audit clone is accepted.");
 DatabaseHelper.ConnectionString=connectionText;
 DataTable Query(string sql,params SqlParameter[] parameters){using var c=DatabaseHelper.GetConnection();c.Open();using var q=new SqlCommand(sql,c){CommandTimeout=120};q.Parameters.AddRange(parameters);var table=new DataTable();using var a=new SqlDataAdapter(q);a.Fill(table);return table;}
-int checks=0;void Check(bool ok,string label){if(!ok)throw new Exception(label);checks++;Console.WriteLine("PASS: "+label);}
+int checks=0;
+void Check(bool ok,string label)
+{
+    if(!ok)
+    {
+        // Fixed, synthetic assertion labels only; the outer harness still
+        // suppresses raw SQL and command output.
+        Console.Error.WriteLine("MUTATION_CHECK_FAIL: "+label);
+        throw new Exception(label);
+    }
+    checks++;Console.WriteLine("PASS: "+label);
+}
 using(var compatible=DatabaseHelper.GetConnection()){
     compatible.Open();DatabaseCompatibility.Validate(compatible);
     Check(true,"current schema 6 meets production startup and restore compatibility requirements");
