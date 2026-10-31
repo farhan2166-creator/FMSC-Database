@@ -59,9 +59,7 @@ public sealed partial class FeeCollectionPage
                 var bill=await Task.Run(()=>FeeDiscountPeriod.BillContext(chargeId));
                 int assignmentId=Convert.ToInt32(bill["StudentFeeAssignmentId"]);
                 var context=await Task.Run(()=>FeeDiscountPeriod.Context(assignmentId));
-                using var dialog=new ChangeFeeDiscountForm(assignmentId,Convert.ToString(context["FeeTypeName"])??"Fee",
-                    Convert.ToDecimal(context["StandardAmount"]),Convert.ToDecimal(context["DiscountAmount"]),context);
-                dialog.ConfigureCollectionAction((int)action);
+                using var dialog=CreateCollectionFeeDialog(assignmentId,context,action,bill["BillingMonth"] is DateTime month?month:null);
                 dialog.ShowDialog(FindForm());
                 if(!dialog.Changed)return;
             }
@@ -71,6 +69,17 @@ public sealed partial class FeeCollectionPage
         }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
         finally{billBusy=false;}
+    }
+    private static ChangeFeeDiscountForm CreateCollectionFeeDialog(int assignmentId,DataRow context,ChargeConcessionAction action,DateTime? chargeMonth=null)
+    {
+        var dialog=new ChangeFeeDiscountForm(assignmentId,Convert.ToString(context["FeeTypeName"])??"Fee",
+            Convert.ToDecimal(context["StandardAmount"]),Convert.ToDecimal(context["DiscountAmount"]),context);
+        try
+        {
+            dialog.ConfigureCollectionAction((int)action,chargeMonth);
+            return dialog;
+        }
+        catch { dialog.Dispose(); throw; }
     }
     private async Task<DataTable> TransportAssignmentsAsync()=>await DatabaseHelper.QueryUserAsync("GetStudentFeeAssignments",DatabaseHelper.Int("@EnrollmentId",enrollmentId));
     private bool SelectedEnrollmentIsOpen=>enrollment.SelectedItem is DataRowView view && GetText(view.Row,"Status")=="Active";

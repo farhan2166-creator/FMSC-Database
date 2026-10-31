@@ -3,7 +3,7 @@ using Microsoft.Data.SqlClient;
 
 namespace FMSC_SMS.Pages.Finance.StudentAccounts;
 
-/// <summary>Choose one fee task, its scope, and review the financial result before saving.</summary>
+/// <summary>Choose fee terms and confirm on one screen; validate the financial snapshot before saving.</summary>
 public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
 {
     private readonly int assignment;
@@ -26,7 +26,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     private string initial;
     private DataSet? reviewed;
     private MutationIntent? pending;
-    private bool busy, blocked, monthly, validContext, reviewStage;
+    private bool busy, blocked, monthly, validContext;
     private int generation;
     private decimal releasedPayment;
     private int? fixedBillAction;
@@ -59,7 +59,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         assignment=id; standardAmount=rate; originalDiscount=discount; feeName=fee;
         this.query=query??(args=>DatabaseHelper.QueryUserSetAsync("SaveStudentFeeDiscount",args));
         this.submit=submit??SubmitRecoverableAsync;
-        Text=$"Review Fee Terms — {fee}"; StartPosition=FormStartPosition.CenterParent;
+        Text=$"Change Fee Terms — {fee}"; StartPosition=FormStartPosition.CenterParent;
         Size=new Size(AppScale.Scale(940),AppScale.Scale(700)); MinimumSize=new Size(AppScale.Scale(850),AppScale.Scale(650));
         amount.ZeroAsPlaceholder=newRate.ZeroAsPlaceholder=true;
         amount.Text=discount.ToString("0.############################",System.Globalization.CultureInfo.InvariantCulture);
@@ -88,6 +88,11 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
             DateTime Date(string column,DateTime fallback)=>context.Table.Columns.Contains(column)&&context[column] is DateTime value?First(value):fallback;
             DateTime first=Date("StartDate",First(DateTime.Today)),last=Date("EndDate",First(DateTime.Today));
             first=new[]{first,Date("EnrollmentDate",first)}.Max();
+            if(monthly && billId is null)
+            {
+                first=new[]{first,Date("EffectiveFrom",first),Date("BillingStartDate",first)}.Max();
+                last=new[]{last,Date("EffectiveTo",last)}.Min();
+            }
             if(first<=last)
             {
                 fromMonth.Format=throughMonth.Format=DateTimePickerFormat.Custom;
@@ -119,17 +124,17 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
                 e.Cancel=!ModernMessageDialog.Confirm(this,"Discard the unsaved fee choices?","Review Fee Terms",defaultYes:false);
         };
         Disposed+=(_,_)=>reviewed?.Dispose();
-        impact.Text="Choose what you want to change. Review shows the result before anything is saved.";
+        impact.Text="Choose what you want to change, enter the details, then confirm.";
         ReadPending(); State();
     }
     private static DateTime First(DateTime value)=>new(value.Year,value.Month,1);
-    internal void ConfigureCollectionAction(int choice)
+    internal void ConfigureCollectionAction(int choice,DateTime? chargeMonth=null)
     {
         if(choice is <0 or >3 || billId is not null)
             throw new ArgumentException("Choose a fee-plan action.",nameof(choice));
         collectionAction=choice;
         action.SelectedIndex=choice;
-        DateTime current=First(DateTime.Today);
+        DateTime current=First(chargeMonth??DateTime.Today);
         current=current<fromMonth.MinDate?fromMonth.MinDate:current>fromMonth.MaxDate?fromMonth.MaxDate:current;
         fromMonth.Value=throughMonth.Value=current;
         Text=$"{action.Items[choice]} — {feeName}";
@@ -173,14 +178,13 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     }
     private void InvalidateReview(bool keepPaidDecision=false,bool updateChoices=true)
     {
-        bool stageChanged=reviewStage&&!keepPaidDecision;
         generation++;
         if(reviewed is not null){bills.DataSource=schedule.DataSource=null;reviewed.Dispose();reviewed=null;}
-        if(!keepPaidDecision){releasedPayment=0;reviewStage=false;}
+        if(!keepPaidDecision){releasedPayment=0;}
         if(!busy&&!blocked) impact.Text=keepPaidDecision
-            ? $"Excess already paid: Rs. {releasedPayment:N0}. Review again to confirm the {(paidReduction.SelectedIndex==1?"refund":"advance credit")} choice."
-            : DirectBillChange?"":"Review the selected change to see its effect before confirming.";
-        State(updateChoices||stageChanged);
+            ? $"Excess already paid: Rs. {releasedPayment:N0}. Confirm to apply your {(paidReduction.SelectedIndex==1?"refund":"advance credit")} choice."
+            : DirectBillChange?"":"Enter the details, then confirm. The selected scope and period will be checked before saving.";
+        State(updateChoices);
     }
     private void State(bool updateChoices=true)
     {
@@ -189,12 +193,11 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         fields.Enabled=canChange;
         fields.Visible=!recoveryOnly;
         if(updateChoices)UpdateVisibleFields();
-        review.Enabled=canChange&&HasAction; save.Enabled=canChange&&HasAction&&(DirectBillChange||reviewed is not null);
-        review.Visible=!DirectBillChange&&(!reviewStage||reviewed is null);
-        review.Text=reviewStage?"Review Again":fixedBillAction is not null
-            ?RemoveAction?"Review Removal":"Review Discount":"Review Fee Change";
-        save.Visible=DirectBillChange||reviewStage;
-        editChoices.Visible=!DirectBillChange&&reviewStage;editChoices.Enabled=canChange;
+        review.Visible=false;review.Enabled=false;
+        save.Enabled=canChange&&HasAction;
+        save.Visible=!recoveryOnly;
+        if(!DirectBillChange)save.Text=DiscountAction?"Confirm Discount":WaiverAction?"Confirm Waiver":RateAction?"Confirm Fee Amount":RemoveAction?"Confirm Removal":"Confirm Fee Change";
+        editChoices.Visible=false;
         check.Visible=blocked; check.Enabled=!busy;
         if(updateChoices)UpdateQuickControls(canChange);
     }
@@ -246,7 +249,10 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         {
             var result=await query(Args(true));
             if(IsDisposed||version!=generation){result.Dispose();return;}
-            if(result.Tables.Count<3||result.Tables[0].Rows.Count!=1){result.Dispose();throw new InvalidDataException("The fee review is incomplete. Reload before saving.");}
+            if(result.Tables.Count<3||result.Tables[0].Rows.Count!=1||!result.Tables[0].Columns.Contains("Snapshot")
+                ||string.IsNullOrWhiteSpace(Convert.ToString(result.Tables[0].Rows[0]["Snapshot"]))
+                ||!result.Tables[0].Columns.Contains("ReleasedPaidAmount"))
+            {result.Dispose();throw new InvalidDataException("The fee check is incomplete. Reload before saving.");}
             var periods=result.Tables[2];
             if(RateAction&&UpdateAgreement&&periods.Columns.Contains("Old Fee")&&periods.Columns.Contains("Old Concession")&&
                 periods.AsEnumerable().Any(period=>originalWaiver
@@ -259,7 +265,6 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
                 return;
             }
             reviewed?.Dispose(); reviewed=result;
-            reviewStage=true;
             bills.DataSource=result.Tables[1]; schedule.DataSource=result.Tables[2];
             foreach(var grid in new[]{bills,schedule}) foreach(DataGridViewColumn column in grid.Columns)
                 if(column.ValueType==typeof(decimal))column.DefaultCellStyle.Format="N0"; else if(column.ValueType==typeof(DateTime))column.DefaultCellStyle.Format="MMM yyyy";
@@ -284,7 +289,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         var row=result.Tables[0].Rows[0];
         string summary=fixedBillAction is not null
             ?$"{(RemoveAction?"Review Discount Removal":"Review Discount")}\r\n{feeName} · {fromMonth.Value:MMM yyyy}. This bill only."
-            :$"3. Review the change\r\n{action.Text}: {feeName}. {ScopeText()}";
+            :$"{action.Text}: {feeName}. {ScopeText()}";
         if(ApplyBills && result.Tables[1].Rows.Count>0 && result.Tables[1].Columns.Contains("Current Bill") && result.Tables[1].Columns.Contains("Proposed Bill"))
         {
             decimal before=result.Tables[1].AsEnumerable().Sum(b=>Convert.ToDecimal(b["Current Bill"])),
@@ -303,11 +308,22 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
             (originalWaiver?"The existing full waiver is retained.":$"Existing discount retained: Rs. {originalDiscount:N0}.");
         if(monthly&&billId is null) summary+=$"\r\nPeriod: {fromMonth.Value:MMM yyyy} through {throughMonth.Value:MMM yyyy}.";
         if(releasedPayment>0) summary+=$"\r\nExcess already paid: Rs. {releasedPayment:N0}, {(paidReduction.SelectedIndex==1?"to refund":"to keep as advance credit")}.";
-        return summary+"\r\nReview the comparison below, then confirm. No payment is collected here.";
+        return summary+"\r\nNo payment is collected here.";
     }
     private async Task SaveAsync()
     {
-        if(busy||blocked||Changed||!ValidateChoices()||(!DirectBillChange&&reviewed is null))return;
+        if(busy||blocked||Changed||!ValidateChoices())return;
+        int actor=CurrentUser.UserId;
+        if(!DirectBillChange)
+        {
+            await ReviewAsync();
+            if(IsDisposed||blocked||Changed||reviewed is null)return;
+            if(RateAction&&releasedPayment>0&&paidReduction.SelectedIndex<0)
+            {
+                impact.Text=$"This correction releases Rs. {releasedPayment:N0} already paid. Choose advance credit or refund below, then confirm. Nothing has been saved.";
+                paidReduction.Focus();return;
+            }
+        }
         int version=++generation;busy=true;State();
         try
         {
@@ -335,6 +351,8 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
                     ||Convert.ToDecimal(bill["Proposed Bill"])!=standardAmount-ChosenDiscount)
                 {impact.Text="This bill changed while the window was open. Close and reload the fees before confirming the discount.";return;}
             }
+            if(CurrentUser.UserId!=actor||!ValidateChoices())
+            {impact.Text="The operator or fee choices changed. Check the details and confirm again.";return;}
             var args=Args(false);
             var outcome=await submit(args);
             if(outcome.Outcome==MutationOutcome.Unconfirmed){blocked=true;impact.Text="The save outcome is uncertain. Use Check Save Outcome before another fee change.";return;}

@@ -17,7 +17,7 @@ internal static class FeeDiscountPeriod
 
     public static DataRow Context(int id) => DatabaseHelper.QuerySql("""
         EXEC dbo.RequirePermission @UserId,N'Fees.View';
-        SELECT S.Amount StandardAmount,S.DiscountAmount,F.FeeTypeName,S.ConcessionLabel, S.Frequency, S.EffectiveFrom, S.EffectiveTo, A.StartDate, A.EndDate, E.EnrollmentDate,E.Status,ST.StudentName,ST.AdmissionNumber,A.YearName,
+        SELECT S.Amount StandardAmount,S.DiscountAmount,F.FeeTypeName,S.ConcessionLabel, S.Frequency, S.EffectiveFrom, S.EffectiveTo, A.StartDate, A.EndDate, E.EnrollmentDate,E.BillingStartDate,E.Status,ST.StudentName,ST.AdmissionNumber,A.YearName,
             (SELECT MAX(B.BillingMonth) FROM dbo.BillingCharges B
              WHERE B.StudentFeeAssignmentId=S.StudentFeeAssignmentId) LastBilledMonth
         FROM dbo.StudentFeeAssignments S

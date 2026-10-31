@@ -24,6 +24,29 @@ internal static partial class Program
             context.Columns.Add("Balance",typeof(decimal));
             int year=DateTime.Today.Year;var month=new DateTime(year,3,1);
             var row=context.Rows.Add("Monthly","Active",DBNull.Value,"Preview Student","542","Preview year",new DateTime(year,1,1),new DateTime(year,12,31),new DateTime(year,1,1),month,41,321L,300m);
+            using(var routed=context.Copy())
+            {
+                routed.Columns.Add("FeeTypeName");routed.Columns.Add("StandardAmount",typeof(decimal));routed.Columns.Add("DiscountAmount",typeof(decimal));
+                var bill=routed.Rows[0];bill["FeeTypeName"]="Library Fee";bill["StandardAmount"]=700m;bill["DiscountAmount"]=200m;
+                using var planRoute=routed.Copy();planRoute.Columns.Remove("BillingChargeId");
+                var choiceType=typeof(FeeCollectionPage).GetNestedType("ChargeConcessionAction",BindingFlags.NonPublic)!;
+                var create=typeof(FeeCollectionPage).GetMethod("CreateCollectionFeeDialog",BindingFlags.Static|BindingFlags.NonPublic)!;
+                foreach(int choice in new[]{0,1,2,3})
+                {
+                    using var form=(ChangeFeeDiscountForm)create.Invoke(null,new object?[]{41,planRoute.Rows[0],Enum.ToObject(choiceType,choice),null})!;
+                    form.Show();Application.DoEvents();
+                    Check(Field<ModernButton>(form,"save").Visible&&!Field<ModernButton>(form,"review").Visible,
+                        "Each collection action confirms on its entry screen without a separate review stage");
+                    Check(Field<Panel>(form,"scopeField").Visible&&Field<Panel>(form,"reasonField").Visible,
+                        "Collection keeps the admission editor's scope and reason choices");
+                    Check(!Field<Panel>(form,"actionField").Visible&&!Field<TabControl>(form,"comparisons").Visible,
+                        "A collection menu action hides only the action tabs, with no review screen");
+                }
+                var clickedMonth=month.AddMonths(1);
+                using var correction=(ChangeFeeDiscountForm)create.Invoke(null,new object?[]{41,planRoute.Rows[0],Enum.ToObject(choiceType,2),clickedMonth})!;
+                Check(Field<ModernDatePicker>(correction,"fromMonth").Value==clickedMonth&&Field<ModernDatePicker>(correction,"throughMonth").Value==clickedMonth,
+                    "Correct Fee Amount opens at the clicked charge month rather than today's month");
+            }
             using(var plan=context.Copy())
             {
                 plan.Columns.Remove("BillingChargeId");
@@ -42,6 +65,22 @@ internal static partial class Program
                 using var admission=new ChangeFeeDiscountForm(41,"Tuition Fee",700m,0m,plan.Rows[0],
                     _=>Task.FromResult(new DataSet()),_=>throw new InvalidOperationException("Unexpected write"));
                 Check(Field<ModernDatePicker>(admission,"throughMonth").Value==new DateTime(year,12,1),"Admission retains the academic-year end default");
+                using var future=plan.Copy();
+                foreach(string name in new[]{"EffectiveFrom","EffectiveTo","BillingStartDate"})future.Columns.Add(name,typeof(DateTime));
+                var firstBillingMonth=new DateTime(DateTime.Today.Year,DateTime.Today.Month,1).AddMonths(1);
+                future.Rows[0]["EffectiveFrom"]=firstBillingMonth;
+                future.Rows[0]["BillingStartDate"]=firstBillingMonth;
+                future.Rows[0]["EffectiveTo"]=firstBillingMonth.AddMonths(2);
+                future.Rows[0]["EndDate"]=firstBillingMonth.AddMonths(6);
+                using var futureCorrection=new ChangeFeeDiscountForm(41,"Tuition Fee",700m,0m,future.Rows[0],
+                    _=>Task.FromResult(new DataSet()),_=>throw new InvalidOperationException("Unexpected write"));
+                futureCorrection.ConfigureCollectionAction(2);
+                foreach(string name in new[]{"fromMonth","throughMonth"})
+                {
+                    var picker=Field<ModernDatePicker>(futureCorrection,name);
+                    Check(picker.Value==firstBillingMonth&&picker.MinDate==firstBillingMonth&&picker.MaxDate==firstBillingMonth.AddMonths(2),
+                        "A future-start fee defaults to its first billing month and limits corrections to its effective period");
+                }
             }
             SqlParameter[]? captured=null;int reads=0,writes=0;bool stale=false;
             Task<DataSet> Review(SqlParameter[] args)

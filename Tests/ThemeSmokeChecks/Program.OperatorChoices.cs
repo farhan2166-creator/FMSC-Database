@@ -36,23 +36,20 @@ internal static partial class Program
             var from=Field<ModernDatePicker>("fromMonth");var through=Field<ModernDatePicker>("throughMonth");
             Check(from.Enabled&&through.Enabled,"The operator can choose concession start and end months");
             from.Value=new DateTime(year,5,1);through.Value=new DateTime(year,6,1);Field<ModernTextBox>("reason").Text="Approved temporary scholarship";
-            Click(Field<ModernButton>("review"));
+            Click(Field<ModernButton>("save"));
             Check(queries.Count==1&&RefusesClose(),"Concession review locks its inputs and keeps its modal owner until the result is known");
             Check((DateTime)queries[0].Single(p=>p.ParameterName=="@EffectiveFrom").Value==new DateTime(year,5,1)&&
                 (DateTime)queries[0].Single(p=>p.ParameterName=="@EffectiveThrough").Value==new DateTime(year,6,1),"The chosen period reaches the SQL review unchanged");
             through.Value=new DateTime(year,7,1);replies.Dequeue().SetResult(Plan());
-            PumpUntil(()=>Field<ModernButton>("review").Enabled,"Stale concession review settles");
-            Check(!Field<ModernButton>("save").Enabled,"Changing the period invalidates an in-flight financial review");
-            Click(Field<ModernButton>("review"));replies.Dequeue().SetResult(Plan());PumpUntil(()=>Field<ModernButton>("save").Enabled,"Current concession review settles");
-            Check(Field<DataGridView>("bills").ReadOnly&&Field<Label>("impact").Text.Contains("1 bill"),"The review presents the concession and a read-only bill comparison");
+            PumpUntil(()=>Field<ModernButton>("save").Enabled,"Stale concession check settles");
+            Check(submissions==0,"Changing the period invalidates an in-flight financial check before any write");
             Check(!Field<ModernComboBox>("paidReduction").Visible,"Concessions preserve paid money without offering a credit/refund choice");
-            Field<ModernComboBox>("paidReduction").SelectedIndex=1;
-            Check(!Field<ModernButton>("save").Enabled,"Changing the excess-payment decision requires a new review");
-            Click(Field<ModernButton>("review"));replies.Dequeue().SetResult(Plan());PumpUntil(()=>Field<ModernButton>("save").Enabled,"Refund review settles");
             CurrentUser.SignIn(7782,"Read-only fixture","Accountant",false,new[]{"Fees.View"});Click(Field<ModernButton>("save"));
             Check(submissions==0,"Concession confirmation rechecks operator permission before submitting");
             CurrentUser.SignIn(7781,"Concession fixture","Administrator",false,Array.Empty<string>());
             Click(Field<ModernButton>("save"));Click(Field<ModernButton>("save"));
+            Check(queries.Count==2&&submissions==0,"Duplicate confirmation cannot start a second financial check");
+            replies.Dequeue().SetResult(Plan());PumpUntil(()=>submissions==1,"Confirmation proceeds from its internal check directly to saving");
             Check(submissions==1&&RefusesClose(),"Concession save refuses duplicate submission and close while its outcome is pending");
             writes.Dequeue().SetResult(new MutationWriteResult(MutationOutcome.Unconfirmed));
             PumpUntil(()=>Field<ModernButton>("check").Enabled,"Unconfirmed concession save settles");
@@ -73,13 +70,16 @@ internal static partial class Program
                 var scope=Term<ModernComboBox>("scope");
                 Check(scope.Items.Count==(choice.Status=="Active"&&!choice.Bill?3:1),"Closed placements and individual bills cannot choose saved-plan changes");
                 Term<ModernComboBox>("action").SelectedIndex=2;Term<ModernTextBox>("newRate").Text="6000";
-                Term<ModernTextBox>("reason").Text="Approved revised fee";Click(Term<ModernButton>("review"));Application.DoEvents();
+                Term<ModernTextBox>("reason").Text="Approved revised fee";
+                var preview=(Task)typeof(ChangeFeeDiscountForm).GetMethod("ReviewAsync",flags)!.Invoke(terms,null)!;
+                PumpUntil(()=>preview.IsCompleted,"Internal fee check settles");preview.GetAwaiter().GetResult();
                 Check(captured is not null&&(decimal)captured.Single(p=>p.ParameterName=="@NewAmount").Value==6000m&&
                     !(bool)captured.Single(p=>p.ParameterName=="@FullFeeWaiver").Value&&!(bool)captured.Single(p=>p.ParameterName=="@ApplyAvailableCredit").Value,
                     "A fee correction changes the rate, preserves the fixed discount and leaves credit use to collection");
                 Check(!choice.Bill||(long)captured!.Single(p=>p.ParameterName=="@BillingChargeId").Value==8421L,"Individual bill review retains the selected bill identity");
-                Term<ModernComboBox>("action").SelectedIndex=1;Check(!Term<ModernButton>("save").Enabled,"Choosing a waiver instead invalidates the prior rate review");
-                Click(Term<ModernButton>("review"));Application.DoEvents();
+                Term<ModernComboBox>("action").SelectedIndex=1;Check(typeof(ChangeFeeDiscountForm).GetField("reviewed",flags)!.GetValue(terms) is null,"Choosing a waiver instead invalidates the prior rate check");
+                preview=(Task)typeof(ChangeFeeDiscountForm).GetMethod("ReviewAsync",flags)!.Invoke(terms,null)!;
+                PumpUntil(()=>preview.IsCompleted,"Internal waiver check settles");preview.GetAwaiter().GetResult();
                 Check((bool)captured!.Single(p=>p.ParameterName=="@FullFeeWaiver").Value&&captured!.Single(p=>p.ParameterName=="@NewAmount").Value is DBNull,
                     "A full waiver is a separate task and does not carry over a hidden rate correction");
             }

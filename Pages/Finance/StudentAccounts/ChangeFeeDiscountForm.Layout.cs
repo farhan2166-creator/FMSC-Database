@@ -69,19 +69,20 @@ public sealed partial class ChangeFeeDiscountForm
         scopeField=AddField("Apply this change to",scope,0,4);fields.SetColumnSpan(scopeField,2);
         Wide(fixedScope,4);Wide(scopeNote,5);
         reasonField=AddField("Reason (optional)",reason,0,6);fields.SetColumnSpan(reasonField,2);
-        paidField=AddField("Excess payment: choose what happens to it",paidReduction,0,7);fields.SetColumnSpan(paidField,2);
+        paidField=AddField("If this correction releases paid money",paidReduction,0,7);fields.SetColumnSpan(paidField,2);
 
         bills.Dock=schedule.Dock=DockStyle.Fill;billTab.Controls.Add(bills);planTab.Controls.Add(schedule);
         var close=new ModernButton { Text="Close",DialogResult=DialogResult.Cancel };CancelButton=close;
         footerButtons=new[]{review,save,editChoices,check,close};
-        footer=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=footerButtons.Length+1,RowCount=1,Margin=Padding.Empty };
-        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        footer=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=footerButtons.Length+2,RowCount=1,Margin=Padding.Empty };
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
         for(int index=0;index<footerButtons.Length;index++)
         {
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,0));
             var button=footerButtons[index];button.Dock=DockStyle.Fill;button.AutoSize=false;button.Margin=new Padding(3,5,3,5);
             footer.Controls.Add(button,index+1,0);
         }
+        footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
         var root=new TableLayoutPanel { Dock=DockStyle.Fill,AutoScroll=true,Padding=new Padding(12),ColumnCount=1,RowCount=2 };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         root.RowStyles.Add(new RowStyle(SizeType.Percent,100));
@@ -120,9 +121,9 @@ public sealed partial class ChangeFeeDiscountForm
         {
             var button=footerButtons[index];
             bool visible=index switch {
-                0=>!DirectBillChange&&!recoveryOnly&&!blocked&&(!reviewStage||reviewed is null),
-                1=>!recoveryOnly&&!blocked&&(DirectBillChange||reviewStage),
-                2=>!DirectBillChange&&!recoveryOnly&&!blocked&&reviewStage,
+                0=>false,
+                1=>!recoveryOnly&&!blocked,
+                2=>false,
                 3=>blocked, _=>true };
             button.Visible=visible;
             footer.ColumnStyles[index+1].Width=visible
@@ -151,24 +152,24 @@ public sealed partial class ChangeFeeDiscountForm
         else if(WaiverAction)return "Full discount for the selected months. Existing charges retain paid money and discount only remaining dues.";
         else if(RemoveAction)discount=0;
         else return "";
-        return $"Selected fee after this change: Rs. {rate-discount:N0}. Review confirms the effect on each bill or period.";
+        return $"Selected fee after this change: Rs. {rate-discount:N0}. Confirm to apply it to the selected scope and period.";
     }
 
     private void UpdateVisibleFields()
     {
-        actionField.Visible=!reviewStage&&fixedBillAction is null&&collectionAction is null;
-        scopeField.Visible=!reviewStage&&HasAction&&scope.Items.Count>1;
-        fixedScope.Visible=!reviewStage&&HasAction&&scope.Items.Count==1&&fixedBillAction is null;
+        actionField.Visible=fixedBillAction is null&&collectionAction is null;
+        scopeField.Visible=HasAction&&scope.Items.Count>1;
+        fixedScope.Visible=HasAction&&scope.Items.Count==1&&fixedBillAction is null;
         fixedScope.Text=$"Apply to: {scope.Text}";
-        scopeNote.Visible=!reviewStage&&HasAction;
+        scopeNote.Visible=HasAction;
         scopeNote.Text=fixedBillAction is not null?$"This bill only · {fromMonth.Value:MMM yyyy}. Fee plan unchanged.":ScopeText();
-        amountField.Visible=!reviewStage&&DiscountAction;rateField.Visible=!reviewStage&&RateAction;
-        concessionField.Visible=!reviewStage&&fixedBillAction is null&&(DiscountAction||WaiverAction);
+        amountField.Visible=DiscountAction;rateField.Visible=RateAction;
+        concessionField.Visible=fixedBillAction is null&&(DiscountAction||WaiverAction);
         fields.SetColumnSpan(amountField,fixedBillAction is not null?2:1);
         concessionField.Controls.OfType<Label>().Single().Text=WaiverAction?"Waiver type *":"Discount type *";
         concession.AccessibleName=WaiverAction?"Waiver type":"Discount type";
         fields.SetColumn(concessionField,WaiverAction?0:1);fields.SetColumnSpan(concessionField,WaiverAction?2:1);
-        taskNote.Visible=!reviewStage&&HasAction;
+        taskNote.Visible=HasAction;
         string note=WaiverAction?"The concession fully discounts the chosen bill or period, up to unpaid dues on issued charges."
             : RemoveAction?fixedBillAction is not null?"Remove the discount from this bill.":"The discount or full waiver will be removed. The full fee becomes payable."
             : RateAction?originalWaiver?"The existing full waiver will be kept."
@@ -177,13 +178,13 @@ public sealed partial class ChangeFeeDiscountForm
                 ? $"Current unpaid dues: Rs. {billBalance:N0}. Enter the total discount for this bill."
                 : "Enter the discount to subtract from the fee.";
         string net=DraftNetText();taskNote.Text=net.Length>0?note+"\r\n"+net:note;
-        bool choosePeriod=!reviewStage&&HasAction&&monthly&&billId is null;
+        bool choosePeriod=HasAction&&monthly&&billId is null;
         fromField.Visible=throughField.Visible=choosePeriod;
-        periodNote.Visible=!reviewStage&&HasAction&&!choosePeriod&&fixedBillAction is null;
+        periodNote.Visible=HasAction&&!choosePeriod&&fixedBillAction is null;
         periodNote.Text=billId is not null?$"Bill period: {fromMonth.Value:MMMM yyyy}.":$"Fee period: {fromMonth.Value:MMM yyyy} through {throughMonth.Value:MMM yyyy}.";
-        reasonField.Visible=!reviewStage&&HasAction;
-        paidField.Visible=RateAction&&ApplyBills&&releasedPayment>0;
-        comparisons.Visible=!DirectBillChange&&reviewed is not null;
+        reasonField.Visible=HasAction;
+        paidField.Visible=RateAction&&ApplyBills;
+        comparisons.Visible=false;
         if(ApplyBills&&!comparisons.TabPages.Contains(billTab))comparisons.TabPages.Add(billTab);
         if(!ApplyBills&&comparisons.TabPages.Contains(billTab))comparisons.TabPages.Remove(billTab);
         if(UpdateAgreement&&!comparisons.TabPages.Contains(planTab))comparisons.TabPages.Add(planTab);

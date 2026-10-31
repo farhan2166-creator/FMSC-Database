@@ -70,13 +70,13 @@ internal static partial class Program
                 Check(Field<TabControl>(form,"comparisons").TabPages.Count==1,"A bill-only review shows only the issued-bill comparison.");
                 Capture(form,"discount-unpaid");
                 Click(form,"editChoices");
-                Check(Field<ModernTextBox>(form,"amount").Visible&&Field<ModernTextBox>(form,"amount").Text=="2000"&&!Field<ModernButton>(form,"save").Enabled,
-                    "Edit Choices preserves the entries and requires a fresh review.");
+                Check(Field<ModernTextBox>(form,"amount").Visible&&Field<ModernTextBox>(form,"amount").Text=="2000"&&Field<ModernButton>(form,"save").Enabled,
+                    "Entry edits stay on screen and allow confirmation with a fresh internal check.");
                 ClickTask(form,1);
                 Check(Field<ModernComboBox>(form,"action").SelectedIndex==1,"The waiver quick action selects the existing full-waiver task.");
                 Capture(form,"waiver-entry");
-                Check(!Field<ModernTextBox>(form,"amount").Visible&&!Field<ModernTextBox>(form,"newRate").Visible&&!Field<ModernButton>(form,"save").Enabled,
-                    "Switching to a waiver hides unrelated amounts and invalidates the discount preview.");
+                Check(!Field<ModernTextBox>(form,"amount").Visible&&!Field<ModernTextBox>(form,"newRate").Visible&&Field<ModernButton>(form,"save").Enabled,
+                    "Switching to a waiver hides unrelated amounts and keeps same-screen confirmation.");
                 Click(form,"review");Check((bool)Arg("@FullFeeWaiver")&&Arg("@NewAmount") is DBNull,"Waiver task leaves the fee rate unchanged.");
                 ClickTask(form,3);Check(Field<ModernComboBox>(form,"action").SelectedIndex==3,"Remove Discount selects its existing task directly.");Click(form,"review");
                 Check(!(bool)Arg("@FullFeeWaiver")&&(decimal)Arg("@DiscountAmount")==0m&&Arg("@ConcessionLabel") is DBNull,
@@ -86,7 +86,7 @@ internal static partial class Program
                 Check(!Field<ModernComboBox>(form,"paidReduction").Visible&&!Field<Label>(form,"impact").Text.Contains("Excess already paid"),
                     "Concessions retain recorded payments and never offer refund or advance credit.");
                 Field<ModernComboBox>(form,"paidReduction").SelectedIndex=1;
-                Check(!Field<ModernButton>(form,"save").Enabled,"Refund selection invalidates the earlier credit review.");
+                Check(type.GetField("reviewed",flags)!.GetValue(form) is null,"Refund selection invalidates the earlier internal check.");
                 Click(form,"review");Check((string)Arg("@PaidReductionAction")=="Credit","A concession cannot submit a refund choice left from another action.");
                 Capture(form,"discount-paid");
                 Click(form,"save");Check(saves==1&&form.Changed&&(string)Arg("@ExpectedSnapshot")=="fee-task-snapshot",
@@ -108,10 +108,10 @@ internal static partial class Program
                 Check((bool)Arg("@UpdateAgreement")&&!(bool)Arg("@ApplyToBills")&&(decimal)Arg("@DiscountAmount")==2000m&&Arg("@ConcessionLabel") is DBNull,
                     "Plan-only correction preserves the fixed discount, accepts an empty original label and leaves bills unchanged.");
                 mixedTerms=true;Click(form,"editChoices");Click(form,"review");
-                Check(!Field<ModernButton>(form,"save").Enabled&&Field<Label>(form,"impact").Text.Contains("different discount terms"),
+                Check(type.GetField("reviewed",flags)!.GetValue(form) is null&&Field<Label>(form,"impact").Text.Contains("different discount terms"),
                     "A rate-only task cannot silently replace different scheduled discount agreements.");
                 mixedTerms=false;
-                Field<ModernComboBox>(form,"scope").SelectedIndex=1;Check(!Field<ModernButton>(form,"save").Enabled,"Scope changes invalidate the review.");
+                Field<ModernComboBox>(form,"scope").SelectedIndex=1;Check(type.GetField("reviewed",flags)!.GetValue(form) is null,"Scope changes invalidate the internal check.");
                 Click(form,"review");Check((bool)Arg("@UpdateAgreement")&&(bool)Arg("@ApplyToBills"),"Combined scope explicitly changes plan and bills.");
                 Capture(form,"monthly-correction");
                 Field<ModernComboBox>(form,"scope").SelectedIndex=2;Click(form,"review");
@@ -126,6 +126,43 @@ internal static partial class Program
                     "Correcting a waived fee preserves the full waiver and explains that effect.");
             }
 
+            monthly.Rows[0]["ConcessionLabel"]=DBNull.Value;oldDiscount=2000m;paid=0;mixedTerms=false;
+            foreach(bool collection in new[]{false,true})
+            foreach(int choice in Enumerable.Range(0,4))
+            foreach(int scope in Enumerable.Range(0,3))
+            {
+                using var form=new ChangeFeeDiscountForm(41,"Tuition",10000,2000,monthly.Rows[0],Query,Save);
+                if(collection)form.ConfigureCollectionAction(choice);else Field<ModernComboBox>(form,"action").SelectedIndex=choice;
+                Show(form);Field<ModernComboBox>(form,"scope").SelectedIndex=scope;
+                if(choice==0)Field<ModernTextBox>(form,"amount").Text="1500";
+                if(choice==2)Field<ModernTextBox>(form,"newRate").Text="9000";
+                Check(Field<ModernButton>(form,"save").Visible&&Field<ModernButton>(form,"save").Enabled
+                    &&!Field<ModernButton>(form,"review").Visible&&!Field<ModernButton>(form,"editChoices").Visible,
+                    "Every admission/collection action uses one entry screen and an enabled confirmation");
+                Check(Field<Panel>(form,"actionField").Visible==!collection,
+                    "Only the action selector differs between the admission and collection editors");
+                int before=saves;Click(form,"save");
+                Check(form.Changed&&saves==before+1&&(string)Arg("@ExpectedSnapshot")=="fee-task-snapshot",
+                    "One confirmation internally checks and saves exactly once without a second review screen");
+                Check((bool)Arg("@UpdateAgreement")== (scope is 0 or 1) && (bool)Arg("@ApplyToBills")== (scope is 1 or 2),
+                    "Single-screen confirmation preserves the chosen fee-plan and issued-bill scope");
+            }
+            paid=10000m;
+            using(var form=new ChangeFeeDiscountForm(41,"Tuition",10000,2000,monthly.Rows[0],Query,Save))
+            {
+                form.ConfigureCollectionAction(2);Show(form);
+                Field<ModernComboBox>(form,"scope").SelectedIndex=1;
+                Field<ModernTextBox>(form,"newRate").Text="5000";
+                int before=saves;
+                Check(Field<Panel>(form,"paidField").Visible&&Field<ModernComboBox>(form,"paidReduction").SelectedIndex==0,
+                    "The excess-payment choice is available before confirmation with the established advance-credit default");
+                Check(Field<ModernTextBox>(form,"newRate").Visible&&!Field<TabControl>(form,"comparisons").Visible,
+                    "The excess-payment choice is on the original editor");
+                Field<ModernComboBox>(form,"paidReduction").SelectedIndex=1;Click(form,"save");
+                Check(saves==before+1&&form.Changed&&(string)Arg("@PaidReductionAction")=="Refund",
+                    "One confirmation checks the excess payment and submits the chosen refund once");
+            }
+
             object Arg(string name)=>captured!.Single(p=>p.ParameterName==name).Value;
         }
         finally{CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Permissions);}
@@ -133,6 +170,11 @@ internal static partial class Program
         T Field<T>(object owner,string name)=>(T)type.GetField(name,flags)!.GetValue(owner)!;
         void Click(Form form,string name)
         {
+            if(name=="review")
+            {
+                var task=(Task)type.GetMethod("ReviewAsync",flags)!.Invoke(form,null)!;
+                PumpUntil(()=>task.IsCompleted,"Internal financial check completes");task.GetAwaiter().GetResult();return;
+            }
             typeof(Control).GetMethod("OnClick",flags)!.Invoke(Field<ModernButton>(form,name),new object[]{EventArgs.Empty});Application.DoEvents();
         }
         void ClickTask(Form form,int index)
