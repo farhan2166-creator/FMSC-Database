@@ -78,6 +78,26 @@ internal static partial class Program
             foreach(DataRow row in childReceipt.Rows)row["CopyLabel"]="CHILD COPY";
             Check(childReceipt.AsEnumerable().All(row=>string.IsNullOrWhiteSpace(row.Field<string>("ReceiptStatus"))),"A child copy needs no redundant status explanation beside its own payment figures");
             Check(render("family-child-copy-concise",childReceipt)==1,"The concise child copy renders on one page");
+            // A modern saved receipt must stay clean; only legacy snapshots
+            // carry the historical limitation on both full and child reprints.
+            saved.Tables[0].Columns.Add("SnapshotVersion",typeof(int));
+            saved.Tables[0].Rows[0]["SnapshotVersion"]=2;
+            FeeReceiptDocuments.ApplyLegacyReceiptNotice(saved.Tables[0].Rows[0]);
+            Check(string.IsNullOrWhiteSpace(saved.Tables[0].Rows[0].Field<string>("ReceiptStatus")),
+                "Complete modern receipts do not show the legacy warning");
+            saved.Tables[0].Rows[0]["SnapshotVersion"]=1;
+            FeeReceiptDocuments.ApplyLegacyReceiptNotice(saved.Tables[0].Rows[0]);
+            FeeReceiptDocuments.ApplyLegacyReceiptNotice(saved.Tables[0].Rows[0]);
+            string familyStatus=Convert.ToString(saved.Tables[0].Rows[0]["ReceiptStatus"])??"";
+            Check(familyStatus.Contains("Legacy receipt:")&&familyStatus.Split("Legacy receipt:").Length==2,
+                "Legacy family receipt receives the limitation warning once");
+            using(var legacyChild=FeeReceiptChildCopy.Extract(saved,100))
+            using(var legacyChildPrint=FeeReceiptDocuments.BuildData(school,legacyChild.Tables[0].Rows[0],legacyChild.Tables[1],legacyChild.Tables[2]))
+            {
+                Check(Convert.ToString(legacyChild.Tables[0].Rows[0]["ReceiptStatus"])==familyStatus
+                    &&legacyChildPrint.AsEnumerable().All(row=>(row.Field<string>("ReceiptStatus")??"").Contains("Legacy receipt:")),
+                    "Legacy child copy inherits the same warning as the original family receipt");
+            }
         }
         using(var advanceStudents=students.Clone())
         using(var advanceHeader=header.Copy())
