@@ -1,8 +1,8 @@
 using Microsoft.Data.SqlClient;
 using FMSC_SMS.Services.Communication;
 
-// End-to-end business examples against the actual release DACPAC, not just the
-// historical upgrade fixture. Every amount below belongs to a fictional school.
+// End-to-end business examples against the complete migrated, data-free SQL fixture.
+// The reference DACPAC is not a deployment or fixture-publishing source.
 internal sealed partial class SchoolScenarios(Fixture f, Report r)
 {
     private (int Student, int Enrollment) Admit(string name, int? family = null)
@@ -47,46 +47,33 @@ internal sealed partial class SchoolScenarios(Fixture f, Report r)
 
     internal async Task Upgrade()
     {
+        // The runner has already installed the approved data-free baseline and
+        // replayed every numbered production migration to the current schema.
+        // Do not fake a schema-20 version over that complete schema and rerun
+        // migration 21: migration files must never be reapplied out of order.
         using var connection = DatabaseHelper.GetConnection(); connection.Open();
         using var stream = typeof(FMSC_SMS.Core.CommunicationInstallation).Assembly
             .GetManifestResourceStream("FMSC_SMS.Communication.Schema.sql")!;
         using var reader = new StreamReader(stream);
         string script = await reader.ReadToEndAsync();
         r.Check(await CommunicationFixture.InstallAsync(connection, script) == CommunicationInstallation.Ready,
-            "The optional communication fixture installs disabled against the current base schema.");
+            "An optional disabled Communication module installs against the latest schema.");
         var child = Admit("Upgrade Preservation Example");
         long charge = Tuition(child.Enrollment);
         await Pay(child.Student, child.Enrollment, 1000, (charge, 1000));
         int students = Sql.Count("SELECT COUNT(*) FROM dbo.Students;");
         decimal received = Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments;");
-        // Reconstruct the schema-20 module version check, then exercise the
-        // production migration. This owned database is never a school target.
-        Sql.Query("""
-            DECLARE @Definition nvarchar(max)=OBJECT_DEFINITION(OBJECT_ID(N'comm.IngestMeta'));
-            SET @Definition=REPLACE(@Definition,N'FROM dbo.DatabaseVersion)<>21',N'FROM dbo.DatabaseVersion)<>20');
-            SET @Definition=N'ALTER '+SUBSTRING(@Definition,CHARINDEX(N'PROCEDURE',@Definition),LEN(@Definition));
-            EXEC sys.sp_executesql @Definition;
-            UPDATE dbo.DatabaseVersion SET VersionNumber=N'20' WHERE VersionId=(SELECT MAX(VersionId) FROM dbo.DatabaseVersion);
-            """);
-        string migration = File.ReadAllText(Path.Combine(Directory.GetCurrentDirectory(), "Migrations", "21.sql"));
-        using(var transaction=connection.BeginTransaction())
-        {
-            foreach(string batch in System.Text.RegularExpressions.Regex.Split(migration,@"(?im)^\s*GO\s*\r?$"))
-            {
-                if(string.IsNullOrWhiteSpace(batch))continue;
-                using var command=new SqlCommand(batch,connection,transaction){CommandTimeout=120};
-                command.ExecuteNonQuery();
-            }
-            transaction.Commit();
-        }
-        r.Check(await CommunicationSchemaContract.VerifyAsync(connection), "An existing callback module matches the runtime contract after migration 21.");
-        r.Check(Sql.Count("SELECT CASE WHEN OBJECT_DEFINITION(OBJECT_ID(N'comm.IngestMeta')) LIKE N'%INSERT comm.Audit%' THEN 1 ELSE 0 END;")==0,
-            "The revised callback retires audit writes while retaining its inbox and pending-receipt recovery records.");
+        r.Check(await CommunicationFixture.InstallAsync(connection, script) == CommunicationInstallation.Ready &&
+            await CommunicationSchemaContract.VerifyAsync(connection),
+            "A verified optional module can be checked repeatedly without reinstallation or drift.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Students;") == students &&
             Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments;") == received && Due(charge) == 4000,
-            "Migration preserves student count, receipts and the exact unpaid tuition balance.");
+            "Optional installation and subsequent verification preserve students, payments, and exact outstanding dues.");
+        r.Check(Convert.ToString(Sql.Scalar("SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC;"))
+            == DatabaseHelper.RequiredDatabaseSchemaVersion,
+            "Optional module verification never changes the fully migrated base schema version.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM sys.procedures WHERE name IN(N'GetRoles',N'GetUserRoles',N'GetRolesAndPermissions',N'GetAdjustableFeePayments');") == 0,
-            "The four retired read procedures are absent after the upgrade.");
+            "All four retired schema-21 read procedures remain absent after the complete migration chain.");
     }
 
     private async Task LegacyActivation()
