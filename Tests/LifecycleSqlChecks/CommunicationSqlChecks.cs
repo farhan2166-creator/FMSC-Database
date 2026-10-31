@@ -12,6 +12,7 @@ internal static class CommunicationSqlChecks
     {
         var store=new SqlCommunicationStore(DatabaseHelper.GetConnection,f.Admin);
         int student=0,enrollment=0;Guid contact=Guid.NewGuid(),template=Guid.NewGuid();
+        Guid initialContact=contact; // Original student contact; later scenarios add separate contacts.
         bool installed=await report.Stage("Communication: additive schema, explicit consent and permission isolation",async()=>{
             int grants=Sql.Count("SELECT COUNT(*) FROM dbo.RolePermissions;");
             using var connection=DatabaseHelper.GetConnection();connection.Open();
@@ -193,7 +194,9 @@ internal static class CommunicationSqlChecks
         });
         await report.Stage("Communication: interrupted bulk campaign and readable history",async()=>{
             await Contact(true,false);template=Guid.NewGuid();await Template("bulk_fixture","Utility","{{student}}: {{announcement}}");
-            var contacts=Sql.Query("SELECT ContactId,AdmissionId FROM comm.Contact WHERE OwnerKind='Student'");
+            // Restrict the bulk fixture to its original two recipients. The promotion
+            // scenario also creates a historical contact and must not silently expand this test.
+            var contacts=Sql.Query("SELECT ContactId,AdmissionId FROM comm.Contact WHERE OwnerKind='Student' AND ContactId IN (@Initial,@Current)",Sql.P("@Initial",initialContact),Sql.P("@Current",contact));
             var savedContact=contact;var savedStudent=student;
             try{foreach(DataRow row in contacts.Rows){contact=(Guid)row["ContactId"];student=Convert.ToInt32(row["AdmissionId"]);await Contact(true,false);}}finally{contact=savedContact;student=savedStudent;}
             var ids=contacts.AsEnumerable().Select(r=>(Guid)r["ContactId"]).ToArray();report.Check(ids.Length==2,"The bulk fixture has two independently scoped fictional student contacts with fresh consent after the shared-phone opt-out test.");
