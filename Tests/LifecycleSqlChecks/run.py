@@ -206,8 +206,14 @@ def main():
             # numeric codes and SQL severity/state, never the SQL or raw output.
             sql_codes = re.findall(r"Msg (\d+), Level (\d+), State (\d+)", result.stdout + result.stderr)
             codes = ["SQL Msg " + code + " level " + level + " state " + state for code, level, state in sql_codes[-3:]]
+            # Only labels emitted by the owned synthetic mutation test's Check()
+            # helper are eligible for evidence; reject punctuation that could
+            # carry a connection string, SQL statement or student record.
+            fixture_labels = re.findall(r"^MUTATION_CHECK_FAIL: ([A-Za-z0-9 ,.'()/-]{1,140})\s*$",
+                                        result.stdout + result.stderr, re.MULTILINE)
+            fixture_error = ["Mutation fixture assertion: " + fixture_labels[-1]] if fixture_labels else []
             raise RuntimeError("Child command failed with exit " + str(result.returncode) +
-                               ("; " + " | ".join((errors + codes)[-3:]) if errors or codes else ""))
+                               ("; " + " | ".join((errors + codes + fixture_error)[-3:]) if errors or codes or fixture_error else ""))
         return result.stdout + result.stderr
 
     def stage(name, action):
