@@ -219,19 +219,41 @@ internal sealed partial class SchoolScenarios
     {
         foreach(var choice in new[]{(Carry:false,Discount:1000m),(Carry:true,Discount:1000m),(Carry:true,Discount:5000m)})
         {
-            var child=EarlierChild("Promotion concession example "+choice);int id=Assignment(child.Enrollment);DateTime last=new(f.AdmissionDate.Year,12,1);
-            SaveTerms(id,last,last,choice.Discount,full:choice.Discount==5000);
-            var decisions=new DataTable();decisions.Columns.Add("AdmissionId",typeof(int));decisions.Columns.Add("Decision");decisions.Rows.Add(child.Student,"PROMOTE");
-            Sql.Proc("BulkPromoteStudents",Sql.P("@UserId",f.Admin),Sql.P("@SourceAcademicYearId",f.SourceYear),Sql.P("@DestinationAcademicYearId",f.NextYear),Sql.P("@SourceCampusId",f.Campus),Sql.P("@SourceClassId",f.Class6),Sql.P("@SourceSectionId",f.Section),Sql.P("@DestinationClassSectionId",f.Placement7),Sql.P("@EffectiveDate",f.PromotionDate),Sql.P("@Remarks","Fictional reviewed concession policy"),Sql.P("@CarryConcessions",choice.Carry),Sql.TvpParameter("@Decisions","BulkPromotionDecisionType",decisions));
-            int next=Sql.Count("SELECT EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=@S AND AcademicYearId=@Y;",Sql.P("@S",child.Student),Sql.P("@Y",f.NextYear));
+            // Historical admission deliberately generates no retroactive fees.
+            // Seed only a synthetic prior-year monthly AGREEMENT, never a past bill,
+            // to test the promotion policy that copies or clears its last concession.
+            var row=Sql.Proc("AdmitStudent",f.AdmissionArgs("Historical promotion concession "+choice,current:false)).Rows[0];
+            int admission=Convert.ToInt32(row["AdmissionId"]);
+            int source=Convert.ToInt32(row["EnrollmentId"]);
+            DateTime last=new(f.AdmissionDate.Year,12,1);
+            Sql.Query("""
+                INSERT dbo.StudentFeeAssignments(EnrollmentId,AdmissionId,FeeTypeId,Amount,DiscountAmount,Frequency,Remarks,EffectiveFrom,ConcessionLabel)
+                VALUES(@E,@S,@F,5000,@Discount,N'Monthly',N'Synthetic historical agreement',@Month,N'Scholarship');
+                """,Sql.P("@E",source),Sql.P("@S",admission),Sql.P("@F",f.Tuition),
+                Sql.P("@Discount",choice.Discount),Sql.P("@Month",last));
+            r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@E;",Sql.P("@E",source))==0,
+                "Synthetic historical agreement does not invent past tuition charges.");
+            var decisions=new DataTable();decisions.Columns.Add("AdmissionId",typeof(int));decisions.Columns.Add("Decision");decisions.Rows.Add(admission,"PROMOTE");
+            Sql.Proc("BulkPromoteStudents",Sql.P("@UserId",f.Admin),Sql.P("@SourceAcademicYearId",f.SourceYear),
+                Sql.P("@DestinationAcademicYearId",f.NextYear),Sql.P("@SourceCampusId",f.Campus),
+                Sql.P("@SourceClassId",f.Class6),Sql.P("@SourceSectionId",f.Section),
+                Sql.P("@DestinationClassSectionId",f.Placement7),Sql.P("@EffectiveDate",f.PromotionDate),
+                Sql.P("@Remarks","Fictional reviewed concession policy"),Sql.P("@CarryConcessions",choice.Carry),
+                Sql.TvpParameter("@Decisions","BulkPromotionDecisionType",decisions));
+            int next=Sql.Count("SELECT EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=@S AND AcademicYearId=@Y;",
+                Sql.P("@S",admission),Sql.P("@Y",f.NextYear));
             decimal expected=!choice.Carry?0:choice.Discount==5000?6000:1000;
-            r.Check(Sql.Money("SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@E AND FeeTypeId=@F;",Sql.P("@E",next),Sql.P("@F",f.Tuition))==expected,
-                "Promotion explicitly resets concessions or carries the final monthly agreement, including a full waiver at the destination rate.");
-            r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@E;",Sql.P("@E",next))==0&&Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE EnrollmentId=@E AND BillingReady=0;",Sql.P("@E",next))==1,
-                "Carrying a concession never bills a student before return confirmation.");
-            r.Check(Due(Tuition(child.Enrollment))==5000,"Prior-placement dues remain collectible after either promotion policy.");
+            r.Check(Sql.Money("SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@E AND FeeTypeId=@F;",
+                    Sql.P("@E",next),Sql.P("@F",f.Tuition))==expected,
+                "Promotion clears or carries the last monthly agreement, including a full waiver at the destination rate.");
+            r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@E;",Sql.P("@E",next))==0 &&
+                Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE EnrollmentId=@E AND BillingReady=0;",Sql.P("@E",next))==1,
+                "A carried concession does not bill until return confirmation.");
+            r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@E;",Sql.P("@E",source))==0,
+                "Prior-year records remain historical without invented financial dues.");
         }
         return Task.CompletedTask;
     }
+
 
 }
