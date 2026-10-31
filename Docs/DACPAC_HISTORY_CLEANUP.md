@@ -31,7 +31,8 @@ contained exported data according to the repository owner.
    and your new independently verified schema-only DACPAC **outside** the
    cleanup directory. Do not upload an old data-bearing archive as an
    Actions artifact.
-3. Install Git and `git-filter-repo`; example: `py -m pip install --upgrade git-filter-repo`.
+3. Use the installed Git for Windows and Windows PowerShell. No Python,
+   `git-filter-repo`, package manager or additional installation is required.
 4. Run from a working directory with sufficient disk space:
 
    ```powershell
@@ -40,15 +41,35 @@ contained exported data according to the repository owner.
 
 5. Review `DACPAC_CLEANUP_REVIEW.txt`. The script makes an isolated
    `--mirror` clone, removes only `fmsc.dacpac` **in that local copy**,
-   verifies no reachable history retains that path, and compares the mode,
-   blob ID and path of every other file on both branch tips. It **does not**
+   verifies every rewritten commit lacks that root path, and compares all other
+   files in every old/new commit pair. Commit messages, author/committer identities,
+   dates and merge-parent order are also verified. The original clone remains
+   untouched. It **does not**
    push or delete GitHub content.
 
-The script deliberately fails if the branch set differs from the observed
-`main` and `ops/automatic-actions-run-retention-20261024`, or if tags
-appear. Once this PR is merged, remove the cleanup PR's short-lived head
-branch **after verifying it is no longer needed**, before attempting the
-preview. Investigate any branch or tag changes rather than bypassing guards.
+The script uses Git's bundled `filter-branch` with a fixed index filter for the
+single ASCII root path. Git cautions against general-purpose use of this older
+command. This procedure therefore runs only in a fresh isolated bare mirror,
+refuses unexpected refs/tags/grafts, keeps empty commits, and checks every commit
+before removing the mirror's temporary backup refs. A failed check stops the
+preview; never publish a failed or partially verified mirror. It does not claim
+that old, unreachable objects or external copies have been physically erased.
+
+`DACPAC_COMMIT_MAP.txt` records old/new commit IDs. `DACPAC_AFFECTED_PULL_REFS.txt`
+and the first-changed commits in the review report support a GitHub Support request.
+Original commit signatures cannot remain valid after rewriting history.
+
+For a local synthetic regression test, run
+`powershell -NoProfile -ExecutionPolicy Bypass -File Tools/TestDacpacHistoryCleanup.ps1`.
+This creates only disposable repositories under `artifacts`, including a merge,
+a DACPAC-only commit and the separate test fixture. It does not contact GitHub.
+
+The script deliberately fails if the branch set differs from the reviewed
+`main` branch, or if tags appear. GitHub's branch and tag inventory was checked
+again on 30 October 2026: only `main` exists and there are no tags. The old
+operations and preparation branches are no longer present remotely; stale
+remote-tracking branches in an existing clone do not describe the current
+GitHub inventory. Investigate any new branch or tag rather than bypassing guards.
 
 ## Before any remote rewrite
 
