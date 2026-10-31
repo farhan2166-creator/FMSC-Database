@@ -430,6 +430,10 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
     private string SelectionCountText() => $" {GetSelectedAdmissionIds().Count:N0} student(s) included.";
     private void UpdateSelectionActions()
     {
+        // Keep the family toggle caption in sync with its actual scope, including
+        // when opening a sibling directly or clearing/changing the main student.
+        if (accountFamily is not null)
+            accountFamily.Text = familySelections.Count > 0 ? "Student Only" : "Include Siblings";
         bool hasStudents = GetSelectedAdmissionIds().Count > 0;
         if (generateStatementButton is not null) generateStatementButton.Enabled = hasStudents&&!BusyOperationRunning;
         if (printAmountsDueButton is not null) printAmountsDueButton.Enabled = hasStudents && !IsBusy && CurrentUser.HasPermission("Fees.View");
