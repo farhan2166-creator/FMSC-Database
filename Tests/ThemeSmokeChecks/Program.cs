@@ -566,7 +566,9 @@ internal static partial class Program
         if(args.Contains("--fee-documents"))
         {
             CheckFeeDocuments();
+            int billAssertions=RegistrationBillChecks.Run();
             Console.WriteLine($"PASS: {checks} fee document checks, including RDLC PNG/PDF rendering.");
+            Console.WriteLine($"PASS: {billAssertions} student and family bill data checks.");
             return;
         }
         if(args.Contains("--current-receipt-balances"))
