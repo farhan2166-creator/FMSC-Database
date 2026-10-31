@@ -97,12 +97,14 @@ internal static partial class Program
             Check(payments.Columns["Refunded"].Visible,"A real refund remains visible rather than being hidden with unused adjustments");
             paymentData.Rows[0]["Refunded"]=0m;Invoke("StyleAccountGrid",payments);
             Check(Field<DataGridView>("accountTransactions").Rows.Count==2,"Chronological statement retains charge and payment rows without changing existing statement calculations");
+            Check(DescendantControls(page).OfType<ModernButton>().Any(button=>button.Text=="Charge & Payment Activity…"),
+                "The account activity action names its charge/payment scope without implying a complete lifetime ledger");
             Exception? activityFailure=null;
             using(var activityTimer=new System.Windows.Forms.Timer {Interval=100})
             {
                 activityTimer.Tick+=(_,_)=>{
                     activityTimer.Stop();
-                    var dialog=Application.OpenForms.Cast<Form>().First(form=>form.Text=="Full Account Activity");
+                    var dialog=Application.OpenForms.Cast<Form>().First(form=>form.Text=="Charge & Payment Activity");
                     try{Check(Field<DataGridView>("accountTransactions").FindForm()==dialog,"Full account activity keeps the detailed ledger available outside the main tabs");}
                     catch(Exception ex){activityFailure=ex;}
                     finally{dialog.Close();}
