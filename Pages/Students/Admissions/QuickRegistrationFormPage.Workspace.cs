@@ -25,6 +25,7 @@ internal sealed partial class QuickRegistrationFormPage
             ("Place of birth", siblingBirth, false, 1), ("Address", address, false, 1));
         registrationContent.Controls.Remove(previous); previous?.Dispose();
         registrationContent.Controls.Add(fields, 0, 1);
+        foreach (Control input in new Control[] { name, joining, year, placement, parent, contact, siblingBirth, address }) input.MaximumSize = Size.Empty;
         registrationCard.SetHeaderText("Admit Sibling", "Shared details come from the loaded student. Complete this child's name, placement and fees.");
         year.SelectedValue = defaultAcademicYear;
         UpdateActions();

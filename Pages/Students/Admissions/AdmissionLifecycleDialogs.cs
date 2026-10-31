@@ -28,7 +28,7 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
         {date.ShowCheckBox=true;date.Checked=false;}
         Text=cancel?"Cancel Registration":"Record Departure";StartPosition=FormStartPosition.CenterParent;
         ClientSize=new Size(AppScale.Scale(820),AppScale.Scale(740));MinimumSize=new Size(AppScale.Scale(680),AppScale.Scale(580));
-        if (cancel) { MinimumSize = new Size(AppScale.Scale(680), AppScale.Scale(350)); ClientSize = new Size(AppScale.Scale(760), AppScale.Scale(380)); reason.Multiline = false; }
+        if (cancel) { MinimumSize = new Size(AppScale.Scale(680), AppScale.Scale(330)); ClientSize = new Size(AppScale.Scale(760), AppScale.Scale(340)); MaximizeBox = false; reason.Multiline = false; reason.MaxLength = 250; }
         ShowInTaskbar=false;MinimizeBox=false;
         impact.ReadOnly=true;impact.Dock=DockStyle.Fill;impact.ScrollBars=ScrollBars.Vertical;
         impact.Text=placementEnd is DateTime last && last<DateTime.Today

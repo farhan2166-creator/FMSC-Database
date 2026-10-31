@@ -27,12 +27,16 @@ internal static partial class Program
             family.Rows.Add(123, "Fictional Pending Child", "Fictional Parent", "Four", "Test Campus", "Pending");
             family.Rows.Add(456, "Fictional Cancelled Child", "Fictional Parent", "Five", "Test Campus", "Cancelled");
             family.Rows.Add(789, "Fictional Active Child", "Fictional Parent", "Six", "Test Campus", "Active");
+            family.Rows.Add(999, "Fictional Waiting Sibling", "Fictional Parent", "Four", "Test Campus", "Pending");
             var siblingGrid = Field<DataGridView>("siblingsGrid"); siblingGrid.AutoGenerateColumns = true; siblingGrid.DataSource = family;
             type.GetMethod("ConfigureSiblingRegistrationRows", flags)!.Invoke(page, null);
             siblingGrid.Columns["AdmissionId"].Visible = false;
             foreach (DataGridViewColumn column in siblingGrid.Columns) column.MinimumWidth = 90;
             Application.DoEvents();
             Set("currentAdmissionId", 123); Set("_workspaceStudentStatus", "Pending"); Update();
+            Check(Field<ModernButton>("quickRegistrationButton").Text == "Admit Sibling", "Admission offers sibling-only registration");
+            Check(Field<Label>("pendingSiblingCount").Text == "Pending siblings: 1", "Waiting count excludes the loaded child and counts pending siblings");
+            Check(Field<ModernButton>("saveButton").Text == "Confirm & Save", "Completing pending details does not require saving a draft first");
             Check(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationConfirm"].Value) == "Confirm & Save", "Pending children get Confirm & Save on their own row");
             Check(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationCancel"].Value) == "Cancel", "Pending children retain row cancellation");
             var addSibling = Field<ModernButton>("addNewSiblingButton");
@@ -50,6 +54,8 @@ internal static partial class Program
             Check(string.IsNullOrEmpty(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationReopen"].Value)), "Admitted students do not get registration reopening");
             CurrentUser.SignIn(2, "Read only", "Operator", false, new[] { "Students.View" }); Update();
             Check(!Field<ModernButton>("quickRegistrationButton").Enabled && !addSibling.Enabled, "Viewing access does not grant registration writes");
+            CurrentUser.SignIn(3, "Registration without family access", "Operator", false, new[] { "Students.Admit", "Students.View" }); Update();
+            Check(!Field<ModernButton>("quickRegistrationButton").Enabled, "Admit Sibling requires family-link write permission before the button is enabled");
             CurrentUser.SignIn(1, "Fictional admission operator", "Administrator", false, Array.Empty<string>());
             Set("_workspaceStudentStatus", "Pending"); family.Rows[0]["Status"] = "Pending"; Update();
             typeof(V2Page).GetMethod("SetStatus", flags, null, new[] { typeof(string), typeof(bool) }, null)!.Invoke(page, new object[] { "Pending registration: complete details, then Confirm & Save.", false });
@@ -66,7 +72,29 @@ internal static partial class Program
                 using var picture = new Bitmap(host.Width, host.Height); host.DrawToBitmap(picture, new Rectangle(Point.Empty, picture.Size));
                 picture.Save($"artifacts/registration-workflow-ui/admission-{width}.png");
             }
+            using var child = new QuickRegistrationFormPage((_, _, _) => { }, 0, false);
+            var childType = typeof(QuickRegistrationFormPage);
+            T ChildField<T>(string key) => (T)childType.GetField(key, flags)!.GetValue(child)!;
+            using var years = new DataTable(); years.Columns.Add("AcademicYearId", typeof(int)); years.Columns.Add("YearName"); years.Rows.Add(77, "2026-2027");
+            ChildField<LookupBox>("year").Bind(years, "AcademicYearId", "YearName");
+            childType.GetField("defaultAcademicYear", flags)!.SetValue(child, 77);
+            var numberFlags = BindingFlags.Static | BindingFlags.NonPublic;
+            typeof(AdmissionNumbers).GetField("_numbers", numberFlags)!.SetValue(null, new Dictionary<int, string> { [123] = "QR-123" });
+            typeof(AdmissionNumbers).GetField("_loadedAt", numberFlags)!.SetValue(null, DateTime.UtcNow);
+            child.ConfigureSiblingEntry(123, "Fictional Parent", "03001234567", "Shared address", "Shared city");
+            Check(ChildField<ModernTextBox>("parent").ReadOnly && ChildField<ModernTextBox>("parent").Text == "Fictional Parent", "Sibling father name is inherited and locked");
+            Check(ChildField<ModernTextBox>("contact").ReadOnly && ChildField<ModernTextBox>("address").ReadOnly && ChildField<ModernTextBox>("siblingBirth").Text == "Shared city", "Phone, address and birthplace are inherited and locked");
+            Check(!ChildField<LookupBox>("year").Enabled && ChildField<LookupBox>("year").SelectedId == 77, "Sibling year is locked to the current year");
+            using var childHost = new Form { ClientSize = new Size(1050, 760) }; childHost.Controls.Add(child); childHost.Show(); Application.DoEvents();
+            using var childImage = new Bitmap(childHost.Width, childHost.Height); childHost.DrawToBitmap(childImage, new Rectangle(Point.Empty, childImage.Size)); childImage.Save("artifacts/registration-workflow-ui/admit-sibling.png");
+            using var reopen = new RegistrationReopenDialog(123, "Fictional Child", false); reopen.Show(); Application.DoEvents();
+            Check(typeof(RegistrationReopenDialog).GetField("placement", flags)!.GetValue(reopen) is PlacementPicker, "Reopening uses Add Placement's shared picker");
+            Check(reopen.ClientSize.Height <= 380, "Reopening dialog is compact");
+            using var reopenImage = new Bitmap(reopen.Width, reopen.Height); reopen.DrawToBitmap(reopenImage, new Rectangle(Point.Empty, reopenImage.Size)); reopenImage.Save("artifacts/registration-workflow-ui/reopen.png");
+            using var cancel = new CloseAdmissionDialog(123, "Fictional Child", true, (_, _) => Task.FromResult(new DataTable())); cancel.Show(); Application.DoEvents();
+            Check(cancel.ClientSize.Height <= AppScale.Scale(400), "Cancellation dialog is compact");
+            using var cancelImage = new Bitmap(cancel.Width, cancel.Height); cancel.DrawToBitmap(cancelImage, new Rectangle(Point.Empty, cancelImage.Size)); cancelImage.Save("artifacts/registration-workflow-ui/cancel.png");
         }
-        finally { CurrentUser.SignIn(previous.UserId, previous.Username, previous.RoleName, previous.MustChangePassword, previous.Grants); }
+        finally { AdmissionNumbers.Invalidate(); CurrentUser.SignIn(previous.UserId, previous.Username, previous.RoleName, previous.MustChangePassword, previous.Grants); }
     }
 }

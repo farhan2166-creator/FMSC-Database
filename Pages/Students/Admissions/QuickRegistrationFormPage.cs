@@ -339,7 +339,7 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
         name.ReadOnly=contact.ReadOnly=address.ReadOnly=!editing;
         if (siblingEntry) { contact.ReadOnly = address.ReadOnly = true; year.Enabled = false; }
         parent.ReadOnly=!editing||familyAnchor>0||loadingFamily;
-        registrationCard.SetHeaderText(workspaceHosted?"Child Details":"Registration Details",recoveryBlocked?"Save recovery pending · Use Check Save Outcome before continuing.":workspaceHosted?"Parent details are shared above. Review this child's placement and fees.":savedStudent>0
+        registrationCard.SetHeaderText(siblingEntry ? "Admit Sibling" : workspaceHosted?"Child Details":"Registration Details",recoveryBlocked?"Save recovery pending · Use Check Save Outcome before continuing.":siblingEntry ? "Shared details are inherited and locked. Enter the child's name, placement and fees." : workspaceHosted?"Parent details are shared above. Review this child's placement and fees.":savedStudent>0
             ? $"{familyReference} · "+(savedFamilyMemberCount>1?$"Family: {savedFamilyMemberCount} children · Link or unlink a parent above.":"One child · You can link an existing parent above.")
             : familyAnchor>0?$"Parent linked · {familyReference} · Use Unlink Parent to change it.":"Enter a child, or use Link Existing Parent above.");
         addFee.Enabled=editing&&feesLoaded&&(savedStudent==0||!HasPendingChanges&&CurrentUser.HasPermission("Fees.Adjust"));

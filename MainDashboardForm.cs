@@ -665,7 +665,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     "Certificates",
                     PageTitles.StudentCertificates,
                     "Certificates.Create")
-            }.Where(item => item.Title != PageTitles.FamilyAdmission || FamilyAdmissionData.CanUse(CurrentUser.HasPermission)).ToArray(),
+            }.Where(item => item.Title != "Pending Registrations" || QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)).ToArray(),
             expandInitially: true);
         AddModule(
             flow,

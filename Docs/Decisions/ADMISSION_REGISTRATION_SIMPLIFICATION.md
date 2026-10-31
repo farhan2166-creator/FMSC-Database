@@ -7,11 +7,12 @@ of the historical admission workflow and family-workspace rollout documents.
 
 ## Operator flow
 
-- Quick Registration opens one child editor using the established registration
-  writer, fee quote and durable unknown-save recovery. It saves a pending child,
-  not an official admission. Add New Sibling uses that editor with the loaded
-  student's existing family/parent context and retains the loaded parent afterward.
-- Admission search accepts pending and cancelled records. Pending Registrations
+- Admit Sibling requires a loaded student and opens one child editor using the
+  established registration writer, fee quote and durable unknown-save recovery.
+  Father name, phone, address and place of birth are inherited and read-only.
+  Academic year is locked to the current year and rechecked inside the save
+  transaction. It saves a pending child and retains the loaded student afterward.
+- Admission search accepts pending and cancelled records. Daily Work → Pending Registrations
   opens the existing list, with Open and Review both loading the selected child in
   the existing Admission form. Opening a sibling loads that child in the same form.
 - Student & Siblings includes the loaded student, including a child without a
@@ -19,9 +20,14 @@ of the historical admission workflow and family-workspace rollout documents.
   Reopen. These actions are absent from the main toolbar. Officially admitted
   students retain their ordinary lifecycle actions. Confirm loads/rechecks the
   target and validates required details before the existing official-number review.
-- Save Draft persists pending detail changes without confirming. Save and
+- The existing Save button becomes Confirm & Save for pending children: completing
+  details leads directly to official-number review and one confirmation transaction.
+  Actions → Save Registration Draft is the optional non-confirming route. Save and
   registration confirmation retain the existing transaction/recovery contracts.
   Check Registration Save appears only when a saved outcome needs checking.
+- Admission shows the number of pending siblings instead of a pending-list button.
+  Reopen uses the same searchable PlacementPicker as Add Placement. Reopen and
+  cancellation dialogs use compact field rows with short, single-line reasons.
 - Admission messages occupy a compact full-width row below the action buttons.
   Long messages retain the existing tooltip; buttons can wrap at narrower widths.
 

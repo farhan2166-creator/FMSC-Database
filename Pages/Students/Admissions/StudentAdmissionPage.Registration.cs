@@ -38,7 +38,7 @@ public sealed partial class StudentAdmissionPage
     private void UpdateRegistrationActions()
     {
         bool ready = !IsBusy && unconfirmedAdmission is null;
-        if (quickRegistrationButton is not null) quickRegistrationButton.Enabled = ready && currentAdmissionId > 0 && !IsCancelledRegistration && CurrentUser.HasPermission("Students.Admit") && CurrentUser.HasPermission("Students.View");
+        if (quickRegistrationButton is not null) quickRegistrationButton.Enabled = ready && currentAdmissionId > 0 && !IsCancelledRegistration && CurrentUser.HasPermission("Students.Admit") && CurrentUser.HasPermission("Students.View") && CurrentUser.HasPermission("Students.Administer");
         if (addNewSiblingButton is not null) addNewSiblingButton.Enabled = ready && currentAdmissionId > 0 && !IsCancelledRegistration && CurrentUser.HasPermission("Students.Admit") && CurrentUser.HasPermission("Students.Administer");
         if (registrationRecoveryButton is not null)
         {
@@ -47,7 +47,7 @@ public sealed partial class StudentAdmissionPage
             registrationRecoveryButton.Enabled = ready && QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);
         }
         admissionIdCaption.Text = IsPendingRegistration || IsCancelledRegistration ? "Temp Reference" : "Admission No.";
-        if (saveButton is not null && !registrationReview) saveButton.Text = IsPendingRegistration ? "Confirm & Save" : UiText.Actions.Save;
+        if (saveButton is not null) saveButton.Text = IsPendingRegistration ? "Confirm & Save" : UiText.Actions.Save;
         RefreshSiblingRegistrationRows();
     }
     private async Task RunSiblingRegistrationActionAsync(int rowIndex, int columnIndex)
@@ -83,7 +83,9 @@ public sealed partial class StudentAdmissionPage
     {
         int waiting = siblingsGrid.Columns.Contains("Status") ? siblingsGrid.Rows.Cast<DataGridViewRow>().Count(row => !row.IsNewRow &&
             Convert.ToString(row.Cells["Status"].Value) == "Pending" && Convert.ToInt32(row.Cells["AdmissionId"].Value) != currentAdmissionId) : 0;
-        pendingSiblingCount.Text = currentAdmissionId > 0 ? $"{waiting} sibling(s) awaiting confirmation" : "Load a student to admit a sibling";
+        pendingSiblingCount.Visible = currentAdmissionId > 0;
+        pendingSiblingCount.Text = $"Pending siblings: {waiting}";
+        pendingSiblingCount.AccessibleDescription = "Siblings waiting for confirmation of admission.";
         pendingSiblingCount.Width = TextRenderer.MeasureText(pendingSiblingCount.Text, pendingSiblingCount.Font).Width + 16;
         if (!siblingsGrid.Columns.Contains("RegistrationConfirm")) return;
         foreach (DataGridViewRow row in siblingsGrid.Rows)
@@ -113,17 +115,6 @@ public sealed partial class StudentAdmissionPage
             if (sibling) { await LoadCurrentSiblingsAsync(); SetStatus("Sibling saved as Pending. Select and open the sibling to complete details, then Confirm & Save.", PageStatusKind.Success); }
             else await LoadStudentForEditAsync(dialog.SavedAdmissionId);
         }
-    }
-    private async Task OpenPendingRegistrationListAsync()
-    {
-        if (IsBusy || !QuickRegistrationAccess.CanUse(CurrentUser.HasPermission) || !ConfirmDiscardAdmission()) return;
-        int selected = 0;
-        using var dialog = new ApplicationWindowForm { Text = "Pending Registrations", StartPosition = FormStartPosition.CenterParent, ClientSize = new Size(1150, 720) };
-        using var page = new AdmissionReviewListPage(RegistrationNavigation, true, id => {
-            selected = id; dialog.DialogResult = DialogResult.OK; dialog.Close(); return Task.CompletedTask;
-        }) { Dock = DockStyle.Fill };
-        dialog.Controls.Add(page); dialog.ShowDialog(FindForm());
-        if (selected > 0) await LoadStudentForEditAsync(selected);
     }
     private async Task ReopenRegistrationAsync()
     {
