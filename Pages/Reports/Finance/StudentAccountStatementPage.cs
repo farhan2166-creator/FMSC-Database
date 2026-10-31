@@ -266,6 +266,9 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
     }
     internal Func<Task<DataTable>> ReadAnnualYears=()=>DatabaseHelper.QueryUserAsync("GetAcademicYears");
     internal Func<Form?,int,int,Func<bool>,Action<string>,Task> PreviewAnnualReceipts=AnnualReceiptPreview.ShowAsync;
+    // Intentional: Annual Receipts always uses the main student selected in studentSearch,
+    // even when Include Siblings is active. Family selection changes account/bill scope,
+    // not the student whose annual receipts are previewed or printed.
     private async Task OpenAnnualReceipts()
     {
         if(IsBusy||IsDisposed||!CurrentUser.HasPermission("Fees.Statement.View")||studentSearch.SelectedId<=0)return;
