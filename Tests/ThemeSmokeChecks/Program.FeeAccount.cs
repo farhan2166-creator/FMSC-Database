@@ -117,6 +117,7 @@ internal static partial class Program
             Application.DoEvents();Invoke("UpdateAccountActions");
             Check(Field<ModernButton>("correctPayment").Enabled,"Eligible cash payment exposes the existing correction workflow");
             Field<Dictionary<int,HashSet<int>>>("familySelections")[41]=new(){41,42};Invoke("OnFiltersChanged");
+            Check(Field<ModernButton>("accountFamily").Text=="Student Only","Family account toggle offers returning to a single student");
             Check(receipts.DataSource is null&&!Field<ModernButton>("correctPayment").Enabled,"Scope changes immediately clear actionable financial rows");
             Wait((Task)Invoke("LoadStatement")!);
             Check(Field<Label>("accountSummary").Text.Contains("2 students")&&Field<Label>("accountSummary").Text.Contains("1,200"),"Family summary sums the same existing student balance readers");
@@ -158,6 +159,7 @@ internal static partial class Program
             int siblingRow=payments.Rows.Cast<DataGridViewRow>().Single(row=>Convert.ToInt32(row.Cells["AccountAdmissionId"].Value)==42).Index;
             Wait((Task)Invoke("OpenRowStudentAsync",payments,siblingRow)!);
             Check(picker.SelectedId==42&&Field<Dictionary<int,HashSet<int>>>("familySelections").Count==0&&payments.Rows.Count==1,"Opening a sibling row makes that child the main student and reloads their individual account");
+            Check(Field<ModernButton>("accountFamily").Text=="Include Siblings","Opening a sibling individual account resets the family toggle caption");
             picker.SetStudent(41,"Student 41");Invoke("SelectSingleStudent");Wait((Task)Invoke("LoadStatement")!);
             CurrentUser.SignIn(921,"Read only","Operator",false,new[]{"Reports.View","Fees.View"});
             Invoke("UpdateAccountActions");Check(!Field<ModernButton>("correctPayment").Enabled,"A different signed-in user cannot act on the preceding user's financial rows");
