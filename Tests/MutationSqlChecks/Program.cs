@@ -62,7 +62,11 @@ if(args.Contains("--bank"))
     string OutcomeLabel(MutationWriteResult result)=>result.Outcome+" err "+(result.Error is SqlException sql ? sql.Number.ToString() : result.Error?.GetType().Name??"none");
     Check(both.All(r=>r.Outcome==MutationOutcome.Saved)&&both[0].Result==both[1].Result&&concurrencyCount==count+1,
         "concurrent bank request one certificate outcome "+OutcomeLabel(both[0])+" and "+OutcomeLabel(both[1])+" count delta "+(concurrencyCount-count));
-    var brokenArgs=Bank();var broken=Intent(MutationKind.BankCertificateCreate,brokenArgs);count=Certificates();
+    // Use a new business identity: the injected request-marker failure must
+    // roll back an actual certificate insert, not a previously deduplicated row.
+    var brokenArgs=Bank();
+    brokenArgs.First(p=>p.ParameterName=="@Purpose").Value="Synthetic marker rollback certificate";
+    var broken=Intent(MutationKind.BankCertificateCreate,brokenArgs);count=Certificates();
     Query("CREATE TRIGGER dbo.FMSC_FailMutationMarker ON dbo.MutationRequests AFTER INSERT AS BEGIN SET NOCOUNT ON;THROW 57699,'Injected marker failure',1;END;");
     try{var failed=await RecoverableMutationWriter.SaveAsync(broken,brokenArgs);Check(failed.Outcome!=MutationOutcome.Saved,"bank marker failure cannot acknowledge successful creation");}
     finally{Query("DROP TRIGGER dbo.FMSC_FailMutationMarker");}
