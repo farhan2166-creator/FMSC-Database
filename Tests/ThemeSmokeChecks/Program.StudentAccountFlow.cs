@@ -86,12 +86,16 @@ internal static partial class Program
             data.Rows.Add("Synthetic Ava", "CHARGE", 1L, new DateTime(2026, 10, 1), 100m, 40m);
             data.Rows.Add("Synthetic Ava", "PAYMENT", 2L, new DateTime(2026, 10, 2), 0m, 40m);
             reply.SetResult((data, 20m));
-            PumpUntil(() => !page.IsBusy, "The selected student's account finishes binding");
+            // Busy state may clear just before the awaiting caller restores its
+            // report controls. Wait for the completed UI state, not only the
+            // intermediate busy flag, before asserting receipt availability.
+            PumpUntil(() => !page.IsBusy && Field<ModernButton>("annualReceiptsButton").Enabled,
+                "The account finishes binding and restores main-student annual receipt access");
             Console.WriteLine("ACCOUNT_FLOW: account read and binding completed");
             Check(grid.Rows.Count == 1 && Field<Label>("closingBalance").Text == "80" && Field<ModernButton>("exportButton").Enabled,
                 "The simplified view preserves opening balance, charges, payment totals and current-snapshot export");
             Check(Field<Label>("statementContext").Text.Contains("Synthetic Ava") && Field<ModernButton>("annualReceiptsButton").Enabled,
-                "The account identifies its student and enables contextual annual receipts");
+                "The account identifies its main student and enables contextual annual receipts");
             Check(Field<ModernButton>("annualReceiptsButton").Parent!=Field<ModernButton>("generateStatementButton").Parent,
                 "Related reports are separate from statement generation actions");
             Directory.CreateDirectory("artifacts/student-account");
