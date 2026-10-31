@@ -24,15 +24,15 @@ internal static class FeeReceiptDocuments
         }
         int? child=selectedChild ?? (complete&&result.Tables[1].Rows.Count>1?FeeReceiptCopyDialog.Choose(owner,result.Tables[1]):0);
         if(child is null||!Current())return true;
+        // Annotate the saved header before Extract clones it for a child reprint.
+        // Both the full family print and its individual child copy must disclose
+        // the same limitation of an incomplete historical snapshot.
+        ApplyLegacyReceiptNotice(result.Tables[0].Rows[0]);
         using var childCopy=child>0?FeeReceiptChildCopy.Extract(result,child.Value):null;
         var document=childCopy??result;
         using var printableLines=document.Tables[2].Copy();
         await FeeCarryForwardLabels.ApplyAsync(printableLines,receiptNumber);
         // Issued documents never acquire today's fees, concessions or balances.
-        // Legacy snapshots remain reproducible, with their limitation disclosed.
-        if(!complete)
-            result.Tables[0].Rows[0]["ReceiptStatus"]=(Convert.ToString(result.Tables[0].Rows[0]["ReceiptStatus"])+
-                " Legacy receipt: saved fee details may exclude earlier discounts or waivers. See the account statement.").Trim();
         using var data=BuildData(institution,document.Tables[0].Rows[0],document.Tables[1],printableLines);
         if(child>0)foreach(DataRow row in data.Rows){row["DocumentTitle"]="STUDENT COPY OF FAMILY RECEIPT";row["CopyLabel"]="CHILD COPY";}
         await FeeDocumentParents.ApplyAsync(data);
@@ -43,6 +43,15 @@ internal static class FeeReceiptDocuments
 
     internal static bool IsCompleteSnapshot(DataRow header)=>header.Table.Columns.Contains("SnapshotVersion")
         && !header.IsNull("SnapshotVersion") && Convert.ToInt32(header["SnapshotVersion"])>=2;
+
+    internal static void ApplyLegacyReceiptNotice(DataRow header)
+    {
+        if(IsCompleteSnapshot(header))return;
+        const string notice="Legacy receipt: saved fee details may exclude earlier discounts or waivers. See the account statement.";
+        string current=Convert.ToString(header["ReceiptStatus"])??"";
+        if(!current.Contains(notice,StringComparison.Ordinal))
+            header["ReceiptStatus"]=(current+" "+notice).Trim();
+    }
 
     internal static void AddAgreementNotes(DataTable document,DataTable agreements,DataTable students)
     {
