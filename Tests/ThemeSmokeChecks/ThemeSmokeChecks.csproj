@@ -6,6 +6,9 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../../FMSC_SMS.csproj" />
+    <!-- Exercise the existing bill-data assertions with all production report helpers. -->
+    <Compile Include="../AuditFixChecks/RegistrationBillChecks.cs" Link="RegistrationBillChecks.cs" />
+    <Using Include="System.Data" />
     <Using Include="System.Drawing" />
     <Using Include="System.Windows.Forms" />
   </ItemGroup>
