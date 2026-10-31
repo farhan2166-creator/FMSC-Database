@@ -104,7 +104,7 @@ BEGIN TRY
   COMMIT; RETURN;
  END;
  IF @ExpectedSnapshot IS NULL OR @ExpectedSnapshot<>@Snapshot THROW 59618,'Records changed after review. Review the correction again; nothing was applied.',1;
- IF @Blocked>0 THROW 59619,'Affected charges have payments. Resolve them in Fee Corrections, then review this correction again.',1;
+ IF @Blocked>0 THROW 59619,'Affected charges have payments. Resolve them in Student Fee Account > Payment History, then review this correction again.',1;
  IF @Cancelled>0 EXEC dbo.RequirePermission @UserId,N'Fees.Collect';
  DECLARE @Charge bigint;
  DECLARE charges CURSOR LOCAL FAST_FORWARD FOR SELECT Id FROM @Affected WHERE Blocked=0 ORDER BY Id;
