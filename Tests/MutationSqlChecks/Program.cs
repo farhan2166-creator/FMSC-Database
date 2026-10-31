@@ -52,7 +52,10 @@ if(args.Contains("--bank"))
     try{await RecoverableMutationWriter.SaveAsync(bankIntent,changed);throw new Exception("Changed bank request accepted");}catch(InvalidOperationException){Check(true,"changed bank details cannot reuse a completed request identity");}
     var concurrentArgs=Bank();var concurrent=Intent(MutationKind.BankCertificateCreate,concurrentArgs);count=Certificates();
     var both=await Task.WhenAll(RecoverableMutationWriter.SaveAsync(concurrent,concurrentArgs),RecoverableMutationWriter.SaveAsync(concurrent,concurrentArgs));
-    Check(both.All(r=>r.Outcome==MutationOutcome.Saved)&&both[0].Result==both[1].Result&&Certificates()==count+1,"concurrent copies of a bank create request produce exactly one certificate");
+    int concurrencyCount=Certificates();
+    string OutcomeLabel(MutationWriteResult result)=>result.Outcome+" err "+(result.Error is SqlException sql ? sql.Number.ToString() : result.Error?.GetType().Name??"none");
+    Check(both.All(r=>r.Outcome==MutationOutcome.Saved)&&both[0].Result==both[1].Result&&concurrencyCount==count+1,
+        "concurrent bank request one certificate outcome "+OutcomeLabel(both[0])+" and "+OutcomeLabel(both[1])+" count delta "+(concurrencyCount-count));
     var brokenArgs=Bank();var broken=Intent(MutationKind.BankCertificateCreate,brokenArgs);count=Certificates();
     Query("CREATE TRIGGER dbo.FMSC_FailMutationMarker ON dbo.MutationRequests AFTER INSERT AS BEGIN SET NOCOUNT ON;THROW 57699,'Injected marker failure',1;END;");
     try{var failed=await RecoverableMutationWriter.SaveAsync(broken,brokenArgs);Check(failed.Outcome!=MutationOutcome.Saved,"bank marker failure cannot acknowledge successful creation");}
