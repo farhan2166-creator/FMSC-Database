@@ -99,5 +99,27 @@ internal static partial class Program
             window.ClientSize=new Size(900,700);Application.DoEvents();Check((task==StudentPlacementTask.History?Field<DataGridView>(page,"history"):grid).Height>=100,"Every page retains a usable grid at a compact window size.");
             window.ClientSize=new Size(1600,850);Application.DoEvents();string output=Path.GetFullPath(task==StudentPlacementTask.AnnualPromotion?"artifacts/placement-workspace.png":$"artifacts/placement-page-{task}.png");Directory.CreateDirectory(Path.GetDirectoryName(output)!);using var bitmap=new Bitmap(window.ClientSize.Width,window.ClientSize.Height);window.DrawToBitmap(bitmap,window.ClientRectangle);bitmap.Save(output);
         }
+        CurrentUser.SignIn(7782,"Placement without adjustments","Operator",false,new[]{"Enrollment.Manage"});
+        foreach(var task in new[]{StudentPlacementTask.AnnualPromotion,StudentPlacementTask.Transfer,StudentPlacementTask.History})
+        {
+            using var restricted=new StudentPlacementPage(null,false,task);
+            var content=Field<Control>(restricted,"pageContent");
+            if(task==StudentPlacementTask.AnnualPromotion)
+                Check(!Field<CheckBox>(restricted,"carry").Enabled,"Carrying monthly concessions requires SQL's Fees.Adjust grant");
+            if(task==StudentPlacementTask.Transfer)
+                Check(!Field<ModernComboBox>(restricted,"fees").Enabled,"Changing destination fees requires SQL's Fees.Adjust grant");
+            if(task==StudentPlacementTask.History)
+                Check(!Descendants(content).OfType<ModernButton>().Single(b=>b.Text=="Undo Selected Promotion").Enabled,
+                    "Undo promotion requires Students.Administer as well as Enrollment.Manage");
+            typeof(StudentPlacementPage).GetMethod("SetPendingControls",flags)!.Invoke(restricted,new object[]{content});
+            if(task==StudentPlacementTask.History)
+                Check(!Descendants(content).OfType<ModernButton>().Single(b=>b.Text=="Undo Selected Promotion").Enabled,
+                    "Refreshing placement controls cannot reenable an unauthorized undo");
+            else if(task==StudentPlacementTask.AnnualPromotion)
+                Check(!Field<CheckBox>(restricted,"carry").Enabled,"Refreshing controls keeps concession carry permission-gated");
+            else
+                Check(!Field<ModernComboBox>(restricted,"fees").Enabled,"Refreshing controls keeps transfer fee choices permission-gated");
+        }
+        CurrentUser.SignIn(7781,"Placement fixture","Administrator",false,Array.Empty<string>());
     }
 }
