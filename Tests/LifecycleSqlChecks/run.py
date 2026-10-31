@@ -196,7 +196,12 @@ def main():
                 args.diagnostics.write_text(diagnostic)
                 args.diagnostics.chmod(0o600)
             errors = re.findall(r"(?:error (?:CS|NETSDK|MSB|SQL)[0-9]+[^\r\n]*|Unhandled exception\. [^:]+)", result.stdout + result.stderr)
-            raise RuntimeError("Child command failed with exit " + str(result.returncode) + ("; " + " | ".join(errors[-3:]) if errors else ""))
+            # SQL errors may include record values after the message header. Keep only
+            # numeric codes and SQL severity/state, never the SQL or raw output.
+            sql_codes = re.findall(r"Msg (\d+), Level (\d+), State (\d+)", result.stdout + result.stderr)
+            codes = ["SQL Msg " + code + " level " + level + " state " + state for code, level, state in sql_codes[-3:]]
+            raise RuntimeError("Child command failed with exit " + str(result.returncode) +
+                               ("; " + " | ".join((errors + codes)[-3:]) if errors or codes else ""))
         return result.stdout + result.stderr
 
     def stage(name, action):
@@ -218,22 +223,27 @@ def main():
         return execute(docker_command() + ["exec", "--env", "SQLCMDPASSWORD", container, "/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-C", "-b", "-d", catalog, "-i", "/tmp/level1.sql"])
 
     def provision(suffix, current_schema=False):
+        def checked(label, action):
+            try:
+                return action()
+            except RuntimeError as ex:
+                raise RuntimeError("Disposable provisioning " + label + ": " + str(ex)) from ex
         catalog = "FMSC_AuditChecks_" + suffix + "_" + token.hex
         env["FMSC_AUDIT_CONNECTION"] = f"Server=127.0.0.1,{port};Database={catalog};User ID=sa;Password={secret};Encrypt=False;TrustServerCertificate=True;Connect Timeout=20;Pooling=True"
         # Both owned catalogs use the data-free test baseline plus numbered migrations.
         # The root fmsc.dacpac is a reference artifact, never a deployment/test source.
         package = str(Path(private.name) / "schema-only.dacpac")
         prefix = [str(args.sqlpackage)] if args.sqlpackage else [args.dotnet, "tool", "run", "sqlpackage", "--"]
-        execute(prefix + ["/Action:Publish", "/SourceFile:" + package, "/TargetConnectionString:" + env["FMSC_AUDIT_CONNECTION"], "/p:CreateNewDatabase=True"], timeout=240, cwd=PROJECT)
-        sql(catalog, "DECLARE @Owner uniqueidentifier='" + str(token) + "'; EXEC sys.sp_addextendedproperty @name=N'FMSC_Level1Owner',@value=@Owner;")
+        checked("schema-only publish", lambda: execute(prefix + ["/Action:Publish", "/SourceFile:" + package, "/TargetConnectionString:" + env["FMSC_AUDIT_CONNECTION"], "/p:CreateNewDatabase=True"], timeout=240, cwd=PROJECT))
+        checked("owner registration", lambda: sql(catalog, "DECLARE @Owner uniqueidentifier='" + str(token) + "'; EXEC sys.sp_addextendedproperty @name=N'FMSC_Level1Owner',@value=@Owner;"))
         # The approved data-free fixture is schema 6. Replay the entire chain into
         # each isolated catalog; never seed a fabricated "current" version.
-        sql(catalog, "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');")
+        checked("baseline schema version", lambda: sql(catalog, "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');"))
         for migration in sorted((PROJECT / "Migrations").glob("*.sql"), key=lambda p: int(p.stem)):
             if 6 < int(migration.stem) <= 19:
-                sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;")
+                checked("fixture migration " + migration.stem, lambda: sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;"))
         for migration in sorted((ROOT / "Migrations").glob("*.sql"), key=lambda p: int(p.stem)):
-            sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;")
+            checked("migration " + migration.stem, lambda: sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;"))
         return catalog
 
     def run_lifecycle(mode, report_name):
