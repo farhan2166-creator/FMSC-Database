@@ -85,6 +85,12 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
         FormClosing+=(_,e)=>{if(busy&&!Changed)e.Cancel=true;};
     }
     private string Policy=>monthlyPolicy.SelectedIndex switch {1=>"KeepIssued",2=>"FromMonth",_=>"SchoolCutoff"};
+    // SQL requires Fees.Collect for every pending cancellation. Reversing any
+    // saved charge additionally calls ReverseBillingCharge (Fees.Adjust).
+    private bool CanApplyCancellation => !cancel || (plan is not null &&
+        CurrentUser.HasPermission("Students.Administer") &&
+        CurrentUser.HasPermission("Fees.Collect") &&
+        (Convert.ToInt32(plan["ChargeCount"]) == 0 || CurrentUser.HasPermission("Fees.Adjust")));
     private Task<DataTable> Run(bool preview)=>query("CloseStudentAdmission",new[]{
         DatabaseHelper.Int("@AdmissionId",admission),DatabaseHelper.Date("@LeavingDate",date.Value.Date),DatabaseHelper.P("@Reason",reason.Text.Trim()),
         DatabaseHelper.Bit("@Cancel",cancel),DatabaseHelper.P("@MonthlyFeePolicy",Policy),
@@ -113,14 +119,19 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
                     $"Paid amount released as {(paidReduction.SelectedIndex==1?"refund":"credit")}: Rs. {paid:N0}\r\nRemaining outstanding on this placement: Rs. {outstanding-reduction:N0}\r\n\r\n"+
                     "Earlier placement dues, annual/one-time fees and original receipts remain. No payment or leave certificate is required to record departure.";
             }
-            apply.Enabled=Convert.ToInt32(plan["BlockedCount"])==0;OperationFeedback.Apply(impact,!apply.Enabled);
+            if(cancel && Convert.ToInt32(plan["ChargeCount"])>0 && !CurrentUser.HasPermission("Fees.Adjust"))
+                impact.Text+="\r\nReversing saved charges requires Fees.Adjust permission. Ask an authorized operator to complete cancellation.";
+            apply.Enabled=Convert.ToInt32(plan["BlockedCount"])==0 && CanApplyCancellation;
+            OperationFeedback.Apply(impact,!apply.Enabled);
         }
         catch(Exception ex){FMSC_SMS.Core.OperationFeedback.Set(impact,DbMessage.UserMessage(ex),true);}
         finally{busy=false;if(!IsDisposed)root.Enabled=true;}
     }
     private async Task ApplyAsync()
     {
-        if(busy||plan is null)return;busy=true;root.Enabled=false;impact.Text="Saving the reviewed departure…";
+        if(busy||plan is null)return;
+        if(!CanApplyCancellation){impact.Text="Required cancellation permission is missing. Review with an authorized operator.";Reset();return;}
+        busy=true;root.Enabled=false;impact.Text="Saving the reviewed departure…";
         try{await Run(false);Changed=true;StudentSearchCache.Invalidate();DialogResult=DialogResult.OK;Close();}
         catch(Exception ex){impact.Text="Check the student's current status and account before repeating a departure after a connection failure.\r\n"+DbMessage.UserMessage(ex);Reset();}
         finally{busy=false;if(!IsDisposed)root.Enabled=true;}
