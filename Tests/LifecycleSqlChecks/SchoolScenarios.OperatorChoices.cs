@@ -52,21 +52,23 @@ internal sealed partial class SchoolScenarios
         using var review=ReviewConcession(ConcessionArgs(id,may,june,1000,true,true));
         decimal reviewedDifference=review.Tables.Count>0?Convert.ToDecimal(review.Tables[0].Rows[0]["Difference"]):decimal.MinValue;
         decimal reviewedReleased=review.Tables.Count>0?Convert.ToDecimal(review.Tables[0].Rows[0]["ReleasedPaidAmount"]):decimal.MinValue;
-        r.Check(review.Tables.Count==3&&reviewedDifference==-2000&&reviewedReleased==500,
-            $"Concession review shows both bill reductions and only the paid difference to release (fictional difference={reviewedDifference}, released={reviewedReleased}).");
+        // With no explicit rate change, SQL caps concessions at unpaid dues;
+        // already-paid amounts are not automatically released to credit.
+        r.Check(review.Tables.Count==3&&reviewedDifference==-1500&&reviewedReleased==0,
+            $"Concession review waives unpaid dues without reclassifying paid cash (fictional difference={reviewedDifference}, released={reviewedReleased}).");
         var args=ConcessionArgs(id,may,june,1000,true,false,Snapshot(review));
         var intent=new MutationIntent(Guid.NewGuid(),MutationKind.FeeConcession,f.Admin,await RecoverableMutationWriter.GetScopeAsync(),
             RecoverableMutationWriter.PayloadHash(MutationKind.FeeConcession,f.Admin,args),"Fictional concession recovery",DateTime.UtcNow);
         var outcome=await RecoverableMutationWriter.SaveAsync(intent,args,t=>{t.Commit();throw new IOException("Synthetic lost acknowledgement");});
         r.Check(outcome.Outcome==MutationOutcome.Unconfirmed,"Lost concession acknowledgement remains unresolved until checked.");
         var recovered=await RecoverableMutationWriter.CheckAsync(intent);
-        r.Check(recovered?.Amount==-2000&&recovered.ReleasedPaidAmount==500&&recovered.EffectiveThrough==june,
-            "Read-only recovery finds the exact saved period and financial result.");
+        r.Check(recovered?.Amount==-1500&&recovered.ReleasedPaidAmount==0&&recovered.EffectiveThrough==june,
+            "Read-only recovery finds the exact capped concession without generating credit.");
         int corrections=Sql.Count("SELECT COUNT(*) FROM dbo.FeeBillCorrections;");
         r.Check((await RecoverableMutationWriter.SaveAsync(intent,args)).Outcome==MutationOutcome.Saved&&Sql.Count("SELECT COUNT(*) FROM dbo.FeeBillCorrections;")==corrections,
             "Exact concession retry returns its saved result without another correction or credit.");
-        r.Check(ChainDue(first)==0&&ChainDue(second)==5000&&Credit(child.Student)==500,
-            "Partial payment consumes unpaid dues first and releases only 500 as credit; the other bill remains 5000 due.");
+        r.Check(ChainDue(first)==0&&ChainDue(second)==5000&&Credit(child.Student)==0,
+            "Concessions waive unpaid dues but do not release the previously collected 4500 as credit.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@E AND FeeTypeId=@F AND EffectiveFrom=@July AND EffectiveTo IS NULL AND Amount=6000 AND DiscountAmount=0;",Sql.P("@E",child.Enrollment),Sql.P("@F",f.Tuition),Sql.P("@July",july))==1,
             "After the temporary concession, the previously agreed 6000 rate and zero concession resume automatically.");
         r.Check(Due(Tuition(child.Enrollment))==5000&&Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments WHERE AdmissionId=@S AND IsCreditApplication=0;",Sql.P("@S",child.Student))==4500,
@@ -140,7 +142,7 @@ internal sealed partial class SchoolScenarios
         r.Check(Sql.Money("SELECT TOP(1) NewGross FROM dbo.FeeBillCorrections WHERE BillingChargeId=@C ORDER BY FeeBillCorrectionId DESC;",Sql.P("@C",bill))==5000,
             "A change of gross fee and concession with unchanged net bill still records the new fee basis.");
         SaveTerms(id,month,month,0);
-        decimal revisedNet=Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE BillingChargeId=@C OR CorrectionOfBillingChargeId=@C;",Sql.P("@C",bill));
+        decimal revisedNet=Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE (BillingChargeId=@C OR CorrectionOfBillingChargeId=@C) AND Status<>N'Cancelled';",Sql.P("@C",bill));
         decimal revisedDue=ChainDue(bill), retainedCredit=Credit(child.Student);
         r.Check(revisedNet==5000&&revisedDue==1000&&retainedCredit==500,
             $"Later removal uses the reviewed 5000 fee basis and keeps paid credit until its use is explicitly chosen (fictional net={revisedNet}, due={revisedDue}, credit={retainedCredit}).");
