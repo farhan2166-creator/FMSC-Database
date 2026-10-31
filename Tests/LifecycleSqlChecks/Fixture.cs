@@ -63,7 +63,8 @@ internal sealed class Fixture
 
     private int Placement(int classId) => Sql.Count("INSERT dbo.CampusClassSections(CampusId,ClassId,SectionId) VALUES(@Campus,@Class,@Section); SELECT CONVERT(int,SCOPE_IDENTITY());",
         Sql.P("@Campus", Campus), Sql.P("@Class", classId), Sql.P("@Section", Section));
-    private int Year(int year, bool current) => Sql.Key("SaveAcademicYear", Sql.P("@AcademicYearId", 0), Sql.P("@YearName", $"Fictional {year}"),
+    // Schema 63 requires consecutive YYYY-YYYY names; dates remain synthetic Jan-Dec.
+    private int Year(int year, bool current) => Sql.Key("SaveAcademicYear", Sql.P("@AcademicYearId", 0), Sql.P("@YearName", $"{year:D4}-{year+1:D4}"),
         Sql.P("@StartDate", new DateTime(year, 1, 1)), Sql.P("@EndDate", new DateTime(year, 12, 31)), Sql.P("@IsCurrent", current), Sql.P("@Remarks", "Synthetic fixture"), Sql.P("@UserId", Admin));
     private int Fee(string code, string name, bool mandatory, string frequency)
     {
