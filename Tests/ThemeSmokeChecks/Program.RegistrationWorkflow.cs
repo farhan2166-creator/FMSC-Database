@@ -54,6 +54,20 @@ internal static partial class Program
             Check(!Field<ModernButton>("quickRegistrationButton").Enabled && !Field<ModernButton>("quickRegistrationButton").Enabled, "Viewing access does not grant registration writes");
             CurrentUser.SignIn(3, "Registration without family access", "Operator", false, new[] { "Students.Admit", "Students.View" }); Update();
             Check(!Field<ModernButton>("quickRegistrationButton").Enabled, "Admit Sibling requires family-link write permission before the button is enabled");
+            Set("_workspaceStudentStatus", "Pending"); family.Rows[0]["Status"] = "Pending";
+            CurrentUser.SignIn(4, "Administrator without fee collection", "Operator", false, new[] { "Students.Administer" }); Update();
+            Check(string.IsNullOrEmpty(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationCancel"].Value)),
+                "Cancel Registration is not offered without SQL-required Fees.Collect");
+            CurrentUser.SignIn(5, "Cancellation operator", "Operator", false, new[] { "Students.Administer", "Fees.Collect" }); Update();
+            Check(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationCancel"].Value) == "Cancel",
+                "Cancel Registration is available with its mandatory Students.Administer and Fees.Collect grants");
+            Set("_workspaceStudentStatus", "Cancelled"); family.Rows[0]["Status"] = "Cancelled";
+            CurrentUser.SignIn(6, "Reopening without student view", "Operator", false, new[] { "Students.Admit", "Students.Administer", "Fees.View" }); Update();
+            Check(string.IsNullOrEmpty(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationReopen"].Value)),
+                "Reopening also requires SQL-required Students.View");
+            CurrentUser.SignIn(7, "Authorized reopening", "Operator", false, new[] { "Students.View", "Students.Admit", "Students.Administer", "Fees.View" }); Update();
+            Check(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationReopen"].Value) == "Reopen",
+                "Reopening is offered with all four SQL-required grants");
             CurrentUser.SignIn(1, "Fictional admission operator", "Administrator", false, Array.Empty<string>());
             Set("_workspaceStudentStatus", "Pending"); family.Rows[0]["Status"] = "Pending"; Update();
             typeof(V2Page).GetMethod("SetStatus", flags, null, new[] { typeof(string), typeof(bool) }, null)!.Invoke(page, new object[] { "Pending registration: complete details, then Confirm & Save.", false });
@@ -99,6 +113,31 @@ internal static partial class Program
             using var reopenImage = new Bitmap(reopen.Width, reopen.Height); reopen.DrawToBitmap(reopenImage, new Rectangle(Point.Empty, reopenImage.Size)); reopenImage.Save("artifacts/registration-workflow-ui/reopen.png");
             using var cancel = new CloseAdmissionDialog(123, "Fictional Child", true, (_, _) => Task.FromResult(new DataTable())); cancel.Show(); Application.DoEvents();
             Check(cancel.ClientSize.Height <= AppScale.Scale(400), "Cancellation dialog is compact");
+            using var cancellationPreview = new DataTable();
+            cancellationPreview.Columns.Add("Snapshot");
+            cancellationPreview.Columns.Add("ChargeCount", typeof(int));
+            cancellationPreview.Columns.Add("Outstanding", typeof(decimal));
+            cancellationPreview.Columns.Add("BlockedCount", typeof(int));
+            cancellationPreview.Rows.Add("fictional-review", 1, 500m, 0);
+            using var permissionDialog = new CloseAdmissionDialog(123, "Fictional Child", true,
+                (_, _) => Task.FromResult(cancellationPreview));
+            var cancelType = typeof(CloseAdmissionDialog);
+            void PreviewCancellation() =>
+                ((Task)cancelType.GetMethod("ReviewAsync", flags)!.Invoke(permissionDialog, null)!).GetAwaiter().GetResult();
+            var applyCancellation = (ModernButton)cancelType.GetField("apply", flags)!.GetValue(permissionDialog)!;
+            var cancellationImpact = (ModernTextBox)cancelType.GetField("impact", flags)!.GetValue(permissionDialog)!;
+            CurrentUser.SignIn(8, "Collection without adjustment", "Operator", false, new[] { "Students.Administer", "Fees.Collect" });
+            PreviewCancellation();
+            Check(!applyCancellation.Enabled && cancellationImpact.Text.Contains("Fees.Adjust"),
+                "Cancellation of saved charges requires Fees.Adjust, as the SQL charge reversal does");
+            cancellationPreview.Rows[0]["ChargeCount"] = 0;
+            PreviewCancellation();
+            Check(applyCancellation.Enabled, "Cancellation without charges needs Fees.Collect but not Fees.Adjust");
+            cancellationPreview.Rows[0]["ChargeCount"] = 1;
+            CurrentUser.SignIn(9, "Collection and adjustment", "Operator", false, new[] { "Students.Administer", "Fees.Collect", "Fees.Adjust" });
+            PreviewCancellation();
+            Check(applyCancellation.Enabled, "Cancellation with charges is enabled for operators with every required SQL grant");
+            CurrentUser.SignIn(1, "Fictional admission operator", "Administrator", false, Array.Empty<string>());
             using var cancelImage = new Bitmap(cancel.Width, cancel.Height); cancel.DrawToBitmap(cancelImage, new Rectangle(Point.Empty, cancelImage.Size)); cancelImage.Save("artifacts/registration-workflow-ui/cancel.png");
         }
         finally { AdmissionNumbers.Invalidate(); CurrentUser.SignIn(previous.UserId, previous.Username, previous.RoleName, previous.MustChangePassword, previous.Grants); }
