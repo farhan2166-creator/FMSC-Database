@@ -305,7 +305,7 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         var panel=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(12)};
         panel.Controls.Add(HumanUi.Field("Decision",decision));panel.Controls.Add(HumanUi.Field("Destination Placement",lookup));
         using var dialog=Window("Assign Highlighted Students",panel);dialog.ClientSize=new Size(AppScale.Scale(700),AppScale.Scale(240));
-        var apply=new ModernButton{Text="Assign",DialogResult=DialogResult.OK};panel.Controls.Add(HumanUi.ButtonRow(apply));dialog.AcceptButton=apply;
+        var apply=new ModernButton{Text="Assign",DialogResult=DialogResult.OK};panel.Controls.Add(HumanUi.DialogButtons(apply));dialog.AcceptButton=apply;
         if(dialog.ShowDialog(FindForm())!=DialogResult.OK)return;
         string selectedDecision=Convert.ToString(decision.SelectedValue)!;
         if(selectedDecision!="HOLD" && selectedDecision!="SKIP" && lookup.SelectedId<=0){Warn("Choose a destination placement.");return;}
@@ -361,7 +361,7 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         var root=new TableLayoutPanel{Dock=DockStyle.Fill,RowCount=3,ColumnCount=1,Padding=new Padding(12)};
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,85));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonRowHeight));
         root.Controls.Add(new Label{Dock=DockStyle.Fill,Text=$"{selected.Length:N0} students · {effective.Value:dd-MMM-yyyy} · {targetYear.Text}\n{reason.Text.Trim()}\n"+(Annual?"New placements await return admission before billing. "+(carry.Checked?"Carry monthly concessions.":"Reset concessions for return review."):fees.Text+". Paid reductions remain as student advance.")+" All selected students succeed together; a failure rolls back the entire plan."},0,0);
-        root.Controls.Add(grid,0,1);var apply=new ModernButton{Text="Process Reviewed Plan",DialogResult=DialogResult.OK};var cancel=new ModernButton{Text="Back to Plan",DialogResult=DialogResult.Cancel};root.Controls.Add(HumanUi.ButtonRow(apply,cancel),0,2);
+        root.Controls.Add(grid,0,1);var apply=new ModernButton{Text="Process Reviewed Plan",DialogResult=DialogResult.OK};var cancel=new ModernButton{Text="Back to Plan",DialogResult=DialogResult.Cancel};root.Controls.Add(HumanUi.DialogButtons(apply,cancel),0,2);
         using var dialog=Window("Review Placement Plan",root);dialog.CancelButton=cancel;return dialog.ShowDialog(FindForm())==DialogResult.OK;
     }
     private async Task Retry()

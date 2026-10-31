@@ -83,7 +83,7 @@ internal static class FeeBillDocuments
         card.Content.Controls.Add(grid);
         var root=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(12)};
         root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.Controls.Add(card,0,0);root.Controls.Add(HumanUi.ButtonRow(print,close),0,1);dialog.Controls.Add(root);
+        root.Controls.Add(card,0,0);root.Controls.Add(HumanUi.DialogButtons(print,close),0,1);dialog.Controls.Add(root);
         dialog.ShowDialog(owner);
     }
 }

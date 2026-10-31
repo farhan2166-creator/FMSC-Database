@@ -354,13 +354,12 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage, IUnsavedChanges
     }
     private static Control CorrectionFooter(params ModernButton[] buttons)
     {
-        var footer=new FlowLayoutPanel {Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft,
-            WrapContents=false,Margin=Padding.Empty,Padding=new Padding(0,AppMetrics.SpacingSm,0,0)};
         foreach(var button in buttons) {
             button.Dock=DockStyle.None;
             button.Size=new Size(AppMetrics.TextWidth(button.Text,AppTheme.ButtonFont,44),AppMetrics.ButtonHeight);
-            button.Margin=new Padding(4,0,0,0);footer.Controls.Add(button);
         }
+        var footer=HumanUi.DialogButtons(buttons.Reverse().Cast<Control>().ToArray());
+        footer.Padding=new Padding(0,AppMetrics.SpacingSm,0,0);
         return footer;
     }
     private static Label CorrectionHint(string text) => new() {

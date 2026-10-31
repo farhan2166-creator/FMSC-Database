@@ -49,7 +49,7 @@ internal sealed class ReadmissionFeeDecisionDialog : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.Controls.Add(note,0,0); root.Controls.Add(grid,0,1); root.Controls.Add(HumanUi.Field("Monthly fees start",months,true),0,2);
-        root.Controls.Add(annual,0,3); root.Controls.Add(impact,0,4); root.Controls.Add(HumanUi.ButtonRow(confirm,cancel),0,5);
+        root.Controls.Add(annual,0,3); root.Controls.Add(impact,0,4); root.Controls.Add(HumanUi.DialogButtons(confirm,cancel),0,5);
         Controls.Add(root); CancelButton=cancel; Update(); FormFlow.OrderTableFields(root);
         Shown+=(_,_)=>{months.Focus(); months.SelectedIndex=-1; charge.Checked=false; waive.Checked=false; Update();};
     }

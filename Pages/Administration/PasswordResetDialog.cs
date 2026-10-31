@@ -26,7 +26,7 @@ internal sealed class PasswordResetDialog : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.InputControlHeight+12));
         root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.ButtonRowHeight));
         root.Controls.Add(HumanUi.Field("New password",password,true),0,0);root.Controls.Add(HumanUi.Field("Confirm new password",confirmation,true),0,1);
-        root.Controls.Add(forceChange,0,2);root.Controls.Add(status,0,3);root.Controls.Add(HumanUi.ButtonRow(save,cancel),0,4);Controls.Add(root);
+        root.Controls.Add(forceChange,0,2);root.Controls.Add(status,0,3);root.Controls.Add(HumanUi.DialogButtons(save,cancel),0,4);Controls.Add(root);
         status.Text="This saves only the selected account's password and next-sign-in password requirement.";
         save.Click+=async(_,_)=>await SaveAsync();cancel.Click+=(_,_)=>Close();AcceptButton=save;CancelButton=cancel;SetSaveShortcut(save);
         FormFlow.EnterMovesToNext(this);Shown+=(_,_)=>password.Focus();

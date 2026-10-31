@@ -664,7 +664,7 @@ internal sealed class PaymentCorrectionReview : V2Page, IBusyPage, IUnsavedChang
         var close=new ModernButton { Text=UiText.Actions.Close,DialogResult=DialogResult.OK,ThemeRole="Secondary" };
         var layout=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=1,RowCount=2,Padding=new Padding(12) };
         layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        layout.Controls.Add(card,0,0);layout.Controls.Add(HumanUi.ButtonRow(close),0,1);
+        layout.Controls.Add(card,0,0);layout.Controls.Add(HumanUi.DialogButtons(close),0,1);
         dialog.Controls.Add(layout);dialog.CancelButton=close;
         dialog.ShowDialog(FindForm());
     }

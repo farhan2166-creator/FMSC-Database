@@ -53,7 +53,7 @@ internal sealed class LeavingDateCorrectionDialog : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.Controls.Add(guidance, 0, 0); root.Controls.Add(fields, 0, 1); root.Controls.Add(records, 0, 2);
-        root.Controls.Add(flags, 0, 3); root.Controls.Add(outcome, 0, 4); root.Controls.Add(HumanUi.ButtonRow(review, apply, cancel), 0, 5);
+        root.Controls.Add(flags, 0, 3); root.Controls.Add(outcome, 0, 4); root.Controls.Add(HumanUi.DialogButtons(review, apply, cancel), 0, 5);
         Controls.Add(root); CancelButton = cancel;
         void ResetReview()
         {

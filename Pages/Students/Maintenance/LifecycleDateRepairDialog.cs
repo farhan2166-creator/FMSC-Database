@@ -183,7 +183,7 @@ internal sealed class LifecycleDateRepairDialog : ApplicationWindowForm
         root.Controls.Add(editor,0,2);
         root.Controls.Add(certificateHeading,0,3);
         root.Controls.Add(certificates,0,4);root.Controls.Add(withdrawalPanel,0,5);root.Controls.Add(flags,0,6);root.Controls.Add(HumanUi.Field("Repair reason",reason,true),0,7);
-        root.Controls.Add(impact,0,8);root.Controls.Add(HumanUi.ButtonRow(save,cancel),0,9);
+        root.Controls.Add(impact,0,8);root.Controls.Add(HumanUi.DialogButtons(save,cancel),0,9);
         Controls.Add(root);CancelButton=cancel;UpdateImpact();FormFlow.OrderTableFields(root);
         if(focused && selected!=null) {
             Text="Correct Placement Dates";

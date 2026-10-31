@@ -94,7 +94,7 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
         }
         Add(impact, SizeType.Percent, 100);
         var close = new ModernButton { Text = "Close", DialogResult = DialogResult.Cancel, ThemeRole = "Secondary" };
-        CancelButton = close; Add(HumanUi.ButtonRow(review, save, check, close), SizeType.AutoSize); Controls.Add(body);
+        CancelButton = close; Add(HumanUi.DialogButtons(review, save, check, close), SizeType.AutoSize); Controls.Add(body);
         body.AutoScrollMinSize = new Size(0, AppScale.Scale(640));
         body.SizeChanged += (_, _) => {
             foreach (var label in body.Controls.OfType<Label>())

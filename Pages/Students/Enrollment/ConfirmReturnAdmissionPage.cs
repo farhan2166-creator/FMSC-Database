@@ -215,14 +215,12 @@ public sealed partial class ConfirmReturnAdmissionPage : V2Page, IUnsavedChanges
             buttonRow.Dispose();
             var cancel = new ModernButton { Text = UiText.Actions.Cancel, ThemeRole = "Secondary" };
             cancel.Click += (_, _) => FindForm()?.Close();
-            var actions=new FlowLayoutPanel { Dock=DockStyle.Fill,AutoSize=true,AutoSizeMode=AutoSizeMode.GrowAndShrink,
-                FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=Padding.Empty,Padding=Padding.Empty };
             foreach(var action in new[]{confirm,cancel})
             {
                 action.AutoSize=false;action.Width=AppScale.Scale(action==confirm?170:110);
                 action.Height=AppMetrics.ButtonHeight;action.Margin=new Padding(AppScale.Scale(8),AppScale.Scale(6),0,0);
-                actions.Controls.Add(action);
             }
+            var actions=HumanUi.DialogButtons(cancel,confirm);
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 1, RowCount = 2,
                 Margin=Padding.Empty,Padding=Padding.Empty };
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));

@@ -43,7 +43,7 @@ internal sealed class FeeRateDetailsDialog : ApplicationWindowForm
         layout.Controls.Add(HumanUi.Field("Amount", amount, true), 0, 0);
         layout.Controls.Add(HumanUi.Field("Frequency", frequency, true), 0, 1);
         layout.Controls.Add(HumanUi.Field("Remarks", remarks), 0, 2);
-        layout.Controls.Add(HumanUi.ButtonRow(apply, cancel), 0, 3);
+        layout.Controls.Add(HumanUi.DialogButtons(apply, cancel), 0, 3);
         Controls.Add(layout);
         FinanceHelp.Attach(this,amount,FinanceHelp.Topic.FeeRate);
         FinanceHelp.Attach(this,frequency,"Choose how often this fee can be charged: monthly, yearly, or as a one-time charge when needed.","Tuition is normally Monthly; an occasional book purchase is As Needed. This setting does not receive payment.");

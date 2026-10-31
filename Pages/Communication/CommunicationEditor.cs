@@ -21,8 +21,8 @@ internal sealed class CommunicationEditor : ApplicationWindowForm, IBusyPage, IU
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         var scroll=new Panel{Dock=DockStyle.Fill,AutoScroll=true,Padding=new Padding(AppMetrics.PagePadding)};
         fields.ColumnCount=1;scroll.Controls.Add(fields);
-        var actions=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=AppMetrics.ButtonRowHeight,FlowDirection=FlowDirection.RightToLeft};
-        var cancel=new ModernButton{Text="Cancel",ThemeRole="Secondary"};cancel.Click+=(_,_)=>Close();actions.Controls.Add(save);actions.Controls.Add(cancel);
+        var cancel=new ModernButton{Text="Cancel",ThemeRole="Secondary"};cancel.Click+=(_,_)=>Close();
+        var actions=HumanUi.DialogButtons(save,cancel);actions.Dock=DockStyle.Bottom;
         Controls.Add(scroll);Controls.Add(status);Controls.Add(actions);
         save.Click+=async(_,_)=>{
             if(IsBusy)return;IsBusy=true;save.Enabled=false;fields.Enabled=false;status.Text="";
