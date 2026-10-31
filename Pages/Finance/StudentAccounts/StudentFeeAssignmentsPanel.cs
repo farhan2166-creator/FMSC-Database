@@ -584,8 +584,8 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
         try
         {
             int id=Convert.ToInt32(row.Cells["StudentFeeAssignmentId"].Value);
-            using var form=new ChangeFeeDiscountForm(id,Convert.ToString(row.Cells["FeeTypeName"].Value)??"Fee",
-                Convert.ToDecimal(row.Cells["StandardAmount"].Value),Convert.ToDecimal(row.Cells["DiscountAmount"].Value));
+            var context=FeeDiscountPeriod.Context(id);
+            using var form=ChangeFeeDiscountForm.ForAssignment(id,context);
             if(form.ShowDialog(this)==DialogResult.OK){AnnounceChange();LoadGrid();}
         }
         catch(Exception ex){ModernMessageDialog.Show(FindForm(),DbMessage.UserMessage(ex),"Review Fee Terms",MessageBoxButtons.OK,MessageBoxIcon.Warning);}

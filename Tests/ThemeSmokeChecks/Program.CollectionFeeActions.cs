@@ -45,7 +45,7 @@ internal static partial class Program
                 var clickedMonth=month.AddMonths(1);
                 using var correction=(ChangeFeeDiscountForm)create.Invoke(null,new object?[]{41,planRoute.Rows[0],Enum.ToObject(choiceType,2),clickedMonth})!;
                 Check(Field<ModernDatePicker>(correction,"fromMonth").Value==clickedMonth&&Field<ModernDatePicker>(correction,"throughMonth").Value==clickedMonth,
-                    "Correct Fee Amount opens at the clicked charge month rather than today's month");
+                    "The owner-approved collection default resets both months to the clicked charge month");
             }
             using(var plan=context.Copy())
             {
@@ -59,7 +59,7 @@ internal static partial class Program
                     Check(Field<ModernComboBox>(form,"action").SelectedIndex==choice,"Each collection dialog selects its menu action");
                     var current=new DateTime(DateTime.Today.Year,DateTime.Today.Month,1);
                     Check(Field<ModernDatePicker>(form,"fromMonth").Value==current&&Field<ModernDatePicker>(form,"throughMonth").Value==current,
-                        "Collection defaults both editable months to the current month");
+                        "The owner-approved collection default resets both months to the starting month");
                     Check(Field<ModernComboBox>(form,"scope").Items.Count==3,"Collection retains the shared fee-plan and existing-bill scopes");
                 }
                 using var admission=new ChangeFeeDiscountForm(41,"Tuition Fee",700m,0m,plan.Rows[0],

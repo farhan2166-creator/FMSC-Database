@@ -72,8 +72,7 @@ public sealed partial class FeeCollectionPage
     }
     private static ChangeFeeDiscountForm CreateCollectionFeeDialog(int assignmentId,DataRow context,ChargeConcessionAction action,DateTime? chargeMonth=null)
     {
-        var dialog=new ChangeFeeDiscountForm(assignmentId,Convert.ToString(context["FeeTypeName"])??"Fee",
-            Convert.ToDecimal(context["StandardAmount"]),Convert.ToDecimal(context["DiscountAmount"]),context);
+        var dialog=ChangeFeeDiscountForm.ForAssignment(assignmentId,context);
         try
         {
             dialog.ConfigureCollectionAction((int)action,chargeMonth);

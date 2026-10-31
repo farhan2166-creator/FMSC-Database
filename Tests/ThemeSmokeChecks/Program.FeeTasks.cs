@@ -127,12 +127,23 @@ internal static partial class Program
             }
 
             monthly.Rows[0]["ConcessionLabel"]=DBNull.Value;oldDiscount=2000m;paid=0;mixedTerms=false;
+            monthly.Columns.Add("FeeTypeName");monthly.Columns.Add("StandardAmount",typeof(decimal));monthly.Columns.Add("DiscountAmount",typeof(decimal));
+            monthly.Rows[0]["FeeTypeName"]="Tuition";monthly.Rows[0]["StandardAmount"]=10000m;monthly.Rows[0]["DiscountAmount"]=2000m;
+            var admissionPayloads=new Dictionary<(int Action,int Scope),string>();
             foreach(bool collection in new[]{false,true})
             foreach(int choice in Enumerable.Range(0,4))
             foreach(int scope in Enumerable.Range(0,3))
             {
-                using var form=new ChangeFeeDiscountForm(41,"Tuition",10000,2000,monthly.Rows[0],Query,Save);
+                using var form=ChangeFeeDiscountForm.ForAssignment(41,monthly.Rows[0],Query,Save);
                 if(collection)form.ConfigureCollectionAction(choice);else Field<ModernComboBox>(form,"action").SelectedIndex=choice;
+                if(collection)
+                {
+                    Check(Field<ModernDatePicker>(form,"fromMonth").Value==Field<ModernDatePicker>(form,"throughMonth").Value,
+                        "Collection intentionally resets the end month to its start month");
+                    // Compare both entry points for the SAME explicitly chosen period;
+                    // their different initial through-month defaults are owner-approved.
+                    Field<ModernDatePicker>(form,"throughMonth").Value=new DateTime(DateTime.Today.Year,12,1);
+                }
                 Show(form);Field<ModernComboBox>(form,"scope").SelectedIndex=scope;
                 if(choice==0)Field<ModernTextBox>(form,"amount").Text="1500";
                 if(choice==2)Field<ModernTextBox>(form,"newRate").Text="9000";
@@ -146,6 +157,11 @@ internal static partial class Program
                     "One confirmation internally checks and saves exactly once without a second review screen");
                 Check((bool)Arg("@UpdateAgreement")== (scope is 0 or 1) && (bool)Arg("@ApplyToBills")== (scope is 1 or 2),
                     "Single-screen confirmation preserves the chosen fee-plan and issued-bill scope");
+                string payload=string.Join("|",captured!.Select(parameter=>parameter.ParameterName+"="+
+                    (parameter.Value is DateTime date?date.ToString("O",System.Globalization.CultureInfo.InvariantCulture):Convert.ToString(parameter.Value,System.Globalization.CultureInfo.InvariantCulture))));
+                if(!collection)admissionPayloads[(choice,scope)]=payload;
+                else Check(admissionPayloads[(choice,scope)]==payload,
+                    "Admission and collection submit identical amounts, labels, dates, scope, payment treatment and snapshot for the same choices");
             }
             paid=10000m;
             using(var form=new ChangeFeeDiscountForm(41,"Tuition",10000,2000,monthly.Rows[0],Query,Save))

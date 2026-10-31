@@ -53,6 +53,15 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     public ChangeFeeDiscountForm(int id,string fee,decimal rate,decimal discount,DataRow? periodContext=null)
         : this(id,fee,rate,discount,periodContext,null,null) { }
 
+    internal static ChangeFeeDiscountForm ForAssignment(int id,DataRow context,
+        Func<SqlParameter[],Task<DataSet>>? query=null,Func<SqlParameter[],Task<MutationWriteResult>>? submit=null)
+    {
+        if(context.Table.Columns.Contains("BillingChargeId"))
+            throw new ArgumentException("Use a fee-plan context for assignment changes.",nameof(context));
+        return new(id,Convert.ToString(context["FeeTypeName"])??"Fee",Convert.ToDecimal(context["StandardAmount"]),
+            Convert.ToDecimal(context["DiscountAmount"]),context,query,submit);
+    }
+
     internal ChangeFeeDiscountForm(int id,string fee,decimal rate,decimal discount,DataRow? context,
         Func<SqlParameter[],Task<DataSet>>? query,Func<SqlParameter[],Task<MutationWriteResult>>? submit)
     {
@@ -128,15 +137,20 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         ReadPending(); State();
     }
     private static DateTime First(DateTime value)=>new(value.Year,value.Month,1);
+    // Owner decision — 31 October 2026 (Docs/Decisions/FEE_MANAGEMENT_SHARED_RULES.md):
+    // Admissions and Collection share all fee rules, fields, scopes and one-screen confirmation.
+    // Collection alone opens a fixed action from its own menu, hiding the admission action tabs,
+    // and resets BOTH From and Through to its starting month (clicked charge, or current month,
+    // clamped to the valid fee period). Admissions retains its normal through-month default.
     internal void ConfigureCollectionAction(int choice,DateTime? chargeMonth=null)
     {
         if(choice is <0 or >3 || billId is not null)
             throw new ArgumentException("Choose a fee-plan action.",nameof(choice));
         collectionAction=choice;
         action.SelectedIndex=choice;
-        DateTime current=First(chargeMonth??DateTime.Today);
-        current=current<fromMonth.MinDate?fromMonth.MinDate:current>fromMonth.MaxDate?fromMonth.MaxDate:current;
-        fromMonth.Value=throughMonth.Value=current;
+        DateTime selected=First(chargeMonth??DateTime.Today);
+        selected=selected<fromMonth.MinDate?fromMonth.MinDate:selected>fromMonth.MaxDate?fromMonth.MaxDate:selected;
+        fromMonth.Value=throughMonth.Value=selected;
         Text=$"{action.Items[choice]} — {feeName}";
         initial=Draft();State();
     }
