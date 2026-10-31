@@ -2,9 +2,9 @@ using Microsoft.Data.SqlClient;
 
 internal sealed class Lifecycle(Fixture f, Report r)
 {
-    private int student, sibling, originalEnrollment, newEnrollment;
+    private int student, sibling, originalEnrollment, historicalStudent, historicalEnrollment, newEnrollment;
     private string oldFinancialSnapshot = "";
-    private DateTime paidDate => f.MonthlyDate.AddDays(3);
+    private DateTime paidDate => DateTime.UtcNow.Date;
 
     internal async Task Run()
     {
@@ -32,7 +32,7 @@ internal sealed class Lifecycle(Fixture f, Report r)
             (DateTime)details["DateOfBirth"] == f.BirthDate && Convert.ToString(details["Gender"]) == "Male" && details.IsNull("ContactNumber"), "Persisted admission details match the submitted fictional draft, including optional phone.");
         r.Check(!details.IsNull("AdmissionNumber") && !details.IsNull("RegistrationNumber") && Convert.ToString(details["Status"]) == "Active", "Official admission and registration identities were assigned to an active student.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE EnrollmentId=@Enrollment AND AdmissionId=@Student AND AcademicYearId=@Year AND ClassSectionId=@Placement AND BillingReady=1 AND PlacementConfirmedAt IS NOT NULL;",
-            Sql.P("@Enrollment", originalEnrollment), Sql.P("@Student", student), Sql.P("@Year", f.SourceYear), Sql.P("@Placement", f.Placement6)) == 1, "Confirmed first enrollment has the exact source year/campus/class/section.");
+            Sql.P("@Enrollment", originalEnrollment), Sql.P("@Student", student), Sql.P("@Year", f.NextYear), Sql.P("@Placement", f.Placement6)) == 1, "Confirmed current-year enrollment retains the exact year/campus/class/section.");
         r.Check(Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE EnrollmentId=@Enrollment;", Sql.P("@Enrollment", originalEnrollment)) == 7000, "Opening tuition 5000 plus annual admission 2000 equals 7000.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@Enrollment AND CancelledAt IS NULL;", Sql.P("@Enrollment", originalEnrollment)) == 2, "Exactly two mandatory opening assignments were persisted.");
         var second = Sql.Proc("AdmitStudent", f.AdmissionArgs("Zara Example", student)); sibling = Convert.ToInt32(second.Rows[0]["AdmissionId"]);
@@ -44,14 +44,16 @@ internal sealed class Lifecycle(Fixture f, Report r)
 
     private Task Posting()
     {
-        var posted = Post(originalEnrollment, f.SourceYear, f.MonthlyDate, f.Tuition);
-        r.Check(Convert.ToInt32(posted.Rows[0]["ChargesCreated"]) == 1, "An eligible monthly fee posts exactly one charge.");
+        // The current month's opening charge was already posted by admission.
+        // Trying that same month must not create a duplicate.
+        var posted = Post(originalEnrollment, f.NextYear, f.MonthlyDate, f.Tuition);
+        r.Check(Convert.ToInt32(posted.Rows[0]["ChargesCreated"]) == 0, "Posting the opening month again creates no duplicate charge.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@Enrollment AND AdmissionId=@Student AND FeeTypeId=@Fee AND BillingMonth=@Month AND ChargeDate=@Month AND NetAmount=5000 AND ChargeKind=N'Monthly';",
             Sql.P("@Enrollment", originalEnrollment), Sql.P("@Student", student), Sql.P("@Fee", f.Tuition), Sql.P("@Month", f.MonthlyDate)) == 1, "The posted charge has the exact fee, month, enrollment and amount.");
-        r.Check(Convert.ToInt32(Post(originalEnrollment, f.SourceYear, f.MonthlyDate, f.Tuition).Rows[0]["ChargesCreated"]) == 0, "Repeating the same monthly posting creates zero additional charges.");
-        r.Check(Convert.ToInt32(Post(originalEnrollment, f.SourceYear, f.MonthlyDate, f.Purchase).Rows[0]["ChargesCreated"]) == 0, "An unassigned/unconfigured fee is reported as not posted rather than silently invented.");
-        r.Refused("Posting cannot assign a charge to the wrong academic year", () => { Post(originalEnrollment, f.NextYear, f.MonthlyDate, f.Tuition); return Task.CompletedTask; }, 54744).GetAwaiter().GetResult();
-        r.Check(Balance(originalEnrollment) == 12000, "Opening and monthly charges reconcile to exactly 12000 outstanding.");
+        r.Check(Convert.ToInt32(Post(originalEnrollment, f.NextYear, f.MonthlyDate, f.Tuition).Rows[0]["ChargesCreated"]) == 0, "Repeating monthly posting remains idempotent.");
+        r.Check(Convert.ToInt32(Post(originalEnrollment, f.NextYear, f.MonthlyDate, f.Purchase).Rows[0]["ChargesCreated"]) == 0, "An unassigned/unconfigured fee is reported as not posted rather than silently invented.");
+        r.Refused("Posting cannot assign a charge to the wrong academic year", () => { Post(originalEnrollment, f.SourceYear, f.MonthlyDate, f.Tuition); return Task.CompletedTask; }, 54744).GetAwaiter().GetResult();
+        r.Check(Balance(originalEnrollment) == 7000, "Current-year opening charges reconcile to 7000 without a duplicate monthly fee.");
         return Task.CompletedTask;
     }
 
@@ -61,13 +63,13 @@ internal sealed class Lifecycle(Fixture f, Report r)
         int initial = PaymentCount(originalEnrollment);
         await r.Refused("Payment amount must equal its allocations", async () => await CollectExact(originalEnrollment, paidDate, 1000, new[] { (first, 999m) }), 54011);
         await r.Refused("An allocation cannot exceed its unpaid charge", async () => await CollectExact(originalEnrollment, paidDate, 9000, new[] { (first, 9000m) }), 54013);
-        r.Check(PaymentCount(originalEnrollment) == initial && Balance(originalEnrollment) == 12000, "Invalid allocations roll back and retain all original dues.");
+        r.Check(PaymentCount(originalEnrollment) == initial && Balance(originalEnrollment) == 7000, "Invalid allocations roll back and retain all original dues.");
         var partial = await Collect(originalEnrollment, paidDate, 4000);
         r.Check(Convert.ToInt32(partial.Rows[0]["FeePaymentId"]) > 0 && !string.IsNullOrWhiteSpace(Convert.ToString(partial.Rows[0]["ReceiptNumber"])), "Partial collection returns a receipt and durable payment identity.");
-        r.Check(Balance(originalEnrollment) == 8000, "Partial collection leaves exactly 8000 outstanding.");
+        r.Check(Balance(originalEnrollment) == 3000, "Partial collection leaves exactly 3000 outstanding.");
         r.Check(Payments(originalEnrollment) == 4000 && Allocations(originalEnrollment) == 4000, "Partial payment total equals persisted allocations.");
-        await Collect(originalEnrollment, paidDate, 8000);
-        r.Check(Balance(originalEnrollment) == 0 && Payments(originalEnrollment) == 12000 && Allocations(originalEnrollment) == 12000, "Final collection settles the ledger and reconciles all 12000.");
+        await Collect(originalEnrollment, paidDate, 3000);
+        r.Check(Balance(originalEnrollment) == 0 && Payments(originalEnrollment) == 7000 && Allocations(originalEnrollment) == 7000, "Final collection settles the ledger and reconciles all 7000.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@Enrollment AND Status<>N'Paid';", Sql.P("@Enrollment", originalEnrollment)) == 0, "All original-year posted charges are Paid after settlement.");
         int count = PaymentCount(originalEnrollment);
         long paidCharge = Convert.ToInt64(Sql.Scalar("SELECT MIN(BillingChargeId) FROM dbo.BillingCharges WHERE EnrollmentId=@Enrollment;", Sql.P("@Enrollment", originalEnrollment)));
@@ -103,7 +105,7 @@ internal sealed class Lifecycle(Fixture f, Report r)
         r.Check(Convert.ToInt64(Sql.Proc("PostAdditionalFee", Args()).Rows[0]["BillingChargeId"]) == charge, "Exact manual request replay returns the original charge identity.");
         await r.Refused("A manual request ID cannot be reused with a different discount", () => { Sql.Proc("PostAdditionalFee", Args(100)); return Task.CompletedTask; }, 53026);
         await CollectExact(originalEnrollment, paidDate, 1000, new[] { (charge, 1000m) });
-        r.Check(Balance(originalEnrollment) == 0 && Payments(originalEnrollment) == 13000 && Allocations(originalEnrollment) == 13000, "Manual purchase settles exactly 1000 and original-year collections total 13000.");
+        r.Check(Balance(originalEnrollment) == 0 && Payments(originalEnrollment) == 8000 && Allocations(originalEnrollment) == 8000, "Manual purchase settles exactly 1000 and current-year collections total 8000.");
         oldFinancialSnapshot = FinancialSnapshot(originalEnrollment);
     }
 
@@ -151,13 +153,13 @@ internal sealed class Lifecycle(Fixture f, Report r)
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.FeePaymentAllocations A LEFT JOIN dbo.FeePayments P ON P.FeePaymentId=A.FeePaymentId LEFT JOIN dbo.BillingCharges C ON C.BillingChargeId=A.BillingChargeId WHERE P.FeePaymentId IS NULL OR C.BillingChargeId IS NULL OR P.AdmissionId<>C.AdmissionId OR P.EnrollmentId<>C.EnrollmentId;") == 0, "No orphan allocation or payment against the wrong enrollment.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE dbo.GetFeeChargeBalance(BillingChargeId)<0;") == 0, "No unexplained negative charge balances.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.FeePayments P WHERE P.Status=N'Completed' AND P.PaymentMethod NOT IN(N'Refund',N'Correction') AND P.TotalAmount<>ISNULL((SELECT SUM(A.Amount) FROM dbo.FeePaymentAllocations A WHERE A.FeePaymentId=P.FeePaymentId),0);") == 0, "All completed collections reconcile exactly with allocation rows.");
-        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.PromotionBatchStudents WHERE AdmissionId=@Student;", Sql.P("@Student", student)) == 1, "Exactly one promotion decision exists.");
+        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.PromotionBatchStudents WHERE AdmissionId=@Student;", Sql.P("@Student", historicalStudent)) == 1, "Exactly one historical-student promotion decision exists.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM (SELECT EnrollmentId,FeeTypeId,BillingMonth,ChargeKind FROM dbo.BillingCharges WHERE Status<>N'Cancelled' AND ChargeKind IN(N'Monthly',N'Annual') GROUP BY EnrollmentId,FeeTypeId,BillingMonth,ChargeKind HAVING COUNT(*)>1) X;") == 0, "No duplicate active monthly or annual billing charges.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM sys.foreign_keys WHERE is_disabled=1 OR is_not_trusted=1;") == 0 &&
             Sql.Count("SELECT COUNT(*) FROM sys.check_constraints WHERE is_disabled=1 OR is_not_trusted=1;") == 0, "Referential and financial constraints remain trusted and enabled.");
-        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE AdmissionId=@Student AND Status=N'Active' AND ClassSectionId=@Placement;", Sql.P("@Student", student), Sql.P("@Placement", f.Placement7)) == 1 &&
-            Convert.ToString(Sql.Scalar("SELECT Status FROM dbo.Students WHERE AdmissionId=@Student;", Sql.P("@Student", student))) == "Active", "Current status/class is Class 7 Active with historical Class 6 retained.");
-        r.Check(Payments(originalEnrollment) == 13000 && Payments(newEnrollment) == 3000, "Historical collections 13000 and current-year collections 3000 remain separated.");
+        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE AdmissionId=@Student AND Status=N'Active' AND ClassSectionId=@Placement;", Sql.P("@Student", historicalStudent), Sql.P("@Placement", f.Placement7)) == 1 &&
+            Convert.ToString(Sql.Scalar("SELECT Status FROM dbo.Students WHERE AdmissionId=@Student;", Sql.P("@Student", historicalStudent))) == "Active", "Promoted historical student is active in Class 7, retaining Class 6 history.");
+        r.Check(Payments(originalEnrollment) == 8000 && Payments(newEnrollment) == 3000, "Current-year collections and promoted student's collections retain separate enrollment identities.");
         return Task.CompletedTask;
     }
 
@@ -207,14 +209,14 @@ internal sealed class Lifecycle(Fixture f, Report r)
     {
         var open = Sql.Query("SELECT TOP(1) BillingChargeId,DiscountAmount,dbo.GetFeeChargeBalance(BillingChargeId) Balance FROM dbo.BillingCharges WHERE EnrollmentId=@Id AND dbo.GetFeeChargeBalance(BillingChargeId)>0 ORDER BY BillingChargeId;", Sql.P("@Id", newEnrollment)).Rows[0];
         int count = PaymentCount(newEnrollment); decimal balance = Balance(newEnrollment);
-        var stale = new CollectionDiscountWriter.Edit(Convert.ToInt64(open["BillingChargeId"]), student, newEnrollment, 1, 0, Convert.ToDecimal(open["Balance"]));
+        var stale = new CollectionDiscountWriter.Edit(Convert.ToInt64(open["BillingChargeId"]), historicalStudent, newEnrollment, 1, 0, Convert.ToDecimal(open["Balance"]));
         await r.Refused("A stale bill-discount review cannot collect", async () => await CollectionDiscountWriter.CollectAsync("ProcessFeeTransaction", new[] { stale }, "Synthetic stale review",
-            CollectionArgs(student, newEnrollment, f.NextMonthlyDate, 500, new[] { (stale.ChargeId, 500m) })), 53104);
+            CollectionArgs(historicalStudent, newEnrollment, f.NextMonthlyDate, 500, new[] { (stale.ChargeId, 500m) })), 53104);
         CurrentUser.UserId = f.Restricted;
         try {
             var edit = stale with { OriginalDiscount = 0 };
             await r.Refused("A restricted operator cannot adjust a bill", async () => await CollectionDiscountWriter.CollectAsync("ProcessFeeTransaction", new[] { edit }, "Synthetic unauthorized edit",
-                CollectionArgs(student, newEnrollment, f.NextMonthlyDate, 500, new[] { (edit.ChargeId, 500m) })), 50003);
+                CollectionArgs(historicalStudent, newEnrollment, f.NextMonthlyDate, 500, new[] { (edit.ChargeId, 500m) })), 50003);
         }
         finally { CurrentUser.UserId = f.Admin; }
         r.Check(PaymentCount(newEnrollment) == count && Balance(newEnrollment) == balance, "Stale and unauthorized financial attempts leave payments and balances unchanged.");
@@ -235,7 +237,7 @@ internal sealed class Lifecycle(Fixture f, Report r)
 
     private DataTable Promote(int destinationYear, int placement)
     {
-        var decisions = new DataTable(); decisions.Columns.Add("AdmissionId", typeof(int)); decisions.Columns.Add("Decision", typeof(string)); decisions.Rows.Add(student, "PROMOTE");
+        var decisions = new DataTable(); decisions.Columns.Add("AdmissionId", typeof(int)); decisions.Columns.Add("Decision", typeof(string)); decisions.Rows.Add(historicalStudent, "PROMOTE");
         return Sql.Proc("BulkPromoteStudents", Sql.P("@UserId", f.Admin), Sql.P("@SourceAcademicYearId", f.SourceYear), Sql.P("@DestinationAcademicYearId", destinationYear),
             Sql.P("@SourceCampusId", f.Campus), Sql.P("@SourceClassId", f.Class6), Sql.P("@SourceSectionId", f.Section), Sql.P("@DestinationClassSectionId", placement),
             Sql.P("@EffectiveDate", f.PromotionDate), Sql.P("@Remarks", "Fictional year-end promotion"), Sql.TvpParameter("@Decisions", "BulkPromotionDecisionType", decisions));
@@ -254,7 +256,9 @@ internal sealed class Lifecycle(Fixture f, Report r)
         return CollectExact(enrollment, date, amount, lines);
     }
     private Task<DataTable> CollectExact(int enrollment, DateTime date, decimal amount, IEnumerable<(long,decimal)> allocations) =>
-        CollectionDiscountWriter.CollectAsync("ProcessFeeTransaction", Array.Empty<CollectionDiscountWriter.Edit>(), "Fictional lifecycle collection", CollectionArgs(student, enrollment, date, amount, allocations));
+        CollectionDiscountWriter.CollectAsync("ProcessFeeTransaction", Array.Empty<CollectionDiscountWriter.Edit>(), "Fictional lifecycle collection",
+            CollectionArgs(Sql.Count("SELECT AdmissionId FROM dbo.Enrollments WHERE EnrollmentId=@Id;", Sql.P("@Id", enrollment)),
+                enrollment, date, amount, allocations));
     internal static SqlParameter[] CollectionArgs(int admission, int enrollment, DateTime date, decimal amount, IEnumerable<(long,decimal)> allocations, string remarks = "Fictional lifecycle collection") => new[] {
         Sql.P("@AdmissionId", admission), Sql.P("@EnrollmentId", enrollment), Sql.P("@TransactionType", "Collection"), Sql.P("@Amount", amount), Sql.P("@TransactionDate", date),
         Sql.P("@PaymentMethod", "Cash"), Sql.P("@ReferenceNumber", null), Sql.P("@Remarks", remarks), Sql.P("@FeePaymentId", null),
