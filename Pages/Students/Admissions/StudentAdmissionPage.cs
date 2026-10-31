@@ -709,7 +709,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                 siblingsGrid.Dispose();
                 siblingsStatus.Dispose();
                 findSiblingButton.Dispose();
-                addNewSiblingButton.Dispose();
                 openSiblingButton.Dispose();
             }
         }
@@ -2007,7 +2006,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             siblingsLayout.Controls.Add(siblingsStatus, 0, 0);
             siblingsLayout.Controls.Add(siblingsGrid, 0, 1);
             siblingsLayout.Controls.Add(
-                HumanUi.ButtonRow(addNewSiblingButton, findSiblingButton, openSiblingButton),
+                HumanUi.ButtonRow(findSiblingButton, openSiblingButton),
                 0,
                 2);
             siblingsCard.Content.Controls.Add(siblingsLayout);

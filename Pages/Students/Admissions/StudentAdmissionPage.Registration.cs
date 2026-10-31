@@ -8,7 +8,6 @@ public sealed partial class StudentAdmissionPage
     protected override bool StatusBelowActions => true;
     private ModernButton? quickRegistrationButton, registrationRecoveryButton;
     private readonly Label pendingSiblingCount = new() { AutoSize = false, Height = AppMetrics.ButtonHeight, Font = AppTheme.NormalFont, TextAlign = ContentAlignment.MiddleLeft };
-    private readonly ModernButton addNewSiblingButton = new() { Text = "Add New Sibling", ThemeRole = "Secondary" };
     private bool IsCancelledRegistration => _workspaceStudentStatus == "Cancelled";
     private Action<Func<Control>, string, string> RegistrationNavigation => _navigate ?? ((_, _, _) => { });
 
@@ -20,7 +19,6 @@ public sealed partial class StudentAdmissionPage
             if (!IsBusy) RegistrationEntryDialog.CheckPreviousSave(FindForm(), RegistrationNavigation);
             await Task.CompletedTask;
         }, "Secondary");
-        addNewSiblingButton.Click += async (_, _) => await RegisterChildAsync(true);
         var draft = new ToolStripMenuItem("Save Registration Draft");
         draft.Click += async (_, _) => { if (IsPendingRegistration && !IsBusy) await SaveDraftOrDetailsAsync(); };
         enrollmentActionsMenu.Items.Add(draft);
@@ -39,7 +37,6 @@ public sealed partial class StudentAdmissionPage
     {
         bool ready = !IsBusy && unconfirmedAdmission is null;
         if (quickRegistrationButton is not null) quickRegistrationButton.Enabled = ready && currentAdmissionId > 0 && !IsCancelledRegistration && CurrentUser.HasPermission("Students.Admit") && CurrentUser.HasPermission("Students.View") && CurrentUser.HasPermission("Students.Administer");
-        if (addNewSiblingButton is not null) addNewSiblingButton.Enabled = ready && currentAdmissionId > 0 && !IsCancelledRegistration && CurrentUser.HasPermission("Students.Admit") && CurrentUser.HasPermission("Students.Administer");
         if (registrationRecoveryButton is not null)
         {
             try { registrationRecoveryButton.Visible = QuickRegistrationRecoveryJournal.ReadPending() is not null; }

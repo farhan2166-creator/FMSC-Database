@@ -39,8 +39,6 @@ internal static partial class Program
             Check(Field<ModernButton>("saveButton").Text == "Confirm & Save", "Completing pending details does not require saving a draft first");
             Check(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationConfirm"].Value) == "Confirm & Save", "Pending children get Confirm & Save on their own row");
             Check(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationCancel"].Value) == "Cancel", "Pending children retain row cancellation");
-            var addSibling = Field<ModernButton>("addNewSiblingButton");
-            Check(addSibling.Parent is FlowLayoutPanel && addSibling.Enabled && addSibling.Visible && addSibling.Parent.ClientRectangle.Contains(addSibling.Bounds), "Add New Sibling is visible inside the existing sibling action row");
             using var rows = new DataTable(); rows.Columns.Add("Status"); var pending = rows.Rows.Add("Pending"); var cancelled = rows.Rows.Add("Cancelled");
             var picker = Field<StudentPicker>("quickStudent");
             Check(picker.RowFilter!(pending) && picker.RowFilter!(cancelled), "Admission quick search accepts pending and cancelled records");
@@ -49,11 +47,11 @@ internal static partial class Program
             type.GetMethod("SwitchTab", flags)!.Invoke(page, new object[] { 1 });
             Set("_workspaceStudentStatus", "Cancelled"); family.Rows[0]["Status"] = "Cancelled"; Update();
             Check(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationReopen"].Value) == "Reopen", "Cancelled registration exposes row reopening");
-            Check(string.IsNullOrEmpty(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationConfirm"].Value)) && !Field<ModernButton>("saveButton").Enabled && !addSibling.Enabled, "Cancelled records cannot be confirmed, edited through Save or used to create siblings");
+            Check(string.IsNullOrEmpty(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationConfirm"].Value)) && !Field<ModernButton>("saveButton").Enabled && !Field<ModernButton>("quickRegistrationButton").Enabled, "Cancelled records cannot be confirmed, edited through Save or used to create siblings");
             Set("_workspaceStudentStatus", "Active"); family.Rows[0]["Status"] = "Active"; Update();
             Check(string.IsNullOrEmpty(Convert.ToString(siblingGrid.Rows[0].Cells["RegistrationReopen"].Value)), "Admitted students do not get registration reopening");
             CurrentUser.SignIn(2, "Read only", "Operator", false, new[] { "Students.View" }); Update();
-            Check(!Field<ModernButton>("quickRegistrationButton").Enabled && !addSibling.Enabled, "Viewing access does not grant registration writes");
+            Check(!Field<ModernButton>("quickRegistrationButton").Enabled && !Field<ModernButton>("quickRegistrationButton").Enabled, "Viewing access does not grant registration writes");
             CurrentUser.SignIn(3, "Registration without family access", "Operator", false, new[] { "Students.Admit", "Students.View" }); Update();
             Check(!Field<ModernButton>("quickRegistrationButton").Enabled, "Admit Sibling requires family-link write permission before the button is enabled");
             CurrentUser.SignIn(1, "Fictional admission operator", "Administrator", false, Array.Empty<string>());
@@ -91,7 +89,9 @@ internal static partial class Program
             Check(!ChildField<ModernTextBox>("contact").Visible && !ChildField<ModernTextBox>("address").Visible && ChildField<ModernTextBox>("contact").Text == "03001234567" && ChildField<ModernTextBox>("address").Text == "Shared address", "Hidden inherited contact fields retain their saved values");
             var siblingFields = (TableLayoutPanel)ChildField<ModernTextBox>("name").Parent!.Parent!;
             Check(siblingFields.GetRow(ChildField<ModernDatePicker>("joining").Parent!) == 0 && siblingFields.GetRow(ChildField<LookupBox>("year").Parent!) == 0 && siblingFields.GetRow(ChildField<ModernTextBox>("name").Parent!) == 1 && siblingFields.GetRow(ChildField<PlacementPicker>("placement").Parent!) == 1 && siblingFields.RowCount == 3, "Sibling fields use three rows with dates first and student placement second");
-            Check(ChildField<LookupBox>("year").Width == ChildField<ModernTextBox>("name").Width && ChildField<PlacementPicker>("placement").Width == ChildField<ModernTextBox>("name").Width, "Sibling lookup widths match text fields");
+            Check(!ChildField<ModernTextBox>("siblingBirth").Visible && siblingFields.GetColumn(ChildField<ModernComboBox>("siblingGender").Parent!) == 0 && siblingFields.GetRow(ChildField<ModernComboBox>("siblingGender").Parent!) == 2 && siblingFields.GetColumn(ChildField<ModernTextBox>("parent").Parent!) == 1, "Gender replaces father on the left; father replaces hidden birthplace on the right");
+            Check(ChildField<ModernComboBox>("siblingGender").SelectedIndex == -1 && ChildField<ModernComboBox>("siblingGender").Items.Count == 3 && ChildField<ModernComboBox>("siblingGender").Enabled, "Sibling gender requires an explicit selection before the first save");
+            Check(ChildField<ModernDatePicker>("joining").Width == ChildField<ModernTextBox>("name").Width && ChildField<LookupBox>("year").Width == ChildField<ModernTextBox>("name").Width && ChildField<PlacementPicker>("placement").Width == ChildField<ModernTextBox>("name").Width, "Sibling lookup widths match text fields");
             using var childImage = new Bitmap(childHost.Width, childHost.Height); childHost.DrawToBitmap(childImage, new Rectangle(Point.Empty, childImage.Size)); childImage.Save("artifacts/registration-workflow-ui/admit-sibling.png");
             using var reopen = new RegistrationReopenDialog(123, "Fictional Child", false); reopen.Show(); Application.DoEvents();
             Check(typeof(RegistrationReopenDialog).GetField("placement", flags)!.GetValue(reopen) is PlacementPicker, "Reopening uses Add Placement's shared picker");

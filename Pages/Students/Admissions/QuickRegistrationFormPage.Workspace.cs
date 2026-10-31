@@ -10,6 +10,7 @@ internal sealed partial class QuickRegistrationFormPage
     private bool workspaceLoaded,workspaceHosted,recoveryOnly;
     private Guid? workspaceSaveRequest;
     private bool siblingEntry;
+    private readonly ModernComboBox siblingGender = HumanUi.Combo();
     private readonly ModernTextBox siblingBirth = HumanUi.TextBox(false, 500);
     internal void ConfigureSiblingEntry(int anchor, string father, string phone, string home, string birth)
     {
@@ -18,19 +19,23 @@ internal sealed partial class QuickRegistrationFormPage
         PrepareForEmbedding(keepActions: false);
         SetWorkspaceFamily(anchor, father, phone, home);
         siblingBirth.Text = birth; siblingBirth.ReadOnly = true;
+        siblingGender.Items.AddRange(new object[] { "Male", "Female", "Other" });
+        siblingGender.SelectedIndex = -1;
         var previous = registrationContent.GetControlFromPosition(0, 1);
         var fields = Fields(("Joining date", joining, true, 1), ("Academic year", year, true, 1),
             ("Student name", name, true, 1), ("Campus / Class / Section", placement, true, 1),
-            ("Father name", parent, true, 1), ("Place of birth", siblingBirth, false, 1));
+            ("Gender", siblingGender, true, 1), ("Father name", parent, true, 1));
         // Keep inherited values alive for validation and saving when removing the old grid.
-        foreach (var input in new[] { contact, address })
+        foreach (var input in new[] { contact, address, siblingBirth })
         {
             registrationContent.Controls.Add(input);
             input.Visible = false;
         }
         registrationContent.Controls.Remove(previous); previous?.Dispose();
+
+        foreach (Control input in new Control[] { name, joining, year, placement, siblingGender, parent, contact, siblingBirth, address }) input.MaximumSize = Size.Empty;
         registrationContent.Controls.Add(fields, 0, 1);
-        foreach (Control input in new Control[] { name, joining, year, placement, parent, contact, siblingBirth, address }) input.MaximumSize = Size.Empty;
+        fields.PerformLayout();
         root.RowStyles[0].Height = AppMetrics.FieldCardHeight(3);
         registrationCard.SetHeaderText("Admit Sibling", "Shared details come from the loaded student. Complete this child's name, placement and fees.");
         year.SelectedValue = defaultAcademicYear;
