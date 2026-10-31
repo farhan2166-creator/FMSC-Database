@@ -9,6 +9,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     private int newDraftStudent;
     private readonly Func<string,bool>? discardConfirmation;
     private readonly Func<int,DataTable> readCertificates;
+    private readonly Action<StudentPicker> refreshStudent;
     // Short certificate details can be retyped without a discard warning.
     public bool HasUnsavedChanges => reissue.Blocked;
     private bool ConfirmDraftDiscard(string message)=>!HasUnsavedChanges||
@@ -67,11 +68,13 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         Width = AppScale.Scale(120)
     };
     public RegularStudentCertificatePage():this(true){ }
-    internal RegularStudentCertificatePage(bool initialize,Func<string,bool>? discardConfirmation=null,Func<int,DataTable>? readCertificates=null)
+    internal RegularStudentCertificatePage(bool initialize,Func<string,bool>? discardConfirmation=null,Func<int,DataTable>? readCertificates=null,
+        Action<StudentPicker>? refreshStudent=null)
         : base("Regular Student Certificate", "Record and print regular student (proof of placement) certificates.")
     {
         this.discardConfirmation=discardConfirmation;
         this.readCertificates=readCertificates??(id=>DatabaseHelper.QueryUser("GetRegularStudentCertificateRecords",DatabaseHelper.Int("@AdmissionId",id)));
+        this.refreshStudent=refreshStudent??CertificateCollectionFlow.RefreshStudent;
         copyFlow.Wire(this,()=>selectedIssueId,id=>{int record=selectedRegularStudentCertificateId;LoadCertificates(student.SelectedId);SelectCertificate(record,id);},()=>HasCertificateEdits);
         className.MaxLength = 100;
         className.ReadOnly = true;
@@ -721,7 +724,7 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
     {
         if (creatingCertificate||student.SelectedId<=0)return;
         if(!ConfirmDraftDiscard("Discard the unsaved changes and refresh certificates?"))return;
-        try {CertificateCollectionFlow.RefreshStudent(student);}catch(Exception ex){Fail(ex);return;}
+        try {refreshStudent(student);}catch(Exception ex){Fail(ex);return;}
         if (selectedRegularStudentCertificateId > 0)
         {
             int id = selectedRegularStudentCertificateId;
