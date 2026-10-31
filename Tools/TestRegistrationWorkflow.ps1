@@ -10,8 +10,12 @@ $directory=$run.Replace("'","''")
 $versionLines=@(& sqlcmd -S $Instance -E -d FMSC_DB -b -l 10 -h -1 -W -Q "SET NOCOUNT ON; SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC;")
 if($LASTEXITCODE -ne 0){throw 'Could not read source schema version.'}
 $version=($versionLines | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^\d+$' }) -join ''
-if($version -notin @('63','64')){throw 'Registration tests require schema 63 or 64.'}
-$migration=if($version -eq '63'){[IO.File]::ReadAllText((Join-Path $root 'Migrations/64.sql'))}else{''}
+if($version -notin @('63','64','65')){throw 'Registration tests require schema 63, 64 or 65.'}
+# Upgrade only the disposable clone, in order; never rerun a source migration.
+$migration=(@(
+ if($version -eq '63'){[IO.File]::ReadAllText((Join-Path $root 'Migrations/64.sql'))}
+ if($version -in @('63','64')){[IO.File]::ReadAllText((Join-Path $root 'Migrations/65.sql'))}
+) -join "`r`n")
 $header=@"
 SET NOCOUNT ON; SET XACT_ABORT ON; SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON;
 SET ANSI_PADDING ON; SET ANSI_WARNINGS ON; SET ARITHABORT ON; SET CONCAT_NULL_YIELDS_NULL ON; SET NUMERIC_ROUNDABORT OFF;
