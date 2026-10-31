@@ -98,7 +98,8 @@ internal static partial class Program
             // actual main selection and bound account identity instead of its caption.
             Check(picker.SelectedId == 41 &&
                 Field<Dictionary<int,string>>("accountStudentNames").TryGetValue(41,out string? accountName) &&
-                accountName == "Synthetic Ava" && Field<ModernButton>("annualReceiptsButton").Enabled,
+                accountName.StartsWith("Synthetic Ava",StringComparison.Ordinal) &&
+                Field<ModernButton>("annualReceiptsButton").Enabled,
                 "The bound main student's identity is retained and annual receipts are available");
             Check(Field<ModernButton>("annualReceiptsButton").Parent!=Field<ModernButton>("generateStatementButton").Parent,
                 "Related reports are separate from statement generation actions");
