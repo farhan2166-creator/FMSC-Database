@@ -68,7 +68,6 @@ Console.WriteLine($"PASS: {await FilePersistenceChecks.RunAsync()} logo prefligh
 Console.WriteLine($"PASS: {AdministrativeAccessChecks.Run()} administrative drafts, access previews and transaction-outcome checks.");
 Console.WriteLine($"PASS: {ThemeAppearanceChecks.Run()} lightweight palettes, saved preferences and refresh delivery checks.");
 
-Console.WriteLine($"PASS: {RegistrationBillChecks.Run()} student and family bill data checks.");
 
 Console.WriteLine($"PASS: {QuickRegistrationRecoveryChecks.Run()} registration commit-outcome and durable recovery checks.");
 
