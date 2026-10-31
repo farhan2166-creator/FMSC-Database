@@ -9,6 +9,14 @@ public sealed partial class StudentAdmissionPage
     private ModernButton? quickRegistrationButton, registrationRecoveryButton;
     private readonly Label pendingSiblingCount = new() { AutoSize = false, Height = AppMetrics.ButtonHeight, Font = AppTheme.NormalFont, TextAlign = ContentAlignment.MiddleLeft };
     private bool IsCancelledRegistration => _workspaceStudentStatus == "Cancelled";
+    // Mirror CloseStudentAdmission's mandatory cancellation permissions. When saved
+    // charges need reversing, the cancellation dialog additionally checks Fees.Adjust.
+    private static bool CanCancelPendingRegistration() =>
+        CurrentUser.HasPermission("Students.Administer") && CurrentUser.HasPermission("Fees.Collect");
+    // ReopenPendingRegistration requires all four permissions, not only write access.
+    private static bool CanReopenPendingRegistration() =>
+        CurrentUser.HasPermission("Students.View") && CurrentUser.HasPermission("Students.Admit") &&
+        CurrentUser.HasPermission("Students.Administer") && CurrentUser.HasPermission("Fees.View");
     private Action<Func<Control>, string, string> RegistrationNavigation => _navigate ?? ((_, _, _) => { });
 
     private void ConfigureRegistrationActions()
@@ -54,8 +62,8 @@ public sealed partial class StudentAdmissionPage
             if (action is not ("RegistrationConfirm" or "RegistrationCancel" or "RegistrationReopen") ||
                 string.IsNullOrWhiteSpace(Convert.ToString(siblingsGrid.Rows[rowIndex].Cells[columnIndex].Value))) return;
             if (action == "RegistrationConfirm" && !CurrentUser.HasPermission("Students.Admit") ||
-                action == "RegistrationCancel" && !CurrentUser.HasPermission("Students.Administer") ||
-                action == "RegistrationReopen" && (!CurrentUser.HasPermission("Students.Administer") || !CurrentUser.HasPermission("Students.Admit") || !CurrentUser.HasPermission("Fees.View"))) return;
+                action == "RegistrationCancel" && !CanCancelPendingRegistration() ||
+                action == "RegistrationReopen" && !CanReopenPendingRegistration()) return;
             int id = Convert.ToInt32(siblingsGrid.Rows[rowIndex].Cells["AdmissionId"].Value);
             if (id != currentAdmissionId)
             {
@@ -91,8 +99,8 @@ public sealed partial class StudentAdmissionPage
             string state = Convert.ToString(row.Cells["Status"].Value) ?? "";
             bool ready = !IsBusy;
             row.Cells["RegistrationConfirm"].Value = ready && state == "Pending" && CurrentUser.HasPermission("Students.Admit") ? "Confirm & Save" : "";
-            row.Cells["RegistrationCancel"].Value = ready && state == "Pending" && CurrentUser.HasPermission("Students.Administer") ? "Cancel" : "";
-            row.Cells["RegistrationReopen"].Value = ready && state == "Cancelled" && CurrentUser.HasPermission("Students.Administer") && CurrentUser.HasPermission("Students.Admit") && CurrentUser.HasPermission("Fees.View") ? "Reopen" : "";
+            row.Cells["RegistrationCancel"].Value = ready && state == "Pending" && CanCancelPendingRegistration() ? "Cancel" : "";
+            row.Cells["RegistrationReopen"].Value = ready && state == "Cancelled" && CanReopenPendingRegistration() ? "Reopen" : "";
         }
         foreach (string column in new[] { "RegistrationConfirm", "RegistrationCancel", "RegistrationReopen" })
             siblingsGrid.Columns[column].Visible = siblingsGrid.Rows.Cast<DataGridViewRow>().Any(row => !row.IsNewRow &&
@@ -124,7 +132,7 @@ public sealed partial class StudentAdmissionPage
     }
     private async Task ReopenRegistrationAsync()
     {
-        if (IsBusy || !IsCancelledRegistration || !CurrentUser.HasPermission("Students.Administer") || !CurrentUser.HasPermission("Students.Admit")) return;
+        if (IsBusy || !IsCancelledRegistration || !CanReopenPendingRegistration()) return;
         if (HasUnsavedChanges && !ConfirmDiscardAdmission()) return;
         int id = currentAdmissionId;
         using var dialog = new RegistrationReopenDialog(id, name.Text);
