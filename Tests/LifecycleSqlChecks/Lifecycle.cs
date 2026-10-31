@@ -111,22 +111,45 @@ internal sealed class Lifecycle(Fixture f, Report r)
 
     private async Task Promotion()
     {
+        // Historical admissions retain their recorded placement but are deliberately
+        // not billed when entered after the source academic year has ended.
+        // Test the promotion/return path on a separate historical student so the
+        // independently tested current-year collection is not misclassified.
+        var archived = Sql.Proc("AdmitStudent", f.AdmissionArgs("Fictional Historical Pupil",current:false));
+        historicalStudent=Convert.ToInt32(archived.Rows[0]["AdmissionId"]);
+        historicalEnrollment=Convert.ToInt32(archived.Rows[0]["EnrollmentId"]);
+        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE EnrollmentId=@Id AND AcademicYearId=@Year AND BillingReady=0 AND PlacementConfirmedAt IS NOT NULL;",
+            Sql.P("@Id",historicalEnrollment),Sql.P("@Year",f.SourceYear))==1 &&
+            Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE EnrollmentId=@Id;",Sql.P("@Id",historicalEnrollment))==0,
+            "A historical admission retains its verified source placement without inventing past fees.");
+        string historicalFinancialSnapshot=FinancialSnapshot(historicalEnrollment);
         int before = Sql.Count("SELECT COUNT(*) FROM dbo.PromotionBatches;");
         await r.Refused("Same-year promotion is refused", () => { Promote(f.SourceYear, f.Placement7); return Task.CompletedTask; }, 52503);
         await r.Refused("An invalid destination section is refused", () => { Promote(f.NextYear, int.MaxValue); return Task.CompletedTask; }, 52516);
         Sql.Query("DELETE dbo.FeeConfigurations WHERE ClassId=@Class AND FeeTypeId=@Fee;", Sql.P("@Class", f.Class7), Sql.P("@Fee", f.Tuition));
         try { await r.Refused("Promotion requires all destination mandatory rates", () => { Promote(f.NextYear, f.Placement7); return Task.CompletedTask; }, 52519); }
         finally { f.Rate(f.Class7, f.Tuition, 6000, "Monthly"); }
-        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.PromotionBatches;") == before && Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE AdmissionId=@Student;", Sql.P("@Student", student)) == 1, "All refused promotions preserve the original enrollment and create no batch.");
+        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.PromotionBatches;") == before &&
+            Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE AdmissionId=@Student;", Sql.P("@Student", historicalStudent)) == 1,
+            "Refused promotions preserve the historical source placement and create no batch.");
         Promote(f.NextYear, f.Placement7);
-        newEnrollment = Sql.Count("SELECT EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=@Student AND AcademicYearId=@Year AND Status=N'Active';", Sql.P("@Student", student), Sql.P("@Year", f.NextYear));
-        r.Check(newEnrollment != originalEnrollment && Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE EnrollmentId=@Id AND Status=N'Promoted' AND LeavingDate=@Date;", Sql.P("@Id", originalEnrollment), Sql.P("@Date", f.PromotionDate)) == 1, "Promotion closes the source enrollment and creates a distinct destination enrollment.");
-        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE EnrollmentId=@Id AND ClassSectionId=@Placement AND BillingReady=0;", Sql.P("@Id", newEnrollment), Sql.P("@Placement", f.Placement7)) == 1, "Destination Class 7 correctly awaits return confirmation before billing.");
+        newEnrollment = Sql.Count("SELECT EnrollmentId FROM dbo.Enrollments WHERE AdmissionId=@Student AND AcademicYearId=@Year AND Status=N'Active';",
+            Sql.P("@Student", historicalStudent), Sql.P("@Year", f.NextYear));
+        r.Check(newEnrollment != historicalEnrollment && Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE EnrollmentId=@Id AND Status=N'Promoted' AND LeavingDate=@Date;",
+            Sql.P("@Id", historicalEnrollment), Sql.P("@Date", f.PromotionDate)) == 1,
+            "Promotion preserves the historical source episode and creates a distinct destination enrollment.");
+        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE EnrollmentId=@Id AND ClassSectionId=@Placement AND BillingReady=0;",
+            Sql.P("@Id", newEnrollment), Sql.P("@Placement", f.Placement7)) == 1,
+            "Destination Class 7 correctly awaits return confirmation before billing.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.PromotionBatchStudents WHERE AdmissionId=@Student AND OldEnrollmentId=@Old AND NewEnrollmentId=@New AND Decision=N'PROMOTE';",
-            Sql.P("@Student", student), Sql.P("@Old", originalEnrollment), Sql.P("@New", newEnrollment)) == 1 &&
-            Sql.Count("SELECT COUNT(*) FROM dbo.EnrollmentHistory WHERE AdmissionId=@Student AND ActionType=N'BULK_PROMOTE';", Sql.P("@Student", student)) == 1, "One promotion decision and one academic-history event were recorded.");
+            Sql.P("@Student", historicalStudent), Sql.P("@Old", historicalEnrollment), Sql.P("@New", newEnrollment)) == 1 &&
+            Sql.Count("SELECT COUNT(*) FROM dbo.EnrollmentHistory WHERE AdmissionId=@Student AND ActionType=N'BULK_PROMOTE';",
+                Sql.P("@Student", historicalStudent)) == 1, "One historical-student promotion and one movement record are saved.");
         await r.Refused("Duplicate promotion of the old enrollment is refused", () => { Promote(f.NextYear, f.Placement7); return Task.CompletedTask; }, 52521);
-        r.Check(FinancialSnapshot(originalEnrollment) == oldFinancialSnapshot, "Promotion leaves original-year financial rows byte-equivalent in canonical SQL JSON.");
+        r.Check(FinancialSnapshot(historicalEnrollment) == historicalFinancialSnapshot,
+            "Promotion does not backfill or modify earlier-year historical finance.");
+        r.Check(FinancialSnapshot(originalEnrollment) == oldFinancialSnapshot,
+            "Promotion of an archived student leaves a different student's existing collections intact.");
     }
 
     private async Task NextYear()
@@ -142,7 +165,8 @@ internal sealed class Lifecycle(Fixture f, Report r)
         await Collect(newEnrollment, f.NextMonthlyDate, 3000);
         r.Check(Payments(newEnrollment) == 3000 && Allocations(newEnrollment) == 3000 && Balance(newEnrollment) == 5000 + expectedNew * 6000, "New-year partial collection has the exact enrollment and remaining balance.");
         r.Check(FinancialSnapshot(originalEnrollment) == oldFinancialSnapshot, "New-year posting and payment preserve all original-year financial records.");
-        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE AdmissionId=@Student;", Sql.P("@Student", student)) == 2, "The student retains exactly two academic-year enrollments.");
+        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE AdmissionId=@Student;", Sql.P("@Student", historicalStudent)) == 2,
+            "The promoted historical student retains exactly two academic-year enrollments.");
     }
 
     private Task FinalAudit()
