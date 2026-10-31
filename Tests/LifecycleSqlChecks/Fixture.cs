@@ -49,7 +49,10 @@ internal sealed class Fixture
         f.Section = Sql.Key("SaveSection", Sql.P("@UserId", f.Admin), Sql.P("@SectionId", 0), Sql.P("@SectionCode", "A"), Sql.P("@SectionName", "Section A"));
         f.Placement6 = f.Placement(f.Class6); f.Placement7 = f.Placement(f.Class7);
         int year = DateTime.UtcNow.Year;
-        f.AdmissionDate = new DateTime(year - 1, 4, 1); f.MonthlyDate = f.AdmissionDate.AddMonths(1);
+        f.AdmissionDate = new DateTime(year - 1, 4, 1);
+        // Current-year admissions bill normally; backdated previous-year admissions
+        // intentionally preserve history without creating fees (schema 60 onward).
+        f.MonthlyDate = new DateTime(year, DateTime.UtcNow.Month, 1);
         f.PromotionDate = new DateTime(year, 1, 1);
         f.NextMonthlyDate = new DateTime(year, DateTime.UtcNow.Month, 1);
         f.SourceYear = f.Year(year - 1, false); f.NextYear = f.Year(year, true);
@@ -76,7 +79,7 @@ internal sealed class Fixture
     internal int Rate(int classId, int fee, decimal amount, string frequency) => Sql.Key("SaveFeeConfiguration",
         Sql.P("@UserId", Admin), Sql.P("@CampusId", Campus), Sql.P("@ClassId", classId), Sql.P("@FeeTypeId", fee),
         Sql.P("@Amount", amount), Sql.P("@Frequency", frequency), Sql.P("@FeeConfigurationId", 0), Sql.P("@Remarks", "Synthetic rate"));
-    internal SqlParameter[] AdmissionArgs(string name = "Ayaan Example", int? family = null, bool current = false) => new[] {
+    internal SqlParameter[] AdmissionArgs(string name = "Ayaan Example", int? family = null, bool current = true) => new[] {
         Sql.P("@UserId", Admin), Sql.P("@AdmissionDate", current ? PromotionDate : AdmissionDate), Sql.P("@AdmissionCampusId", Campus),
         Sql.P("@AcademicYearId", current ? NextYear : SourceYear), Sql.P("@ClassSectionId", Placement6),
         Sql.P("@StudentName", name), Sql.P("@FatherName", "Fictional Parent"), Sql.P("@DateOfBirth", BirthDate),
