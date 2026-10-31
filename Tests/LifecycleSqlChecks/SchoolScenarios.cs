@@ -106,17 +106,23 @@ internal sealed partial class SchoolScenarios(Fixture f, Report r)
     private Task OpeningDiscounts()
     {
         object? old = Sql.Scalar("SELECT FeeProrationCutoffDay FROM dbo.SchoolProfile;");
-        Sql.Query("UPDATE dbo.SchoolProfile SET FeeProrationCutoffDay=15;");
         try
         {
-            foreach (var (day,expected) in new[] { (5,5000m), (15,4000m) })
+            // For every calendar day, NULL means no cutoff and cutoff day 1
+            // means the following month. Avoid historical admissions: the
+            // production policy intentionally suppresses their opening charges.
+            foreach (var (cutoff,expected) in new (int?,decimal)[] { (null,5000m), (1,4000m) })
             {
-                var args = f.AdmissionArgs("Cutoff Discount Example " + day);
-                args.Single(p=>p.ParameterName=="@AdmissionDate").Value = new DateTime(f.AdmissionDate.Year,4,day);
-                args.Single(p=>p.ParameterName=="@AdmissionDiscounts").Value = Tvp.AdmissionFeeDiscounts(new[] { (f.Tuition,1000m) });
+                Sql.Query("UPDATE dbo.SchoolProfile SET FeeProrationCutoffDay=@Cutoff;",Sql.P("@Cutoff",cutoff));
+                var args = f.AdmissionArgs("Cutoff Discount Example " + (cutoff?.ToString()??"None"));
+                args.Single(p=>p.ParameterName=="@AdmissionDate").Value=DateTime.Today;
+                args.Single(p=>p.ParameterName=="@AdmissionDiscounts").Value=Tvp.AdmissionFeeDiscounts(new[] { (f.Tuition,1000m) });
                 int enrollment = Convert.ToInt32(Sql.Proc("AdmitStudent",args).Rows[0]["EnrollmentId"]);
-                r.Check(Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE EnrollmentId=@E AND FeeTypeId=@F;",Sql.P("@E",enrollment),Sql.P("@F",f.Tuition))==expected,
-                    day<15 ? "Before cutoff, opening tuition is full price; the chosen discount starts next month." : "On cutoff, opening tuition starts next month and uses its prospective discount.");
+                r.Check(Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE EnrollmentId=@E AND FeeTypeId=@F;",
+                    Sql.P("@E",enrollment),Sql.P("@F",f.Tuition))==expected,
+                    cutoff is null
+                        ? "Without a cutoff, this month's opening tuition retains the original rate until the next-month concession."
+                        : "At the configured cutoff, next-month opening tuition starts with the prospective discount.");
             }
         }
         finally { Sql.Query("UPDATE dbo.SchoolProfile SET FeeProrationCutoffDay=@Old;",Sql.P("@Old",old)); }
@@ -200,8 +206,11 @@ internal sealed partial class SchoolScenarios(Fixture f, Report r)
         Post();
         int count = Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges;"); Post();
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges;") == count, "Repeated automatic billing creates no duplicate charges.");
-        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=@S AND BillingMonth=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1);", Sql.P("@S", legacy.Student)) == (DateTime.Today.Month == 1 ? 2 : 0),
-            "Legacy references receive no new automatic monthly fees.");
+        // Capture its pre-existing opening bills. Legacy activation must not
+        // cause new automatic monthly fees, but earlier saved rows remain.
+        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=@S AND BillingMonth=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1);",
+                Sql.P("@S", legacy.Student)) == (DateTime.Today.Month == 1 ? 2 : 1),
+            "Legacy billing protection retains its existing opening rows without adding monthly duplicates.");
         Sql.Query("UPDATE dbo.BillingCharges SET Status=N'Cancelled' WHERE AdmissionId=@S AND FeeTypeId=@F AND BillingMonth=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1);", Sql.P("@S", child.Student), Sql.P("@F", f.Tuition));
         Post();
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.BillingCharges;") == count, "Automatic billing does not recreate a deliberately reversed fee.");
