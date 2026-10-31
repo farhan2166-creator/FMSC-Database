@@ -50,7 +50,13 @@ if(args.Contains("--bank"))
     var again=await RecoverableMutationWriter.SaveAsync(bankIntent,bankArgs);Check(again.Outcome==MutationOutcome.Saved&&again.Result==found&&Certificates()==count+1,"same bank request replay cannot create another certificate");
     var changed=Bank();changed.First(p=>p.ParameterName=="@BankName").Value="Another Bank";
     try{await RecoverableMutationWriter.SaveAsync(bankIntent,changed);throw new Exception("Changed bank request accepted");}catch(InvalidOperationException){Check(true,"changed bank details cannot reuse a completed request identity");}
-    var concurrentArgs=Bank();var concurrent=Intent(MutationKind.BankCertificateCreate,concurrentArgs);count=Certificates();
+    // A fresh request with identical certificate fields is intentionally
+    // deduplicated by SQL against the earlier saved certificate. Use a
+    // distinct fictional purpose so this case exercises two *concurrent*
+    // submissions of one new certificate rather than business deduplication.
+    var concurrentArgs=Bank();
+    concurrentArgs.First(p=>p.ParameterName=="@Purpose").Value="Synthetic concurrent payroll certificate";
+    var concurrent=Intent(MutationKind.BankCertificateCreate,concurrentArgs);count=Certificates();
     var both=await Task.WhenAll(RecoverableMutationWriter.SaveAsync(concurrent,concurrentArgs),RecoverableMutationWriter.SaveAsync(concurrent,concurrentArgs));
     int concurrencyCount=Certificates();
     string OutcomeLabel(MutationWriteResult result)=>result.Outcome+" err "+(result.Error is SqlException sql ? sql.Number.ToString() : result.Error?.GetType().Name??"none");
