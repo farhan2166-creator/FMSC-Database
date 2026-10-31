@@ -37,7 +37,7 @@ In **Fee Collection**, the Paying For panel shows each child's status, such as *
 
 Close the family window to reload the selected student's placement and fees. Tick the siblings to include, then use **Student Fees → Print Outstanding Bill**. The bill includes all posted unpaid charges for those children, including older periods. It is separate from **Print Receipt**, which follows a saved payment. Finish or clear an entered payment draft before opening Family / Returns; unsaved discount changes must be reviewed before printing a saved-charge bill.
 
-For a new sibling, continue using **Quick Registration → Link Existing Parent**. Saving that child does not confirm the other children's return. Printing warns if selected family members still await return or placement review. You can decline and finish the return reviews first, or explicitly print only charges already posted. A zero balance or missing bill line does not prove a child has completed return admission.
+For a new sibling, open **Daily Work → Student Admissions**, load an existing student in that family and choose **Admit Sibling**. The child editor inherits the selected student's father name, contact number, address and birthplace as read-only family details; enter the new child's own name, gender, placement and fees. The sibling is first saved as **Pending**. Open that child in Admissions (or from **Daily Work → Pending Registrations**) to finish the details and **Confirm & Save**; creating the pending sibling does not confirm any other child's return. Printing warns if selected family members still await return or placement review. You can finish those reviews first or explicitly print only charges already posted. A zero balance or missing bill line does not prove that return admission is complete.
 
 ## Entry and search actions
 
@@ -72,11 +72,11 @@ retains its financial preview, confirmation and server-side permissions.
 | Work | Where to start | Operational caution |
 |---|---|---|
 | New student | **Daily Work → Student Admissions** | Check student, placement, guardian, date, and opening charges before saving |
-| Provisional registration | **Student Admissions → Registration & Pending** | Pending records have a temporary reference; an official admission/registration number is assigned only upon confirmation |
+| Pending/sibling registration | **Daily Work → Student Admissions → Admit Sibling** or **Daily Work → Pending Registrations** | New siblings first receive a temporary reference; complete details and Confirm & Save in Admissions for official numbers |
 | Student history and family | **Student Profile / Student Management** | Verify the selected student before editing or printing |
 | Student leave/transfer/re-admission | **Student Management → Transfers / Re-Admission** | Preserve history; do not treat leaving as deleting the student |
 | Fee configuration | **School Setup → Fee Rate Setup** | Rates affect future billing; use approved whole-rupee rules |
-| Post fees or corrections | **Daily Work → Billing Center / Daily Work → Student Fee Corrections** | Verify class/academic year/student and review existing postings before repeating |
+| Post fees or review payment corrections | **Daily Work → Billing Center / Daily Work → Student Fee Account → Payment History** | Billing remains in Billing Center; select the original payment to review an eligible correction, and check uncertain save outcomes before retrying |
 | Receive a payment | **Daily Work → Fee Collection** | Reconcile an uncertain save outcome before attempting another payment |
 | School or financial reports | **Reports** | Confirm student, time range, report filters and selected printer/export path |
 | Staff and certificates | **Staff / Student Certificates** | Finish or intentionally discard edits before switching records |
@@ -93,32 +93,36 @@ Screen naming and source mapping: [PROJECT_STRUCTURE.md](Development/PROJECT_STR
 5. After finishing a transaction, verify the resulting record, receipt or posted balance.
 6. Before finishing for the day, confirm a current, verified backup is stored at an approved location. Follow school policy for off-computer backup copies.
 
-## Admissions and Quick Registration
+## Admissions and pending registrations
 
-**Daily Work → Student Admissions** opens the admission form directly.
-**Daily Work → Quick Registration** contains Registration Form and Pending Registrations.
-**Existing Student Setup** is a tab under
-**Daily Work → Student Data Review**. Billing Center's
-student exception lists open the selected record directly for setup or collection.
-See [school operations](SCHOOL_OPERATIONS.md) for the complete daily sequence.
+**Daily Work → Student Admissions** is the main admission and registration workspace. **Daily Work → Pending Registrations** opens the pending-record list; **Open** or **Review** loads the selected child into the same Admissions form. The old standalone **Quick Registration** page and separate **Family Admission** navigation entry are retired. **Existing Student Setup** remains under **Daily Work → Student Data Review**; Billing Center's exception lists can open the selected student directly. See [school operations](SCHOOL_OPERATIONS.md) for the daily sequence.
 
-**Direct admission:** Student details and placement are handled in Admissions. Valid opening fees are posted as part of the save operation. A legacy-record verification / Go Live sequence applies to historical data and has separate safety checks.
+**Direct admission:** Enter the student's details, placement and opening fees in Admissions. Review the details and charges before saving. Historical/legacy student activation uses its own guarded process.
 
-**Quick Registration:** Creates a pending student with temporary reference and reviewed opening charges. The **Registration Form** supports editing pending details; **Pending Registrations** supports searching and reviewing. Confirmation allocates official admission and registration numbers. Pending students are excluded from normal monthly fee posting, promotion and official certificates. Existing paid charges must not be casually reversed or reposted.
+**Admit a sibling:** Load an existing student in Admissions and choose **Admit Sibling**. The sibling editor intentionally inherits and locks the father's name, contact number, address and birthplace. Enter the child's own name, gender, current-year placement and fees. Saving creates a **Pending** child and keeps the original student loaded. Open the new sibling from **Student & Siblings** or **Pending Registrations** to finish any missing details.
 
-Admission saves hold the submitted details until saving and refresh finish. For **Mark as Left / Cancel Registration** or **Legacy Go Live**, Review holds the inputs; changing them after review requires another review. Wait for a pending operation to finish before closing.
+**Confirm a pending registration:** With the pending child loaded, **Confirm & Save** opens the existing official-number review and confirmation; you do not have to save a separate draft first. If you only want to save edits without confirming, use **Actions → Save Registration Draft**. Pending rows in **Student & Siblings** offer **Confirm & Save** and **Cancel**; cancelled pending rows offer **Reopen**, subject to permission. Official admission and registration numbers are assigned on confirmation. Pending students are not normal monthly-billing or official-certificate candidates.
 
-For business-rule context see [ADMISSION_WORKFLOW.md](Workflows/ADMISSION_WORKFLOW.md). The current runtime requires schema 21 even if historical text in that file refers to older database versions.
+**Reopen a cancelled pending child:** Review the new placement, academic year, joining date, reason and financial preservation notice. Reopening retains the same child identity and temporary reference and preserves earlier cancelled placements, bills, payments and family history; it does **not** automatically restore cancelled fees or bills. Review the current fee plan before subsequently confirming admission.
+
+If a registration save has an uncertain result, use **Check Registration Save** when offered rather than creating or confirming a second child. Other admission saves also retain their existing **Check Saved Admission** or recovery controls. Do not close an active save or blindly repeat a transaction. See [current admission/registration decisions](Decisions/ADMISSION_REGISTRATION_SIMPLIFICATION.md) and [admission workflow](Workflows/ADMISSION_WORKFLOW.md) for details.
 
 ## Find Student
 
 Typing an admission number clears Campus, Academic Year, Class and Status. Changing any of those filters clears the admission number while keeping the other filters. Either change clears old results and disables **Open Student** until you click **Search** again. Student/father name searches can still be combined with filters. **Reset** clears both modes.
 
-## Student Promotion
+## Placement Management
 
-Open **Student Promotion** (previously Bulk Promotion) to choose the source and destination placement, review candidates and process ticked students. **View Promotion History**, at the top right of Promotion Details, opens completed batches in a separate window using the selected source year, class and section. Blank source filters show all history. You can change the history filters and use **Load**, or clear them to review other batches. Closing the window keeps your promotion selections and remarks intact.
+Open **Placement Management** in the sidebar. It contains four separate pages, each with its own workspace and permissions, rather than the old single **Student Promotion** screen:
 
-Promotion History is reached from this button rather than a separate navigation item. Student Promotion retains the existing Enrollment Management permission; viewing history also requires the existing report-viewing permission enforced by SQL. Administrator retains full access. The history button is unavailable while candidates are loading or promotions are processing. After promoting students, continue to Confirm Return Admission as before.
+- **Annual Promotion:** Choose a source academic year; blank campus, class or section includes all matching active placements. Choose the destination year, then **Load Students**. Use **Suggest** or assign destinations to selected rows. Each student can **Promote**, **Repeat Class** (same placement in the new year) or **Skip for Now**. Review exceptions such as missing next classes before processing. Newly promoted students still require return-admission confirmation before billing for the new year.
+- **Transfers & Sections:** Move students between sections, classes or campuses **within the recorded academic year**. Use **Load Students**, **Suggest**, **Assign** and row-level destinations. Section-only moves preserve fees; class/campus moves offer current fees, destination fees from next month, or the school cutoff rule.
+- **Placement Corrections:** Correct a recorded placement within the same year using a correction explanation and date. Review the fee policy and affected records before processing. **History / Dates** opens the existing date/history tools; **Undo Promotion** takes you to **Placement History**.
+- **Placement History:** Use **Refresh History** to review recent saved movements. For an eligible, unchanged annual promotion, select its record, enter a correction date and reason, and choose **Undo Selected Promotion**. The operation retains the original and corrected history; it is refused if later return/billing, payments, certificates, fee changes or subsequent movement make automatic undo unsafe.
+
+**Review** previews a proposed plan and its fee/bill implications before applying it. Processing is all-or-nothing. If a submission's outcome is uncertain, the page locks editing and offers **Check / Retry Plan** for that same request; do not create a duplicate plan. Leaving a page without processing does not save its draft.
+
+**Earlier Promotion History** is available from the placement-history workflow for older promotion records and retains its report permission check. Placement-management access requires the existing enrollment-management permission; undo additionally requires student-administration access. Individual admission/return/transfer dialogs remain available for specialized cases. See [placement workspace rules](STUDENT_PLACEMENT_WORKSPACE.md).
 
 ## Unsaved edits and unresolved transactions
 
@@ -133,11 +137,18 @@ Promotion History is reached from this button rather than a separate navigation 
 
 ## Student Fee Account and annual receipts
 
-Open **Daily Work > Student Fee Account**, then choose a student by admission number or name. From Fee Collection, choose **Student Fees > Student Fee Account** to open the same workspace with the student already selected. Finish or clear a collection draft first. Closing the account returns to Fee Collection and refreshes dues, available credit and payment history for the same selected children.
+Open **Daily Work → Student Fee Account** and select a student by admission number or name. From Fee Collection, choose **Student Fees → Student Fee Account** to open the same account with the student preselected. Finish or clear any collection draft first. Closing the account returns to Fee Collection and refreshes that collection context.
 
-The **Statement** tab shows fee balances and chronological entries. Leave the optional dates unchecked for the complete account, or choose a period and click **View Statement**. Changing a student or period makes the old export unavailable until the statement is refreshed. **Receipts** contains issued documents, payments and adjustments, and account credit. Current dues and credit are shown separately from period totals. Collection-only operators can review authorized receipt history without gaining statement or export access.
+The account has four direct tabs:
 
-Choose **Include Siblings** to review the family in the same workspace; **Student Only** restores the individual scope. Under **Reports**, choose **Annual Receipts** for the selected student's yearly receipt sheet or **Outstanding Bills** for current unpaid fees. Annual receipts also remain available from Reports and Student Profile and retain their own permission requirement.
+- **Fees & Dues:** Shows fee charges, payments and per-fee balances for the selected period. Leave optional dates unchecked for the unfiltered statement, or choose dates and click **View Statement**. **Charge & Payment Activity…** opens the chronological charge/payment rows for those dates; it is **not** a complete lifetime event ledger or a running account balance. **Fee Change History…** and **Related Payment…** open the relevant separate details when available. Changing a student or date range invalidates an earlier statement export until it is refreshed.
+- **Payment History:** Shows payments, refunds and corrections across all dates. Use **Fee Breakdown** for a selected payment, **Review Correction…** for eligible changes and **Check Save Outcome…** to resolve an uncertain correction without submitting a new one.
+- **Receipts:** Lists saved receipts across all dates. **Open Receipt** shows the saved document for review or reprinting; a family receipt appears once rather than once per child.
+- **Advance Credit:** Shows retained advance payments and how credit was used. Current dues and available credit are displayed separately, not netted against one another.
+
+Choose **Include Siblings** to work with the family scope; the button then says **Student Only** to return to an individual account. Double-clicking a sibling's eligible account row loads that child's individual account and restores **Include Siblings**. This scope affects account views and outstanding bills, **not** the Annual Receipts student.
+
+Under **Reports… → Annual Receipts…**, choose the academic year for the **main selected student only**, even if siblings are included. Under **Reports… → Outstanding Bills**, choose **Separate Student Bills** or **Combined Family Bills** as needed; these reports use posted unpaid fees, not unsaved payment drafts. Annual receipts also remain available from their other authorized report/profile routes. Statement, receipt, correction and annual-receipt actions retain separate permissions; collection-only operators do not gain statement/export access.
 
 ## Family / Siblings from Student Profile
 
