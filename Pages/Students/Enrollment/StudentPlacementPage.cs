@@ -54,6 +54,8 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         retry=AddAction("Check / Retry Plan",async(_,_)=>await Guard(Retry),"Warning");
         var records=AddAction("Refresh History",async(_,_)=>await Guard(LoadHistory),"Secondary");
         var undo=AddAction("Undo Selected Promotion",async(_,_)=>await Guard(Undo),"Warning");
+        // SQL requires Students.Administer in addition to Enrollment.Manage for undo.
+        undo.Enabled=CurrentUser.HasPermission("Students.Administer");
         correction=AddAction("History / Dates",(_,_)=>OpenStudentHistory(),"Secondary");
         studentActions=AddAction("Student Actions",(_,_)=>OpenStudentActions(),"Secondary");
         findUndo=AddAction("Undo Promotion",(_,_)=>OpenPlacementHistory(),"Secondary");
@@ -162,7 +164,7 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         foreach(var wrapper in oldFields)wrapper.Dispose();
         carry.Visible=Annual;
         SetToolTip(targetCampus,"Leave blank to keep each student's current campus.");SetToolTip(targetClass,"Leave blank to keep each student's current class.");
-        fees.Enabled=!Annual;targetClass.Enabled=!Annual;
+        fees.Enabled=!Annual && CurrentUser.HasPermission("Fees.Adjust");carry.Enabled=Annual && CurrentUser.HasPermission("Fees.Adjust");targetClass.Enabled=!Annual;
         review.Text="Review";SetToolTip(review,Annual?"Review the annual promotion plan before processing.":operation==1?"Review the transfer plan before processing.":"Review the placement correction before processing.");
         correction.Visible=operation==2;findUndo.Visible=operation==2;studentActions.Visible=operation!=1;retry.Visible=pending is not null;
         studentActions.Text=Annual?"Return / Completion":"Student Actions";
@@ -177,13 +179,20 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         if(busy)return;busy=true;pageContent.Enabled=false;
         try{await work();}catch(Exception ex){Fail(ex);}finally{
             busy=false;
-            if(!IsDisposed){pageContent.Enabled=true;SetPendingControls(pageContent);if(!ViewingHistory){fees.Enabled=pending is null && !Annual;carry.Enabled=pending is null && Annual;targetClass.Enabled=pending is null && !Annual;}}
+            if(!IsDisposed){pageContent.Enabled=true;SetPendingControls(pageContent);if(!ViewingHistory){fees.Enabled=pending is null && !Annual && CurrentUser.HasPermission("Fees.Adjust");carry.Enabled=pending is null && Annual && CurrentUser.HasPermission("Fees.Adjust");targetClass.Enabled=pending is null && !Annual;}}
         }
     }
     private void SetPendingControls(Control parent)
     {
         foreach(Control child in parent.Controls){
-            if(child is ModernButton button){button.Enabled=pending is null || button.Text=="Check / Retry Plan";if(button.Text=="Check / Retry Plan")button.Visible=pending is not null;continue;}
+            if(child is ModernButton button){
+                button.Enabled=(pending is null || button.Text=="Check / Retry Plan") &&
+                    (button.Text!="Undo Selected Promotion" || CurrentUser.HasPermission("Students.Administer"));
+                if(button.Text=="Check / Retry Plan")button.Visible=pending is not null;
+                continue;
+            }
+            if(ReferenceEquals(child,fees)){child.Enabled=pending is null && !Annual && CurrentUser.HasPermission("Fees.Adjust");continue;}
+            if(ReferenceEquals(child,carry)){child.Enabled=pending is null && Annual && CurrentUser.HasPermission("Fees.Adjust");continue;}
             if(child is LookupBox || child is ModernComboBox || child is ModernDatePicker || child is ModernTextBox || child is DataGridView || child is CheckBox){child.Enabled=pending is null;continue;}
             SetPendingControls(child);
         }
@@ -210,7 +219,7 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
             Bind(sourceClass,catalog,"ClassId","ClassName",true);Bind(targetClass,catalog,"ClassId","ClassName",true,"Keep current class");Bind(sourceSection,sections,"SectionId","SectionName",true);
             var choices=placements.Copy();var empty=choices.NewRow();empty["ClassSectionId"]=0;empty["Display"]="Choose a destination";choices.Rows.InsertAt(empty,0);
             ((DataGridViewComboBoxColumn)students.Columns["Destination"]).DataSource=choices;
-            fees.Enabled=!Annual;targetClass.Enabled=!Annual;
+            fees.Enabled=!Annual && CurrentUser.HasPermission("Fees.Adjust");carry.Enabled=Annual && CurrentUser.HasPermission("Fees.Adjust");targetClass.Enabled=!Annual;
             SetStatus("Choose a source year. Blank campus, class and section include all active placements. Load students to begin.");
         }finally{binding=false;}
     }
@@ -333,6 +342,8 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         if(targetYear.SelectedId<=0 || reason.Text.Trim().Length==0)throw new InvalidOperationException("Choose the destination year and enter a reason.");
         if(selected.Any(r=>Convert.ToInt32(r["Destination"])<=0))throw new InvalidOperationException("Choose a destination for every selected student. Final-class students can repeat or be skipped for departure review.");
         if(selected.Any(r=>Annual ? Convert.ToString(r["Decision"]) is not ("PROMOTE" or "HOLD") : Convert.ToString(r["Decision"]) is not ("MOVE" or "CORRECT")))throw new InvalidOperationException("Choose decisions that match the selected action.");
+        if(Annual && carry.Checked && !CurrentUser.HasPermission("Fees.Adjust"))
+            throw new UnauthorizedAccessException("Carrying monthly concessions requires fee adjustment access.");
         var plan=selected.Select(r=> {
             string? policy=null;
             var destination=placements.AsEnumerable().Single(p=>Convert.ToInt32(p["ClassSectionId"])==Convert.ToInt32(r["Destination"]));
@@ -340,6 +351,8 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
             if(!Annual && classOrCampus)policy=fees.SelectedIndex switch{1=>"NEXT_MONTH",2=>"SCHOOL_CUTOFF",_=>null};
             return new PlacementPlanItem(Convert.ToInt32(r["EnrollmentId"]),Convert.ToInt32(r["SourcePlacementId"]),Convert.ToString(r["Stamp"])!,Convert.ToString(r["Decision"])!,Convert.ToInt32(r["Destination"]),policy);
         }).ToArray();
+        if(plan.Any(item=>item.FeePolicy is not null) && !CurrentUser.HasPermission("Fees.Adjust"))
+            throw new UnauthorizedAccessException("Changing destination fees requires fee adjustment access.");
         var json=PlacementPlan.Serialize(plan);Guid id=Guid.NewGuid();
         SetStatus("Validating the complete plan, including lifecycle and fee rules…");
         var preview=await PlacementPlan.RunAsync(id,json,targetYear.SelectedId,effective.Value.Date,reason.Text.Trim(),Annual && carry.Checked,true);
@@ -428,6 +441,8 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
     }
     private async Task Undo()
     {
+        if(!CurrentUser.HasPermission("Students.Administer"))
+            throw new UnauthorizedAccessException("Student administration access is required to undo a promotion.");
         if(pending is not null)throw new InvalidOperationException(BusyMessage);
         if(history.CurrentRow?.DataBoundItem is not DataRowView row)throw new InvalidOperationException("Select a promotion in History first.");
         if(historyReason.Text.Trim().Length==0)throw new InvalidOperationException("Enter the reason for undoing the selected promotion on Placement History.");
