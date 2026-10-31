@@ -18,6 +18,9 @@ internal sealed partial class QuickRegistrationFormPage
         siblingEntry = workspaceHosted = true;
         PrepareForEmbedding(keepActions: false);
         SetWorkspaceFamily(anchor, father, phone, home);
+        // Intentional sibling-registration rule: copy the selected student's birthplace
+        // into the new sibling's saved record. This inherited value stays hidden and
+        // read-only in the streamlined sibling form by design.
         siblingBirth.Text = birth; siblingBirth.ReadOnly = true;
         siblingGender.Items.AddRange(new object[] { "Male", "Female", "Other" });
         siblingGender.SelectedIndex = -1;
