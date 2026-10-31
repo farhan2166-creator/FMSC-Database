@@ -71,8 +71,8 @@ internal sealed partial class SchoolScenarios
             "Concessions waive unpaid dues but do not release the previously collected 4500 as credit.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@E AND FeeTypeId=@F AND EffectiveFrom=@July AND EffectiveTo IS NULL AND Amount=6000 AND DiscountAmount=0;",Sql.P("@E",child.Enrollment),Sql.P("@F",f.Tuition),Sql.P("@July",july))==1,
             "After the temporary concession, the previously agreed 6000 rate and zero concession resume automatically.");
-        r.Check(Due(Tuition(child.Enrollment))==5000&&Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments WHERE AdmissionId=@S AND IsCreditApplication=0;",Sql.P("@S",child.Student))==4500,
-            "Earlier tuition and cash received are preserved.");
+        r.Check(Due(Tuition(child.Enrollment))==0&&Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments WHERE AdmissionId=@S AND IsCreditApplication=0;",Sql.P("@S",child.Student))==4500,
+            "The already-paid first month's tuition stays settled and the original cash receipt is preserved.");
         using var remove=ReviewConcession(ConcessionArgs(id,may,june,0,true,true));
         Sql.Proc("SaveStudentFeeDiscount",ConcessionArgs(id,may,june,0,true,false,Snapshot(remove)));
         r.Check(Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE (BillingChargeId=@C OR CorrectionOfBillingChargeId=@C) AND Status<>N'Cancelled';",Sql.P("@C",first))==4500 &&
