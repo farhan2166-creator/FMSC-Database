@@ -41,10 +41,14 @@ internal sealed class EnrollmentDateCorrectionDialog : ApplicationWindowForm
         fields.Controls.Add(HumanUi.Field("Billing start", billing), 1, 0);
         fields.Controls.Add(HumanUi.Field("Reason", reason, true), 0, 1); fields.SetColumnSpan(fields.GetControlFromPosition(0, 1)!, 2);
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5, Padding = new Padding(14) };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight * 3));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.Controls.Add(guidance, 0, 0); root.Controls.Add(fields, 0, 1); root.Controls.Add(legacy, 0, 2);
-        root.Controls.Add(impact, 0, 3); root.Controls.Add(HumanUi.ButtonRow(review, apply, cancel), 0, 4);
+        root.Controls.Add(impact, 0, 3);
+        var actions = HumanUi.DialogButtons(review, apply, cancel);
+        actions.Margin = new Padding(0, AppScale.Scale(10), 0, 0);
+        root.Controls.Add(actions, 0, 4);
         Controls.Add(root); CancelButton = cancel;
         void ResetReview()
         {

@@ -11,7 +11,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
     private readonly PlacementPicker placement = new();
     private readonly ModernComboBox status = new();
     private readonly ModernDatePicker start = HumanUi.Date(), leave = HumanUi.Date(), billing = HumanUi.Date();
-    private readonly ModernTextBox reason = HumanUi.TextBox(true, 500), impact = HumanUi.TextBox(true, 0);
+    private readonly ModernTextBox reason = HumanUi.TextBox(false, 500), impact = HumanUi.TextBox(true, 0);
     private readonly CheckBox legacy = new() { Text = "Verified legacy dates (before admission or overlapping history)", AutoSize = true };
     private readonly ModernButton review = new() { Text = "Review", ThemeRole = "Secondary" },
         confirm = new() { Text = "Confirm Placement", ThemeRole = "Primary" },
@@ -72,8 +72,8 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         Text = editingEnrollment == 0 ? "Add Missing Historical Placement" :
             editingEnrollment.HasValue ? "Complete Placement" : "Placement History";
         StartPosition = FormStartPosition.CenterParent;
-        Size = new Size(AppScale.Scale(850), AppScale.Scale(650));
-        MinimumSize = new Size(AppScale.Scale(740), AppScale.Scale(600));
+        Size = new Size(AppScale.Scale(850), AppScale.Scale(600));
+        MinimumSize = new Size(AppScale.Scale(740), AppScale.Scale(560));
         leave.ShowCheckBox = billing.ShowCheckBox = true; leave.Checked = billing.Checked = false;
         status.Items.AddRange(new object[] { "Active", "Left", "Promoted" });
         impact.ReadOnly = true;
@@ -87,8 +87,10 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         AddField("Placement Start Date", start, 0, 2); AddField("Leaving / Promotion date", leave, 1, 2, false);
         AddField("Billing start (optional)", billing, 0, 3, false);
         var reasonField = HumanUi.Field("Correction reason", reason, true);
-        reasonField.Height = AppMetrics.FieldRowHeight + 25;
+        reasonField.Height = AppMetrics.FieldRowHeight;
         fields.Controls.Add(reasonField, 1, 3);
+        foreach (Control input in new Control[] { year, status, start, leave, billing })
+            input.MaximumSize = new Size(0, input.MaximumSize.Height);
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(14), ColumnCount = 1, RowCount = 5 };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -106,7 +108,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         root.Controls.Add(fields, 0, 1); root.Controls.Add(legacy, 0, 2);
         addHistory.Width = AppScale.Scale(275);
         edit.Width = AppScale.Scale(240);
-        var buttons = HumanUi.ButtonRow(dates, edit, addHistory, review, apply, confirm, close); buttons.Dock = DockStyle.Fill;
+        var buttons = HumanUi.ButtonRowInOrder(dates, edit, addHistory, review, apply, confirm, close); buttons.Dock = DockStyle.Fill;
         dates.Width = review.Width = apply.Width = confirm.Width = AppScale.Scale(160);
         edit.Width = AppScale.Scale(240); close.Width = AppScale.Scale(110);
         root.Controls.Add(impact, 0, 3); root.Controls.Add(buttons, 0, 4);
@@ -307,7 +309,15 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         if (editingEnrollment.HasValue)
         {
             fields.SetColumn(year.Parent!, 0);
-            fields.SetColumnSpan(year.Parent!, 2);
+            fields.SetColumnSpan(year.Parent!, 1);
+            fields.SetCellPosition(status.Parent!, new TableLayoutPanelCellPosition(1, 0));
+            fields.SetColumnSpan(placement.Parent!, 2);
+            if (editingEnrollment == 0)
+            {
+                billing.Parent!.Visible = false;
+                fields.SetColumn(reason.Parent!, 0);
+                fields.SetColumnSpan(reason.Parent!, 2);
+            }
         }
         year.Enabled = editingEnrollment == 0;
         review.Visible = apply.Visible = CanReviewPlacement;

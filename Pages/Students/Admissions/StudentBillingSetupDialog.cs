@@ -57,7 +57,7 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
         Field("Academic year", year, 0, 1); Field("Campus / Class / Section", placement, 1, 1);
         Field("Placement start", start, 0, 2); Field("Billing starts from", billing, 1, 2);
         admissionFeeHandling.Items.AddRange(new object[] { "Already paid before system", "Charge admission fee now" });
-        admissionFeeHandling.SelectedIndex = -1;
+        admissionFeeHandling.SelectedIndex = 0;
         Field("Admission fee handling", admissionFeeHandling, 0, 3);
         var remarksField = HumanUi.Field("Remarks", reason, false);
         remarksField.Height = AppMetrics.FieldRowHeight;
