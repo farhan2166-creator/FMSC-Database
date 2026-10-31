@@ -116,7 +116,7 @@ public sealed partial class StudentAccountStatementPage
                 &&accountTransactions.Rows[e.RowIndex].DataBoundItem is DataRowView row&&StudentFeeAccountData.Text(row.Row,"TransactionType")=="PAYMENT")
             {e.Value="";e.FormattingApplied=true;}
         };
-        var allEntries=CreateFilterButton("Full Account Activity…",AppTheme.MutedText);
+        var allEntries=CreateFilterButton("Charge & Payment Activity…",AppTheme.MutedText);
         allEntries.Click+=(_,_)=>ShowAllAccountEntries();
         var statementBody=AccountLayout(Grid,HumanUi.ButtonRow(entryDetails,relatedPayment,feeChanges,allEntries),
             "Fees charged, amounts paid and the balance due for each fee in the selected dates.");
@@ -175,7 +175,7 @@ public sealed partial class StudentAccountStatementPage
         if(IsBusy||!CurrentUser.HasPermission("Reports.View"))return;
         var details=CreateFilterButton("Entry Details",AppTheme.MutedText);
         details.Click+=async(_,_)=>await AccountActionAsync(ShowStatementEntryAsync);
-        using var dialog=CreateRelatedReportDialog("Full Account Activity",AccountLayout(accountTransactions,AccountDialogButtons(details),
+        using var dialog=CreateRelatedReportDialog("Charge & Payment Activity",AccountLayout(accountTransactions,AccountDialogButtons(details),
             "Charges and payments in date order for the selected dates. Fee due is the balance of an individual fee, not a running account balance."));
         viewingAccountEntries=true;
         try{dialog.ShowDialog(FindForm());}
