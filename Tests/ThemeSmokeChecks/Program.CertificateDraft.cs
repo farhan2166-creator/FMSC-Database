@@ -82,6 +82,8 @@ internal static partial class Program
 
     private static void CheckRegularNewCertificateDraft()
     {
+        void Trace(string stage)=>Console.WriteLine("REGULAR_CERT: " + stage);
+        Trace("begin");
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
         var type=typeof(FMSC_SMS.Pages.Students.Certificates.RegularStudentCertificatePage);
         int prompts=0,reads=0,studentRefreshes=0;
@@ -96,10 +98,14 @@ internal static partial class Program
         students.Columns.Add("DateOfBirth",typeof(DateTime));
         students.Columns.Add("Status");
         students.Rows.Add(41,"Class 5",new DateTime(2010,1,1),"Active");
+        Trace("fixture created");
         student.SetStudent(students.Rows[0]);
+        Trace("student selected");
         type.GetMethod("StudentChanged",flags)!.Invoke(page,null);
+        Trace("initial record loaded");
         Check(!page.HasUnsavedChanges&&prompts==0,"Regular certificate defaults start clean.");
         date.Value=DateTime.Today.AddDays(-1);
+        Trace("first date changed");
         Check(!page.HasUnsavedChanges&&student.SelectionChangeGuard!(42)&&prompts==0,
             "A short new-date edit can be retyped without an unsaved-draft prompt.");
         using(var selection=new DataGridView{AllowUserToAddRows=false})
@@ -111,20 +117,28 @@ internal static partial class Program
                 selection.SelectedRows.Count==0&&selection.CurrentCell is null,
                 "Explicit certificate-selection refusal clears the unaccepted saved-row highlight.");
         }
+        Trace("selection refusal confirmed");
         int before=reads;
         type.GetMethod("RefreshCertificates",flags)!.Invoke(page,null);
+        Trace("refresh returned");
         Check(student.SelectedId==41&&date.Value.Date==DateTime.Today&&reads==before+1&&studentRefreshes==1&&prompts==0,
             "Refreshing a short edit reloads synthetic student context and defaults without SQL or a discard dialog.");
         date.Value=DateTime.Today.AddDays(-1);
+        Trace("second date changed");
         type.GetMethod("ClearForm",flags)!.Invoke(page,new object[]{true});
+        Trace("first clear returned");
         Check(student.SelectedId==0&&!page.HasUnsavedChanges&&prompts==0,
             "New clears short unsaved date wording without treating it as a pending reissue.");
         type.GetField("creatingCertificate",flags)!.SetValue(page,true);
+        Trace("test busy set");
         student.SetStudent(41,"Student");
+        Trace("busy student selected");
         type.GetMethod("ClearForm",flags)!.Invoke(page,new object[]{true});
         Check(student.SelectedId==41,"New cannot clear student context while a certificate is saving.");
         type.GetField("creatingCertificate",flags)!.SetValue(page,false);
+        Trace("test busy clear");
         type.GetMethod("ClearForm",flags)!.Invoke(page,new object[]{true});
+        Trace("final clear returned");
         Check(student.SelectedId==0&&!page.IsHandleCreated,"The fixture never queries a school database or opens the native page.");
     }
 
