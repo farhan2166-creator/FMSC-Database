@@ -144,8 +144,10 @@ internal sealed partial class SchoolScenarios
         SaveTerms(id,month,month,0);
         decimal revisedNet=Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE (BillingChargeId=@C OR CorrectionOfBillingChargeId=@C) AND Status<>N'Cancelled';",Sql.P("@C",bill));
         decimal revisedDue=ChainDue(bill), retainedCredit=Credit(child.Student);
-        r.Check(revisedNet==5000&&revisedDue==1000&&retainedCredit==500,
-            $"Later removal uses the reviewed 5000 fee basis and keeps paid credit until its use is explicitly chosen (fictional net={revisedNet}, due={revisedDue}, credit={retainedCredit}).");
+        // Removing an old concession cannot retroactively recharge a fully settled
+        // receipt when the operator has not explicitly reviewed a new agreed rate.
+        r.Check(revisedNet==4000&&revisedDue==0&&retainedCredit==500,
+            $"Removing the concession leaves the settled bill unchanged while retaining unapplied credit (fictional net={revisedNet}, due={revisedDue}, credit={retainedCredit}).");
         var waived=EarlierChild("Prior correction and later waiver example");long waivedBill=Tuition(waived.Enrollment);
         Rate(waivedBill,6000);await Pay(waived.Student,waived.Enrollment,0,(waivedBill,-500));
         var actual=FeeDiscountPeriod.BillContext(waivedBill);
