@@ -50,8 +50,10 @@ internal sealed partial class SchoolScenarios
         long first=Charge(child.Enrollment,may),second=Charge(child.Enrollment,june);
         await Pay(child.Student,child.Enrollment,4500,(first,4500));
         using var review=ReviewConcession(ConcessionArgs(id,may,june,1000,true,true));
-        r.Check(review.Tables.Count==3&&Convert.ToDecimal(review.Tables[0].Rows[0]["Difference"])==-2000&&Convert.ToDecimal(review.Tables[0].Rows[0]["ReleasedPaidAmount"])==500,
-            "Concession review shows both bill reductions and only the paid difference to release.");
+        decimal reviewedDifference=review.Tables.Count>0?Convert.ToDecimal(review.Tables[0].Rows[0]["Difference"]):decimal.MinValue;
+        decimal reviewedReleased=review.Tables.Count>0?Convert.ToDecimal(review.Tables[0].Rows[0]["ReleasedPaidAmount"]):decimal.MinValue;
+        r.Check(review.Tables.Count==3&&reviewedDifference==-2000&&reviewedReleased==500,
+            $"Concession review shows both bill reductions and only the paid difference to release (fictional difference={reviewedDifference}, released={reviewedReleased}).");
         var args=ConcessionArgs(id,may,june,1000,true,false,Snapshot(review));
         var intent=new MutationIntent(Guid.NewGuid(),MutationKind.FeeConcession,f.Admin,await RecoverableMutationWriter.GetScopeAsync(),
             RecoverableMutationWriter.PayloadHash(MutationKind.FeeConcession,f.Admin,args),"Fictional concession recovery",DateTime.UtcNow);
@@ -138,8 +140,10 @@ internal sealed partial class SchoolScenarios
         r.Check(Sql.Money("SELECT TOP(1) NewGross FROM dbo.FeeBillCorrections WHERE BillingChargeId=@C ORDER BY FeeBillCorrectionId DESC;",Sql.P("@C",bill))==5000,
             "A change of gross fee and concession with unchanged net bill still records the new fee basis.");
         SaveTerms(id,month,month,0);
-        r.Check(Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE BillingChargeId=@C OR CorrectionOfBillingChargeId=@C;",Sql.P("@C",bill))==5000&&ChainDue(bill)==1000&&Credit(child.Student)==500,
-            "Later removal uses the reviewed 5000 fee basis and keeps paid credit until its use is explicitly chosen.");
+        decimal revisedNet=Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE BillingChargeId=@C OR CorrectionOfBillingChargeId=@C;",Sql.P("@C",bill));
+        decimal revisedDue=ChainDue(bill), retainedCredit=Credit(child.Student);
+        r.Check(revisedNet==5000&&revisedDue==1000&&retainedCredit==500,
+            $"Later removal uses the reviewed 5000 fee basis and keeps paid credit until its use is explicitly chosen (fictional net={revisedNet}, due={revisedDue}, credit={retainedCredit}).");
         var waived=EarlierChild("Prior correction and later waiver example");long waivedBill=Tuition(waived.Enrollment);
         Rate(waivedBill,6000);await Pay(waived.Student,waived.Enrollment,0,(waivedBill,-500));
         var actual=FeeDiscountPeriod.BillContext(waivedBill);
@@ -160,7 +164,13 @@ internal sealed partial class SchoolScenarios
         long annual=Convert.ToInt64(Sql.Scalar("SELECT BillingChargeId FROM dbo.BillingCharges WHERE EnrollmentId=@E AND FeeTypeId=@F;",Sql.P("@E",child.Enrollment),Sql.P("@F",f.AdmissionFee)));
         int annualAssignment=Sql.Count("SELECT StudentFeeAssignmentId FROM dbo.BillingCharges WHERE BillingChargeId=@C;",Sql.P("@C",annual));
         await Pay(child.Student,child.Enrollment,2000,(annual,2000));
-        SaveTerms(annualAssignment,month,month,0,1500,agreement:false,bill:annual,action:"Refund");
+        // Annual opening charges are dated in the admission month, not the
+        // current monthly-billing month. The selected bill must be inside the
+        // period supplied to SaveStudentFeeDiscount.
+        DateTime annualMonth=Convert.ToDateTime(Sql.Scalar(
+            "SELECT COALESCE(BillingMonth,DATEFROMPARTS(YEAR(ChargeDate),MONTH(ChargeDate),1)) FROM dbo.BillingCharges WHERE BillingChargeId=@C;",
+            Sql.P("@C",annual)));
+        SaveTerms(annualAssignment,annualMonth,annualMonth,0,1500,agreement:false,bill:annual,action:"Refund");
         r.Check(ChainDue(annual)==0&&Credit(child.Student)==0&&Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments WHERE AdmissionId=@S AND PaymentMethod=N'Refund';",Sql.P("@S",child.Student))==-500,
             "An explicitly reviewed annual fee reduction issues only the paid 500 refund and retains the original receipt.");
         long Purchase()=>Convert.ToInt64(Sql.Proc("PostAdditionalFee",Sql.P("@UserId",f.Admin),Sql.P("@RequestId",Guid.NewGuid()),Sql.P("@FeeTypeId",f.Purchase),Sql.P("@ChargeDate",DateTime.Today),Sql.P("@Amount",1200m),Sql.P("@DiscountAmount",0m),Sql.P("@Reason","Fictional workbook"),Sql.TvpParameter("@Selection","ManualChargeSelectionType",Tvp.ManualChargeSelection(new[]{child.Enrollment}))).Rows[0]["BillingChargeId"]);
