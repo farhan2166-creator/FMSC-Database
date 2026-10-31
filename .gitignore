@@ -422,3 +422,13 @@ Database/*.bak
 /Tests/SafetySqlChecks/*
 !/Tests/SafetySqlChecks/*.cs
 !/Tests/SafetySqlChecks/*.csproj
+
+# Portable contact and academic-year validation regression sources only.
+!/Tests/ContactValidationChecks/
+/Tests/ContactValidationChecks/*
+!/Tests/ContactValidationChecks/*.cs
+!/Tests/ContactValidationChecks/*.csproj
+!/Tests/AcademicYearChecks/
+/Tests/AcademicYearChecks/*
+!/Tests/AcademicYearChecks/*.cs
+!/Tests/AcademicYearChecks/*.csproj

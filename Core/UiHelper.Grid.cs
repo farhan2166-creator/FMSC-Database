@@ -852,7 +852,13 @@ namespace FMSC_SMS.Core
                    column is DataGridViewButtonColumn ||
                    column is DataGridViewImageColumn;
         }
-        /// <summary>Sizes every visible column to its own header and content, then shares out whatever width is left between them.</summary>
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DataGridView, object> EqualWidthGrids = new();
+        internal static void UseEqualColumnWidths(DataGridView grid)
+        {
+            EqualWidthGrids.GetValue(grid, _ => new object());
+            FitColumnsToWidth(grid);
+        }
+        /// <summary>Sizes visible columns using the grid's shared sizing policy.</summary>
         public static void FitColumnsToWidth(DataGridView grid)
         {
             if (grid == null ||
@@ -872,6 +878,21 @@ namespace FMSC_SMS.Core
             var columns=grid.Columns.Cast<DataGridViewColumn>().ToArray();
             foreach (DataGridViewColumn column in columns)
                 if(column.DataGridView==grid)ApplyGridValueAlignment(column);
+            if (EqualWidthGrids.TryGetValue(grid, out _))
+            {
+                var visible = columns.Where(column => column.DataGridView == grid && column.Visible).ToArray();
+                if (visible.Length == 0) return;
+                int availableWidth = Math.Max(0, grid.DisplayRectangle.Width - 2);
+                int minimum = visible.Max(column => column.MinimumWidth);
+                int width = Math.Max(minimum, availableWidth / visible.Length);
+                int remainder = width == minimum && availableWidth < minimum * visible.Length ? 0 : availableWidth % visible.Length;
+                for (int index = 0; index < visible.Length; index++)
+                {
+                    visible[index].AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
+                    visible[index].Width = width + (index < remainder ? 1 : 0);
+                }
+                return;
+            }
             var flexible =
                 new List<DataGridViewColumn>();
             int pinnedWidth = 0;

@@ -33,6 +33,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
     private string? _logoFileName;
     private string? _logoContentType;
     private bool _logoRemoved;
+    private readonly FormValidator contactValidator = new();
     public SchoolProfilePage():this(true){}
     internal SchoolProfilePage(bool initialize)
         : base(PageTitles.SchoolInformation, "Set the school details shown on reports, certificates and receipts.")
@@ -41,6 +42,9 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
         RecordTextPolicy.WireInput(schoolName, "@SchoolName");
         RecordTextPolicy.WireInput(addressLine, "@AddressLine");
         RecordTextPolicy.WireInput(city, "@City");
+        Disposed += (_, _) => contactValidator.Dispose();
+        SchoolContactInput.AttachPhone(contactNumber, () => contactValidator);
+        SchoolContactInput.AttachEmail(email, () => contactValidator);
         AddAction(UiText.Actions.Save, (_, _) => Save(), "Success");
         AddAction(UiText.Actions.Reload, (_, _) => LoadProfile());
         AddBusyAction("Choose Logo…", ChooseLogoAsync);
@@ -165,6 +169,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
         try
         {
             _profileReadCompleted = false;
+            contactValidator.ClearAll();
             _logoRemoved = false;
             var dt =
                 DatabaseHelper.QueryUser("GetSchoolProfile");
@@ -244,7 +249,10 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             byte[] bytes =
                 await BoundedImageFile.ReadAsync(dialog.FileName, 2_000_000);
             if (IsDisposed) return;
-            UiHelper.ReplacePictureImage(logoPreview, BitmapFromBytes(bytes));
+            using var validatedLogo = BitmapFromBytes(bytes);
+            if (!Confirm("Save this image as the school logo now? Any other changes on this page will also be saved.", "Save School Logo", defaultYes: false))
+                return;
+            UiHelper.ReplacePictureImage(logoPreview, new Bitmap(validatedLogo));
             _logoBytes = bytes;
             _logoFileName =
                 Path.GetFileName(dialog.FileName);
@@ -258,6 +266,7 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             logoInfo.Text =
                 $"{_logoFileName} (not saved yet)";
             SetStatus("Logo selected. Click Save to store it.");
+            Save();
         }
         catch (InvalidDataException ex)
         {
@@ -275,11 +284,14 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             Warn("There is no logo to remove.");
             return;
         }
+        if (!Confirm("Remove the school logo and save now? Any other changes on this page will also be saved.", "Remove School Logo", defaultYes: false))
+            return;
         ClearLogoState();
         _logoRemoved = true;
         logoInfo.Text =
             "No logo (not saved yet)";
         SetStatus("Logo removed. Click Save to make this permanent.");
+        Save();
     }
     private void ClearLogoState()
     {
@@ -309,17 +321,16 @@ public sealed class SchoolProfilePage : V2Page, IUnsavedChanges
             }
             if (!ValidateRequiredInputs())
                 return;
+            contactValidator.Begin();
+            contactValidator.Rule(contactNumber, () => SchoolContactValidation.IsValidPhoneList(contactNumber.Text), SchoolContactValidation.PhoneMessage);
+            contactValidator.Rule(email, () => EmailAddressValidator.IsBlankOrValid(email.Text),
+                "Enter a valid email address, such as name@example.com.");
+            if (!contactValidator.Finish()) return;
             if(!WholeRupees.IsWhole(feeProrationCutoffDay.Value)||!WholeRupees.IsWhole(transportCutoffDay.Value))
             {Warn("Cutoff days must be whole numbers from 1 to 28, or blank.");return;}
             if (string.IsNullOrWhiteSpace(schoolName.Text))
             {
                 Warn("Enter the school name.");
-                return;
-            }
-            /* this used to be a bare Contains('@'), which accepted "abc@", "@abc" and "@". The field is optional, so blank stays acceptable; anything else must look like a deliverable address. */
-            if (!EmailAddressValidator.IsBlankOrValid(email.Text))
-            {
-                Warn("Enter a valid email address, such as name@example.com, or leave it blank.");
                 return;
             }
             byte[]? logoToSave =

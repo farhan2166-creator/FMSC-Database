@@ -108,20 +108,20 @@ internal static class RecordTextPolicy
         {
             text = text.Trim();
             if (!IsValidYearName(text))
-                throw new ArgumentException("Year Name must contain digits and an optional hyphen only, for example 2025-2026.");
+                throw new ArgumentException(AcademicYearName.ValidationMessage);
             return text;
         }
         return TitleCaseParameters.Contains(parameter) ? TitleCase(text) : value;
     }
 
     internal static bool IsValidYearName(string text) =>
-        Regex.IsMatch(text, @"\A[0-9]+(?:-[0-9]+)?\z", RegexOptions.CultureInvariant);
+        AcademicYearName.TryParse(text, out _);
 
     internal static string? ValidationMessage(string parameter, string text)
     {
         text = text.Trim();
         if (parameter.Equals("@YearName", StringComparison.OrdinalIgnoreCase))
-            return IsValidYearName(text) ? null : "Use digits and an optional hyphen only, for example 2025-2026.";
+            return IsValidYearName(text) ? null : AcademicYearName.ValidationMessage;
         // Required-field checks decide whether optional names may be blank.
         if (text.Length == 0) return null;
         if (PersonNameParameters.Contains(parameter))

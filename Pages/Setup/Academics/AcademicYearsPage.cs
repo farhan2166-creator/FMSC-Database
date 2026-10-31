@@ -2,7 +2,91 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Setup.Academics;
 public sealed class AcademicYearsPage : MasterPage
 {
-    public AcademicYearsPage() : base(
+    private FormValidator? _yearValidator;
+    protected override bool ReserveEditorValidationSpace => true;
+    protected override int EditorValidationLines => 2;
+    protected override bool EditorValidationSpansCaption => true;
+    private FormValidator YearValidator
+    {
+        get
+        {
+            if (_yearValidator is null)
+            {
+                _yearValidator = CreateValidator();
+                BindEditorValidationMessages(_yearValidator);
+            }
+            return _yearValidator;
+        }
+    }
+    private void ValidateDates()
+    {
+        if (TryGetEditorControl("StartDate", out var start) && start is ModernDatePicker first &&
+            TryGetEditorControl("EndDate", out var end) && end is ModernDatePicker last)
+            YearValidator.Rule(last, () => last.Value.Date >= first.Value.Date, "End Date must be on or after Start Date.");
+    }
+    private bool datesLocked;
+    private DateTime loadedStartDate, loadedEndDate;
+    private const string LockedDatesMessage = "Start and End dates are locked because this year has student or promotion history. Name, Remarks and Current remain editable.";
+    protected override void LayoutRecordColumns()
+    {
+        if (Grid.Columns.Contains("DatesLocked")) Grid.Columns["DatesLocked"].Visible = false;
+        if (Grid.Columns.Contains("Remarks")) Grid.Columns["Remarks"].Visible = false;
+        base.LayoutRecordColumns();
+    }
+    protected override bool CanSaveRecord()
+    {
+        var validator = YearValidator;
+        validator.Begin();
+        validator.RequiredFields(this);
+        ValidateDates();
+        if (TryGetEditorControl("YearName", out var name) && name is not null)
+            validator.Rule(name, () => AcademicYearName.TryParse(name.Text, out _), AcademicYearName.ValidationMessage);
+        if (datesLocked && TryGetEditorControl("StartDate", out var start) && start is ModernDatePicker startDate &&
+            TryGetEditorControl("EndDate", out var end) && end is ModernDatePicker endDate &&
+            (startDate.Value.Date != loadedStartDate || endDate.Value.Date != loadedEndDate))
+        {
+            Warn(LockedDatesMessage);
+            return false;
+        }
+        return validator.Finish();
+    }
+    protected override void EditorCleared(bool afterSave)
+    {
+        base.EditorCleared(afterSave);
+        _yearValidator?.ClearAll();
+        startDateChosen = false;
+        endDateChosen = false;
+        SetDateLock(false);
+        // MasterPage restores each control's pre-save enabled state in finally.
+        // Reapply the new-record state after that restoration has completed.
+        if (afterSave) Defer(() => SetDateLock(datesLocked));
+    }
+    protected override void RecordLoaded(DataGridViewRow row)
+    {
+        base.RecordLoaded(row);
+        _yearValidator?.ClearAll();
+        startDateChosen = endDateChosen = true;
+        // Fail closed if an unexpected reader omits the lock flag.
+        SetDateLock(row.DataGridView is not { } owner || !owner.Columns.Contains("DatesLocked") ||
+            row.Cells["DatesLocked"].Value is not bool locked || locked);
+        if (TryGetEditorControl("StartDate", out var start) && start is ModernDatePicker startDate)
+            loadedStartDate = startDate.Value.Date;
+        if (TryGetEditorControl("EndDate", out var end) && end is ModernDatePicker endDate)
+            loadedEndDate = endDate.Value.Date;
+    }
+    private void SetDateLock(bool locked)
+    {
+        datesLocked = locked;
+        foreach (string key in new[] { "StartDate", "EndDate" })
+            if (TryGetEditorControl(key, out var date) && date is not null)
+            {
+                date.Enabled = !locked;
+                SetToolTip(date, locked ? LockedDatesMessage : "Choose the academic year's date.");
+            }
+        if (locked) SetStatus(LockedDatesMessage);
+    }
+    public AcademicYearsPage() : this(true) { }
+    internal AcademicYearsPage(bool initialize) : base(
         "Academic Years",
         "Create academic years, set their dates and mark the current year.",
         "GetAcademicYears",
@@ -64,11 +148,18 @@ public sealed class AcademicYearsPage : MasterPage
         usageCountProcedure: "GetAcademicYearUsageCount",
         usageCountIdParameter: "@AcademicYearId",
         usageCountLabel: "placement record(s)",
-        deleteBlockedProcedure: "GetAcademicYearDeleteBlockedIds")
+        deleteBlockedProcedure: "GetAcademicYearDeleteBlockedIds",
+        initialize: initialize)
     {
         WireYearDateDefaults();
         // MasterPage performs its own deferred initialization. Apply the page-specific date defaults after that initialization.
-        Defer(ApplyInitialDateDefaults);
+        if (initialize) Defer(ApplyInitialDateDefaults);
+        foreach (string key in new[] { "StartDate", "EndDate" })
+            if (TryGetEditorControl(key, out var date) && date is ModernDatePicker picker)
+            {
+                picker.ValueChanged += (_, _) => { if (!applyingDateDefaults && picker.Focused) ValidateDates(); };
+                picker.Leave += (_, _) => ValidateDates();
+            }
     }
     /* These flags record that a date field already carries a value that is meant to be kept: either the operator picked it or a saved record put it there. */
     private bool startDateChosen;
@@ -98,7 +189,11 @@ public sealed class AcademicYearsPage : MasterPage
                         return;
                     }
                     ApplyYearDateDefaults(yearName);
+                    if (yearName.Focused)
+                        YearValidator.Rule(yearName, () => AcademicYearName.TryParse(yearName.Text, out _), AcademicYearName.ValidationMessage);
                 };
+            yearName.Leave += (_, _) => YearValidator.Rule(yearName,
+                () => AcademicYearName.TryParse(yearName.Text, out _), AcademicYearName.ValidationMessage);
         }
         /* A date the operator (or a loaded record) has already set is a date the year name must not overwrite. */
         if (TryGetEditorControl(
@@ -161,16 +256,20 @@ public sealed class AcademicYearsPage : MasterPage
             return;
         }
         /* fill only what is still open. */
+        var proposedStart = new DateTime(startYear, 4, 1);
+        var proposedEnd = new DateTime(startYear + 1, 3, 31);
+        if (proposedStart < startDate.MinDate || proposedStart > startDate.MaxDate ||
+            proposedEnd < endDate.MinDate || proposedEnd > endDate.MaxDate) return;
         applyingDateDefaults = true;
         try
         {
             if (!startDateChosen)
             {
-                startDate.Value = new DateTime(startYear, 4, 1);
+                startDate.Value = proposedStart;
             }
             if (!endDateChosen)
             {
-                endDate.Value = new DateTime(startYear + 1, 3, 31);
+                endDate.Value = proposedEnd;
             }
         }
         finally
@@ -180,12 +279,6 @@ public sealed class AcademicYearsPage : MasterPage
     }
     private static bool TryParseAcademicYear(string? value, out int startYear)
     {
-        startYear = 0;
-        if (string.IsNullOrWhiteSpace(value))
-            return false;
-        var match =
-            System.Text.RegularExpressions.Regex.Match(value.Trim(), @"\b(20\d{2})\b");
-        return match.Success &&
-               int.TryParse(match.Groups[1].Value, out startYear);
+        return AcademicYearName.TryParse(value, out startYear);
     }
 }

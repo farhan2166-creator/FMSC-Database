@@ -9,6 +9,16 @@
 
 ## Consolidation index — 21 October 2026
 
+### Focused update — 31 October 2026
+
+The owner-approved academic-year date lock is implemented in migration 63 and
+applied locally after a verified backup with unchanged hashes across 79 business
+tables. Portable, native-control and isolated SQL checks passed. See the
+[decision and dated evidence](../Docs/Decisions/ACADEMIC_YEAR_DATE_LOCK.md) for the
+reviewed working-tree baseline, initial checker rollback and exact test scope.
+Joint operator acceptance remains pending; this does not change unrelated release
+gates or certify all forms.
+
 - [Audit index](README.md) identifies the canonical owner-decision record, immutable investigations and historical verification.
 - [Owner decisions and invariants](OWNER_DECISIONS_AND_INVARIANTS.md) is the cross-module locator for financial, admission, setup, data-preservation, access and UI safeguards. It does **not** replace current implementation or SQL checks.
 - [UI guidance audit](Reviews/FMSC_UI_Guidance_Audit_2026-10-20.md) is an unimplemented wording/design assessment. Its G01–G17 findings require visual review and explicit approval before changes.

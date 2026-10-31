@@ -34,6 +34,24 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--assignment-layout"))
+        {
+            CheckAssignmentLayout();
+            Console.WriteLine($"PASS: {checks} assignment layout checks (no database connection).");
+            return;
+        }
+        if (args.Contains("--setup-validation-layout"))
+        {
+            CheckSetupValidationLayout();
+            Console.WriteLine($"PASS: {checks} setup validation/layout checks (no database connection).");
+            return;
+        }
+        if (args.Contains("--academic-year-date-lock"))
+        {
+            CheckAcademicYearDateLock();
+            Console.WriteLine($"PASS: {checks} native academic-year date-lock checks (no database connection).");
+            return;
+        }
         if (args.Contains("--certificate-submission"))
         {
             CheckMeaningfulCertificateContent();

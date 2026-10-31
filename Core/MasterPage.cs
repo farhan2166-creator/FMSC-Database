@@ -10,7 +10,9 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
     protected virtual bool ReserveEditorValidationSpace => false;
     protected virtual int EditorFieldGap => UiDesignSystem.Spacing.Sm;
     protected virtual int EditorInputVerticalInset => UiDesignSystem.Spacing.Xs;
-    private int EditorValidationHeight => ReserveEditorValidationSpace ? AppMetrics.TextHeight(AppTheme.SmallFont) + 4 : 0;
+    protected virtual int EditorValidationLines => 1;
+    protected virtual bool EditorValidationSpansCaption => false;
+    private int EditorValidationHeight => ReserveEditorValidationSpace ? AppMetrics.TextHeight(AppTheme.SmallFont) * EditorValidationLines + 4 : 0;
     private readonly Dictionary<Control, Label> _editorValidationLabels = new();
     protected void BindEditorValidationMessages(FormValidator validator)
     {
@@ -198,7 +200,8 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
         string? deleteBlockedProcedure = null,
         string? recordIdColumn = null,
         bool separateEntryAndRecords = false,
-        bool editorOnly = false)
+        bool editorOnly = false,
+        bool initialize = true)
         : base(title, context)
     {
         _changeTracker = new MasterEditorChangeTracker(Values);
@@ -415,7 +418,7 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
         SetContent(host, _guidance);
         FormFlow.EnterMovesToNext(this);
         CaptureEditorBaseline();
-        Defer(async () => {
+        if (initialize) Defer(async () => {
             await BindLookupsAsync();
             Reload();
             FocusFirstEditorField();

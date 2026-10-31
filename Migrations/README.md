@@ -1,14 +1,23 @@
-## Current target: schema 60
+## Current target: schema 63
+
+Migration `63.sql` implements the owner decision of 31 October 2026: academic
+years referenced by any enrolment (including historical/left students) or either
+side of a promotion batch keep their Start and End dates. Name, Remarks and
+Current remain editable. It adds a reader flag and a transactional save guard,
+and enforces consecutive four-digit year names. Existing rows are not rewritten.
+Apply after `61.sql` and `62.sql`, under an outer transaction. Verify with
+`Tools/TestAcademicYearDateLock.ps1`, `Tests/AcademicYearChecks` and native
+`ThemeSmokeChecks --academic-year-date-lock`.
 
 Migration `60.sql` fixes admission/fee flow authorization and recovery. It adds nullable cancellation reason/actor/time fields without rewriting old history, requires collection and adjustment permissions for cancelling a debt, passes the current operator into credit settlement, and marks verified direct-admission rollbacks with SQL error state 60. C# also keeps pending transport editing in registration and aligns the aging shortcut with account access. Apply 59 first if needed; run 60 under an outer transaction. Validation: `Tools/TestAdmissionFeeFlowFixes.ps1` and native `--admission-fee-flow-fixes`.
 
 Migration `59.sql` retires the remaining 19 generic audit writers after schema 58. Apply it once under an outer transaction using the installer or `sqlcmd -b`. It preserves existing audit rows/readers, permissions, preview snapshots, operational history and recovery markers. This remaining batch is explicitly owner-authorized on 28 October 2026. Validate with `Tools/TestRemainingAuditRetirement.ps1` (owned, record-free fixture).
 
-For any supported starting version from 19 through 59, apply every numbered file greater than that version up to and including 60 in ascending order. Never rerun an applied migration. Historical tables below describe the earlier migration-51 stage; they are not the current complete upgrade list.
+For any supported starting version from 19 through 62, apply every numbered file greater than that version up to and including 63 in ascending order. Never rerun an applied migration. Historical tables below describe the earlier migration-51 stage; they are not the current complete upgrade list.
 
 # Apply the database changes later
 
-The application requires **schema 60**. SQL changes are checked in here;
+The application requires **schema 63**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,

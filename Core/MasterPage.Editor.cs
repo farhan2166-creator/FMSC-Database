@@ -189,8 +189,8 @@ public partial class MasterPage
                 TextAlign = ContentAlignment.MiddleLeft, UseMnemonic = false,
                 Visible = false, AccessibleRole = AccessibleRole.Alert
             };
-            panel.Controls.Add(message, 1, 1);
-            panel.SetColumnSpan(message, 2);
+            panel.Controls.Add(message, EditorValidationSpansCaption ? 0 : 1, 1);
+            panel.SetColumnSpan(message, EditorValidationSpansCaption ? 3 : 2);
             _editorValidationLabels[control] = message;
         }
         if (field.ManageDialogFactory is null)
@@ -1003,7 +1003,7 @@ public partial class MasterPage
             if (values.TryGetValue("YearName", out var yearName) &&
                 !RecordTextPolicy.IsValidYearName(Convert.ToString(yearName)?.Trim() ?? string.Empty))
             {
-                Warn("Year Name must contain digits and an optional hyphen only, for example 2025-2026.");
+                Warn(AcademicYearName.ValidationMessage);
                 focusAfterSave = _controls["YearName"];
                 return;
             }

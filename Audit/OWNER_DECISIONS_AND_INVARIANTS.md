@@ -7,6 +7,13 @@ Read [the master audit](FMSC_MASTER_AUDIT.md) for release gates and dated findin
 
 ## Enforced or recorded application behavior
 
+**31 October 2026 — Academic-year editing:** The owner approved locking Start/End
+dates once a year is referenced by student enrolment (including legacy/historical
+records) or promotion history. Name/Remarks corrections and Current remain
+editable. Implemented by `Migrations/63.sql` and `AcademicYearsPage`; see the
+isolated SQL and native `--academic-year-date-lock` checks. This entry records the
+decision and implementation, not complete release acceptance.
+
 | Area | Rule to preserve | Source / implementation | Evidence boundary |
 |---|---|---|---|
 | Fee collection and family payments | Posting a fee creates dues; collecting records settlement. A family collection may use one family receipt, but each child's allocations, discounts and dues stay attached to that child. Student advance settles fees without new cash. A successful collection must not be repeated merely because receipt printing fails. | [Finance wording record](../Docs/FINANCE_WORDING_REVIEW_2026-10-20.md), [FeeCollectionPage](../Pages/Finance/Collection/FeeCollectionPage.cs) | Reconfirm live SQL, lost-response and print/reprint routes for each release candidate. |
