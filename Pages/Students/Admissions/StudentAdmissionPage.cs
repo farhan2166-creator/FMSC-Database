@@ -3714,7 +3714,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     }
     private async Task CloseAdmissionAsync(bool cancel)
     {
-        if (currentAdmissionId <= 0 || saveBusy || (cancel && !IsPendingRegistration)) return;
+        if (currentAdmissionId <= 0 || saveBusy || (cancel && (!IsPendingRegistration || !CanCancelPendingRegistration()))) return;
         if (HasUnsavedChanges) { SetStatus("Save changes before closing this record."); return; }
         using var dialog = new CloseAdmissionDialog(currentAdmissionId,name.Text,cancel,
             placementStart: placementStartDate, placementEnd: placementYearEnd);
