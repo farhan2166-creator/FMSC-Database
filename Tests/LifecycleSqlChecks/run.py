@@ -32,8 +32,13 @@ def verify_baseline():
     The real SQL scenarios and live runtime contract enforce their own behavior.
     """
     requirement = re.search(r'RequiredDatabaseSchemaVersion\s*=\s*"(\d+)"', (ROOT / "DatabaseHelper.cs").read_text())
-    if requirement is None or requirement.group(1) != "58":
-        raise ValueError("Production schema requirement changed; review the SQL test fixture before running tests.")
+    installer = re.search(r"\$DatabaseVersion\s*=\s*'(\d+)'", (ROOT / "Installer/core.ps1").read_text())
+    if requirement is None or installer is None or requirement.group(1) != installer.group(1):
+        raise ValueError("Application and installer schema targets differ; review the SQL test fixture.")
+    target = int(requirement.group(1))
+    migrations = {int(p.stem) for p in (ROOT / "Migrations").glob("*.sql") if p.stem.isdecimal()}
+    if migrations != set(range(20, target + 1)):
+        raise ValueError("Numbered migration chain must be complete through the required schema.")
 
     def provider_version(project):
         return next(e.get("Version") for e in ET.parse(project).getroot().iter("PackageReference") if e.get("Include") == "Microsoft.Data.SqlClient")
@@ -107,7 +112,7 @@ def write_evidence(output, report):
     (output / "report.json").write_text(json.dumps(report, indent=2))
     rows = report["scenarios"]
     summary = ["# FMSC_SMS Level 1 automated evidence", "", f"Commit: `{report['commit']}`", f"Run: `{report['runId']}`",
-               f"Engine: SQL Server 2022 ({report.get('engine') or 'unverified'}); required schema: 21", "",
+               f"Engine: SQL Server 2022 ({report.get('engine') or 'unverified'}); required schema: {report.get('schemaVersion') or 'unverified'}", "",
                f"PASS: {sum(s['result']=='PASS' for s in rows)} · FAIL: {sum(s['result']=='FAIL' for s in rows)} · BLOCKED: {sum(s['result']=='BLOCKED' for s in rows)}",
                "", "| Scenario | Result | Assertions | Seconds |", "|---|---|---:|---:|"]
     summary += [f"| {s['name'].replace('|','/')} | {s['result']} | {s.get('assertions',0)} | {s.get('seconds',0):.2f} |" for s in rows]
@@ -167,7 +172,7 @@ def main():
     report = {"commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "runId": str(token), "workingTreeDirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()), "scenarios": [], "measurements": {"HostLogicalCpus": os.cpu_count() or 0, "HostMemoryMiB": os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") / (1024 * 1024)}, "limitations": [
         "Linux real-SQL lifecycle/integration tests; existing desktop CI separately runs Windows control contracts and PDF export.",
         "No interactive visual, printing, installer, Windows LocalDB/operator-account or actual network-loss acceptance.",
-        "No real school rows are imported: schema-only packages and fresh synthetic records. Both the pinned upgrade fixture and current release DACPAC are published into separate owned catalogs.",
+        "No real school rows are imported: the approved data-free test baseline is independently upgraded through the complete numbered migration chain in each owned catalog. The reference DACPAC is never published.",
         "Test-only seeds set baseline schema versions and repair DacFx recovery-scope type; this does not prove the owner's distributed MDF/LDF snapshot.",
         "Legacy PowerShell scripts that back up FMSC_DB or hardcode school IDs are inspected but never executed."]}
     current_stage = None
@@ -215,25 +220,15 @@ def main():
     def provision(suffix, current_schema=False):
         catalog = "FMSC_AuditChecks_" + suffix + "_" + token.hex
         env["FMSC_AUDIT_CONNECTION"] = f"Server=127.0.0.1,{port};Database={catalog};User ID=sa;Password={secret};Encrypt=False;TrustServerCertificate=True;Connect Timeout=20;Pooling=True"
+        # Both owned catalogs use the data-free test baseline plus numbered migrations.
+        # The root fmsc.dacpac is a reference artifact, never a deployment/test source.
         package = str(Path(private.name) / "schema-only.dacpac")
-        if current_schema:
-            # A second target exercises the actual release schema, independently of
-            # the retained v6 fixture/upgrade chain. Never accept data-bearing packages.
-            sys.path.insert(0, str(ROOT / "Tools"))
-            from check_security import inspect_dacpac
-            inspect_dacpac((ROOT / "fmsc.dacpac").read_bytes())
-            package = str(ROOT / "fmsc.dacpac")
         prefix = [str(args.sqlpackage)] if args.sqlpackage else [args.dotnet, "tool", "run", "sqlpackage", "--"]
         execute(prefix + ["/Action:Publish", "/SourceFile:" + package, "/TargetConnectionString:" + env["FMSC_AUDIT_CONNECTION"], "/p:CreateNewDatabase=True"], timeout=240, cwd=PROJECT)
         sql(catalog, "DECLARE @Owner uniqueidentifier='" + str(token) + "'; EXEC sys.sp_addextendedproperty @name=N'FMSC_Level1Owner',@value=@Owner;")
-        # The approved data-free fixture is v6; exercise numbered upgrades rather than changing its model.
-        sql(catalog, "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'" + ("21" if current_schema else "6") + "');")
-        if current_schema:
-            migration = ROOT / "Migrations" / "22.sql"
-            sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;")
-            migration = ROOT / "Migrations" / "23.sql"
-            sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;")
-            return catalog
+        # The approved data-free fixture is schema 6. Replay the entire chain into
+        # each isolated catalog; never seed a fabricated "current" version.
+        sql(catalog, "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');")
         for migration in sorted((PROJECT / "Migrations").glob("*.sql"), key=lambda p: int(p.stem)):
             if 6 < int(migration.stem) <= 19:
                 sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;")
