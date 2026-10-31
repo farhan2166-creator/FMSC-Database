@@ -74,10 +74,6 @@ internal sealed class AboutForm : ApplicationWindowForm
         };
         root.SizeChanged += (_, _) => feedback.MaximumSize = new Size(Math.Max(1, root.ClientSize.Width - root.Padding.Horizontal), 0);
         root.Controls.Add(feedback, 0, 1);
-        var actions = new FlowLayoutPanel {
-            Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false, Margin = Padding.Empty, Padding = new Padding(0, UiDesignSystem.Spacing.Md, 0, 0)
-        };
         var close = new ModernButton {
             Text = UiText.Actions.Close, ThemeRole = "Primary", DialogResult = DialogResult.OK,
             Width = AppScale.S(100), Height = AppMetrics.ButtonHeight, Margin = Padding.Empty
@@ -94,8 +90,8 @@ internal sealed class AboutForm : ApplicationWindowForm
                 feedback.Text = "The clipboard is busy. Try Copy details again.";
             }
         };
-        actions.Controls.Add(close);
-        actions.Controls.Add(copy);
+        var actions = HumanUi.DialogButtons(copy, close);
+        actions.Padding = new Padding(0, UiDesignSystem.Spacing.Md, 0, 0);
         root.Controls.Add(actions, 0, 2);
         Controls.Add(root);
         AcceptButton = close;

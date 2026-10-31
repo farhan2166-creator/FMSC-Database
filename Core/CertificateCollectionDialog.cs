@@ -18,8 +18,8 @@ internal static class CertificateCollectionDialog
         bool Valid()=>!string.IsNullOrWhiteSpace(input.Text)&&input.Text.Trim().Length<=maxLength;
         input.TextChanged+=(_,_)=>collect.Enabled=Valid();
         collect.Click+=(_,_)=>{if(!Valid())return;result=input.Text.Trim();dialog.DialogResult=DialogResult.OK;dialog.Close();};
-        var actions=new FlowLayoutPanel {Dock=DockStyle.Fill,AutoSize=true,FlowDirection=FlowDirection.RightToLeft,WrapContents=false,Margin=new Padding(0,8,0,0)};
-        actions.Controls.Add(collect);actions.Controls.Add(cancel);
+        var actions=HumanUi.DialogButtons(cancel,collect);
+        actions.Margin=new Padding(0,8,0,0);
         var body=new TableLayoutPanel {Dock=DockStyle.Fill,ColumnCount=1,RowCount=5,Padding=new Padding(AppScale.Scale(20)),Margin=Padding.Empty};
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         body.RowStyles.Add(new RowStyle(SizeType.AutoSize));body.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));

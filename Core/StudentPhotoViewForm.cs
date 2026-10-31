@@ -36,16 +36,12 @@ internal sealed class StudentPhotoViewForm : ApplicationWindowForm
         };
         root.Controls.Add(photo, 0, 1);
         UiHelper.DisposePictureImageOnDispose(photo);
-        var actions = new FlowLayoutPanel {
-            Dock = DockStyle.Fill, FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false, Margin = Padding.Empty,
-            Padding = new Padding(0, UiDesignSystem.Spacing.Md, 0, 0)
-        };
         var close = new ModernButton {
             Text = UiText.Actions.Close, ThemeRole = "Primary", DialogResult = DialogResult.OK,
             Width = AppScale.S(100), Height = AppMetrics.ButtonHeight, Margin = Padding.Empty
         };
-        actions.Controls.Add(close);
+        var actions = HumanUi.DialogButtons(close);
+        actions.Padding = new Padding(0, UiDesignSystem.Spacing.Md, 0, 0);
         root.Controls.Add(actions, 0, 2);
         Controls.Add(root);
         AcceptButton = close;

@@ -120,15 +120,9 @@ public sealed class ReportColumnDialog : ApplicationWindowForm
         cancel.Click += (_, _) => DialogResult = DialogResult.Cancel;
         apply.Margin = new Padding(AppScale.S(8), 0, 0, 0);
         cancel.Margin = new Padding(AppScale.S(8), 0, 0, 0);
-        var buttonRow = new FlowLayoutPanel {
-            Dock = DockStyle.Bottom,
-            Height = AppMetrics.ButtonHeight + AppScale.S(14),
-            FlowDirection = FlowDirection.RightToLeft,
-            Padding = new Padding(0, AppScale.S(8), 0, 0),
-            BackColor = Color.Transparent
-        };
-        buttonRow.Controls.Add(apply);
-        buttonRow.Controls.Add(cancel);
+        var buttonRow = HumanUi.DialogButtons(cancel, apply);
+        buttonRow.Dock = DockStyle.Bottom;
+        buttonRow.Padding = new Padding(0, AppScale.S(8), 0, 0);
         var body = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
         body.Controls.Add(list);
         body.Controls.Add(moveColumn);

@@ -21,6 +21,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         addHistory = new() { Text = "Add Missing Historical Placement", ThemeRole = "Secondary" },
         close = new() { Text = "Close", DialogResult = DialogResult.Cancel };
     private readonly TableLayoutPanel fields;
+    private readonly Label introduction;
     private readonly int admission;
     private readonly string studentName;
     // History stays read-only. An explicit action opens a separate editor; zero creates missing history.
@@ -93,9 +94,9 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize)); root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        var introduction = new Label { AutoSize = true, Dock = DockStyle.Fill,
+        introduction = new Label { AutoSize = true, Dock = DockStyle.Fill,
             MaximumSize = new Size(AppScale.Scale(780), 0),
-            Text = $"{AdmissionNumbers.ForId(admission)} · {studentName}\n" +
+            Text = $"{studentName}\n" +
                 (editingEnrollment == 0 ? "Record a verified gap in this student's history. Use Promotion, Transfer or Re-admission for an actual move."
                 : editingEnrollment.HasValue ? "Review the unconfirmed placement, then review its impact before saving."
                 : "Select a placement to view its details and available actions.") };
@@ -174,6 +175,12 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
         try
         {
             var student = await DatabaseHelper.QueryUserAsync("GetStudentDetails", DatabaseHelper.Int("@AdmissionId", admission));
+            if (student.Rows.Count > 0)
+            {
+                string number = AdmissionNumbers.Read(student.Rows[0]);
+                string guidance = introduction.Text[(introduction.Text.IndexOf('\n') + 1)..];
+                introduction.Text = $"{number} · {studentName}\n{guidance}";
+            }
             legacySetupPending = student.Rows.Count > 0 && Convert.ToBoolean(student.Rows[0]["LegacySetupPending"]);
             enrollments = await DatabaseHelper.QueryUserAsync("GetStudentEnrollmentsForLifecycle", DatabaseHelper.Int("@AdmissionId", admission));
             var repeatDecisions=await DatabaseHelper.QuerySqlAsync("""

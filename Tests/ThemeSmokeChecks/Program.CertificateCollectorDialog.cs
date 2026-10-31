@@ -28,6 +28,8 @@ internal static partial class Program
                     Check(inputBounds.Left>=AppScale.Scale(18)&&dialog.ClientSize.Width-inputBounds.Right>=AppScale.Scale(18),"Collector input has balanced inset spacing");
                     Check(collectBounds.Top>inputBounds.Bottom&&collectBounds.Right<=dialog.ClientSize.Width-AppScale.Scale(18)
                         &&cancelBounds.Right<collectBounds.Left,"Cancel and Collect fit below the field in a clear order");
+                    Check(Math.Abs((cancelBounds.Left+collectBounds.Right)/2.0-dialog.ClientSize.Width/2.0)<=2,
+                        "Cancel and Collect are centered as a group in the dialog");
                     foreach(var label in Walk(dialog).OfType<Label>())
                     {
                         var bounds=dialog.RectangleToClient(label.RectangleToScreen(label.ClientRectangle));

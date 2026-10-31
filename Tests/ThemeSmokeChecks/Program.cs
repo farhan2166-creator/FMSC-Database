@@ -34,6 +34,23 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--certificate-submission"))
+        {
+            CheckMeaningfulCertificateContent();
+            CheckCertificateSubmissionGuard();
+            Console.WriteLine($"PASS: {checks} certificate discard-policy and submission guards (no database connection).");
+            return;
+        }
+        if (args.Contains("--navigation-controls"))
+        {
+            CheckNavigationRecovery();
+            CheckPaletteDestinations();
+            CheckShortcutPermissions();
+            CheckSelectiveWorkspaceGuards();
+            CheckAdmissionActions();
+            Console.WriteLine($"PASS: {checks} navigation recovery, palette dispatch, permission, busy/draft and admission-action checks (no database connection).");
+            return;
+        }
         if(args.Contains("--placement-workspace"))
         {
             CheckPlacementWorkspace();Console.WriteLine($"PASS: {checks} placement workspace checks.");return;
@@ -737,6 +754,7 @@ internal static partial class Program
             var disabled = new ModernButton { Bounds = new Rectangle(240, 280, 200, 42), Text = "Disabled", Enabled = false };
             card.Controls.AddRange(new Control[] { field, choice, day, student, button, disabled });
             form.Controls.Add(card); form.Show(); Application.DoEvents();
+            UiHelper.ApplyThemeToForm(form);
             Control[] controls = { card, field, choice, day, student, button, disabled };
             var before = controls.Select(c => (c.Bounds, c.Padding, c.Margin, c.Font, c.TabIndex, c.Enabled, c.Visible)).ToArray();
             var focus = form.ActiveControl;

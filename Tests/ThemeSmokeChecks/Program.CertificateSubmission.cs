@@ -32,6 +32,12 @@ internal static partial class Program
                 T Field<T>(string name) => (T)type.GetField(name, flags)!.GetValue(page)!;
                 object? Call(string name) => type.GetMethod(name, flags)!.Invoke(page, null);
                 var student = Field<StudentPicker>("student");
+                var studentRows = new DataTable();
+                studentRows.Columns.Add("AdmissionId", typeof(int));
+                studentRows.Columns.Add("StudentName");
+                studentRows.Columns.Add("DateOfBirth", typeof(DateTime));
+                studentRows.Rows.Add(41, "Synthetic student", new DateTime(2010, 1, 1));
+                student.SetSource(studentRows);
                 student.SetStudent(41, "Synthetic student");
                 Field<ModernDatePicker>("certificateDate").Value = DateTime.Today.AddDays(-1);
                 if (kind == "Sports")

@@ -205,6 +205,15 @@ public static class HumanUi
         => BuildButtonRow(buttons, preserveOrder: false);
     internal static TableLayoutPanel ButtonRowInOrder(params Control[] buttons)
         => BuildButtonRow(buttons, preserveOrder: true);
+    internal static TableLayoutPanel DialogButtons(params Control[] buttons)
+    {
+        foreach (Control button in buttons)
+            button.Margin = new Padding(AppScale.Scale(4), 0, AppScale.Scale(4), 0);
+        var row = ButtonRowInOrder(buttons);
+        row.Dock = DockStyle.Fill;
+        row.Margin = Padding.Empty;
+        return row;
+    }
     private static TableLayoutPanel BuildButtonRow(Control[] buttons, bool preserveOrder)
     {
         if (!preserveOrder) buttons = ActionButtonStyle.Ordered(buttons);

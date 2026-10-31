@@ -51,14 +51,9 @@ public sealed class ReportNameDialog : ApplicationWindowForm
             DialogResult = DialogResult.OK;
         };
         cancel.Click += (_, _) => DialogResult = DialogResult.Cancel;
-        var row = new FlowLayoutPanel {
-            Dock = DockStyle.Bottom,
-            Height = AppMetrics.ButtonHeight + AppScale.S(8),
-            FlowDirection = FlowDirection.RightToLeft,
-            BackColor = Color.Transparent
-        };
-        row.Controls.Add(ok);
-        row.Controls.Add(cancel);
+        var row = HumanUi.DialogButtons(cancel, ok);
+        row.Dock = DockStyle.Bottom;
+        row.Padding = new Padding(0, AppScale.S(8), 0, 0);
         card.Controls.Add(name);
         card.Controls.Add(label);
         card.Controls.Add(row);

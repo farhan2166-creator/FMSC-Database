@@ -22,7 +22,9 @@ internal static partial class Program
             foreach (string name in provisional ? new[] { "examYear", "boardName", "rollNumber", "marksObtained", "marksOutOf", "otherSubjects" } : new[] { "sportName", "performance" })
             {
                 Clear(); Field<ModernTextBox>(name).Text = "Synthetic edited content";
-                Check(draft.HasUnsavedChanges, name + " protects meaningful new certificate content");
+                Check(draft.HasUnsavedChanges == provisional, provisional
+                    ? name + " protects meaningful new provisional certificate content"
+                    : name + " follows the prompt-free short sports-certificate policy");
             }
             Clear();
             if (provisional)
@@ -35,7 +37,8 @@ internal static partial class Program
             ModalPageCloseGuard.Attach(owner, page, confirmDiscard: _ => { asks++; return false; });
             var close = new FormClosingEventArgs(CloseReason.UserClosing, false);
             typeof(Form).GetMethod("OnFormClosing", flags)!.Invoke(owner, new object[] { close });
-            Check(close.Cancel && asks == 1, "Stay preserves meaningful new certificate content at its modal boundary");
+            Check(provisional ? close.Cancel && asks == 1 : !close.Cancel && asks == 0,
+                "Modal closing follows each certificate's discard policy");
             Clear(); Check(!draft.HasUnsavedChanges, "Clearing committed/discarded certificate fields resets meaningful draft state");
             Field<ModernTextBox>(provisional ? "rollNumber" : "performance").Text = "Synthetic content";
             student.SetStudent(0, ""); Check(!draft.HasUnsavedChanges, "A blank student context does not invent a certificate draft");

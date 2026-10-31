@@ -133,6 +133,9 @@ internal static class UiTheme
     internal static bool IsReferenceFont(Font font) => FontRole(null, font) is not null;
     private static Func<Font>? FontRole(Control? control, Font font)
     {
+        // The native-height caption uses the Windows caption font. Rebinding it
+        // to the larger body font clips dialog titles after a theme refresh.
+        if (control is Label && control.Parent is ApplicationTitleBar) return null;
         Func<Font>[] roles = {
             () => AppTheme.NormalFont, () => AppTheme.BodyBoldFont, () => AppTheme.ButtonFont,
             () => AppTheme.FieldCaptionFont, () => AppTheme.NavigationFont,
