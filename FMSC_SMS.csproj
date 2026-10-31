@@ -13,6 +13,8 @@
         <Compile Remove="Apps/**/*.cs" />
     </ItemGroup>
 	<PropertyGroup>
+		<!-- Local verification repositories and generated files are not application inputs. -->
+		<DefaultItemExcludes>$(DefaultItemExcludes);artifacts/**</DefaultItemExcludes>
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net8.0-windows</TargetFramework>
 		<Nullable>enable</Nullable>
