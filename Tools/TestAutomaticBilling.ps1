@@ -206,7 +206,9 @@ try {
  $familySql=[regex]::Match($familySource,'private const string ChargesSql = """\r?\n([\s\S]*?)\r?\n\s*""";').Groups[1].Value
  if(-not $familySql){throw 'Family bill SQL could not be located.'}
  $familyBill=Query $familySql @{'@UserId'=1;'@Admission'=1;'@Ids'='[1,5]';'@WholeFamily'=$false}
- Check (($familyBill.Tables[0].Rows | Where-Object {$_.Reference -eq '1005' -and $_.FeeTypeName -like '*Free*' -and $_.Due -eq 0}).Count -eq 1) 'The production family bill shows the free child without a zero-value charge.'
+ # Free is an assignment concession, not part of the stored fee-type name.
+ # The visit SQL represents this without a posted charge by a negative assignment ID.
+ Check (($familyBill.Tables[0].Rows | Where-Object {$_.Reference -eq '1005' -and $_.BillingChargeId -lt 0 -and $_.DiscountAmount -eq 10000 -and $_.Due -eq 0}).Count -eq 1) 'The production family bill shows the free child as a concession line without a zero-value charge.'
 
  $family=Query "DECLARE @A dbo.FamilyFeeAllocationType,@Today date=CONVERT(date,GETDATE()); INSERT @A SELECT 1,1,BillingChargeId,500 FROM dbo.BillingCharges WHERE EnrollmentId=1 AND ChargeKind=N'Annual'; EXEC dbo.ProcessFamilyFeeTransaction @TransactionType=N'Collection',@TransactionDate=@Today,@PaymentMethod=N'Cash',@ReferenceNumber=NULL,@Remarks=N'Fictional family including free child',@Allocations=@A,@UserId=1,@IncludedStudentsJson=N'[1,5]';"
  $receipt=[string]$family.Tables[0].Rows[0].ReceiptNumber
