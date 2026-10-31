@@ -9,6 +9,8 @@
     <!-- Linked production TVP helpers use SqlClient; keep the portable fixture's
          provider aligned with the application's SQL package. -->
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+    <!-- Bill document assertions run against the full Windows report assembly. -->
+    <Compile Remove="RegistrationBillChecks.cs" />
     <Compile Include="../../Pages/Finance/StudentAccounts/PaymentAdjustmentState.cs" Link="PaymentAdjustmentState.cs" />
     <Compile Include="../../Core/AppTheme.Appearance.cs" Link="AppTheme.Appearance.cs" />
     <Compile Include="../../Core/QuickRegistrationAccess.cs" Link="QuickRegistrationAccess.cs" />
@@ -31,11 +33,6 @@
     <Compile Include="../../Core/QuickRegistrationRecovery.cs" Link="QuickRegistrationRecovery.cs" />
     <Compile Include="../../Core/QuickRegistrationRecoveryJournal.cs" Link="QuickRegistrationRecoveryJournal.cs" />
     <Compile Include="../../Core/QuickRegistrationView.cs" Link="QuickRegistrationView.cs" />
-    <Compile Include="../../Core/Reports/Fees/FeeBillDataBuilder.cs" Link="FeeBillDataBuilder.cs" />
-    <Compile Include="../../Core/Reports/Fees/StudentBillReport.Data.cs" Link="StudentBillReport.Data.cs" />
-    <Compile Include="../../Core/Reports/Fees/FamilyBillReport.Data.cs" Link="FamilyBillReport.Data.cs" />
-    <Compile Include="../../Core/FamilyBillingData.cs" Link="FamilyBillingData.cs" />
-    <Compile Include="../../Core/Reports/Fees/FeeDocumentData.cs" Link="FeeDocumentData.cs" />
     <Compile Include="../../Core/StudentPhotoDraft.cs" Link="StudentPhotoDraft.cs" />
     <Compile Include="../../Core/AdmissionSaveConfirmation.cs" Link="AdmissionSaveConfirmation.cs" />
     <Compile Include="../../Core/StudentPhotoCompression.cs" Link="StudentPhotoCompression.cs" />
