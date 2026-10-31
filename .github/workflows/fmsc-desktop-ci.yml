@@ -49,6 +49,18 @@ jobs:
         timeout-minutes: 5
         run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --post-fix
 
+      - name: Run targeted admission, placement and finance regressions
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $suites = @('--registration-workflow', '--placement-workspace', '--fee-account', '--fee-documents', '--collection-fee-actions')
+          foreach ($suite in $suites) {
+            Write-Output "Checking $suite"
+            & dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- $suite
+            if ($LASTEXITCODE -ne 0) { throw "$suite failed with exit code $LASTEXITCODE" }
+          }
+
       - name: Run Level 3 noninteractive resource and export checks
         timeout-minutes: 5
         env:
@@ -98,6 +110,6 @@ jobs:
 # - Genuine complete-installer packaging separately verifies the Microsoft MSI;
 #   fresh installations require the owner's detached compatible MDF/LDF.
 # - No SQL mutation/integration tests: those require a disposable test database.
-# - Only --post-fix control contracts execute here, using injected reads and
-#   confirmation decisions with startup disabled. No school SQL is used.
+# - Only offline control, admission, placement, finance and document suites execute
+#   here, with injected reads and no school SQL connection.
 # - Full native UI/DPI/printing acceptance needs an interactive Windows desktop.
