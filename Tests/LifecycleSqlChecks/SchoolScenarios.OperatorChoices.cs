@@ -75,8 +75,9 @@ internal sealed partial class SchoolScenarios
             "Earlier tuition and cash received are preserved.");
         using var remove=ReviewConcession(ConcessionArgs(id,may,june,0,true,true));
         Sql.Proc("SaveStudentFeeDiscount",ConcessionArgs(id,may,june,0,true,false,Snapshot(remove)));
-        r.Check(Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE (BillingChargeId=@C OR CorrectionOfBillingChargeId=@C) AND Status<>N'Cancelled';",Sql.P("@C",first))==5000,
-            "Removing a concession restores the agreed liability through an explicit correction chain.");
+        r.Check(Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE (BillingChargeId=@C OR CorrectionOfBillingChargeId=@C) AND Status<>N'Cancelled';",Sql.P("@C",first))==4500 &&
+            ChainDue(first)==0 && ChainDue(second)==6000 && Credit(child.Student)==0,
+            "Removing an agreement concession updates unpaid bills but preserves the settled bill and previously collected cash.");
     }
     private async Task ConcessionRefusals()
     {
