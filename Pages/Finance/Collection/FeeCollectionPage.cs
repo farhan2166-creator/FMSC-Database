@@ -12,7 +12,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private readonly LookupBox enrollment = new();
     private readonly DataGridView charges =
         HumanUi.Grid(true);
-    /* Reverse acts on one charge; assignment changes belong in Fee Assignments. */
+    /* Reverse acts on one charge; recurring assignments remain in Admissions.
+       Collection fee-term and transport actions have their own handlers. */
     private readonly ContextMenuStrip chargeMenu = new StyledContextMenu();
     private readonly ContextMenuStrip studentFeesMenu = new StyledContextMenu();
     private readonly DataGridView recentPayments =
@@ -104,7 +105,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         Font = AppTheme.NormalFont, ForeColor = AppTheme.Text,
         Margin = new Padding(4, 8, 4, 4)
     };
-    private ModernButton? feeAssignmentsButton;
     private ModernButton? addChargeButton;
     private ModernButton? futureFeesButton;
     private ModernButton? historyButton;
@@ -299,13 +299,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 (lastCollectionReceipt is null && lastGroupReceiptNumber is null)))
                 printReceiptButton.Enabled = false;
         };
-        // Open fee assignments for the selected enrollment.
-        feeAssignmentsButton =
-            AddAction(
-                "Fee Assignments",
-                (_, _) => OpenFeeAssignments(),
-                "Secondary");
-        feeAssignmentsButton.Enabled = false;
         addChargeButton = AddAction(
             "Additional Charge", (_, _) => OpenAdditionalFee(), "Secondary");
         addChargeButton.Enabled = false;
@@ -403,7 +396,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         RelocateFromActions(
             executeButton,
             printReceiptButton,
-            feeAssignmentsButton,
             printBillButton,
             printStudentBillButton,
             addChargeButton,
@@ -456,8 +448,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             collectionResult.Text = ""; collectionResult.Visible = false;
             if (printReceiptButton is not null)
                 printReceiptButton.Enabled = false;
-            if (feeAssignmentsButton is not null)
-                feeAssignmentsButton.Enabled = admissionId > 0 && enrollmentId > 0;
             if (addChargeButton is not null)
                 addChargeButton.Enabled = admissionId > 0 && enrollmentId > 0;
             if (futureFeesButton is not null)
@@ -1665,8 +1655,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         /* Reset to today for a new student unless the operator chooses another date. */
         ResetPaymentDateToNow(true);
         enrollment.Enabled = false;
-        if (feeAssignmentsButton is not null)
-            feeAssignmentsButton.Enabled = false;
         if (addChargeButton is not null)
             addChargeButton.Enabled = false;
         if (futureFeesButton is not null)
@@ -1822,8 +1810,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                 selectedEnrollmentId;
             charges.Rows.Clear();
             recentPayments.Rows.Clear();
-            if (feeAssignmentsButton is not null)
-                feeAssignmentsButton.Enabled = admissionId > 0 && enrollmentId > 0;
             if (addChargeButton is not null)
                 addChargeButton.Enabled = admissionId > 0 && enrollmentId > 0;
             if (futureFeesButton is not null)
@@ -3763,26 +3749,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             UpdateProcessCollectionAvailability();
         }
     }
-    // A contextual dialog on the currently selected enrollment - see FeeAssignmentsDialog.cs.
-    private void OpenFeeAssignments()
-    {
-        using var returnFocus = new DialogReturnFocus(this);
-        if (admissionId <= 0 || enrollmentId <= 0)
-        {
-            Warn(UiText.Prompts.SelectStudentAndEnrollment);
-            return;
-        }
-        using var dialog = new FeeAssignmentsDialog(
-            enrollmentId,
-            admissionId,
-            student.Text.Trim());
-        dialog.ShowDialog(FindForm());
-        if (dialog.ChangesMade)
-        {
-            int refreshVersion = ++loadVersion;
-            _ = LoadChargesAsync(refreshVersion);
-        }
-    }
     private void OpenAdditionalFee()
     {
         using var returnFocus = new DialogReturnFocus(this);
@@ -4085,8 +4051,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         collectionResult.Text = ""; collectionResult.Visible = false;
         if (printReceiptButton is not null)
             printReceiptButton.Enabled = false;
-        if (feeAssignmentsButton is not null)
-            feeAssignmentsButton.Enabled = false;
         if (addChargeButton is not null)
             addChargeButton.Enabled = false;
         if (futureFeesButton is not null)
