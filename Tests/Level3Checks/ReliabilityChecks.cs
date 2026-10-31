@@ -137,7 +137,7 @@ internal sealed class ReliabilityChecks(Fixture f, Report r)
     {
         Sql.ValidateTarget();
         DateTime month = f.MonthlyDate.AddMonths(1);
-        DataTable Post() => Sql.Proc("PostSelectedMonthlyFees", Sql.P("@UserId", f.Admin), Sql.P("@AcademicYearId", f.SourceYear), Sql.P("@BillingMonth", month),
+        DataTable Post() => Sql.Proc("PostSelectedMonthlyFees", Sql.P("@UserId", f.Admin), Sql.P("@AcademicYearId", f.NextYear), Sql.P("@BillingMonth", month),
             Sql.TvpParameter("@Selection", "PostingSelectionType", Tvp.PostingSelections(new[] { (enrollment, f.Tuition, month) })), Sql.P("@Reason", "Synthetic competing posting"));
         using var gate = new ManualResetEventSlim(false);
         var posts = Enumerable.Range(0, 4).Select(_ => Task.Run(() => { gate.Wait(); return Convert.ToInt32(Post().Rows[0]["ChargesCreated"]); })).ToArray(); gate.Set();
@@ -311,7 +311,7 @@ internal sealed class ReliabilityChecks(Fixture f, Report r)
         r.Check(r.Measurements["SyntheticStudentCount"] == before + 1000, "Every bounded workload student was created by production admission logic.");
         var samples = new List<double>();
         for (int i = 0; i < 20; i++) {
-            watch.Restart(); var results = Sql.Proc("GetStudents", Sql.P("@UserId", f.Admin), Sql.P("@CampusId", f.Campus), Sql.P("@AcademicYearId", f.SourceYear), Sql.P("@Search", "Load Example 09"), Sql.P("@IncludeFormerStudents", true));
+            watch.Restart(); var results = Sql.Proc("GetStudents", Sql.P("@UserId", f.Admin), Sql.P("@CampusId", f.Campus), Sql.P("@AcademicYearId", f.NextYear), Sql.P("@Search", "Load Example 09"), Sql.P("@IncludeFormerStudents", true));
             samples.Add(watch.Elapsed.TotalMilliseconds);
             r.Check(results.Rows.Count == 100, "Production search returns the expected 100 matches without omissions or unrelated students.");
         }
