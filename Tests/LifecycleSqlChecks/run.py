@@ -39,6 +39,12 @@ def verify_baseline():
     migrations = {int(p.stem) for p in (ROOT / "Migrations").glob("*.sql") if p.stem.isdecimal()}
     if migrations != set(range(20, target + 1)):
         raise ValueError("Numbered migration chain must be complete through the required schema.")
+    # Shared SQL test contexts must not silently lag the runtime contract.
+    for context in ("QuickRegistrationSqlChecks", "MutationSqlChecks"):
+        fixture = (ROOT / "Tests" / context / "DatabaseContext.cs").read_text()
+        declared = re.search(r'RequiredDatabaseSchemaVersion\s*=\s*"(\d+)"', fixture)
+        if declared is None or int(declared.group(1)) != target:
+            raise ValueError(context + " test context schema must match the application.")
 
     def provider_version(project):
         return next(e.get("Version") for e in ET.parse(project).getroot().iter("PackageReference") if e.get("Include") == "Microsoft.Data.SqlClient")
