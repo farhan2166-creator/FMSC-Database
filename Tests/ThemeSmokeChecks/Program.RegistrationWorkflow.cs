@@ -86,6 +86,12 @@ internal static partial class Program
             Check(ChildField<ModernTextBox>("contact").ReadOnly && ChildField<ModernTextBox>("address").ReadOnly && ChildField<ModernTextBox>("siblingBirth").Text == "Shared city", "Phone, address and birthplace are inherited and locked");
             Check(!ChildField<LookupBox>("year").Enabled && ChildField<LookupBox>("year").SelectedId == 77, "Sibling year is locked to the current year");
             using var childHost = new Form { ClientSize = new Size(1050, 760) }; childHost.Controls.Add(child); childHost.Show(); Application.DoEvents();
+            child.FocusSiblingName();
+            Check(ChildField<ModernTextBox>("name").ContainsFocus, "Sibling entry starts with student name focused");
+            Check(!ChildField<ModernTextBox>("contact").Visible && !ChildField<ModernTextBox>("address").Visible && ChildField<ModernTextBox>("contact").Text == "03001234567" && ChildField<ModernTextBox>("address").Text == "Shared address", "Hidden inherited contact fields retain their saved values");
+            var siblingFields = (TableLayoutPanel)ChildField<ModernTextBox>("name").Parent!.Parent!;
+            Check(siblingFields.GetRow(ChildField<ModernDatePicker>("joining").Parent!) == 0 && siblingFields.GetRow(ChildField<LookupBox>("year").Parent!) == 0 && siblingFields.GetRow(ChildField<ModernTextBox>("name").Parent!) == 1 && siblingFields.GetRow(ChildField<PlacementPicker>("placement").Parent!) == 1 && siblingFields.RowCount == 3, "Sibling fields use three rows with dates first and student placement second");
+            Check(ChildField<LookupBox>("year").Width == ChildField<ModernTextBox>("name").Width && ChildField<PlacementPicker>("placement").Width == ChildField<ModernTextBox>("name").Width, "Sibling lookup widths match text fields");
             using var childImage = new Bitmap(childHost.Width, childHost.Height); childHost.DrawToBitmap(childImage, new Rectangle(Point.Empty, childImage.Size)); childImage.Save("artifacts/registration-workflow-ui/admit-sibling.png");
             using var reopen = new RegistrationReopenDialog(123, "Fictional Child", false); reopen.Show(); Application.DoEvents();
             Check(typeof(RegistrationReopenDialog).GetField("placement", flags)!.GetValue(reopen) is PlacementPicker, "Reopening uses Add Placement's shared picker");

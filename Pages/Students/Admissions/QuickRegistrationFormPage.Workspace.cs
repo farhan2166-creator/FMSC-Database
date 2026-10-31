@@ -19,17 +19,24 @@ internal sealed partial class QuickRegistrationFormPage
         SetWorkspaceFamily(anchor, father, phone, home);
         siblingBirth.Text = birth; siblingBirth.ReadOnly = true;
         var previous = registrationContent.GetControlFromPosition(0, 1);
-        var fields = Fields(("Student name", name, true, 1), ("Joining date", joining, true, 1),
-            ("Academic year", year, true, 1), ("Campus / Class / Section", placement, true, 1),
-            ("Father name", parent, true, 1), ("Primary phone (optional)", contact, false, 1),
-            ("Place of birth", siblingBirth, false, 1), ("Address", address, false, 1));
+        var fields = Fields(("Joining date", joining, true, 1), ("Academic year", year, true, 1),
+            ("Student name", name, true, 1), ("Campus / Class / Section", placement, true, 1),
+            ("Father name", parent, true, 1), ("Place of birth", siblingBirth, false, 1));
+        // Keep inherited values alive for validation and saving when removing the old grid.
+        foreach (var input in new[] { contact, address })
+        {
+            registrationContent.Controls.Add(input);
+            input.Visible = false;
+        }
         registrationContent.Controls.Remove(previous); previous?.Dispose();
         registrationContent.Controls.Add(fields, 0, 1);
         foreach (Control input in new Control[] { name, joining, year, placement, parent, contact, siblingBirth, address }) input.MaximumSize = Size.Empty;
+        root.RowStyles[0].Height = AppMetrics.FieldCardHeight(3);
         registrationCard.SetHeaderText("Admit Sibling", "Shared details come from the loaded student. Complete this child's name, placement and fees.");
         year.SelectedValue = defaultAcademicYear;
         UpdateActions();
     }
+    internal void FocusSiblingName() => name.Focus();
     internal Func<Task>? WorkspaceRecoveryRequested;
     internal string WorkspaceName => name.Text.Trim();
     internal string WorkspaceParent => parent.Text.Trim();

@@ -107,7 +107,16 @@ public sealed partial class StudentAdmissionPage
             sibling && (currentAdmissionId <= 0 || IsCancelledRegistration || !CurrentUser.HasPermission("Students.Administer"))) return;
         if (HasUnsavedChanges) { Warn("Save or discard the loaded student's edits before admitting a sibling."); return; }
         int anchor = currentAdmissionId;
-        using var dialog = new RegistrationEntryDialog(RegistrationNavigation, anchor, fatherName.Text, contact.Text, address.Text, placeOfBirthInput.Text);
+        string siblingPhone = contact.Text;
+        try
+        {
+            var details = await DatabaseHelper.QueryUserAsync("GetStudentDetails", DatabaseHelper.Int("@AdmissionId", anchor));
+            if (details.Rows.Count > 0 && !string.IsNullOrWhiteSpace(GetTextColumn(details.Rows[0], "ContactNumber")))
+                siblingPhone = GetTextColumn(details.Rows[0], "ContactNumber");
+        }
+        catch (Exception ex) { Fail(ex); return; }
+        if (IsDisposed || currentAdmissionId != anchor) return;
+        using var dialog = new RegistrationEntryDialog(RegistrationNavigation, anchor, fatherName.Text, siblingPhone, address.Text, placeOfBirthInput.Text);
         dialog.ShowDialog(FindForm());
         if (dialog.SavedAdmissionId > 0)
         {

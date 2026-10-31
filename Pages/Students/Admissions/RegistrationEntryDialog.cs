@@ -19,7 +19,6 @@ internal sealed class RegistrationEntryDialog : ApplicationWindowForm
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2 };
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonRowHeight));
         root.Controls.Add(page, 0, 0); root.Controls.Add(actions, 0, 1); Controls.Add(root);
-        ModalPageCloseGuard.Attach(this, page, () => SavedAdmissionId > 0);
         page.WorkspaceRecoveryRequested = () => { CheckPreviousSave(this, navigate); page.RefreshWorkspaceRecovery(); return Task.CompletedTask; };
         bool saving = false;
         FormClosing += (_, e) => { if (saving || page.IsBusy) e.Cancel = true; };
@@ -35,7 +34,7 @@ internal sealed class RegistrationEntryDialog : ApplicationWindowForm
             save.Enabled = false;
             try { await page.InitializeWorkspaceAsync(); page.ConfigureSiblingEntry(anchor, parent, phone, address, birth); page.ShowAdmissionRegistrationGuidance("Shared details are carried forward. Save creates a pending sibling; complete admission details before confirming."); }
             catch (Exception ex) { page.ShowRegistrationContextWarning(DbMessage.UserMessage(ex)); }
-            finally { if (!IsDisposed) save.Enabled = true; }
+            finally { if (!IsDisposed) { save.Enabled = true; page.FocusSiblingName(); } }
         };
     }
     internal static void CheckPreviousSave(IWin32Window? owner, Action<Func<Control>, string, string> navigate)
