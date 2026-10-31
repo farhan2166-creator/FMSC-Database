@@ -121,7 +121,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         filterGrid.Controls.Add(HumanUi.Field("To (optional)", to), 3, 0);
         foreach (TableLayoutPanel field in filterGrid.Controls.OfType<TableLayoutPanel>())
             field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        generateStatementButton = CreateFilterButton("View Statement", AppTheme.Primary);
+        generateStatementButton = CreateFilterButton("View Account", AppTheme.Primary);
         generateStatementButton.Click += async (_, _) => await LoadStatement();
         var clear = CreateFilterButton("Clear", AppTheme.MutedText);
         clear.MinimumSize=new Size(AppScale.Scale(90),AppMetrics.ButtonHeight);
@@ -141,6 +141,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         billGrouping.Items.AddRange(new object[]{"Individual","By family"});billGrouping.SelectedIndex=0;
         billGrouping.Width=AppScale.Scale(140);billGrouping.Margin=new Padding(4,0,4,0);
         billGrouping.AccessibleName="Bill grouping";
+        SetToolTip(billGrouping,"Choose how Outstanding Bills are printed. This does not change the account tabs or balances.");
         modeBar.Controls.Add(new Label {Text="Bill grouping",AutoSize=true,Margin=new Padding(4,8,0,0)});
         modeBar.Controls.Add(billGrouping);
         printAmountsDueButton=CreateFilterButton("Outstanding Bills…",AppTheme.MutedText);
@@ -167,7 +168,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         filterBody.Controls.Add(actions,0,1);
         filters.Content.Controls.Add(filterBody);
 
-        var statement = HumanUi.Card("Account Activity", "Statements, saved receipts and authorized payment corrections.", accessory: exportButton);
+        var statement = HumanUi.Card("Account Activity", "Review fees, payments, receipts and advance credit.", accessory: exportButton);
         statement.Header.Controls.SetChildIndex(exportButton, statement.Header.Controls.Count - 1);
         statement.Content.Controls.Add(BuildAccountViews());
         var summary = BuildSummary();
@@ -177,12 +178,13 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         var filterRow = new RowStyle(SizeType.Absolute);
         root.RowStyles.Add(filterRow);
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.ButtonFont) + 12));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, SummaryCardRowHeight()));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.NormalFont) * 2 + 8));
         root.Controls.Add(filters, 0, 0);
         root.Controls.Add(statementContext, 0, 1);
+        statementContext.Visible=false;
         root.Controls.Add(summary, 0, 2);
         root.Controls.Add(statement, 0, 3);
         root.Controls.Add(StatusLabel, 0, 4);
@@ -359,7 +361,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         if (current)
             SetStatus("Statement matches the current filters and student selection.");
         else
-            SetStatus("Filters or student changed. Use View Statement again before exporting.", true);
+            SetStatus("Filters or student changed. Use View Account again before exporting.", true);
     }
     private void SelectFamilyForStudent(int admissionId)
     {
@@ -483,11 +485,11 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         table.Controls.Add(
             SummaryCard("Opening Balance", openingBalance), 0, 0);
         table.Controls.Add(
-            SummaryCard("Charges in Period", chargesTotal), 1, 0);
+            SummaryCard("Fees Charged in Period", chargesTotal), 1, 0);
         table.Controls.Add(
             SummaryCard("Payments in Period", paymentsTotal), 2, 0);
         table.Controls.Add(
-            SummaryCard("Period Closing Balance", closingBalance), 3, 0);
+            SummaryCard("Balance Due at Period End", closingBalance), 3, 0);
         return table;
     }
     private static Control SummaryCard(string title, Label value)
@@ -647,7 +649,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
                 combined.Columns.Contains("TransactionDate"))
             {
                 combined = await Task.Run(()=>{
-                    combined.DefaultView.Sort="TransactionDate ASC, StatementStudent ASC, TransactionType ASC, TransactionId ASC";
+                    combined.DefaultView.Sort=string.Join(", ",new[]{"BillingMonth","TransactionDate","StatementStudent","FeeDisplayOrder","TransactionId"}.Where(combined.Columns.Contains).Select(column=>column+" ASC"));
                     return combined.DefaultView.ToTable();
                 },request.Token);
                 if(IsDisposed||!statementReads.IsCurrent(request)||signature!=FilterSignature())return;
@@ -791,6 +793,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
     }
     private void ConfigureStatementGrid()
     {
+        Grid.CellFormatting-=FormatAccountMonth;Grid.CellFormatting+=FormatAccountMonth;
         Grid.AutoGenerateColumns = true;
         Grid.AllowUserToAddRows = false;
         Grid.AllowUserToDeleteRows = false;
@@ -800,6 +803,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
         string[] hiddenColumns =
         {
+            "StudentName",
             "TransactionId",
             "AdmissionId",
             "TransactionType",
@@ -814,7 +818,8 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
             if (Grid.Columns.Contains(name))
                 Grid.Columns[name].Visible = false;
         }
-        SetStatementColumn("StatementStudent", "Student", 170, true);
+        foreach(DataGridViewColumn column in Grid.Columns)column.Visible=false;
+        SetStatementColumn("StatementStudent", "Student", 170, GetSelectedAdmissionIds().Count>1);
         SetStatementColumn("TransactionDate", "Date", 88, true);
         SetStatementColumn("FeeTypeName", UiText.Fees.FeeType, 135, true);
         SetStatementColumn("BillingMonth", "Month", 90, true);
@@ -824,7 +829,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         if (Grid.Columns.Contains("TransactionDate"))
             Grid.Columns["TransactionDate"].DefaultCellStyle.Format = "dd-MM-yyyy";
         if (Grid.Columns.Contains("BillingMonth"))
-            Grid.Columns["BillingMonth"].DefaultCellStyle.Format = "MMM-yyyy";
+            Grid.Columns["BillingMonth"].DefaultCellStyle.Format = "MMM yyyy";
         if (Grid.Columns.Contains("DebitAmount"))
             Grid.Columns["DebitAmount"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
         if (Grid.Columns.Contains("PaidAmount"))

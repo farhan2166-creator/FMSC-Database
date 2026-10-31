@@ -42,6 +42,7 @@ internal static partial class Program
             foreach(string column in new[]{"PaidAmount","Refunded","Corrected","ReleasedToCredit"})payments.Columns.Add(column,typeof(decimal));
             payments.Columns.Add("IsCreditEntry",typeof(bool));payments.Columns.Add("TransactionDate",typeof(DateTime));
             payments.Rows.Add("FR-test","Cash","Completed","Student "+id,id+100,DBNull.Value,400m,0m,0m,0m,false,new DateTime(2026,10,2));
+            StudentFeeAccountData.DescribePayments(payments);
             return new(receipts,payments,600m,150m);
         }
         try
@@ -85,18 +86,42 @@ internal static partial class Program
             Wait((Task)Invoke("LoadStatement")!);
             Check(((DataGridView)typeof(V2Page).GetField("Grid",flags)!.GetValue(page)!).Rows.Count==1,"The established fee-balance statement retains its charge row");
             var receipts=Field<DataGridView>("accountReceipts");var payments=Field<DataGridView>("accountPayments");
-            Check(Field<Label>("accountSummary").Text.Contains("Current outstanding: Rs. 600")&&Field<Label>("accountSummary").Text.Contains("Available credit: Rs. 150"),"Student dues and credit are separate, without netting");
+            Check(Field<Label>("accountSummary").Text.Contains("Current dues: Rs. 600")&&Field<Label>("accountSummary").Text.Contains("Advance credit: Rs. 150"),"Student dues and credit are separate, without netting: "+Field<Label>("accountSummary").Text);
             Check(receipts.Rows.Count==1&&payments.Rows.Count==1,"Student receipts and payments share the selected account");
+            var fees=(DataGridView)typeof(V2Page).GetField("Grid",flags)!.GetValue(page)!;
+            Check(!Field<Label>("statementContext").Visible&&!fees.Columns["StatementStudent"].Visible&&!payments.Columns["StudentName"].Visible,"Single-student context is shown once in the search field");
+            Check(!payments.Columns["Status"].Visible&&payments.Columns["AccountState"].Visible&&!payments.Columns["Refunded"].Visible,"Payment history shows one status and hides unused adjustment columns");
+            Check(payments.Columns.Cast<DataGridViewColumn>().Where(column=>column.Visible).OrderBy(column=>column.DisplayIndex).First().Name=="TransactionDate","Payment history begins with its date");
+            var paymentData=(DataTable)payments.DataSource!;paymentData.Rows[0]["Refunded"]=25m;
+            Invoke("StyleAccountGrid",payments);
+            Check(payments.Columns["Refunded"].Visible,"A real refund remains visible rather than being hidden with unused adjustments");
+            paymentData.Rows[0]["Refunded"]=0m;Invoke("StyleAccountGrid",payments);
             Check(Field<DataGridView>("accountTransactions").Rows.Count==2,"Chronological statement retains charge and payment rows without changing existing statement calculations");
+            Exception? activityFailure=null;
+            using(var activityTimer=new System.Windows.Forms.Timer {Interval=100})
+            {
+                activityTimer.Tick+=(_,_)=>{
+                    activityTimer.Stop();
+                    var dialog=Application.OpenForms.Cast<Form>().First(form=>form.Text=="Full Account Activity");
+                    try{Check(Field<DataGridView>("accountTransactions").FindForm()==dialog,"Full account activity keeps the detailed ledger available outside the main tabs");}
+                    catch(Exception ex){activityFailure=ex;}
+                    finally{dialog.Close();}
+                };
+                activityTimer.Start();Invoke("ShowAllAccountEntries");
+            }
+            if(activityFailure is not null)throw activityFailure;
+            Check(!Field<DataGridView>("accountTransactions").IsDisposed&&Field<DataGridView>("accountTransactions").Parent is null,"Closing full activity preserves its records for reopening");
             Field<TabControl>("accountViews").SelectedIndex=1;
-            ((TabControl)Field<TabControl>("accountViews").TabPages[1].Controls[0]).SelectedIndex=1;
+            Check(Field<TabControl>("accountViews").TabPages.Cast<TabPage>().Select(tab=>tab.Text).SequenceEqual(new[]{"Fees & Dues","Payment History","Receipts","Advance Credit"}), "Four direct account tabs use plain labels");
+            Check(!DescendantControls(Field<TabControl>("accountViews")).OfType<TabControl>().Any(), "Account views have no nested tabs");
             Application.DoEvents();Invoke("UpdateAccountActions");
             Check(Field<ModernButton>("correctPayment").Enabled,"Eligible cash payment exposes the existing correction workflow");
             Field<Dictionary<int,HashSet<int>>>("familySelections")[41]=new(){41,42};Invoke("OnFiltersChanged");
             Check(receipts.DataSource is null&&!Field<ModernButton>("correctPayment").Enabled,"Scope changes immediately clear actionable financial rows");
             Wait((Task)Invoke("LoadStatement")!);
-            Check(Field<Label>("accountSummary").Text.Contains("Family account · 2 student(s)")&&Field<Label>("accountSummary").Text.Contains("1,200"),"Family summary sums the same existing student balance readers");
+            Check(Field<Label>("accountSummary").Text.Contains("2 students")&&Field<Label>("accountSummary").Text.Contains("1,200"),"Family summary sums the same existing student balance readers");
             Check(receipts.Rows.Count==1&&payments.Rows.Count==2,"Family receipt is deduplicated but both student payments remain selectable");
+            Check(payments.Columns["StudentName"].Visible&&fees.Columns["StatementStudent"].Visible,"Family views retain student identities for each row");
             Check(!receipts.Columns["CashApplied"].Visible,"Deduplicated family list cannot mislabel one child's share as a family total");
             Field<TabControl>("accountViews").SelectedIndex=1;Application.DoEvents();
             Check(picker.SelectedId==41&&Field<Dictionary<int,HashSet<int>>>("familySelections").Count==1,"Switching views preserves student and family scope");
@@ -118,7 +143,7 @@ internal static partial class Program
                 type.GetMethod("SelectSingleStudent",flags)!.Invoke(restricted,null);
                 Wait((Task)type.GetMethod("LoadStatement",flags)!.Invoke(restricted,null)!);
                 var restrictedViews=(TabControl)type.GetField("accountViews",flags)!.GetValue(restricted)!;
-                Check(restrictedViews.SelectedIndex==1,"Collection-only account opens receipts instead of unauthorized statements");
+                Check(restrictedViews.SelectedIndex==1,"Collection-only account opens Payment History instead of unauthorized fees");
                 restrictedViews.SelectedIndex=0;Check(restrictedViews.SelectedIndex==1,"Statement tab does not bypass report authorization");
                 Check(((DataGridView)type.GetField("accountPayments",flags)!.GetValue(restricted)!).Rows.Count==1,"Existing authorized payment history remains accessible without report permission");
                 Check(((ModernButton)type.GetField("recoverPayment",flags)!.GetValue(restricted)!).Enabled,"Save recovery remains reachable independently of payment eligibility");
@@ -150,16 +175,39 @@ internal static partial class Program
                 Check(page.SelectNextControl(picker,true,true,true,true),"Account keyboard navigation finds the next focusable control");
                 foreach(var viewport in DescendantControls(page).OfType<ScrollableControl>())if(viewport.AutoScroll)viewport.AutoScrollPosition=Point.Empty;
                 using var image=new Bitmap(page.Width,page.Height);page.DrawToBitmap(image,page.ClientRectangle);image.Save(Path.GetFullPath($"artifacts/fee-account/account-{size.Width}.png"));
+                if(size.Width==1500)
+                {
+                    Field<TabControl>("accountViews").SelectedIndex=1;Application.DoEvents();
+                    using var paymentImage=new Bitmap(page.Width,page.Height);page.DrawToBitmap(paymentImage,page.ClientRectangle);paymentImage.Save(Path.GetFullPath("artifacts/fee-account/payment-history.png"));
+                }
             }
             // The actual snapshot presentation is shared across legacy/current document formats.
             foreach(int version in new[]{1,2,3})
             {
                 using var saved=new DataSet();var header=new DataTable();header.Columns.Add("SnapshotVersion",typeof(int));header.Rows.Add(version);saved.Tables.Add(header);
-                saved.Tables.Add(new DataTable());saved.Tables.Add(new DataTable());
+                var members=new DataTable();members.Columns.Add("AdmissionId",typeof(int));members.Columns.Add("AdmissionNumber");members.Columns.Add("StudentName");members.Rows.Add(41,"6590","Student 41");saved.Tables.Add(members);
+                var lines=new DataTable();lines.Columns.Add("AdmissionId",typeof(int));lines.Columns.Add("ChargeId",typeof(int));lines.Columns.Add("FeeTypeName");lines.Columns.Add("FeePeriod",typeof(DateTime));lines.Columns.Add("AmountBefore",typeof(decimal));lines.Rows.Add(41,100,"Tuition",new DateTime(2026,10,1),1000m);saved.Tables.Add(lines);
                 using var later=Snapshot(41).Payments;
                 using var content=(Control)Invoke("BuildReceiptDetail",saved,"FR-test",later)!;
                 using var window=(ApplicationWindowForm)type.GetMethod("CreateRelatedReportDialog",BindingFlags.Static|BindingFlags.NonPublic)!.Invoke(null,new object[]{"Receipt fixture",content})!;
-                window.Show();Application.DoEvents();Check(content.Width>700,"Snapshot version "+version+" opens the existing receipt-detail structure");window.Close();
+                window.Show();Application.DoEvents();Check(content.Width>700,"Snapshot version "+version+" opens the existing receipt-detail structure");
+                var receiptTabs=DescendantControls(content).OfType<TabControl>().Single();receiptTabs.SelectedIndex=1;Application.DoEvents();
+                var lineGrid=DescendantControls(content).OfType<DataGridView>().Single(grid=>grid.Name=="receiptLines");
+                Check(!lineGrid.Columns["AdmissionId"].Visible&&!lineGrid.Columns["ChargeId"].Visible&&lineGrid.Columns["Student"].Visible,"Nested receipt lines identify students without exposing database IDs");
+                Check(lineGrid.Columns.Cast<DataGridViewColumn>().Where(column=>column.Visible).OrderBy(column=>column.DisplayIndex).Select(column=>column.Name).SequenceEqual(new[]{"Student","FeePeriod","FeeTypeName","AmountBefore"}),"Nested receipt lines show student, month, fee and amount in natural order");
+                Check(!saved.Tables[2].Columns.Contains("Student"),"Readable receipt presentation does not change the saved snapshot");
+                Check(Convert.ToString(lineGrid.Rows[0].Cells["FeePeriod"].FormattedValue)=="Oct 2026","Nested receipt billing periods show a month rather than an artificial first-day date");
+                foreach(int width in new[]{1180,820})
+                {
+                    window.Width=AppScale.Scale(width);Application.DoEvents();
+                    var actions=DescendantControls(content).OfType<ModernButton>().Where(button=>button.Visible&&new[]{"Reprint / Child Copy","Row Details","Go to Payment History"}.Contains(button.Text)).ToArray();
+                    var bounds=actions.Select(button=>content.RectangleToClient(button.RectangleToScreen(button.ClientRectangle))).ToArray();
+                    Check(bounds.Length==3&&bounds.Select(rect=>rect.Top).Distinct().Count()==1,"Receipt actions stay on one row at width "+width);
+                    Check(bounds.All(rect=>rect.Left>=0&&rect.Right<=content.ClientSize.Width)&&Math.Abs((bounds.Min(rect=>rect.Left)+bounds.Max(rect=>rect.Right))/2-content.ClientSize.Width/2)<=AppScale.Scale(8),"Receipt action group is centered and fully visible at width "+width);
+                }
+                window.ClientSize=new Size(AppScale.Scale(1180),AppScale.Scale(760));Application.DoEvents();
+                if(version==3){using var image=new Bitmap(window.Width,window.Height);window.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.GetFullPath("artifacts/fee-account/receipt-details.png"));}
+                window.Close();
             }
             owner.Close();
             var scale=(AppScale.Dpi,AppScale.RawFactor);
