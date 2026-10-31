@@ -84,9 +84,10 @@ internal static partial class Program
     {
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
         var type=typeof(FMSC_SMS.Pages.Students.Certificates.RegularStudentCertificatePage);
-        int prompts=0,reads=0;
+        int prompts=0,reads=0,studentRefreshes=0;
         using var page=new FMSC_SMS.Pages.Students.Certificates.RegularStudentCertificatePage(false,
-            _=>{prompts++;return false;},_=>{reads++;return new System.Data.DataTable();});
+            _=>{prompts++;return false;},_=>{reads++;return new System.Data.DataTable();},
+            _=>studentRefreshes++);
         var student=(StudentPicker)type.GetField("student",flags)!.GetValue(page)!;
         var date=(ModernDatePicker)type.GetField("certificateDate",flags)!.GetValue(page)!;
         using var students=new System.Data.DataTable();
@@ -112,8 +113,8 @@ internal static partial class Program
         }
         int before=reads;
         type.GetMethod("RefreshCertificates",flags)!.Invoke(page,null);
-        Check(student.SelectedId==41&&date.Value.Date==DateTime.Today&&reads==before+1&&prompts==0,
-            "Refreshing a short edit reloads defaults without an unnecessary discard dialog.");
+        Check(student.SelectedId==41&&date.Value.Date==DateTime.Today&&reads==before+1&&studentRefreshes==1&&prompts==0,
+            "Refreshing a short edit reloads synthetic student context and defaults without SQL or a discard dialog.");
         date.Value=DateTime.Today.AddDays(-1);
         type.GetMethod("ClearForm",flags)!.Invoke(page,new object[]{true});
         Check(student.SelectedId==0&&!page.HasUnsavedChanges&&prompts==0,
