@@ -3,7 +3,7 @@ IF DB_NAME() NOT LIKE N'FMSC_RegistrationChecks[_]%' THROW 51000,'Registration c
 DECLARE @Year int=(SELECT TOP(1) AcademicYearId FROM dbo.AcademicYears WHERE CONVERT(date,GETDATE()) BETWEEN StartDate AND EndDate ORDER BY IsCurrent DESC),
  @Placement int,@Campus int,@Today date=CONVERT(date,GETDATE());
 SELECT TOP(1) @Placement=P.ClassSectionId,@Campus=P.CampusId FROM dbo.CampusClassSections P
- JOIN dbo.FeeConfigurations C ON C.CampusId=P.CampusId AND C.ClassId=P.ClassId WHERE C.Amount>0 ORDER BY P.ClassSectionId;
+ JOIN dbo.FeeConfigurations C ON C.CampusId=P.CampusId AND C.ClassId=P.ClassId WHERE C.Amount>0 AND P.IsActive=1 ORDER BY P.ClassSectionId;
 IF @Year IS NULL OR @Placement IS NULL THROW 51000,'Fixture needs a current-year placement with class rates.',1;
 DECLARE @Fees dbo.FeeTypeIdList,@Discounts dbo.AdmissionFeeDiscountType;
 CREATE TABLE #Admission(AdmissionId int,EnrollmentId int,RegistrationNumber nvarchar(40),AdmissionNumber varchar(40),QuickReference nvarchar(50));
@@ -29,6 +29,27 @@ BEGIN TRY
  EXEC dbo.ReopenPendingRegistration 999999,@Student,@Year,@Placement,@Today,N'Returned',@Bad,1;
  THROW 51000,'Unauthorized reopening was accepted.',1;
 END TRY BEGIN CATCH IF ERROR_NUMBER()=51000 THROW; END CATCH;
+-- Only an active placement may be chosen for a NEW reopening. Use the owned
+-- disposable clone and restore the fixture's placement state after both checks.
+DECLARE @InactiveRequest uniqueidentifier=NEWID(),@BeforeEnrollments int=
+ (SELECT COUNT(*) FROM dbo.Enrollments WHERE AdmissionId=@Student);
+UPDATE dbo.CampusClassSections SET IsActive=0 WHERE ClassSectionId=@Placement AND IsActive=1;
+IF @@ROWCOUNT<>1 THROW 51000,'Could not prepare an inactive fixture placement.',1;
+BEGIN TRY
+ EXEC dbo.ReopenPendingRegistration 1,@Student,@Year,@Placement,@Today,N'Inactive preview',@InactiveRequest,1;
+ THROW 51000,'Inactive placement was accepted in reopening preview.',1;
+END TRY BEGIN CATCH IF ERROR_NUMBER()<>59844 THROW; END CATCH;
+BEGIN TRY
+ EXEC dbo.ReopenPendingRegistration 1,@Student,@Year,@Placement,@Today,N'Inactive preview',@InactiveRequest,0,NULL;
+ THROW 51000,'Inactive placement was accepted in reopening apply.',1;
+END TRY BEGIN CATCH IF ERROR_NUMBER()<>59844 THROW; END CATCH;
+IF EXISTS(SELECT 1 FROM dbo.RegistrationReopenRequests WHERE RequestId=@InactiveRequest)
+ OR (SELECT COUNT(*) FROM dbo.Enrollments WHERE AdmissionId=@Student)<>@BeforeEnrollments
+ OR NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@Student AND Status=N'Cancelled')
+ THROW 51000,'Inactive reopening changed saved registration state.',1;
+UPDATE dbo.CampusClassSections SET IsActive=1 WHERE ClassSectionId=@Placement;
+IF @@ROWCOUNT<>1 THROW 51000,'Could not restore the fixture placement.',1;
+PRINT 'PASS: inactive class-sections refused in preview and apply without creating a placement or request marker.';
 INSERT #Review EXEC dbo.ReopenPendingRegistration 1,@Student,@Year,@Placement,@Today,N'Returned',@Request,1;
 SELECT @Hash=Snapshot FROM #Review;
 IF EXISTS(SELECT 1 FROM dbo.RegistrationReopenRequests WHERE RequestId=@Request) OR NOT EXISTS(SELECT 1 FROM dbo.Students WHERE AdmissionId=@Student AND Status=N'Cancelled') THROW 51000,'Preview wrote registration state.',1;
