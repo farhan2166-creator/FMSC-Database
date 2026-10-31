@@ -6,6 +6,8 @@ on:
     paths:
       - 'Core/AdmissionBillReport*.cs'
       - 'Core/ReceiptReportLayout.cs'
+      - 'Core/Reports/Fees/**'
+      - 'Tests/ThemeSmokeChecks/Program.FamilyDocumentSections.cs'
       - 'Pages/Reports/Templates/*Bill.rdlc'
       - 'Pages/Reports/Templates/*Receipt.rdlc'
       - 'Tests/ThemeSmokeChecks/Program.FeeDocuments.cs'
