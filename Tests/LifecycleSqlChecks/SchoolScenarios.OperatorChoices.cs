@@ -9,7 +9,7 @@ internal sealed partial class SchoolScenarios
         return(Convert.ToInt32(row["AdmissionId"]),Convert.ToInt32(row["EnrollmentId"]));
     }
     private void PostMonth(int enrollment,DateTime month)=>Sql.Proc("PostSelectedMonthlyFees",
-        Sql.P("@UserId",f.Admin),Sql.P("@BillingMonth",month),Sql.P("@AcademicYearId",f.SourceYear),Sql.P("@Reason","Fictional agreed monthly bill"),
+        Sql.P("@UserId",f.Admin),Sql.P("@BillingMonth",month),Sql.P("@AcademicYearId",f.NextYear),Sql.P("@Reason","Fictional agreed monthly bill"),
         Sql.TvpParameter("@Selection","PostingSelectionType",Tvp.PostingSelections(new[]{(enrollment,f.Tuition,month)})));
     private long Charge(int enrollment,DateTime month)=>Convert.ToInt64(Sql.Scalar("SELECT BillingChargeId FROM dbo.BillingCharges WHERE EnrollmentId=@E AND FeeTypeId=@F AND BillingMonth=@M AND CorrectionOfBillingChargeId IS NULL;",Sql.P("@E",enrollment),Sql.P("@F",f.Tuition),Sql.P("@M",month)));
     private int Assignment(int enrollment)=>Sql.Count("SELECT TOP(1) StudentFeeAssignmentId FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@E AND FeeTypeId=@F AND CancelledAt IS NULL ORDER BY StudentFeeAssignmentId;",Sql.P("@E",enrollment),Sql.P("@F",f.Tuition));
@@ -29,7 +29,7 @@ internal sealed partial class SchoolScenarios
     {
         foreach(bool immediate in new[]{true,false})
         {
-            var args=f.AdmissionArgs("Admission concession choice "+immediate).Concat(new[]{Sql.P("@MonthlyDiscountFrom",new DateTime(f.AdmissionDate.Year,4,1).AddMonths(immediate?0:1))}).ToArray();
+            var args=f.AdmissionArgs("Admission concession choice "+immediate).Concat(new[]{Sql.P("@MonthlyDiscountFrom",f.MonthlyDate.AddMonths(immediate?0:1))}).ToArray();
             args.Single(p=>p.ParameterName=="@AdmissionDiscounts").Value=Tvp.AdmissionFeeDiscounts(new[]{(f.Tuition,1000m)});
             int enrollment=Convert.ToInt32(Sql.Proc("AdmitStudent",args).Rows[0]["EnrollmentId"]);
             r.Check(Due(Tuition(enrollment))==(immediate?4000:5000),"The school explicitly chooses admission-month or following-month concessions for the opening bill.");
@@ -77,7 +77,7 @@ internal sealed partial class SchoolScenarios
     private async Task ConcessionRefusals()
     {
         var child=EarlierChild("Concession stale and rollback example");int id=Assignment(child.Enrollment);
-        DateTime month=new(f.AdmissionDate.Year,f.AdmissionDate.Month,1);long bill=Tuition(child.Enrollment);
+        DateTime month=f.MonthlyDate;long bill=Tuition(child.Enrollment);
         using var review=ReviewConcession(ConcessionArgs(id,month,month,1000,true,true));
         await Pay(child.Student,child.Enrollment,1000,(bill,1000));
         await r.Refused("A payment after concession review prevents saving a stale financial decision",()=>Task.Run(()=>Sql.Proc("SaveStudentFeeDiscount",ConcessionArgs(id,month,month,1000,true,false,Snapshot(review)))),53104);
@@ -145,7 +145,7 @@ internal sealed partial class SchoolScenarios
         var actual=FeeDiscountPeriod.BillContext(waivedBill);
         r.Check(Convert.ToDecimal(actual["StandardAmount"])==6000&&Convert.ToDecimal(actual["DiscountAmount"])==500,
             "Opening a bill review includes a later unpaid waiver as well as its prior rate correction, preventing accidental recharging.");
-        using(var unchanged=ReviewConcession(TermsArgs(Assignment(waived.Enrollment),new DateTime(f.AdmissionDate.Year,f.AdmissionDate.Month,1),new DateTime(f.AdmissionDate.Year,f.AdmissionDate.Month,1),500,true,rate:6000,agreement:false,bill:waivedBill)))
+        using(var unchanged=ReviewConcession(TermsArgs(Assignment(waived.Enrollment),f.MonthlyDate,f.MonthlyDate,500,true,rate:6000,agreement:false,bill:waivedBill)))
             r.Check(Convert.ToDecimal(unchanged.Tables[0].Rows[0]["Difference"])==0,"Reviewing the actual current bill terms proposes no new liability by default.");
         DateTime june=month.AddMonths(1);SaveTerms(id,june,june,5000,6000,full:false);
         r.Check(Sql.Money("SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@E AND FeeTypeId=@F AND EffectiveFrom=@M;",Sql.P("@E",child.Enrollment),Sql.P("@F",f.Tuition),Sql.P("@M",june))==5000,
@@ -156,14 +156,14 @@ internal sealed partial class SchoolScenarios
     }
     private async Task AnnualAndPurchaseTerms()
     {
-        var child=EarlierChild("Annual and purchase correction example");DateTime month=new(f.AdmissionDate.Year,f.AdmissionDate.Month,1);
+        var child=EarlierChild("Annual and purchase correction example");DateTime month=f.MonthlyDate;
         long annual=Convert.ToInt64(Sql.Scalar("SELECT BillingChargeId FROM dbo.BillingCharges WHERE EnrollmentId=@E AND FeeTypeId=@F;",Sql.P("@E",child.Enrollment),Sql.P("@F",f.AdmissionFee)));
         int annualAssignment=Sql.Count("SELECT StudentFeeAssignmentId FROM dbo.BillingCharges WHERE BillingChargeId=@C;",Sql.P("@C",annual));
         await Pay(child.Student,child.Enrollment,2000,(annual,2000));
         SaveTerms(annualAssignment,month,month,0,1500,agreement:false,bill:annual,action:"Refund");
         r.Check(ChainDue(annual)==0&&Credit(child.Student)==0&&Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments WHERE AdmissionId=@S AND PaymentMethod=N'Refund';",Sql.P("@S",child.Student))==-500,
             "An explicitly reviewed annual fee reduction issues only the paid 500 refund and retains the original receipt.");
-        long Purchase()=>Convert.ToInt64(Sql.Proc("PostAdditionalFee",Sql.P("@UserId",f.Admin),Sql.P("@RequestId",Guid.NewGuid()),Sql.P("@FeeTypeId",f.Purchase),Sql.P("@ChargeDate",f.AdmissionDate),Sql.P("@Amount",1200m),Sql.P("@DiscountAmount",0m),Sql.P("@Reason","Fictional workbook"),Sql.TvpParameter("@Selection","ManualChargeSelectionType",Tvp.ManualChargeSelection(new[]{child.Enrollment}))).Rows[0]["BillingChargeId"]);
+        long Purchase()=>Convert.ToInt64(Sql.Proc("PostAdditionalFee",Sql.P("@UserId",f.Admin),Sql.P("@RequestId",Guid.NewGuid()),Sql.P("@FeeTypeId",f.Purchase),Sql.P("@ChargeDate",DateTime.Today),Sql.P("@Amount",1200m),Sql.P("@DiscountAmount",0m),Sql.P("@Reason","Fictional workbook"),Sql.TvpParameter("@Selection","ManualChargeSelectionType",Tvp.ManualChargeSelection(new[]{child.Enrollment}))).Rows[0]["BillingChargeId"]);
         long first=Purchase(),second=Purchase();int purchaseId=Sql.Count("SELECT StudentFeeAssignmentId FROM dbo.BillingCharges WHERE BillingChargeId=@C;",Sql.P("@C",first));
         await Pay(child.Student,child.Enrollment,500,(first,500));SaveTerms(purchaseId,month,month,200,1000,agreement:false,bill:first);
         r.Check(ChainDue(first)==300&&ChainDue(second)==1200&&Credit(child.Student)==0,"A purchase correction affects only the selected purchase and waives unpaid money first.");
