@@ -136,7 +136,12 @@ var actorFrame=await users.LoadAsync(created.Id);
 var actorSave=users.SaveAsync(AccessDraft.From(actorFrame.Record) with { Name=prefix+"-actor" },actorFrame.Record.Snapshot,actorFrame.Catalog.Token);
 CurrentUser.UserId=viewer.Id;var actorResult=await actorSave;CurrentUser.UserId=admin;
 Check(actorResult.Outcome==AccessSaveOutcome.Saved,"queued save captures its acting user before background execution");
-Check(Id("SELECT TOP(1) UserId FROM dbo.AuditLogs WHERE TableName=N'Users' AND RecordId=N'"+created.Id+"' ORDER BY AuditLogId DESC;")==admin,"SQL audit records the captured actor rather than a later session value");
+// Migration 59 intentionally retired generic AuditLogs writes. The actor
+// contract is enforced by the stored procedure's SQL permission check, while
+// the save must use the administrator captured before the session changed.
+Check(actorResult.Intent?.Values.Name==prefix+"-actor"&&
+    (await users.LoadAsync(created.Id)).Record.Name==prefix+"-actor",
+    "the queued administrator save commits the exact submitted user changes despite a later session change");
 var protectedRole=await roles.LoadAsync(adminRole);
 Check((await roles.SaveAsync(AccessDraft.From(protectedRole.Record) with { Description="Forbidden" },protectedRole.Record.Snapshot,protectedRole.Catalog.Token)).Outcome==AccessSaveOutcome.Rejected,"Administrator role remains protected in the unified writer");
 var raceFrame=await users.LoadAsync(created.Id);
