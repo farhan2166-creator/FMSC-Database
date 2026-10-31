@@ -215,7 +215,7 @@ def main():
             # A numeric source line in the owned AdministrationSqlChecks fixture
             # identifies a missing synthetic prerequisite without leaking SQL,
             # connection values, real names, or the raw stack trace.
-            admin_lines = re.findall(r"Tests[/\\]AdministrationSqlChecks[/\\]Program\\.cs:line (\\d+)",
+            admin_lines = re.findall(r"Tests[/\\]AdministrationSqlChecks[/\\]Program\.cs:line (\d+)",
                                      result.stdout + result.stderr)
             admin_location = ["Administration fixture source line " + admin_lines[-1]] if admin_lines else []
             raise RuntimeError("Child command failed with exit " + str(result.returncode) +
