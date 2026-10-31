@@ -7,6 +7,14 @@ Read [the master audit](FMSC_MASTER_AUDIT.md) for release gates and dated findin
 
 ## Enforced or recorded application behavior
 
+**31 October 2026 — Registration simplification:** Admission owns pending child
+registration and sibling confirmation. Confirm/Cancel/Reopen belong to the
+student's row in Student & Siblings, not the main toolbar. Cancelled registrations
+reuse the same student identity through a reviewed reopening with a new pending
+placement, retaining cancelled episodes and all financial/family history. The
+separate Family Admission navigation entry is retired. See the
+[decision and implementation evidence](../Docs/Decisions/ADMISSION_REGISTRATION_SIMPLIFICATION.md).
+
 **31 October 2026 — Academic-year editing:** The owner approved locking Start/End
 dates once a year is referenced by student enrolment (including legacy/historical
 records) or promotion history. Name/Remarks corrections and Current remain

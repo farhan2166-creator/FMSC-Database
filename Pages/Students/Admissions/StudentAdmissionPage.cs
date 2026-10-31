@@ -294,7 +294,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     private readonly ContextMenuStrip printMenu = new StyledContextMenu();
     private readonly ContextMenuStrip enrollmentActionsMenu = new StyledContextMenu();
     private ModernButton? confirmReturnButton;
-    private ModernButton? confirmAdmissionButton;
     private int loadedAdmissionCampusId;
     private bool registrationReadyToClose;
     private ModernButton? collectPaymentButton;
@@ -590,6 +589,9 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     private readonly Action<Func<Control>, string, string>? _navigate;
     /// <param name="navigate">The shell's page-switch callback, unchanged.</param>
     private readonly bool registrationReview;
+    private readonly bool initializeAdmission;
+    internal StudentAdmissionPage(bool initialize) : this(null, 0, false, false, WritePreparedPhotoAsync,
+        (id, token) => DatabaseHelper.QueryUserAsync("GetStudentPhoto", token, DatabaseHelper.Int("@AdmissionId", id)), initialize) { }
     internal event Action? RegistrationFinished;
     public StudentAdmissionPage(
         Action<Func<Control>, string, string>? navigate = null, int preselectAdmissionId = 0, bool registrationReview = false, bool focusPhoto = false)
@@ -598,12 +600,13 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
 
     internal StudentAdmissionPage(Action<Func<Control>, string, string>? navigate, int preselectAdmissionId,
         bool registrationReview, bool focusPhoto, Func<int, byte[], string?, string?, Task> writePhoto,
-        Func<int, CancellationToken, Task<DataTable>> readPhoto)
+        Func<int, CancellationToken, Task<DataTable>> readPhoto, bool initialize = true)
     : base(
         registrationReview ? "Review Registration" : PageTitles.Admissions,
         registrationReview ? "Complete the details, then Confirm Admission to save and assign the official number. Save Draft is optional." : AdmissionContextSubtitle)
     {
         this.registrationReview = registrationReview;
+        initializeAdmission = initialize;
         this.writePhoto = writePhoto;
         this.readPhoto = readPhoto;
         EnabledChanged += (_, _) => {
@@ -641,18 +644,14 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         }
         FormFlow.EnterMovesToNext(this);
         FormFlow.OrderTableFields(tab1Panel);
-        quickStudent.RowFilter = row => Convert.ToString(row["Status"]) != "Pending" && Convert.ToString(row["Status"]) != "Cancelled";
+        quickStudent.RowFilter = row => true;
+        ConfigureRegistrationActions();
         if (registrationReview)
         {
             quickStudent.Visible = findButton!.Visible = newAdmissionButton!.Visible = saveAndNewButton!.Visible = false;
             enrollmentActionsButton!.Visible = collectPaymentButton!.Visible = admissionPrintButton!.Visible = false;
             saveButton!.Text = "Save Draft";
-            confirmAdmissionButton = AddAction("Confirm Admission", async (_, _) => await CompleteRegistrationAsync(), "Success");
-            GateAction(confirmAdmissionButton, "Students.Admit");
-            UiAccessibility.Describe(confirmAdmissionButton, "Confirm Admission",
-                "Review the official admission number, then save the completed details and confirm admission together.");
-            var cancel = AddBusyAction("Cancel Registration", () => CloseAdmissionAsync(true), "Warning");
-            GateAction(cancel, "Students.Administer");
+
             admissionIdCaption.Text = "Temp Reference";
         }
         if (preselectAdmissionId > 0) Defer(async () => {
@@ -710,6 +709,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                 siblingsGrid.Dispose();
                 siblingsStatus.Dispose();
                 findSiblingButton.Dispose();
+                addNewSiblingButton.Dispose();
                 openSiblingButton.Dispose();
             }
         }
@@ -883,7 +883,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             action.AutoSize = true;
             action.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         }
-        LoadCampuses();
+        if (initializeAdmission) LoadCampuses();
         Campus.SelectedIndexChanged +=
     (_, _) => Defer(LoadFeeStructure);
         Year.SelectedIndexChanged +=
@@ -910,7 +910,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             (_, _) => UpdateOpenSiblingAvailability();
         siblingsGrid.CellDoubleClick +=
             async (_, e) => {
-                if (e.RowIndex >= 0)
+                if (e.RowIndex >= 0 && e.ColumnIndex >= 0 && siblingsGrid.Columns[e.ColumnIndex] is not DataGridViewButtonColumn)
                     await OpenSelectedSiblingAsync();
             };
         siblingsGrid.KeyDown +=
@@ -919,12 +919,14 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                     return;
                 e.Handled = true;
                 e.SuppressKeyPress = true;
-                await OpenSelectedSiblingAsync();
+                if (siblingsGrid.CurrentCell?.OwningColumn is DataGridViewButtonColumn)
+                    await RunSiblingRegistrationActionAsync(siblingsGrid.CurrentCell.RowIndex, siblingsGrid.CurrentCell.ColumnIndex);
+                else await OpenSelectedSiblingAsync();
             };
         quickStudent.PlaceholderText = StudentPicker.SearchPlaceholder;
         // Defer student lookup loading so the admission page can paint first.
         // the admission form. Starting it through the UI queue lets the page appear first.
-        Defer(StudentSearchCache.Warm);
+        if (initializeAdmission) Defer(StudentSearchCache.Warm);
         quickStudent.SearchFailed += ex => Fail(ex);
         quickStudent.UserSelectionChanged += async (_, _) => await LoadQuickStudentAsync();
         UpdateStudentWorkspace();
@@ -1989,8 +1991,8 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             feeCard.Content.Controls.Add(feeLayout);
 
             var siblingsCard = HumanUi.Card(
-                "Current Siblings",
-                "Siblings already linked to this student.",
+                "Student & Siblings",
+                "Open a student to complete details. Registration actions belong to each row.",
                 Accent);
             var siblingsLayout = new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -2005,7 +2007,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             siblingsLayout.Controls.Add(siblingsStatus, 0, 0);
             siblingsLayout.Controls.Add(siblingsGrid, 0, 1);
             siblingsLayout.Controls.Add(
-                HumanUi.ButtonRow(findSiblingButton, openSiblingButton),
+                HumanUi.ButtonRow(addNewSiblingButton, findSiblingButton, openSiblingButton),
                 0,
                 2);
             siblingsCard.Content.Controls.Add(siblingsLayout);
@@ -2070,6 +2072,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     /// <summary>Display New Admission or the loaded student's stored status.</summary>
     private void UpdateStudentWorkspace()
     {
+        UpdateRegistrationActions();
         UpdatePhotoActions();
         bool savedStudentReady = currentAdmissionId > 0 && !IsBusy;
         if (collectPaymentButton is not null)
@@ -2082,10 +2085,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         findSiblingButton.Enabled = savedStudentReady && CurrentUser.HasPermission("Students.Administer");
         if (saveAndNewButton is not null)
             saveAndNewButton.Enabled = !IsBusy && currentAdmissionId <= 0 && unconfirmedAdmission is null;
-        if (saveButton is not null) saveButton.Enabled = !IsBusy && unconfirmedAdmission is null && (!registrationReview || IsPendingRegistration);
-        if (confirmAdmissionButton is not null)
-            confirmAdmissionButton.Enabled = !IsBusy && unconfirmedAdmission is null && IsPendingRegistration &&
-                currentAdmissionId > 0 && CurrentUser.HasPermission("Students.Admit");
+        if (saveButton is not null) saveButton.Enabled = !IsBusy && !IsCancelledRegistration && unconfirmedAdmission is null && (!registrationReview || IsPendingRegistration);
         if (checkAdmissionButton is not null)
         {
             checkAdmissionButton.Visible = unconfirmedAdmission is not null;
@@ -2138,7 +2138,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         try
         {
             using var dialog =
-                new StudentSearchDialog(this, officialAdmissionsOnly:true);
+                new StudentSearchDialog(this, officialAdmissionsOnly:false);
             if (dialog.ShowDialog(this) != DialogResult.OK)
             {
                 return;
@@ -2215,7 +2215,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         {
             admissionIdValue.Text = AdmissionNumbers.ForId(currentAdmissionId);
             admissionIdValue.PlaceholderText = string.Empty;
-            if (!IsPendingRegistration) Defer(CheckExistingAdmissionNumberAsync);
+            if (!IsPendingRegistration && !IsCancelledRegistration) Defer(CheckExistingAdmissionNumberAsync);
         }
         else
         {
@@ -2245,6 +2245,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     }
     private async Task ShowNextAdmissionNumberAsync()
     {
+        if (!initializeAdmission) return;
         if(currentAdmissionId>0 || IsDisposed || saveBusy) return;
         int version = ++admissionNumberVersion;
         DateTime date=admissionDate.Value.Date;
@@ -2818,13 +2819,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                 return false;
             }
             DataRow row = dt.Rows[0];
-            if (!registrationReview && Convert.ToString(row["Status"]) == "Pending")
-            {
-                if (!QuickRegistrationAccess.CanUse(CurrentUser.HasPermission)) Warn("Your role needs admission and student-view access to edit or confirm this quick registration.");
-                else if (_navigate is not null) _navigate(() => new FamilyAdmissionWorkspace(_navigate, admissionId), "Students", PageTitles.FamilyAdmission);
-                else Warn("This is a pending registration. Review and confirm it in Family Admission & Fees.");
-                return false;
-            }
             unconfirmedAdmission = null;
             legacySetupPending = row.Table.Columns.Contains("LegacySetupPending") && Convert.ToBoolean(row["LegacySetupPending"]);
             currentAdmissionId =
@@ -3165,8 +3159,9 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         /* Update the header only for the record actually displayed. */
         string loadedStudent = name.Text.Trim();
         SetPageHeaderText(
-            registrationReview ? "Review Registration" : "Edit Student",
-            registrationReview ? $"{loadedStudent} · {AdmissionNumbers.ForId(admissionId)} · Confirm Admission saves the completed details and assigns the official number."
+            IsPendingRegistration ? "Pending Registration" : IsCancelledRegistration ? "Cancelled Registration" : "Edit Student",
+            IsPendingRegistration ? $"{loadedStudent} · {AdmissionNumbers.ForId(admissionId)} · Complete details, then Confirm & Save on this child's row in Student & Siblings."
+                : IsCancelledRegistration ? $"{loadedStudent} · Reopen from Student & Siblings to review a new registration attempt. Cancellation history is retained."
                 : $"Student: {loadedStudent} (Admission Number {AdmissionNumbers.ForId(admissionId)}) - saving updates this student.");
         /* Capture the clean baseline after the record has settled. */
         CaptureAdmissionBaseline();
@@ -3177,6 +3172,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     private int feeStructureLoadVersion;
     private async Task LoadFeeStructure()
     {
+        if (!initializeAdmission) return;
         bool editing = currentAdmissionId > 0;
         if (editing)
             return;
@@ -3358,7 +3354,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                     .ThenBy(row => AdmissionNumbers.Read(row),StringComparer.CurrentCultureIgnoreCase))
                 {
                     int siblingAdmissionId = GetIntColumn(row, "AdmissionId");
-                    if (siblingAdmissionId <= 0 || siblingAdmissionId == admissionId)
+                    if (siblingAdmissionId <= 0)
                         continue;
                     display.Rows.Add(
                         GetTextColumn(row, "StudentName"),
@@ -3374,6 +3370,9 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                         AdmissionNumbers.Read(row));
                 }
             }
+            if (!display.AsEnumerable().Any(member => Convert.ToInt32(member["AdmissionId"]) == admissionId))
+                display.Rows.Add(name.Text, fatherName.Text, "", viewClass.Text + " - " + viewSection.Text,
+                    viewCampus.Text, _workspaceStudentStatus, 0, admissionId, AdmissionNumbers.ForId(admissionId));
             // Define the schema even when the details tab has not created a binding context yet.
             siblingsGrid.DataSource = null;
             siblingsGrid.AutoGenerateColumns = false;
@@ -3386,6 +3385,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                     ReadOnly = true
                 });
             siblingsGrid.DataSource = display;
+            ConfigureSiblingRegistrationRows();
             if (siblingsGrid.Columns.Contains("FamilyMemberId"))
                 siblingsGrid.Columns["FamilyMemberId"].Visible = false;
             /* Lead with Admission Number; keep registration only in the backing table. */
@@ -3406,13 +3406,13 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             siblingsGrid.Columns["AdmissionNumber"].HeaderText = "Adm. No.";
             siblingsGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             foreach (DataGridViewColumn column in siblingsGrid.Columns)
-                if (column.Visible) column.MinimumWidth = AppScale.Scale(column.Name == "AdmissionNumber" ? 75 : 100);
+                if (column.Visible && column is not DataGridViewButtonColumn) column.MinimumWidth = AppScale.Scale(column.Name == "AdmissionNumber" ? 75 : 100);
             siblingsGrid.Columns["AdmissionNumber"].FillWeight = 65;
             siblingsGrid.Columns["Student Name"].FillWeight = 130;
             siblingsGrid.Columns["Father Name"].FillWeight = 120;
             siblingsGrid.Columns["Campus"].FillWeight = 110;
             siblingsStatus.Text = display.Rows.Count > 0
-                ? $"{display.Rows.Count} sibling(s) currently linked. Select one and click Open Selected Sibling, or double-click the row."
+                ? $"{display.Rows.Count} student(s), including the loaded student. Open a row to edit; use its registration action when ready."
                 : "No siblings are linked yet. Click Find Possible Siblings to add one.";
             if (display.Rows.Count > 0)
                 siblingsGrid.ClearSelection();
@@ -3657,7 +3657,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
 
     private async Task CompleteRegistrationAsync()
     {
-        if (!registrationReview || !IsPendingRegistration || currentAdmissionId <= 0 || IsBusy ||
+        if (!IsPendingRegistration || currentAdmissionId <= 0 || IsBusy ||
             unconfirmedAdmission is not null || !CurrentUser.HasPermission("Students.Admit")) return;
         // Confirmation includes the current edits; saving a draft first is optional.
         if (!ValidateAdmissionInline(isNew: false, confirmingRegistration: true)) return;
@@ -3715,7 +3715,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     }
     private async Task CloseAdmissionAsync(bool cancel)
     {
-        if (currentAdmissionId <= 0 || saveBusy || (cancel && (!registrationReview || !IsPendingRegistration))) return;
+        if (currentAdmissionId <= 0 || saveBusy || (cancel && !IsPendingRegistration)) return;
         if (HasUnsavedChanges) { SetStatus("Save changes before closing this record."); return; }
         using var dialog = new CloseAdmissionDialog(currentAdmissionId,name.Text,cancel,
             placementStart: placementStartDate, placementEnd: placementYearEnd);
@@ -4171,9 +4171,10 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     }
     private bool IsPendingRegistration => _workspaceStudentStatus == "Pending";
     private bool legacySetupPending;
-    private async Task Save()
+    private Task Save() => IsPendingRegistration ? CompleteRegistrationAsync() : SaveDraftOrDetailsAsync();
+    private async Task SaveDraftOrDetailsAsync()
     {
-        if (IsBusy || unconfirmedAdmission is not null || (registrationReview && (!IsPendingRegistration || currentAdmissionId <= 0)))
+        if (IsBusy || IsCancelledRegistration || unconfirmedAdmission is not null || (registrationReview && (!IsPendingRegistration || currentAdmissionId <= 0)))
             return;
         saveBusy = true;
         UpdateStudentWorkspace();
@@ -4405,7 +4406,7 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
         {
             using var hold = BeginBusy("Checking the saved admission…", this);
             var confirmation = await AdmissionSaveConfirmation.RecheckAsync(submitted,
-                registrationReview ? value => ReadCompletedRegistrationAsync(currentAdmissionId, value) : ReadSubmittedAdmissionAsync);
+                registrationReview || IsPendingRegistration ? value => ReadCompletedRegistrationAsync(currentAdmissionId, value) : ReadSubmittedAdmissionAsync);
             if (IsDisposed || version != admissionLoadVersion || !ReferenceEquals(unconfirmedAdmission, submitted)) return;
             await ApplyAdmissionConfirmationAsync(submitted, confirmation);
         }

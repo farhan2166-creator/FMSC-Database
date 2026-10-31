@@ -331,60 +331,14 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         ControlToolTips.SetDescription(summaryTip,editFeeButton, "Change the frequency and remarks for one class. The Frequency column changes the whole row.");
         ControlToolTips.SetDescription(summaryTip,applyStudentsButton, "Review and update eligible existing student fee rates. This does not create bills.");
         var campusLabel = new Label {
-            Text = "Campus",
-            AutoSize = true,
-            Anchor = AnchorStyles.Left,
-            Font = AppTheme.NormalFont,
-            ForeColor = AppTheme.Text,
-            Margin = new Padding(0, 0, 8, 0)
+            Text = "Campus", AutoSize = false, Height = AppMetrics.ButtonHeight,
+            Width = AppMetrics.TextWidth("Campus", AppTheme.NormalFont, 12),
+            Font = AppTheme.NormalFont, TextAlign = ContentAlignment.MiddleLeft
         };
-        campus.Dock = DockStyle.None;
-        campus.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-        campus.Margin = new Padding(0);
-        summaryLabel.AutoSize = false;
-        summaryLabel.AutoEllipsis = true;
-        summaryLabel.Dock = DockStyle.Fill;
-        summaryLabel.TextAlign = ContentAlignment.MiddleLeft;
-        summaryLabel.Margin = new Padding(14, 0, 8, 0);
-        // Long messages (errors, invalid-cell counts) are cut to one line here; hovering shows all of it.
-        summaryLabel.TextChanged += (_, _) => ControlToolTips.SetDescription(summaryTip,summaryLabel, summaryLabel.Text);
-        var actions = new FlowLayoutPanel {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
-            Anchor = AnchorStyles.Left,
-            Margin = new Padding(0)
-        };
-        saveButton.Margin = new Padding(0, 0, 8, 0);
-        closeButton.Margin = new Padding(0);
-        actions.Controls.Add(saveButton);
-        editFeeButton.Margin = new Padding(0, 0, 8, 0);
-        actions.Controls.Add(editFeeButton);
-        applyStudentsButton.Margin = new Padding(0, 0, 8, 0);
-        actions.Controls.Add(applyStudentsButton);
-        actions.Controls.Add(closeButton);
-        ActionButtonStyle.Arrange(actions);
-        var toolbar = new TableLayoutPanel {
-            Dock = DockStyle.Top,
-            Height = AppMetrics.ButtonHeight + AppMetrics.InputControlHeight + 16,
-            ColumnCount = 4,
-            RowCount = 2,
-            Margin = new Padding(0),
-            Padding = new Padding(0, 4, 0, 4)
-        };
-        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 260));
-        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        toolbar.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 8));
-        toolbar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        toolbar.Controls.Add(actions, 0, 0);
-        toolbar.SetColumnSpan(actions, 4);
-        toolbar.Controls.Add(campusLabel, 0, 1);
-        toolbar.Controls.Add(campus, 1, 1);
-        toolbar.Controls.Add(summaryLabel, 2, 1);
-        toolbar.SetColumnSpan(summaryLabel, 2);
+        campus.Width = AppScale.Scale(260);
+        campus.Height = AppMetrics.ButtonHeight;
+        var toolbar = FeeToolLayout.Toolbar(summaryLabel, summaryTip,
+            campusLabel, campus, saveButton, editFeeButton, applyStudentsButton, closeButton);
         grid.Dock = DockStyle.Fill;
         grid.AutoGenerateColumns = false;
         grid.SelectionMode = DataGridViewSelectionMode.CellSelect;

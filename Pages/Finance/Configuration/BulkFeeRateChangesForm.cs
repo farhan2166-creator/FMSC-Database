@@ -231,9 +231,6 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         var amountCaption = changeRow.GetControlFromPosition(2, 0)!.Controls.OfType<Label>().Single();
         typePercentage.CheckedChanged += (_, _) =>
             amountCaption.Text = typePercentage.Checked ? "Amount (%)" : "Amount (Rs.)";
-        // Keep related fields together instead of stretching them across a wide workspace.
-        int fieldWidth = AppMetrics.TextWidth(new string('M', 20), AppTheme.NormalFont, AppScale.Scale(32));
-        scopeRow.MaximumSize = changeRow.MaximumSize = new Size(fieldWidth * 4, 0);
         scopeRow.Height = AppMetrics.FieldRowHeight;
         changeRow.Height = AppMetrics.FieldRowHeightFor(Math.Max(AppMetrics.InputControlHeight,
             new[] { directionIncrease, directionDecrease, typePercentage, typeFlatAmount }.Max(choice => choice.PreferredSize.Height) * 2));
@@ -273,19 +270,6 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
             Close();
         };
         var toolbar = FeeToolLayout.Toolbar(summaryLabel, tip, previewButton, selectAllButton, selectNoneButton, applyButton, closeButton);
-        // Give the selection summary its own line so bulk actions do not squeeze it.
-        Control toolbarActions = toolbar.GetControlFromPosition(1, 0)!;
-        toolbar.SetCellPosition(summaryLabel, new TableLayoutPanelCellPosition(0, 1));
-        toolbar.SetCellPosition(toolbarActions, new TableLayoutPanelCellPosition(0, 0));
-        toolbar.ColumnCount = 1;
-        toolbar.ColumnStyles.Clear();
-        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        toolbar.RowCount = 2;
-        toolbar.RowStyles.Clear();
-        toolbar.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight));
-        int summaryHeight = AppMetrics.TextHeight(summaryLabel.Font) * 2 + 8;
-        toolbar.RowStyles.Add(new RowStyle(SizeType.Absolute, summaryHeight));
-        toolbar.Height = AppMetrics.ButtonHeight + summaryHeight + toolbar.Padding.Vertical;
         rootPanel = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
@@ -429,8 +413,13 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
                 ? AllId
                 : Convert.ToInt32(feeTypeScope.SelectedValue);
             string frequencyFilter = frequencyScope.SelectedItem?.ToString() ?? "All Frequencies";
-            decimal magnitude = adjustmentValue.Value;
-            if(!WholeRupees.IsWhole(magnitude))throw new ArgumentException("Enter a whole-number percentage or adjustment amount.");
+            if (!InputParse.TryWholeAmount(adjustmentValue.Text.Trim(), out decimal magnitude) ||
+                magnitude > adjustmentValue.Maximum)
+            {
+                OperationFeedback.Set(summaryLabel, "Enter a whole-number percentage or adjustment amount within the allowed range.", true);
+                adjustmentValue.Focus();
+                return;
+            }
             if (magnitude <= 0)
             {
                 summaryLabel.Text = "Enter an adjustment value greater than zero.";
@@ -502,7 +491,11 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
                         if (roundTo > 0)
                             newAmount = Math.Round(newAmount / roundTo, MidpointRounding.AwayFromZero) * roundTo;
                         if(!WholeRupees.IsWhole(newAmount))
-                            throw new ArgumentException("This adjustment produces fractional fees. Select an explicit rounding option or change the adjustment; rates are not rounded automatically.");
+                        {
+                            plan.Clear();
+                            OperationFeedback.Set(summaryLabel, "This adjustment produces fractional fees. Select an explicit rounding option or change the adjustment; rates are not rounded automatically.", true);
+                            return;
+                        }
                         plan.Add(new PlanRow {
                             FeeConfigurationId = Convert.ToInt32(row["FeeConfigurationId"]),
                             CampusId = c.Id,

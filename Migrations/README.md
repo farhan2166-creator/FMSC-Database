@@ -1,4 +1,13 @@
-## Current target: schema 63
+## Current target: schema 64
+
+Migration `64.sql` adds guarded, recoverable cancelled-registration reopening for
+the simplified Admission flow. It preserves existing student/financial rows and
+cancelled placements, creates a new pending placement only on an explicit reviewed
+reopening, and permits repeated registration cancellation when earlier episodes
+were cancelled too. Actual attendance/certificate safeguards remain. Apply after
+63 under an outer transaction. See
+`Docs/Decisions/ADMISSION_REGISTRATION_SIMPLIFICATION.md` and
+`Tools/TestRegistrationWorkflow.ps1`. Never rerun an applied migration.
 
 Migration `63.sql` implements the owner decision of 31 October 2026: academic
 years referenced by any enrolment (including historical/left students) or either
@@ -13,11 +22,11 @@ Migration `60.sql` fixes admission/fee flow authorization and recovery. It adds 
 
 Migration `59.sql` retires the remaining 19 generic audit writers after schema 58. Apply it once under an outer transaction using the installer or `sqlcmd -b`. It preserves existing audit rows/readers, permissions, preview snapshots, operational history and recovery markers. This remaining batch is explicitly owner-authorized on 28 October 2026. Validate with `Tools/TestRemainingAuditRetirement.ps1` (owned, record-free fixture).
 
-For any supported starting version from 19 through 62, apply every numbered file greater than that version up to and including 63 in ascending order. Never rerun an applied migration. Historical tables below describe the earlier migration-51 stage; they are not the current complete upgrade list.
+For any supported starting version from 19 through 63, apply every numbered file greater than that version up to and including 64 in ascending order. Never rerun an applied migration. Historical tables below describe the earlier migration-51 stage; they are not the current complete upgrade list.
 
 # Apply the database changes later
 
-The application requires **schema 63**. SQL changes are checked in here;
+The application requires **schema 64**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,

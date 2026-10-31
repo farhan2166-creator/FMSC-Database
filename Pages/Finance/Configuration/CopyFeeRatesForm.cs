@@ -95,7 +95,8 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
         if (rootPanel is not null)
             rootPanel.Padding = new Padding(4, 4, 4, 6);
     }
-    public CopyFeeRatesForm(int sourceCampusId = 0, int sourceClassId = 0)
+    public CopyFeeRatesForm(int sourceCampusId = 0, int sourceClassId = 0) : this(sourceCampusId, sourceClassId, true) { }
+    internal CopyFeeRatesForm(int sourceCampusId, int sourceClassId, bool initialize)
     {
         Text = PageTitles.CopyFeeRates;
         StartPosition = FormStartPosition.CenterParent;
@@ -116,7 +117,7 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
             "Replace existing amounts"
         });
         conflictMode.SelectedIndex = 0;
-        LoadSourceCampuses(sourceCampusId, sourceClassId);
+        if (initialize) LoadSourceCampuses(sourceCampusId, sourceClassId);
         sourceCampus.SelectedIndexChanged += (_, _) => {
             if (loading)
                 return;
@@ -170,18 +171,6 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
         selectAllButton.Enabled = selectNoneButton.Enabled = false;
         HumanUi.ApplyGridStyle(preview, AppTheme.Primary);
         var toolbar = FeeToolLayout.Toolbar(summaryLabel, tip, selectAllButton, selectNoneButton, applyButton, closeButton);
-        Control toolbarActions = toolbar.GetControlFromPosition(1, 0)!;
-        toolbar.SetCellPosition(summaryLabel, new TableLayoutPanelCellPosition(0, 1));
-        toolbar.SetCellPosition(toolbarActions, new TableLayoutPanelCellPosition(0, 0));
-        toolbar.ColumnCount = 1;
-        toolbar.ColumnStyles.Clear();
-        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        toolbar.RowCount = 2;
-        toolbar.RowStyles.Clear();
-        toolbar.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight));
-        int summaryHeight = AppMetrics.TextHeight(summaryLabel.Font) * 2 + 8;
-        toolbar.RowStyles.Add(new RowStyle(SizeType.Absolute, summaryHeight));
-        toolbar.Height = AppMetrics.ButtonHeight + summaryHeight + toolbar.Padding.Vertical;
         rootPanel = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
@@ -338,6 +327,16 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
                 return;
             }
             int targetCampusId = Convert.ToInt32(targetCampus.SelectedValue);
+            if (targetCampusId <= 0 || targetCampusId == sourceCampusId)
+            {
+                summaryLabel.Text = "Choose a different destination campus.";
+                return;
+            }
+            if (sourceClass.SelectedIndex < 0 || conflictMode.SelectedIndex < 0)
+            {
+                summaryLabel.Text = "Choose a class (or All classes) and how to handle existing fees.";
+                return;
+            }
             int sourceClassId = SelectedId(sourceClass);
             var sourceClasses = sourceClassId == AllClassesId
                 ? ClassesOfCampus(sourceCampusId)

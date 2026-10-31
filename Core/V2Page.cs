@@ -457,6 +457,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     }
     /// <summary>Space reserved for action-bar status before buttons wrap.</summary>
     protected virtual int ActionStatusWidth => 240;
+    protected virtual bool StatusBelowActions => false;
     /// <summary>For dense entry pages: allow actions to wrap within the available width.</summary>
     protected void UseWrappingToolbar()
     {
@@ -473,6 +474,16 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,0));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         layout.RowStyles.Clear();layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        if (StatusBelowActions)
+        {
+            layout.ColumnCount = 1; layout.RowCount = 2;
+            layout.ColumnStyles.Clear(); layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            layout.SetCellPosition(StatusLabel, new TableLayoutPanelCellPosition(0, 1));
+            layout.RowStyles.Clear();
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 0));
+            StatusLabel.TextAlign = ContentAlignment.MiddleLeft;
+        }
         Actions.AutoSize=false;Actions.AutoScroll=false;
         bool fitting=false;
         void Fit()
@@ -486,6 +497,22 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 _actionBar.Visible=true;Actions.Visible=true;
                 var buttons=Actions.Controls.Cast<Control>().Where(c=>c.Visible).ToArray();
                 bool hasActions=buttons.Length>0;
+                if (StatusBelowActions)
+                {
+                    int required = buttons.Sum(c => c.Width + c.Margin.Horizontal) + Actions.Padding.Horizontal;
+                    Actions.WrapContents = required > width;
+                    int buttonsHeight = hasActions ? Math.Max(AppMetrics.ButtonHeight,
+                        Actions.GetPreferredSize(new Size(width, 0)).Height) : 0;
+                    bool statusVisible = !string.IsNullOrWhiteSpace(StatusLabel.Text);
+                    int messageHeight = statusVisible ? AppMetrics.TextHeight(StatusLabel.Font) + 8 : 0;
+                    StatusLabel.Visible = statusVisible;
+                    layout.RowStyles[0].Height = buttonsHeight;
+                    layout.RowStyles[1].Height = messageHeight;
+                    Actions.Visible = hasActions;
+                    _actionBar.Visible = hasActions || statusVisible;
+                    _shellRoot.RowStyles[1].Height = buttonsHeight + messageHeight + _actionBar.Padding.Vertical + _actionBar.Margin.Vertical;
+                    return;
+                }
                 bool managed=StatusLabel.Parent==layout || StatusLabel.Parent==_headerTitleLine || StatusLabel.Parent==_externalStatusHeader;
                 var headerHost=_externalStatusHeader ?? (_pageHeader?.Visible==true?_headerTitleLine:null);
                 if(managed && !hasActions && headerHost is not null) {

@@ -1,6 +1,6 @@
 namespace FMSC_SMS.Pages.Students.Admissions;
 
-/// <summary>Direct admission entry point; registration and data review have separate routes.</summary>
+/// <summary>Admission entry point for direct admission, pending registration and sibling review.</summary>
 public static class AdmissionsWorkspace
 {
     public static Control Create(Action<Func<Control>, string, string> navigate)

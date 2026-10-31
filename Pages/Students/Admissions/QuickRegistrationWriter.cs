@@ -179,6 +179,12 @@ internal static class QuickRegistrationWriter
                 access.Parameters.Add(DatabaseHelper.Int("@UserId",user));access.ExecuteNonQuery();
                 LockRequest(connection,transaction,request.Id,false);
                 if(ReadRequest(connection,transaction,request) is { } prior)return prior;
+                if (parameters.FirstOrDefault(p => p.ParameterName == "@RequireCurrentAcademicYear")?.Value is true)
+                {
+                    using var currentYear = new SqlCommand("SELECT COUNT(*) FROM dbo.AcademicYears WITH(UPDLOCK,HOLDLOCK) WHERE AcademicYearId=@Year AND IsCurrent=1;", connection, transaction);
+                    currentYear.Parameters.Add(DatabaseHelper.Int("@Year", Convert.ToInt32(parameters.Single(p => p.ParameterName == "@AcademicYearId").Value)));
+                    if (Convert.ToInt32(currentYear.ExecuteScalar()) != 1) throw new InvalidOperationException("The current academic year changed. Close and reopen Admit Sibling before saving.");
+                }
                 using var check = new SqlCommand("EXEC dbo.RequirePermission @UserId,N'Students.Admit';\n"+FeeQuery,connection,transaction);
                 check.Parameters.AddRange(new[] { DatabaseHelper.Int("@UserId",user),DatabaseHelper.Int("@Placement",placement) });
                 var current = new DataTable();
@@ -186,7 +192,7 @@ internal static class QuickRegistrationWriter
                 if (Quote(current)!=expectedQuote)
                     throw new InvalidOperationException("The class fees have changed. Choose the placement again to review the current fees before saving.");
                 using var command=new SqlCommand("AdmitStudent",connection,transaction){CommandType=CommandType.StoredProcedure,CommandTimeout=120};
-                command.Parameters.AddRange(parameters.Where(p=>!p.ParameterName.Equals("@UserId",StringComparison.OrdinalIgnoreCase)&&!p.ParameterName.Equals("@ExcludedFeeTypeIds",StringComparison.OrdinalIgnoreCase))
+                command.Parameters.AddRange(parameters.Where(p=>!p.ParameterName.Equals("@UserId",StringComparison.OrdinalIgnoreCase)&&!p.ParameterName.Equals("@ExcludedFeeTypeIds",StringComparison.OrdinalIgnoreCase)&&p.ParameterName!="@RequireCurrentAcademicYear")
                     .Select(p=>(SqlParameter)((ICloneable)p).Clone()).ToArray());
                 command.Parameters.Add(DatabaseHelper.Int("@UserId",user));
                 state.SubmissionStarted=true;

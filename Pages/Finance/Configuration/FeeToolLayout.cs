@@ -23,42 +23,42 @@ internal static class FeeToolLayout
         summary.AutoEllipsis = true;
         summary.Dock = DockStyle.Fill;
         summary.TextAlign = ContentAlignment.MiddleLeft;
-        summary.Margin = new Padding(0, 0, 12, 0);
+        summary.Margin = Padding.Empty;
         summary.TextChanged += (_, _) => tip.SetToolTip(summary, summary.Text);
         var actions = new FlowLayoutPanel {
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
-            Anchor = AnchorStyles.Right,
-            Margin = new Padding(0)
+            Name = "FeeToolActions", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false, Margin = Padding.Empty, Padding = Padding.Empty
         };
         foreach (Control button in buttons)
         {
             if (button is ModernButton)
             {
                 button.Height = AppMetrics.ButtonHeight;
-                button.Width = Math.Max(
-                    AppScale.Scale(110),
-                    Math.Max(button.Width, AppMetrics.TextWidth(button.Text, button.Font, AppScale.Scale(32))));
+                button.Width = Math.Max(AppScale.Scale(110), Math.Max(button.Width,
+                    AppMetrics.TextWidth(button.Text, button.Font, AppScale.Scale(32))));
             }
-            button.Margin = new Padding(AppScale.Scale(8), 0, 0, 0);
+            button.Dock = DockStyle.None;
+            button.Margin = new Padding(0, 0, AppScale.Scale(8), 0);
             actions.Controls.Add(button);
         }
         ActionButtonStyle.Arrange(actions);
+        var actionHost = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Margin = Padding.Empty };
+        actionHost.Controls.Add(actions);
+        void CenterActions() => actions.Location = new Point(
+            Math.Max(0, (actionHost.ClientSize.Width - actions.Width) / 2),
+            Math.Max(0, (actionHost.ClientSize.Height - actions.Height) / 2));
+        actionHost.SizeChanged += (_, _) => CenterActions();
+        actions.SizeChanged += (_, _) => CenterActions();
+        int summaryHeight = AppMetrics.TextHeight(summary.Font) * 2 + 8;
         var toolbar = new TableLayoutPanel {
-            Dock = DockStyle.Top,
-            Height = AppMetrics.ButtonHeight + 12,
-            ColumnCount = 2,
-            RowCount = 1,
-            Margin = new Padding(0),
-            Padding = new Padding(0, 6, 0, 6)
+            Dock = DockStyle.Top, Height = AppMetrics.ButtonHeight + summaryHeight + 16,
+            ColumnCount = 1, RowCount = 2, Margin = Padding.Empty, Padding = new Padding(0, 4, 0, 4)
         };
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        toolbar.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.ButtonHeight + 8));
         toolbar.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        toolbar.Controls.Add(summary, 0, 0);
-        toolbar.Controls.Add(actions, 1, 0);
+        toolbar.Controls.Add(actionHost, 0, 0);
+        toolbar.Controls.Add(summary, 0, 1);
         return toolbar;
     }
     /// <summary>A row of equal-width fields, each a caption over its control.</summary>

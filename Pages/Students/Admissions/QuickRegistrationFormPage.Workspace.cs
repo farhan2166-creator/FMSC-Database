@@ -9,6 +9,26 @@ internal sealed partial class QuickRegistrationFormPage
     internal event EventHandler? WorkspaceChanged;
     private bool workspaceLoaded,workspaceHosted,recoveryOnly;
     private Guid? workspaceSaveRequest;
+    private bool siblingEntry;
+    private readonly ModernTextBox siblingBirth = HumanUi.TextBox(false, 500);
+    internal void ConfigureSiblingEntry(int anchor, string father, string phone, string home, string birth)
+    {
+        if (anchor <= 0) throw new ArgumentException("Load a student before admitting a sibling.");
+        siblingEntry = workspaceHosted = true;
+        PrepareForEmbedding(keepActions: false);
+        SetWorkspaceFamily(anchor, father, phone, home);
+        siblingBirth.Text = birth; siblingBirth.ReadOnly = true;
+        var previous = registrationContent.GetControlFromPosition(0, 1);
+        var fields = Fields(("Student name", name, true, 1), ("Joining date", joining, true, 1),
+            ("Academic year", year, true, 1), ("Campus / Class / Section", placement, true, 1),
+            ("Father name", parent, true, 1), ("Primary phone (optional)", contact, false, 1),
+            ("Place of birth", siblingBirth, false, 1), ("Address", address, false, 1));
+        registrationContent.Controls.Remove(previous); previous?.Dispose();
+        registrationContent.Controls.Add(fields, 0, 1);
+        registrationCard.SetHeaderText("Admit Sibling", "Shared details come from the loaded student. Complete this child's name, placement and fees.");
+        year.SelectedValue = defaultAcademicYear;
+        UpdateActions();
+    }
     internal Func<Task>? WorkspaceRecoveryRequested;
     internal string WorkspaceName => name.Text.Trim();
     internal string WorkspaceParent => parent.Text.Trim();
@@ -16,6 +36,7 @@ internal sealed partial class QuickRegistrationFormPage
     internal string WorkspaceAddress => address.Text.Trim();
     internal string WorkspacePlacement => placement.Text;
     internal string WorkspaceStatus=>StatusLabel.Text;
+    internal void ShowAdmissionRegistrationGuidance(string message) => SetStatus(message);
     internal bool WorkspaceNeedsRefresh => needsRefresh;
     internal bool CommitWorkspaceEdit()=>fees.EndEdit();
     internal decimal WorkspaceMonthly => PlanAmount(true);

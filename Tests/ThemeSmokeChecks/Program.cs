@@ -34,6 +34,19 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--registration-workflow"))
+        {
+            CheckRegistrationWorkflow();
+            Console.WriteLine($"PASS: {checks} native admission registration and status-row checks (no database connection).");
+            return;
+        }
+        if (args.Contains("--fee-setup-review"))
+        {
+            CheckFeeSetupReview();
+            CheckFeeMatrixClearing();
+            Console.WriteLine($"PASS: {checks} fee setup validation/layout and matrix checks (no database connection).");
+            return;
+        }
         if (args.Contains("--assignment-layout"))
         {
             CheckAssignmentLayout();

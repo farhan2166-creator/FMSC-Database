@@ -337,6 +337,7 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
         family.Enabled=linkFamily.Enabled=canLink;
         unlinkFamily.Enabled=canLink&&(savedStudent==0?familyAnchor>0:savedFamilyMemberId>0);
         name.ReadOnly=contact.ReadOnly=address.ReadOnly=!editing;
+        if (siblingEntry) { contact.ReadOnly = address.ReadOnly = true; year.Enabled = false; }
         parent.ReadOnly=!editing||familyAnchor>0||loadingFamily;
         registrationCard.SetHeaderText(workspaceHosted?"Child Details":"Registration Details",recoveryBlocked?"Save recovery pending · Use Check Save Outcome before continuing.":workspaceHosted?"Parent details are shared above. Review this child's placement and fees.":savedStudent>0
             ? $"{familyReference} · "+(savedFamilyMemberCount>1?$"Family: {savedFamilyMemberCount} children · Link or unlink a parent above.":"One child · You can link an existing parent above.")
@@ -429,7 +430,8 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
                 selected.Where(r=>Convert.ToString(r["ConcessionLabel"])!="None")
                     .Select(r=>new { FeeTypeId=Convert.ToInt32(r["FeeTypeId"]),ConcessionLabel=Convert.ToString(r["ConcessionLabel"]) }))));
             args.Add(new SqlParameter("@ExcludedFeeTypeIds",SqlDbType.Structured){TypeName="dbo.FeeTypeIdList",Value=Tvp.FeeTypeIds(rates.AsEnumerable().Where(r=>Convert.ToBoolean(r["IsMandatory"])&&!Convert.ToBoolean(r["Include"])).Select(r=>Convert.ToInt32(r["FeeTypeId"])))});
-            foreach(string key in new[]{"DateOfBirth","PlaceOfBirth","Gender","BFormNumber","Religion","BloodGroup","AlternateContactNumber","PreviousSchool","FatherOccupation"})args.Add(DatabaseHelper.P("@"+key,null));
+            foreach(string key in new[]{"DateOfBirth","PlaceOfBirth","Gender","BFormNumber","Religion","BloodGroup","AlternateContactNumber","PreviousSchool","FatherOccupation"})args.Add(DatabaseHelper.P("@"+key,key == "PlaceOfBirth" && siblingEntry ? DatabaseHelper.OptionalText(siblingBirth.Text) : null));
+            if (siblingEntry) args.Add(DatabaseHelper.Bit("@RequireCurrentAcademicYear", true));
             if(selected.Any(r=>Convert.ToString(r["Frequency"])=="Monthly"&&Convert.ToDecimal(r["Discount"])>0))
                 args.Add(DatabaseHelper.Date("@MonthlyDiscountFrom",new DateTime(joining.Value.Year,joining.Value.Month,1).AddMonths(monthlyConcessionsFromAdmission.Checked?0:1)));
             await SubmitNewRegistrationAsync(args.ToArray());

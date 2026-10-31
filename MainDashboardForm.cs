@@ -606,11 +606,9 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     PageTitles.Admissions,
                     "Students.Admit"),
                 new(
-                    PageTitles.FamilyAdmission,
-                    () => new FamilyAdmissionWorkspace((factory,module,title)=>NavigateTo(factory,module,title)),
-                    "Students",
-                    PageTitles.FamilyAdmission,
-                    "Students.View"),
+                    "Pending Registrations",
+                    () => new FMSC_SMS.Pages.Students.Maintenance.AdmissionReviewListPage((factory, module, title) => NavigateTo(factory, module, title), true),
+                    "Students", "Pending Registrations", "Students.Admit"),
                 new(
                     "Student Profile",
                     () => new StudentProfilePage(

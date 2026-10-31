@@ -28,6 +28,7 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
         {date.ShowCheckBox=true;date.Checked=false;}
         Text=cancel?"Cancel Registration":"Record Departure";StartPosition=FormStartPosition.CenterParent;
         ClientSize=new Size(AppScale.Scale(820),AppScale.Scale(740));MinimumSize=new Size(AppScale.Scale(680),AppScale.Scale(580));
+        if (cancel) { MinimumSize = new Size(AppScale.Scale(680), AppScale.Scale(350)); ClientSize = new Size(AppScale.Scale(760), AppScale.Scale(380)); reason.Multiline = false; }
         ShowInTaskbar=false;MinimizeBox=false;
         impact.ReadOnly=true;impact.Dock=DockStyle.Fill;impact.ScrollBars=ScrollBars.Vertical;
         impact.Text=placementEnd is DateTime last && last<DateTime.Today
@@ -46,8 +47,17 @@ internal sealed class CloseAdmissionDialog : ApplicationWindowForm
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));
         root.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight*1.5f));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));root.RowStyles.Add(new RowStyle(SizeType.Percent,100));root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.Controls.Add(new Label{Text=student,AutoSize=true},0,0);root.Controls.Add(HumanUi.Field(cancel?"Cancellation date":"Leaving date",date,true),0,1);
-        root.Controls.Add(HumanUi.Field("Reason",reason,true),0,2);
+        root.Controls.Add(new Label{Text=student,AutoSize=true},0,0);
+        if (cancel)
+        {
+            root.RowStyles[2].Height = 0;
+            var fields = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1, Margin = Padding.Empty };
+            fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50)); fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+            fields.Controls.Add(HumanUi.Field("Cancellation date", date, true), 0, 0); fields.Controls.Add(HumanUi.Field("Reason", reason, true), 1, 0);
+            date.MaximumSize = reason.MaximumSize = Size.Empty;
+            root.Controls.Add(fields, 0, 1);
+        }
+        else { root.Controls.Add(HumanUi.Field("Leaving date",date,true),0,1); root.Controls.Add(HumanUi.Field("Reason",reason,true),0,2); }
         var choices=new TableLayoutPanel{Dock=DockStyle.Fill,AutoSize=true,ColumnCount=1,RowCount=3,Visible=!cancel,Margin=Padding.Empty};
         choices.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
         choices.RowStyles.Add(new RowStyle(SizeType.Absolute,AppMetrics.FieldRowHeight));

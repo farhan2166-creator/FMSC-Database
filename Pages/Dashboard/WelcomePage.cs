@@ -318,7 +318,6 @@ public sealed class WelcomePage : UserControl
         (PageTitles.StudentFeeAccount, "Finance", () => StudentAccountStatementPage.CreateAccount(), () => StudentAccountStatementPage.CanOpenAccount),
         (PageTitles.FeePosting, "Finance", () => FeePostingWorkspace.Create(Navigate), () => CurrentUser.HasPermission("Fees.Collect")),
         ("Student Profile", "Students", () => new StudentProfilePage(Navigate), () => CurrentUser.HasPermission("Students.View")),
-        (PageTitles.FamilyAdmission, "Students", () => new FamilyAdmissionWorkspace(Navigate), () => FamilyAdmissionData.CanUse(CurrentUser.HasPermission)),
         ("Student Reports", "Students", () => new StudentReportsPage(), () => CurrentUser.HasPermission("Students.View") && CurrentUser.HasPermission("Reports.View")),
         (PageTitles.StudentCertificates, "Certificates", () => new StudentCertificatesPage(Navigate), () => CurrentUser.HasPermission("Certificates.Create")),
         ("Reports", "Reports", () => new ReportsHomePage(Navigate), () => CurrentUser.HasPermission("Reports.View"))

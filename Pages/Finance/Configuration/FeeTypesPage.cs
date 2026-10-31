@@ -3,13 +3,31 @@ namespace FMSC_SMS.Pages.Finance.Configuration;
 /// <summary>The Fee Types tab of Fee Configuration - the same editor-plus-records layout as Define Classes, replacing the Fee Type Manager dialog (and the "+" beside the fee-type dropdown that opened it).</summary>
 public sealed class FeeTypesPage : MasterPage
 {
+    protected override bool ReserveEditorValidationSpace => true;
+    protected override int EditorValidationLines => 2;
+    protected override bool EditorValidationSpansCaption => true;
+    private FormValidator? _validator;
+    protected override bool CanSaveRecord()
+    {
+        if (_validator is null)
+        {
+            _validator = CreateValidator();
+            BindEditorValidationMessages(_validator);
+        }
+        _validator.Begin();
+        _validator.RequiredFields(this);
+        return _validator.Finish();
+    }
+    protected override void EditorCleared(bool afterSave) { base.EditorCleared(afterSave); _validator?.ClearAll(); }
+    protected override void RecordLoaded(DataGridViewRow row) { base.RecordLoaded(row); _validator?.ClearAll(); }
     private static readonly string[] Frequencies =
     {
         "Monthly",
         "Yearly",
         "As Needed"
     };
-    public FeeTypesPage(bool splitEditorAndRecords = true)
+    public FeeTypesPage(bool splitEditorAndRecords = true) : this(splitEditorAndRecords, true) { }
+    internal FeeTypesPage(bool splitEditorAndRecords, bool initialize)
         : base(
             "Fee Types",
             "Define fee types, then enter their class rates in Class Fee Rates.",
@@ -27,7 +45,7 @@ public sealed class FeeTypesPage : MasterPage
                     Required: true),
                 new FieldSpec(
                     "DefaultFrequency",
-                    "How often it is charged",
+                    "Charge frequency",
                     FieldKind.ComboString,
                     Required: true,
                     Options: Frequencies),
@@ -78,7 +96,7 @@ public sealed class FeeTypesPage : MasterPage
             deleteDisplayField:
                 "FeeTypeName",
             deleteBlockedProcedure:
-                "GetFeeTypeDeleteBlockedIds")
+                "GetFeeTypeDeleteBlockedIds", initialize: initialize)
     {
     }
     /// <summary>Formats the complete fee-type result without another database read.</summary>

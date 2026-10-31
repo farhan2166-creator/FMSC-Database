@@ -11,6 +11,13 @@
 
 ### Focused update — 31 October 2026
 
+The owner-approved Admission registration simplification and migration 64 are
+implemented and locally applied with a verified backup and unchanged hashes for
+79 existing business tables. Native row-action/status layout checks and isolated
+clone registration/cancel/reopen/confirmation checks passed. See the
+[decision and scope of evidence](../Docs/Decisions/ADMISSION_REGISTRATION_SIMPLIFICATION.md).
+Joint acceptance of the updated entry/confirmation UI remains a separate gate.
+
 The owner-approved academic-year date lock is implemented in migration 63 and
 applied locally after a verified backup with unchanged hashes across 79 business
 tables. Portable, native-control and isolated SQL checks passed. See the
