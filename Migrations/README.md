@@ -1,4 +1,15 @@
-## Current target: schema 65
+## Current target: schema 66
+
+
+Migration `66.sql` updates **only error-message wording** for the current
+`dbo.ApplyStudentPlacementPlan`, `dbo.BulkPromoteStudents`, and
+`dbo.CloseStudentAdmission` procedures. The old **Fee Corrections** screen name
+is replaced with **Student Fee Account > Payment History**. The embedded
+`Pages/Students/Admissions/PlacementCorrection.sql` runtime script receives
+the same wording correction. SQL validation, permissions, financial calculation,
+request recovery, error numbers and historical records are unchanged.
+Apply 66 once after 65 under the normal verified-backup migration workflow;
+do not rerun earlier versions.
 
 Migration `65.sql` requires schema 64 and updates **only**
 `dbo.ReopenPendingRegistration`. An operator may reopen a cancelled pending
@@ -32,11 +43,11 @@ Migration `60.sql` fixes admission/fee flow authorization and recovery. It adds 
 
 Migration `59.sql` retires the remaining 19 generic audit writers after schema 58. Apply it once under an outer transaction using the installer or `sqlcmd -b`. It preserves existing audit rows/readers, permissions, preview snapshots, operational history and recovery markers. This remaining batch is explicitly owner-authorized on 28 October 2026. Validate with `Tools/TestRemainingAuditRetirement.ps1` (owned, record-free fixture).
 
-For any supported starting version from 19 through 64, apply every numbered file greater than that version up to and including 65 in ascending order. Never rerun an applied migration. Historical tables below describe the earlier migration-51 stage; they are not the current complete upgrade list.
+For any supported starting version from 19 through 65, apply every numbered file greater than that version up to and including 66 in ascending order. Never rerun an applied migration. Historical tables below describe the earlier migration-51 stage; they are not the current complete upgrade list.
 
 # Apply the database changes later
 
-The application requires **schema 65**. SQL changes are checked in here;
+The application requires **schema 66**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,
