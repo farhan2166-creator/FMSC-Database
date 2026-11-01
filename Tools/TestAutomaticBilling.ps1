@@ -267,12 +267,28 @@ try {
  $pendingChange=Admit 15 $true
  $pendingId=[int]$pendingChange.Tables[0].Rows[0].AdmissionId
  $pendingDiscounts=Number "SELECT SUM(DiscountAmount) FROM dbo.BillingCharges WHERE AdmissionId=$pendingId;"
- $refused=$false
+ # Legacy discount edits target NEXT month, not every already-issued opening bill.
+ # At month-end that month may already be billed; at the academic-year end it
+ # may be outside the placement. Keep all three SQL-authoritative cases covered.
+ $window=Query "SELECT TOP(1) DATEADD(month,1,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1)) NextMonth,Y.EndDate YearEnd FROM dbo.Enrollments E JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId WHERE E.AdmissionId=$pendingId;"
+ $nextMonth=[datetime]$window.Tables[0].Rows[0].NextMonth
+ $yearEnd=[datetime]$window.Tables[0].Rows[0].YearEnd
+ $futureBills=Number "SELECT COUNT(*) FROM dbo.BillingCharges WHERE AdmissionId=$pendingId AND Status<>N'Cancelled' AND BillingMonth>=DATEADD(month,1,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1));"
+ $directError=$null
  try{[void](Query "DECLARE @Id int=(SELECT StudentFeeAssignmentId FROM dbo.StudentFeeAssignments WHERE AdmissionId=$pendingId AND FeeTypeId=1 AND EffectiveTo IS NULL); EXEC dbo.SaveStudentFeeDiscount @UserId=1,@StudentFeeAssignmentId=@Id,@DiscountAmount=3000;")}
- catch{$refused=$_.Exception.Message -like '*Issued bills exist*'}
- Check $refused 'A pending registration with current opening bills requires the reviewed fee-discount workflow.'
- Check ((Number "SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE AdmissionId=$pendingId AND FeeTypeId=1 AND EffectiveTo IS NULL;") -eq 2000) 'Refusing a direct pending discount edit preserves the billed assignment.'
- Check ((Number "SELECT SUM(DiscountAmount) FROM dbo.BillingCharges WHERE AdmissionId=$pendingId;") -eq $pendingDiscounts) 'Editing a pending assignment leaves its existing opening bill unchanged.'
+ catch{$directError=$_.Exception.Message}
+ if($nextMonth -gt $yearEnd){
+  Check ($directError -like '*within this placement and academic year*') 'A legacy concession cannot extend beyond the recorded academic year.'
+  Check ((Number "SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE AdmissionId=$pendingId AND FeeTypeId=1 AND EffectiveTo IS NULL;") -eq 2000) 'An out-of-year request leaves the original fee agreement unchanged.'
+ }elseif($futureBills -gt 0){
+  Check ($directError -like '*Issued bills exist*') 'An already-billed legacy concession period requires explicit reviewed fee corrections.'
+  Check ((Number "SELECT DiscountAmount FROM dbo.StudentFeeAssignments WHERE AdmissionId=$pendingId AND FeeTypeId=1 AND EffectiveTo IS NULL;") -eq 2000) 'Refusing an already-billed edit preserves the fee agreement.'
+ }else{
+  Check (-not $directError) 'A future-only discount can be saved while its next-month period has no issued bill.'
+  Check ((Number "SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE AdmissionId=$pendingId AND FeeTypeId=1 AND EffectiveFrom=DATEADD(month,1,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1)) AND DiscountAmount=3000;") -eq 1) 'The prospective concession starts next month, not on already-billed dates.'
+  Check ((Number "SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE AdmissionId=$pendingId AND FeeTypeId=1 AND DiscountAmount=2000 AND EffectiveTo=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1);") -eq 1) 'The previous month retains its original agreed concession.'
+ }
+ Check ((Number "SELECT SUM(DiscountAmount) FROM dbo.BillingCharges WHERE AdmissionId=$pendingId;") -eq $pendingDiscounts) 'Prospective or refused concession edits never rewrite an existing opening bill.'
  # Credit must also reach an already-issued bill when no new charge is needed.
  [void](Post (Preview))
  [void](Query "DECLARE @R uniqueidentifier=NEWID(); EXEC dbo.ProcessStudentCredit @UserId=1,@AdmissionId=5,@Action=N'Deposit',@Amount=500,@RequestId=@R,@Reason=N'Fictional credit for issued bill';")
