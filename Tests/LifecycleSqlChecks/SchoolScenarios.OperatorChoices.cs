@@ -100,12 +100,10 @@ internal sealed partial class SchoolScenarios
         Sql.Proc("SaveStudentFeeDiscount",ConcessionArgs(id,month,month,1000,false,false,Snapshot(assignmentOnly)));
         r.Check(Due(bill)==4000&&Credit(child.Student)==0,"The explicit leave-issued-bills-unchanged choice creates no waiver, payment or credit.");
     }
-    // The closure date must be in the current placement year and never in the
-    // future. Prefer the fifth of the preceding month so its issued future bills
-    // are still exercised; January falls back to the first of that year.
-    private DateTime FictionalLeavingDate() => f.MonthlyDate.Month == 1
-        ? f.MonthlyDate
-        : f.MonthlyDate.AddMonths(-1).AddDays(4);
+    // The current month's first day is never future-dated. Keep departure in
+    // the same month as the first bill so FromMonth can legitimately select
+    // the following month under dbo.CloseStudentAdmission's SQL boundary rule.
+    private DateTime FictionalLeavingDate() => f.MonthlyDate;
 
     private async Task LeavingChoices()
     {
