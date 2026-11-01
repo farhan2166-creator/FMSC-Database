@@ -41,28 +41,35 @@ public sealed class StudentCertificatesPage : V2Page
     }
     private Control BuildCards()
     {
+        // Keep the hub usable for leaving-only staff without exposing ordinary
+        // certificates; all student lookups still require Students.View.
+        var cards = new (string Title, string Subtitle, Func<Control> Factory, bool Leaving)[] {
+            ("Regular Student", "Proof of current placement", () => new RegularStudentCertificatePage(), false),
+            ("Character", "Student character certificate", () => new CharacterCertificatePage(), false),
+            ("Leave", "Student leave certificate", () => new LeaveCertificatePage(), true),
+            ("College Leaving", "College leaving certificate", () => new CollegeLeaveCertificatePage(), true),
+            ("Date of Birth", "Student date of birth certificate", () => new DateOfBirthCertificatePage(), false),
+            ("Sports", "Student sports certificate", () => new SportsCertificatePage(), false),
+            ("No Objection", "No objection certificate", () => new NoObjectionCertificatePage(), false),
+            ("Provisional", "Student provisional certificate", () => new ProvisionalCertificatePage(), false)
+        }.Where(card => CertificateWorkspaceAccess.CanOpenCard(card.Leaving, CurrentUser.HasPermission)).ToArray();
+        int rows = Math.Max(1, (cards.Length + 2) / 3);
         var grid = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 3,
-            RowCount = 3,
+            RowCount = rows,
             Margin = new Padding(0),
             Padding = new Padding(0)
         };
         for (int i = 0; i < 3; i++)
             grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.3333f));
-        for (int i = 0; i < 3; i++)
-            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 33.3333f));
-        AddCard(grid, 0, 0, "Regular Student", "Proof of current placement", () => new RegularStudentCertificatePage());
-        AddCard(grid, 1, 0, "Character", "Student character certificate", () => new CharacterCertificatePage());
-        AddCard(grid, 2, 0, "Leave", "Student leave certificate", () => new LeaveCertificatePage());
-        AddCard(grid, 0, 1, "College Leaving", "College leaving certificate", () => new CollegeLeaveCertificatePage());
-        AddCard(grid, 1, 1, "Date of Birth", "Student date of birth certificate", () => new DateOfBirthCertificatePage());
-        AddCard(grid, 2, 1, "Sports", "Student sports certificate", () => new SportsCertificatePage());
-        AddCard(grid, 0, 2, "No Objection", "No objection certificate", () => new NoObjectionCertificatePage());
-        AddCard(grid, 1, 2, "Provisional", "Student provisional certificate", () => new ProvisionalCertificatePage());
+        for (int i = 0; i < rows; i++)
+            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100f / rows));
+        for (int i = 0; i < cards.Length; i++)
+            AddCard(grid, i % 3, i / 3, cards[i].Title, cards[i].Subtitle, cards[i].Factory, cards[i].Leaving);
         return grid;
     }
-    private void AddCard(TableLayoutPanel grid, int column, int row, string title, string subtitle, Func<Control> factory)
+    private void AddCard(TableLayoutPanel grid, int column, int row, string title, string subtitle, Func<Control> factory, bool leaving)
     {
         var open = new ModernButton {
             Text = "Open",
@@ -71,7 +78,7 @@ public sealed class StudentCertificatesPage : V2Page
             ThemeRole = UiDesignSystem.Actions.Primary,
             Margin = new Padding(0)
         };
-        open.Click += (_, _) => Open(factory, title);
+        open.Click += (_, _) => Open(factory, title, leaving);
         var card = HumanUi.Card(title, subtitle, AppTheme.ModuleAccent("Certificates"), open);
         open.Image = UiHelper.CreateGlyphIcon("→", AppTheme.ModuleAccent("Certificates"), 21);
         open.ImageAlign = ContentAlignment.MiddleLeft;
@@ -102,7 +109,7 @@ public sealed class StudentCertificatesPage : V2Page
             AccessibleDescription = subtitle
         };
         card.Content.Controls.Add(certificateIcon);
-        void OpenCard(object? sender, EventArgs e) => Open(factory, title);
+        void OpenCard(object? sender, EventArgs e) => Open(factory, title, leaving);
         card.Click += OpenCard;
         card.Header.Click += OpenCard;
         card.Content.Click += OpenCard;
@@ -127,8 +134,11 @@ public sealed class StudentCertificatesPage : V2Page
         };
         return label;
     }
-    private void Open(Func<Control> factory, string title)
+    private void Open(Func<Control> factory, string title, bool leaving)
     {
+        // Recheck at dispatch: an existing hub must not retain access after
+        // the signed-in operator or permissions change.
+        if (!CertificateWorkspaceAccess.CanOpenCard(leaving, CurrentUser.HasPermission)) return;
         if (navigate != null)
         {
             navigate(factory, "Certificates", title);
