@@ -4,6 +4,7 @@ using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Dashboard;
 using FMSC_SMS.Pages.Security;
 using FMSC_SMS.Pages.Students.Profile;
+using FMSC_SMS.Pages.Reports.Finance;
 
 internal static partial class Program
 {
@@ -15,6 +16,31 @@ internal static partial class Program
         IEnumerable<Control> Children(Control parent) => parent.Controls.Cast<Control>().SelectMany(c => new[] { c }.Concat(Children(c)));
         try
         {
+            // Student Fee Account has two alternative entry permissions, but its
+            // GetStudents-backed picker requires Students.View in every scenario.
+            for (int mask=0;mask<8;mask++)
+            {
+                bool students=(mask&1)!=0, reports=(mask&2)!=0, collect=(mask&4)!=0;
+                var grants=new List<string>();
+                if(students)grants.Add("Students.View");
+                if(reports)grants.Add("Reports.View");
+                if(collect)grants.Add("Fees.Collect");
+                CurrentUser.SignIn(970+mask,"Account access fixture","Accountant",false,grants);
+                bool expected=students&&(reports||collect);
+                Check(StudentAccountStatementPage.CanOpenAccount==expected,
+                    "Account entry needs Students.View plus Reports.View or Fees.Collect");
+                using(var home=new WelcomePage(_=>{},null,_=>Task.FromResult(new DataTable()),_=>Task.FromResult(new DataTable())))
+                    Check(Children(home).OfType<ModernButton>().Any(b=>b.Text==PageTitles.StudentFeeAccount)==expected,
+                        "Dashboard account shortcut matches the full account access rule");
+                if(mask is 2 or 5)
+                {
+                    using var shell=new FMSC_SMS.MainDashboardForm((_,_)=>{});
+                    var commands=(List<NavigationCommand>)typeof(FMSC_SMS.MainDashboardForm)
+                        .GetField("navigationCommands",flags)!.GetValue(shell)!;
+                    Check(commands.Any(c=>c.Caption==PageTitles.StudentFeeAccount)==expected,
+                        "Sidebar account entry matches the full account access rule");
+                }
+            }
             foreach (bool reportAccess in new[] { false, true })
             {
                 var permissions = reportAccess ? new[] { "Students.View", "Reports.View", "Fees.View", "Fees.Statement.View", "Fees.Collect" } : new[] { "Students.View" };

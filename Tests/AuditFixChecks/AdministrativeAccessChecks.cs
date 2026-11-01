@@ -71,6 +71,15 @@ internal static class AdministrativeAccessChecks
             "Fee viewing removes only the matching purchase dependency.");
         Check(!AdministrativeAccess.Hints(feeCollectionCatalog,new[]{10,20,21}).Any(hint=>hint.Contains("Student Purchases")),
             "Complete purchase permissions do not show false missing-access warnings.");
+        var accountCatalog=feeCollectionCatalog with { Permissions=feeCollectionCatalog.Permissions.Append(
+            new AccessPermission(22,"Reports.View","View reports","")).ToArray() };
+        Check(AdministrativeAccess.Hints(accountCatalog,new[]{22}).Any(h=>h.Contains("Student Fee Account")&&h.Contains("View Students")),
+            "Report-only roles explain the student-search requirement for Student Fee Account.");
+        Check(AdministrativeAccess.Hints(accountCatalog,new[]{20,21}).Any(h=>h.Contains("Student Fee Account")&&h.Contains("View Students")),
+            "Collection without student viewing warns for Student Fee Account.");
+        Check(!AdministrativeAccess.Hints(accountCatalog,new[]{10,22}).Any(h=>h.Contains("Student Fee Account")) &&
+              !AdministrativeAccess.Hints(accountCatalog,new[]{10,21}).Any(h=>h.Contains("Student Fee Account")),
+            "Either account entry authority with student viewing avoids a spurious warning.");
         var certificateCatalog=catalog with { Permissions=permissions.Concat(new[]{
             new AccessPermission(40,"Certificates.Create","Create certificates",""),
             new AccessPermission(41,"Students.Leave","Leave student","") }).ToArray() };

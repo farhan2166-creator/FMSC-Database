@@ -27,7 +27,10 @@ public sealed partial class StudentAccountStatementPage
     private Dictionary<int,string> accountStudentNames=new();
     private int accountUser;
 
-    internal static bool CanOpenAccount=>CurrentUser.HasPermission("Reports.View")||CurrentUser.HasPermission("Fees.Collect");
+    // GetStudents-backed search and preload require Students.View. Reporting and
+    // collection remain alternative entry authorities; financial detail checks stay separate.
+    internal static bool CanOpenAccount=>CurrentUser.HasPermission("Students.View") &&
+        (CurrentUser.HasPermission("Reports.View")||CurrentUser.HasPermission("Fees.Collect"));
     public static StudentAccountStatementPage CreateAccount(int admissionId=0)
     {
         var page=new StudentAccountStatementPage();
