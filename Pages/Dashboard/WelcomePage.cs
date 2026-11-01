@@ -319,7 +319,7 @@ public sealed class WelcomePage : UserControl
         (PageTitles.FeePosting, "Finance", () => FeePostingWorkspace.Create(Navigate), () => CurrentUser.HasPermission("Fees.Collect")),
         ("Student Profile", "Students", () => new StudentProfilePage(Navigate), () => CurrentUser.HasPermission("Students.View")),
         ("Student Reports", "Students", () => new StudentReportsPage(), () => CurrentUser.HasPermission("Students.View") && CurrentUser.HasPermission("Reports.View")),
-        (PageTitles.StudentCertificates, "Certificates", () => new StudentCertificatesPage(Navigate), () => CurrentUser.HasPermission("Certificates.Create")),
+        (PageTitles.StudentCertificates, "Certificates", () => new StudentCertificatesPage(Navigate), () => CertificateWorkspaceAccess.CanOpenHub(CurrentUser.HasPermission)),
         ("Reports", "Reports", () => new ReportsHomePage(Navigate), () => CurrentUser.HasPermission("Reports.View"))
         };
         var visibleActions = actions
