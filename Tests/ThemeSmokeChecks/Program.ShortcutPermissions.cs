@@ -4,6 +4,7 @@ using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Dashboard;
 using FMSC_SMS.Pages.Security;
 using FMSC_SMS.Pages.Students.Profile;
+using FMSC_SMS.Pages.Students.Admissions;
 using FMSC_SMS.Pages.Reports.Finance;
 
 internal static partial class Program
@@ -16,6 +17,34 @@ internal static partial class Program
         IEnumerable<Control> Children(Control parent) => parent.Controls.Cast<Control>().SelectMany(c => new[] { c }.Concat(Children(c)));
         try
         {
+            for (int mask=0;mask<4;mask++)
+            {
+                bool admit=(mask&1)!=0,students=(mask&2)!=0;
+                var grants=new List<string>();
+                if(admit)grants.Add("Students.Admit");
+                if(students)grants.Add("Students.View");
+                CurrentUser.SignIn(980+mask,"Admission access fixture","Accountant",false,grants);
+                bool canCreate=admit&&students;
+                Check(DirectAdmissionAccess.CanCreate(CurrentUser.HasPermission)==canCreate,
+                    "Direct admission requires both Admit and View permissions");
+                using(var home=new WelcomePage(_=>{},null,_=>Task.FromResult(new DataTable()),_=>Task.FromResult(new DataTable())))
+                    Check(Children(home).OfType<ModernButton>().Any(b=>b.Text==PageTitles.Admissions)==canCreate,
+                        "Dashboard admission shortcut respects student viewing");
+                using(var shell=new FMSC_SMS.MainDashboardForm((_,_)=>{}))
+                {
+                    var commands=(List<NavigationCommand>)typeof(FMSC_SMS.MainDashboardForm)
+                        .GetField("navigationCommands",flags)!.GetValue(shell)!;
+                    Check(commands.Any(c=>c.Caption==PageTitles.Admissions)==canCreate,
+                        "Sidebar admission entry matches the two-permission rule");
+                }
+                using(var page=new StudentAdmissionPage(false))
+                {
+                    var save=(ModernButton)typeof(StudentAdmissionPage).GetField("saveButton",flags)!.GetValue(page)!;
+                    var picker=(StudentPicker)typeof(StudentAdmissionPage).GetField("quickStudent",flags)!.GetValue(page)!;
+                    Check(save.Enabled==canCreate && picker.Enabled==students,
+                        "New admission Save and SQL-backed finder are individually permission gated");
+                }
+            }
             // Student Fee Account has two alternative entry permissions, but its
             // GetStudents-backed picker requires Students.View in every scenario.
             for (int mask=0;mask<8;mask++)

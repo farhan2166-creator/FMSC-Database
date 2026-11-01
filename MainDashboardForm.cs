@@ -665,7 +665,8 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     "Certificates",
                     PageTitles.StudentCertificates,
                     CurrentUser.HasPermission("Certificates.Create") ? "Certificates.Create" : "Students.Leave")
-            }.Where(item => (item.Title != "Pending Registrations" || QuickRegistrationAccess.CanUse(CurrentUser.HasPermission))
+            }.Where(item => (item.Title != PageTitles.Admissions || DirectAdmissionAccess.CanCreate(CurrentUser.HasPermission))
+                && (item.Title != "Pending Registrations" || QuickRegistrationAccess.CanUse(CurrentUser.HasPermission))
                 && (item.Title != "Fee Collection" || FeeCollectionAccess.CanUse(CurrentUser.HasPermission))
                 && (item.Title != PageTitles.StudentFeeAccount || StudentAccountStatementPage.CanOpenAccount)
                 && (item.Title != PageTitles.StudentPurchases || StudentPurchasesAccess.CanUse(CurrentUser.HasPermission))
@@ -950,6 +951,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             });
             var command = new NavigationCommand(AppHotKeys.PlainCaption(item.Text), () => {
                 if (!string.IsNullOrWhiteSpace(item.Permission) && !CurrentUser.HasPermission(item.Permission)) return;
+                if (item.Title == PageTitles.Admissions && !DirectAdmissionAccess.CanCreate(CurrentUser.HasPermission)) return;
                 if (item.Title == PageTitles.StudentFeeAccount && !StudentAccountStatementPage.CanOpenAccount) return;
                 NavigateTo(
                     item.Factory,

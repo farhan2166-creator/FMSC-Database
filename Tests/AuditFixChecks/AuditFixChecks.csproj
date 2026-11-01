@@ -14,6 +14,7 @@
     <Compile Include="../../Pages/Finance/StudentAccounts/PaymentAdjustmentState.cs" Link="PaymentAdjustmentState.cs" />
     <Compile Include="../../Core/AppTheme.Appearance.cs" Link="AppTheme.Appearance.cs" />
     <Compile Include="../../Core/QuickRegistrationAccess.cs" Link="QuickRegistrationAccess.cs" />
+    <Compile Include="../../Core/DirectAdmissionAccess.cs" Link="DirectAdmissionAccess.cs" />
     <Compile Include="../../Core/FeeCollectionAccess.cs" Link="FeeCollectionAccess.cs" />
     <Compile Include="../../Core/StudentPurchasesAccess.cs" Link="StudentPurchasesAccess.cs" />
     <Compile Include="../../Core/CertificateWorkspaceAccess.cs" Link="CertificateWorkspaceAccess.cs" />

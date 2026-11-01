@@ -51,7 +51,10 @@ internal static class AdministrativeAccessChecks
         Check(AdministrativeAccess.Validate(AccessEditorKind.Roles,new(2,"Accountant","",false,new[]{999}),roleCatalog) is not null,"Unknown permission IDs are refused");
         Check(AdministrativeAccess.Hints(catalog,new[]{30}).Length==1&&AdministrativeAccess.Hints(catalog,new[]{30,31,32}).Length==0,"User-management dependency hints inform without silently granting access");
         Check(AdministrativeAccess.Hints(catalog,new[]{33}).Length==1&&AdministrativeAccess.Hints(catalog,new[]{33,32}).Length==0,"Role-management hints match the screen's read requirements");
-        Check(AdministrativeAccess.Hints(catalog,new[]{11}).Single().Contains("Quick Registration")&&AdministrativeAccess.Hints(catalog,new[]{11,10}).Length==0,"Admission hint preserves the narrower Quick Registration requirement");
+        Check(AdministrativeAccess.Hints(catalog,new[]{11}).Single().Contains("Quick Registration")&&
+              AdministrativeAccess.Hints(catalog,new[]{11}).Single().Contains("Direct Admissions")&&
+              AdministrativeAccess.Hints(catalog,new[]{11,10}).Length==0,
+            "Admit-only role warns about both student-search-dependent admission flows");
         var feeCollectionCatalog=catalog with { Permissions=permissions.Append(new AccessPermission(21,"Fees.Collect","Collect fees","")).ToArray() };
         Check(AdministrativeAccess.Hints(feeCollectionCatalog,new[]{21}).Any(hint=>hint.Contains("Fee Collection")&&hint.Contains("View Fees")),
             "Collection-only permissions explain that Fee Collection also requires fee viewing.");

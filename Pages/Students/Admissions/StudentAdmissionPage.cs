@@ -863,7 +863,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             "Print ▾",
             (_, _) => printMenu.Show(admissionPrintButton!, new Point(0, admissionPrintButton!.Height)),
             "Secondary");
-        /* Students.Admit opens this page; New and Clear are local actions. */
+        /* New admissions require both Students.Admit and Students.View; existing-record actions keep their own permissions. */
         GateActionAny(saveButton, "Students.Admit", "Students.Administer");
         GateAction(saveAndNewButton, "Students.Admit");
         GateAction(collectPaymentButton, "Fees.Collect");
@@ -924,9 +924,11 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                 else await OpenSelectedSiblingAsync();
             };
         quickStudent.PlaceholderText = StudentPicker.SearchPlaceholder;
+        // The existing-student lookup is SQL-protected by Students.View.
+        quickStudent.Enabled = CurrentUser.HasPermission("Students.View");
         // Defer student lookup loading so the admission page can paint first.
         // the admission form. Starting it through the UI queue lets the page appear first.
-        if (initializeAdmission) Defer(StudentSearchCache.Warm);
+        if (initializeAdmission && CurrentUser.HasPermission("Students.View")) Defer(StudentSearchCache.Warm);
         quickStudent.SearchFailed += ex => Fail(ex);
         quickStudent.UserSelectionChanged += async (_, _) => await LoadQuickStudentAsync();
         UpdateStudentWorkspace();
@@ -2084,8 +2086,16 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                 (CurrentUser.HasPermission("Students.Admit") || CurrentUser.HasPermission("Enrollment.Manage") || CurrentUser.HasPermission("Students.Administer"));
         findSiblingButton.Enabled = savedStudentReady && CurrentUser.HasPermission("Students.Administer");
         if (saveAndNewButton is not null)
-            saveAndNewButton.Enabled = !IsBusy && currentAdmissionId <= 0 && unconfirmedAdmission is null;
-        if (saveButton is not null) saveButton.Enabled = !IsBusy && !IsCancelledRegistration && unconfirmedAdmission is null && (!registrationReview || IsPendingRegistration);
+            saveAndNewButton.Enabled = !IsBusy && currentAdmissionId <= 0 && unconfirmedAdmission is null
+                && DirectAdmissionAccess.CanCreate(CurrentUser.HasPermission);
+        if (saveButton is not null)
+            saveButton.Enabled = !IsBusy && !IsCancelledRegistration && unconfirmedAdmission is null
+                && (!registrationReview || IsPendingRegistration)
+                && (currentAdmissionId > 0
+                    ? CurrentUser.HasPermission("Students.Admit") || CurrentUser.HasPermission("Students.Administer")
+                    : DirectAdmissionAccess.CanCreate(CurrentUser.HasPermission));
+        quickStudent.Enabled = CurrentUser.HasPermission("Students.View") && !IsBusy;
+        if (findButton is not null) findButton.Enabled = CurrentUser.HasPermission("Students.View") && !IsBusy;
         if (checkAdmissionButton is not null)
         {
             checkAdmissionButton.Visible = unconfirmedAdmission is not null;
@@ -2135,6 +2145,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     }
     private async Task OpenStudentSearchDialog()
     {
+        if (!CurrentUser.HasPermission("Students.View")) { Warn("Finding existing students requires View Students access."); return; }
         try
         {
             using var dialog =
@@ -4218,6 +4229,11 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     private BusyScope HoldSubmittedInputs() => BeginBusy(string.Empty, this);
     private async Task SaveNewAdmissionAsync()
     {
+        if (!DirectAdmissionAccess.CanCreate(CurrentUser.HasPermission))
+        {
+            Warn("New admissions require both Admit Students and View Students permissions.");
+            return;
+        }
         using var numberingInputs=BeginBusy(string.Empty,admissionDate,Year,admissionIdValue);
         try
         {
@@ -4646,7 +4662,7 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
             "Continue saving with this age anyway?",
             "Unusual Age");
     }
-    /// <summary>Best-effort check for an existing active/inactive student with the same name and father's name before a brand-new admission is created.</summary>
+    /// <summary>Check existing students before creating an admission; refuse the save if the comparison cannot be read.</summary>
     private async Task<bool> ConfirmNotDuplicateAsync(string studentName, string fatherNameText)
     {
         if (string.IsNullOrWhiteSpace(studentName))
@@ -4699,11 +4715,11 @@ admissionParameters.First(parameter=>parameter.ParameterName=="@AdmissionNumber"
                 "Possible Duplicate Student", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                 MessageBoxDefaultButton.Button2) == DialogResult.Yes;
         }
-        catch (Exception nonFatalException56)
+        catch (Exception ex)
         {
-            FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(nonFatalException56, "StudentAdmissionPage: ConfirmNotDuplicateAsync fallback");
-            // Duplicate-name lookup is advisory; its failure must not block admission.
-            return true;
+            FMSC_SMS.Core.AppExceptionHandler.LogNonFatal(ex, "StudentAdmissionPage: ConfirmNotDuplicateAsync");
+            Warn("Cannot check for an existing student. Verify access and database connection, then retry saving; nothing was submitted.");
+            return false;
         }
     }
     private void ClearAll(

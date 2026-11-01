@@ -313,7 +313,7 @@ public sealed class WelcomePage : UserControl
             oldControl.Dispose();
         var actions = new (string Text, string Module, Func<Control> Factory, Func<bool> Allowed)[]
         {
-        (PageTitles.Admissions, "Students", () => AdmissionsWorkspace.Create(Navigate), () => CurrentUser.HasPermission("Students.Admit")),
+        (PageTitles.Admissions, "Students", () => AdmissionsWorkspace.Create(Navigate), () => DirectAdmissionAccess.CanCreate(CurrentUser.HasPermission)),
         ("Fee Collection", "Finance", () => new FeeCollectionPage(), () => FeeCollectionAccess.CanUse(CurrentUser.HasPermission)),
         (PageTitles.StudentFeeAccount, "Finance", () => StudentAccountStatementPage.CreateAccount(), () => StudentAccountStatementPage.CanOpenAccount),
         (PageTitles.FeePosting, "Finance", () => FeePostingWorkspace.Create(Navigate), () => CurrentUser.HasPermission("Fees.Collect")),

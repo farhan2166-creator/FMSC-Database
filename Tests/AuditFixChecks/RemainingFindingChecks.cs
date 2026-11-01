@@ -14,6 +14,13 @@ internal static class RemainingFindingChecks
         }
         Check(QuickRegistrationAccess.CanUse(_=>true),"Administrator bypass from HasPermission remains supported");
         Check(!QuickRegistrationAccess.CanUse(p=>p is "Students.View" or "Students.Administer"),"Administer does not implicitly grant Admit");
+        foreach(var pair in new[]{(false,false),(true,false),(false,true),(true,true)}){
+            bool allowed=DirectAdmissionAccess.CanCreate(p=>p=="Students.Admit"?pair.Item1:p=="Students.View"&&pair.Item2);
+            Check(allowed==(pair.Item1&&pair.Item2),"Direct Admissions requires both admit and student viewing");
+        }
+        Check(DirectAdmissionAccess.CanCreate(_=>true),"Administrator bypass grants new-admission access");
+        Check(!DirectAdmissionAccess.CanCreate(p=>p is "Students.View" or "Students.Administer"),
+            "Student administration without Admit does not create new admissions");
         for(int mask=0;mask<8;mask++){
             bool collect=(mask&1)!=0, viewFees=(mask&2)!=0, viewStudents=(mask&4)!=0;
             bool allowed=FeeCollectionAccess.CanUse(p=>p switch {
