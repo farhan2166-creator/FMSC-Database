@@ -314,7 +314,7 @@ public sealed class WelcomePage : UserControl
         var actions = new (string Text, string Module, Func<Control> Factory, Func<bool> Allowed)[]
         {
         (PageTitles.Admissions, "Students", () => AdmissionsWorkspace.Create(Navigate), () => CurrentUser.HasPermission("Students.Admit")),
-        ("Fee Collection", "Finance", () => new FeeCollectionPage(), () => CurrentUser.HasPermission("Fees.Collect")),
+        ("Fee Collection", "Finance", () => new FeeCollectionPage(), () => FeeCollectionAccess.CanUse(CurrentUser.HasPermission)),
         (PageTitles.StudentFeeAccount, "Finance", () => StudentAccountStatementPage.CreateAccount(), () => StudentAccountStatementPage.CanOpenAccount),
         (PageTitles.FeePosting, "Finance", () => FeePostingWorkspace.Create(Navigate), () => CurrentUser.HasPermission("Fees.Collect")),
         ("Student Profile", "Students", () => new StudentProfilePage(Navigate), () => CurrentUser.HasPermission("Students.View")),
