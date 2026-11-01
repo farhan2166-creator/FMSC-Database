@@ -1,4 +1,18 @@
-## Current target: schema 68
+## Current target: schema 69
+
+Migration `69.sql` enforces the approved transfer classification at the
+SQL writer boundary: `TransferEnrollmentClass` requires a different ClassId.
+If only SectionId changes within the same campus and class, use
+`TransferEnrollmentClassSection`. The C# individual-transfer screen and
+bulk placement-plan dispatcher already route these operations correctly.
+The new SQL guard runs before history insertion and optional fee synchronization,
+so a mistaken direct class-transfer call cannot write TRANSFER_CLASS history
+or alter class-transfer fees. The guard does not restrict upward/downward
+same-year class moves, campus moves, historical transfer dates, or the
+intentionally C#-owned IsActive selection rule. Migration is forward-only
+after schema 68 and changes no student, history, billing or fee rows.
+
+## Previous target: schema 68
 
 Migration `68.sql` aligns readmission eligibility across C# and SQL. Officially
 admitted former students in Left, Inactive or legacy Withdrawn status may

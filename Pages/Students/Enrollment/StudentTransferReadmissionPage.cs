@@ -1214,6 +1214,8 @@ public sealed class StudentTransferReadmissionPage : V2Page
                     "different campus - use Re-Admit if they are returning to the same one.");
                 return;
             }
+            // Owner decision: a same-campus/same-class section change is always
+            // Transfer Section. SQL independently enforces this for direct callers.
             if (operation == "Transfer Class" && destinationClassId == currentClassId)
             {
                 Warn(
