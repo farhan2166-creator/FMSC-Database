@@ -57,6 +57,16 @@ internal static class AdministrativeAccessChecks
             "Collection-only permissions explain that Fee Collection also requires fee viewing.");
         Check(!AdministrativeAccess.Hints(feeCollectionCatalog,new[]{20,21}).Any(hint=>hint.Contains("Fee Collection")),
             "Complete collection and viewing permissions do not show a false dependency warning.");
+        Check(AdministrativeAccess.Hints(feeCollectionCatalog,new[]{21}).Any(hint=>hint.Contains("Student Purchases")&&hint.Contains("View Fees")),
+            "Collection-only roles receive the purchase fee-view dependency.");
+        Check(AdministrativeAccess.Hints(feeCollectionCatalog,new[]{21}).Any(hint=>hint.Contains("Student Purchases")&&hint.Contains("View Students")),
+            "Collection-only roles receive the purchase student-view dependency.");
+        Check(!AdministrativeAccess.Hints(feeCollectionCatalog,new[]{10,21}).Any(hint=>hint.Contains("Student Purchases")&&hint.Contains("View Students")),
+            "Student viewing removes only the matching purchase dependency.");
+        Check(!AdministrativeAccess.Hints(feeCollectionCatalog,new[]{20,21}).Any(hint=>hint.Contains("Student Purchases")&&hint.Contains("View Fees")),
+            "Fee viewing removes only the matching purchase dependency.");
+        Check(!AdministrativeAccess.Hints(feeCollectionCatalog,new[]{10,20,21}).Any(hint=>hint.Contains("Student Purchases")),
+            "Complete purchase permissions do not show false missing-access warnings.");
         var certificateCatalog=catalog with { Permissions=permissions.Concat(new[]{
             new AccessPermission(40,"Certificates.Create","Create certificates",""),
             new AccessPermission(41,"Students.Leave","Leave student","") }).ToArray() };
