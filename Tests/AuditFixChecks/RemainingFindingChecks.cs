@@ -14,9 +14,16 @@ internal static class RemainingFindingChecks
         }
         Check(QuickRegistrationAccess.CanUse(_=>true),"Administrator bypass from HasPermission remains supported");
         Check(!QuickRegistrationAccess.CanUse(p=>p is "Students.View" or "Students.Administer"),"Administer does not implicitly grant Admit");
-        foreach(var pair in new[]{(false,false),(true,false),(false,true),(true,true)}){
-            bool allowed=FeeCollectionAccess.CanUse(p=>p=="Fees.Collect"?pair.Item1:p=="Fees.View"&&pair.Item2);
-            Check(allowed==(pair.Item1&&pair.Item2),"Fee Collection requires both SQL read and collection permissions");
+        for(int mask=0;mask<8;mask++){
+            bool collect=(mask&1)!=0, viewFees=(mask&2)!=0, viewStudents=(mask&4)!=0;
+            bool allowed=FeeCollectionAccess.CanUse(p=>p switch {
+                "Fees.Collect"=>collect,
+                "Fees.View"=>viewFees,
+                "Students.View"=>viewStudents,
+                _=>false
+            });
+            Check(allowed==(collect&&viewFees&&viewStudents),
+                "Fee Collection needs collect, fee-view and student-view permissions together");
         }
         Check(FeeCollectionAccess.CanUse(_=>true),"Administrator may access Fee Collection through the existing permission bypass");
         Check(!FeeCollectionAccess.CanUse(p=>p is "Fees.Collect" or "Fees.Adjust"),"Fee adjustment does not substitute for fee viewing");

@@ -55,8 +55,12 @@ internal static class AdministrativeAccessChecks
         var feeCollectionCatalog=catalog with { Permissions=permissions.Append(new AccessPermission(21,"Fees.Collect","Collect fees","")).ToArray() };
         Check(AdministrativeAccess.Hints(feeCollectionCatalog,new[]{21}).Any(hint=>hint.Contains("Fee Collection")&&hint.Contains("View Fees")),
             "Collection-only permissions explain that Fee Collection also requires fee viewing.");
-        Check(!AdministrativeAccess.Hints(feeCollectionCatalog,new[]{20,21}).Any(hint=>hint.Contains("Fee Collection")),
-            "Complete collection and viewing permissions do not show a false dependency warning.");
+        Check(AdministrativeAccess.Hints(feeCollectionCatalog,new[]{21}).Any(hint=>hint.Contains("Fee Collection")&&hint.Contains("View Students")),
+            "Collection-only roles explain the student-search dependency.");
+        Check(AdministrativeAccess.Hints(feeCollectionCatalog,new[]{20,21}).Any(hint=>hint.Contains("Fee Collection")&&hint.Contains("View Students")),
+            "Fee viewing without student viewing still warns for collection.");
+        Check(!AdministrativeAccess.Hints(feeCollectionCatalog,new[]{10,20,21}).Any(hint=>hint.Contains("Fee Collection")),
+            "Complete collection, fee-view and student-view permissions show no dependency warning.");
         Check(AdministrativeAccess.Hints(feeCollectionCatalog,new[]{21}).Any(hint=>hint.Contains("Student Purchases")&&hint.Contains("View Fees")),
             "Collection-only roles receive the purchase fee-view dependency.");
         Check(AdministrativeAccess.Hints(feeCollectionCatalog,new[]{21}).Any(hint=>hint.Contains("Student Purchases")&&hint.Contains("View Students")),
