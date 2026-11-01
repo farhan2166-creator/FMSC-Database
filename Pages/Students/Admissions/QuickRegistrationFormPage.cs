@@ -73,9 +73,10 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
         checkSave=AddAction("Check Save Outcome",async(_,_)=>await CheckSaveOutcomeAsync(),"Secondary");
         next=AddAction("Add Another Child", (_,_)=>StartNextDraft(false), "Secondary");
         bill=AddBusyAction("Print Bill", PrintBillAsync, "Secondary");
-        collect=AddAction("Collect Payment",(_,_)=>navigate(()=>new FMSC_SMS.Pages.Finance.Collection.FeeCollectionPage(savedStudent),"Daily Work","Fee Collection"),"Primary");
+        collect=AddAction("Collect Payment",(_,_)=>{if(FeeCollectionAccess.CanUse(CurrentUser.HasPermission))navigate(()=>new FMSC_SMS.Pages.Finance.Collection.FeeCollectionPage(savedStudent),"Daily Work","Fee Collection");},"Primary");
         newFamily=AddAction("New Family",(_,_)=>StartNextDraft(true),"Secondary");
         GateAction(save,"Students.Admit"); GateAction(collect,"Fees.Collect");
+        collect.Visible = FeeCollectionAccess.CanUse(CurrentUser.HasPermission);
         GateAction(next,"Students.Administer");
         linkFamily=AddAction("Link Existing Parent",(_,_)=>ToggleFamilySearch(),"Secondary");
         unlinkFamily=AddAction("Unlink Parent",async(_,_)=>await UnlinkFamilyAsync(),"Secondary");
@@ -329,7 +330,7 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
     private string[] BasicValues()=>new[]{name.Text.Trim(),parent.Text.Trim(),contact.Text.Trim(),address.Text.Trim()};
     private bool HasPendingChanges=>savedStudent>0&&savedStatus=="Pending"&&savedBasics.Length==4&&(!savedBasics.SequenceEqual(BasicValues())||rates.AsEnumerable().Any(r=>Convert.ToDecimal(r["Discount"])!=Convert.ToDecimal(r["OriginalDiscount"])));
     private void PendingEditChanged(){if(applyingRegistration)return;UpdateActions();if(!busy&&!recoveryBlocked&&HasPendingChanges)SetStatus("Save changes before printing, collecting payment or changing the parent link.");}
-    private void UpdateActions(){save.Enabled=ReadyToSave&&QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&savedStudent>0&&CurrentUser.HasPermission("Students.Administer");newFamily.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh;bill.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.Collect");
+    private void UpdateActions(){save.Enabled=ReadyToSave&&QuickRegistrationAccess.CanUse(CurrentUser.HasPermission);save.Text=savedStudent>0?"Save Changes":"Save Registration";next.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&savedStudent>0&&CurrentUser.HasPermission("Students.Administer");newFamily.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh;bill.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&CurrentUser.HasPermission("Fees.View");collect.Enabled=!IsBusy&&!recoveryBlocked&&!needsRefresh&&!HasPendingChanges&&savedStudent>0&&savedStatus!="Cancelled"&&FeeCollectionAccess.CanUse(CurrentUser.HasPermission);
         checkSave.Visible=recoveryBlocked;checkSave.Enabled=recoveryBlocked&&!IsBusy;
         reload.Visible=savedStudent>0 && (!workspaceHosted || needsRefresh);reload.Enabled=!IsBusy&&!recoveryBlocked&&savedStudent>0;
         bool editing=!busy&&!loadingFamily&&!recoveryBlocked&&!needsRefresh&&(savedStudent==0||savedStatus=="Pending"&&CurrentUser.HasPermission("Students.Administer"));year.Enabled=placement.Enabled=joining.Enabled=editing&&savedStudent==0;
