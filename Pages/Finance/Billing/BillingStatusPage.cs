@@ -97,8 +97,10 @@ public sealed class BillingStatusPage : V2Page, IBusyPage
         try
         {
             DataSet current = await read();
-            if (current.Tables[2].Rows.Count > 0)
-                AddStudentDetails(current.Tables[2], await StudentSearchCache.GetAllAsync());
+            // Billing review is authorized by Fees.Collect. Names and placements
+            // from the separate student reader are optional and require Students.View.
+            await EnrichStudentDetailsAsync(current.Tables[2], StudentSearchCache.GetAllAsync,
+                CurrentUser.HasPermission);
             if (IsDisposed || request != generation) { current.Dispose(); return; }
             DataSet? previous = review;
             Grid.DataSource = null;
@@ -135,6 +137,17 @@ public sealed class BillingStatusPage : V2Page, IBusyPage
         if (Grid.Columns.Contains("BillingMonth")) Grid.Columns["BillingMonth"].DefaultCellStyle.Format = "MMMM yyyy";
         if (Grid.Columns.Contains("Amount")) Grid.Columns["Amount"].DefaultCellStyle.Format = "N0";
         UpdateActions();
+    }
+
+    internal static async Task EnrichStudentDetailsAsync(DataTable exceptions,
+        Func<Task<DataTable>> loadStudents, Func<string, bool> hasPermission)
+    {
+        if (exceptions.Rows.Count == 0 || !hasPermission("Students.View")) return;
+        var students = await loadStudents();
+        // The signed-in operator may lose student viewing access while the
+        // asynchronous lookup is running. Do not attach details after revocation.
+        if (!hasPermission("Students.View")) return;
+        AddStudentDetails(exceptions, students);
     }
 
     internal static void AddStudentDetails(DataTable exceptions, DataTable students)
