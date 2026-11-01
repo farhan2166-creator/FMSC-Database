@@ -39,7 +39,9 @@ internal sealed partial class SchoolScenarios
     private async Task ConcessionChoices()
     {
         var child=EarlierChild("Temporary scholarship example");int id=Assignment(child.Enrollment);
-        DateTime may=f.MonthlyDate,june=may.AddMonths(1),july=june.AddMonths(1);
+        // Keep the three concession months inside the current Jan-Dec academic year,
+        // even when CI runs in November/December. Never extend an agreement into next year.
+        DateTime may=new(f.MonthlyDate.Year,Math.Max(1,f.MonthlyDate.Month-2),1),june=may.AddMonths(1),july=june.AddMonths(1);
         // A pre-agreed future rate is fixture context; the concession must retain it.
         Sql.Query("""
             UPDATE dbo.StudentFeeAssignments SET EffectiveTo=@May WHERE StudentFeeAssignmentId=@Id;
@@ -98,6 +100,13 @@ internal sealed partial class SchoolScenarios
         Sql.Proc("SaveStudentFeeDiscount",ConcessionArgs(id,month,month,1000,false,false,Snapshot(assignmentOnly)));
         r.Check(Due(bill)==4000&&Credit(child.Student)==0,"The explicit leave-issued-bills-unchanged choice creates no waiver, payment or credit.");
     }
+    // The closure date must be in the current placement year and never in the
+    // future. Prefer the fifth of the preceding month so its issued future bills
+    // are still exercised; January falls back to the first of that year.
+    private DateTime FictionalLeavingDate() => f.MonthlyDate.Month == 1
+        ? f.MonthlyDate
+        : f.MonthlyDate.AddMonths(-1).AddDays(4);
+
     private async Task LeavingChoices()
     {
         foreach(string policy in new[]{"KeepIssued","SchoolCutoff","FromMonth"})
@@ -105,7 +114,7 @@ internal sealed partial class SchoolScenarios
             var child=EarlierChild("Leaving policy example "+policy);DateTime may=f.MonthlyDate,june=may.AddMonths(1);
             PostMonth(child.Enrollment,may);PostMonth(child.Enrollment,june);long juneBill=Charge(child.Enrollment,june);
             Rate(juneBill,6000);await Pay(child.Student,child.Enrollment,5500,(juneBill,5000),(Convert.ToInt64(Sql.Scalar("SELECT BillingChargeId FROM dbo.BillingCharges WHERE CorrectionOfBillingChargeId=@C;",Sql.P("@C",juneBill))),500));
-            SqlParameter[] Args(bool preview,string? snapshot=null)=>new[]{Sql.P("@UserId",f.Admin),Sql.P("@AdmissionId",child.Student),Sql.P("@LeavingDate",may.AddDays(4)),Sql.P("@Reason","Fictional reviewed departure"),
+            SqlParameter[] Args(bool preview,string? snapshot=null)=>new[]{Sql.P("@UserId",f.Admin),Sql.P("@AdmissionId",child.Student),Sql.P("@LeavingDate",FictionalLeavingDate()),Sql.P("@Reason","Fictional reviewed departure"),
                 Sql.P("@MonthlyFeePolicy",policy),Sql.P("@ReverseFromMonth",policy=="FromMonth"?june:null),Sql.P("@PaidReductionAction","Credit"),Sql.P("@Preview",preview),Sql.P("@ExpectedSnapshot",snapshot)};
             var plan=Sql.Proc("CloseStudentAdmission",Args(true)).Rows[0];
             r.Check(Convert.ToDecimal(plan["FutureAmount"])==(policy=="KeepIssued"?0:policy=="FromMonth"?500:5500)&&Convert.ToDecimal(plan["PaidReturnAmount"])==(policy=="KeepIssued"?0:5500),
@@ -198,7 +207,7 @@ internal sealed partial class SchoolScenarios
         var child=EarlierChild("Closed placement financial correction example");DateTime month=f.MonthlyDate.AddMonths(1);
         PostMonth(child.Enrollment,month);long bill=Charge(child.Enrollment,month);int id=Assignment(child.Enrollment);
         await Pay(child.Student,child.Enrollment,5000,(bill,5000));
-        SqlParameter[] Close(bool preview,string? snapshot=null)=>new[]{Sql.P("@UserId",f.Admin),Sql.P("@AdmissionId",child.Student),Sql.P("@LeavingDate",f.MonthlyDate.AddDays(4)),Sql.P("@Reason","Fictional departure with retained bills"),Sql.P("@MonthlyFeePolicy","KeepIssued"),Sql.P("@Preview",preview),Sql.P("@ExpectedSnapshot",snapshot)};
+        SqlParameter[] Close(bool preview,string? snapshot=null)=>new[]{Sql.P("@UserId",f.Admin),Sql.P("@AdmissionId",child.Student),Sql.P("@LeavingDate",FictionalLeavingDate()),Sql.P("@Reason","Fictional departure with retained bills"),Sql.P("@MonthlyFeePolicy","KeepIssued"),Sql.P("@Preview",preview),Sql.P("@ExpectedSnapshot",snapshot)};
         var plan=Sql.Proc("CloseStudentAdmission",Close(true));Sql.Proc("CloseStudentAdmission",Close(false,Convert.ToString(plan.Rows[0]["Snapshot"])));
         SaveTerms(id,month,month,0,4500,agreement:false,bill:bill);
         r.Check(ChainDue(bill)==0&&Credit(child.Student)==500,"A reviewed paid bill reduction remains possible after departure, including a retained future issued bill.");
