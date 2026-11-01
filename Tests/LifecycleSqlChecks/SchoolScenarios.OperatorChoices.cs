@@ -39,9 +39,9 @@ internal sealed partial class SchoolScenarios
     private async Task ConcessionChoices()
     {
         var child=EarlierChild("Temporary scholarship example");int id=Assignment(child.Enrollment);
-        // Keep the three concession months inside the current Jan-Dec academic year,
-        // even when CI runs in November/December. Never extend an agreement into next year.
-        DateTime may=new(f.MonthlyDate.Year,Math.Max(1,f.MonthlyDate.Month-2),1),june=may.AddMonths(1),july=june.AddMonths(1);
+        // Use the same months as actual opening/collection charges. A concession
+        // ending in December must not create a January agreement for a new year.
+        DateTime may=f.MonthlyDate,june=may.AddMonths(1),july=june.AddMonths(1);
         // A pre-agreed future rate is fixture context; the concession must retain it.
         Sql.Query("""
             UPDATE dbo.StudentFeeAssignments SET EffectiveTo=@May WHERE StudentFeeAssignmentId=@Id;
@@ -71,8 +71,12 @@ internal sealed partial class SchoolScenarios
             "Exact concession retry returns its saved result without another correction or credit.");
         r.Check(ChainDue(first)==0&&ChainDue(second)==5000&&Credit(child.Student)==0,
             "Concessions waive unpaid dues but do not release the previously collected 4500 as credit.");
-        r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@E AND FeeTypeId=@F AND EffectiveFrom=@July AND EffectiveTo IS NULL AND Amount=6000 AND DiscountAmount=0;",Sql.P("@E",child.Enrollment),Sql.P("@F",f.Tuition),Sql.P("@July",july))==1,
-            "After the temporary concession, the previously agreed 6000 rate and zero concession resume automatically.");
+        int restored=Sql.Count("SELECT COUNT(*) FROM dbo.StudentFeeAssignments WHERE EnrollmentId=@E AND FeeTypeId=@F AND EffectiveFrom=@July AND EffectiveTo IS NULL AND Amount=6000 AND DiscountAmount=0;",
+            Sql.P("@E",child.Enrollment),Sql.P("@F",f.Tuition),Sql.P("@July",july));
+        r.Check(restored==(july.Year==may.Year?1:0),
+            july.Year==may.Year
+                ? "After the temporary concession, the previously agreed 6000 rate and zero concession resume inside this academic year."
+                : "A December-ending concession never creates a new-year agreement without an actual new-year placement.");
         r.Check(ChainDue(first)==0&&Sql.Money("SELECT SUM(TotalAmount) FROM dbo.FeePayments WHERE AdmissionId=@S AND IsCreditApplication=0;",Sql.P("@S",child.Student))==4500,
             "The first month's complete bill-and-correction chain is settled; the original cash receipt stays preserved.");
         using var remove=ReviewConcession(ConcessionArgs(id,may,june,0,true,true));
