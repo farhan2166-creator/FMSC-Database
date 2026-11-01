@@ -17,17 +17,41 @@ SET @Reopen=REPLACE(@Reopen,
  N'Choose a valid placement and a joining date within its academic year');
 -- An existing module may retain a CREATE/CREATE OR ALTER definition text.
 -- Re-execute it as ALTER, never CREATE, to preserve the procedure and grants.
--- SQL module definitions can retain leading comments or newlines.
--- Only accept CREATE/ALTER PROC headers in the opening 512 characters.
+-- Read only the beginning of the module definition (including optional comments).
+-- SQL Server may preserve formatting around CREATE [OR ALTER] PROCEDURE.
 DECLARE @ModuleText nvarchar(max)=UPPER(@Reopen);
-DECLARE @CreateOrAlterAt int=CHARINDEX(N'CREATE OR ALTER PROC',@ModuleText);
-DECLARE @CreateAt int=CHARINDEX(N'CREATE PROC',@ModuleText);
-DECLARE @AlterAt int=CHARINDEX(N'ALTER PROC',@ModuleText);
-IF @CreateOrAlterAt BETWEEN 1 AND 512
-    SET @Reopen=STUFF(@Reopen,@CreateOrAlterAt,15,N'ALTER');
-ELSE IF @CreateAt BETWEEN 1 AND 512
-    SET @Reopen=STUFF(@Reopen,@CreateAt,6,N'ALTER');
-ELSE IF @AlterAt NOT BETWEEN 1 AND 512
+DECLARE @HeaderStart int=1;
+WHILE @HeaderStart <= LEN(@ModuleText)
+BEGIN
+    WHILE @HeaderStart<=LEN(@ModuleText)
+          AND UNICODE(SUBSTRING(@ModuleText,@HeaderStart,1)) IN (9,10,13,32)
+        SET @HeaderStart+=1;
+    IF SUBSTRING(@ModuleText,@HeaderStart,2)=N'--'
+    BEGIN
+        DECLARE @LineEnd int=CHARINDEX(CHAR(10),@ModuleText,@HeaderStart+2);
+        IF @LineEnd=0 THROW 51007,'Procedure module comment was not terminated.',1;
+        SET @HeaderStart=@LineEnd+1;
+        CONTINUE;
+    END;
+    IF SUBSTRING(@ModuleText,@HeaderStart,2)=N'/*'
+    BEGIN
+        DECLARE @CommentEnd int=CHARINDEX(N'*/',@ModuleText,@HeaderStart+2);
+        IF @CommentEnd=0 THROW 51007,'Procedure module comment was not terminated.',1;
+        SET @HeaderStart=@CommentEnd+2;
+        CONTINUE;
+    END;
+    BREAK;
+END;
+DECLARE @ProcAt int=CHARINDEX(N'PROC',@ModuleText,@HeaderStart);
+IF @ProcAt=0 OR @ProcAt-@HeaderStart>100
+    THROW 51007,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
+DECLARE @Prefix nvarchar(100)=SUBSTRING(@ModuleText,@HeaderStart,@ProcAt-@HeaderStart);
+SET @Prefix=REPLACE(REPLACE(REPLACE(@Prefix,CHAR(9),N' '),CHAR(10),N' '),CHAR(13),N' ');
+WHILE CHARINDEX(N'  ',@Prefix)>0 SET @Prefix=REPLACE(@Prefix,N'  ',N' ');
+SET @Prefix=LTRIM(RTRIM(@Prefix));
+IF @Prefix IN (N'CREATE',N'CREATE OR ALTER')
+    SET @Reopen=STUFF(@Reopen,@HeaderStart,@ProcAt-@HeaderStart,N'ALTER ');
+ELSE IF @Prefix<>N'ALTER'
     THROW 51007,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
 EXEC sys.sp_executesql @Reopen;
 GO
@@ -41,17 +65,41 @@ SET @Plan=REPLACE(@Plan,
  N'Choose a valid destination for every selected student.');
 -- An existing module may retain a CREATE/CREATE OR ALTER definition text.
 -- Re-execute it as ALTER, never CREATE, to preserve the procedure and grants.
--- SQL module definitions can retain leading comments or newlines.
--- Only accept CREATE/ALTER PROC headers in the opening 512 characters.
+-- Read only the beginning of the module definition (including optional comments).
+-- SQL Server may preserve formatting around CREATE [OR ALTER] PROCEDURE.
 DECLARE @ModuleText nvarchar(max)=UPPER(@Plan);
-DECLARE @CreateOrAlterAt int=CHARINDEX(N'CREATE OR ALTER PROC',@ModuleText);
-DECLARE @CreateAt int=CHARINDEX(N'CREATE PROC',@ModuleText);
-DECLARE @AlterAt int=CHARINDEX(N'ALTER PROC',@ModuleText);
-IF @CreateOrAlterAt BETWEEN 1 AND 512
-    SET @Plan=STUFF(@Plan,@CreateOrAlterAt,15,N'ALTER');
-ELSE IF @CreateAt BETWEEN 1 AND 512
-    SET @Plan=STUFF(@Plan,@CreateAt,6,N'ALTER');
-ELSE IF @AlterAt NOT BETWEEN 1 AND 512
+DECLARE @HeaderStart int=1;
+WHILE @HeaderStart <= LEN(@ModuleText)
+BEGIN
+    WHILE @HeaderStart<=LEN(@ModuleText)
+          AND UNICODE(SUBSTRING(@ModuleText,@HeaderStart,1)) IN (9,10,13,32)
+        SET @HeaderStart+=1;
+    IF SUBSTRING(@ModuleText,@HeaderStart,2)=N'--'
+    BEGIN
+        DECLARE @LineEnd int=CHARINDEX(CHAR(10),@ModuleText,@HeaderStart+2);
+        IF @LineEnd=0 THROW 51007,'Procedure module comment was not terminated.',1;
+        SET @HeaderStart=@LineEnd+1;
+        CONTINUE;
+    END;
+    IF SUBSTRING(@ModuleText,@HeaderStart,2)=N'/*'
+    BEGIN
+        DECLARE @CommentEnd int=CHARINDEX(N'*/',@ModuleText,@HeaderStart+2);
+        IF @CommentEnd=0 THROW 51007,'Procedure module comment was not terminated.',1;
+        SET @HeaderStart=@CommentEnd+2;
+        CONTINUE;
+    END;
+    BREAK;
+END;
+DECLARE @ProcAt int=CHARINDEX(N'PROC',@ModuleText,@HeaderStart);
+IF @ProcAt=0 OR @ProcAt-@HeaderStart>100
+    THROW 51007,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
+DECLARE @Prefix nvarchar(100)=SUBSTRING(@ModuleText,@HeaderStart,@ProcAt-@HeaderStart);
+SET @Prefix=REPLACE(REPLACE(REPLACE(@Prefix,CHAR(9),N' '),CHAR(10),N' '),CHAR(13),N' ');
+WHILE CHARINDEX(N'  ',@Prefix)>0 SET @Prefix=REPLACE(@Prefix,N'  ',N' ');
+SET @Prefix=LTRIM(RTRIM(@Prefix));
+IF @Prefix IN (N'CREATE',N'CREATE OR ALTER')
+    SET @Plan=STUFF(@Plan,@HeaderStart,@ProcAt-@HeaderStart,N'ALTER ');
+ELSE IF @Prefix<>N'ALTER'
     THROW 51007,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
 EXEC sys.sp_executesql @Plan;
 GO
