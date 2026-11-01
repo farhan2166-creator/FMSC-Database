@@ -163,11 +163,11 @@ internal static partial class Program
             Check(picker.SelectedId==42&&Field<Dictionary<int,HashSet<int>>>("familySelections").Count==0&&payments.Rows.Count==1,"Opening a sibling row makes that child the main student and reloads their individual account");
             Check(Field<ModernButton>("accountFamily").Text=="Include Siblings","Opening a sibling individual account resets the family toggle caption");
             picker.SetStudent(41,"Student 41");Invoke("SelectSingleStudent");Wait((Task)Invoke("LoadStatement")!);
-            CurrentUser.SignIn(921,"Read only","Operator",false,new[]{"Reports.View","Fees.View"});
+            CurrentUser.SignIn(921,"Read only","Operator",false,new[]{"Students.View","Reports.View","Fees.View"});
             Invoke("UpdateAccountActions");Check(!Field<ModernButton>("correctPayment").Enabled,"A different signed-in user cannot act on the preceding user's financial rows");
             Wait((Task)Invoke("RefreshAccountAsync")!);Invoke("UpdateAccountActions");
             Check(!Field<ModernButton>("correctPayment").Visible,"Read-only operator is not offered corrections");
-            CurrentUser.SignIn(923,"Collections operator","Operator",false,new[]{"Fees.Collect","Fees.View","Fees.Adjust"});
+            CurrentUser.SignIn(923,"Collections operator","Operator",false,new[]{"Students.View","Fees.Collect","Fees.View","Fees.Adjust"});
             using(var restricted=new StudentAccountStatementPage((_,_,_)=>throw new Exception("Report reader must not run for collection-only access")){BindingContext=new BindingContext()})
             {
                 restricted.ReadAccount=id=>Task.FromResult(Snapshot(id));
@@ -187,7 +187,7 @@ internal static partial class Program
                 Check(((ModernButton)type.GetField("recoverPayment",flags)!.GetValue(restricted)!).Enabled,"Save recovery remains reachable independently of payment eligibility");
                 restrictedWindow.Close();
             }
-            CurrentUser.SignIn(921,"Read only","Operator",false,new[]{"Reports.View","Fees.View"});
+            CurrentUser.SignIn(921,"Read only","Operator",false,new[]{"Students.View","Reports.View","Fees.View"});
             using(var context=(PaymentCorrectionReview)Activator.CreateInstance(typeof(PaymentCorrectionReview),flags,null,new object?[]{false,null,null,41,101},null)!)
             {
                 var adjustmentType=context.GetType();
