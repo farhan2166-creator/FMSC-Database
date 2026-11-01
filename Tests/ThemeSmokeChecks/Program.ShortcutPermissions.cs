@@ -43,6 +43,49 @@ internal static partial class Program
                 Check(Button("Open Family / Siblings").Enabled && !Button("Manage Photo").Enabled,
                     "Family viewing does not require or imply photo administration");
             }
+            // Certificate types have separate SQL write/read authority, while the
+            // student picker and detail readers need Students.View for both.
+            foreach(var scenario in new (string Name, string[] Grants, int General, int Leaving)[] {
+                ("Nothing", Array.Empty<string>(), 0, 0),
+                ("Student viewer", new[]{"Students.View"}, 0, 0),
+                ("General without student reads", new[]{"Certificates.Create"}, 0, 0),
+                ("Leaving without student reads", new[]{"Students.Leave"}, 0, 0),
+                ("Ordinary certificates", new[]{"Students.View","Certificates.Create"}, 6, 0),
+                ("Leaving certificates", new[]{"Students.View","Students.Leave"}, 0, 2),
+                ("Both categories", new[]{"Students.View","Students.Leave","Certificates.Create"}, 6, 2)
+            }){
+                CurrentUser.SignIn(910,scenario.Name,"Accountant",false,scenario.Grants);
+                bool hubAllowed=scenario.General+scenario.Leaving>0;
+                Check(CertificateWorkspaceAccess.CanOpenHub(CurrentUser.HasPermission)==hubAllowed,
+                    scenario.Name+": certificate hub requires a usable SQL-backed category");
+                using var dashboard = new WelcomePage(_ => { }, null, (_, _) => Task.FromResult(new DataTable()), _ => Task.FromResult(new DataTable()));
+                Check(Children(dashboard).OfType<ModernButton>().Any(b => b.Text == PageTitles.StudentCertificates)==hubAllowed,
+                    scenario.Name+": dashboard certificate shortcut follows SQL-required permissions");
+                using var hub = new FMSC_SMS.Pages.Students.Certificates.StudentCertificatesPage((_,_,_)=>{});
+                var displayed=Children(hub).OfType<Label>()
+                    .Where(label=>label.AccessibleName?.EndsWith(" certificate",StringComparison.Ordinal)==true)
+                    .Select(label=>label.AccessibleName!).ToArray();
+                Check(displayed.Length==scenario.General+scenario.Leaving &&
+                      displayed.Contains("Leave certificate")== (scenario.Leaving>0) &&
+                      displayed.Contains("College Leaving certificate")== (scenario.Leaving>0) &&
+                      displayed.Contains("Regular Student certificate")== (scenario.General>0),
+                    scenario.Name+": only SQL-authorized certificate cards appear");
+                Check(!hub.IsHandleCreated,"Certificate card access checks do not start student lookups");
+            }
+            int certificateOpens=0;
+            CurrentUser.SignIn(911,"Leaving operator","Accountant",false,new[]{"Students.View","Students.Leave"});
+            using(var hub=new FMSC_SMS.Pages.Students.Certificates.StudentCertificatesPage((_,_,_)=>certificateOpens++))
+            {
+                var open=typeof(FMSC_SMS.Pages.Students.Certificates.StudentCertificatesPage).GetMethod("Open",flags)!;
+                Func<Control> neverBuild=()=>throw new InvalidOperationException("Navigation must not instantiate a certificate page");
+                open.Invoke(hub,new object[]{neverBuild,"Leave",true});
+                Check(certificateOpens==1,"Leaving-only authority can navigate to a leaving certificate");
+                CurrentUser.SignIn(912,"General operator","Accountant",false,new[]{"Students.View","Certificates.Create"});
+                open.Invoke(hub,new object[]{neverBuild,"Leave",true});
+                Check(certificateOpens==1,"A stale certificate card cannot dispatch after losing leaving permission");
+                open.Invoke(hub,new object[]{neverBuild,"Regular Student",false});
+                Check(certificateOpens==2,"An authorized ordinary certificate can still dispatch");
+            }
             CurrentUser.SignIn(903, "Fixture admin", "Administrator", false, Array.Empty<string>());
             CheckProfileShortcutContext();
         }
