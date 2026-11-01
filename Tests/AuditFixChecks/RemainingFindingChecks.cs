@@ -20,6 +20,20 @@ internal static class RemainingFindingChecks
         }
         Check(FeeCollectionAccess.CanUse(_=>true),"Administrator may access Fee Collection through the existing permission bypass");
         Check(!FeeCollectionAccess.CanUse(p=>p is "Fees.Collect" or "Fees.Adjust"),"Fee adjustment does not substitute for fee viewing");
+        for(int mask=0;mask<8;mask++){
+            bool view=(mask&1)!=0, general=(mask&2)!=0, leaving=(mask&4)!=0;
+            bool Has(string p)=>p switch {
+                "Students.View"=>view,"Certificates.Create"=>general,"Students.Leave"=>leaving,_=>false
+            };
+            Check(CertificateWorkspaceAccess.CanOpenGeneral(Has)==(view&&general),"General certificates require student viewing and certificate creation");
+            Check(CertificateWorkspaceAccess.CanOpenLeaving(Has)==(view&&leaving),"Leaving certificates require student viewing and leaving authority");
+            Check(CertificateWorkspaceAccess.CanOpenHub(Has)==(view&&(general||leaving)),"Certificate hub requires at least one usable certificate category");
+            Check(CertificateWorkspaceAccess.CanOpenCard(false,Has)==(view&&general) &&
+                  CertificateWorkspaceAccess.CanOpenCard(true,Has)==(view&&leaving),"Certificate cards never inherit unrelated permissions");
+        }
+        Check(CertificateWorkspaceAccess.CanOpenHub(_=>true) &&
+              CertificateWorkspaceAccess.CanOpenGeneral(_=>true) &&
+              CertificateWorkspaceAccess.CanOpenLeaving(_=>true),"Administrator permission bypass remains supported for certificates");
 
         var table=new DataTable{CaseSensitive=false,Locale=System.Globalization.CultureInfo.InvariantCulture};
         table.Columns.Add("Id",typeof(int));
