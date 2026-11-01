@@ -14,6 +14,9 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
     private const int InsetLeft = 8;
     private const int InsetRight = 8;
     private bool _isHovered;
+    private bool _lastChecked;
+    /// <summary>Raised when an optional date is enabled or cleared, even if its date value is unchanged.</summary>
+    public event EventHandler? CheckedChanged;
     public ModernDatePicker()
     {
         _inner = new InnerDatePicker {
@@ -23,9 +26,10 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
             ForeColor = AppTheme.Text,
             CalendarMonthBackground = AppTheme.SurfaceElevated
         };
+        _lastChecked = _inner.Checked;
         _inner.OpenCalendar = OpenCalendar;
-        _inner.StateChanged = RefreshDisplayFormat;
-        _inner.ValueChanged += (_, _) => RefreshDisplayFormat();
+        _inner.StateChanged = NotifyDateStateChanged;
+        _inner.ValueChanged += (_, _) => NotifyDateStateChanged();
         _inner.GotFocus += (_, _) => {
             OnGotFocus(EventArgs.Empty);
             Invalidate();
@@ -164,7 +168,14 @@ public sealed class ModernDatePicker : Panel, IValidationTarget, IAccessibleInpu
     public bool Checked
     {
         get => _inner.Checked;
-        set { _inner.Checked = value; RefreshDisplayFormat(); }
+        set { _inner.Checked = value; NotifyDateStateChanged(); }
+    }
+    private void NotifyDateStateChanged()
+    {
+        bool checkedChanged = _lastChecked != _inner.Checked;
+        _lastChecked = _inner.Checked;
+        RefreshDisplayFormat();
+        if (checkedChanged) CheckedChanged?.Invoke(this, EventArgs.Empty);
     }
     private void RefreshDisplayFormat()
     {

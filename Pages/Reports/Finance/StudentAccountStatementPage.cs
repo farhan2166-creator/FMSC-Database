@@ -96,6 +96,10 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
             (_, _) => OnFiltersChanged();
         to.ValueChanged +=
             (_, _) => OnFiltersChanged();
+        // Optional dates can change from unchecked to checked without changing Value.
+        // Both transitions invalidate the statement/export snapshot.
+        from.CheckedChanged += (_, _) => OnFiltersChanged();
+        to.CheckedChanged += (_, _) => OnFiltersChanged();
         Grid.DataBindingComplete += (_, _) => { ConfigureStatementGrid(); FormatStatementAmounts(); };
         BuildStatementLayout();
         ClearForm();
@@ -358,7 +362,11 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
         if(BusyOperationRunning)statementReads.Cancel();
         UpdateSelectionActions();
         if (string.IsNullOrEmpty(_appliedFilterSignature))
+        {
+            // An account summary is not proof of a newly generated statement.
+            SetReportActionsEnabled(false);
             return;
+        }
         bool current = string.Equals(_appliedFilterSignature, FilterSignature(), StringComparison.Ordinal);
         SetReportActionsEnabled(current);
         if (current)
