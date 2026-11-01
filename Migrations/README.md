@@ -21,7 +21,10 @@ replace database files, install the desktop app, or activate an app release.
 4. Each pending numbered `*.sql` is executed in ascending order inside the
    same-connection, exclusive-lock, outer-transaction and schema-version
    wrapper used by the installer. Already-applied files are skipped. The
-   process stops on any SQL/version/backup error; do not blindly retry.
+   applier verifies the complete consecutive sequence from the database's
+   current version to the required schema **before taking a backup**. If an
+   intermediate file is missing, it refuses to run instead of skipping ahead.
+   The process stops on any SQL/version/backup error; do not blindly retry.
 5. Verify the final version and test the updated FMSC app against the database.
    **Only the full installer performs its staged-application compatibility
    checks and activation**; this standalone tool does not certify app
