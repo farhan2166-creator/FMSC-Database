@@ -66,15 +66,24 @@ public sealed class FeePostingPage : V2Page, IBusyPage
         FinanceHelp.Attach(this,throughMonth,FinanceHelp.Topic.Period);
         FinanceHelp.Attach(this,loadPreview,FinanceHelp.Topic.Review);
         FinanceHelp.Attach(this,postButton,FinanceHelp.Topic.PostFees);
+        // Fees.Collect allows bulk posting, but the optional GetStudents-backed
+        // individual search additionally requires Students.View.
+        bool canSearchStudents = CurrentUser.HasPermission("Students.View");
+        student.Enabled = canSearchStudents;
+        student.TabStop = canSearchStudents;
         var filters = ReportUi.Bar(4,
             ("Academic year", academicYear),
             ("From month", monthBox),
             ("Through month (optional)", throughMonth),
-            ("Student (optional)", student),
+            (canSearchStudents ? "Student (optional)" : "Student (restricted)", student),
             ("Campus", campus),
             ("Class", klass),
             ("Section", section),
             ("Fee type", feeType));
+        if (!canSearchStudents)
+            FinanceHelp.Attach(this, student.Parent!,
+                "Individual student search requires View Students permission. Posting fees for a campus, class or section remains available.",
+                "Choose the campus and class without selecting an individual student.");
         /* any filter change drops the loaded preview, so Post can never send one filter's rows under another filter's label. */
         monthBox.SelectedIndexChanged += (_, _) => {
             if (!suppressFilterEvents)

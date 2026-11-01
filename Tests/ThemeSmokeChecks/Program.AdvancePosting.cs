@@ -2,6 +2,7 @@ using System.Data;
 using System.Reflection;
 using FMSC_SMS.Core;
 using FMSC_SMS.Pages.Finance.Billing;
+using FMSC_SMS.Pages.Security;
 
 internal static partial class Program
 {
@@ -34,5 +35,39 @@ internal static partial class Program
         typeof(FeePostingPage).GetField("loadedMonth", flags)!.SetValue(page, june);
         typeof(FeePostingPage).GetField("loadedThrough", flags)!.SetValue(page, august);
         Check((string)typeof(FeePostingPage).GetProperty("PeriodLabel", flags)!.GetValue(page)! == "June 2027 through August 2027", "Confirmation identifies the complete month range");
+
+        var previous=(CurrentUser.UserId,CurrentUser.Username,CurrentUser.RoleName,
+            CurrentUser.MustChangePassword,CurrentUser.GetPermissions().ToArray());
+        try
+        {
+            foreach (var role in new[] {
+                (Name:"Collector",Grants:new[]{"Fees.Collect"},CanSearch:false),
+                (Name:"Collector with student viewing",Grants:new[]{"Fees.Collect","Students.View"},CanSearch:true),
+                (Name:"Administrator",Grants:Array.Empty<string>(),CanSearch:true)
+            })
+            {
+                CurrentUser.SignIn(991,role.Name,role.Name=="Administrator"?"Administrator":"Accountant",false,role.Grants);
+                using var scope=new FeePostingPage(false);
+                var search=(StudentPicker)typeof(FeePostingPage).GetField("student",flags)!.GetValue(scope)!;
+                var caption=search.Parent!.Controls.OfType<Label>().Single();
+                Check(search.Enabled==role.CanSearch && search.TabStop==role.CanSearch,
+                    "Individual fee-posting student search respects Students.View, including administrator bypass");
+                Check(caption.Text==(role.CanSearch?"Student (optional)":"Student (restricted)"),
+                    "Posting clearly labels a disabled student-only filter");
+                if(!role.CanSearch)
+                {
+                    Check(FinanceHelp.Tooltip(scope,search.Parent!).Contains("View Students"),
+                        "Restricted student search explains the missing permission on the enabled field caption");
+                    Check(((LookupBox)typeof(FeePostingPage).GetField("campus",flags)!.GetValue(scope)!).Enabled,
+                        "Bulk campus/class posting remains available with Fees.Collect alone");
+                }
+            }
+        }
+        finally
+        {
+            if(previous.UserId>0)CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,
+                previous.MustChangePassword,previous.Item5);
+            else CurrentUser.SignOut();
+        }
     }
 }
