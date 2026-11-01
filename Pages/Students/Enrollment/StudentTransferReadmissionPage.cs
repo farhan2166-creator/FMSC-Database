@@ -9,6 +9,9 @@ public sealed class StudentTransferReadmissionPage : V2Page
     private readonly LookupBox enrollment = new();
     private bool suppressDestinationEvents;
     private DataTable enrollmentsRaw = new();
+    private string selectedStudentStatus = string.Empty;
+    private bool selectedStudentOfficial;
+    private bool selectedStudentHeld;
     private DataTable destinationClasses = new();
     private DataTable destinationSections = new();
     private DataTable destinationCampuses = new();
@@ -331,7 +334,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         history.TabIndex = 2;
         SetContent(
             root,
-            "Transfer within the same year; Re-Admit in a new year. Review before confirming.");
+            "Transfers stay in their recorded year; readmission follows a recorded departure. Review before confirming.");
         if (fixedOperation is not null)
         {
             PrepareForEmbedding();
@@ -489,6 +492,9 @@ public sealed class StudentTransferReadmissionPage : V2Page
         currentAdmissionNumber.Text = student.SelectedId > 0 ? AdmissionNumbers.ForId(student.SelectedId) : string.Empty;
         enrollment.ClearLookup();
         enrollmentsRaw = new DataTable();
+        selectedStudentStatus = string.Empty;
+        selectedStudentOfficial = false;
+        selectedStudentHeld = false;
         if (student.SelectedId <= 0)
             return;
         try
@@ -498,6 +504,12 @@ public sealed class StudentTransferReadmissionPage : V2Page
                     "GetStudentEnrollmentsForLifecycle",
                     DatabaseHelper.Int("@AdmissionId", student.SelectedId));
             enrollmentsRaw = raw;
+            if (raw.Rows.Count > 0)
+            {
+                selectedStudentStatus = Convert.ToString(raw.Rows[0]["StudentStatus"]) ?? string.Empty;
+                selectedStudentOfficial = raw.Rows[0]["HasOfficialAdmissionNumber"] is bool official && official;
+                selectedStudentHeld = raw.Rows[0]["IsOnHold"] is bool held && held;
+            }
             var dt = new DataTable();
             dt.Columns.Add("EnrollmentId", typeof(int));
             dt.Columns.Add("Display", typeof(string));
@@ -523,6 +535,12 @@ public sealed class StudentTransferReadmissionPage : V2Page
             Fail(ex);
         }
     }
+    private bool CanReadmitSelected() => AdmissionWorkflowActions.CanReadmit(
+        selectedStudentStatus, selectedStudentOfficial,
+        enrollmentsRaw.AsEnumerable().Any(row =>
+            string.Equals(Convert.ToString(row["Status"]),"Active",StringComparison.OrdinalIgnoreCase)),
+        selectedStudentHeld);
+
     private static string FormatEnrollmentDisplay(DataRow row)
     {
         string year =
@@ -584,7 +602,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
             enabled.RemoveWhere(operation => operation.StartsWith("Transfer", StringComparison.Ordinal));
         if (!CurrentUser.HasPermission("Students.Administer"))
             enabled.Remove("Re-Admit");
-        if (enrollmentsRaw.AsEnumerable().Any(row => string.Equals(Convert.ToString(row["Status"]), "Active", StringComparison.OrdinalIgnoreCase)))
+        if (!CanReadmitSelected())
             enabled.Remove("Re-Admit");
 
         foreach (var (name, button)
@@ -599,7 +617,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
             if (executeButton is not null) executeButton.Enabled = enabled.Contains(fixedOperation);
             if (!enabled.Contains(fixedOperation))
                 SetStatus(fixedOperation == "Re-Admit"
-                    ? "Readmission is available for students who have left or are inactive."
+                    ? "Readmission requires an officially admitted former student with no active enrollment or hold."
                     : "Transfers require an active placement.");
             return;
         }
@@ -1074,10 +1092,9 @@ public sealed class StudentTransferReadmissionPage : V2Page
             return;
         if(selectedOperation!="Re-Admit"&&date.ShowCheckBox&&!date.Checked)
         {Warn("Select the actual historical transfer date within the recorded academic year.");return;}
-        if (selectedOperation == "Re-Admit" && enrollmentsRaw.AsEnumerable().Any(row =>
-            string.Equals(Convert.ToString(row["Status"]), "Active", StringComparison.OrdinalIgnoreCase)))
+        if (selectedOperation == "Re-Admit" && !CanReadmitSelected())
         {
-            Warn("An active student cannot be readmitted. The student must have left or be inactive first.");
+            Warn("Readmission is for officially admitted former students who left or became inactive. Cancelled pending registrations use Reopen Registration; holds use Lift Hold / Resume.");
             return;
         }
         if (!ValidateRequiredInputs())

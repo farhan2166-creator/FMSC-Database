@@ -34,7 +34,7 @@ public sealed partial class StudentAdmissionPage
         enrollmentActionsMenu.Opening+=(_,_)=>{
             var state=AdmissionWorkflowActions.For(currentAdmissionId,_workspaceStudentStatus,IsPendingRegistration,legacySetupPending,
                 pendingPlacementId,studentPostingHeld,IsBusy || unconfirmedAdmission is not null,
-                CurrentUser.HasPermission("Students.Administer"),CurrentUser.HasPermission("Enrollment.Manage"),HasCurrentPlacement);
+                CurrentUser.HasPermission("Students.Administer"),CurrentUser.HasPermission("Enrollment.Manage"),HasCurrentPlacement,_hasOfficialAdmissionNumber);
             void Show(ToolStripItem item,bool visible) {item.Visible=visible;item.Enabled=visible && state.Enabled;}
             Show(setup,state.Setup);Show(complete,state.CompleteDraft);Show(history,state.History);
             Show(hold,state.Hold);Show(resume,state.Resume);Show(departure,state.Departure);Show(readmit,state.Readmit);

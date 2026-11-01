@@ -4,8 +4,16 @@ namespace FMSC_SMS.Core;
 internal sealed record AdmissionWorkflowActions(bool Setup,bool CompleteDraft,bool History,bool Hold,bool Resume,
     bool Departure,bool Readmit,bool Transfer,bool ReviewLeft,bool Enabled)
 {
+    // Left covers Admission departure, leaving certificates and final-class completion.
+    // Withdrawn is a legacy synonym; current workflows record Left.
+    internal static bool CanReadmit(string? status,bool officialAdmission,bool activeEnrollment=false,bool held=false) =>
+        officialAdmission && !activeEnrollment && !held &&
+        (string.Equals(status?.Trim(),"Left",StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(status?.Trim(),"Withdrawn",StringComparison.OrdinalIgnoreCase) ||
+         string.Equals(status?.Trim(),"Inactive",StringComparison.OrdinalIgnoreCase));
+
     internal static AdmissionWorkflowActions For(int admissionId,string status,bool pendingRegistration,bool legacySetup,
-        int pendingPlacement,bool held,bool busy,bool administrator,bool enrollmentManager,bool currentPlacement=true)
+        int pendingPlacement,bool held,bool busy,bool administrator,bool enrollmentManager,bool currentPlacement=true,bool officialAdmission=true)
     {
         bool saved=admissionId>0 && !pendingRegistration;
         bool active=string.Equals(status,"Active",StringComparison.OrdinalIgnoreCase);
@@ -13,7 +21,7 @@ internal sealed record AdmissionWorkflowActions(bool Setup,bool CompleteDraft,bo
         bool settled=saved && !legacySetup && pendingPlacement==0;
         return new(saved && legacySetup && !held && administrator,saved && !legacySetup && pendingPlacement>0 && !held && administrator,
             saved && administrator,settled && active && !held && administrator && currentPlacement,saved && held && administrator && currentPlacement,
-            settled && active && !held && administrator,settled && !active && !held && administrator,
+            settled && active && !held && administrator,settled && administrator && CanReadmit(status,officialAdmission,held:held),
             settled && active && !held && enrollmentManager,saved && left && !held && administrator && currentPlacement,
             !busy && pendingPlacement>=0);
     }

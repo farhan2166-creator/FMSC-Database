@@ -1,4 +1,16 @@
-## Current target: schema 67
+## Current target: schema 68
+
+Migration `68.sql` aligns readmission eligibility across C# and SQL. Officially
+admitted former students in Left, Inactive or legacy Withdrawn status may
+readmit, provided there is no active enrollment or unresolved posting hold.
+Cancelled pending registrations use Reopen Registration. Final-class
+completion and school/college leaving certificates retain the usual Left status.
+The lifecycle reader accepts Enrollment.Manage or Students.Administer for
+reading, but readmission writes still require Students.Administer. No student,
+enrollment, financial or certificate rows are rewritten. Apply 68 after 67.
+See `Docs/Decisions/READMISSION_ELIGIBILITY_2026-11-01.md`.
+
+## Previous target: schema 67
 
 Migration `67.sql` supersedes only the class-section IsActive hard stops
 introduced for `dbo.ReopenPendingRegistration` in 65 and
@@ -57,7 +69,7 @@ For any supported starting version from 19 through 65, apply every numbered file
 
 # Apply the database changes later
 
-The application requires **schema 66**. SQL changes are checked in here;
+The application requires **schema 68**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,

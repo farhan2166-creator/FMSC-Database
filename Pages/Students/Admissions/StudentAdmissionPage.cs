@@ -79,6 +79,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     private readonly BindingList<FeeSelectionRow> _selectedFees = new();
     private List<FeeConfigOption> _availableFeeOptions = new();
     private string _workspaceStudentStatus = string.Empty;
+    private bool _hasOfficialAdmissionNumber;
     private bool studentPostingHeld;
     /* The student's status (Active, Left, New Admission ...). */
     private readonly Label studentStatusBadge = new() {
@@ -2206,6 +2207,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         pendingPlacementId = 0;
         currentAdmissionId = 0;
         _workspaceStudentStatus = string.Empty;
+        _hasOfficialAdmissionNumber = false;
         studentPostingHeld = false;
         _editEnrollmentId = 0;
         _editCampusId = 0;
@@ -2840,6 +2842,9 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                 row["Status"] != DBNull.Value
                     ? Convert.ToString(row["Status"]) ?? string.Empty
                     : string.Empty;
+            _hasOfficialAdmissionNumber = row.Table.Columns.Contains("AdmissionNumber")
+                && row["AdmissionNumber"] != DBNull.Value
+                && !string.IsNullOrWhiteSpace(Convert.ToString(row["AdmissionNumber"]));
             UpdateAdmissionIdDisplay();
             name.Text =
                 Convert.ToString(

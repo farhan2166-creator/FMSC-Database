@@ -20,13 +20,16 @@ internal static partial class Program
             var menu=(ContextMenuStrip)type.GetField("enrollmentActionsMenu",flags)!.GetValue(page)!;
             void Refresh()=>typeof(ToolStripDropDown).GetMethod("OnOpening",flags)!.Invoke(menu,new object[]{new CancelEventArgs()});
             ToolStripItem Item(string caption)=>menu.Items.Cast<ToolStripItem>().Single(i=>i.Text==caption);
-            Set("currentAdmissionId",41);Set("pendingPlacementId",0);Set("_workspaceStudentStatus","Active");
+            Set("currentAdmissionId",41);Set("pendingPlacementId",0);Set("_workspaceStudentStatus","Active");Set("_hasOfficialAdmissionNumber",true);
             Set("placementYearStart",DateTime.Today.AddMonths(-1));Set("placementYearEnd",DateTime.Today.AddMonths(10));Refresh();
             Check(Item("Put on Hold…").Available&&Item("Record Departure…").Available&&!Item("Re-Admit…").Available,"Active menu presents current-student actions");
             var transfer=(ToolStripMenuItem)Item("Transfer");
             Check(transfer.Available&&transfer.DropDownItems.Cast<ToolStripItem>().Select(i=>i.Text).SequenceEqual(new[]{"Transfer Section","Transfer Class","Transfer Campus"}),"One Transfer submenu retains original operation codes");
             Set("_workspaceStudentStatus","Left");Refresh();
             Check(Item("Placement History…").Available&&Item("Re-Admit…").Available&&!Item("Record Departure…").Available,"Former students retain history and appropriate readmission");
+            Set("_hasOfficialAdmissionNumber",false);Refresh();
+            Check(!Item("Re-Admit…").Available,"Unnumbered registrations cannot enter readmission");
+            Set("_hasOfficialAdmissionNumber",true);Refresh();
             var advanced=(ToolStripMenuItem)Item("Corrections / Advanced");
             Check(advanced.Available&&advanced.DropDownItems.Count==1&&!menu.Items.Cast<ToolStripItem>().Any(i=>(i.Text ?? "").StartsWith("Review Left")),"Exceptional adoption is under Advanced");
             Set("studentPostingHeld",true);Refresh();
