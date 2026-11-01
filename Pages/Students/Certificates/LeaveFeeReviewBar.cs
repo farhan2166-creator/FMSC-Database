@@ -107,7 +107,7 @@ internal sealed class LeaveFeeReviewBar : TableLayoutPanel
         summary.Text=$"Outstanding: Rs. {balance:N0}";
         Visible=balance>0;
         summary.ForeColor=balance>0 ? AppTheme.Danger : AppTheme.Text;
-        collect.Enabled=admission()>0 && CurrentUser.HasPermission("Fees.Collect");
+        collect.Enabled=admission()>0 && FeeCollectionAccess.CanUse(CurrentUser.HasPermission);
         UpdateCertificateState();
     }
     internal void UpdateCertificateState() => review.Enabled=loaded && balance>0 && !certificateExists();
@@ -241,7 +241,7 @@ internal sealed class LeaveFeeReviewBar : TableLayoutPanel
     private decimal LaterBalance => later.AsEnumerable().Sum(row=>Convert.ToDecimal(row["Balance"]));
     private void OpenCollection()
     {
-        if(admission()<=0) return;
+        if(admission()<=0 || !FeeCollectionAccess.CanUse(CurrentUser.HasPermission)) return;
         try {
             var screenArea=Screen.FromControl(this).WorkingArea;
             using var window=new ApplicationWindowForm {Text="Fee Collection",StartPosition=FormStartPosition.CenterParent,
