@@ -667,6 +667,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     CurrentUser.HasPermission("Certificates.Create") ? "Certificates.Create" : "Students.Leave")
             }.Where(item => (item.Title != "Pending Registrations" || QuickRegistrationAccess.CanUse(CurrentUser.HasPermission))
                 && (item.Title != "Fee Collection" || FeeCollectionAccess.CanUse(CurrentUser.HasPermission))
+                && (item.Title != PageTitles.StudentPurchases || StudentPurchasesAccess.CanUse(CurrentUser.HasPermission))
                 && (item.Title != PageTitles.StudentCertificates || CertificateWorkspaceAccess.CanOpenHub(CurrentUser.HasPermission))).ToArray(),
             expandInitially: true);
         AddModule(
