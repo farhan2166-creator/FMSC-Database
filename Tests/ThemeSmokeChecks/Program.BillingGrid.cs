@@ -1,6 +1,7 @@
 using System.Data;
 using System.Reflection;
 using FMSC_SMS.Core;
+using FMSC_SMS.Pages.Security;
 using FMSC_SMS.Pages.Finance.Billing;
 
 internal static partial class Program
@@ -38,5 +39,73 @@ internal static partial class Program
             grid.Columns["StudentName"].DisplayIndex < grid.Columns["FatherName"].DisplayIndex &&
             grid.Columns["FatherName"].DisplayIndex < grid.Columns["ClassSection"].DisplayIndex,
             "Grid starts with admission number, student, father and placement");
+
+        // Billing SQL permits Fees.Collect alone; the separate student list does
+        // not. An operator without Students.View must still get the base review.
+        var prior = (CurrentUser.UserId, CurrentUser.Username, CurrentUser.RoleName,
+            CurrentUser.MustChangePassword, CurrentUser.GetPermissions().ToArray());
+        try
+        {
+            CurrentUser.SignIn(950, "Billing-only fixture", "Accountant", false, new[] { "Fees.Collect" });
+            using var restricted = new DataSet();
+            var status = new DataTable();
+            status.Columns.Add("BillingMonth", typeof(DateTime));
+            status.Columns.Add("CurrentCharges", typeof(int));
+            status.Columns.Add("CurrentAmount", typeof(decimal));
+            status.Rows.Add(new DateTime(2026, 11, 1), 2, 1500m);
+            restricted.Tables.Add(status);
+            restricted.Tables.Add(new DataTable());
+            var pending = new DataTable();
+            pending.Columns.Add("AdmissionId", typeof(int));
+            pending.Columns.Add("AdmissionNumber");
+            pending.Columns.Add("StudentName");
+            pending.Columns.Add("Reason");
+            pending.Columns.Add("IsLegacyReference", typeof(bool));
+            pending.Rows.Add(1, "41", "Synthetic student", "Needs review", false);
+            restricted.Tables.Add(pending);
+            using var collectOnly = new BillingStatusPage(null, () => Task.FromResult(restricted), false);
+            ((Task)typeof(BillingStatusPage).GetMethod("RefreshAsync", flags)!.Invoke(collectOnly, null)!)
+                .GetAwaiter().GetResult();
+            var reviewField = typeof(BillingStatusPage).GetField("review", flags)!;
+            Check(ReferenceEquals(reviewField.GetValue(collectOnly), restricted),
+                "Collect-only operator loads SQL-authorized billing review without student lookup");
+            Check(!pending.Columns.Contains("FatherName") && !pending.Columns.Contains("ClassSection"),
+                "Collect-only review does not attach student-reader details");
+            var restrictedView = (ModernComboBox)typeof(BillingStatusPage).GetField("view", flags)!.GetValue(collectOnly)!;
+            restrictedView.SelectedIndex = 1;
+            var restrictedGrid = (DataGridView)typeof(V2Page).GetField("Grid", flags)!.GetValue(collectOnly)!;
+            Check(restrictedGrid.DataSource is DataView limited && limited.Count == 1 &&
+                Convert.ToInt32(limited[0]["AdmissionId"]) == 1,
+                "Collect-only operator can review billing exceptions without student viewing access");
+
+            int lookupCalls = 0;
+            var allowedRows = pending.Copy();
+            CurrentUser.SignIn(951, "Billing and student viewer", "Accountant", false,
+                new[] { "Fees.Collect", "Students.View" });
+            BillingStatusPage.EnrichStudentDetailsAsync(allowedRows, () => {
+                lookupCalls++;
+                return Task.FromResult(students);
+            }, CurrentUser.HasPermission).GetAwaiter().GetResult();
+            Check(lookupCalls == 1 && allowedRows.Columns.Contains("FatherName") &&
+                Convert.ToString(allowedRows.Rows[0]["FatherName"]) == "Father one",
+                "Student-view permission enables student details from an authorized lookup");
+
+            // Revoking the permission during a completed asynchronous read still
+            // must not attach the student's sensitive detail columns.
+            bool canView = true;
+            var revokedRows = pending.Copy();
+            BillingStatusPage.EnrichStudentDetailsAsync(revokedRows, () => {
+                canView = false;
+                return Task.FromResult(students);
+            }, _ => canView).GetAwaiter().GetResult();
+            Check(!revokedRows.Columns.Contains("FatherName"),
+                "Revoked student-view access cannot enrich a billing review after lookup");
+        }
+        finally
+        {
+            CurrentUser.SignIn(prior.UserId, prior.Username, prior.RoleName,
+                prior.MustChangePassword, prior.Item5);
+        }
+
     }
 }
