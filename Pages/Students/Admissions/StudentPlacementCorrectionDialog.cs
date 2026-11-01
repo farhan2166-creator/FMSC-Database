@@ -199,6 +199,7 @@ internal sealed class StudentPlacementCorrectionDialog : ApplicationWindowForm
                 if(row["StartDate"] is DateTime date) academicYearStarts[Convert.ToInt32(row["AcademicYearId"])]=date.Date;
             currentAcademicYear = years.AsEnumerable().FirstOrDefault(r => Convert.ToBoolean(r["IsCurrent"])) is DataRow currentYear
                 ? Convert.ToInt32(currentYear["AcademicYearId"]) : 0;
+            // Historical corrections deliberately allow sections disabled since the event.
             allPlacements = await DatabaseHelper.QueryUserAsync("GetClassSections", DatabaseHelper.Int("@CampusId", 0), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0));
             missingPlacementChoices = await MissingPlacementPolicy.ReadAsync(admission);
             missingWindows = missingPlacementChoices.DefaultView.ToTable(true, "WindowId", "AcademicYearId", "YearName", "GapStart", "GapEnd", "PromotionDate");

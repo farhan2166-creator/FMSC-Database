@@ -415,6 +415,8 @@ internal sealed partial class QuickRegistrationFormPage : V2Page, IUnsavedChange
         if(savedStudent>0){await SavePendingAsync();return;}
         busy=true;UpdateActions();using var hold=BeginBusy("Saving registration…",family,parent,contact,address,name,year,placement,joining,fees);
         try{
+            // Only new registrations need active section selection; saved history is retained.
+            await ActiveClassSectionPolicy.EnsureActiveAsync(placement.SelectedId);
             // Re-read the family parent before saving. The copied contact/address
             // belong to this child; a linked parent cannot be renamed here.
             if(familyAnchor>0){

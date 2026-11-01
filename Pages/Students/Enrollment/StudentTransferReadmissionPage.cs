@@ -965,7 +965,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
         BindDestinationLookups();
     }
     private (int ClassSectionId, string? Note)
-        ResolveDestinationClassSection(int campusId, int classId, int currentSectionId, string destinationLabel)
+        ResolveDestinationClassSection(int campusId, int classId, int currentSectionId, string destinationLabel, bool requireActive)
     {
         var exact =
             DatabaseHelper.QueryUser(
@@ -977,6 +977,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
                     "@ClassId",
                     classId),
                 DatabaseHelper.Int("@SectionId", currentSectionId));
+        if (requireActive) exact = ActiveClassSectionPolicy.OnlyActive(exact);
         if (exact.Rows.Count > 0)
         {
             return (
@@ -992,6 +993,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
                     "@ClassId",
                     classId),
                 DatabaseHelper.Int("@SectionId", 0));
+        if (requireActive) anySection = ActiveClassSectionPolicy.OnlyActive(anySection);
         if (anySection.Rows.Count == 0)
             return (0, null);
         string sectionName =
@@ -1139,6 +1141,8 @@ public sealed class StudentTransferReadmissionPage : V2Page
             if(destinationCampusId<=0 || destinationYearId<=0 || destinationSectionId<=0) {Warn("Select campus, academic year, and new class/section."); return;}
             try {
                 isExecuting=true;
+                // Re-admission is a new placement: C# owns its active-section selection.
+                await ActiveClassSectionPolicy.EnsureActiveAsync(destinationSectionId);
                 var data=await Task.Run(()=> {
                     using var connection=DatabaseHelper.GetConnection();
                     DatabaseHelper.OpenConnection(connection);
@@ -1212,9 +1216,9 @@ public sealed class StudentTransferReadmissionPage : V2Page
             {
                 (int resolvedId, string? note) = operation == "Transfer Class"
                     ? await Task.Run(() => ResolveDestinationClassSection(
-                        currentCampusId, destinationClassId, currentSectionId, "the current campus"))
+                        currentCampusId, destinationClassId, currentSectionId, "the current campus",currentTransferPlacement))
                     : await Task.Run(() => ResolveDestinationClassSection(
-                        destinationCampusId, currentClassId, currentSectionId, "the selected campus"));
+                        destinationCampusId, currentClassId, currentSectionId, "the selected campus",currentTransferPlacement));
                 if (resolvedId <= 0)
                 {
                     Warn(operation == "Transfer Class"
@@ -1309,6 +1313,8 @@ public sealed class StudentTransferReadmissionPage : V2Page
                     case "Transfer Section":
                         if (destinationSectionId <= 0)
                             throw new InvalidOperationException("Select the new section.");
+                        // Backdated historical transfers may retain inactive old sections.
+                        if (currentTransferPlacement) ActiveClassSectionPolicy.EnsureActive(destinationSectionId);
                         DatabaseHelper.Execute(
                             "TransferEnrollmentClassSection",
                             DatabaseHelper.Int("@UserId", CurrentUser.UserId),
@@ -1319,6 +1325,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
                         break;
                     case "Transfer Class":
                         {
+                            if (currentTransferPlacement) ActiveClassSectionPolicy.EnsureActive(preResolvedDestinationClassSectionId!.Value);
                             (string? feePolicy, string? feeSyncReason) = ResolveFeeSyncArgs(feeDecision, remarksText);
                             DatabaseHelper.Execute(
                                 "TransferEnrollmentClass",
@@ -1336,6 +1343,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
                         }
                     case "Transfer Campus":
                         {
+                            if (currentTransferPlacement) ActiveClassSectionPolicy.EnsureActive(preResolvedDestinationClassSectionId!.Value);
                             (string? feePolicy, string? feeSyncReason) = ResolveFeeSyncArgs(feeDecision, remarksText);
                             DatabaseHelper.Execute(
                                 "TransferEnrollmentCampus",
@@ -1354,6 +1362,7 @@ public sealed class StudentTransferReadmissionPage : V2Page
                     case "Re-Admit":
                         if (destinationCampusId <= 0 || destinationYearId <= 0 || destinationSectionId <= 0)
                             throw new InvalidOperationException("Select campus, academic year, and new class/section.");
+                        ActiveClassSectionPolicy.EnsureActive(destinationSectionId);
                         DatabaseHelper.Execute(
                             "ReAdmitStudentWithNumberChoice",
                             DatabaseHelper.Int("@UserId", CurrentUser.UserId),

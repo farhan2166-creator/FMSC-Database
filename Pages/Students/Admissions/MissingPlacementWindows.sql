@@ -47,6 +47,8 @@ SELECT AcademicYearId,YearName,GapStart,GapEnd,
    AND E.EnrollmentDate=NextStart AND E.AcademicYearId<>G.AcademicYearId) THEN NextStart END
 FROM Gaps G WHERE GapStart<=GapEnd;
 
+-- Historical gap correction may select a class-section later marked inactive.
+-- This is not a new admission; the current IsActive rule belongs to C# intake.
 -- Follow the class order used by Promotion. Repeating a class is valid history,
 -- but a higher class cannot precede a lower one. School precedes College;
 -- parallel programs of the same type do not have a relative class order.
@@ -69,7 +71,7 @@ SELECT W.WindowId,CS.ClassSectionId,CONVERT(bit,CASE WHEN W.PromotionDate IS NOT
  (SELECT 1 FROM History H WHERE H.EnrollmentDate=W.PromotionDate AND H.AcademicProgramId=C.AcademicProgramId
   AND (H.DisplayOrder>C.DisplayOrder OR H.DisplayOrder=C.DisplayOrder AND H.ClassId>C.ClassId)) THEN 1 ELSE 0 END)
 FROM @MissingWindows W CROSS JOIN Catalog C
-JOIN dbo.CampusClassSections CS WITH(HOLDLOCK) ON CS.ClassId=C.ClassId AND CS.IsActive=1
+JOIN dbo.CampusClassSections CS WITH(HOLDLOCK) ON CS.ClassId=C.ClassId
 WHERE NOT EXISTS
  (SELECT 1 FROM History H WHERE
   (H.EnrollmentDate<W.GapStart AND

@@ -530,7 +530,8 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
             await Task.WhenAll(catalogTask, assignmentsTask,sourcesTask);
             if (IsDisposed || version != classLoadVersion || campusId != sourceCampus.SelectedId||yearId!=sourceYear.SelectedId) return;
             classTable = await catalogTask;
-            campusAssignments=await assignmentsTask;
+            // C# filters only new promotion destinations, never historical source/HOLD.
+            campusAssignments=await ActiveClassSectionPolicy.OnlyActiveAsync(await assignmentsTask);
             sourcePlacements=await sourcesTask;
             using var sources=CampusClasses(classTable,sourcePlacements);
             sourceClass.Bind(sources, "ClassId", "ClassName");
@@ -643,9 +644,10 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
         var assignments=DatabaseHelper.QueryUserAsync("GetClassSections",DatabaseHelper.Int("@CampusId",sourceCampus.SelectedId),
             DatabaseHelper.Int("@ClassId",0),DatabaseHelper.Int("@SectionId",0));
         await Task.WhenAll(catalog,assignments);
-        using var allowed=PromotionChoices.DestinationClasses(await catalog,await assignments,sourceClass.SelectedId);
+        using var activeAssignments=await ActiveClassSectionPolicy.OnlyActiveAsync(await assignments);
+        using var allowed=PromotionChoices.DestinationClasses(await catalog,activeAssignments,sourceClass.SelectedId);
         if(allowed.AsEnumerable().Any(row=>Convert.ToInt32(row["ClassId"])==destinationClass.SelectedId)
-            &&(destinationSection.SelectedId<0||(await assignments).AsEnumerable().Any(row=>
+            &&(destinationSection.SelectedId<0||activeAssignments.AsEnumerable().Any(row=>
                 Convert.ToInt32(row["ClassId"])==destinationClass.SelectedId
                 &&Convert.ToInt32(row["ClassSectionId"])==destinationSection.SelectedId)))return true;
         Warn("The next class or its campus sections changed. Reload and review the destination before processing.");
@@ -1045,6 +1047,9 @@ public sealed class BulkPromotionPage : V2Page, IBusyPage
                         "dbo.BulkPromotionDecisionType",
                     Value = decisions
                 };
+            // Direct NEW promotion target: C# rechecks IsActive before the SQL write.
+            if(promoteCount>0 && destinationSection.SelectedId>0)
+                await ActiveClassSectionPolicy.EnsureActiveAsync(destinationSection.SelectedId);
             /* Section mappings use the existing promotion procedure per source section inside one transaction. */
             DataTable result = destinationSection.SelectedId < 0
                 ? await MatchingSectionPromotion.RunAsync(decisions,sourceYear.SelectedId,destinationYear.SelectedId,

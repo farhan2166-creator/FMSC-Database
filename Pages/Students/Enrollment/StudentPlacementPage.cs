@@ -208,12 +208,14 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
             var sections=await Task.Run(()=>DatabaseHelper.QueryUser("GetSections"));
             placements=await DatabaseHelper.QuerySqlAsync("""
                 EXEC dbo.RequirePermission @UserId,N'Enrollment.Manage';
-                SELECT P.ClassSectionId,P.CampusId,P.ClassId,P.SectionId,
-                 CONCAT(C.CampusName,N' / ',K.ClassName,N' / ',S.SectionName) Display
+                SELECT P.ClassSectionId,P.CampusId,P.ClassId,P.SectionId,P.IsActive,
+                 CONCAT(C.CampusName,N' / ',K.ClassName,N' / ',S.SectionName,
+                  CASE WHEN P.IsActive=0 THEN N' (inactive - historical only)' ELSE N'' END) Display
                 FROM dbo.CampusClassSections P JOIN dbo.Campuses C ON C.CampusId=P.CampusId
                 JOIN dbo.Classes K ON K.ClassId=P.ClassId JOIN dbo.Sections S ON S.SectionId=P.SectionId
-                WHERE P.IsActive=1 ORDER BY C.CampusName,K.DisplayOrder,S.DisplayOrder;
-                """,DatabaseHelper.Int("@UserId",CurrentUser.UserId));
+                WHERE P.IsActive=1 OR @IncludeInactive=1 ORDER BY C.CampusName,K.DisplayOrder,S.DisplayOrder;
+                """,DatabaseHelper.Int("@UserId",CurrentUser.UserId),
+                DatabaseHelper.Bit("@IncludeInactive",Annual || operation==2));
             Bind(sourceCampus,campuses,"CampusId","CampusName",true);Bind(targetCampus,campuses,"CampusId","CampusName",true,"Keep current campus");
             Bind(sourceYear,years,"AcademicYearId","YearName",false);Bind(targetYear,years,"AcademicYearId","YearName",false);
             Bind(sourceClass,catalog,"ClassId","ClassName",true);Bind(targetClass,catalog,"ClassId","ClassName",true,"Keep current class");Bind(sourceSection,sections,"SectionId","SectionName",true);
@@ -298,7 +300,7 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
             if(decision=="HOLD"){row["Destination"]=row["SourcePlacementId"];continue;}
             if(Annual){var next=PromotionChoices.NextClass(catalog,cls);cls=next is null?0:Convert.ToInt32(next["ClassId"]);}
             else if(targetClass.SelectedId>0)cls=targetClass.SelectedId;
-            var match=placements.AsEnumerable().Where(p=>Convert.ToInt32(p["CampusId"])==campus && Convert.ToInt32(p["ClassId"])==cls && Convert.ToInt32(p["SectionId"])==Convert.ToInt32(row["SectionId"])).ToArray();
+            var match=placements.AsEnumerable().Where(p=>Convert.ToInt32(p["CampusId"])==campus && Convert.ToInt32(p["ClassId"])==cls && Convert.ToInt32(p["SectionId"])==Convert.ToInt32(row["SectionId"]) && Convert.ToBoolean(p["IsActive"])).ToArray();
             row["Destination"]=match.Length==1?match[0]["ClassSectionId"]:0;
             row["Note"]=cls==0?"Final class: review departure, repeat or skip":match.Length!=1?"Map a destination section":Convert.ToString(row["PlacementState"]);
             if(Convert.ToBoolean(row["LegacySetupPending"]) || row.IsNull("PlacementConfirmedAt"))row["Note"]="Complete admission / legacy verification before movement";
@@ -344,6 +346,11 @@ public sealed class StudentPlacementPage : V2Page, IBusyPage
         if(selected.Any(r=>Annual ? Convert.ToString(r["Decision"]) is not ("PROMOTE" or "HOLD") : Convert.ToString(r["Decision"]) is not ("MOVE" or "CORRECT")))throw new InvalidOperationException("Choose decisions that match the selected action.");
         if(Annual && carry.Checked && !CurrentUser.HasPermission("Fees.Adjust"))
             throw new UnauthorizedAccessException("Carrying monthly concessions requires fee adjustment access.");
+        // NEW PROMOTE/MOVE targets must be active. HOLD retains its old section,
+        // and CORRECT may refer to an inactive historical section by design.
+        foreach(var target in selected.Where(r=>Convert.ToString(r["Decision"]) is "PROMOTE" or "MOVE")
+            .Select(r=>Convert.ToInt32(r["Destination"])).Distinct())
+            await ActiveClassSectionPolicy.EnsureActiveAsync(target);
         var plan=selected.Select(r=> {
             string? policy=null;
             var destination=placements.AsEnumerable().Single(p=>Convert.ToInt32(p["ClassSectionId"])==Convert.ToInt32(r["Destination"]));

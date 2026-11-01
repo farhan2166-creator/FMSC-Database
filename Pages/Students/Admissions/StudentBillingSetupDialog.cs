@@ -105,6 +105,7 @@ internal sealed class StudentBillingSetupDialog : ApplicationWindowForm
             var student = students.Rows[0]; studentName.Text = Convert.ToString(student["StudentName"]); fatherName.Text = Convert.ToString(student["FatherName"]);
             reason.Clear();
             var years = await DatabaseHelper.QueryUserAsync("GetAcademicYears"); year.Bind(years, "AcademicYearId", "YearName");
+            // Old/legacy placement may be inactive; preserve the recorded history.
             placements = await DatabaseHelper.QueryUserAsync("GetClassSections", DatabaseHelper.Int("@CampusId", 0), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0)); placement.Bind(placements);
             var records = await DatabaseHelper.QueryUserAsync("GetStudentEnrollmentsForLifecycle", DatabaseHelper.Int("@AdmissionId", admission));
             var current = records.AsEnumerable().FirstOrDefault(r => Convert.ToString(r["Status"]) == "Active");

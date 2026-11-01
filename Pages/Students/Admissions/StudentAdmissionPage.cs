@@ -4242,6 +4242,8 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             /* Show all field errors and focus the first invalid input. */
             if (!ValidateAdmissionInline(isNew: true))
                 return;
+            // IsActive is a C# rule for new intakes, not a permanent SQL history rule.
+            await ActiveClassSectionPolicy.EnsureActiveAsync(Section.SelectedId);
             string studentName =
                 name.Text.Trim();
             if (!ConfirmReasonableAge())

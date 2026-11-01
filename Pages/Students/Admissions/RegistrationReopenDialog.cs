@@ -45,9 +45,13 @@ internal sealed class RegistrationReopenDialog : ApplicationWindowForm
             if (year.SelectedValue is null || placement.SelectedId <= 0 || string.IsNullOrWhiteSpace(reason.Text) || reason.Text.Trim().Length > 250)
             { status.Text = "Choose the academic year and placement, and enter a reopening reason of up to 250 characters."; return; }
             busy = true; review.Enabled = apply.Enabled = year.Enabled = placement.Enabled = joining.Enabled = reason.Enabled = false;
-            bool saved = false;
+            bool saved = false, submitted = false;
             try
             {
+                // New reopening targets must be active at both review and apply.
+                // This is a C# selection rule; historical SQL placements remain valid.
+                await ActiveClassSectionPolicy.EnsureActiveAsync(placement.SelectedId);
+                submitted = true;
                 using var result = await DatabaseHelper.QueryUserAsync("ReopenPendingRegistration",
                     DatabaseHelper.Int("@AdmissionId", admission), DatabaseHelper.Int("@AcademicYearId", Convert.ToInt32(year.SelectedValue)),
                     DatabaseHelper.Int("@ClassSectionId", Convert.ToInt32(placement.SelectedValue)), DatabaseHelper.Date("@JoiningDate", joining.Value.Date),
@@ -63,8 +67,8 @@ internal sealed class RegistrationReopenDialog : ApplicationWindowForm
             catch (Exception ex)
             {
                 snapshot = null;
-                if (!preview) unknown = true;
-                status.Text = DbMessage.UserMessage(ex) + (preview ? "" : " Close this window and reload the student to check the saved outcome before trying again.");
+                if (!preview && submitted) unknown = true;
+                status.Text = DbMessage.UserMessage(ex) + (preview || !submitted ? "" : " Close this window and reload the student to check the saved outcome before trying again.");
             }
             finally
             {
@@ -84,7 +88,7 @@ internal sealed class RegistrationReopenDialog : ApplicationWindowForm
                 var current = years.AsEnumerable().FirstOrDefault(row => Convert.ToBoolean(row["IsCurrent"]));
                 if (current is not null) year.SelectedValue = current["AcademicYearId"];
                 var places = await DatabaseHelper.QueryUserAsync("GetClassSections", DatabaseHelper.Int("@CampusId", 0), DatabaseHelper.Int("@ClassId", 0), DatabaseHelper.Int("@SectionId", 0));
-                placement.Bind(places);
+                placement.Bind(await ActiveClassSectionPolicy.OnlyActiveAsync(places));
                 ready = true;
                 status.Text = "Select the new placement and joining date. Review reopening first; old cancelled records and finances remain unchanged.";
             }

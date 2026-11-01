@@ -50,7 +50,7 @@ internal static class MatchingSectionPromotion
         }
         if (missing.Count>0)
             throw new InvalidOperationException("Choose destination sections for: " + string.Join(", ",missing.OrderBy(name=>name)) + ". No students were processed.");
-        using(var check=new SqlCommand("SELECT ClassSectionId FROM dbo.CampusClassSections WITH(HOLDLOCK) WHERE CampusId=@Campus AND ClassId=@Class;",connection,transaction))
+        using(var check=new SqlCommand("SELECT ClassSectionId FROM dbo.CampusClassSections WITH(HOLDLOCK) WHERE CampusId=@Campus AND ClassId=@Class AND IsActive=1;",connection,transaction))
         {
             check.Parameters.AddRange(new[]{DatabaseHelper.Int("@Campus",campus),DatabaseHelper.Int("@Class",destinationClass)});
             var valid=new HashSet<int>();

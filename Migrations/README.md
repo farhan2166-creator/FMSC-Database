@@ -1,4 +1,14 @@
-## Current target: schema 66
+## Current target: schema 67
+
+Migration `67.sql` supersedes only the class-section IsActive hard stops
+introduced for `dbo.ReopenPendingRegistration` in 65 and
+`dbo.ApplyStudentPlacementPlan` in 62/66. C# selects and rechecks active
+destinations for new intake, reopening, promotions, readmissions and current
+transfers. SQL retains permission, review, financial, referential and history
+rules; historical corrections and retained older placements may reference an
+inactive section. This decision does not change inactive-user security or
+setup-readiness reporting. Apply 67 once after 66; never rerun old migrations.
+Previous entries below document behavior at those version numbers.
 
 
 Migration `66.sql` updates **only error-message wording** for the current
