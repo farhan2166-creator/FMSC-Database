@@ -53,10 +53,11 @@ function Get-RequiredVersion {
     foreach ($item in $sources) {
         if (-not (Test-Path -LiteralPath $item.Path -PathType Leaf)) { continue }
         $source = Get-Content -LiteralPath $item.Path -Raw
-        if ($source -notmatch $item.Pattern) {
+        $versionMatch = [regex]::Match($source, $item.Pattern)
+        if (-not $versionMatch.Success) {
             throw "Could not determine required schema version from $($item.Path). Refusing to guess."
         }
-        $found += [pscustomobject]@{ Label = $item.Label; Version = [int]$Matches[1] }
+        $found += [pscustomobject]@{ Label = $item.Label; Version = [int]$versionMatch.Groups[1].Value }
     }
     if ($found.Count -gt 0) {
         $different = @($found | Where-Object { $_.Version -ne $found[0].Version })
