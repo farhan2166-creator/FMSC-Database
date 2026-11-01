@@ -27,7 +27,7 @@ internal static partial class Program
                 bool canCreate=admit&&students;
                 Check(DirectAdmissionAccess.CanCreate(CurrentUser.HasPermission)==canCreate,
                     "Direct admission requires both Admit and View permissions");
-                using(var home=new WelcomePage(_=>{},null,_=>Task.FromResult(new DataTable()),_=>Task.FromResult(new DataTable())))
+                using(var home=new WelcomePage(_=>{},null,(_,_)=>Task.FromResult(new DataTable()),_=>Task.FromResult(new DataTable())))
                     Check(Children(home).OfType<ModernButton>().Any(b=>b.Text==PageTitles.Admissions)==canCreate,
                         "Dashboard admission shortcut respects student viewing");
                 using(var shell=new FMSC_SMS.MainDashboardForm((_,_)=>{}))
@@ -58,7 +58,7 @@ internal static partial class Program
                 bool expected=students&&(reports||collect);
                 Check(StudentAccountStatementPage.CanOpenAccount==expected,
                     "Account entry needs Students.View plus Reports.View or Fees.Collect");
-                using(var home=new WelcomePage(_=>{},null,_=>Task.FromResult(new DataTable()),_=>Task.FromResult(new DataTable())))
+                using(var home=new WelcomePage(_=>{},null,(_,_)=>Task.FromResult(new DataTable()),_=>Task.FromResult(new DataTable())))
                     Check(Children(home).OfType<ModernButton>().Any(b=>b.Text==PageTitles.StudentFeeAccount)==expected,
                         "Dashboard account shortcut matches the full account access rule");
                 if(mask is 2 or 5)

@@ -21,13 +21,18 @@ SET @Definition=REPLACE(@Definition,@Anchor,
         THROW 52311, ''This is a section-only movement. Use Transfer Section; no class-transfer fees were changed.'', 1;');
 -- An existing module may retain a CREATE/CREATE OR ALTER definition text.
 -- Re-execute it as ALTER, never CREATE, to preserve the procedure and grants.
-DECLARE @ModuleHeader nvarchar(80)=UPPER(LEFT(LTRIM(@Definition),80));
-IF @ModuleHeader LIKE N'CREATE OR ALTER PROC%'
-    SET @Definition=STUFF(@Definition,CHARINDEX(N'CREATE OR ALTER',UPPER(@Definition)),15,N'ALTER');
-ELSE IF @ModuleHeader LIKE N'CREATE PROC%'
-    SET @Definition=STUFF(@Definition,CHARINDEX(N'CREATE',UPPER(@Definition)),6,N'ALTER');
-ELSE IF @ModuleHeader NOT LIKE N'ALTER PROC%'
-    THROW 51000,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
+-- SQL module definitions can retain leading comments or newlines.
+-- Only accept CREATE/ALTER PROC headers in the opening 512 characters.
+DECLARE @ModuleText nvarchar(max)=UPPER(@Definition);
+DECLARE @CreateOrAlterAt int=CHARINDEX(N'CREATE OR ALTER PROC',@ModuleText);
+DECLARE @CreateAt int=CHARINDEX(N'CREATE PROC',@ModuleText);
+DECLARE @AlterAt int=CHARINDEX(N'ALTER PROC',@ModuleText);
+IF @CreateOrAlterAt BETWEEN 1 AND 512
+    SET @Definition=STUFF(@Definition,@CreateOrAlterAt,15,N'ALTER');
+ELSE IF @CreateAt BETWEEN 1 AND 512
+    SET @Definition=STUFF(@Definition,@CreateAt,6,N'ALTER');
+ELSE IF @AlterAt NOT BETWEEN 1 AND 512
+    THROW 51007,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
 EXEC sys.sp_executesql @Definition;
 GO
 INSERT dbo.DatabaseVersion(VersionNumber,AppliedOn,AppliedBy,Notes)

@@ -63,13 +63,18 @@ SET @ReAdmit=REPLACE(@ReAdmit,@Anchor,@Anchor+CHAR(10)+N'
 ');
 -- An existing module may retain a CREATE/CREATE OR ALTER definition text.
 -- Re-execute it as ALTER, never CREATE, to preserve the procedure and grants.
-DECLARE @ModuleHeader nvarchar(80)=UPPER(LEFT(LTRIM(@ReAdmit),80));
-IF @ModuleHeader LIKE N'CREATE OR ALTER PROC%'
-    SET @ReAdmit=STUFF(@ReAdmit,CHARINDEX(N'CREATE OR ALTER',UPPER(@ReAdmit)),15,N'ALTER');
-ELSE IF @ModuleHeader LIKE N'CREATE PROC%'
-    SET @ReAdmit=STUFF(@ReAdmit,CHARINDEX(N'CREATE',UPPER(@ReAdmit)),6,N'ALTER');
-ELSE IF @ModuleHeader NOT LIKE N'ALTER PROC%'
-    THROW 51000,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
+-- SQL module definitions can retain leading comments or newlines.
+-- Only accept CREATE/ALTER PROC headers in the opening 512 characters.
+DECLARE @ModuleText nvarchar(max)=UPPER(@ReAdmit);
+DECLARE @CreateOrAlterAt int=CHARINDEX(N'CREATE OR ALTER PROC',@ModuleText);
+DECLARE @CreateAt int=CHARINDEX(N'CREATE PROC',@ModuleText);
+DECLARE @AlterAt int=CHARINDEX(N'ALTER PROC',@ModuleText);
+IF @CreateOrAlterAt BETWEEN 1 AND 512
+    SET @ReAdmit=STUFF(@ReAdmit,@CreateOrAlterAt,15,N'ALTER');
+ELSE IF @CreateAt BETWEEN 1 AND 512
+    SET @ReAdmit=STUFF(@ReAdmit,@CreateAt,6,N'ALTER');
+ELSE IF @AlterAt NOT BETWEEN 1 AND 512
+    THROW 51007,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
 EXEC sys.sp_executesql @ReAdmit;
 GO
 INSERT dbo.DatabaseVersion(VersionNumber,AppliedOn,AppliedBy,Notes)
