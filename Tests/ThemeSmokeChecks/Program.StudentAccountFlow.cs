@@ -109,8 +109,14 @@ internal static partial class Program
             {page.DrawToBitmap(bitmap,page.ClientRectangle);bitmap.Save(Path.GetFullPath("artifacts/student-account/single.png"));}
             Check(type.GetMethod("PrintThermalDueReport",flags) is null,
                 "Statement printing no longer uses the retired drawing-based fee-due report");
-            var from = Field<ModernDatePicker>("from"); from.Value = new DateTime(2026, 10, 1); from.Checked = true;
+            var from = Field<ModernDatePicker>("from");
+            bool checkboxNotification = false;
+            from.CheckedChanged += (_, _) => checkboxNotification = true;
+            // The existing value already equals 1 October: checking an optional
+            // date still changes the effective financial filter and must notify.
+            from.Value = new DateTime(2026, 10, 1); from.Checked = true;
             Console.WriteLine("ACCOUNT_FLOW: owned receipt guard verified");
+            Check(checkboxNotification, "An optional-date checkbox change notifies the owning financial report");
             Check(!Field<ModernButton>("exportButton").Enabled, "Changing the period invalidates the previous financial snapshot");
             Check(!Descendants(page).Any(c=>c.Text=="Family / Group Statements"),
                 "The retired group statement has no account shortcut");
