@@ -1,8 +1,20 @@
 # Publication security review
 
-Status: NOT CLEARED FOR PUBLICATION. Repository visibility has not been changed.
+**Current repository visibility (checked 2026-11-01): PUBLIC.**
+**Privacy/publication acceptance: NOT YET ESTABLISHED.** This is not an assertion
+that a leak exists, and this review does not change visibility or permissions.
+The original findings below describe an earlier local review and must not be
+mistaken for a fresh all-assets clearance.
 
-## Local findings
+## Current evidence and remaining privacy gate
+
+- [FMSC Security Checks at main 12b37c3](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/41325439569) passed. It scans available history, current source, and selected schema-package contents; it is not a visual or artifact-wide privacy certification.
+- Public GitHub repository metadata was checked on 2026-11-01. No GitHub Releases were returned in that check. Existing Actions artifacts, logs, issue attachments, screenshots and remote-only refs were **not** individually cleared.
+- Before sharing release assets or production-adjacent screenshots, review all images and documents, issue/PR attachments, retained workflow artifacts and any external mirrors. Verify fictional fixtures and redact sensitive student/staff data. If an actual credential or private record is discovered, restrict access and follow incident response; deleting the current file does not clean history.
+
+## Historical publication assessment (retained for traceability)
+
+## Earlier local findings
 
 - Reviewed all 14 commits available through local refs (not a shallow clone).
   The configured fetch covers main only; other remote branches and tags remain unreviewed.
@@ -24,7 +36,7 @@ Status: NOT CLEARED FOR PUBLICATION. Repository visibility has not been changed.
 - Several desktop/SQL workflows reference test projects and other Tools scripts
   missing from the current commit. Security repairs do not restore these test suites.
 
-## Changes prepared locally
+## Earlier changes prepared locally
 
 - Security workflow runs on main pushes and pull requests, plus manual dispatch.
 - Checkouts explicitly disable credential persistence.
@@ -55,4 +67,4 @@ Status: NOT CLEARED FOR PUBLICATION. Repository visibility has not been changed.
    must use fictional data. Public standard hosted runners have free Actions usage;
    larger runners remain billed.
 
-Remote settings and assets were not changed or verified. The review itself does not change repository visibility.
+At the time of the earlier local review, remote settings and assets were not changed or verified. As of 2026-11-01 this repository is public; the publication/privacy acceptance gate above remains unresolved. This document edit does not alter GitHub visibility or settings.

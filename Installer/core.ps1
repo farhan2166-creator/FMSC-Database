@@ -924,6 +924,15 @@ function Invoke-PendingMigrations {
     if ($target -ne $RequiredVersion) {
         throw "Available migrations stop at $target, but this release requires $RequiredVersion. No migrations were run."
     }
+    # Refuse an incomplete upgrade BEFORE taking a backup or modifying SQL.
+    # A target-version file alone cannot prove intermediate migrations were supplied.
+    $expected = $current + 1
+    foreach ($migration in $pending) {
+        if ($migration.Version -ne $expected) {
+            throw "Missing required migration $expected.sql (database schema $current, target $RequiredVersion). No migrations were run."
+        }
+        $expected++
+    }
     $script:RecoveryBackupPath = New-PreMigrationBackup -FromVersion "$current" -ToVersion "$target"
     foreach ($migration in $pending) {
         Write-Step "Applying database migration $($migration.Version)..."

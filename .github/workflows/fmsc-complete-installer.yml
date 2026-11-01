@@ -163,6 +163,19 @@ jobs:
           $excluded = @(Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.Extension.ToLowerInvariant() -in @('.mdf','.ldf','.bak') })
           if ($excluded.Count -gt 0) { throw 'Unexpected school database or backup file in the GitHub artifact.' }
 
+          # Derive package instructions from the actual source version, never a stale number.
+          $installerText = Get-Content -LiteralPath (Join-Path $root 'core.ps1') -Raw
+          $applicationText = Get-Content -LiteralPath (Join-Path $env:GITHUB_WORKSPACE 'DatabaseHelper.cs') -Raw
+          $installerVersion = [regex]::Match($installerText, '\$DatabaseVersion\s*=\s*''([0-9]+)''')
+          $applicationVersion = [regex]::Match($applicationText, 'RequiredDatabaseSchemaVersion\s*=\s*"([0-9]+)"')
+          if (-not $installerVersion.Success -or -not $applicationVersion.Success) {
+            throw 'Cannot determine schema version from the installer and application source.'
+          }
+          $requiredSchema = $installerVersion.Groups[1].Value
+          if ($requiredSchema -ne $applicationVersion.Groups[1].Value) {
+            throw "Release schema mismatch: installer $requiredSchema vs application $($applicationVersion.Groups[1].Value)."
+          }
+
           $db = Join-Path $root 'Database'
           New-Item -ItemType Directory -Path $db -Force | Out-Null
           @(
@@ -189,14 +202,17 @@ jobs:
             ''
             'APPLICATION UPDATE WITHOUT REPLACING A SCHOOL DATABASE'
             'Do not put a new MDF/LDF over an existing installed school database.'
-            'The installer verifies schema 21 before activating the app; schema 19/20 upgrades use a verified backup.'
-            'Historical upgrades are retired. Migrations 20/21 upgrade the supported schema-19/20 baselines.'
+            "The installer and application require database schema $requiredSchema."
+            'Only consecutive pending migrations may upgrade an older supported schema.'
+            'A missing version stops before backup or SQL changes; newer databases refuse.'
+            'For a fresh install, supply the latest compatible detached database pair.'
             ''
             'Includes the current self-contained .NET 8 app, SQL LocalDB 2022 MSI,'
             'pinned Microsoft sqlcmd tool and current installer core.ps1.'
             'The migrations folder may be empty. Numbered SQL files newer than the'
             'installed database version run in numeric order, with a verified backup'
-            'first. Already-applied files are skipped; failed SQL or compatibility'
+            'first. Missing intermediate files refuse without touching SQL.'
+            'Already-applied files are skipped; failed SQL or compatibility'
             'verification stops application activation. Retired setup 7 is not rerun.'
             'Communication Center is preserved from the supplied/installed database.'
             'If silent LocalDB setup fails, this installer offers the official Microsoft'
