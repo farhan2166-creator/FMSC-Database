@@ -107,6 +107,10 @@ internal static class AdministrativeAccess
             hints.Add("Quick Registration also needs student viewing access.");
         if (codes.Contains("Fees.Collect") && !codes.Contains("Fees.View"))
             hints.Add("Fee Collection also needs View Fees access to load charges and balances.");
+        if (codes.Contains("Fees.Collect") && !codes.Contains("Students.View"))
+            hints.Add("Student Purchases also needs View Students access to find students and their placements.");
+        if (codes.Contains("Fees.Collect") && !codes.Contains("Fees.View"))
+            hints.Add("Student Purchases also needs View Fees access to load charge options and history.");
         if ((codes.Contains("Certificates.Create") || codes.Contains("Students.Leave")) && !codes.Contains("Students.View"))
             hints.Add("Student certificates also need View Students access to find and verify students.");
         return hints.ToArray();
