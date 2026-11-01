@@ -57,6 +57,15 @@ internal static class AdministrativeAccessChecks
             "Collection-only permissions explain that Fee Collection also requires fee viewing.");
         Check(!AdministrativeAccess.Hints(feeCollectionCatalog,new[]{20,21}).Any(hint=>hint.Contains("Fee Collection")),
             "Complete collection and viewing permissions do not show a false dependency warning.");
+        var certificateCatalog=catalog with { Permissions=permissions.Concat(new[]{
+            new AccessPermission(40,"Certificates.Create","Create certificates",""),
+            new AccessPermission(41,"Students.Leave","Leave student","") }).ToArray() };
+        foreach(int chosen in new[]{40,41}){
+            Check(AdministrativeAccess.Hints(certificateCatalog,new[]{chosen}).Any(h=>h.Contains("Student certificates")&&h.Contains("View Students")),
+                "Certificate-only permissions warn that student viewing is also required.");
+            Check(!AdministrativeAccess.Hints(certificateCatalog,new[]{chosen,10}).Any(h=>h.Contains("Student certificates")),
+                "Full student and certificate permission has no spurious warning.");
+        }
         Check(AdministrativeAccess.Hints(catalog,new[]{30,33,34}).Length==0,"Broad administration rights satisfy the known management dependencies");
         Check(catalog.Token==AdministrativeAccess.CatalogToken(roles.Reverse(),permissions.Reverse()),"Catalog fingerprints are independent of SQL row ordering");
         Check(catalog.Token!=AdministrativeAccess.CatalogToken(roles.Select(role=>role.Id==2?role with { Permissions=new[]{10} }:role),permissions),"Changed permission definitions invalidate a displayed access preview");
