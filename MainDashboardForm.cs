@@ -664,9 +664,10 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                         (factory, module, title) => NavigateTo(factory, module, title)),
                     "Certificates",
                     PageTitles.StudentCertificates,
-                    "Certificates.Create")
+                    CurrentUser.HasPermission("Certificates.Create") ? "Certificates.Create" : "Students.Leave")
             }.Where(item => (item.Title != "Pending Registrations" || QuickRegistrationAccess.CanUse(CurrentUser.HasPermission))
-                && (item.Title != "Fee Collection" || FeeCollectionAccess.CanUse(CurrentUser.HasPermission))).ToArray(),
+                && (item.Title != "Fee Collection" || FeeCollectionAccess.CanUse(CurrentUser.HasPermission))
+                && (item.Title != PageTitles.StudentCertificates || CertificateWorkspaceAccess.CanOpenHub(CurrentUser.HasPermission))).ToArray(),
             expandInitially: true);
         AddModule(
             flow,
