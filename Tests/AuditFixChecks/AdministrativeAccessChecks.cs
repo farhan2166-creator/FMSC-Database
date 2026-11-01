@@ -52,6 +52,11 @@ internal static class AdministrativeAccessChecks
         Check(AdministrativeAccess.Hints(catalog,new[]{30}).Length==1&&AdministrativeAccess.Hints(catalog,new[]{30,31,32}).Length==0,"User-management dependency hints inform without silently granting access");
         Check(AdministrativeAccess.Hints(catalog,new[]{33}).Length==1&&AdministrativeAccess.Hints(catalog,new[]{33,32}).Length==0,"Role-management hints match the screen's read requirements");
         Check(AdministrativeAccess.Hints(catalog,new[]{11}).Single().Contains("Quick Registration")&&AdministrativeAccess.Hints(catalog,new[]{11,10}).Length==0,"Admission hint preserves the narrower Quick Registration requirement");
+        var feeCollectionCatalog=catalog with { Permissions=permissions.Append(new AccessPermission(21,"Fees.Collect","Collect fees","")).ToArray() };
+        Check(AdministrativeAccess.Hints(feeCollectionCatalog,new[]{21}).Any(hint=>hint.Contains("Fee Collection")&&hint.Contains("View Fees")),
+            "Collection-only permissions explain that Fee Collection also requires fee viewing.");
+        Check(!AdministrativeAccess.Hints(feeCollectionCatalog,new[]{20,21}).Any(hint=>hint.Contains("Fee Collection")),
+            "Complete collection and viewing permissions do not show a false dependency warning.");
         Check(AdministrativeAccess.Hints(catalog,new[]{30,33,34}).Length==0,"Broad administration rights satisfy the known management dependencies");
         Check(catalog.Token==AdministrativeAccess.CatalogToken(roles.Reverse(),permissions.Reverse()),"Catalog fingerprints are independent of SQL row ordering");
         Check(catalog.Token!=AdministrativeAccess.CatalogToken(roles.Select(role=>role.Id==2?role with { Permissions=new[]{10} }:role),permissions),"Changed permission definitions invalidate a displayed access preview");
