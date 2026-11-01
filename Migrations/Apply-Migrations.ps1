@@ -287,6 +287,16 @@ function Invoke-MigrationApplier {
     if ($pending[-1].Version -ne $required) {
         throw "Available migrations stop at $($pending[-1].Version), but the release requires $required. No migrations were run."
     }
+    # Never skip a version in the required migration chain. The earliest
+    # available script must upgrade the database's exact current version.
+    # Detect missing files before prompting, creating a backup, or changing SQL.
+    $expected = $current + 1
+    foreach ($migration in $pending) {
+        if ($migration.Version -ne $expected) {
+            throw "Missing required migration $expected.sql (database schema $current, target $required). No migrations were run."
+        }
+        $expected++
+    }
 
     if ($PlanOnly) {
         Write-Host 'Plan only: no backup or migrations executed.' -ForegroundColor Yellow
