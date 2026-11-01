@@ -21,6 +21,21 @@ internal static class RemainingFindingChecks
         Check(FeeCollectionAccess.CanUse(_=>true),"Administrator may access Fee Collection through the existing permission bypass");
         Check(!FeeCollectionAccess.CanUse(p=>p is "Fees.Collect" or "Fees.Adjust"),"Fee adjustment does not substitute for fee viewing");
         for(int mask=0;mask<8;mask++){
+            bool collect=(mask&1)!=0, viewFees=(mask&2)!=0, viewStudents=(mask&4)!=0;
+            bool Has(string permission)=>permission switch {
+                "Fees.Collect"=>collect,
+                "Fees.View"=>viewFees,
+                "Students.View"=>viewStudents,
+                _=>false
+            };
+            Check(StudentPurchasesAccess.CanUse(Has)==(collect&&viewFees&&viewStudents),
+                "Student Purchases requires collection, fee viewing and student viewing together");
+        }
+        Check(StudentPurchasesAccess.CanUse(_=>true),
+            "Administrator permission bypass is respected by Student Purchases");
+        Check(!StudentPurchasesAccess.CanUse(p=>p is "Fees.View" or "Students.View" or "Fees.Adjust"),
+            "Fee adjustment cannot substitute for collection permission");
+        for(int mask=0;mask<8;mask++){
             bool canViewStudent=(mask&1)!=0, general=(mask&2)!=0, leaving=(mask&4)!=0;
             bool Has(string p)=>p switch {
                 "Students.View"=>canViewStudent,"Certificates.Create"=>general,"Students.Leave"=>leaving,_=>false
