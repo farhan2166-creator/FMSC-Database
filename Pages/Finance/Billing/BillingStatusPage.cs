@@ -68,7 +68,7 @@ public sealed class BillingStatusPage : V2Page, IBusyPage
     {
         if (busy || navigate is null || SelectedStudent <= 0) return;
         int id = SelectedStudent;
-        if (collection && CurrentUser.HasPermission("Fees.Collect"))
+        if (collection && FeeCollectionAccess.CanUse(CurrentUser.HasPermission))
             navigate(() => new FeeCollectionPage(id), "Finance", "Fee Collection");
         else if (!collection && CurrentUser.HasPermission("Students.View") && CurrentUser.HasPermission("Students.Administer"))
             navigate(() => new StudentAdmissionPage(navigate, id), "Students", PageTitles.Admissions);
@@ -86,7 +86,7 @@ public sealed class BillingStatusPage : V2Page, IBusyPage
     {
         bool selected = !busy && navigate is not null && SelectedStudent > 0;
         openStudent.Enabled = selected && CurrentUser.HasPermission("Students.View") && CurrentUser.HasPermission("Students.Administer");
-        collect.Enabled = selected && CurrentUser.HasPermission("Fees.Collect");
+        collect.Enabled = selected && FeeCollectionAccess.CanUse(CurrentUser.HasPermission);
     }
 
     private async Task RefreshAsync()
