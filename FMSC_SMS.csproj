@@ -149,8 +149,10 @@
 		<MakeDir Directories="$(ReleaseRoot)Migrations" />
 		<ItemGroup>
 			<MigrationFiles Include="$(DeploymentMigrationDirectory)\*.sql" />
+			<MigrationApplierFiles Include="$(MSBuildProjectDirectory)\Migrations\Apply-Migrations.ps1;$(MSBuildProjectDirectory)\Migrations\Apply-Migrations.bat;$(MSBuildProjectDirectory)\Migrations\README.md" />
 		</ItemGroup>
 		<Copy SourceFiles="@(MigrationFiles)" DestinationFiles="@(MigrationFiles->'$(ReleaseRoot)Migrations\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="@(MigrationApplierFiles)" DestinationFolder="$(ReleaseRoot)Migrations" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\core.ps1" DestinationFiles="$(ReleaseRoot)core.ps1" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\Install FMSC_SMS.bat" DestinationFiles="$(ReleaseRoot)Install FMSC_SMS.bat" SkipUnchangedFiles="true" />
 	</Target>
