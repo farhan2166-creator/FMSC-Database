@@ -61,6 +61,15 @@ SET @ReAdmit=REPLACE(@ReAdmit,@Anchor,@Anchor+CHAR(10)+N'
               WHERE H.AdmissionId=@AdmissionId AND H.ResumeDate IS NULL)
         THROW 56530, ''This student is on hold. Use Lift Hold / Resume rather than readmission.'',1;
 ');
+-- An existing module may retain a CREATE/CREATE OR ALTER definition text.
+-- Re-execute it as ALTER, never CREATE, to preserve the procedure and grants.
+DECLARE @ModuleHeader nvarchar(80)=UPPER(LEFT(LTRIM(@ReAdmit),80));
+IF @ModuleHeader LIKE N'CREATE OR ALTER PROC%'
+    SET @ReAdmit=STUFF(@ReAdmit,CHARINDEX(N'CREATE OR ALTER',UPPER(@ReAdmit)),15,N'ALTER');
+ELSE IF @ModuleHeader LIKE N'CREATE PROC%'
+    SET @ReAdmit=STUFF(@ReAdmit,CHARINDEX(N'CREATE',UPPER(@ReAdmit)),6,N'ALTER');
+ELSE IF @ModuleHeader NOT LIKE N'ALTER PROC%'
+    THROW 51000,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
 EXEC sys.sp_executesql @ReAdmit;
 GO
 INSERT dbo.DatabaseVersion(VersionNumber,AppliedOn,AppliedBy,Notes)

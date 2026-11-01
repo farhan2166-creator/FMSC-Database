@@ -15,6 +15,15 @@ SET @Reopen=REPLACE(@Reopen,@Expected,N'WHERE ClassSectionId=@ClassSectionId');
 SET @Reopen=REPLACE(@Reopen,
  N'Choose an active placement and a joining date within its academic year',
  N'Choose a valid placement and a joining date within its academic year');
+-- An existing module may retain a CREATE/CREATE OR ALTER definition text.
+-- Re-execute it as ALTER, never CREATE, to preserve the procedure and grants.
+DECLARE @ModuleHeader nvarchar(80)=UPPER(LEFT(LTRIM(@Reopen),80));
+IF @ModuleHeader LIKE N'CREATE OR ALTER PROC%'
+    SET @Reopen=STUFF(@Reopen,CHARINDEX(N'CREATE OR ALTER',UPPER(@Reopen)),15,N'ALTER');
+ELSE IF @ModuleHeader LIKE N'CREATE PROC%'
+    SET @Reopen=STUFF(@Reopen,CHARINDEX(N'CREATE',UPPER(@Reopen)),6,N'ALTER');
+ELSE IF @ModuleHeader NOT LIKE N'ALTER PROC%'
+    THROW 51000,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
 EXEC sys.sp_executesql @Reopen;
 GO
 DECLARE @Plan nvarchar(max)=OBJECT_DEFINITION(OBJECT_ID(N'dbo.ApplyStudentPlacementPlan',N'P'));
@@ -25,6 +34,15 @@ SET @Plan=REPLACE(@Plan,@Expected,N'WHERE ClassSectionId=@Target');
 SET @Plan=REPLACE(@Plan,
  N'Choose an active destination for every selected student.',
  N'Choose a valid destination for every selected student.');
+-- An existing module may retain a CREATE/CREATE OR ALTER definition text.
+-- Re-execute it as ALTER, never CREATE, to preserve the procedure and grants.
+DECLARE @ModuleHeader nvarchar(80)=UPPER(LEFT(LTRIM(@Plan),80));
+IF @ModuleHeader LIKE N'CREATE OR ALTER PROC%'
+    SET @Plan=STUFF(@Plan,CHARINDEX(N'CREATE OR ALTER',UPPER(@Plan)),15,N'ALTER');
+ELSE IF @ModuleHeader LIKE N'CREATE PROC%'
+    SET @Plan=STUFF(@Plan,CHARINDEX(N'CREATE',UPPER(@Plan)),6,N'ALTER');
+ELSE IF @ModuleHeader NOT LIKE N'ALTER PROC%'
+    THROW 51000,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
 EXEC sys.sp_executesql @Plan;
 GO
 INSERT dbo.DatabaseVersion(VersionNumber,AppliedOn,AppliedBy,Notes)

@@ -19,6 +19,15 @@ IF @Definition IS NULL OR CHARINDEX(@Anchor,@Definition)=0
 SET @Definition=REPLACE(@Definition,@Anchor,
  @Anchor+CHAR(10)+N'    IF @OldClassId = @NewClassId
         THROW 52311, ''This is a section-only movement. Use Transfer Section; no class-transfer fees were changed.'', 1;');
+-- An existing module may retain a CREATE/CREATE OR ALTER definition text.
+-- Re-execute it as ALTER, never CREATE, to preserve the procedure and grants.
+DECLARE @ModuleHeader nvarchar(80)=UPPER(LEFT(LTRIM(@Definition),80));
+IF @ModuleHeader LIKE N'CREATE OR ALTER PROC%'
+    SET @Definition=STUFF(@Definition,CHARINDEX(N'CREATE OR ALTER',UPPER(@Definition)),15,N'ALTER');
+ELSE IF @ModuleHeader LIKE N'CREATE PROC%'
+    SET @Definition=STUFF(@Definition,CHARINDEX(N'CREATE',UPPER(@Definition)),6,N'ALTER');
+ELSE IF @ModuleHeader NOT LIKE N'ALTER PROC%'
+    THROW 51000,'Procedure definition has an unexpected header; refusing an unsafe change.',1;
 EXEC sys.sp_executesql @Definition;
 GO
 INSERT dbo.DatabaseVersion(VersionNumber,AppliedOn,AppliedBy,Notes)
