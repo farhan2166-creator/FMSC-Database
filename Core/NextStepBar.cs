@@ -12,6 +12,8 @@ public sealed class FlowStep
     public string Text { get; }
     /// <summary>The permission the step's screen or procedure needs; a user without it is not offered the step.</summary>
     public string? Permission { get; }
+    /// <summary>Additional entry requirements, such as SQL readers needing a second permission.</summary>
+    public Func<bool>? Eligible { get; private init; }
     /// <summary>The recommended next step, drawn as the filled button.</summary>
     public bool Primary { get; }
     public string Module { get; private init; } = string.Empty;
@@ -26,8 +28,9 @@ public sealed class FlowStep
         string title,
         string? permission,
         Func<int, NavigateAction?, Control> page,
-        bool primary = false) =>
-        new(text, permission, primary) { Module = module, Title = title, Page = page };
+        bool primary = false,
+        Func<bool>? eligible = null) =>
+        new(text, permission, primary) { Module = module, Title = title, Page = page, Eligible = eligible };
     public static FlowStep Do(
         string text,
         string? permission,
@@ -55,7 +58,7 @@ public static class StudentFlow
             "Fee Collection",
             "Fees.Collect",
             (admissionId, _) => new Pages.Finance.Collection.FeeCollectionPage(admissionId),
-            primary);
+            primary, eligible: () => FeeCollectionAccess.CanUse(CurrentUser.HasPermission));
     /// <summary>Fee Collection, opened on the student.</summary>
     public static FlowStep FeeCollection(bool primary = false) =>
         FlowStep.Go(
@@ -64,7 +67,7 @@ public static class StudentFlow
             "Fee Collection",
             "Fees.Collect",
             (admissionId, _) => new Pages.Finance.Collection.FeeCollectionPage(admissionId),
-            primary);
+            primary, eligible: () => FeeCollectionAccess.CanUse(CurrentUser.HasPermission));
 }
 /// <summary>A slim strip that appears when a step has finished: a message about what was done and a button for each sensible next step, each carrying the student that was just handled.</summary>
 public sealed class NextStepBar : Panel
@@ -146,7 +149,7 @@ public sealed class NextStepBar : Panel
         ClearButtons();
         foreach (FlowStep step in steps)
         {
-            if (step.Permission is not null && !CurrentUser.HasPermission(step.Permission))
+            if ((step.Permission is not null && !CurrentUser.HasPermission(step.Permission)) || step.Eligible?.Invoke() == false)
                 continue;
             if (step.Page is not null && _navigate is null)
                 continue;
@@ -176,7 +179,7 @@ public sealed class NextStepBar : Panel
     }
     private async Task RunAsync(FlowStep step)
     {
-        if (_busy || IsDisposed)
+        if (_busy || IsDisposed || (step.Permission is not null && !CurrentUser.HasPermission(step.Permission)) || step.Eligible?.Invoke() == false)
             return;
         try
         {
