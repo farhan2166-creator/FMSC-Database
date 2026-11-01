@@ -867,6 +867,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         GateActionAny(saveButton, "Students.Admit", "Students.Administer");
         GateAction(saveAndNewButton, "Students.Admit");
         GateAction(collectPaymentButton, "Fees.Collect");
+        collectPaymentButton.Visible = FeeCollectionAccess.CanUse(CurrentUser.HasPermission);
         UseWrappingToolbar();
         SetActionButtonImage("Find Student", "⌕");
         SetActionButtonImage("Clear / New", "＋");
@@ -2075,7 +2076,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         UpdatePhotoActions();
         bool savedStudentReady = currentAdmissionId > 0 && !IsBusy;
         if (collectPaymentButton is not null)
-            collectPaymentButton.Enabled = savedStudentReady && _navigate is not null && CurrentUser.HasPermission("Fees.Collect");
+            collectPaymentButton.Enabled = savedStudentReady && _navigate is not null && FeeCollectionAccess.CanUse(CurrentUser.HasPermission);
         if (admissionPrintButton is not null)
             admissionPrintButton.Enabled = savedStudentReady;
         if (enrollmentActionsButton is not null)
@@ -3442,6 +3443,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     }
     private void CollectPaymentNow()
     {
+        if (!FeeCollectionAccess.CanUse(CurrentUser.HasPermission)) { Warn("Fee Collection requires both Collect Fee and View Fees access."); return; }
         if (pendingPlacementId > 0) { SetStatus("Use Actions → Complete Placement to review and confirm the draft before collecting payment."); return; }
         if (currentAdmissionId <= 0)
         {
