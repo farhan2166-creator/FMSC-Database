@@ -1,4 +1,5 @@
 using FMSC_SMS.Core;
+using FMSC_SMS.Pages.Finance.Collection;
 namespace FMSC_SMS.Pages.Finance.Billing;
 
 public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
@@ -8,17 +9,24 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
     private readonly AdditionalFeeEntry entry = new();
     private readonly DataGridView recent = HumanUi.Grid(false);
     private readonly ModernButton clear;
+    private readonly ModernButton collect;
+    private readonly Action<Func<Control>, string, string>? navigate;
     private int selectionVersion;
     private bool binding;
     private int loadedEnrollmentId;
+    private int loadedAdmissionId;
     public bool IsBusy => entry.IsPosting;
     public string BusyMessage => "Wait for this purchase to finish saving before leaving.";
     public bool HasUnsavedChanges => entry.HasDraft;
     public string UnsavedChangesMessage => "This purchase has not been added. Discard it and leave?";
 
-    public StudentPurchasesPage() : base(PageTitles.StudentPurchases,
+    public StudentPurchasesPage(Action<Func<Control>, string, string>? navigate = null) : base(PageTitles.StudentPurchases,
         "Add purchases and event charges for collection with student fees.")
     {
+        this.navigate = navigate;
+        collect = AddAction("Collect Payment", (_, _) => OpenCollection(), "Primary");
+        RelocateFromActions(collect);
+        FinanceHelp.Attach(this, collect, FinanceHelp.Topic.ReceiveMoney);
         clear = AddAction("Clear Student", (_, _) => {
             if (CanChangeStudent()) ClearStudent();
         }, "Secondary");
@@ -47,7 +55,7 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
             accent: AppTheme.ModuleAccent("Finance"), accessory: tools);
         studentPanel.Content.Controls.Add(identity);
         var history = HumanUi.Card("Recent Charges", "Latest purchases, balances and payment status.",
-            accent: AppTheme.ModuleAccent("Finance"));
+            accent: AppTheme.ModuleAccent("Finance"), accessory: collect);
         history.Margin = new Padding(AppMetrics.SpacingMd, 0, 0, 0);
         recent.AutoGenerateColumns = false;
         recent.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
@@ -113,13 +121,31 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
         };
         entry.PostingChanged += (_, _) => {
             student.Enabled = enrollment.Enabled = clear.Enabled = !entry.IsPosting;
+            UpdateCollectionAction();
         };
         entry.ChargePosted += async (_, _) => {
-            SetStatus("Purchase added. It is available for collection with the student's fees.");
+            SetStatus("Purchase added. Choose Collect Payment to receive payment with the student's fees.");
+            UpdateCollectionAction();
             await LoadRecentAsync(enrollment.SelectedId, selectionVersion);
         };
         FormFlow.OrderTableFields(identity);
+        UpdateCollectionAction();
         SetStatus("No student selected.");
+    }
+
+    private bool CanCollect => !IsDisposed && navigate is not null && !entry.IsPosting
+        && !entry.HasUnresolvedSave && loadedAdmissionId > 0 && loadedAdmissionId == student.SelectedId
+        && loadedEnrollmentId > 0 && loadedEnrollmentId == enrollment.SelectedId
+        && FeeCollectionAccess.CanUse(CurrentUser.HasPermission);
+
+    private void UpdateCollectionAction() => collect.Enabled = CanCollect;
+
+    private void OpenCollection()
+    {
+        // The shell checks unfinished purchase drafts before constructing the destination.
+        if (!CanCollect) return;
+        int admissionId = loadedAdmissionId;
+        navigate!(() => new FeeCollectionPage(admissionId), "Finance", "Fee Collection");
     }
 
     private bool CanChangeStudent() => !entry.IsPosting && (!entry.HasDraft
@@ -130,6 +156,8 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
         if (entry.IsPosting) return;
         ++selectionVersion;
         loadedEnrollmentId = 0;
+        loadedAdmissionId = 0;
+        UpdateCollectionAction();
         binding = true;
         try { enrollment.ClearLookup(); }
         finally { binding = false; }
@@ -177,12 +205,17 @@ public sealed class StudentPurchasesPage : V2Page, IBusyPage, IUnsavedChanges
     private async Task LoadEnrollmentAsync(int version)
     {
         int id = enrollment.SelectedId;
+        int admissionId = student.SelectedId;
+        loadedAdmissionId = 0;
+        UpdateCollectionAction();
         loadedEnrollmentId = id;
         entry.ClearStudent();
         recent.DataSource = null;
         if (id <= 0) return;
         await entry.LoadStudentAsync(id);
         if (IsDisposed || version != selectionVersion) return;
+        loadedAdmissionId = admissionId;
+        UpdateCollectionAction();
         SetStatus(entry.PostButton.Enabled ? "Ready." : "This placement is not ready for additional charges.");
         await LoadRecentAsync(id, version);
     }

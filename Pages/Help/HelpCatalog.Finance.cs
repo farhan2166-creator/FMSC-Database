@@ -142,7 +142,7 @@ internal static partial class HelpCatalog
             new[] { HelpRule.System, HelpRule.Permission }, HelpOwner.CSharp,
             new[] { "Pages/Finance/StudentAccounts/FeeAssignmentPosting.cs#FeeAssignmentPosting" }, System.Array.Empty<string>(), ""),
         new("FAQ-099", "Billing", "Where do I record a uniform or another student purchase?",
-            "Use Daily Work → Student Purchases, or the purchase action offered in Fee Collection. Select the correct student and eligible enrollment, enter a permitted whole-rupee charge and review it before posting. Creating the charge is different from collecting it; verify the remaining balance afterward.",
+            "Use Daily Work → Student Purchases, or the purchase action offered in Fee Collection. Select the correct student and eligible enrollment, enter a permitted whole-rupee charge and review it before posting. Then choose Collect Payment to open Fee Collection for that student. Creating the charge is different from collecting it; review the balance and enter the payment there.",
             "purchase uniform book additional manual charge", "Daily Work → Student Purchases",
             new[] { HelpRule.Choice, HelpRule.Permission }, HelpOwner.CSharp,
             new[] { "Pages/Finance/Billing/StudentPurchasesPage.cs#StudentPurchasesPage", "Pages/Finance/Collection/FeeCollectionPage.cs#FeeCollectionPage" }, System.Array.Empty<string>(), ""),

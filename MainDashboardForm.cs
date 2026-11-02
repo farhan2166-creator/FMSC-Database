@@ -630,7 +630,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     "Fees.View"),
                 new(
                     PageTitles.StudentPurchases,
-                    () => new StudentPurchasesPage(),
+                    () => new StudentPurchasesPage((factory, module, title) => NavigateTo(factory, module, title)),
                     "Finance",
                     PageTitles.StudentPurchases,
                     "Fees.Collect"),
