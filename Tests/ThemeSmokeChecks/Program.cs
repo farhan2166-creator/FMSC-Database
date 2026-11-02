@@ -674,6 +674,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} additional-fee recovery checks (no database connection).");
             return;
         }
+        if(args.Contains("--student-purchase-collection"))
+        {
+            CheckStudentPurchaseCollection();
+            Console.WriteLine($"PASS: {checks} purchase-to-collection hand-off checks (no database connection).");
+            return;
+        }
         if(args.Contains("--additional-fee-scope"))
         {
             CheckAdditionalFeeScope();

@@ -70,6 +70,7 @@ public sealed class AdditionalFeeEntry : UserControl
     public static int PreferredHeight =>
         3 * AppMetrics.FieldRowHeight + AppMetrics.ButtonRowHeight + AppScale.Scale(108);
     public bool IsPosting => busy;
+    public bool HasUnresolvedSave => recovery.Blocked;
     public bool HasDraft => feeType.SelectedId > 0 || amount.Value > 0 || discount.Value > 0
         || !string.IsNullOrWhiteSpace(reason.Text);
     public ModernButton PostButton => post;
