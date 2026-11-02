@@ -47,6 +47,13 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} fee setup validation/layout and matrix checks (no database connection).");
             return;
         }
+        if (args.Contains("--class-section-setup"))
+        {
+            CheckAssignmentLayout();
+            CheckSelectiveWorkspaceGuards();
+            Console.WriteLine($"PASS: {checks} class/section catalog, draft and dialog checks (no database connection).");
+            return;
+        }
         if (args.Contains("--assignment-layout"))
         {
             CheckAssignmentLayout();

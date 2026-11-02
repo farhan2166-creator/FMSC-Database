@@ -8,16 +8,20 @@ internal static partial class Program
     private static void CheckSelectiveWorkspaceGuards()
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
-        using var setup = new ClassesAndSectionsWorkspacePage();
-        Check((object)setup is not IUnsavedChanges, "Small Classes & Sections drafts remain prompt-free at the shell boundary");
         var saving = typeof(MasterPage).GetField("_saving", flags)!;
-        foreach (string name in new[] { "classes", "sections" })
+        foreach (bool classes in new[] { true, false })
         {
-            var child = (MasterPage)typeof(ClassesAndSectionsWorkspacePage).GetField(name, flags)!.GetValue(setup)!;
+            using var setup = new ClassSectionCatalogDialog(classes);
+            var child = setup.Editor;
+            Check(classes ? child is ClassesPage : child is SectionsPage, "Catalog dialog retains the complete existing editor");
             saving.SetValue(child, true);
-            Check(setup.IsBusy && setup.BusyMessage == child.BusyMessage, "The setup workspace forwards either child's submitted save");
+            Check(setup.IsBusy && setup.BusyMessage == child.BusyMessage, "Catalog dialog forwards submitted saves");
             saving.SetValue(child, false);
-            Check(!setup.IsBusy, "Completed setup saves release shell navigation");
+            Check(!setup.IsBusy, "Completed saves release catalog close guard");
+            var deleting = typeof(MasterPage).GetField("_deleting", flags)!;
+            deleting.SetValue(child, true);
+            Check(setup.IsBusy, "Catalog delete in flight also blocks dialog close");
+            deleting.SetValue(child, false);
         }
         using var bulk = new BulkFeeRateChangesForm(0, 0, false);
         bulk.TopLevel = false; // Match CreateEmbedded: a form must be made a child before hosting.

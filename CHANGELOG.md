@@ -1,5 +1,13 @@
 # Changelog
 
+## Class and section setup consolidation — 2026-11-02
+
+- Manage Classes and Manage Sections now open from Campus Classes / Sections;
+  the separate Classes & Sections navigation page is retired.
+- Full catalog editing, ordering, programs and safe deletion remain available.
+  Catalog refresh preserves pending campus ticks by ID without saving them.
+- No SQL schema or financial behavior changes.
+
 Notable user-facing, database, installer, and operational changes will be tracked here. This file begins as a **forward-looking** changelog; it is not a fabricated complete history of previous builds.
 
 ## [Unreleased]
