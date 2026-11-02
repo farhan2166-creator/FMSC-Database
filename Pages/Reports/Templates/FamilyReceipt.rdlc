@@ -843,7 +843,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -862,86 +862,6 @@
               </TablixCells>
             </TablixRow>
 
-            <TablixRow>
-              <Height>0.15in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="FeesTotal0">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>Fees total</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Left</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <TopBorder>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </TopBorder>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0.75pt</PaddingTop>
-                        <PaddingBottom>0.75pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                    <ColSpan>2</ColSpan>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell />
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="FeesTotal1">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=Format(First(Fields!ChildFeesCovered.Value, "ReceiptStudentGroup"), "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Right</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <Border>
-                          <Style>None</Style>
-                        </Border>
-                        <TopBorder>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </TopBorder>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0.75pt</PaddingTop>
-                        <PaddingBottom>0.75pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-              </TablixCells>
-            </TablixRow>
             <TablixRow>
               <Height>0.14in</Height>
               <TablixCells>
@@ -994,7 +914,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -1024,7 +944,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Fees payable</Value>
+                              <Value>Net payable</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1070,7 +990,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -1104,7 +1024,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Money received</Value>
+                              <Value>Payment received</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1150,88 +1070,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <Border>
-                          <Style>None</Style>
-                        </Border>
-                        <TopBorder>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </TopBorder>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0.75pt</PaddingTop>
-                        <PaddingBottom>0.75pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-              </TablixCells>
-            </TablixRow>
-
-            <TablixRow>
-              <Height>0.15in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="CreditUsed0">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>Credit used</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Left</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <TopBorder>
-                          <Style>Solid</Style>
-                          <Width>0.5pt</Width>
-                        </TopBorder>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0.75pt</PaddingTop>
-                        <PaddingBottom>0.75pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                    <ColSpan>2</ColSpan>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell />
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="CreditUsed1">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=Format(First(Fields!ChildCreditApplied.Value, "ReceiptStudentGroup"), "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>7.5pt</FontSize>
-                                <FontWeight>Bold</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -1312,7 +1151,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -1392,7 +1231,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -1472,7 +1311,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -1552,7 +1391,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -1632,7 +1471,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -1666,7 +1505,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=First(Fields!ChildReceiptSettlementCaption.Value, "ReceiptStudentGroup")</Value>
+                              <Value>Total</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7.5pt</FontSize>
@@ -1712,7 +1551,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -1786,7 +1625,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -1862,7 +1701,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -2043,7 +1882,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Payment Date: </Value>
+                              <Value>Document Date: </Value>
                               <Style>
                                 <FontStyle>Italic</FontStyle>
                                 <FontFamily>Segoe UI</FontFamily>
@@ -2090,7 +1929,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>FAMILY SUMMARY</Value>
+                              <Value>GROUP SUMMARY</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>
@@ -2127,7 +1966,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Family fees total</Value>
+                              <Value>Net total</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>
@@ -2169,7 +2008,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -2238,7 +2077,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -2265,7 +2104,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Family payable</Value>
+                              <Value>Net payable</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>
@@ -2307,7 +2146,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -2334,7 +2173,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Money received</Value>
+                              <Value>Net received</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>
@@ -2376,77 +2215,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                  </CellContents>
-                </TablixCell>
-              </TablixCells>
-            </TablixRow>
-
-            <TablixRow>
-              <Height>0.12in</Height>
-              <TablixCells>
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="FamilyCreditUsed0">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>Credit used</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>6.5pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Left</TextAlign>
-                          </Style>
-                        </Paragraph>
-                      </Paragraphs>
-                      <Style>
-                        <PaddingLeft>2pt</PaddingLeft>
-                        <PaddingRight>2pt</PaddingRight>
-                        <PaddingTop>0pt</PaddingTop>
-                        <PaddingBottom>0pt</PaddingBottom>
-                      </Style>
-                    </Textbox>
-                    <ColSpan>2</ColSpan>
-                  </CellContents>
-                </TablixCell>
-                <TablixCell />
-                <TablixCell>
-                  <CellContents>
-                    <Textbox Name="FamilyCreditUsed1">
-                      <CanGrow>true</CanGrow>
-                      <CanShrink>true</CanShrink>
-                      <Paragraphs>
-                        <Paragraph>
-                          <TextRuns>
-                            <TextRun>
-                              <Value>=Format(First(Fields!GroupCreditApplied.Value, "ReceiptPageGroup"), "N0")</Value>
-                              <Style>
-                                <FontFamily>Segoe UI</FontFamily>
-                                <FontSize>6.5pt</FontSize>
-                                <FontWeight>Normal</FontWeight>
-                              </Style>
-                            </TextRun>
-                          </TextRuns>
-                          <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -2474,7 +2243,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Family balance due</Value>
+                              <Value>Net due</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>7pt</FontSize>
@@ -2516,7 +2285,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -2602,11 +2371,6 @@
 
                     <TablixMember>
                       <Visibility>
-                        <Hidden>=Not First(Fields!ChildShowSettlement.Value, "ReceiptStudentGroup")</Hidden>
-                      </Visibility>
-                    </TablixMember>
-                    <TablixMember>
-                      <Visibility>
                         <Hidden>=Not First(Fields!ChildShowReceiptDeduction.Value, "ReceiptStudentGroup")</Hidden>
                       </Visibility>
                     </TablixMember>
@@ -2618,12 +2382,6 @@
                     <TablixMember>
                       <Visibility>
                         <Hidden>=Not First(Fields!ChildShowSettlement.Value, "ReceiptStudentGroup")</Hidden>
-                      </Visibility>
-                    </TablixMember>
-
-                    <TablixMember>
-                      <Visibility>
-                        <Hidden>=Not First(Fields!ChildShowReceiptCredit.Value, "ReceiptStudentGroup")</Hidden>
                       </Visibility>
                     </TablixMember>
 
@@ -2654,7 +2412,7 @@
                     </TablixMember>
                     <TablixMember>
                       <Visibility>
-                        <Hidden>=Not First(Fields!ChildShowReceiptTotal.Value, "ReceiptStudentGroup")</Hidden>
+                        <Hidden>=First(Fields!ChildShowSettlement.Value, "ReceiptStudentGroup")</Hidden>
                       </Visibility>
                     </TablixMember>
                     <TablixMember>
@@ -2703,12 +2461,6 @@
                 <TablixMember>
                   <Visibility>
                     <Hidden>=Not First(Fields!ShowGroupSummary.Value, "ReceiptPageGroup")</Hidden>
-                  </Visibility>
-                </TablixMember>
-
-                <TablixMember>
-                  <Visibility>
-                    <Hidden>=Not First(Fields!GroupShowReceiptCredit.Value, "ReceiptPageGroup")</Hidden>
                   </Visibility>
                 </TablixMember>
 
@@ -3017,31 +2769,7 @@
         <Field Name="ShowGroupSummary">
           <DataField>ShowGroupSummary</DataField>
         </Field>
-      <Field Name="ParentRelationLabel"><DataField>ParentRelationLabel</DataField></Field><Field Name="ChildReceiptDeductionCaption"><DataField>ChildReceiptDeductionCaption</DataField></Field><Field Name="ChildReceiptSummaryDeductionCaption"><DataField>ChildReceiptSummaryDeductionCaption</DataField></Field><Field Name="ChildReceiptDeductionAmount"><DataField>ChildReceiptDeductionAmount</DataField></Field><Field Name="ChildReceiptNetPayable"><DataField>ChildReceiptNetPayable</DataField></Field><Field Name="ChildShowReceiptDeduction"><DataField>ChildShowReceiptDeduction</DataField></Field><Field Name="GroupReceiptDeductionCaption"><DataField>GroupReceiptDeductionCaption</DataField></Field><Field Name="GroupReceiptSummaryDeductionCaption"><DataField>GroupReceiptSummaryDeductionCaption</DataField></Field><Field Name="GroupReceiptDeductionAmount"><DataField>GroupReceiptDeductionAmount</DataField></Field><Field Name="GroupReceiptNetPayable"><DataField>GroupReceiptNetPayable</DataField></Field><Field Name="GroupShowReceiptDeduction"><DataField>GroupShowReceiptDeduction</DataField></Field><Field Name="ChildShowReceiptCredit">
-          <DataField>ChildShowReceiptCredit</DataField>
-          <rd:TypeName>System.Boolean</rd:TypeName>
-        </Field>
-        <Field Name="ChildShowReceiptTotal">
-          <DataField>ChildShowReceiptTotal</DataField>
-          <rd:TypeName>System.Boolean</rd:TypeName>
-        </Field>
-        <Field Name="ChildReceiptSettlementCaption">
-          <DataField>ChildReceiptSettlementCaption</DataField>
-          <rd:TypeName>System.String</rd:TypeName>
-        </Field>
-        <Field Name="GroupShowReceiptCredit">
-          <DataField>GroupShowReceiptCredit</DataField>
-          <rd:TypeName>System.Boolean</rd:TypeName>
-        </Field>
-        <Field Name="GroupShowReceiptTotal">
-          <DataField>GroupShowReceiptTotal</DataField>
-          <rd:TypeName>System.Boolean</rd:TypeName>
-        </Field>
-        <Field Name="GroupReceiptSettlementCaption">
-          <DataField>GroupReceiptSettlementCaption</DataField>
-          <rd:TypeName>System.String</rd:TypeName>
-        </Field>
-        </Fields>
+      <Field Name="ParentRelationLabel"><DataField>ParentRelationLabel</DataField></Field><Field Name="ChildReceiptDeductionCaption"><DataField>ChildReceiptDeductionCaption</DataField></Field><Field Name="ChildReceiptSummaryDeductionCaption"><DataField>ChildReceiptSummaryDeductionCaption</DataField></Field><Field Name="ChildReceiptDeductionAmount"><DataField>ChildReceiptDeductionAmount</DataField></Field><Field Name="ChildReceiptNetPayable"><DataField>ChildReceiptNetPayable</DataField></Field><Field Name="ChildShowReceiptDeduction"><DataField>ChildShowReceiptDeduction</DataField></Field><Field Name="GroupReceiptDeductionCaption"><DataField>GroupReceiptDeductionCaption</DataField></Field><Field Name="GroupReceiptSummaryDeductionCaption"><DataField>GroupReceiptSummaryDeductionCaption</DataField></Field><Field Name="GroupReceiptDeductionAmount"><DataField>GroupReceiptDeductionAmount</DataField></Field><Field Name="GroupReceiptNetPayable"><DataField>GroupReceiptNetPayable</DataField></Field><Field Name="GroupShowReceiptDeduction"><DataField>GroupShowReceiptDeduction</DataField></Field></Fields>
     </DataSet>
   </DataSets>
   <ConsumeContainerWhitespace>true</ConsumeContainerWhitespace>

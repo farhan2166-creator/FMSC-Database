@@ -22,21 +22,16 @@ raw-data route and selected columns; no layout-derived fields are added to it.
 
 ## Receipt and bill presentation
 
-This supersedes the former print-only combined discount/credit deduction.
-Individual and family child slips show Fees total, Discount/Waived, Fees payable,
-Money received and a separate Credit used line when applicable. When credit is
-used, Total settled makes the combined money/credit settlement explicit. Ordinary
-money-only receipts avoid a redundant total line. Legacy adjustments retain a
-Net settled caption and their original/refund/correction/reversal disclosures.
-
-The saved discount, payable, cash, credit, settlement and balance remain unchanged.
-For example, fees 1,000 less discount 100 means fees payable 900; credit 200 plus
-money 400 settles 600, leaving 300. Credit does not reduce the fee's price.
-Previously-paid deductions and advance retained/remaining-credit rows remain.
-Family summaries use explicit family-scope labels. Monetary figures share a right
-edge. Receipt footers say Payment Date; bill printed-on timestamps remain.
-No snapshot, receipt identity, allocation or financial history is rewritten.
-
+Owner decision — 2 November 2026: receipt and bill presentation is restored to
+its finalized form before PR #74. Individual receipts use Net payable,
+Payment received and Total, with the original print-only combined discount/credit
+deduction. Family documents use GROUP SUMMARY and the finalized Net total,
+Net discount, Net payable, Net received and Net due captions where applicable.
+The extra Fees total and separate Credit used rows introduced by PR #74 are
+removed, and the original Document Date caption is restored. The four financial
+RDLC templates and receipt presentation helper match that prior revision.
+Saved financial values, payment allocations and history are unchanged.
+Management report PDF/preview improvements above remain in place.
 The existing narrow paper width and automatic roll sizing are retained. The A4
 annual receipt selector now correctly describes three columns. No schema version
 change or SQL migration is required for these presentation changes.
@@ -44,7 +39,7 @@ change or SQL migration is required for these presentation changes.
 ## Verification
 
 - Portable report checks cover authoritative summaries, money/count formatting,
-  total/detail counts, new due-status metrics, and discount/credit separation.
+  total/detail counts and new due-status metrics.
 - Reporting-engine checks compile/process the actual StudentBill, FamilyBill,
   StudentReceipt, FamilyReceipt, FeeChanges and ClassOutstandingCharges templates
   with fictional data to XML; they also exercise signed collection subtotals.

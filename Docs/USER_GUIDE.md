@@ -291,6 +291,4 @@ Export PDF uses the same readable layout as Print Preview: school and report
 headings, selected scope, summary amounts, repeated table headings and page
 numbers. Very wide reports continue in labelled sections with repeated references.
 CSV remains a data export. Configure School Profile before saving report PDFs.
-Receipts show discounts separately from Credit used; Money received is new money,
-while Total settled may include credit. Family balance due identifies the whole
-family's remaining fees.
+Receipts retain the finalized Net payable, Payment received and Total wording. Discounts and applied credit share the print-only deduction; saved values remain separate. Family summaries retain the Net total, Net payable, Net received and Net due captions.

@@ -18,12 +18,5 @@ internal static partial class Program
         rows.Rows[0]["Student"]="Netali";
         Check(!ReportPrintSummary.IsTotalRow(rows.Rows[0]),"Ordinary names starting Net do not become financial totals");
         Check(ReportPrintSummary.FromTotals(totals.Clone()).Count==0,"Empty totals do not invent summary values");
-        var mixed=ReceiptPrintAmounts.Create(100m,900m,200m,true);
-        Check(mixed.Discount==100m && mixed.FeesPayable==900m && mixed.ShowCredit && mixed.ShowTotal && mixed.SettlementCaption=="Total settled",
-            "Mixed payment keeps price reduction separate from advance-credit settlement");
-        Check(mixed.FeesPayable-200m-400m==300m,"1000 fee less 100 discount, 200 credit and 400 money leaves 300 due");
-        var legacy=ReceiptPrintAmounts.Create(0m,0m,200m,false);
-        Check(!legacy.ShowCredit && legacy.ShowTotal && legacy.SettlementCaption=="Net settled","Legacy adjustments preserve their independent net-settlement meaning");
-        Check(!ReceiptPrintAmounts.Create(0m,900m,0m,true).ShowTotal,"Ordinary money-only receipt avoids a duplicate payment total");
     }
 }

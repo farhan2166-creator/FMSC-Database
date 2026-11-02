@@ -7,7 +7,6 @@
     <Compile Include="../../Core/CollectionReceiptGrouping.cs" Link="CollectionReceiptGrouping.cs" />
     <Compile Include="../../Core/CollectionReceiptRdlc.cs" Link="CollectionReceiptRdlc.cs" />
     <Compile Include="../../Core/ReportPrintSummary.cs" Link="ReportPrintSummary.cs" />
-    <Compile Include="../../Core/ReceiptPrintAmounts.cs" Link="ReceiptPrintAmounts.cs" />
     <Compile Include="../../Core/ReportPaginator.cs" Link="ReportPaginator.cs" />
     <Compile Include="../../Core/OutstandingReportFilter.cs" Link="OutstandingReportFilter.cs" />
     <Compile Include="../../Core/ReportDatePeriod.cs" Link="ReportDatePeriod.cs" />
