@@ -1,6 +1,6 @@
 # Publication security review
 
-Status: NOT CLEARED FOR PUBLICATION. Repository visibility has not been changed.
+Status (2026-11-02): The GitHub repository is already **public**. This is an outstanding privacy/security review, not a pre-publication visibility gate. The historical checks below are limited to the source and refs reviewed at that time; they do not certify all public artifacts or the current commit.
 
 ## Local findings
 
@@ -44,15 +44,15 @@ Status: NOT CLEARED FOR PUBLICATION. Repository visibility has not been changed.
    contact details, IDs and other private data. Removing a current file does not
    remove historical copies; any required history cleanup needs a separate plan.
 3. Review existing releases, release attachments, Actions artifacts, logs, issues,
-   pull requests and wiki pages before visibility changes. Local Git checks cannot
+   pull requests and wiki pages for the existing public repository. Local Git checks cannot
    audit these. Revoke any credentials already exposed through these surfaces.
 4. In GitHub settings enable secret scanning/push protection where available,
    Dependabot alerts/security updates and private vulnerability reporting. Configure
    rules for main to require reviewed pull requests and successful security checks.
    Require approval for outside-contributor Actions runs; retain read-only token
    defaults and do not expose production secrets to public tests.
-5. Disconnect self-hosted runners before making this repository public. Hosted CI
+5. Disconnect self-hosted runners before any use with this public repository. Hosted CI
    must use fictional data. Public standard hosted runners have free Actions usage;
    larger runners remain billed.
 
-Remote settings and assets were not changed or verified. The review itself does not change repository visibility.
+Remote settings and assets were not changed or verified. This document does not change repository visibility. Review public releases, Actions artifacts, screenshots and all remote refs; redact or revoke exposed data as appropriate.
