@@ -11,6 +11,7 @@ on:
       - 'Tests/ThemeSmokeChecks/Program.Fee*.cs'
       - 'Tests/ThemeSmokeChecks/Program.Receipt*.cs'
       - 'Tests/ThemeSmokeChecks/Program.FamilyDocumentSections.cs'
+      - 'Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj'
       - '.github/workflows/fmsc-fee-documents.yml'
   pull_request:
     paths:
@@ -18,6 +19,7 @@ on:
       - 'Core/ReceiptReportLayout.cs'
       - 'Core/Reports/Fees/**'
       - 'Tests/ThemeSmokeChecks/Program.FamilyDocumentSections.cs'
+      - 'Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj'
       - 'Pages/Reports/Templates/*Bill.rdlc'
       - 'Pages/Reports/Templates/*Receipt.rdlc'
       - 'Tests/ThemeSmokeChecks/Program.Fee*.cs'
