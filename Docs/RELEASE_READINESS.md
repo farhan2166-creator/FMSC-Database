@@ -1,4 +1,14 @@
-# Operator-control revision readiness
+# Release readiness — current source and historical evidence
+
+Current source baseline (2026-11-01): application 1.1.0-rc.2, required database schema **69**, main commit `12b37c39a6915c5a9f5730f4191e9c92a445d992` (before the audit-fix PR).
+
+**Release decision: NO-GO pending same-SHA validation and local owner acceptance.** The successful [combined readiness run](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/41283058444) tested commit `b6005e58f24ec7cca076a9544e6d0b4bfb060d93`, not the current main tree. Its results must not be represented as validation of later changes. Rerun the existing combined readiness workflow against the exact candidate commit, record the run URL and all job results, then perform disposable Windows/SQL acceptance and the owner checklist in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
+
+The historical operator-control acceptance record (schema 21) is preserved below for traceability. It applies **only to its tested revision**, not to schema 69 or later releases.
+
+---
+
+# Historical operator-control revision readiness (schema 21)
 
 Candidate: 1.1.0-rc.2, database schema 21.
 
