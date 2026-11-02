@@ -4,8 +4,13 @@ Management PDF export now uses the same GridReportPreview RDLC definition and
 projected data as Print Preview. The shared document includes the school name,
 report title, captured filters, authoritative summary cards, a logical detail-row
 count, monetary formatting, repeating headings, printed-by information and Page X
-of Y. Currency columns align right, appropriate counts/dates center, names remain
-left aligned, and total rows have bold text and a top rule. Very wide reports use
+of Y. Owner-approved styling — 2 November 2026: use black text and rules on white
+paper, without colored fills or alternating shading. Center school/report titles,
+filter context, summary labels/values and all table headings. Amounts, counts,
+dates, references and short placement fields center; names and descriptions stay
+left aligned. Receipt group headings and monetary subtotals follow the same
+alignment. Total rows have bold text and a top rule. Summary rows reserve enough
+height for wrapped labels and values. Very wide reports use
 identified column bands with repeated student/reference fields instead of tiny
 text. Every selected source field remains in the document.
 
@@ -47,6 +52,9 @@ change or SQL migration is required for these presentation changes.
   cards, decimal precision, selected-field preservation, wide-column pagination,
   current receipt reconciliation and original-snapshot immutability.
 - Desktop CI runs --grid-pdf alongside the existing --fee-documents suite.
+- Desktop CI retains the resulting direct-export PDFs for review. See
+  [direct export samples](DIRECT_PDF_EXPORT_SAMPLES.md) for artifact access,
+  fictional data and verification limits.
 
 Linux cannot execute WinForms, EMF/thermal printing or the Windows usp10.dll PDF
 text renderer. Native PDF/thermal/A4 acceptance remains a Windows check; successful

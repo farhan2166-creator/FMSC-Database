@@ -19,17 +19,44 @@ internal static partial class Program
         {
             string before=source.GetXmlForTest();
             var built=GridReportPreview.Build("Fictional Meadow School & College",title,subtitle,source,"Example Operator");
+            var layout=CollectionReceiptGrouping.Layout(source);
             Check(source.GetXmlForTest()==before,"Printing must not modify source rows, values or types");
             var columns=GridReportColumns.Create(source,"#,##0.##");
             Check(columns.SelectMany(c=>c.Fields).OrderBy(i=>i).SequenceEqual(Enumerable.Range(0,source.Columns.Count)),"Every selected source field appears exactly once in the print projection");
-            Check(built.Data.Rows.Count==source.Rows.Count,"Print layout preserves the number of financial records");
+            Check(built.Data.Rows.Count==(layout?.Count(row=>row.Kind=="Detail")??source.Rows.Count),"Print layout preserves all detail records without counting group headings or totals as receipts");
+            int printedRow=0;
             for(int row=0;row<source.Rows.Count;row++)
+            {
+                if(layout is not null && layout[row].Kind!="Detail")continue;
                 for(int column=0;column<source.Columns.Count;column++)
                 {
                     string value=GridReportColumns.Value(source.Rows[row],column,"#,##0.##");
-                    if(value.Length>0)Check(built.Data.Rows[row].ItemArray.Any(cell=>Convert.ToString(cell)!.Contains(value)),"Printed data preserves each source value");
+                    if(value.Length>0)Check(built.Data.Rows[printedRow].ItemArray.Any(cell=>Convert.ToString(cell)!.Contains(value)),"Printed data preserves each source value");
                 }
+                printedRow++;
+            }
             var definition=XDocument.Parse(built.Definition);
+            var boxes=definition.Descendants(ns+"Textbox").ToArray();
+            string Align(XElement box)=>box.Descendants(ns+"TextAlign").First().Value;
+            foreach(string item in new[]{"Institution","ReportTitle","Filters"})
+                Check(Align(boxes.Single(box=>(string?)box.Attribute("Name")==item))=="Center","School, title and filter context are centered");
+            Check(definition.Descendants(ns+"Color").All(color=>color.Value=="#000000"),"Direct exports use black text and rules only");
+            Check(!definition.Descendants(ns+"BackgroundColor").Any(),"Direct exports have no colored fills or alternating shading");
+            foreach(var box in boxes)
+            {
+                string boxName=(string)box.Attribute("Name")!;
+                if(boxName.StartsWith("Heading") || boxName.StartsWith("MetricLabel") || boxName.StartsWith("MetricValue") || boxName.StartsWith("ReceiptHeading"))
+                    Check(Align(box)=="Center","Table/group headings and summary labels/figures are centered");
+                if(System.Text.RegularExpressions.Regex.Match(boxName,@"^Value\d+_(\d+)$") is {Success:true} match)
+                {
+                    var column=columns[int.Parse(match.Groups[1].Value)];
+                    if(column.Numeric || column.Caption.StartsWith("Receipt") || column.Caption.StartsWith("Adm.") || column.Caption.StartsWith("Oldest Due"))
+                        Check(Align(box)=="Center","Amounts, counts, references and due dates have centered data");
+                    if(column.Caption.StartsWith("Student"))Check(Align(box)=="Left","Student names remain readable and left aligned");
+                }
+                if(boxName.StartsWith("ReceiptTotal") && box.Descendants(ns+"Value").First().Value.StartsWith("=Format(Sum("))
+                    Check(Align(box)=="Center","Receipt subtotals and grand totals align with their centered amount columns");
+            }
             Check(definition.Descendants(ns+"FontSize").Any(element=>element.Value=="9pt"),"Table text remains readable");
             Check(definition.Descendants(ns+"PageHeader").Any() && definition.Descendants(ns+"PageFooter").Any(),
                 "Every report document repeats its identity header and page footer");
@@ -71,7 +98,21 @@ internal static partial class Program
                 credit>0?"Account Credit":refund>0?"Refund":correction>0?"Correction":"Cash",money,refund,correction,credit,money-refund-correction,"operator");
         }
         string totals="View: Receipts   Period: Any start to Any end   Campus: Campus Boys   Class: All   Section: All   Receipts: 10     Money Received: Rs. 14,800     Refunds: Rs. 1,200     Corrections: Rs. 1,450     Credit Applied: Rs. 10,950     Adjusted Collection: Rs. 12,150";
-        Check(Render("collections-receipts","Collections & Receipts",totals,receipts)==1,"Ten ordinary receipts fit one readable A4 landscape page");
+        using(var wholeSchool=receipts.Copy())
+        {
+            // Match the screen's PrepareReportData step before the shared export.
+            CollectionReceiptGrouping.Apply(wholeSchool,"Whole School");
+            Check(Render("collections-receipts","Collections & Receipts",totals,wholeSchool)==1,"Ten receipts and their actual whole-school total fit one readable A4 landscape page");
+        }
+        using(var byCampus=receipts.Copy())
+        {
+            for(int row=5;row<byCampus.Rows.Count;row++)byCampus.Rows[row]["Campus"]="Campus Girls";
+            CollectionReceiptGrouping.Apply(byCampus,"Campus");
+            var groupedLayout=CollectionReceiptGrouping.Layout(byCampus)!;
+            Check(groupedLayout.Count(row=>row.Kind=="Heading")==2 && groupedLayout.Count(row=>row.Kind=="Subtotal")==2,
+                "The campus sample includes two real receipt groups and their subtotals");
+            Render("collections-by-campus","Collections & Receipts",totals.Replace("Campus: Campus Boys","Campus: All")+"   Grouped by: Campus",byCampus);
+        }
         var receiptColumns=GridReportColumns.Create(receipts,"#,##0.##");
         Check(receiptColumns.Count==9,"Receipt identity fields share cells instead of squeezing thirteen columns");
         Check(receiptColumns.Single(c=>c.Caption=="Receipt / Date").Minimum>=1.3,"Receipt references and dates have a readable minimum width");
@@ -92,6 +133,15 @@ internal static partial class Program
             var xml=XDocument.Parse(report.Definition);
             Check(xml.Descendants(ns+"Textbox").Count(box=>((string?)box.Attribute("Name"))?.StartsWith("MetricLabel")==true)==4,
                 "Every structured due-status amount becomes a readable summary card");
+            foreach(var label in xml.Descendants(ns+"Textbox").Where(box=>((string?)box.Attribute("Name"))?.StartsWith("MetricLabel")==true))
+            {
+                string index=((string)label.Attribute("Name")!)["MetricLabel".Length..];
+                var value=xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="MetricValue"+index);
+                double Inches(XElement box,string property)=>double.Parse(box.Element(ns+property)!.Value.Replace("in",""),System.Globalization.CultureInfo.InvariantCulture);
+                Check(Inches(label,"Top")+Inches(label,"Height")<=Inches(value,"Top")+.0001,"Summary labels reserve their own height above the values");
+                Check(Inches(value,"Top")+Inches(value,"Height")<=double.Parse(xml.Descendants(ns+"PageHeader").Single().Element(ns+"Height")!.Value.Replace("in",""),System.Globalization.CultureInfo.InvariantCulture),
+                    "Summary figures fit inside the reserved header");
+            }
             Check(xml.Descendants(ns+"Value").Any(v=>v.Value.Contains("Data rows: 1")),"Printed row count excludes the authoritative TOTAL");
             Check(report.Data.Rows[1].Field<bool>("IsReportTotal") && report.Data.Rows[0].Field<string>("C1")==1234.5m.ToString("#,##0.##"),
                 "Totals are emphasized and decimal money retains its readable precision");
