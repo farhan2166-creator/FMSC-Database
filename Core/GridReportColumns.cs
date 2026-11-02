@@ -73,7 +73,15 @@ internal static class GridReportColumns
     internal static List<int[]> Bands(IReadOnlyList<Column> columns,double width)
     {
         if(columns.Sum(c=>c.Minimum)<=width)return new(){Enumerable.Range(0,columns.Count).ToArray()};
-        int[] identity=Enumerable.Range(0,Math.Min(2,columns.Count)).Where(i=>!columns[i].Numeric).ToArray();
+        // Operator-selected order may put money before the student's reference.
+        // Repeat identity wherever it appears, without adding unselected fields.
+        int[] identity=Enumerable.Range(0,columns.Count).Where(i=>!columns[i].Numeric &&
+            (columns[i].Caption.Contains("Receipt",StringComparison.OrdinalIgnoreCase)
+             || columns[i].Caption.Contains("Admission",StringComparison.OrdinalIgnoreCase)
+             || columns[i].Caption.Contains("Adm.",StringComparison.OrdinalIgnoreCase)
+             || columns[i].Caption.Contains("Student",StringComparison.OrdinalIgnoreCase)))
+            .Take(2).ToArray();
+        if(identity.Length==0)identity=Enumerable.Range(0,columns.Count).Where(i=>!columns[i].Numeric).Take(2).ToArray();
         if(identity.Length==0)identity=new[]{0};
         var remaining=new Queue<int>(Enumerable.Range(0,columns.Count).Except(identity));var result=new List<int[]>();
         if(remaining.Count==0)return new(){identity};

@@ -56,16 +56,17 @@ internal static partial class Program
         using(var display=FamilyFeeDocumentPresentation.Receipt(source))
         {
             var child=display.AsEnumerable().First(row=>row.Field<string>("ChildAdmissionNumberText")=="249");
-            Check(child.Field<string>("ChildReceiptDeductionCaption")=="Less: Discount / Waived / Credit"
-                &&child.Field<decimal>("ChildReceiptDeductionAmount")==750m&&child.Field<decimal>("ChildReceiptNetPayable")==750m
+            Check(child.Field<string>("ChildReceiptDeductionCaption")=="Less: Discount / Waived"
+                &&child.Field<decimal>("ChildReceiptDeductionAmount")==300m&&child.Field<decimal>("ChildReceiptNetPayable")==1200m
+                &&child.Field<bool>("ChildShowReceiptCredit")
                 &&child.Field<decimal>("ChildCashReceived")==200m&&child.Field<decimal>("ChildBalanceRemaining")==550m,
-                "The supplied family example reconciles 1500 less 300 concession and 450 credit, less 200 cash, to 550 due");
-            Check(child.Field<decimal>("GroupReceiptDeductionAmount")==950m&&child.Field<decimal>("GroupReceiptNetPayable")==2550m
+                "The family example shows 1500 less 300 concession as 1200 payable, then 450 credit and 200 money leave 550 due");
+            Check(child.Field<decimal>("GroupReceiptDeductionAmount")==500m&&child.Field<decimal>("GroupReceiptNetPayable")==3000m
                 &&child.Field<decimal>("GroupReceived")==2000m&&child.Field<decimal>("GroupDue")==550m,
-                "The group summary includes credit once and keeps the actual cash and outstanding balance");
+                "The group summary keeps fees payable separate from credit, actual cash and outstanding balance");
             Check(child.Field<decimal>("ChildDiscountApplied")==300m&&child.Field<decimal>("ChildPayable")==1200m
                 &&child.Field<decimal>("ChildCreditApplied")==450m&&child.Field<decimal>("GroupDiscount")==500m,
-                "Combining printed deductions preserves all original accounting values");
+                "Separating printed payment sources preserves all original accounting values");
         }
         Check(!source.Columns.Contains("ChildReceiptDeductionAmount"),"Print preparation leaves the original receipt data unchanged");
         Check(render("aligned-family-example",source)==1,"The supplied mixed-credit family example renders on one continuous slip");
@@ -75,19 +76,20 @@ internal static partial class Program
         using(var receipt=FeeReceiptDocuments.BuildData(school,h,oneStudent,oneLine))
         {
             using var display=FeeReceiptPresentation.Prepare(receipt);var first=display.Rows[0];
-            Check(first.Field<decimal>("ReceiptDeductionAmount")==750m&&first.Field<decimal>("ReceiptNetPayable")==750m
+            Check(first.Field<decimal>("ReceiptDeductionAmount")==300m&&first.Field<decimal>("ReceiptNetPayable")==1200m
                 &&first.Field<decimal>("CashReceived")==200m&&first.Field<decimal>("BalanceRemaining")==550m,
                 "Printing that same child individually has exactly the same deductions, payable, cash and due");
             Check(render("aligned-individual-example",receipt)==1,"The matching individual receipt renders with the family layout");
         }
-        foreach(var (discount,credit,settlement,caption) in new[]{(0m,450m,true,"Less: Credit"),(300m,0m,true,"Less: Discount / Waived"),(0m,0m,true,"Less: "),(300m,450m,false,"Less: Discount / Waived")})
+        foreach(var (discount,credit,settlement,caption) in new[]{(0m,450m,true,"Less: Discount / Waived"),(300m,0m,true,"Less: Discount / Waived"),(0m,0m,true,"Less: Discount / Waived"),(300m,450m,false,"Less: Discount / Waived")})
         {
             using var data=FeeDocumentData.Create();var row=data.NewRow();
             row["DiscountApplied"]=discount;row["CreditApplied"]=credit;row["Payable"]=1200m;row["ShowSettlement"]=settlement;data.Rows.Add(row);
             using var display=FeeReceiptPresentation.Prepare(data);
             Check(display.Rows[0].Field<string>("ReceiptDeductionCaption")==caption
-                &&display.Rows[0].Field<bool>("ShowReceiptDeduction")== (discount>0m||settlement&&credit>0m)
-                &&display.Rows[0].Field<decimal>("ReceiptNetPayable")==1200m-(settlement?credit:0m),
+                &&display.Rows[0].Field<bool>("ShowReceiptDeduction")== (discount>0m)
+                &&display.Rows[0].Field<decimal>("ReceiptNetPayable")==1200m
+                &&display.Rows[0].Field<bool>("ShowReceiptCredit")== (settlement&&credit>0m),
                 "Deduction captions and visibility follow the actual concession and applied credit, respecting legacy settlements");
         }
     }

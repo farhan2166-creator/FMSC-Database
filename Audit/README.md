@@ -13,6 +13,7 @@
 
 | Record | Purpose | Interpretation |
 |---|---|---|
+| [PDF / financial RDLC presentation — 2 Nov 2026](Reviews/FMSC_PDF_FINANCE_PRESENTATION_2026-11-02.md) | PDF/preview consistency, monetary clarity and parent documents | Main `806440f`; portable visual samples, native Windows printing unverified |
 | [End-user flow audit — 14 Oct 2026](Reviews/FMSC_END_USER_FLOW_AUDIT_2026-10-14.md) | UFA-01–09 discovery and full source coverage | Original findings at their reviewed baseline; consult master for later corrections |
 | [Post-merge project audit — 14 Oct 2026](Reviews/FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md) | PMA release/installer findings and evidence | Baseline-specific release assessment, not a new verification |
 | [UI improvements review](Reviews/UI_IMPROVEMENTS_REVIEW.md) | Earlier UI changes, portable tests and Windows acceptance checklist | Implementation history; native acceptance remains separate |

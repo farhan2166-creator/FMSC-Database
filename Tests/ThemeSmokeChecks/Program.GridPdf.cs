@@ -9,6 +9,10 @@ internal static partial class Program
     {
         var oversizedIdentity=new[]{new GridReportColumns.Column("Student",new[]{0},false,12,1)};
         Check(GridReportColumns.Bands(oversizedIdentity,10).Single().SequenceEqual(new[]{0}),"An oversized identity column remains present in the report");
+        var reordered=new[]{new GridReportColumns.Column("Balance",new[]{0},true,4,1),new GridReportColumns.Column("Amount",new[]{1},true,4,1),
+            new GridReportColumns.Column("Admission Number",new[]{2},false,1.4,1),new GridReportColumns.Column("Student",new[]{3},false,1.5,1)};
+        Check(GridReportColumns.Bands(reordered,7).All(band=>band.Contains(2)&&band.Contains(3)),
+            "Every wide-report section retains selected identities even when the operator moves money columns first");
         string folder=Path.GetFullPath("artifacts/grid-pdf");Directory.CreateDirectory(folder);
         XNamespace ns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";
         int Render(string name,string title,string subtitle,DataTable source)
@@ -27,6 +31,10 @@ internal static partial class Program
                 }
             var definition=XDocument.Parse(built.Definition);
             Check(definition.Descendants(ns+"FontSize").Any(element=>element.Value=="9pt"),"Table text remains readable");
+            Check(definition.Descendants(ns+"PageHeader").Any() && definition.Descendants(ns+"PageFooter").Any(),
+                "Every report document repeats its identity header and page footer");
+            Check(definition.Descendants(ns+"Value").Any(v=>v.Value.Contains("Globals!PageNumber")),"PDF includes Page X of Y footer");
+            Check(built.Data.Columns.Contains("IsReportTotal"),"Total emphasis is retained independently of the first visible field");
             foreach(var table in definition.Descendants(ns+"Tablix"))
             {
                 double width=table.Element(ns+"TablixBody")!.Element(ns+"TablixColumns")!.Elements().Sum(c=>double.Parse(c.Element(ns+"Width")!.Value.Replace("in",""),System.Globalization.CultureInfo.InvariantCulture));
@@ -39,7 +47,17 @@ internal static partial class Program
             File.WriteAllText(Path.Combine(folder,name+".rdlc"),built.Definition);
             using var parsed=PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdf),PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
             Check(parsed.PageCount>0&&pdf.Length>1000,"The shared RDLC generates a valid PDF");
+            string exported=Path.Combine(folder,name+"-export.pdf");
+            GridReportPreview.ExportPdf(exported,built);
+            using var exportedPdf=PdfSharp.Pdf.IO.PdfReader.Open(exported,PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+            Check(exportedPdf.PageCount==parsed.PageCount,"Saved PDF uses the exact preview document and pagination");
+            Check(source.GetXmlForTest()==before,"PDF export does not mutate source transactions");
             built.Data.Dispose();return parsed.PageCount;
+        }
+        using(var empty=new DataTable())
+        {
+            empty.Columns.Add("Student");empty.Columns.Add("Outstanding",typeof(decimal));
+            Check(Render("empty-report","Outstanding","Campus: All",empty)==1,"Empty report is a readable one-page document");
         }
         using var receipts=new DataTable();
         foreach(string name in new[]{"Receipt / Reference","Date","Scope","Student / Family","Campus","Class / Section","Payment Method","Money Received","Refunds","Corrections","Credit Applied","Adjusted Collection","Received By"})
@@ -64,6 +82,21 @@ internal static partial class Program
         outstanding.Rows.Add("QR-102","Example Sibling","Campus Girls","Play Group - F",6900m,0m,6900m,new DateTime(2026,10,19),"Due Today");
         outstanding.Rows.Add("103","Another Student","Campus Girls","Class 10 - A",2500m,1700m,800m,new DateTime(2027,1,1),"Not Yet Due");
         Check(Render("outstanding-aging","Outstanding & Aging","View: Students   Campus: All   Students Owing: 3     Total Outstanding: Rs. 14,600     Overdue: Rs. 0     90+ Days: Rs. 0",outstanding)==1,"Outstanding report fits one clear page");
+        using(var summaryRows=new DataTable())
+        {
+            summaryRows.Columns.Add("Charge Date");summaryRows.Columns.Add("Gross Billed",typeof(decimal));
+            summaryRows.Rows.Add("01-11-2026",1234.50m);summaryRows.Rows.Add("TOTAL",1234.50m);
+            var values=new[]{new ReportPrintMetric("Overdue Amount","Rs. 200"),new ReportPrintMetric("Due Today","Rs. 100"),
+                new ReportPrintMetric("Not Yet Due","Rs. 700"),new ReportPrintMetric("Due Date Missing","Rs. 0")};
+            var report=GridReportPreview.Build("Fictional Meadow School","Debt summary","Campus: All",summaryRows,"Fixture",summaryMetrics:values);
+            var xml=XDocument.Parse(report.Definition);
+            Check(xml.Descendants(ns+"Textbox").Count(box=>((string?)box.Attribute("Name"))?.StartsWith("MetricLabel")==true)==4,
+                "Every structured due-status amount becomes a readable summary card");
+            Check(xml.Descendants(ns+"Value").Any(v=>v.Value.Contains("Data rows: 1")),"Printed row count excludes the authoritative TOTAL");
+            Check(report.Data.Rows[1].Field<bool>("IsReportTotal") && report.Data.Rows[0].Field<string>("C1")==1234.5m.ToString("#,##0.##"),
+                "Totals are emphasized and decimal money retains its readable precision");
+            report.Data.Dispose();
+        }
         using var wide=new DataTable();wide.Columns.Add("Admission Number");wide.Columns.Add("Student");
         for(int column=0;column<16;column++)wide.Columns.Add("Detailed Amount "+column,typeof(decimal));
         for(int row=0;row<36;row++)wide.Rows.Add(new object[]{(row+1).ToString(),"Example student "+(row+1)}.Concat(Enumerable.Range(0,16).Select(column=>(object)(1234567.89m+row+column))).ToArray());

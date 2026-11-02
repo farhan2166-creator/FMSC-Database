@@ -13,6 +13,8 @@ public sealed class CertificateIssueRegisterPage : V2Page
     private readonly ModernButton print,export;
     private readonly FormValidator validator;
     private string applied="",subtitle="";
+    private IReadOnlyList<ReportPrintMetric> printMetrics=Array.Empty<ReportPrintMetric>();
+    private protected override IReadOnlyList<ReportPrintMetric>? ReportPrintMetrics() => printMetrics;
     private bool running,hasRows;
 
     public CertificateIssueRegisterPage() : base("Certificate Issue Register",
@@ -84,6 +86,7 @@ public sealed class CertificateIssueRegisterPage : V2Page
             if (IsDisposed) return;
             if (!ReportLanded || rows is null) { summary.Text="Run the report again to see current totals."; return; }
             var totals=CertificateIssueRegisterData.Totals(rows);
+            printMetrics=ReportPrintSummary.FromTotals(totals);
             summary.Text=string.Join("     ",totals.Columns.Cast<DataColumn>().Select(c => $"{c.ColumnName}: {totals.Rows[0][c]}"));
             subtitle=captured+" | "+summary.Text+" | Saved record only does not confirm printing or collection.";
             applied=requested; hasRows=rows.Rows.Count>0;

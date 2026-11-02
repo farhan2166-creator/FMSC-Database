@@ -6,7 +6,7 @@ namespace FMSC_SMS.Core;
 internal static class GridReportPreview
 {
     internal sealed record Report(string Definition, DataTable Data);
-    internal static Report Build(string institution,string title,string subtitle,DataTable source,string printedBy,string moneyFormat="#,##0.##")
+    internal static Report Build(string institution,string title,string subtitle,DataTable source,string printedBy,string moneyFormat="#,##0.##",IReadOnlyList<ReportPrintMetric>? summaryMetrics=null)
     {
         if(source.Columns.Count==0)throw new ArgumentException("Choose at least one report column.",nameof(source));
         XNamespace ns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";
@@ -18,6 +18,7 @@ internal static class GridReportPreview
         var bands=GridReportColumns.Bands(columns,width);
         var data=new DataTable("ReportData");
         for(int i=0;i<columns.Count;i++)data.Columns.Add("C"+i);
+        data.Columns.Add("IsReportTotal",typeof(bool));
         var receiptLayout = CollectionReceiptGrouping.Layout(source);
         if (receiptLayout is not null)
         {
@@ -28,6 +29,7 @@ internal static class GridReportPreview
         {
             if (receiptLayout is not null && receiptLayout[rowIndex].Kind != "Detail") continue;
             DataRow row = source.Rows[rowIndex], printed = data.NewRow();
+            printed["IsReportTotal"]=ReportPrintSummary.IsTotalRow(row);
             for (int i = 0; i < columns.Count; i++)
             {
                 var column = columns[i];
@@ -58,14 +60,16 @@ internal static class GridReportPreview
             var headings=new List<XElement>();var details=new List<XElement>();
             foreach(int index in indices)
             {
-                var column=columns[index];string alignment=column.Numeric?"Right":"Left";
+                var column=columns[index];bool count=column.Numeric && column.Fields.All(i=>Type.GetTypeCode(source.Columns[i].DataType) is TypeCode.Byte or TypeCode.SByte or TypeCode.Int16 or TypeCode.UInt16 or TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Int64 or TypeCode.UInt64);
+                string alignment=count?"Center":column.Numeric?"Right":column.Fields.Length==1 && (source.Columns[column.Fields[0]].DataType==typeof(DateTime) || column.Caption.Contains("Date",StringComparison.OrdinalIgnoreCase))?"Center":"Left";
                 var heading=Text($"Heading{bandIndex}_{index}",column.Caption,true,alignment,"8.5pt");
                 heading.Element(ns+"Style")!.Add(E("BackgroundColor","#EAF0F5"),E("BottomBorder",E("Style","Solid"),E("Width","0.8pt"),E("Color","#486780")));
                 headings.Add(E("TablixCell",E("CellContents",heading)));
                 var detail=Text($"Value{bandIndex}_{index}",$"=Fields!C{index}.Value",false,alignment);
-                detail.Descendants(ns+"FontWeight").First().Value="=IIf(Left(Fields!C0.Value, 5) = \"TOTAL\" Or Left(Fields!C0.Value, 3) = \"NET\", \"Bold\", \"Normal\")";
+                detail.Descendants(ns+"FontWeight").First().Value="=IIf(Fields!IsReportTotal.Value, \"Bold\", \"Normal\")";
                 detail.Element(ns+"Style")!.Add(E("BottomBorder",E("Style","Solid"),E("Width","0.25pt"),E("Color","#DCE4EC")),
                     E("BackgroundColor","=IIf(RowNumber(Nothing) Mod 2 = 0, \"#F5F7FA\", \"White\")"));
+                detail.Element(ns+"Style")!.Add(E("TopBorder",E("Style","=IIf(Fields!IsReportTotal.Value, \"Solid\", \"None\")"),E("Width","0.8pt"),E("Color","#486780")));
                 details.Add(E("TablixCell",E("CellContents",detail)));
             }
             var table=E("Tablix",new XAttribute("Name","ReportRows"+bandIndex),
@@ -74,7 +78,7 @@ internal static class GridReportPreview
                 E("TablixColumnHierarchy",E("TablixMembers",indices.Select(_=>E("TablixMember")))),
                 E("TablixRowHierarchy",E("TablixMembers",E("TablixMember",E("KeepWithGroup","After"),E("RepeatOnNewPage",true)),
                     E("TablixMember",E("Group",new XAttribute("Name","DetailRows"+bandIndex)),E("KeepTogether",true)))),
-                E("DataSetName","ReportData"),E("Top",bands.Count>1?"0.25in":"0in"),E("Left","0in"),E("Height","0.68in"),E("Width",Inch(width)),E("Style"));
+                E("DataSetName","ReportData"),E("NoRowsMessage","No records match the selected filters."),E("Top",bands.Count>1?"0.25in":"0in"),E("Left","0in"),E("Height","0.68in"),E("Width",Inch(width)),E("Style"));
             if (receiptLayout is not null) CollectionReceiptRdlc.Apply(table, indices, columns.Select(column => column.Numeric).ToArray(), bandIndex);
             if(bands.Count==1)items.Add(table);
             else
@@ -86,15 +90,11 @@ internal static class GridReportPreview
                 items.Add(rectangle);
             }
         }
-        var summaryKeys=new HashSet<string>(StringComparer.OrdinalIgnoreCase){"Receipts","Money Received","Gross Received","Refunds","Corrections","Credit Applied","Adjusted Collection","Net Collection","Students Owing","Total Outstanding","Overdue","90+ Days","Gross Billed","Discounts","Net Billed","Charges","Students","Rows shown","Outstanding shown","Students holding credit","Credit held","Assignments"};
-        var metrics=new List<(string Label,string Value)>();var filters=new List<string>();
-        foreach(string part in System.Text.RegularExpressions.Regex.Split(subtitle.Trim(),@"\s{3,}"))
-        {
-            int colon=part.IndexOf(':');string key=colon>=0?part[..colon].Trim():"";
-            if(summaryKeys.Contains(key))metrics.Add((key,part[(colon+1)..].Trim()));
-            else if(part.Length>0)filters.Add(part.Replace("Period: Any start to Any end","Period: All dates",StringComparison.OrdinalIgnoreCase));
-        }
-        string scope=string.Join("   |   ",filters);
+        var presentation=ReportPrintSummary.Split(subtitle,summaryMetrics);
+        var metrics=presentation.Metrics;
+        string scope=presentation.Scope;
+        if(source.Columns.Cast<DataColumn>().Any(ReportPrintSummary.IsMoneyColumn)) scope+=(scope.Length>0?"   |   ":"")+"Amounts in Rs.";
+        scope+=(scope.Length>0?"   |   ":"")+"Data rows: "+ReportPrintSummary.DetailCount(source).ToString("N0",CultureInfo.CurrentCulture);
         using var bitmap=new Bitmap(1,1);using var graphics=Graphics.FromImage(bitmap);
         double TextHeight(string text,float points)
         {
@@ -138,9 +138,19 @@ internal static class GridReportPreview
                 E("LeftMargin","0.5in"),E("RightMargin","0.5in"),E("TopMargin","0.35in"),E("BottomMargin","0.35in"),E("Style")),E("ConsumeContainerWhitespace",true)));
         return new(document.ToString(),data);
     }
-    internal static void Show(IWin32Window? owner, string institution, string title, string subtitle, DataTable source, string printedBy, string moneyFormat = "#,##0.##")
+    internal static void ExportPdf(string path,Report report)
     {
-        var report = Build(institution, title, subtitle, source, printedBy, moneyFormat);
+        using var local=new Microsoft.Reporting.WinForms.LocalReport();
+        local.LoadReportDefinition(new StringReader(report.Definition));
+        local.DataSources.Add(new Microsoft.Reporting.WinForms.ReportDataSource("ReportData",report.Data));
+        byte[] bytes=local.Render("PDF");
+        AtomicExportFile.Publish(path,temp=>File.WriteAllBytes(temp,bytes),PdfTableExporter.ValidatePdf);
+    }
+
+    internal static void Show(IWin32Window? owner, string institution, string title, string subtitle, DataTable source, string printedBy, string moneyFormat = "#,##0.##",IReadOnlyList<ReportPrintMetric>? summaryMetrics=null)
+    {
+        var report = Build(institution, title, subtitle, source, printedBy, moneyFormat,summaryMetrics);
+        using var printedData=report.Data;
         RdlcReportPreview.Show(owner, title, "", "ReportData", report.Data, reportDefinition: report.Definition);
     }
 }
