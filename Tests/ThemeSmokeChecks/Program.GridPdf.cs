@@ -19,16 +19,22 @@ internal static partial class Program
         {
             string before=source.GetXmlForTest();
             var built=GridReportPreview.Build("Fictional Meadow School & College",title,subtitle,source,"Example Operator");
+            var layout=CollectionReceiptGrouping.Layout(source);
             Check(source.GetXmlForTest()==before,"Printing must not modify source rows, values or types");
             var columns=GridReportColumns.Create(source,"#,##0.##");
             Check(columns.SelectMany(c=>c.Fields).OrderBy(i=>i).SequenceEqual(Enumerable.Range(0,source.Columns.Count)),"Every selected source field appears exactly once in the print projection");
-            Check(built.Data.Rows.Count==source.Rows.Count,"Print layout preserves the number of financial records");
+            Check(built.Data.Rows.Count==(layout?.Count(row=>row.Kind=="Detail")??source.Rows.Count),"Print layout preserves all detail records without counting group headings or totals as receipts");
+            int printedRow=0;
             for(int row=0;row<source.Rows.Count;row++)
+            {
+                if(layout is not null && layout[row].Kind!="Detail")continue;
                 for(int column=0;column<source.Columns.Count;column++)
                 {
                     string value=GridReportColumns.Value(source.Rows[row],column,"#,##0.##");
-                    if(value.Length>0)Check(built.Data.Rows[row].ItemArray.Any(cell=>Convert.ToString(cell)!.Contains(value)),"Printed data preserves each source value");
+                    if(value.Length>0)Check(built.Data.Rows[printedRow].ItemArray.Any(cell=>Convert.ToString(cell)!.Contains(value)),"Printed data preserves each source value");
                 }
+                printedRow++;
+            }
             var definition=XDocument.Parse(built.Definition);
             Check(definition.Descendants(ns+"FontSize").Any(element=>element.Value=="9pt"),"Table text remains readable");
             Check(definition.Descendants(ns+"PageHeader").Any() && definition.Descendants(ns+"PageFooter").Any(),
@@ -71,7 +77,21 @@ internal static partial class Program
                 credit>0?"Account Credit":refund>0?"Refund":correction>0?"Correction":"Cash",money,refund,correction,credit,money-refund-correction,"operator");
         }
         string totals="View: Receipts   Period: Any start to Any end   Campus: Campus Boys   Class: All   Section: All   Receipts: 10     Money Received: Rs. 14,800     Refunds: Rs. 1,200     Corrections: Rs. 1,450     Credit Applied: Rs. 10,950     Adjusted Collection: Rs. 12,150";
-        Check(Render("collections-receipts","Collections & Receipts",totals,receipts)==1,"Ten ordinary receipts fit one readable A4 landscape page");
+        using(var wholeSchool=receipts.Copy())
+        {
+            // Match the screen's PrepareReportData step before the shared export.
+            CollectionReceiptGrouping.Apply(wholeSchool,"Whole School");
+            Check(Render("collections-receipts","Collections & Receipts",totals,wholeSchool)==1,"Ten receipts and their actual whole-school total fit one readable A4 landscape page");
+        }
+        using(var byCampus=receipts.Copy())
+        {
+            for(int row=5;row<byCampus.Rows.Count;row++)byCampus.Rows[row]["Campus"]="Campus Girls";
+            CollectionReceiptGrouping.Apply(byCampus,"Campus");
+            var groupedLayout=CollectionReceiptGrouping.Layout(byCampus)!;
+            Check(groupedLayout.Count(row=>row.Kind=="Heading")==2 && groupedLayout.Count(row=>row.Kind=="Subtotal")==2,
+                "The campus sample includes two real receipt groups and their subtotals");
+            Render("collections-by-campus","Collections & Receipts",totals.Replace("Campus: Campus Boys","Campus: All")+"   Grouped by: Campus",byCampus);
+        }
         var receiptColumns=GridReportColumns.Create(receipts,"#,##0.##");
         Check(receiptColumns.Count==9,"Receipt identity fields share cells instead of squeezing thirteen columns");
         Check(receiptColumns.Single(c=>c.Caption=="Receipt / Date").Minimum>=1.3,"Receipt references and dates have a readable minimum width");

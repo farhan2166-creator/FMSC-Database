@@ -47,6 +47,9 @@ change or SQL migration is required for these presentation changes.
   cards, decimal precision, selected-field preservation, wide-column pagination,
   current receipt reconciliation and original-snapshot immutability.
 - Desktop CI runs --grid-pdf alongside the existing --fee-documents suite.
+- Desktop CI retains the resulting direct-export PDFs for review. See
+  [direct export samples](DIRECT_PDF_EXPORT_SAMPLES.md) for artifact access,
+  fictional data and verification limits.
 
 Linux cannot execute WinForms, EMF/thermal printing or the Windows usp10.dll PDF
 text renderer. Native PDF/thermal/A4 acceptance remains a Windows check; successful

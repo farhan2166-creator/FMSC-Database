@@ -63,6 +63,19 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "$suite failed with exit code $LASTEXITCODE" }
           }
 
+      - name: Retain direct PDF export samples
+        # Fictional fixture data only. These files use the production export
+        # builder and Windows PDF renderer, rather than a recreated layout.
+        if: ${{ always() && hashFiles('artifacts/grid-pdf/*-export.pdf') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: fmsc-direct-pdf-exports-${{ github.run_id }}
+          path: |
+            artifacts/grid-pdf/*-export.pdf
+            Docs/DIRECT_PDF_EXPORT_SAMPLES.md
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Run Level 3 noninteractive resource and export checks
         timeout-minutes: 5
         env:

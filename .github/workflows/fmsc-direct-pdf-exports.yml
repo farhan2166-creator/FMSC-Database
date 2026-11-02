@@ -1,0 +1,88 @@
+name: Direct PDF export samples
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, chore/direct-pdf-export-evidence]
+    paths:
+      - 'Core/GridReportPreview.cs'
+      - 'Core/GridReportColumns.cs'
+      - 'Core/ReportExportBuilder.cs'
+      - 'Core/CollectionReceiptGrouping.cs'
+      - 'Core/CollectionReceiptRdlc.cs'
+      - 'Tests/ThemeSmokeChecks/Program.GridPdf.cs'
+      - '.github/workflows/fmsc-direct-pdf-exports.yml'
+  pull_request:
+    paths:
+      - 'Core/GridReportPreview.cs'
+      - 'Core/GridReportColumns.cs'
+      - 'Core/ReportExportBuilder.cs'
+      - 'Core/CollectionReceiptGrouping.cs'
+      - 'Core/CollectionReceiptRdlc.cs'
+      - 'Tests/ThemeSmokeChecks/Program.GridPdf.cs'
+      - '.github/workflows/fmsc-direct-pdf-exports.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: direct-pdf-exports-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    name: Render direct exports with fictional data
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Generate and verify direct PDF exports
+        id: render
+        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --grid-pdf
+      - name: Record export provenance
+        if: ${{ always() && hashFiles('artifacts/grid-pdf/*-export.pdf') != '' }}
+        shell: pwsh
+        env:
+          SAMPLE_COMMIT: ${{ github.sha }}
+          SAMPLE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SAMPLE_CHECK_OUTCOME: ${{ steps.render.outcome }}
+        run: |
+          $samples = @(Get-ChildItem artifacts/grid-pdf/*-export.pdf | ForEach-Object {
+            [ordered]@{ file = $_.Name; sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
+          })
+          [ordered]@{
+            sourceCommit = $env:SAMPLE_COMMIT
+            workflowRun = $env:SAMPLE_RUN_URL
+            checkOutcome = $env:SAMPLE_CHECK_OUTCOME
+            data = 'Fictional school, operator and transactions; no school database queried.'
+            renderer = 'Production direct PDF export code on Windows'
+            files = $samples
+          } | ConvertTo-Json -Depth 4 | Set-Content artifacts/grid-pdf/provenance.json -Encoding utf8
+      - name: Upload direct PDF exports
+        id: samples
+        if: ${{ always() && hashFiles('artifacts/grid-pdf/*-export.pdf') != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: fmsc-direct-pdf-exports-${{ github.run_id }}
+          path: |
+            artifacts/grid-pdf/*-export.pdf
+            artifacts/grid-pdf/provenance.json
+            Docs/DIRECT_PDF_EXPORT_SAMPLES.md
+          retention-days: 7
+          if-no-files-found: error
+      - name: Link exported PDFs in the run summary
+        if: ${{ always() && steps.samples.outcome == 'success' }}
+        shell: pwsh
+        env:
+          SAMPLE_ARTIFACT_URL: ${{ steps.samples.outputs.artifact-url }}
+          SAMPLE_COMMIT: ${{ github.sha }}
+          SAMPLE_CHECK_OUTCOME: ${{ steps.render.outcome }}
+        run: |
+          "[Download direct-export PDFs]($env:SAMPLE_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+          "Source commit: $env:SAMPLE_COMMIT. Export checks: $env:SAMPLE_CHECK_OUTCOME." >> $env:GITHUB_STEP_SUMMARY
+          'Fictional data rendered with the production export code on Windows. Review the PDF files themselves; partial output from a failed check is not a passing result.' >> $env:GITHUB_STEP_SUMMARY
