@@ -432,3 +432,9 @@ Database/*.bak
 /Tests/AcademicYearChecks/*
 !/Tests/AcademicYearChecks/*.cs
 !/Tests/AcademicYearChecks/*.csproj
+
+# Global lookup contracts and disposable fixture source only.
+!/Tests/GlobalSearchChecks/
+/Tests/GlobalSearchChecks/*
+!/Tests/GlobalSearchChecks/*.cs
+!/Tests/GlobalSearchChecks/*.csproj

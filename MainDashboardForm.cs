@@ -321,7 +321,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         if (e.KeyData == (Keys.Control | Keys.K))
         {
             e.SuppressKeyPress = true;
-            ShowCommandPalette();
+            ShowRecordSearch();
         }
     }
     protected override bool ProcessCmdKey(ref Message msg,Keys keyData)
@@ -337,7 +337,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             }
             return true;
         }
-        if(keyData==(Keys.Control|Keys.K)) {ShowCommandPalette();return true;}
+        if(keyData==(Keys.Control|Keys.K)) {ShowRecordSearch();return true;}
         if(keyData == Keys.F1) { OpenHotKeysPageAfterAccountMenuCloses(); return true; }
         return base.ProcessCmdKey(ref msg,keyData);
     }
@@ -353,6 +353,22 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         using var dialog = new CommandPaletteDialog(navigationCommands, query);
         if (dialog.ShowDialog(this) == DialogResult.OK && dialog.SelectedCommand != null)
             dialog.SelectedCommand.Execute();
+        ReleaseTopBarFocus();
+    }
+    private void ShowRecordSearch()
+    {
+        using var dialog = new CommandPaletteDialog(Array.Empty<NavigationCommand>(),null,GlobalRecordSearch.ReadAsync);
+        int actor=CurrentUser.UserId;string endpoint=DatabaseHelper.DatabaseEndpoint;
+        if (dialog.ShowDialog(this) == DialogResult.OK && actor==CurrentUser.UserId&&endpoint==DatabaseHelper.DatabaseEndpoint)
+        {
+            if(dialog.SelectedRecord is { } record && GlobalRecordSearch.CanRead(record.Kind))
+            {
+                if(record.Kind=="Student")NavigateTo(()=>StudentProfilePage.ForStudent(record.AdmissionId,
+                    (factory,module,title)=>NavigateTo(factory,module,title)),"Daily Work","Student Profile");
+                else NavigateTo(()=>new SavedFinancialDocumentPage(record,
+                    (factory,module,title)=>NavigateTo(factory,module,title)),"Finance","Saved Financial Document");
+            }
+        }
         ReleaseTopBarFocus();
     }
     /* The search box and the Ctrl+K button are shortcuts, not places to work. */
@@ -481,8 +497,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             Padding = new Padding(10, 0, 10, 0)
         };
         UiHelper.DisposeOwnedButtonImageOnDispose(_commandButton);
-        _commandButton.Click += (_, _) =>
-            ShowCommandPalette(_globalSearchBox?.Text.Trim());
+        _commandButton.Click += (_, _) => ShowRecordSearch();
         var today = new Label {
             Name = "TopBarDate",
             AutoSize = true,

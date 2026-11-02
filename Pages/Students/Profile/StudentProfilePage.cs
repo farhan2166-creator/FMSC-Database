@@ -86,6 +86,21 @@ public sealed class StudentProfilePage : V2Page
         Visible = false
     };
     public StudentProfilePage(Action<Func<Control>, string, string>? navigate = null) : this(navigate,true) { }
+    internal static StudentProfilePage ForStudent(int admissionId,Action<Func<Control>,string,string>? navigate=null)
+    {
+        var page=new StudentProfilePage(navigate);
+        int actor=CurrentUser.UserId;string endpoint=DatabaseHelper.DatabaseEndpoint;
+        // Explicit search targets load after workspace restoration and win over remembered selections.
+        page.Defer(async()=>{
+            if(actor!=CurrentUser.UserId||endpoint!=DatabaseHelper.DatabaseEndpoint||!CurrentUser.HasPermission("Students.View"))return;
+            var row=await StudentSearchCache.FindByAdmissionIdAsync(admissionId);
+            if(page.IsDisposed||actor!=CurrentUser.UserId||endpoint!=DatabaseHelper.DatabaseEndpoint||!CurrentUser.HasPermission("Students.View"))return;
+            if(row is null){page.Warn("This student is no longer available.");return;}
+            page.student.SetStudent(row);page.UpdateStudentShortcuts();page.UpdateFeeHistoryAvailability();
+            await page.LoadProfileAsync();
+        });
+        return page;
+    }
     internal StudentProfilePage(Action<Func<Control>, string, string>? navigate,bool initialize)
         : base(
             "Student Profile",

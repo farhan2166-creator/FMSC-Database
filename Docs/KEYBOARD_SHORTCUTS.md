@@ -53,7 +53,7 @@ Reset Filters (Ctrl+T) is separate from Clear Filters (Alt+C). Admit Sibling
 registration recovery (Ctrl+J) keep separate targets when both are shown.
 Alt+Y opens the secondary A4 summary; Ctrl+P prints the current report.
 
-Ctrl+K opens quick navigation and F1 opens shortcut help from the dashboard.
+Ctrl+K finds student records, saved bills and receipt/payment references. The dashboard search box keeps feature navigation. F1 opens shortcut help from the dashboard.
 Normal text editing keys, field navigation and tab navigation retain their usual
 behavior. F2 remains available for native grid cell editing.
 

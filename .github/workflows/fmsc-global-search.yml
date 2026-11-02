@@ -1,0 +1,57 @@
+name: Global record search checks
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, feat/global-record-search]
+    paths:
+      - 'Core/Global*.cs'
+      - 'Core/CommandPaletteDialog.cs'
+      - 'Core/SavedFinancialDocumentPage.cs'
+      - 'MainDashboardForm.cs'
+      - 'Pages/Students/Profile/StudentProfilePage.cs'
+      - 'Tests/GlobalSearchChecks/**'
+      - 'Tests/ThemeSmokeChecks/Program.GlobalSearch.cs'
+      - '.github/workflows/fmsc-global-search.yml'
+  pull_request:
+    paths:
+      - 'Core/Global*.cs'
+      - 'Core/CommandPaletteDialog.cs'
+      - 'Core/SavedFinancialDocumentPage.cs'
+      - 'MainDashboardForm.cs'
+      - 'Pages/Students/Profile/StudentProfilePage.cs'
+      - 'Tests/GlobalSearchChecks/**'
+      - 'Tests/ThemeSmokeChecks/Program.GlobalSearch.cs'
+      - '.github/workflows/fmsc-global-search.yml'
+permissions:
+  contents: read
+concurrency:
+  group: global-search-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Read-only search contracts and disposable SQL
+        shell: pwsh
+        run: |
+          $instance = 'Fmsc_GlobalSearchChecks_' + [Guid]::NewGuid().ToString('N')
+          & sqllocaldb create $instance -s
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create the owned disposable SQL instance.' }
+          try {
+            $env:FMSC_GLOBAL_SEARCH_SQL_CONNECTION = "Server=(localdb)\$instance;Initial Catalog=master;Integrated Security=true;TrustServerCertificate=true"
+            & dotnet run --project Tests/GlobalSearchChecks/GlobalSearchChecks.csproj -c Release -- --sql
+            if ($LASTEXITCODE -ne 0) { throw 'Global search contracts or disposable SQL checks failed.' }
+          } finally {
+            & sqllocaldb stop $instance -k
+            & sqllocaldb delete $instance
+            Remove-Item Env:FMSC_GLOBAL_SEARCH_SQL_CONNECTION -ErrorAction SilentlyContinue
+          }
+      - name: Search dialog, cancellation and separate feature navigation
+        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --global-search

@@ -303,6 +303,11 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} report ordering, saved-view and stale-result checks (no database connection).");
             return;
         }
+        if(args.Contains("--global-search"))
+        {
+            CheckGlobalSearch();CheckPaletteDestinations();
+            Console.WriteLine($"PASS: {checks} global search and feature-navigation checks (no database connection).");return;
+        }
         if(args.Contains("--saved-report-views"))
         {
             CheckSavedReportViews();

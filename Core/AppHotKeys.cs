@@ -55,7 +55,7 @@ internal static class AppHotKeys
             "Class Summary A4", "Class / Section A4")
     };
 
-    internal const string QuickNavigationAction = "Quick navigation";
+    internal const string QuickNavigationAction = "Find records";
     internal const string QuickNavigationKey = "Ctrl+K";
     internal static readonly (string Caption,Keys Keys,string Hint)[] DashboardNavigation = {
         ("Dashboard",Keys.Alt|Keys.D1,"Alt+1"),

@@ -8,11 +8,20 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
     private readonly TextBox search = new();
     private readonly ListBox results = new();
     private readonly IReadOnlyList<NavigationCommand> source;
+    private readonly Func<string,CancellationToken,Task<IReadOnlyList<GlobalSearchRecord>>>? readRecords;
+    private readonly Label searchStatus=new();
+    private CancellationTokenSource? pendingSearch;
+    private int generation;
+    private bool searching;
+    internal GlobalSearchRecord? SelectedRecord { get; private set; }
     public NavigationCommand? SelectedCommand { get; private set; }
     public CommandPaletteDialog(IReadOnlyList<NavigationCommand> source, string? initialQuery = null)
+        :this(source,initialQuery,null) { }
+    internal CommandPaletteDialog(IReadOnlyList<NavigationCommand> source,string? initialQuery,
+        Func<string,CancellationToken,Task<IReadOnlyList<GlobalSearchRecord>>>? readRecords)
     {
-        this.source = source;
-        Text = "Search FMSC";
+        this.source = source;this.readRecords=readRecords;
+        Text = readRecords is null?"Search FMSC":"Find Records";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -23,14 +32,12 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
         Font = AppTheme.NormalFont;
         KeyPreview = true;
         Build();
-        initialQuery = StripDigits(initialQuery);
+        initialQuery = readRecords is null?StripDigits(initialQuery):GlobalSearchInput.Normalize(initialQuery);
         Populate(initialQuery);
         search.Text = initialQuery;
         search.SelectionStart = search.TextLength;
     }
-    /// <summary>The text without any digit (feature names are text only).</summary>
-    public static string StripDigits(string? text) =>
-        string.IsNullOrEmpty(text) ? string.Empty : new string(text.Where(c => !char.IsDigit(c)).ToArray());
+    public static string StripDigits(string? text)=>string.IsNullOrEmpty(text)?string.Empty:new string(text.Where(c=>!char.IsDigit(c)).ToArray());
     private void Build()
     {
         var card = new RoundedPanel {
@@ -41,7 +48,7 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
         var title = new Label {
             Dock = DockStyle.Top,
             Height = AppScale.S(32),
-            Text = "Quick Navigation",
+            Text = readRecords is null?"Quick Navigation":"Find Records",
             Font = AppTheme.HeadingFont,
             ForeColor = AppTheme.HeadingText,
             TextAlign = ContentAlignment.MiddleLeft
@@ -50,25 +57,17 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
         search.Height = AppScale.S(42);
         search.Font = AppTheme.NormalFont;
         search.BorderStyle = BorderStyle.FixedSingle;
-        search.PlaceholderText = "Search a page or module...";
+        search.PlaceholderText = readRecords is null?"Search a page or module...":"Student name, admission, bill or receipt number…";
+        if(readRecords is not null)search.MaxLength=GlobalSearchInput.MaximumLength;
         search.Margin = new Padding(0, AppScale.S(8), 0, AppScale.S(10));
-        /* Feature / page names are text: digits are refused as they are typed (with a beep) and stripped if they arrive by paste. */
-        search.KeyPress += (_, e) => {
-            if (!char.IsDigit(e.KeyChar))
-                return;
-            e.Handled = true;
-            System.Media.SystemSounds.Beep.Play();
-        };
-        search.TextChanged += (_, _) => {
-            string clean = StripDigits(search.Text);
-            if (!string.Equals(clean, search.Text, StringComparison.Ordinal))
+        if(readRecords is null)search.KeyPress+=(_,e)=>{if(char.IsDigit(e.KeyChar)){e.Handled=true;System.Media.SystemSounds.Beep.Play();}};
+        search.TextChanged += async (_,_) => {
+            if(readRecords is null)
             {
-                int caret = Math.Max(0, search.SelectionStart - (search.TextLength - clean.Length));
-                search.Text = clean;
-                search.SelectionStart = Math.Min(caret, clean.Length);
-                return;
+                string clean=StripDigits(search.Text);
+                if(clean!=search.Text){int caret=Math.Max(0,search.SelectionStart-(search.TextLength-clean.Length));search.Text=clean;search.SelectionStart=Math.Min(caret,clean.Length);return;}
             }
-            Populate(search.Text);
+            await SearchAsync();
         };
         search.KeyDown += SearchKeyDown;
         results.Dock = DockStyle.Fill;
@@ -77,22 +76,32 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
         results.ForeColor = AppTheme.Text;
         results.Font = AppTheme.NormalFont;
         results.IntegralHeight = false;
+        if(readRecords is not null)
+        {
+            results.DrawMode=DrawMode.OwnerDrawFixed;
+            results.ItemHeight=AppMetrics.TextHeight(AppTheme.NormalFont)*2+AppScale.S(10);
+            results.DrawItem+=DrawResult;
+        }
+        searchStatus.Dock=DockStyle.Bottom;searchStatus.Height=AppScale.S(32);
+        searchStatus.Font=AppTheme.SmallFont;searchStatus.ForeColor=AppTheme.MutedText;
+        searchStatus.AutoEllipsis=true;searchStatus.Visible=readRecords is not null;
         results.DoubleClick += (_, _) => Accept();
         results.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; Accept(); } };
         var hint = new Label {
             Dock = DockStyle.Bottom,
             Height = AppScale.S(26),
-            Text = "Ctrl+K to open  •  Enter to navigate  •  Esc to close",
+            Text = readRecords is null?"Enter to navigate  •  Esc to close":"Ctrl+K to open  •  Enter to open record  •  Esc to close",
             Font = AppTheme.SmallFont,
             ForeColor = AppTheme.MutedText,
             TextAlign = ContentAlignment.MiddleLeft
         };
         card.Controls.Add(results);
+        card.Controls.Add(searchStatus);
         card.Controls.Add(hint);
         card.Controls.Add(search);
         card.Controls.Add(title);
         Controls.Add(card);
-        Shown += (_, _) => search.Focus();
+        Shown += async (_, _) => {search.Focus();await SearchAsync();};
         KeyDown += (_, e) => { if (e.KeyCode == Keys.Escape) { e.SuppressKeyPress = true; DialogResult = DialogResult.Cancel; } };
     }
     private void Populate(string query)
@@ -136,11 +145,70 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
     }
     private void Accept()
     {
-        if (results.SelectedItem is not NavigationCommand command)
-            return;
-        SelectedCommand = command;
-        if (SelectedCommand != null)
-            DialogResult = DialogResult.OK;
+        if(searching){searchStatus.Text="Searching records…";return;}
+        if(results.SelectedItem is GlobalSearchRecord record)
+        {
+            if(!GlobalRecordSearch.CanRead(record.Kind)){searchStatus.Text="Access changed. Search again.";return;}
+            SelectedRecord=record;DialogResult=DialogResult.OK;
+        }
+        else if(results.SelectedItem is NavigationCommand command)
+        {SelectedCommand=command;DialogResult=DialogResult.OK;}
     }
+    private async Task SearchAsync()
+    {
+        pendingSearch?.Cancel();pendingSearch?.Dispose();pendingSearch=new CancellationTokenSource();
+        var token=pendingSearch.Token;int request=++generation,actor=CurrentUser.UserId;
+        string query=GlobalSearchInput.Normalize(search.Text);
+        Populate(query);searching=false;
+        if(readRecords is null||!GlobalSearchInput.CanSearch(query)) {searchStatus.Text=readRecords is null?"Enter keywords to find a page.":"Enter a student name, admission, bill or receipt number.";return;}
+        searching=true;searchStatus.Text="Searching records…";
+        try
+        {
+            await Task.Delay(300,token);
+            var records=await readRecords(query,token);
+            if(IsDisposed||request!=generation||token.IsCancellationRequested||actor!=CurrentUser.UserId)return;
+            results.BeginUpdate();
+            try
+            {
+                results.Items.Clear();results.Items.AddRange(records.Where(r=>GlobalRecordSearch.CanRead(r.Kind)).Take(20).Cast<object>().ToArray());
+                if(results.Items.Count>0)results.SelectedIndex=0;
+            }
+            finally {results.EndUpdate();}
+            searchStatus.Text=records.Count>=20?"Showing the first 20 record matches. Enter more detail to narrow the results.":$"{records.Count} record match(es).";
+        }
+        catch(OperationCanceledException) when(token.IsCancellationRequested) { }
+        catch(Exception ex)
+        {
+            if(!IsDisposed&&request==generation&&actor==CurrentUser.UserId)
+            {AppExceptionHandler.LogNonFatal(ex,"Global record search");searchStatus.Text="Record search unavailable. Please try again.";}
+        }
+        finally {if(!IsDisposed&&request==generation)searching=false;}
+    }
+    private void DrawResult(object? sender,DrawItemEventArgs e)
+    {
+        if(e.Index<0||e.Index>=results.Items.Count)return;
+        bool selected=(e.State&DrawItemState.Selected)!=0;
+        var color=selected?SystemColors.HighlightText:AppTheme.Text;
+        using(var brush=new SolidBrush(selected?SystemColors.Highlight:AppTheme.Surface))e.Graphics.FillRectangle(brush,e.Bounds);
+        object item=results.Items[e.Index];
+        string title=item is GlobalSearchRecord record?record.Heading:((NavigationCommand)item).Caption;
+        string detail=item is GlobalSearchRecord row?row.Context:"Page navigation";
+        var top=new Rectangle(e.Bounds.Left+6,e.Bounds.Top+3,e.Bounds.Width-12,e.Bounds.Height/2);
+        var bottom=new Rectangle(top.Left,top.Bottom,top.Width,e.Bounds.Height/2-3);
+        TextRenderer.DrawText(e.Graphics,title,AppTheme.NormalFont,top,color,TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine);
+        TextRenderer.DrawText(e.Graphics,detail,AppTheme.SmallFont,bottom,selected?color:AppTheme.MutedText,TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine);
+        e.DrawFocusRectangle();
+    }
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        generation++;pendingSearch?.Cancel();pendingSearch?.Dispose();pendingSearch=null;base.OnFormClosed(e);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if(disposing){generation++;pendingSearch?.Cancel();pendingSearch?.Dispose();pendingSearch=null;}
+        base.Dispose(disposing);
+    }
+
 }
 

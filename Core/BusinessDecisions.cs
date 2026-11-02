@@ -278,4 +278,12 @@ BD-37 Staff: hire dates cannot be future; an entered leaving date cannot precede
 hire. Add Job and Edit Job use their own dialogs from the staff employment panels,
 without restoring the redundant header Employment button. Saved designation and
 subjects prefill certificates but remain operator-editable.
+
+BD-38 Global record search: the dashboard text box keeps feature/page navigation;
+Ctrl+K separately searches students, saved bills/receipts and payment references.
+Limit results and cancel stale reads; recheck permissions, actor and database
+endpoint before displaying/opening. Explicit selected-record IDs override saved
+workspace selections and keep normal busy/unsaved-work guards. Open saved
+snapshots/readers only; lookup must not issue a bill, allocate a number or record
+money. Keep legacy payment entries distinct when no original receipt is available.
 */

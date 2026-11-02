@@ -11,7 +11,7 @@ public sealed class HotKeysPage : V2Page
         table.Columns.Add("Key", typeof(string));
         table.Columns.Add("Description", typeof(string));
         void Add(string action, string key, string description) => table.Rows.Add(action, key, description);
-        Add("Quick navigation", AppHotKeys.QuickNavigationKey, "Search for a page and press Enter to open it.");
+        Add("Find records", AppHotKeys.QuickNavigationKey, "Search students, bills or receipts. The dashboard text box still searches pages.");
         Add("Shortcut help", "F1", "Open this reference from the dashboard.");
         foreach (var shortcut in AppHotKeys.DashboardNavigation)
             Add(shortcut.Caption, shortcut.Hint, "Open this dashboard page or expand its navigation group.");
