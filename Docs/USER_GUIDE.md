@@ -194,6 +194,24 @@ Saved collection receipts show each included fee's saved amount due before that 
 
 ## Report review and advance credit
 
+Finance reports and Certificate Issue Register offer optional **Order by** choices
+suited to the current view. **Default** is selected automatically; there is no need
+to choose an order before running a report. To override it, choose an order and
+press **Run Report**. Names support A–Z
+and Z–A, amounts support highest/lowest first, and dates support newest/oldest first.
+Admission numbers compare numerically with their suffixes. **Default** retains
+the report's original order: payment dates for collections, campus/class/section
+and admission number for student outstanding lists, billing months for monthly
+reconciliation, campus/class and student name for credit lists, and newest recorded
+entries first for certificates. Summary and family views retain their own group
+ordering. Changing view refreshes the available choices.
+
+Print, PDF and CSV follow the chosen order across the whole result, rather than
+only the visible page. Grouped receipt reports sort details within each group;
+their headings, subtotals and grand total stay together. Saved Views remember the
+chosen order; earlier saved views use Default. Student Reports retains its
+existing Sort by control. Bills/receipts retain their finalized wording.
+
 Named **Saved Views** are available in Collections & Receipts, Outstanding &
 Aging, Billing & Discounts, Student Credit Balance Register, Monthly Fee
 Reconciliation, Certificate Issue Register and Class Marks & Attendance Sheets.

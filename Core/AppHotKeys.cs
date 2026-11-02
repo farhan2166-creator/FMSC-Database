@@ -14,7 +14,7 @@ internal static class AppHotKeys
     internal static readonly ActionShortcut[] PageActions =
     {
         new("Save", "Ctrl+S", Keys.Control | Keys.S, "Save changes, including Add Fee / Add Charge, in the active editor.", "Save"),
-        new("Print", "Ctrl+P", Keys.Control | Keys.P, "Print or preview the current record or report.", "Print"),
+        new("Print", "Ctrl+P", Keys.Control | Keys.P, "Print or preview the current record, report or selected outstanding bills.", "Print", "Preview Selected Bills"),
         new("New record", "Ctrl+N", Keys.Control | Keys.N, "Start a new record using the page’s New action.", "New", "Clear / New"),
         new("Find / Search", "Ctrl+F", Keys.Control | Keys.F, "Focus the page search, or run its Find action.", "Find", "Search"),
         new("Export", "Alt+E", Keys.Alt | Keys.E, "Export the current records or report.", "Export"),
@@ -43,7 +43,16 @@ internal static class AppHotKeys
         new("Review admission", "Alt+D", Keys.Alt | Keys.D, "Review the selected admission or open Admissions for the current student.", "Review Admission", "Open Admissions"),
         new("Pending registrations", "Alt+G", Keys.Alt | Keys.G, "Open pending registrations.", "Pending Registrations"),
         new("Manage photo", "Alt+M", Keys.Alt | Keys.M, "Open photo management for the current student.", "Manage Photo"),
-        new("Issue certificate again", "Alt+I", Keys.Alt | Keys.I, "Start Issue Again for the selected collected certificate; normal checks still apply.", "Issue Again")
+        new("Issue certificate again", "Alt+I", Keys.Alt | Keys.I, "Start Issue Again for the selected collected certificate; normal checks still apply.", "Issue Again"),
+        new("Report columns", "Alt+O", Keys.Alt | Keys.O, "Choose the report's visible columns and their order.", "Columns"),
+        new("Rename saved view", "Ctrl+M", Keys.Control | Keys.M, "Rename the selected saved report view.", "Rename View"),
+        new("Reset report filters", "Ctrl+T", Keys.Control | Keys.T, "Use Reset Filters; keep Alt+C for the separate Clear Filters action.", "Reset Filters"),
+        new("Check save outcome", "Alt+K", Keys.Alt | Keys.K, "Check an uncertain save using the existing recovery action.",
+            "Check Save Outcome", "Check Saved Admission", "Check Saved Changes", "Check Previous Save"),
+        new("Check registration save", "Ctrl+J", Keys.Control | Keys.J, "Check a pending registration save, separately from admission recovery.", "Check Registration Save"),
+        new("Admit sibling", "Alt+L", Keys.Alt | Keys.L, "Open sibling admission; leave Alt+A available for adding a fee.", "Admit Sibling"),
+        new("Class / section A4 report", "Alt+Y", Keys.Alt | Keys.Y, "Open the separate class summary or class/section outstanding A4 report. Ctrl+P retains the current report's print action.",
+            "Class Summary A4", "Class / Section A4")
     };
 
     internal const string QuickNavigationAction = "Quick navigation";

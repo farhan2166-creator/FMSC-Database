@@ -13,6 +13,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
     protected readonly ModernComboBox View = new();
     protected readonly ModernComboBox GroupBy = new();
     protected readonly ModernComboBox PaymentMethod = new();
+    private readonly ModernComboBox _orderBy = new();
     private readonly string _procedure;
     private readonly bool _usesDates;
     private readonly bool _usesYear;
@@ -100,9 +101,13 @@ public abstract class CanonicalFinanceReportPage : V2Page
         if (paymentMethod) fields.Add(("Payment Method", PaymentMethod));
         if (grouping) fields.Add((GroupingCaption, GroupBy));
         fields.AddRange(AdditionalReportFilters());
+        fields.Add(("Order by", _orderBy));
+        ReportUi.RegisterChoiceFilter(_orderBy);
+        SetToolTip(_orderBy, "Optional. Default uses this report view's normal order. Choose another order only when needed, then Run Report. Print and export follow the same order. Grouped receipts sort within each group; totals stay at the end.");
         UiHelper.SetGridPlaceholderMessage(Grid, UiText.EmptyGrid.RunReport);
         var content=ReportUi.CompactLayout(ReportUi.Bar(fields.ToArray()), Grid, title, () => {
             _savedViews?.ResetDates();
+            _orderBy.SelectedIndex = 0;
             _scopeEdited = true;
             ReportLayoutStore.SetPreference(_scopePreferenceKey, "");
             _displayed = null;
@@ -118,8 +123,9 @@ public abstract class CanonicalFinanceReportPage : V2Page
         SetContent(_savedViews.Wrap(content));
         Grid.Parent?.Controls.Add(_summary);
         Grid.BringToFront();
-        View.SelectedIndexChanged += (_, _) => { UpdateViewControls(); FiltersChanged(); };
-        GroupBy.SelectedIndexChanged += (_, _) => FiltersChanged();
+        View.SelectedIndexChanged += (_, _) => { UpdateViewControls(); RefreshOrderChoices(); FiltersChanged(); };
+        GroupBy.SelectedIndexChanged += (_, _) => { RefreshOrderChoices(); FiltersChanged(); };
+        _orderBy.SelectedIndexChanged += (_, _) => FiltersChanged();
         PaymentMethod.SelectedIndexChanged += (_, _) => FiltersChanged();
         From.ValueChanged += (_, _) => FiltersChanged();
         To.ValueChanged += (_, _) => FiltersChanged();
@@ -129,6 +135,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
                 FiltersChanged();
             };
         UpdateViewControls();
+        RefreshOrderChoices();
         ReportAvailabilityChanged();
     }
     protected virtual IEnumerable<ModernButton> AdditionalReportActions() => Array.Empty<ModernButton>();
@@ -158,6 +165,16 @@ public abstract class CanonicalFinanceReportPage : V2Page
     {
         _availableColumns=ReportAvailableColumns.FromGrid(Grid);_boundColumnLayout=ReportLayoutKey;
         RefreshReportColumnLayout();base.OnReportPageBound();
+        LockGridOrder();
+    }
+    private void RefreshOrderChoices()
+    {
+        var choices = ReportRowOrder.Choices(_procedure, ViewName, GroupName);
+        if (_orderBy.Items.Cast<ReportRowOrder.Choice>().SequenceEqual(choices)) return;
+        string previous = _orderBy.Text;
+        _orderBy.Items.Clear();
+        _orderBy.Items.AddRange(choices.Cast<object>().ToArray());
+        _orderBy.SelectedItem = choices.FirstOrDefault(c => c.Label == previous) ?? choices[0];
     }
     private IEnumerable<(string Key,Control Control)> SavedFields()
     {
@@ -167,6 +184,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         yield return ("Campus",Campus);yield return ("Class",Class);yield return ("Section",Section);
         yield return ("Payment method",PaymentMethod);
         foreach(var (caption,control) in AdditionalReportFilters()) yield return (caption,control);
+        yield return ("Order by", _orderBy);
     }
     private Dictionary<string,string> CaptureSavedView()
     {
@@ -177,6 +195,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
     private void RestoreSavedView(IReadOnlyDictionary<string,string> state)
     {
         _scopeEdited=true;
+        if (!state.ContainsKey("Order by")) _orderBy.SelectedIndex=0;
         // View changes rebuild the grouping choices synchronously before Grouping is restored.
         ReportFilterState.Restore(SavedFields().Where(f=>f.Control is not ModernComboBox combo || combo.Items.Count>0),state);
         if (state.TryGetValue("$columns",out string? columns))
@@ -243,7 +262,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
     }
     private string Signature() => string.Join('|', ViewName, GroupName, MethodName,
         $"{From.Checked}:{From.Value.Date:yyyy-MM-dd}", $"{To.Checked}:{To.Value.Date:yyyy-MM-dd}",
-        Campus.SelectedId, Year.SelectedId, Class.SelectedId, Section.SelectedId, AdditionalFilterSignature);
+        Campus.SelectedId, Year.SelectedId, Class.SelectedId, Section.SelectedId, AdditionalFilterSignature, _orderBy.Text);
     protected override string ReportFilterSignature() => Signature();
     protected override string ReportExportSubtitle() =>
         _filterSummary.Length == 0 ? base.ReportExportSubtitle() : _filterSummary;
@@ -275,6 +294,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         if (PaymentMethod.Enabled && MethodName.Length > 0) parts.Add($"Method: {MethodName}");
         if (GroupBy.Enabled) parts.Add($"Grouped by: {GroupName}");
         if (AdditionalFilterDescription.Length > 0) parts.Add(AdditionalFilterDescription);
+        if (_orderBy.SelectedIndex > 0) parts.Add("Order by: " + _orderBy.Text);
         return string.Join("   ", parts);
     }
     protected virtual void PrepareReportData(DataTable data, SqlParameter[] parameters) { }
@@ -301,6 +321,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
             var asOf = parameters.FirstOrDefault(p => p.ParameterName == "@AsOfDate");
             if (asOf?.Value is DateTime date) summary += $"   Aging date: {date:dd-MM-yyyy}";
             var transform = CaptureResultTransform(parameters);
+            var order = (ReportRowOrder.Choice)_orderBy.SelectedItem!;
             await BindReportAsync(async token => {
                 DataSet result = await ReadReportAsync(parameters, token).ConfigureAwait(false);
                 token.ThrowIfCancellationRequested();
@@ -311,6 +332,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
                 if (AppendReportTotals)
                     AppendAuthoritativeTotalRow(captured, totals);
                 (captured, totals) = transform(captured, totals);
+                captured = ReportRowOrder.Apply(captured, order);
                 return captured;
             });
             if (!ReportLanded || captured is null)
