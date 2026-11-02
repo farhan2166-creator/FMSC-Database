@@ -77,3 +77,7 @@ Working tree based on `c7f94141f01ae17914b3ecdc2fd2cd5f9e361fd3`.
 Joint operator acceptance, including actual completion of a newly added sibling
 through the updated Admission UI, remains pending. Focused checks do not certify
 every application workflow or the release package.
+
+## Owner clarification — 2 November 2026
+
+The Siblings panel now lists only brothers and sisters, excluding the loaded student. This supersedes the inclusion described above. The loaded child uses Confirm & Save and Actions → Cancel Registration / Reopen Registration. Sibling row actions remain available.

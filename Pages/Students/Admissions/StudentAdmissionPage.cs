@@ -1994,8 +1994,8 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             feeCard.Content.Controls.Add(feeLayout);
 
             var siblingsCard = HumanUi.Card(
-                "Student & Siblings",
-                "Open a student to complete details. Registration actions belong to each row.",
+                "Siblings",
+                "Brothers and sisters linked to this student. Open a sibling to complete their details.",
                 Accent);
             var siblingsLayout = new TableLayoutPanel {
                 Dock = DockStyle.Fill,
@@ -3176,8 +3176,8 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         string loadedStudent = name.Text.Trim();
         SetPageHeaderText(
             IsPendingRegistration ? "Pending Registration" : IsCancelledRegistration ? "Cancelled Registration" : "Edit Student",
-            IsPendingRegistration ? $"{loadedStudent} · {AdmissionNumbers.ForId(admissionId)} · Complete details, then Confirm & Save on this child's row in Student & Siblings."
-                : IsCancelledRegistration ? $"{loadedStudent} · Reopen from Student & Siblings to review a new registration attempt. Cancellation history is retained."
+            IsPendingRegistration ? $"{loadedStudent} · {AdmissionNumbers.ForId(admissionId)} · Complete details, then Confirm & Save."
+                : IsCancelledRegistration ? $"{loadedStudent} · Use Actions → Reopen Registration to review a new registration attempt. Cancellation history is retained."
                 : $"Student: {loadedStudent} (Admission Number {AdmissionNumbers.ForId(admissionId)}) - saving updates this student.");
         /* Capture the clean baseline after the record has settled. */
         CaptureAdmissionBaseline();
@@ -3370,7 +3370,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                     .ThenBy(row => AdmissionNumbers.Read(row),StringComparer.CurrentCultureIgnoreCase))
                 {
                     int siblingAdmissionId = GetIntColumn(row, "AdmissionId");
-                    if (siblingAdmissionId <= 0)
+                    if (siblingAdmissionId <= 0 || siblingAdmissionId == admissionId)
                         continue;
                     display.Rows.Add(
                         GetTextColumn(row, "StudentName"),
@@ -3386,9 +3386,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
                         AdmissionNumbers.Read(row));
                 }
             }
-            if (!display.AsEnumerable().Any(member => Convert.ToInt32(member["AdmissionId"]) == admissionId))
-                display.Rows.Add(name.Text, fatherName.Text, "", viewClass.Text + " - " + viewSection.Text,
-                    viewCampus.Text, _workspaceStudentStatus, 0, admissionId, AdmissionNumbers.ForId(admissionId));
             // Define the schema even when the details tab has not created a binding context yet.
             siblingsGrid.DataSource = null;
             siblingsGrid.AutoGenerateColumns = false;
@@ -3428,7 +3425,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             siblingsGrid.Columns["Father Name"].FillWeight = 120;
             siblingsGrid.Columns["Campus"].FillWeight = 110;
             siblingsStatus.Text = display.Rows.Count > 0
-                ? $"{display.Rows.Count} student(s), including the loaded student. Open a row to edit; use its registration action when ready."
+                ? $"{display.Rows.Count} sibling(s). Open a row to edit; use its registration action when ready."
                 : "No siblings are linked yet. Click Find Possible Siblings to add one.";
             if (display.Rows.Count > 0)
                 siblingsGrid.ClearSelection();

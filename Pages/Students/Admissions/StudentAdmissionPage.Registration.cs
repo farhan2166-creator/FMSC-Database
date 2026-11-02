@@ -31,6 +31,18 @@ public sealed partial class StudentAdmissionPage
         draft.Click += async (_, _) => { if (IsPendingRegistration && !IsBusy) await SaveDraftOrDetailsAsync(); };
         enrollmentActionsMenu.Items.Add(draft);
         enrollmentActionsMenu.Opening += (_, _) => { draft.Visible = IsPendingRegistration; draft.Enabled = !IsBusy && CurrentUser.HasPermission("Students.Admit"); };
+        var cancel = new ToolStripMenuItem("Cancel Registration");
+        cancel.Click += async (_, _) => { if (IsPendingRegistration && !IsBusy && CanCancelPendingRegistration()) await CloseAdmissionAsync(true); };
+        var reopen = new ToolStripMenuItem("Reopen Registration");
+        reopen.Click += async (_, _) => { if (IsCancelledRegistration && !IsBusy && CanReopenPendingRegistration()) await ReopenRegistrationAsync(); };
+        enrollmentActionsMenu.Items.Add(cancel);
+        enrollmentActionsMenu.Items.Add(reopen);
+        enrollmentActionsMenu.Opening += (_, _) => {
+            cancel.Visible = IsPendingRegistration;
+            cancel.Enabled = !IsBusy && CanCancelPendingRegistration();
+            reopen.Visible = IsCancelledRegistration;
+            reopen.Enabled = !IsBusy && CanReopenPendingRegistration();
+        };
         siblingsGrid.CellContentClick += async (_, e) => await RunSiblingRegistrationActionAsync(e.RowIndex, e.ColumnIndex);
         siblingsGrid.CellPainting += (_, e) => {
             if (e.RowIndex < 0 || e.ColumnIndex < 0 || siblingsGrid.Columns[e.ColumnIndex] is not DataGridViewButtonColumn ||

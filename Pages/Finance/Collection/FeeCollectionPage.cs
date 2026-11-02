@@ -209,7 +209,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     }
     internal override bool FocusEntryField()
     {
-        if (admissionId > 0 && enrollmentId > 0 && !IsBusy && paymentAmount.CanFocus)
+        if (admissionId > 0 && HasOutstandingCharges() && !IsBusy && paymentAmount.CanFocus)
         {
             bool focused = paymentAmount.Focus();
             if (focused) paymentAmount.SelectAll();
@@ -1755,10 +1755,14 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             {
                 enrollmentId = 0;
                 enrollment.Enabled = false;
-                await LoadRecentPaymentsAsync(version);
-                UpdateCollectionTotals();
+                await Task.WhenAll(LoadChargesAsync(version), LoadRecentPaymentsAsync(version));
+                if (IsDisposed || version != loadVersion) return;
+                UpdateOperationMode();
+                RefreshEnteredPaymentAllocation();
                 SetStatus(
-                    "The student has no outstanding charges.");
+                    HasOutstandingCharges()
+                        ? "This student has no collectible placement. Included siblings' posted fees are available below."
+                        : "This student has no collectible placement. No outstanding fees were found for the included siblings.");
                 return;
             }
             int activeEnrollmentId = 0;
@@ -1837,11 +1841,14 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     {
         charges.Rows.Clear();
         availableCreditByStudent.Clear();
-        if (admissionId <= 0 || enrollmentId <= 0)
+        if (admissionId <= 0)
             return;
         try
         {
-            await AppendChargesAsync(admissionId, enrollmentId, version);
+            // Each child supplies their own enrollment; the selected student may
+            // still await placement while a sibling has collectible posted fees.
+            if (enrollmentId > 0)
+                await AppendChargesAsync(admissionId, enrollmentId, version);
             if (IsDisposed || version != loadVersion)
                 return;
             if (counterIds is null)
@@ -3104,8 +3111,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         if (nextStudentButton is not null) nextStudentButton.Enabled = false;
         try
         {
-            if (admissionId <= 0 ||
-                enrollmentId <= 0)
+            if (admissionId <= 0)
             {
                 Warn(
                     UiText.Prompts.SelectStudentAndEnrollment);
