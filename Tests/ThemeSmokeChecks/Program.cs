@@ -291,6 +291,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} departure layout and lifecycle review checks (no database connection).");
             return;
         }
+        if(args.Contains("--report-ordering"))
+        {
+            CheckReportOrderingControls();
+            Console.WriteLine($"PASS: {checks} report ordering, saved-view and stale-result checks (no database connection).");
+            return;
+        }
         if(args.Contains("--saved-report-views"))
         {
             CheckSavedReportViews();

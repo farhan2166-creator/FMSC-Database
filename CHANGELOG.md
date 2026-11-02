@@ -1,5 +1,21 @@
 # Changelog
 
+## Action shortcut coverage — 2026-11-02
+
+- Add shortcuts for bill preview, report columns, saved-view renaming, filter
+  reset, save-outcome checks, sibling admission and secondary class/section A4
+  reports. Preserve distinct keys for adding fees, clearing filters and checking
+  admission versus registration saves. Help, tooltips and hints share the bindings.
+
+## Report ordering — 2026-11-02
+
+- Add view-specific Order by choices to Collections & Receipts, Outstanding &
+  Aging, Billing & Discounts, Credit Balances, Monthly Fee Reconciliation and
+  Certificate Issue Register. Apply with Run Report and retain the order in Saved Views.
+- Sort the full result before pagination so print and export agree. Keep receipt
+  groups together and totals last; compare amounts numerically, dates chronologically
+  and admission/reference numbers naturally. Default preserves the original order.
+
 ## Campus details on bills and receipts — 2026-11-02
 
 - Omit repeated student campus lines when the common campus already appears in

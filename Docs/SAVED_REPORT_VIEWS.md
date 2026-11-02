@@ -23,6 +23,12 @@ Selected result rows, class-sheet Include checkboxes, individual student account
 selections, printed documents and transaction drafts are not stored in views.
 Statements and financial transaction screens keep their current behavior.
 
+Finance and certificate views also save **Order by**. Applying an older view
+without that setting selects Default. Choices depend on the report view and
+grouping; an unavailable order is refused rather than silently substituted.
+Run Report applies the chosen order before pagination, print and export. Receipt
+details sort within their existing groups, with headings and totals retained.
+
 ## Operator flow
 
 1. Configure a report, run it and choose Columns where available. Dynamic report

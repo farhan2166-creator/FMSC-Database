@@ -104,6 +104,7 @@ internal static partial class Program
             "Unavailable receipt does not fall through to another print action");
         printHost.Close();
         CheckCollectionShortcutTargets();
+        CheckNewShortcutCoverage();
     }
 
     private static void CheckCollectionShortcutTargets()

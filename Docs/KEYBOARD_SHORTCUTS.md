@@ -9,7 +9,7 @@ and the hints shown while holding Ctrl or Alt use the shared command definitions
 | Start a new record | Ctrl+N |
 | Find / Search | Ctrl+F |
 | Edit selected record | Ctrl+E |
-| Print / Preview | Ctrl+P |
+| Print / Preview, including Preview Selected Bills | Ctrl+P |
 | Refresh / Reload | Ctrl+R |
 | Export (including report previews) | Alt+E |
 | Add a draft row or open an Add dialog | Alt+A |
@@ -35,11 +35,23 @@ and the hints shown while holding Ctrl or Alt use the shared command definitions
 | Pending registrations | Alt+G |
 | Manage photo | Alt+M |
 | Issue certificate again | Alt+I |
+| Choose report columns | Alt+O |
+| Rename saved view | Ctrl+M |
+| Reset report filters | Ctrl+T |
+| Check save outcome / saved admission / saved changes / previous save | Alt+K |
+| Check registration save | Ctrl+J |
+| Admit sibling | Alt+L |
+| Class Summary A4 / Class–Section A4 report | Alt+Y |
 
 Alt+A also opens Additional Charge in Fee Collection. The individual save dialog
 continues to use Ctrl+S. In report previews Alt+P retains its page-setup action;
 Ctrl+P prints the preview. Each command is available only where its corresponding
 action is visible and enabled.
+
+Reset Filters (Ctrl+T) is separate from Clear Filters (Alt+C). Admit Sibling
+(Alt+L) is separate from Add Fee (Alt+A). Admission recovery (Alt+K) and
+registration recovery (Ctrl+J) keep separate targets when both are shown.
+Alt+Y opens the secondary A4 summary; Ctrl+P prints the current report.
 
 Ctrl+K opens quick navigation and F1 opens shortcut help from the dashboard.
 Normal text editing keys, field navigation and tab navigation retain their usual

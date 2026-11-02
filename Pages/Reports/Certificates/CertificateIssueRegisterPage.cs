@@ -5,7 +5,7 @@ namespace FMSC_SMS.Pages.Reports.Certificates;
 
 public sealed class CertificateIssueRegisterPage : V2Page
 {
-    private readonly ModernComboBox type=new(),recipient=new(),entry=new(),collection=new();
+    private readonly ModernComboBox type=new(),recipient=new(),entry=new(),collection=new(),orderBy=new();
     private readonly ModernTextBox search=new() { PlaceholderText="Name, student/staff no. or certificate no." };
     private readonly ModernDatePicker from=new() { Format=DateTimePickerFormat.Custom,CustomFormat="dd-MM-yyyy",ShowCheckBox=true,Checked=false };
     private readonly ModernDatePicker to=new() { Format=DateTimePickerFormat.Custom,CustomFormat="dd-MM-yyyy",ShowCheckBox=true,Checked=false };
@@ -30,7 +30,9 @@ public sealed class CertificateIssueRegisterPage : V2Page
         recipient.Items.AddRange(new object[] { "All","Student","Staff" });
         entry.Items.AddRange(new object[] { "All","Issue logged","Saved record only" });
         collection.Items.AddRange(new object[] { "All","Collected","Not Collected","Not tracked" });
-        foreach (var combo in new[] { type,recipient,entry,collection })
+        orderBy.Items.AddRange(ReportRowOrder.Choices("CertificateIssueRegister", "").Cast<object>().ToArray());
+        SetToolTip(orderBy, "Optional. Default shows the most recently recorded certificates first. Choose another order only when needed, then Run Report. Print and export use the same order across all pages.");
+        foreach (var combo in new[] { type,recipient,entry,collection,orderBy })
         {
             combo.SelectedIndex=0; ReportUi.RegisterChoiceFilter(combo);
             combo.SelectedIndexChanged+=(_,_) => FiltersChanged();
@@ -41,7 +43,7 @@ public sealed class CertificateIssueRegisterPage : V2Page
         columns=AddColumnsAction();columns.Enabled=false;
         RelocateFromActions(run,print,export,columns);
         var content=ReportUi.CompactLayout(ReportUi.Bar(("Certificate Type",type),("Recipient Type",recipient),
-            ("From Recorded Date (optional)",from),("To Recorded Date (optional)",to),("Entry",entry),("Collection",collection),("Find",search)),
+            ("From Recorded Date (optional)",from),("To Recorded Date (optional)",to),("Entry",entry),("Collection",collection),("Find",search),("Order by",orderBy)),
             Grid,"Certificate Issue Register",ClearReport,run,print,export,columns);
         savedViews=new ReportSavedViewsBar("certificates.issue-register",CaptureSavedView,RestoreSavedView,(message,warning)=>SetStatus(message,warning),()=>!running && CanRead,from,to);
         SetContent(savedViews.Wrap(content));
@@ -53,7 +55,7 @@ public sealed class CertificateIssueRegisterPage : V2Page
         && (CurrentUser.HasPermission("Certificates.Create") || CurrentUser.HasPermission("Students.Leave"));
     private string Signature() => string.Join('|',CurrentUser.UserId,CurrentUser.HasPermission("Reports.View"),
         CurrentUser.HasPermission("Certificates.Create"),CurrentUser.HasPermission("Students.Leave"),
-        type.Text,recipient.Text,entry.Text,collection.Text,search.Text.Trim(),from.Checked,from.Value.Date,to.Checked,to.Value.Date);
+        type.Text,recipient.Text,entry.Text,collection.Text,search.Text.Trim(),from.Checked,from.Value.Date,to.Checked,to.Value.Date,orderBy.Text);
     protected override string ReportFilterSignature() => Signature();
     protected override string ReportExportSubtitle() => subtitle;
     protected override string ReportLayoutKey => "certificates.issue-register.columns";
@@ -61,9 +63,10 @@ public sealed class CertificateIssueRegisterPage : V2Page
     protected override void OnReportPageBound()
     {
         availableColumns=ReportAvailableColumns.FromGrid(Grid);RefreshReportColumnLayout();base.OnReportPageBound();
+        LockGridOrder();
     }
     private (string Key,Control Control)[] SavedFields() => new (string,Control)[] {
-        ("Type",type),("Recipient",recipient),("From",from),("To",to),("Entry",entry),("Collection",collection),("Search",search)
+        ("Type",type),("Recipient",recipient),("From",from),("To",to),("Entry",entry),("Collection",collection),("Search",search),("Order by",orderBy)
     };
     private Dictionary<string,string> CaptureSavedView()
     {
@@ -72,6 +75,7 @@ public sealed class CertificateIssueRegisterPage : V2Page
     }
     private void RestoreSavedView(IReadOnlyDictionary<string,string> state)
     {
+        if (!state.ContainsKey("Order by")) orderBy.SelectedIndex=0;
         ReportFilterState.Restore(SavedFields(),state);
         if (state.TryGetValue("$columns",out var value)) RememberReportColumns(ReportLayoutKey,System.Text.Json.JsonSerializer.Deserialize<string[]?>(value));
         ClearReport();columns.Enabled=false;
@@ -108,13 +112,16 @@ public sealed class CertificateIssueRegisterPage : V2Page
         string captured=$"Type: {type.Text} | Recipient: {recipient.Text} | Entry: {entry.Text} | Collection: {collection.Text}"
             +$" | Recorded dates: {(from.Checked ? from.Value.ToString("dd-MM-yyyy") : "Any start")} to {(to.Checked ? to.Value.ToString("dd-MM-yyyy") : "Any end")}"
             +$" | Find: {search.Text.Trim()} | Sources: {(CurrentUser.HasPermission("Certificates.Create") ? "General certificates" : "")}{(CurrentUser.HasPermission("Students.Leave") ? " Leaving certificates" : "")}"
+            +(orderBy.SelectedIndex>0 ? " | Order by: "+orderBy.Text : "")
             +$" | Report generated: {DateTime.Now:dd-MM-yyyy HH:mm}";
         try
         {
             running=true; hasRows=false; print.Enabled=export.Enabled=false; summary.Text="Generating report…";
             columns.Enabled=false;savedViews.RefreshAvailability();
             DataTable? rows=null;
-            await BindReportAsync(token => Task.Run(() => rows=CertificateIssueRegisterData.Display(DatabaseHelper.QuerySql(query,parameters)),token));
+            var order=(ReportRowOrder.Choice)orderBy.SelectedItem!;
+            await BindReportAsync(token => Task.Run(() => rows=CertificateIssueRegisterData.Display(
+                ReportRowOrder.Apply(DatabaseHelper.QuerySql(query,parameters),order)),token));
             if (IsDisposed) return;
             if (!ReportLanded || rows is null) { summary.Text="Run the report again to see current totals."; return; }
             var totals=CertificateIssueRegisterData.Totals(rows);
