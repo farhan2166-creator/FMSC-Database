@@ -55,11 +55,12 @@ internal static partial class Program
         foreach(string field in new[]{"AmountBefore","Cash","Credit","Discount"})lines.Columns.Add(field,typeof(decimal));
         lines.Rows.Add(542,"Examination Fee","Four","F","Campus Boys",new DateTime(2026,10,1),2000m,1800m,0m,200m);
         lines.Rows.Add(249,"Activity Fee","Nine","F","Campus Boys",new DateTime(2026,10,1),1500m,200m,450m,300m);
+        lines.Columns.Add("ConcessionKind",typeof(string)).DefaultValue="Discount";
         using var source=FeeReceiptDocuments.BuildData(school,h,students,lines);
         using(var display=FamilyFeeDocumentPresentation.Receipt(source))
         {
             var child=display.AsEnumerable().First(row=>row.Field<string>("ChildAdmissionNumberText")=="249");
-            Check(child.Field<string>("ChildReceiptDeductionCaption")=="Less: Discount / Waived / Credit"
+            Check(child.Field<string>("ChildReceiptDeductionCaption")=="Less: Discount / Credit"
                 &&child.Field<decimal>("ChildReceiptDeductionAmount")==750m&&child.Field<decimal>("ChildReceiptNetPayable")==750m
                 &&child.Field<decimal>("ChildCashReceived")==200m&&child.Field<decimal>("ChildBalanceRemaining")==550m,
                 "The supplied family example reconciles 1500 less 300 concession and 450 credit, less 200 cash, to 550 due");
@@ -95,7 +96,7 @@ internal static partial class Program
                 "Printing that same child individually has exactly the same deductions, payable, cash and due");
             Check(render("aligned-individual-example",receipt)==1,"The matching individual receipt renders with the family layout");
         }
-        foreach(var (discount,credit,settlement,caption) in new[]{(0m,450m,true,"Less: Credit"),(300m,0m,true,"Less: Discount / Waived"),(0m,0m,true,"Less: "),(300m,450m,false,"Less: Discount / Waived")})
+        foreach(var (discount,credit,settlement,caption) in new[]{(0m,450m,true,"Less: Credit"),(300m,0m,true,"Less: Discount"),(0m,0m,true,"Less: "),(300m,450m,false,"Less: Discount")})
         {
             using var data=FeeDocumentData.Create();var row=data.NewRow();
             row["DiscountApplied"]=discount;row["CreditApplied"]=credit;row["Payable"]=1200m;row["ShowSettlement"]=settlement;data.Rows.Add(row);
@@ -104,6 +105,15 @@ internal static partial class Program
                 &&display.Rows[0].Field<bool>("ShowReceiptDeduction")== (discount>0m||settlement&&credit>0m)
                 &&display.Rows[0].Field<decimal>("ReceiptNetPayable")==1200m-(settlement?credit:0m),
                 "Deduction captions and visibility follow the actual concession and applied credit, respecting legacy settlements");
+        }
+        foreach(var (kind,caption) in new[]{("Waived","Waived"),("Discount","Discount"),("Scholarship","Discount"),("Free","Discount"),("","Discount")})
+        {
+            oneLine.Rows[0]["ConcessionKind"]=kind;
+            using var receipt=FeeReceiptDocuments.BuildData(school,h,oneStudent,oneLine);
+            using var display=FeeReceiptPresentation.Prepare(receipt);
+            Check(display.Rows[0].Field<string>("ReceiptDeductionCaption")=="Less: "+caption+" / Credit"
+                &&display.Rows[0].Field<decimal>("ReceiptDeductionAmount")==750m,
+                "Saved concession types select the receipt label without changing deductions; sibling concessions remain discounts");
         }
     }
 }

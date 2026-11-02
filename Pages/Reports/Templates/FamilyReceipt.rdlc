@@ -145,7 +145,7 @@
                               </Style>
                             </TextRun>
                             <TextRun>
-                              <Value>=First(Fields!ReceiptNumber.Value, "ReceiptPageGroup") &amp; IIf(Len(Trim(First(Fields!PaymentMethod.Value, "ReceiptPageGroup") &amp; "")) = 0, "", " (" &amp; Trim(First(Fields!PaymentMethod.Value, "ReceiptPageGroup") &amp; "") &amp; ")")</Value>
+                              <Value>=First(Fields!ReceiptNumber.Value, "ReceiptPageGroup") &amp; IIf(Len(Trim(First(Fields!PaymentMethod.Value, "ReceiptPageGroup") &amp; "")) = 0, "", " (" &amp; Replace(Trim(First(Fields!PaymentMethod.Value, "ReceiptPageGroup") &amp; ""), " + credit", " + Credit") &amp; ")")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>
@@ -1882,7 +1882,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>Document Date: </Value>
+                              <Value>Date: </Value>
                               <Style>
                                 <FontStyle>Italic</FontStyle>
                                 <FontFamily>Segoe UI</FontFamily>

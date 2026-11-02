@@ -5,6 +5,9 @@ internal static partial class FeeReceiptDataBuilder
     internal static DataTable BuildGrouped(InstitutionProfile.PrintIdentity institution,DataRow header,DataTable students,DataTable lines,bool family)
     {
         var data=FeeDocumentData.Create();
+        data.Columns.Add("ReceiptConcessionCaption",typeof(string));
+        data.Columns.Add("ChildReceiptConcessionCaption",typeof(string));
+        string concessionCaption=FeeReceiptPresentation.ConcessionCaption(lines.AsEnumerable());
         bool complete=FeeReceiptDocuments.IsCompleteSnapshot(header);
         bool visit=complete&&Convert.ToInt32(header["SnapshotVersion"])>=3;
         bool acknowledgement=Text(header,"PaymentMethod")=="Fee changes";
@@ -28,6 +31,8 @@ internal static partial class FeeReceiptDataBuilder
                 Text(header,"ReceiptStatus"),Money(header,"DiscountApplied")>0,true,institution.ContactNumber,institution.Address,
                 family?campusHeading:detail is null?"":Text(detail,"CampusName"),family?"":parent,period);
             row["NetPaid"]=settled;row["FeesCovered"]=lines.AsEnumerable().Sum(line=>Money(line,"AmountBefore"));
+            row["ReceiptConcessionCaption"]=concessionCaption;
+            row["ChildReceiptConcessionCaption"]=FeeReceiptPresentation.ConcessionCaption(currentLines);
             row["Payable"]=Convert.ToDecimal(row["FeesCovered"])-Money(header,"DiscountApplied");
             row["SnapshotVersion"]=complete?Convert.ToInt32(header["SnapshotVersion"]):1;
             if(acknowledgement)row["DocumentTitle"]="FEE CHANGE ACKNOWLEDGEMENT";

@@ -127,6 +127,14 @@ internal static class FeeReceiptDocuments
                 // collection. Restore that part of the fee if one is removed.
                 if(discount<0m)line["AmountBefore"]=Convert.ToDecimal(line["AmountBefore"])-discount;
                 line["Discount"]=Math.Max(0m,discount);
+                if(Convert.ToDecimal(line["Discount"])!=original)
+                {
+                    // The refresh query supplies the new amount, not its type.
+                    // Do not reuse an older discount/waiver classification.
+                    if(!lines.Columns.Contains("ReceiptConcessionTypeUnknown"))
+                        lines.Columns.Add("ReceiptConcessionTypeUnknown",typeof(bool)).DefaultValue=false;
+                    line["ReceiptConcessionTypeUnknown"]=true;
+                }
                 difference+=Convert.ToDecimal(line["Discount"])-original;
             }
             student["DiscountApplied"]=Convert.ToDecimal(student["DiscountApplied"])+difference;

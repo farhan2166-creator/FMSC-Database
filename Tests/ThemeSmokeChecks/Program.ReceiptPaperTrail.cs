@@ -35,6 +35,10 @@ internal static partial class Program
         using var display=FamilyFeeDocumentPresentation.Receipt(receipt);
         var falak=display.AsEnumerable().First(row=>row.Field<string>("ChildAdmissionNumberText")=="17");
         var robina=display.AsEnumerable().First(row=>row.Field<string>("ChildAdmissionNumberText")=="18");
+        Check(falak.Field<string>("ChildReceiptDeductionCaption")=="Less: Discount / Waived"
+            &&robina.Field<string>("ChildReceiptDeductionCaption")=="Less: Discount"
+            &&falak.Field<string>("GroupReceiptSummaryDeductionCaption")=="Less: Discount / Waived",
+            "Each child and the group summary name only their applicable concession types");
         Check(falak.Field<decimal>("ChildFeesCovered")==12200m&&falak.Field<decimal>("ChildDiscountApplied")==4800m
             &&falak.Field<decimal>("ChildPayable")==7400m&&falak.Field<decimal>("ChildCashReceived")==7400m
             &&falak.Field<decimal>("ChildBalanceRemaining")==0m,"Admission 17 complete receipt shows all 12200 fees less 4800 concessions and 7400 received");
