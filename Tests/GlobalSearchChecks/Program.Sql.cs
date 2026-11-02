@@ -44,13 +44,14 @@ internal static partial class Program
                 """);
             await Execute(cn,"CREATE PROCEDURE dbo.RequireAuthenticatedUser @UserId int AS IF NOT EXISTS(SELECT 1 FROM dbo.FixtureRights WHERE UserId=@UserId) THROW 51001,'Authentication refused',1;");
             await Execute(cn,"CREATE PROCEDURE dbo.RequirePermission @UserId int,@Permission nvarchar(100) AS IF NOT EXISTS(SELECT 1 FROM dbo.FixtureRights WHERE UserId=@UserId AND Permission=@Permission) THROW 51002,'Permission refused',1;");
-            async Task<DataTable> Search(string text,int user=1,bool students=true,bool documents=true)
+            async Task<DataTable> Search(string text,int user=1,bool students=true,bool documents=true,GlobalSearchScope scope=GlobalSearchScope.All)
             {
                 using var cmd=new SqlCommand(GlobalRecordSearch.Query,cn);
                 cmd.Parameters.AddWithValue("@UserId",user);cmd.Parameters.AddWithValue("@Text",text);
                 cmd.Parameters.AddWithValue("@Prefix",GlobalSearchInput.EscapeLike(text)+"%");cmd.Parameters.AddWithValue("@Contains","%"+GlobalSearchInput.EscapeLike(text)+"%");
                 cmd.Parameters.AddWithValue("@Words",System.Text.Json.JsonSerializer.Serialize(GlobalSearchInput.Words(text).Select(w=>"%"+GlobalSearchInput.EscapeLike(w)+"%")));
                 cmd.Parameters.AddWithValue("@Students",students);cmd.Parameters.AddWithValue("@Documents",documents);cmd.Parameters.AddWithValue("@Number",text.Length>=3&&text.All(char.IsDigit));
+                cmd.Parameters.AddWithValue("@Scope",(int)scope);
                 var data=new DataTable();using var reader=await cmd.ExecuteReaderAsync();data.Load(reader);return data;
             }
             using(var data=await Search("6508"))Check(data.Rows[0]["Kind"].ToString()=="Student"&&data.Rows[0]["Rank"].ToString()=="0","Exact admission matches rank first");
@@ -62,6 +63,17 @@ internal static partial class Program
             foreach(var pair in new[]{("B-2026-00015","Bill"),("FR-2026-00012","Receipt"),("R-2026-00012","PaymentReference")})
             {using var data=await Search(pair.Item1);Check(data.Rows.Count==1&&data.Rows[0]["Kind"].ToString()==pair.Item2,"Document/payment references return their exact record without duplicate collection rows");}
             using(var data=await Search("0012"))Check(data.Rows.Count==2,"Numeric document suffixes preserve distinct original and payment references");
+            using(var data=await Search("6508",scope:GlobalSearchScope.Bills))Check(data.Rows.Count==0,"Bill scope excludes matching admission records in SQL");
+            using(var data=await Search("2026",scope:GlobalSearchScope.Bills))Check(data.Rows.Count==1&&data.Rows[0]["Kind"].ToString()=="Bill","Bill scope is applied before the SQL result limit");
+            using(var data=await Search("2026",scope:GlobalSearchScope.Receipts))Check(data.Rows.Count==2&&data.AsEnumerable().All(r=>r["Kind"].ToString() is "Receipt" or "PaymentReference"),"Receipt scope preserves both saved receipts and payment aliases");
+            using(var data=await Search("2026",scope:GlobalSearchScope.Students))Check(data.Rows.Count==0,"Student scope excludes document-number matches in SQL");
+            await Execute(cn,"""
+                WITH Numbers AS(SELECT TOP(25) ROW_NUMBER() OVER(ORDER BY object_id) AS N FROM sys.all_objects)
+                INSERT dbo.IssuedFeeBills
+                SELECT NEWID(),CONCAT(N'B-2026-',10000+N),6508,N'B','2026-10-20',N'<saved>fictional</saved>' FROM Numbers;
+                """);
+            using(var data=await Search("2026"))Check(data.Rows.Count==20&&data.AsEnumerable().All(r=>r["Kind"].ToString()=="Bill"),"Broad lookups remain bounded with many document matches");
+            using(var data=await Search("2026",scope:GlobalSearchScope.Receipts))Check(data.Rows.Count==2,"Receipt scope finds records crowded out of All by twenty bills");
             using(var data=await Search("Ali",2,true,false))Check(data.Rows.Count==2,"Student permission works without financial access");
             using(var data=await Search("FR-2026",3,false,true))Check(data.Rows.Count==1,"Financial lookup does not require student-navigation permission");
             foreach(var pair in new[]{(User:2,Students:false,Documents:true),(User:3,Students:true,Documents:false),(User:4,Students:true,Documents:true)})
@@ -74,7 +86,7 @@ internal static partial class Program
                 cmd.Parameters.AddWithValue("@UserId",1);cmd.Parameters.AddWithValue("@Id",Guid.Parse("00000000-0000-0000-0000-000000000001"));cmd.Parameters.AddWithValue("@Reference","B-2026-00015");
                 using var reader=await cmd.ExecuteReaderAsync();Check(await reader.ReadAsync()&&reader["SnapshotXml"].ToString()=="<saved>original</saved>","Bill lookup returns the original stored snapshot");
             }
-            await Execute(cn,"IF (SELECT COUNT(*) FROM dbo.IssuedFeeBills)<>1 OR (SELECT COUNT(*) FROM dbo.CollectionReceipts)<>1 OR (SELECT SUM(TotalAmount) FROM dbo.FeePayments)<>300 THROW 51003,'Search changed stored documents or money',1;");
+            await Execute(cn,"IF (SELECT COUNT(*) FROM dbo.IssuedFeeBills)<>26 OR (SELECT COUNT(*) FROM dbo.CollectionReceipts)<>1 OR (SELECT SUM(TotalAmount) FROM dbo.FeePayments)<>300 THROW 51003,'Search changed stored documents or money',1;");
             Check(true,"All searches leave document counts and recorded money unchanged");
         }
         finally

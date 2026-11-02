@@ -18,10 +18,10 @@ internal static partial class Program
                 Check(features.SelectedCommand?.Caption=="Feature"&&features.SelectedRecord is null,"Feature navigation stays separate from record search");
             }
             var slow=new TaskCompletionSource<IReadOnlyList<GlobalSearchRecord>>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var reads=new List<string>();int cancelled=0;
-            Task<IReadOnlyList<GlobalSearchRecord>> Read(string query,CancellationToken token)
+            var reads=new List<string>();var scopes=new List<GlobalSearchScope>();int cancelled=0;
+            Task<IReadOnlyList<GlobalSearchRecord>> Read(string query,GlobalSearchScope scope,CancellationToken token)
             {
-                reads.Add(query);token.Register(()=>cancelled++);
+                reads.Add(query);scopes.Add(scope);token.Register(()=>cancelled++);
                 if(query=="Ali")return slow.Task;
                 return Task.FromResult<IReadOnlyList<GlobalSearchRecord>>(new[]{new GlobalSearchRecord("Bill","00000000-0000-0000-0000-000000000001",6508,query,"Fictional Student","Saved bill",0)});
             }
@@ -38,11 +38,20 @@ internal static partial class Program
             PumpUntil(()=>slow.Task.IsCompleted,"The obsolete reader completes");Application.DoEvents();
             Check(results.Items.OfType<GlobalSearchRecord>().All(r=>r.Reference=="B-2026-00015"),"A late response cannot replace the newer document result");
             Check(results.Items.Cast<object>().All(r=>r is GlobalSearchRecord),"Ctrl+K lists records without duplicate page-navigation matches");
+            var filter=(ComboBox)typeof(CommandPaletteDialog).GetField("recordType",flags)!.GetValue(records)!;
+            Check((GlobalSearchScope)filter.SelectedItem! == GlobalSearchScope.All,"Record search starts with All and requires no filter selection");
+            filter.SelectedItem=GlobalSearchScope.Students;
+            PumpUntil(()=>scopes.LastOrDefault()==GlobalSearchScope.Students,"Changing record type reruns the current query without retyping");
+            Check(search.Text=="B-2026-00015"&&results.Items.Count==0,"Type filtering retains input and rejects another record kind");
+            filter.SelectedItem=GlobalSearchScope.All;
+            PumpUntil(()=>results.Items.OfType<GlobalSearchRecord>().Any(),"Choosing All restores matching records");
             CurrentUser.SignIn(9912,"Revoked fixture","Operator",false,new[]{"Students.View"});
             typeof(CommandPaletteDialog).GetMethod("Accept",flags)!.Invoke(records,null);
             Check(records.SelectedRecord is null,"Revoked financial access blocks opening a visible result");
             records.Close();owner.Close();
             using var disposed=new CommandPaletteDialog(Array.Empty<NavigationCommand>(),"Ali",Read);
+            var permitted=(ComboBox)typeof(CommandPaletteDialog).GetField("recordType",flags)!.GetValue(disposed)!;
+            Check(permitted.Items.Cast<GlobalSearchScope>().SequenceEqual(new[]{GlobalSearchScope.All,GlobalSearchScope.Students}),"The type selector offers only accessible record types");
             disposed.Dispose();Check(disposed.IsDisposed,"Closing during a pending debounce releases the lookup safely");
         }
         finally {CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Item5);}

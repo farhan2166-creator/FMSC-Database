@@ -355,6 +355,7 @@ subjects prefill certificates but remain operator-editable.
 
 Global record search: the dashboard text box keeps feature/page navigation;
 Ctrl+K separately searches students, saved bills/receipts and payment references.
+Default to All; an optional permitted record type filters SQL before limiting results.
 Limit results and cancel stale reads; recheck permissions, actor and database
 endpoint before displaying/opening. Explicit selected-record IDs override saved
 workspace selections and keep normal busy/unsaved-work guards. Open saved

@@ -5,6 +5,12 @@ its labelled button open a separate record search for student names, official or
 pending admission references, saved bill/receipt numbers and payment references.
 No form-navigation rows are mixed into that dialog.
 
+The optional **Search in** selector starts at **All**. Choose **Students**,
+**Bills**, or **Receipts** to narrow the same text without retyping it. Only
+permitted types are offered; Receipts includes payment references. Filtering
+applies in SQL before the 20-result limit, so other types cannot crowd out the
+selected type. Changing the type cancels the previous lookup.
+
 Results show record type, reference, student and distinguishing context. Exact
 references rank ahead of partial matches. Student/father words can match in any
 order; former/pending records remain searchable. Numeric fragments of at least

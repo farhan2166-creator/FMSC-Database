@@ -9,24 +9,35 @@ internal static class GlobalRecordSearch
     internal static bool CanRead(string kind)=>kind=="Student"?CurrentUser.HasPermission("Students.View"):
         kind is "Bill" or "Receipt" or "PaymentReference"&&CurrentUser.HasPermission("Fees.View");
 
-    internal static async Task<IReadOnlyList<GlobalSearchRecord>> ReadAsync(string text,CancellationToken token)
+    internal static bool MatchesScope(string kind,GlobalSearchScope scope)=>scope switch {
+        GlobalSearchScope.All=>kind is "Student" or "Bill" or "Receipt" or "PaymentReference",
+        GlobalSearchScope.Students=>kind=="Student",
+        GlobalSearchScope.Bills=>kind=="Bill",
+        GlobalSearchScope.Receipts=>kind is "Receipt" or "PaymentReference",
+        _=>false
+    };
+
+    internal static Task<IReadOnlyList<GlobalSearchRecord>> ReadAsync(string text,CancellationToken token)=>ReadAsync(text,GlobalSearchScope.All,token);
+    internal static async Task<IReadOnlyList<GlobalSearchRecord>> ReadAsync(string text,GlobalSearchScope scope,CancellationToken token)
     {
         text=GlobalSearchInput.Normalize(text);
-        if(!GlobalSearchInput.CanSearch(text))return Array.Empty<GlobalSearchRecord>();
+        if(!GlobalSearchInput.CanSearch(text)||!Enum.IsDefined(scope))return Array.Empty<GlobalSearchRecord>();
         string endpoint=DatabaseHelper.DatabaseEndpoint;
-        int actor=CurrentUser.UserId;bool students=CanRead("Student"),documents=CanRead("Bill");
+        int actor=CurrentUser.UserId;
+        bool students=MatchesScope("Student",scope)&&CanRead("Student"),
+            documents=(MatchesScope("Bill",scope)||MatchesScope("Receipt",scope))&&CanRead("Bill");
         if(actor<=0||!students&&!documents)return Array.Empty<GlobalSearchRecord>();
         using var data=await DatabaseHelper.QuerySqlAsync(Query,token,
             DatabaseHelper.Int("@UserId",actor),DatabaseHelper.P("@Text",text),
             DatabaseHelper.P("@Prefix",GlobalSearchInput.EscapeLike(text)+"%"),
             DatabaseHelper.P("@Contains","%"+GlobalSearchInput.EscapeLike(text)+"%"),
             DatabaseHelper.P("@Words",JsonSerializer.Serialize(GlobalSearchInput.Words(text).Select(w=>"%"+GlobalSearchInput.EscapeLike(w)+"%"))),
-            DatabaseHelper.Bit("@Students",students),DatabaseHelper.Bit("@Documents",documents),
+            DatabaseHelper.Bit("@Students",students),DatabaseHelper.Bit("@Documents",documents),DatabaseHelper.Int("@Scope",(int)scope),
             DatabaseHelper.Bit("@Number",text.Length>=3&&text.All(char.IsDigit)));
         if(actor!=CurrentUser.UserId||endpoint!=DatabaseHelper.DatabaseEndpoint||token.IsCancellationRequested)return Array.Empty<GlobalSearchRecord>();
         return data.AsEnumerable().Select(row=>new GlobalSearchRecord(Convert.ToString(row["Kind"])!,Convert.ToString(row["RecordKey"])!,
             Convert.ToInt32(row["AdmissionId"]),Convert.ToString(row["Reference"])??"",Convert.ToString(row["Name"])??"",
-            Convert.ToString(row["Context"])??"",Convert.ToInt32(row["Rank"]))).Where(r=>CanRead(r.Kind)).Take(20).ToArray();
+            Convert.ToString(row["Context"])??"",Convert.ToInt32(row["Rank"]))).Where(r=>CanRead(r.Kind)&&MatchesScope(r.Kind,scope)).Take(20).ToArray();
     }
 
     internal const string Query="""
@@ -34,7 +45,7 @@ internal static class GlobalRecordSearch
         EXEC dbo.RequireAuthenticatedUser @UserId;
         DECLARE @Matches TABLE(Kind nvarchar(20),RecordKey nvarchar(40),AdmissionId int,
             Reference nvarchar(80),Name nvarchar(500),Context nvarchar(1000),Rank int);
-        IF @Students=1
+        IF @Students=1 AND @Scope IN(0,1)
         BEGIN
          EXEC dbo.RequirePermission @UserId,N'Students.View';
          INSERT @Matches
@@ -58,12 +69,17 @@ internal static class GlobalRecordSearch
         IF @Documents=1
         BEGIN
          EXEC dbo.RequirePermission @UserId,N'Fees.View';
+         IF @Scope IN(0,2)
+         BEGIN
          INSERT @Matches SELECT TOP(20) N'Bill',CONVERT(nvarchar(40),B.IssuedFeeBillId),B.PrimaryAdmissionId,B.BillNumber,
           COALESCE(S.StudentName,N''),CONCAT(CASE WHEN B.DocumentType=N'FB' THEN N'Family bill' ELSE N'Student bill' END,N' · ',CONVERT(nvarchar(10),B.IssuedAt,105)),
           CASE WHEN B.BillNumber=@Text THEN 0 ELSE 3 END
          FROM dbo.IssuedFeeBills B LEFT JOIN dbo.Students S ON S.AdmissionId=B.PrimaryAdmissionId
          WHERE B.BillNumber LIKE @Prefix ESCAPE N'~' OR (@Number=1 AND B.BillNumber LIKE @Contains ESCAPE N'~')
          ORDER BY 7,B.IssuedAt DESC,B.BillNumber;
+         END;
+         IF @Scope IN(0,3)
+         BEGIN
          INSERT @Matches SELECT TOP(20) N'Receipt',CONVERT(nvarchar(40),R.CollectionReceiptId),R.PrimaryAdmissionId,R.ReceiptNumber,
           COALESCE(S.StudentName,N''),CONCAT(N'Saved receipt · ',CONVERT(nvarchar(10),R.TransactionDate,105),N' · ',R.PaymentMethod),
           CASE WHEN R.ReceiptNumber=@Text THEN 0 ELSE 3 END
@@ -78,6 +94,7 @@ internal static class GlobalRecordSearch
           OR (@Number=1 AND P.ReceiptNumber LIKE @Contains ESCAPE N'~'))
           AND NOT EXISTS(SELECT 1 FROM dbo.CollectionReceipts R WHERE R.ReceiptNumber=P.ReceiptNumber)
          ORDER BY 7,P.PaymentDate DESC,P.FeePaymentId DESC;
+         END;
         END;
         SELECT TOP(20) * FROM @Matches ORDER BY Rank,
           CASE Kind WHEN N'Bill' THEN 0 WHEN N'Receipt' THEN 1 WHEN N'PaymentReference' THEN 2 ELSE 3 END,Reference,RecordKey;

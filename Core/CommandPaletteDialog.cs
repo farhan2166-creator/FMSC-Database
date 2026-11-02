@@ -8,7 +8,8 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
     private readonly TextBox search = new();
     private readonly ListBox results = new();
     private readonly IReadOnlyList<NavigationCommand> source;
-    private readonly Func<string,CancellationToken,Task<IReadOnlyList<GlobalSearchRecord>>>? readRecords;
+    private readonly Func<string,GlobalSearchScope,CancellationToken,Task<IReadOnlyList<GlobalSearchRecord>>>? readRecords;
+    private ComboBox? recordType;
     private readonly Label searchStatus=new();
     private CancellationTokenSource? pendingSearch;
     private int generation;
@@ -18,7 +19,7 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
     public CommandPaletteDialog(IReadOnlyList<NavigationCommand> source, string? initialQuery = null)
         :this(source,initialQuery,null) { }
     internal CommandPaletteDialog(IReadOnlyList<NavigationCommand> source,string? initialQuery,
-        Func<string,CancellationToken,Task<IReadOnlyList<GlobalSearchRecord>>>? readRecords)
+        Func<string,GlobalSearchScope,CancellationToken,Task<IReadOnlyList<GlobalSearchRecord>>>? readRecords)
     {
         this.source = source;this.readRecords=readRecords;
         Text = readRecords is null?"Search FMSC":"Find Records";
@@ -98,6 +99,19 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
         card.Controls.Add(results);
         card.Controls.Add(searchStatus);
         card.Controls.Add(hint);
+        if(readRecords is not null)
+        {
+            var filter=new TableLayoutPanel {Dock=DockStyle.Top,AutoSize=true,ColumnCount=2,Padding=new Padding(0,AppScale.S(4),0,AppScale.S(8))};
+            filter.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));filter.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+            filter.Controls.Add(new Label {Text="Search in",AutoSize=true,Anchor=AnchorStyles.Left},0,0);
+            recordType=new ComboBox {DropDownStyle=ComboBoxStyle.DropDownList,Dock=DockStyle.Fill,AccessibleName="Search in",Font=AppTheme.NormalFont};
+            recordType.Items.Add(GlobalSearchScope.All);
+            if(GlobalRecordSearch.CanRead("Student"))recordType.Items.Add(GlobalSearchScope.Students);
+            if(GlobalRecordSearch.CanRead("Bill")){recordType.Items.Add(GlobalSearchScope.Bills);recordType.Items.Add(GlobalSearchScope.Receipts);}
+            recordType.SelectedIndex=0;
+            recordType.SelectedIndexChanged+=async(_,_)=>await SearchAsync();
+            filter.Controls.Add(recordType,1,0);card.Controls.Add(filter);
+        }
         card.Controls.Add(search);
         card.Controls.Add(title);
         Controls.Add(card);
@@ -159,22 +173,24 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
         pendingSearch?.Cancel();pendingSearch?.Dispose();pendingSearch=new CancellationTokenSource();
         var token=pendingSearch.Token;int request=++generation,actor=CurrentUser.UserId;
         string query=GlobalSearchInput.Normalize(search.Text);
+        var scope=recordType?.SelectedItem is GlobalSearchScope selected?selected:GlobalSearchScope.All;
         Populate(query);searching=false;
         if(readRecords is null||!GlobalSearchInput.CanSearch(query)) {searchStatus.Text=readRecords is null?"Enter keywords to find a page.":"Enter a student name, admission, bill or receipt number.";return;}
         searching=true;searchStatus.Text="Searching records…";
         try
         {
             await Task.Delay(300,token);
-            var records=await readRecords(query,token);
+            var records=await readRecords(query,scope,token);
             if(IsDisposed||request!=generation||token.IsCancellationRequested||actor!=CurrentUser.UserId)return;
             results.BeginUpdate();
             try
             {
-                results.Items.Clear();results.Items.AddRange(records.Where(r=>GlobalRecordSearch.CanRead(r.Kind)).Take(20).Cast<object>().ToArray());
+                results.Items.Clear();results.Items.AddRange(records.Where(r=>GlobalRecordSearch.CanRead(r.Kind)&&GlobalRecordSearch.MatchesScope(r.Kind,scope)).Take(20).Cast<object>().ToArray());
                 if(results.Items.Count>0)results.SelectedIndex=0;
             }
             finally {results.EndUpdate();}
-            searchStatus.Text=records.Count>=20?"Showing the first 20 record matches. Enter more detail to narrow the results.":$"{records.Count} record match(es).";
+            searchStatus.Text=results.Items.Count>=20?"Showing the first 20 record matches. Enter more detail to narrow the results.":
+                results.Items.Count==0?"No matching records. Check the name or number, or choose All.":$"{results.Items.Count} record match(es).";
         }
         catch(OperationCanceledException) when(token.IsCancellationRequested) { }
         catch(Exception ex)

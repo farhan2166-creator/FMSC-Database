@@ -1,5 +1,7 @@
 namespace FMSC_SMS.Core;
 
+internal enum GlobalSearchScope { All, Students, Bills, Receipts }
+
 internal sealed record GlobalSearchRecord(string Kind,string Key,int AdmissionId,string Reference,string Name,string Context,int Rank)
 {
     internal string Heading=>$"{(Kind=="Student"?"Student":Kind=="Bill"?"Bill":Kind=="Receipt"?"Receipt":"Payment reference")} · {Reference} · {Name}";

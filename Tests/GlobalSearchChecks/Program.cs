@@ -36,6 +36,16 @@ internal static partial class Program
         Check(documents.Count==3&&documents.All(r=>r.Kind!="Student"),"Fees-only access returns documents and payment references without student navigation");
         CurrentUser.Grants.Add("Students.View");
         Check((await GlobalRecordSearch.ReadAsync("1",default)).Count==4,"Ambiguous input preserves labelled alternatives");
+        foreach(var scope in new[]{GlobalSearchScope.Students,GlobalSearchScope.Bills,GlobalSearchScope.Receipts})
+        {
+            var scoped=await GlobalRecordSearch.ReadAsync("1",scope,default);
+            Check(scoped.Count==(scope==GlobalSearchScope.Receipts?2:1)&&scoped.All(r=>GlobalRecordSearch.MatchesScope(r.Kind,scope)),"Record scopes retain only their matching result kinds");
+        }
+        CurrentUser.Grants.Remove("Fees.View");int noFinancialReads=reads;
+        Check((await GlobalRecordSearch.ReadAsync("1",GlobalSearchScope.Bills,default)).Count==0&&reads==noFinancialReads,"Selecting a scope never grants access or queries forbidden tables");
+        CurrentUser.Grants.Add("Fees.View");
+        int noInvalidReads=reads;
+        Check((await GlobalRecordSearch.ReadAsync("1",(GlobalSearchScope)99,default)).Count==0&&reads==noInvalidReads,"Invalid scopes do not query the database");
         int before=reads;await GlobalRecordSearch.ReadAsync("A",default);Check(reads==before,"Single-letter searches do not hit the database");
         DatabaseHelper.Read=(_,_,_)=>{var data=Rows();CurrentUser.UserId=2;return Task.FromResult(data);};
         Check((await GlobalRecordSearch.ReadAsync("Ali",default)).Count==0,"Responses from an earlier signed-in actor are discarded");

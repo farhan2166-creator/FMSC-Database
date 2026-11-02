@@ -17,7 +17,7 @@ internal static partial class HelpCatalog
             new[] { HelpRule.System, HelpRule.Permission }, HelpOwner.SQL | HelpOwner.CSharp,
             new[] { "MainDashboardForm.cs#MainDashboardForm", "Pages/Security/CurrentUser.cs#CurrentUser", "Core/PermissionCatalog.json", "fmsc.dacpac#RequirePermission" }, System.Array.Empty<string>(), ""),
         new("FAQ-003", "Getting Started", "How do I find an action quickly?",
-            "Type a destination name in the dashboard search box to find permitted pages, including collapsed menu groups. Ctrl+K separately searches students, admission references, saved bill numbers and receipt/payment references. Select a labelled match and press Enter; access is checked again before opening. F1 opens shortcut help.",
+            "Type a destination name in the dashboard search box to find permitted pages, including collapsed menu groups. Ctrl+K separately searches students, admission references, saved bill numbers and receipt/payment references. Search in starts at All; optionally choose Students, Bills or Receipts to narrow the same text. Select a labelled match and press Enter; access is checked again before opening. F1 opens shortcut help.",
             "ctrl k,shortcut,find menu,help", "Dashboard",
             new[] { HelpRule.Choice, HelpRule.Permission }, HelpOwner.CSharp | HelpOwner.SQL,
             new[] { "MainDashboardForm.cs#MainDashboardForm", "Core/GlobalRecordSearch.cs#GlobalRecordSearch", "Core/SavedFinancialDocumentPage.cs#SavedFinancialDocumentPage", "fmsc.dacpac#RequirePermission" }, System.Array.Empty<string>(), ""),
