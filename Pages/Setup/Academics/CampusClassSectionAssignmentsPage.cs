@@ -3,6 +3,7 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Setup.Academics;
 public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
 {
+    private readonly Dictionary<(int ClassId, int SectionId), bool> catalogDraft = new();
     private readonly LookupBox campus = new();
     private readonly DataGridView matrix = new() {
         Dock = DockStyle.Fill,
@@ -19,10 +20,10 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
     };
     private readonly List<ClassInfo> classes = new();
     private readonly List<SectionInfo> sections = new();
-    /* The matrix holds UNAPPLIED ticks, and `LoadCampusMatrix` clears the grid and refills it from the database, so changing the campus threw them away without a word. */
+    // Dirty state drives Apply/Reset. Campus switching remains prompt-free by owner policy.
     private string? appliedMatrixSignature;
     private int loadedCampusId;
-    /* Set while the campus picker is being put back after a declined change, so the restore cannot re-enter the change handler. */
+    // Suppress selection events while initial lookup binding is in progress.
     private bool suppressCampusChanged;
     private bool updatingMatrix;
     private bool matrixReady;
@@ -51,11 +52,15 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
             AddAction("Clear All", (_, _) => ClearAll(), "Secondary");
         matrixActions.AddRange(new[] { selectAll, clearAll, resetButton });
         RelocateFromActions(applyButton, selectAll, clearAll, resetButton);
+        AddAction("Manage Classes…", (_, _) => ManageCatalog(true), "Secondary");
+        AddAction("Manage Sections…", (_, _) => ManageCatalog(false), "Secondary");
+        AddAction("Refresh Catalogs", (_, _) => RefreshCatalogs(), "Secondary");
         BuildMatrix();
         campus.SelectedIndexChanged +=
             (_, _) => {
                 if (suppressCampusChanged)
                     return;
+                catalogDraft.Clear();
                 LoadCampusMatrix();
             };
         if (initialize) Defer(BindLookups);
@@ -284,6 +289,69 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
                 e.ThrowException = false;
             };
     }
+    private void ManageCatalog(bool manageClasses)
+    {
+        if (!CurrentUser.HasPermission("System.Setup"))
+        {
+            Warn("School setup permission is required.");
+            return;
+        }
+        using var dialog = new ClassSectionCatalogDialog(manageClasses);
+        dialog.ShowDialog(FindForm());
+        RefreshCatalogs();
+    }
+
+    private void RefreshCatalogs()
+    {
+        if (!CurrentUser.HasPermission("System.Setup")) return;
+        // Preserve only local differences, not the entire stale baseline. Fresh
+        // saved assignments remain authoritative for untouched combinations.
+        if (matrixReady)
+        {
+            catalogDraft.Clear();
+            foreach (var cell in AssignmentCells())
+            {
+                var key = (Convert.ToInt32(cell.OwningRow.Tag), sections[cell.ColumnIndex - 1].SectionId);
+                bool selected = Convert.ToBoolean(cell.Value ?? false);
+                if (selected != savedAssignments[key]) catalogDraft[key] = selected;
+            }
+        }
+        try
+        {
+            // Read both catalogs before replacing either in-memory index.
+            using var classRows = DatabaseHelper.QueryUser("GetClasses");
+            using var sectionRows = DatabaseHelper.QueryUser("GetSections");
+            var refreshedClasses = classRows.AsEnumerable().Select(row => new ClassInfo {
+                ClassId = Convert.ToInt32(row["ClassId"]), ClassName = Convert.ToString(row["ClassName"]) ?? ""
+            }).ToArray();
+            var refreshedSections = sectionRows.AsEnumerable().Select(row => new SectionInfo {
+                SectionId = Convert.ToInt32(row["SectionId"]), SectionName = Convert.ToString(row["SectionName"]) ?? ""
+            }).ToArray();
+            classes.Clear(); classes.AddRange(refreshedClasses);
+            sections.Clear(); sections.AddRange(refreshedSections);
+            LoadCampusMatrix();
+            if (!matrixReady) return; // Retain the draft for Refresh Catalogs retry.
+            RestoreCatalogDraft();
+            SetStatus("Catalogs refreshed. New entries are unassigned; unapplied selections were retained.");
+        }
+        catch (Exception ex) { Fail(ex); }
+    }
+
+    private void RestoreCatalogDraft()
+    {
+        updatingMatrix = true;
+        try
+        {
+            foreach (var cell in AssignmentCells())
+            {
+                var key = (Convert.ToInt32(cell.OwningRow.Tag), sections[cell.ColumnIndex - 1].SectionId);
+                if (catalogDraft.TryGetValue(key, out bool selected)) cell.Value = selected;
+            }
+            catalogDraft.Clear();
+        }
+        finally { updatingMatrix = false; UpdateAssignmentSummary(); }
+    }
+
     private void BindLookups()
     {
         try
@@ -412,24 +480,6 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
     bool IUnsavedChanges.HasUnsavedChanges => false;
     public string UnsavedChangesMessage =>
         $"The class/section ticks for \"{campus.Text}\" have not been applied yet.";
-    /// <summary>puts the campus picker back on the campus whose ticks are still on screen, WITHOUT reloading the matrix that is already showing them. Reloading would be the very defect this guards against.</summary>
-    private void RestoreLoadedCampusSelection()
-    {
-        if (loadedCampusId <= 0 ||
-            campus.SelectedId == loadedCampusId)
-        {
-            return;
-        }
-        suppressCampusChanged = true;
-        try
-        {
-            campus.SelectedValue = loadedCampusId;
-        }
-        finally
-        {
-            suppressCampusChanged = false;
-        }
-    }
     private void LoadCampusMatrix()
     {
         updatingMatrix = true;

@@ -127,7 +127,7 @@ Open **Placement Management** in the sidebar. It contains four separate pages un
 ## Unsaved edits and unresolved transactions
 
 - If **Stay / Discard** is offered, select **Stay** to keep the current unsaved draft.
-- Small Classes & Sections drafts can be left without a discard prompt; active saves must finish. Bulk fee-rate adjustments are protected when leaving the finance workspace, and a successful apply starts a clean baseline.
+- Small class/section catalog drafts can be left without a discard prompt; active saves must finish. Bulk fee-rate adjustments are protected when leaving the finance workspace, and a successful apply starts a clean baseline.
 - New sports/provisional certificate wording and result details use the existing discard guards. Opening an untouched dialog or changing only its new default date remains freely abandonable.
 - Certificate creation holds inputs through saving and refresh, refuses a second submission, and preserves the returned result message.
 - Admission and fee collection hold submitted inputs until the pending write and refresh finish. Correct invalid entries before submission; failed saves restore editing.
@@ -240,3 +240,13 @@ otherwise the record creation timestamp. Certificate Date is shown separately
 (Leaving certificates use Leave Date). Recorded names come from the saved
 certificate; student admission/QR references use the current student record.
 Printing/exporting this register does not issue, reissue or collect certificates.
+
+### Manage classes and sections from campus assignments
+
+Open School Setup → Campus Classes / Sections. Use Manage Classes or Manage
+Sections to add/edit the school-wide catalogs, manage class programs, reorder
+records, or delete records when existing usage safeguards allow it. Renames apply
+to all campuses. Adding a class or section does not assign it automatically.
+Close the dialog, tick the desired combinations for the campus, then Apply Changes.
+Pending ticks survive catalog refresh. Reset Changes restores saved assignments.
+Use Refresh Catalogs to retry a failed refresh.

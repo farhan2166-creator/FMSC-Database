@@ -938,7 +938,7 @@ public partial class MasterPage
     {
         /* This is an async void event handler with no protection at all, so clicking twice quickly. */
         if (!CanSaveRecord()) return;
-        if (_saving)
+        if (IsBusy)
             return;
         /* An existing record that was only loaded, not edited, has nothing to save.
            Return before validation or the save procedure so the record cannot be

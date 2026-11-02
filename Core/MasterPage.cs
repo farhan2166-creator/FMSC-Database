@@ -3,8 +3,8 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Core;
 public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
 {
-    public bool IsBusy => _saving;
-    public string BusyMessage => "Please wait for the record to finish saving.";
+    public bool IsBusy => _saving || _deleting;
+    public string BusyMessage => _deleting ? "Please wait for the record to finish deleting." : "Please wait for the record to finish saving.";
     protected virtual bool CanChangeRecord() => true;
     protected virtual bool CanSaveRecord() => true;
     protected virtual bool ReserveEditorValidationSpace => false;
@@ -133,6 +133,7 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
     /* The Save button, held so it can be disabled while a save is in flight. */
     private ModernButton? _saveButton;
     private bool _saving;
+    private bool _deleting;
     private int _id;
     private readonly string? _recordIdColumn;
     private bool _updatingGridBoolean;

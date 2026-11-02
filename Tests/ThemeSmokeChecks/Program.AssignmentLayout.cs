@@ -38,6 +38,39 @@ internal static partial class Program
         using var picture = new Bitmap(host.Width, host.Height);
         host.DrawToBitmap(picture, new Rectangle(Point.Empty, picture.Size));
         picture.Save("artifacts/assignment-layout/assignment-layout.png");
+        // Catalog refresh restores differences by IDs, despite rename/reorder or
+        // removed entries. New combinations retain the freshly loaded baseline.
+        using (var refreshed = new CampusClassSectionAssignmentsPage(false))
+        {
+            var kind = typeof(CampusClassSectionAssignmentsPage);
+            var refreshedGrid = (DataGridView)kind.GetField("matrix", flags)!.GetValue(refreshed)!;
+            var sectionType = kind.GetNestedType("SectionInfo", BindingFlags.NonPublic)!;
+            var sectionList = (System.Collections.IList)kind.GetField("sections", flags)!.GetValue(refreshed)!;
+            foreach (int id in new[] { 20, 10, 30 })
+            {
+                var section = Activator.CreateInstance(sectionType)!;
+                sectionType.GetProperty("SectionId")!.SetValue(section, id);
+                sectionType.GetProperty("SectionName")!.SetValue(section, "Renamed " + id);
+                sectionList.Add(section);
+                refreshedGrid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Section_" + id });
+            }
+            refreshedGrid.Rows.Add("Renamed Class", false, true, false);
+            refreshedGrid.Rows[0].Tag = 7;
+            var baseline = (Dictionary<(int,int),bool>)kind.GetField("savedAssignments", flags)!.GetValue(refreshed)!;
+            baseline[(7,20)] = false; baseline[(7,10)] = true; baseline[(7,30)] = false;
+            kind.GetField("matrixReady", flags)!.SetValue(refreshed, true);
+            var pending = (Dictionary<(int,int),bool>)kind.GetField("catalogDraft", flags)!.GetValue(refreshed)!;
+            pending[(7,20)] = true; pending[(7,10)] = false; pending[(99,10)] = true;
+            kind.GetMethod("RestoreCatalogDraft", flags)!.Invoke(refreshed, null);
+            Check((bool)refreshedGrid.Rows[0].Cells[1].Value! && !(bool)refreshedGrid.Rows[0].Cells[2].Value!,
+                "Catalog rename/reorder retains pending additions and removals by stable IDs");
+            Check(!(bool)refreshedGrid.Rows[0].Cells[3].Value!, "New sections are not implicitly assigned");
+            Check(baseline[(7,10)] && !baseline[(7,20)] && pending.Count == 0,
+                "Restoring catalog drafts preserves saved baseline and drops deleted keys");
+            kind.GetMethod("ResetChanges", flags)!.Invoke(refreshed, null);
+            Check(!(bool)refreshedGrid.Rows[0].Cells[1].Value! && (bool)refreshedGrid.Rows[0].Cells[2].Value!,
+                "Reset after catalog refresh restores freshly loaded saved assignments");
+        }
         using var years = new AcademicYearsPage(false);
         var yearGrid = (DataGridView)typeof(V2Page).GetField("Grid", flags | BindingFlags.Public)!.GetValue(years)!;
         yearGrid.Columns.Add("YearName", "Year Name");

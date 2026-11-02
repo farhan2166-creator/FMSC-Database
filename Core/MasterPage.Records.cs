@@ -177,7 +177,7 @@ public partial class MasterPage
     /* Deleting a record is a business operation, so it returns Task; the CellContentClick wiring is the only event boundary. */
     private async Task DeleteRecordAtRow(int rowIndex)
     {
-        if (!HasDeleteConfiguration ||
+        if (IsBusy || !HasDeleteConfiguration ||
             rowIndex < 0 ||
             rowIndex >= Grid.Rows.Count)
         {
@@ -247,6 +247,7 @@ public partial class MasterPage
             "Delete Record");
         if (!confirm)
             return;
+        _deleting = true;
         try
         {
             await DatabaseHelper.ExecuteUserAsync(
@@ -268,6 +269,7 @@ public partial class MasterPage
         {
             Fail(ex);
         }
+        finally { _deleting = false; }
     }
     private string GetDeleteDisplayName(DataGridViewRow row)
     {
