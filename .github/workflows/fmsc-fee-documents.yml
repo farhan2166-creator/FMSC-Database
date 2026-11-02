@@ -58,19 +58,14 @@ jobs:
             Write-Output "::error title=Fee document rendering failed::$detail"
           }
           exit $renderExit
-      - name: Upload fictional document scenario pack
+      - name: Upload the single review PDF
         id: samples
-        if: ${{ always() && hashFiles('artifacts/fee-documents/render.log') != '' }}
+        if: ${{ success() && hashFiles('artifacts/fee-documents/REVIEW-ALL.pdf') != '' }}
         uses: actions/upload-artifact@v7
         with:
-          name: fee-document-scenarios-${{ github.run_id }}
-          path: |
-            artifacts/fee-documents/render.log
-            artifacts/fee-documents/*.pdf
-            artifacts/fee-documents/*.png
-            artifacts/fee-documents/REVIEW-INDEX.html
-            artifacts/fee-documents/provenance.json
-            artifacts/fee-documents/README.md
+          name: fee-document-review-pdf-${{ github.run_id }}
+          path: artifacts/fee-documents/REVIEW-ALL.pdf
+          compression-level: 9
           if-no-files-found: error
           retention-days: 7
       - name: Link review pack in the workflow summary
@@ -79,9 +74,9 @@ jobs:
         env:
           REVIEW_ARTIFACT_URL: ${{ steps.samples.outputs.artifact-url }}
         run: |
-          "[Download bill and receipt scenario pack]($env:REVIEW_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+          "[Download the single bill and receipt review PDF]($env:REVIEW_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
           if (Test-Path artifacts/fee-documents/provenance.json) {
             $review = Get-Content artifacts/fee-documents/provenance.json -Raw | ConvertFrom-Json
             "Scenarios: $($review.ScenarioCount). PDF pages: $($review.PageCount). Checks: $($review.Checks)." >> $env:GITHUB_STEP_SUMMARY
           }
-          'Open REVIEW-ALL.pdf for every scenario, or REVIEW-INDEX.html for names, individual PDFs and first-page previews. Check provenance.json and this run status before treating partial output as a passing result.' >> $env:GITHUB_STEP_SUMMARY
+          'The download contains only REVIEW-ALL.pdf. Use its bookmarks to navigate all scenarios. No duplicate individual PDFs or PNG previews are included.' >> $env:GITHUB_STEP_SUMMARY
