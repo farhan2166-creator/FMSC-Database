@@ -58,7 +58,16 @@ See `Docs/BACKUP_RECOVERY.md` for recovery guidance.
 
 ---
 
-## Current target: schema 69
+## Current target: schema 70
+
+Migration 70 changes only GetOutstandingAndAgingReport output. Charges, Students
+and Families include Overdue Amount, Due Today, Not Yet Due and Due Date Missing. Families includes
+unlinked students as standalone groups. Existing financial balances, charge
+eligibility and payment writers are unchanged. Apply after 69 using the verified
+backup and transaction workflow above. The DACPAC remains a reference snapshot;
+it does not replace these migrations or school data.
+
+## Previous target: schema 69
 
 Migration `69.sql` enforces the approved transfer classification at the
 SQL writer boundary: `TransferEnrollmentClass` requires a different ClassId.
@@ -139,11 +148,11 @@ Migration `60.sql` fixes admission/fee flow authorization and recovery. It adds 
 
 Migration `59.sql` retires the remaining 19 generic audit writers after schema 58. Apply it once under an outer transaction using the installer or `sqlcmd -b`. It preserves existing audit rows/readers, permissions, preview snapshots, operational history and recovery markers. This remaining batch is explicitly owner-authorized on 28 October 2026. Validate with `Tools/TestRemainingAuditRetirement.ps1` (owned, record-free fixture).
 
-For an approved upgrade starting at a supported schema between 19 and 68, apply every consecutive numbered file strictly above the detected version through 69 in ascending order. Do not skip a version or rerun an applied migration. The installer and standalone applier refuse missing intermediate files. Historical tables below stop at an earlier migration-51 stage and are not the current complete upgrade list.
+For an approved upgrade starting at a supported schema between 19 and 69, apply every consecutive numbered file strictly above the detected version through 70 in ascending order. Do not skip a version or rerun an applied migration. The installer and standalone applier refuse missing intermediate files. Historical tables below stop at an earlier migration-51 stage and are not the current complete upgrade list.
 
 # Apply the database changes later
 
-The current application requires **schema 69**. SQL changes are checked in here;
+The current application requires **schema 70**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,

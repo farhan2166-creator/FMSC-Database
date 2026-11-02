@@ -23,7 +23,7 @@ public sealed class ClassSheetsPage : V2Page
     private Scope CurrentScope() => new(campus.SelectedId, year.SelectedId, klass.SelectedId, section.SelectedId);
 
     public ClassSheetsPage() : base("Class Marks & Attendance Sheets",
-        "Choose students and print marks or attendance sheets.")
+        "Print blank marks or attendance sheets using the current active roster. Selecting a past month does not reconstruct its historical roster.")
     {
         sheet.Items.AddRange(new object[] { "Marks Sheet", "Exam Attendance Sheet", "Monthly Attendance Register" });
         sheet.SelectedIndex = 0;

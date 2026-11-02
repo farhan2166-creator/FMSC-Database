@@ -790,12 +790,6 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Academic Years",
                 "Calendar.Manage"),
             new(
-                "Classes & Sections",
-                () => new ClassesAndSectionsWorkspacePage(),
-                "School Setup",
-                PageTitles.ClassesSections,
-                "System.Setup"),
-            new(
                 PageTitles.CampusAssignments,
                 () => new CampusClassSectionAssignmentsPage(),
                 "School Setup",

@@ -26,7 +26,16 @@ internal sealed record OutstandingReportFilter(bool OverdueOnly, decimal Minimum
     {
         var totals = new DataTable();
         totals.Columns.Add("Rows shown", typeof(int)); totals.Columns.Add("Outstanding shown", typeof(decimal));
-        totals.Rows.Add(rows.Rows.Count, rows.AsEnumerable().Sum(r => r.IsNull("Outstanding") ? 0m : Convert.ToDecimal(r["Outstanding"])));
+        var total = totals.NewRow();
+        total["Rows shown"] = rows.Rows.Count;
+        total["Outstanding shown"] = rows.AsEnumerable().Sum(r => r.IsNull("Outstanding") ? 0m : Convert.ToDecimal(r["Outstanding"]));
+        foreach (string field in new[] { "Overdue Amount", "Due Today", "Not Yet Due", "Due Date Missing" })
+            if (rows.Columns.Contains(field))
+            {
+                totals.Columns.Add(field, typeof(decimal));
+                total[field] = rows.AsEnumerable().Sum(r => r.IsNull(field) ? 0m : Convert.ToDecimal(r[field]));
+            }
+        totals.Rows.Add(total);
         return totals;
     }
 }

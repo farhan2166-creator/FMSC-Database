@@ -3,17 +3,19 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
 {
-    private readonly CheckBox overdueOnly = new() { Text = "Overdue only", AutoSize = true };
+    private readonly CheckBox overdueOnly = new() { Text = "Has overdue charges", AutoSize = true };
     private readonly ModernNumericTextBox minimumBalance = new() { Minimum = 0, Maximum = 1000000000m, ZeroAsPlaceholder = true };
     private readonly ModernTextBox minimumDays = HumanUi.TextBox(false, 6), maximumDays = HumanUi.TextBox(false, 6);
     private ModernButton? openStatement;
     public OutstandingAgingReportPage() : base(
-        "Outstanding & Aging", "Open charges only. Settled amounts include cash and credit; fully settled charges are excluded.",
+        "Outstanding & Aging", "Current open charges, split into overdue, due today and future amounts. Families includes unlinked students as standalone entries.",
         "GetOutstandingAndAgingReport", "FMSC_Outstanding_Aging",
         new[] { "Students", "Charges", "Aging", "Families" },
         Array.Empty<string>(), false, true, false, false, classOutstandingPrint: true)
     {
+        SetToolTip(overdueOnly, "Select whole student/family balances with overdue charges. Overdue Amount excludes due-today and future fees.");
         minimumDays.PlaceholderText = "Any"; maximumDays.PlaceholderText = "Any";
+        SetToolTip(minimumDays, "Student/family rows use the oldest unpaid charge. Amount columns keep the full balance and split its due status.");
         WholeNumberInput.Attach(minimumDays);WholeNumberInput.Attach(maximumDays);
         overdueOnly.CheckedChanged += (_, _) => FiltersChanged();
         minimumBalance.TextChanged += (_, _) => FiltersChanged();
@@ -33,7 +35,7 @@ public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
     };
     protected override string AdditionalFilterSignature => $"{overdueOnly.Checked}|{NumericFilterSignature(minimumBalance.Text)}|{minimumDays.Text}|{maximumDays.Text}";
     protected override string AdditionalFilterDescription => ViewName == "Aging" ? "" :
-        $"Overdue only: {(overdueOnly.Checked ? "Yes" : "No")}   Minimum outstanding: Rs. {minimumBalance.Value:N0}   Days overdue: {(minimumDays.Text.Trim().Length == 0 ? "Any" : minimumDays.Text)} to {(maximumDays.Text.Trim().Length == 0 ? "Any" : maximumDays.Text)}";
+        $"Has overdue charges: {(overdueOnly.Checked ? "Yes" : "No")}   Minimum outstanding: Rs. {minimumBalance.Value:N0}   Oldest due age / charge days: {(minimumDays.Text.Trim().Length == 0 ? "Any" : minimumDays.Text)} to {(maximumDays.Text.Trim().Length == 0 ? "Any" : maximumDays.Text)}";
     protected override void UpdateViewControls()
     {
         base.UpdateViewControls();

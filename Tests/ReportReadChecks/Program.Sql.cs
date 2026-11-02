@@ -11,6 +11,7 @@ internal static partial class Program
         command.Parameters.Add("@FromDate",SqlDbType.Date).Value=new DateTime(2026,1,1);
         command.Parameters.Add("@ToDate",SqlDbType.Date).Value=new DateTime(2026,12,31);
         command.Parameters.AddWithValue("@AcademicYearId",0);
+        command.Parameters.Add("@AsOfDate",SqlDbType.Date).Value=new DateTime(2026,10,21);
         foreach(string parameter in new[]{"@CertificateType","@RecipientType","@EntryKind","@CollectionStatus"}) command.Parameters.Add(parameter,SqlDbType.NVarChar,100).Value=DBNull.Value;
         command.Parameters.AddWithValue("@Search","");
         configure?.Invoke(command);
@@ -51,8 +52,13 @@ internal static partial class Program
                 INSERT dbo.Campuses VALUES(1,N'Boys',1),(2,N'Girls',2);INSERT dbo.Classes VALUES(1,N'Class 1',1);INSERT dbo.Sections VALUES(1,N'A',1);
                 INSERT dbo.CampusClassSections VALUES(1,1,1,1),(2,2,1,1);
                 INSERT dbo.Enrollments VALUES(1,1,1,2,N'Ended','2025-01-01','2025-01-01'),(2,1,1,1,N'Active','2026-01-01','2026-01-01'),(3,2,1,1,N'Active','2026-01-01','2026-01-01'),(4,6,1,2,N'Active','2026-01-01','2026-01-01');
-                INSERT dbo.AcademicYears VALUES(1,'2026-12-31');INSERT dbo.FeeTypes VALUES(1,N'Tuition');
-                INSERT dbo.StudentFeeAssignments VALUES(1,2,1,N'Monthly',N'Sibling',100,NULL,'2026-01-01',NULL),(2,3,1,N'Monthly',N'Sibling',50,NULL,'2026-01-01',NULL),(1,2,1,N'Yearly',N'Sibling',1000,NULL,'2026-01-01',NULL),(1,2,1,N'Monthly',N'Cancelled',900,'2026-01-02','2026-01-01',NULL),(1,1,1,N'Monthly',N'Old',700,NULL,'2025-01-01','2025-12-31'),(1,2,1,N'Monthly',N'Future',800,NULL,'2027-01-01','2027-12-31');
+                INSERT dbo.AcademicYears VALUES(1,'2026-12-31');INSERT dbo.FeeTypes VALUES(1,N'Tuition'),(2,N'Annual');
+                INSERT dbo.StudentFeeAssignments VALUES(1,2,1,N'Monthly',N'Sibling',100,NULL,'2026-01-01',NULL),(2,3,1,N'Monthly',N'Sibling',50,NULL,'2026-01-01',NULL),(1,2,2,N'Yearly',N'Sibling',1000,NULL,'2026-01-01',NULL),(1,2,1,N'Monthly',N'Cancelled',900,'2026-01-02','2026-01-01',NULL),(1,1,1,N'Monthly',N'Old',700,NULL,'2025-01-01','2025-12-31'),(1,2,1,N'Monthly',N'Future',800,NULL,'2027-01-01','2027-12-31');
+                ALTER TABLE dbo.Enrollments ADD LeavingDate date NULL;
+                ALTER TABLE dbo.AcademicYears ADD StartDate date NOT NULL DEFAULT('2026-01-01');
+                ALTER TABLE dbo.StudentFeeAssignments ADD StudentFeeAssignmentId int IDENTITY(1,1);
+                INSERT dbo.StudentFeeAssignments(AdmissionId,EnrollmentId,FeeTypeId,Frequency,ConcessionLabel,DiscountAmount,EffectiveFrom)
+                    VALUES(1,2,1,N'Monthly',N'Sibling',150,'2026-10-01');
                 """);
             Execute(connection,"""
                 CREATE PROCEDURE dbo.RequirePermission @UserId int,@Permission nvarchar(100) AS
@@ -71,12 +77,23 @@ internal static partial class Program
             Check(CreditBalanceReportData.Create(credit,true,0).Rows.Rows.Count==3,"SQL family and unassigned groups remain distinct");
             using var concessions=Read(connection,ConcessionSummaryData.Query);
             Check(concessions.Rows.Count==3,"SQL concession scope excludes cancelled, expired and future assignments");
-            Check(ConcessionSummaryData.Create(concessions).Rows.Rows.Count==2,"SQL concession cycles stay separate");
+            var currentTerms=ConcessionSummaryData.Create(concessions).Rows;
+            Check(currentTerms.Rows.Count==2,"SQL concession cycles stay separate");
+            Check(currentTerms.AsEnumerable().Single(r=>r.Field<string>("Frequency")=="Monthly").Field<decimal>("Assigned Discount / Cycle (Rs.)")==200m,
+                "As-of summary selects latest eligible term rather than summing superseded rates");
+            using var earlier=Read(connection,ConcessionSummaryData.Query,configure:c=>c.Parameters["@AsOfDate"].Value=new DateTime(2026,9,30));
+            Check(earlier.AsEnumerable().Single(r=>r.Field<int>("AdmissionId")==1 && r.Field<string>("Frequency")=="Monthly").Field<decimal>("Assigned Discount")==100m,
+                "Earlier as-of date uses previous term");
+            Execute(connection,"INSERT dbo.StudentFeeAssignments(AdmissionId,EnrollmentId,FeeTypeId,Frequency,ConcessionLabel,DiscountAmount,EffectiveFrom) VALUES(1,2,1,N'Monthly',NULL,0,'2026-10-15');");
+            using var ordinary=Read(connection,ConcessionSummaryData.Query);
+            Check(!ordinary.AsEnumerable().Any(r=>r.Field<int>("AdmissionId")==1 && r.Field<int>("FeeTypeId")==1),
+                "A newer ordinary term does not revive the student's earlier concession");
             bool denied=false;try{Read(connection,CreditBalanceReportData.Query,user:2);}catch(SqlException){denied=true;}
             Check(denied,"Credit query enforces fee viewing in addition to report viewing");
             denied=false;try{Read(connection,ConcessionSummaryData.Query,user:0);}catch(SqlException){denied=true;}
             Check(denied,"Concession query enforces report permission");
             CheckNewSql(connection);
+            CheckDebtSql(connection);
         }
         finally { SqlConnection.ClearAllPools();Execute(master,$"ALTER DATABASE [{database}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{database}];"); }
     }

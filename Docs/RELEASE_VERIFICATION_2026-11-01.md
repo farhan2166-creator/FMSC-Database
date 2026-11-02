@@ -3,6 +3,17 @@
 Source baseline: `12b37c39a6915c5a9f5730f4191e9c92a445d992` on `main` before this repair.
 Application: FMSC School Management System 1.1.0-rc.2. Database schema: **69**.
 
+## Integration update — 2 November 2026
+
+Reconciled with main `db5f8b3` (class/section consolidation and report fixes).
+The current application, installer and SQL fixture contexts require schema 70.
+The schema-69 baseline above is historical. Retain migrations 67–69 header repairs
+and the installer gap guard; do not overwrite newer report migration 70 or
+reintroduce already-fixed shortcut signatures. PR 71 overlaps this repair and
+can be superseded after the integrated change lands. No school database is
+updated merely by merging these sources. Current candidate CI and native/SQL
+acceptance remain distinct from source/build checks.
+
 ## Scope
 
 This repair aligns the installer's missing-migration refusal with the existing
@@ -14,6 +25,19 @@ publication-security documentation with the repository's already-public state.
 **Intentionally excluded at owner request:** adding dedicated automated execution
 coverage of `Migrations/Apply-Migrations.ps1`. The standalone applier is unchanged.
 Existing installer migration regression tests remain in scope.
+
+## Focused execution — 2 November integration
+
+- Release app/native harness compilation: zero warnings and errors.
+- Report data/contract checks: 292 passed.
+- Tools Python checks: 8 passed.
+- Installer-only inert PowerShell suite: 15 version cases, 19 folder/version/backup
+  scenarios, SQL wrapper/failure cleanup and activation-order checks passed.
+- SQL Server syntax parsing: migrations 67, 68, 69 and 70 passed.
+
+These are source, compilation and inert/synthetic checks. Native Windows execution,
+actual SQL upgrades, grants preservation in SQL Server and complete-installer CI
+are not certified by these results. No school database was changed.
 
 ## Required CI evidence
 
