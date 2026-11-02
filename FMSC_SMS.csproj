@@ -87,6 +87,7 @@
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
 		<PackageReference Include="PDFsharp-MigraDoc-GDI" Version="6.2.4" />
 		<PackageReference Include="ReportViewerCore.WinForms" Version="15.1.33" />
+		<PackageReference Include="ClosedXML" Version="0.105.1" />
 	</ItemGroup>
 	<ItemGroup>
 		<None Update="Installer\core.ps1">
