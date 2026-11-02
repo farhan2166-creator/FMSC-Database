@@ -63,9 +63,8 @@ jobs:
         if: ${{ success() && hashFiles('artifacts/fee-documents/REVIEW-ALL.pdf') != '' }}
         uses: actions/upload-artifact@v7
         with:
-          name: fee-document-review-pdf-${{ github.run_id }}
           path: artifacts/fee-documents/REVIEW-ALL.pdf
-          compression-level: 9
+          archive: false
           if-no-files-found: error
           retention-days: 7
       - name: Link review pack in the workflow summary

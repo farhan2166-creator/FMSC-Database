@@ -6,9 +6,9 @@ templates with static fixture data. It never connects to a school database,
 issues a real numbered document, posts a payment or sends pages to a printer.
 The application templates, wording and fonts are unchanged by this review setup.
 
-Download `fee-document-review-pdf-<run ID>` from the workflow's Artifacts section
-or the link in its run summary. It is retained for seven days. GitHub wraps the
-download in a ZIP containing only **REVIEW-ALL.pdf**: all generated pages in one
+Download **REVIEW-ALL.pdf** from the workflow's Artifacts section
+or the link in its run summary. It is retained for seven days and downloads
+directly as a PDF, without a ZIP or extraction. It contains all generated pages in one
 file, with a scenario bookmark for each document. Original page sizes are retained.
 Duplicate individual PDFs, PNG previews, indexes and logs are excluded from the
 download. The workflow still generates them internally for its rendering checks.
