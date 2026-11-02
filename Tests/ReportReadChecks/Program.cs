@@ -65,6 +65,18 @@ internal static partial class Program
         var totals=OutstandingReportFilter.Totals(filtered);
         Check((decimal)totals.Rows[0]["Outstanding shown"]==500m && (int)totals.Rows[0]["Rows shown"]==2,"Filtered summary describes only displayed rows");
         Check(new OutstandingReportFilter(true,10000m,0,null).Apply(data).Rows.Count==0,"No matching overdue records stays empty");
+        foreach (string field in new[] { "Overdue Amount", "Due Today", "Not Yet Due" }) data.Columns.Add(field,typeof(decimal));
+        data.Rows.Clear(); data.Rows.Add(1200m,30,200m,0m,1000m);
+        var debtor=new OutstandingReportFilter(true,0,0,null).Apply(data);
+        var split=OutstandingReportFilter.Totals(debtor);
+        Check((decimal)split.Rows[0]["Outstanding shown"]==1200m && (decimal)split.Rows[0]["Overdue Amount"]==200m
+            && (decimal)split.Rows[0]["Not Yet Due"]==1000m,"Debtor filter preserves full balance and separately totals actual overdue/future money");
+        Check(OutstandingReportFilter.Totals(data.Clone()).Rows[0].Field<decimal>("Overdue Amount")==0m,"Empty due-status totals remain zero");
+        data.Columns.Add("Due Date Missing",typeof(decimal));
+        data.Rows[0]["Due Date Missing"]=0m;
+        data.Rows.Add(50m,DBNull.Value,0m,0m,0m,50m);
+        Check((decimal)OutstandingReportFilter.Totals(data).Rows[0]["Due Date Missing"]==50m,
+            "Legacy missing due dates remain visible as a separate amount, not future or overdue");
     }
     private static DataTable CreditRows()
     {
@@ -105,6 +117,10 @@ internal static partial class Program
         Check((decimal)rows.Rows[0]["Assigned Discount / Cycle (Rs.)"]==150m && (int)rows.Rows[0]["Students"]==2,"Concession group counts students and rate correctly");
         Check((int)totals.Rows[0]["Students"]==2 && (int)totals.Rows[0]["Assignments"]==3,"Summary deduplicates students across assignments");
         Check(totals.Columns.Count==2,"No misleading grand sum of monthly and yearly discounts");
+        foreach(string key in new[]{"CampusId","ClassId","FeeTypeId"}) data.Columns.Add(key,typeof(int));
+        foreach(DataRow row in data.Rows) { row["CampusId"]=1;row["ClassId"]=1;row["FeeTypeId"]=1; }
+        var other=data.NewRow(); other.ItemArray=data.Rows[0].ItemArray; other["CampusId"]=2; data.Rows.Add(other);
+        Check(ConcessionSummaryData.Create(data).Rows.Rows.Count==3,"Same display names in different campus IDs stay separate");
     }
     private static void CheckReceiptRdlc()
     {

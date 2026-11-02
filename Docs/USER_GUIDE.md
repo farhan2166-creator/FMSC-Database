@@ -250,3 +250,13 @@ to all campuses. Adding a class or section does not assign it automatically.
 Close the dialog, tick the desired combinations for the campus, then Apply Changes.
 Pending ticks survive catalog refresh. Reset Changes restores saved assignments.
 Use Refresh Catalogs to retry a failed refresh.
+
+### Understand debt and concession reports
+
+Outstanding shows the full unpaid balance split into Overdue Amount, Due Today
+and Not Yet Due (plus Due Date Missing for legacy records). Has overdue charges selects debtors with an overdue charge;
+future fees stay in their separate column. Families also includes standalone
+students without family links. Day limits on student/family rows use the oldest
+unpaid charge. Concession Summary uses its Summary as of date for effective
+agreements; use Concession Assignments for history or Discount Detail for actual
+billed reductions. Monthly attendance sheets use the current active roster.

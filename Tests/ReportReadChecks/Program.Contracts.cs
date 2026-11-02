@@ -23,6 +23,15 @@ internal static partial class Program
         var folder=new DirectoryInfo(AppContext.BaseDirectory);
         while(folder is not null && !File.Exists(Path.Combine(folder.FullName,"fmsc.dacpac")))folder=folder.Parent;
         if(folder is null)throw new InvalidOperationException("Run checks from a checkout containing fmsc.dacpac.");
+        string migration=File.ReadAllText(Path.Combine(folder.FullName,"Migrations","70.sql"));
+        new TSql160Parser(true).Parse(new StringReader(migration),out var migrationErrors);
+        Check(migrationErrors.Count==0,"Migration 70 parses as SQL Server syntax: "+string.Join("; ",migrationErrors.Select(e=>e.Message)));
+        Check(migration.Contains("LEFT JOIN dbo.FamilyMembers") && migration.Contains("CASE WHEN F.FamilyId IS NULL THEN M.AdmissionId END"),
+            "Family debt retains and separately groups students without family links");
+        Check(System.Text.RegularExpressions.Regex.Matches(migration,@"\[Due Date Missing\]").Count==3,
+            "All three debt views expose missing-date money instead of losing it from the split");
+        Check(migration.Contains("DueDate < @AsOfDate") && migration.Contains("DueDate = @AsOfDate") && migration.Contains("DueDate > @AsOfDate"),
+            "Debt reader separates overdue, due today and future charges");
         using var archive=ZipFile.OpenRead(Path.Combine(folder.FullName,"fmsc.dacpac"));
         using var stream=archive.GetEntry("model.xml")!.Open();var model=XDocument.Load(stream);
         var columns=model.Descendants().Where(e=>(string?)e.Attribute("Type") is "SqlSimpleColumn" or "SqlComputedColumn").Select(e=>(string?)e.Attribute("Name")).ToHashSet();
@@ -30,9 +39,9 @@ internal static partial class Program
             ["StudentCreditEntries"]=new[]{"AdmissionId","Amount","CreatedAt"},
             ["Students"]=new[]{"AdmissionId","AdmissionNumber","QuickReference","StudentName","FatherName","Status"},
             ["Families"]=new[]{"FamilyId","FamilyCode"},["FamilyMembers"]=new[]{"AdmissionId","FamilyId"},
-            ["Enrollments"]=new[]{"AdmissionId","EnrollmentId","EnrollmentDate","Status","ClassSectionId","AcademicYearId","BillingStartDate"},
-            ["StudentFeeAssignments"]=new[]{"AdmissionId","EnrollmentId","FeeTypeId","Frequency","ConcessionLabel","DiscountAmount","CancelledAt","EffectiveFrom","EffectiveTo"},
-            ["AcademicYears"]=new[]{"AcademicYearId","EndDate"},["FeeTypes"]=new[]{"FeeTypeId","FeeTypeName"},
+            ["Enrollments"]=new[]{"AdmissionId","EnrollmentId","EnrollmentDate","LeavingDate","Status","ClassSectionId","AcademicYearId","BillingStartDate"},
+            ["StudentFeeAssignments"]=new[]{"StudentFeeAssignmentId","AdmissionId","EnrollmentId","FeeTypeId","Frequency","ConcessionLabel","DiscountAmount","CancelledAt","EffectiveFrom","EffectiveTo"},
+            ["AcademicYears"]=new[]{"AcademicYearId","StartDate","EndDate"},["FeeTypes"]=new[]{"FeeTypeId","FeeTypeName"},
             ["CampusClassSections"]=new[]{"ClassSectionId","CampusId","ClassId","SectionId"},
             ["BillingCharges"]=new[]{"BillingChargeId","BillingMonth","ChargeDate","AdmissionId","EnrollmentId","FeeTypeId","GrossAmount","DiscountAmount","NetAmount","Status"},
             ["FeePayments"]=new[]{"FeePaymentId","Status","IsCreditApplication"},["FeePaymentAllocations"]=new[]{"FeePaymentId","BillingChargeId","Amount"},
