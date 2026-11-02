@@ -4,8 +4,13 @@ Management PDF export now uses the same GridReportPreview RDLC definition and
 projected data as Print Preview. The shared document includes the school name,
 report title, captured filters, authoritative summary cards, a logical detail-row
 count, monetary formatting, repeating headings, printed-by information and Page X
-of Y. Currency columns align right, appropriate counts/dates center, names remain
-left aligned, and total rows have bold text and a top rule. Very wide reports use
+of Y. Owner-approved styling — 2 November 2026: use black text and rules on white
+paper, without colored fills or alternating shading. Center school/report titles,
+filter context, summary labels/values and all table headings. Amounts, counts,
+dates, references and short placement fields center; names and descriptions stay
+left aligned. Receipt group headings and monetary subtotals follow the same
+alignment. Total rows have bold text and a top rule. Summary rows reserve enough
+height for wrapped labels and values. Very wide reports use
 identified column bands with repeated student/reference fields instead of tiny
 text. Every selected source field remains in the document.
 

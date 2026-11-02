@@ -22,7 +22,7 @@ internal static class CollectionReceiptRdlc
             return box;
         }
         var groupHeading = E("TablixRow", E("Height", "0.28in"), E("TablixCells",
-            E("TablixCell", E("CellContents", Text("ReceiptHeading" + band, "=Fields!GroupLabel.Value", true), E("ColSpan", indices.Length))),
+            E("TablixCell", E("CellContents", Text("ReceiptHeading" + band, "=Fields!GroupLabel.Value", true,"Center"), E("ColSpan", indices.Length))),
             Enumerable.Range(1, indices.Length - 1).Select(_ => E("TablixCell"))));
         XElement Total(bool grand)
         {
@@ -30,7 +30,7 @@ internal static class CollectionReceiptRdlc
                 string value = position == 0 ? (grand ? "Grand Total" : "Subtotal")
                     : numeric[index] ? $"=Format(Sum(Fields!N{index}.Value{(grand ? "" : ", \"" + group + "\"")}), \"#,##0.##\")" : "";
                 return E("TablixCell", E("CellContents", Text($"ReceiptTotal{band}_{index}_{grand}", value, true,
-                    numeric[index] ? "Right" : "Left")));
+                    numeric[index] ? "Center" : "Left")));
             });
             return E("TablixRow", E("Height", "0.28in"), E("TablixCells", cells));
         }

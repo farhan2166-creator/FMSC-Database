@@ -1,5 +1,14 @@
 # Changelog
 
+## Monochrome direct PDF reports — 2026-11-02
+
+- Center report titles, filter context, summary figures and table headings.
+  Center amounts, counts, dates and references while keeping names/descriptions
+  left aligned. Use black text and rules on white paper without colored fills.
+- Keep receipt groups, subtotal calculations, column selection and wide-report
+  bands intact. This shared report-export styling does not change the finalized
+  bill/receipt document templates or stored financial values.
+
 ## Action shortcut coverage — 2026-11-02
 
 - Add shortcuts for bill preview, report columns, saved-view renaming, filter

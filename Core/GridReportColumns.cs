@@ -8,6 +8,21 @@ internal static class GridReportColumns
 {
     internal sealed record Column(string Caption,int[] Fields,bool Numeric,double Minimum,double Weight);
 
+    internal static string Alignment(DataTable source,Column column)
+    {
+        if(column.Numeric || column.Fields.All(i=>source.Columns[i].DataType==typeof(DateTime)))return "Center";
+        string key=Key(column.Caption);
+        return key.StartsWith("receipt") || key.StartsWith("adm") || key.StartsWith("reference")
+            || key.StartsWith("campus") || key.StartsWith("method") || key.StartsWith("period")
+            || key.StartsWith("oldestdue")
+            || key is "class" or "section" or "classsection" or "year" or "academicyear"
+                or "month" or "billingmonth" or "chargemonth" or "feeperiod" or "status"
+                or "aging" or "agingbucket" or "collection" or "paymentmethod"
+                or "certificateno" or "certificatenumber" or "studentstaffno" or "studentno" or "staffno"
+                or "date" or "certificatedate" or "recordedon" or "collectedon" or "dateofbirth"
+            ? "Center" : "Left";
+    }
+
     internal static string Value(DataRow row,int index,string moneyFormat)
     {
         object value=row[index];

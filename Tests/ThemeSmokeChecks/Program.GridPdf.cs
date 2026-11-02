@@ -36,6 +36,27 @@ internal static partial class Program
                 printedRow++;
             }
             var definition=XDocument.Parse(built.Definition);
+            var boxes=definition.Descendants(ns+"Textbox").ToArray();
+            string Align(XElement box)=>box.Descendants(ns+"TextAlign").First().Value;
+            foreach(string item in new[]{"Institution","ReportTitle","Filters"})
+                Check(Align(boxes.Single(box=>(string?)box.Attribute("Name")==item))=="Center","School, title and filter context are centered");
+            Check(definition.Descendants(ns+"Color").All(color=>color.Value=="#000000"),"Direct exports use black text and rules only");
+            Check(!definition.Descendants(ns+"BackgroundColor").Any(),"Direct exports have no colored fills or alternating shading");
+            foreach(var box in boxes)
+            {
+                string boxName=(string)box.Attribute("Name")!;
+                if(boxName.StartsWith("Heading") || boxName.StartsWith("MetricLabel") || boxName.StartsWith("MetricValue") || boxName.StartsWith("ReceiptHeading"))
+                    Check(Align(box)=="Center","Table/group headings and summary labels/figures are centered");
+                if(System.Text.RegularExpressions.Regex.Match(boxName,@"^Value\d+_(\d+)$") is {Success:true} match)
+                {
+                    var column=columns[int.Parse(match.Groups[1].Value)];
+                    if(column.Numeric || column.Caption.StartsWith("Receipt") || column.Caption.StartsWith("Adm.") || column.Caption.StartsWith("Oldest Due"))
+                        Check(Align(box)=="Center","Amounts, counts, references and due dates have centered data");
+                    if(column.Caption.StartsWith("Student"))Check(Align(box)=="Left","Student names remain readable and left aligned");
+                }
+                if(boxName.StartsWith("ReceiptTotal") && box.Descendants(ns+"Value").First().Value.StartsWith("=Format(Sum("))
+                    Check(Align(box)=="Center","Receipt subtotals and grand totals align with their centered amount columns");
+            }
             Check(definition.Descendants(ns+"FontSize").Any(element=>element.Value=="9pt"),"Table text remains readable");
             Check(definition.Descendants(ns+"PageHeader").Any() && definition.Descendants(ns+"PageFooter").Any(),
                 "Every report document repeats its identity header and page footer");
@@ -112,6 +133,15 @@ internal static partial class Program
             var xml=XDocument.Parse(report.Definition);
             Check(xml.Descendants(ns+"Textbox").Count(box=>((string?)box.Attribute("Name"))?.StartsWith("MetricLabel")==true)==4,
                 "Every structured due-status amount becomes a readable summary card");
+            foreach(var label in xml.Descendants(ns+"Textbox").Where(box=>((string?)box.Attribute("Name"))?.StartsWith("MetricLabel")==true))
+            {
+                string index=((string)label.Attribute("Name")!)["MetricLabel".Length..];
+                var value=xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="MetricValue"+index);
+                double Inches(XElement box,string property)=>double.Parse(box.Element(ns+property)!.Value.Replace("in",""),System.Globalization.CultureInfo.InvariantCulture);
+                Check(Inches(label,"Top")+Inches(label,"Height")<=Inches(value,"Top")+.0001,"Summary labels reserve their own height above the values");
+                Check(Inches(value,"Top")+Inches(value,"Height")<=double.Parse(xml.Descendants(ns+"PageHeader").Single().Element(ns+"Height")!.Value.Replace("in",""),System.Globalization.CultureInfo.InvariantCulture),
+                    "Summary figures fit inside the reserved header");
+            }
             Check(xml.Descendants(ns+"Value").Any(v=>v.Value.Contains("Data rows: 1")),"Printed row count excludes the authoritative TOTAL");
             Check(report.Data.Rows[1].Field<bool>("IsReportTotal") && report.Data.Rows[0].Field<string>("C1")==1234.5m.ToString("#,##0.##"),
                 "Totals are emphasized and decimal money retains its readable precision");
