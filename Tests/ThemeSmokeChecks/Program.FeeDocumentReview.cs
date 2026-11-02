@@ -95,15 +95,16 @@ internal static partial class Program
                 Sha256=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(pdfPath)))});
         }
         index.Append("</tbody></table><p>Review names and references, fee/month wrapping, discounts and credit, payment versus balance, child/family totals, legacy notices, page breaks and unused paper. Automated checks do not replace visual review or testing your own printer.</p></html>");
-        if(combined.PageCount>0)
+        int pageCount=combined.PageCount;
+        Check(combined.Outlines.Count==samples.Count,"Each review scenario has a PDF bookmark");
+        if(pageCount>0)
         {
             string path=Path.Combine(folder,"REVIEW-ALL.pdf");combined.Save(path);
             using var verify=PdfReader.Open(path,PdfDocumentOpenMode.Import);
             Check(verify.PageCount==samples.Sum(sample=>sample.Pages),"The combined review PDF preserves every scenario page");
-            Check(combined.Outlines.Count==samples.Count,"Each review scenario has a PDF bookmark");
         }
         File.WriteAllText(Path.Combine(folder,"REVIEW-INDEX.html"),index.ToString());
-        File.WriteAllText(Path.Combine(folder,"provenance.json"),JsonSerializer.Serialize(new {SourceCommit=commit,Checks=status,ScenarioCount=samples.Count,PageCount=combined.PageCount,Samples=metadata},new JsonSerializerOptions {WriteIndented=true}));
-        Console.WriteLine($"::notice title=Bill and receipt review pack::{samples.Count} scenarios, {combined.PageCount} PDF pages. Checks: {status}.");
+        File.WriteAllText(Path.Combine(folder,"provenance.json"),JsonSerializer.Serialize(new {SourceCommit=commit,Checks=status,ScenarioCount=samples.Count,PageCount=pageCount,Samples=metadata},new JsonSerializerOptions {WriteIndented=true}));
+        Console.WriteLine($"::notice title=Bill and receipt review pack::{samples.Count} scenarios, {pageCount} PDF pages. Checks: {status}.");
     }
 }

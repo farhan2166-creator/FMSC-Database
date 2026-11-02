@@ -110,7 +110,8 @@ internal static partial class Program
                         "Family summary uses the agreed net captions");
             }
             using var report=new LocalReport();report.LoadReportDefinition(new StringReader(definition));
-            report.DataSources.Add(new ReportDataSource(xml.Descendants(ns+"DataSet").Single().Attribute("Name")!.Value,data));
+            using var printData=review is null?null:RecordTextPolicy.PrintCopy(data);
+            report.DataSources.Add(new ReportDataSource(xml.Descendants(ns+"DataSet").Single().Attribute("Name")!.Value,printData??data));
             using var roll=review is not null && bill && !annual
                 ? FeeBillRollDocument.Render(path,xml.Descendants(ns+"DataSet").Single().Attribute("Name")!.Value,data) : null;
             byte[] pdf=roll?.ExportPdf()??report.Render("PDF");File.WriteAllBytes(Path.Combine(folder,name+".pdf"),pdf);

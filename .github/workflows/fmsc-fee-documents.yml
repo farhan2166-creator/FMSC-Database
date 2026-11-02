@@ -48,28 +48,29 @@ jobs:
       - name: Render fee documents without a database
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force artifacts | Out-Null
-          dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --fee-document-review-pack 2>&1 | Tee-Object -FilePath artifacts/fee-document-render.log
+          New-Item -ItemType Directory -Force artifacts/fee-documents | Out-Null
+          Copy-Item Docs/FEE_DOCUMENT_REVIEW_PACK.md artifacts/fee-documents/README.md
+          dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --fee-document-review-pack 2>&1 | Tee-Object -FilePath artifacts/fee-documents/render.log
           $renderExit = $LASTEXITCODE
           if ($renderExit -ne 0) {
-            $detail = (Get-Content artifacts/fee-document-render.log -Tail 40) -join "`n"
+            $detail = (Get-Content artifacts/fee-documents/render.log -Tail 40) -join "`n"
             $detail = $detail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
             Write-Output "::error title=Fee document rendering failed::$detail"
           }
           exit $renderExit
       - name: Upload fictional document scenario pack
         id: samples
-        if: ${{ always() && hashFiles('artifacts/fee-document-render.log') != '' }}
+        if: ${{ always() && hashFiles('artifacts/fee-documents/render.log') != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: fee-document-scenarios-${{ github.run_id }}
           path: |
-            artifacts/fee-document-render.log
+            artifacts/fee-documents/render.log
             artifacts/fee-documents/*.pdf
             artifacts/fee-documents/*.png
             artifacts/fee-documents/REVIEW-INDEX.html
             artifacts/fee-documents/provenance.json
-            Docs/FEE_DOCUMENT_REVIEW_PACK.md
+            artifacts/fee-documents/README.md
           if-no-files-found: error
           retention-days: 7
       - name: Link review pack in the workflow summary
