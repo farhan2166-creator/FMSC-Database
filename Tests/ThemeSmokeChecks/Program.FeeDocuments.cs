@@ -104,10 +104,10 @@ internal static partial class Program
                 Check(xml.Descendants(ns+"Group").Single(group=>(string?)group.Attribute("Name")==childGroup)
                     .Parent!.Element(ns+"Visibility")!.Value.Contains("ShowChildDocument"),"Each complete child slip follows its own visibility rule");
                 Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")=="GroupSummaryHeading")
-                    .Descendants(ns+"Value").First().Value=="GROUP SUMMARY","The family printout has one final group summary");
-                foreach(var (labelName,caption) in new[]{("GroupFeeTotalLabel","Net total"),("GroupPayableLabel","Net payable"),("GroupDueLabel","Net due")})
+                    .Descendants(ns+"Value").First().Value=="FAMILY SUMMARY","The family printout has one final family summary");
+                foreach(var (labelName,caption) in new[]{("GroupFeeTotalLabel","Family fees total"),("GroupPayableLabel","Family payable"),("GroupDueLabel","Family balance due")})
                     Check(xml.Descendants(ns+"Textbox").Single(box=>(string?)box.Attribute("Name")==labelName).Descendants(ns+"Value").First().Value==caption,
-                        "Family summary uses the agreed net captions");
+                        "Family summary identifies the full family scope");
             }
             using var report=new LocalReport();report.LoadReportDefinition(new StringReader(definition));
             report.DataSources.Add(new ReportDataSource(xml.Descendants(ns+"DataSet").Single().Attribute("Name")!.Value,data));

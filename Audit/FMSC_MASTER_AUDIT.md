@@ -7,6 +7,25 @@
 
 > **Release acceptance: PENDING.** A passing Windows CI build verifies automated tests, not a complete installer on a real school PC. Do not deploy as an unqualified production release until the deployment and operator checks below are recorded. This document is a consolidation of recorded evidence, not a new execution of all tests.
 
+## PDF presentation implementation — 2 November 2026
+
+The [shared PDF/preview and receipt presentation implementation](../Docs/PDF_REPORT_PRESENTATION.md)
+addresses PP-01–06 through one management RDLC pipeline, structured summaries,
+wide-column sections, readable totals and separate discount/credit captions.
+Portable checks and actual financial RDLC XML processing passed; native PDF and
+physical thermal/A4 acceptance remain Windows checks. No SQL or financial record
+changes. The original source review below remains dated evidence.
+
+## PDF and financial RDLC presentation — 2 November 2026
+
+Main `806440f`: [presentation review](Reviews/FMSC_PDF_FINANCE_PRESENTATION_2026-11-02.md)
+finds PDF/preview design mismatch, plain monetary formatting/total rows, wide
+layout pressure, missing continuation context and receipt-caption ambiguity
+(PP-01–06). Two fictional portable reproductions were visually inspected with
+substitute font measurement; native RDLC PDF rendering is blocked by missing
+Windows `usp10.dll`. No exact Windows/physical-print acceptance is claimed.
+Application/SQL unchanged.
+
 ## Consolidation index — 21 October 2026
 
 ### Focused update — 31 October 2026

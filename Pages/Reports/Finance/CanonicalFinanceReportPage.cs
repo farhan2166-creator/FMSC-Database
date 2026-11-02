@@ -30,6 +30,8 @@ public abstract class CanonicalFinanceReportPage : V2Page
     private DataTable? _displayed;
     private string _appliedSignature = string.Empty;
     private string _filterSummary = string.Empty;
+    private IReadOnlyList<ReportPrintMetric> _printMetrics=Array.Empty<ReportPrintMetric>();
+    private protected override IReadOnlyList<ReportPrintMetric>? ReportPrintMetrics() => _printMetrics;
     private readonly string _scopePreferenceKey;
     private bool _scopeEdited;
     private bool _applyingScope;
@@ -264,6 +266,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
             // Pager rows are detached copies. Keep the private full result for
             // print eligibility without duplicating every financial row.
             _displayed = captured;
+            _printMetrics=ReportPrintSummary.FromTotals(totals);
             string totalsText = FormatTotals(totals);
             _summary.Text = totalsText;
             _filterSummary = summary + "   " + totalsText;

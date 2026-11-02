@@ -36,7 +36,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
         year.UserSelectionChanged += (_, _) => ApplyActionAvailability();
         var selector = HumanUi.Card(
             "Student and Year",
-            "Choose a student and year to print compact receipts in two columns per page.");
+            "Choose a student and year to print compact receipts in three columns per A4 page.");
         int fieldRowHeight = AppMetrics.FieldRowHeight;
         AppMetrics.FitButtonWidth(view,minWidth:170);
         var fieldsTable = new TableLayoutPanel {

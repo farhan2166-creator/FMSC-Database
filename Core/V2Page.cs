@@ -894,16 +894,19 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         _previewingReport = true;
         try
         {
-            var table = ReportExportBuilder.Build(source, Grid.Columns.Cast<DataGridViewColumn>(),
+            using var table = ReportExportBuilder.Build(source, Grid.Columns.Cast<DataGridViewColumn>(),
                 (ReportColumnCatalog ?? Array.Empty<ReportColumnDef>()).Where(column => column.Kind == ReportColumnKind.Date).Select(column => column.Key));
             if (table.Columns.Count == 0) { Warn("Choose at least one report column before printing."); return; }
             string signature = ReportFilterSignature();
             string title = ReportExportTitle(), subtitle = ReportExportSubtitle();
+            var metrics=ReportPrintMetrics();
+            int actor=CurrentUser.UserId;
+            string printedBy=CurrentUser.Username;
             string institution = await InstitutionProfile.GetNameAsync();
             if (IsDisposed) return;
-            if (_reportStale || signature != ReportFilterSignature()) { Warn("Filters changed. Run the report again before printing."); return; }
+            if (CurrentUser.UserId!=actor || _reportStale || signature != ReportFilterSignature()) { Warn("Filters changed. Run the report again before printing."); return; }
             if (string.IsNullOrWhiteSpace(institution)) { Warn("Complete School Profile before printing."); return; }
-            GridReportPreview.Show(FindForm(), institution, title, subtitle, table, CurrentUser.Username);
+            GridReportPreview.Show(FindForm(), institution, title, subtitle, table, printedBy,summaryMetrics:metrics);
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
         finally { _previewingReport = false; }
@@ -982,6 +985,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     protected virtual string ReportExportTitle() => NavigationTitle;
     /// <summary>The line printed under the PDF title. Defaults to the page's header context.</summary>
     protected virtual string ReportExportSubtitle() => _contextText;
+    private protected virtual IReadOnlyList<ReportPrintMetric>? ReportPrintMetrics() => null;
     /// <summary>True when the chosen columns include data the report has not loaded yet.</summary>
     protected virtual bool ReportLayoutNeedsReload(IReadOnlyList<string> keys) => false;
     /// <summary>Called after the operator picks columns that need data the report has not loaded.</summary>
@@ -1357,9 +1361,9 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     private protected virtual ReportPaginator.Page CreateReportPage(DataTable source, int index, int pageSize) =>
         ReportPaginator.Build(source, index, pageSize);
     protected virtual DataTable SelectExportRows(DataTable source, bool asCsv) => source;
-    protected virtual void WritePdfExport(string path, string title, string subtitle, DataTable table, Color accent) =>
-        PdfTableExporter.Export(path, title, subtitle, table, accent);
-    protected virtual int ExportRecordCount(DataTable source) => source.Rows.Count;
+    private protected virtual void WritePdfExport(string path, GridReportPreview.Report report) =>
+        GridReportPreview.ExportPdf(path,report);
+    protected virtual int ExportRecordCount(DataTable source) => ReportPrintSummary.DetailCount(source);
     protected virtual string CsvExportLabel => "CSV file (*.csv)";
     private void BindReportPage()
     {
@@ -1517,8 +1521,11 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             AddExtension = true,
             OverwritePrompt = true
         };
+        int exportActor=CurrentUser.UserId;
         if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
             return;
+        if (CurrentUser.UserId!=exportActor || _reportStale || !ReferenceEquals(source,_reportSource ?? Grid.DataSource as DataTable))
+        { Warn("Results or user changed. Run the report again before exporting."); return; }
         /* declared outside the try so both the finally and the catch restore the same captured states. */
         var suspendedActions = new List<(Control Control, bool WasEnabled)>();
         try
@@ -1526,7 +1533,6 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             string filePath = dialog.FileName;
             string title = ReportExportTitle();
             string subtitle = ReportExportSubtitle();
-            Color accent = Accent;
             bool exportAsCsv = string.Equals(
                 Path.GetExtension(filePath),
                 ".csv",
@@ -1538,7 +1544,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 return;
             }
             /* The file is the report as it is on screen: the columns the operator has showing, in the order they have them, under the headers they read. */
-            DataTable exportTable = ReportExportBuilder.Build(
+            using DataTable exportTable = ReportExportBuilder.Build(
                 SelectExportRows(source, exportAsCsv),
                 Grid.Columns.Cast<DataGridViewColumn>(),
                 (ReportColumnCatalog ?? Array.Empty<ReportColumnDef>())
@@ -1549,6 +1555,20 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 Warn("No columns are showing, so there is nothing to export. Choose at least one column first.");
                 return;
             }
+            GridReportPreview.Report? pdfReport=null;
+            if (!exportAsCsv)
+            {
+                int actor=CurrentUser.UserId;
+                string printedBy=CurrentUser.Username, signature=ReportFilterSignature();
+                var metrics=ReportPrintMetrics();
+                string institution=await InstitutionProfile.GetNameAsync();
+                if (IsDisposed) return;
+                if (CurrentUser.UserId!=actor || _reportStale || signature!=ReportFilterSignature())
+                { Warn("Filters or user changed. Run the report again before exporting."); return; }
+                if (string.IsNullOrWhiteSpace(institution)) { Warn("Complete School Profile before exporting a PDF."); return; }
+                pdfReport=GridReportPreview.Build(institution,title,subtitle,exportTable,printedBy,summaryMetrics:metrics);
+            }
+            using var pdfData=pdfReport?.Data;
             SetStatus($"Exporting {rowCount:N0} record(s)...");
             UseWaitCursor = true;
             suspendedActions = SuspendActionButtons();
@@ -1560,7 +1580,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                     if (exportAsCsv)
                         ReportExportBuilder.WriteCsv(exportTable, filePath);
                     else
-                        WritePdfExport(filePath, title, subtitle, exportTable, accent);
+                        WritePdfExport(filePath, pdfReport!);
                 });
                 try
                 {

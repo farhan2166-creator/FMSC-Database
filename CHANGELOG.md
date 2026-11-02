@@ -1,5 +1,14 @@
 # Changelog
 
+## PDF and financial document presentation — 2026-11-02
+
+- Management PDF exports now share Print Preview's school/scope headings,
+  authoritative summary cards, monetary alignment, total emphasis and page footer.
+- Wide reports retain selected columns in labelled bands; CSV stays data-only.
+- Separate receipt discounts, money received and credit used; make settlement
+  and family balance labels explicit without changing saved financial values.
+- Correct the annual receipt selector to describe its three-column A4 layout.
+
 ## Report purpose improvements — 2026-11-02
 
 - Split unpaid balances into overdue, due today and future amounts; family debt

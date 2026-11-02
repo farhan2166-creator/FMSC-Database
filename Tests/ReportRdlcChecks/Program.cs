@@ -22,3 +22,35 @@ if(groups.Length!=2 || (string?)groups[0].Attribute("ReceiptTotal0_1_False")!="3
     throw new Exception("Group subtotals must preserve signed corrections.");
 if(printed.Descendants("DetailRows0").Count()!=3)throw new Exception("All three original receipts must remain.");
 Console.WriteLine("PASS: grouped report processes original receipts and subtotal/grand-total expressions to XML");
+
+// Compile the actual edited financial definitions, rather than just generated
+// table markup. XML rendering exercises expressions without Windows font APIs.
+var checkout=new DirectoryInfo(AppContext.BaseDirectory);
+while(checkout is not null && !File.Exists(Path.Combine(checkout.FullName,"FMSC_SMS.csproj")))checkout=checkout.Parent;
+if(checkout is null)throw new Exception("Run financial RDLC checks from the repository checkout.");
+foreach(string template in new[]{"StudentBill","FamilyBill","StudentReceipt","FamilyReceipt","FeeChanges","ClassOutstandingCharges"})
+{
+    string path=Path.Combine(checkout.FullName,"Pages","Reports","Templates",template+".rdlc");
+    var definition=XDocument.Load(path);
+    var dataset=definition.Descendants(ns+"DataSet").Single();
+    using var sample=new DataTable();
+    foreach(var field in dataset.Element(ns+"Fields")!.Elements(ns+"Field"))
+    {
+        string typeName=field.Elements().FirstOrDefault(e=>e.Name.LocalName=="TypeName")?.Value??"System.String";
+        sample.Columns.Add((string)field.Attribute("Name")!,Type.GetType(typeName)??typeof(string));
+    }
+    var sampleRow=sample.NewRow();
+    foreach(DataColumn column in sample.Columns)
+        sampleRow[column]=column.DataType==typeof(int)?1:column.DataType==typeof(decimal)?100m
+            :column.DataType==typeof(bool)?true:column.DataType==typeof(DateTime)?new DateTime(2026,11,2):"Example";
+    foreach(string field in new[]{"RowType","LineType"})if(sample.Columns.Contains(field))sampleRow[field]="Fee";
+    foreach(string field in new[]{"ReceiptPageKey","ReceiptStudentKey","BillStudentKey"})if(sample.Columns.Contains(field))sampleRow[field]=1;
+    sample.Rows.Add(sampleRow);
+    using var actual=new LocalReport();actual.LoadReportDefinition(new StringReader(definition.ToString()));
+    actual.DataSources.Add(new ReportDataSource((string)dataset.Attribute("Name")!,sample));
+    _=actual.GetParameters();
+    var xmlBytes=actual.Render("XML");
+    if(xmlBytes.Length==0 || System.Text.Encoding.UTF8.GetString(xmlBytes).Contains("#Error",StringComparison.Ordinal))
+        throw new Exception(template+" did not process financial expressions successfully.");
+    Console.WriteLine("PASS: "+template+" actual RDLC compiles and processes synthetic fields to XML");
+}
