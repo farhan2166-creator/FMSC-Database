@@ -6,7 +6,7 @@ namespace FMSC_SMS.Pages.Finance.Collection;
 public sealed class OutstandingBillsPage : V2Page,IBusyPage
 {
     private readonly LookupBox campus=new(),year=new(),cls=new(),section=new();
-    private readonly ModernComboBox comparison=HumanUi.Combo(),paper=HumanUi.Combo(),billGrouping=HumanUi.Combo();
+    private readonly ModernComboBox comparison=HumanUi.Combo(),paper=HumanUi.Combo(),billGrouping=HumanUi.Combo(),orderBy=HumanUi.Combo();
     private readonly ModernNumericTextBox amount=HumanUi.Number(),through=HumanUi.Number();
     private readonly Label selectedSummary=new(){Dock=DockStyle.Fill,AutoSize=true,ForeColor=AppTheme.MutedText,Padding=new Padding(4,6,0,4)};
     private readonly ModernButton preview;
@@ -26,11 +26,13 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
         comparison.SelectedIndex=0;
         paper.Items.AddRange(new object[]{"Thermal","A4 sheets"});paper.SelectedIndex=0;
         billGrouping.Items.AddRange(new object[]{"Individual","By family"});billGrouping.SelectedIndex=0;
+        orderBy.Items.AddRange(new object[]{"Default","Admission number","Student name","Class / section","Outstanding: highest first","Outstanding: lowest first"});orderBy.SelectedIndex=0;
         foreach(var number in new[]{amount,through}){number.DecimalPlaces=0;number.WholeRupeesOnly=true;}
         var load=AddBusyAction("Load Students",LoadStudentsAsync,"Primary");
         preview=AddBusyAction("Preview Selected Bills",PreviewAsync,"Secondary");preview.Enabled=false;
         FinanceHelp.Attach(this,preview,"Prepare bills for the selected students using their posted unpaid fees. This does not receive payment.","A bill showing Rs. 1,000 due is a request for payment; the student still owes it until money or advance is applied.");
         FinanceHelp.Attach(this,comparison,"Choose which students to include by the size of their outstanding balance. This only filters the list.","At least Rs. 1,000 includes a student owing Rs. 1,000 or Rs. 1,500, but excludes one owing Rs. 500.");
+        FinanceHelp.Attach(this,orderBy,"Reorder the loaded students without changing their selection. Family grouping keeps siblings together; each family's first child in the chosen order determines its position.","Highest first puts the child with the largest outstanding balance first, followed by their siblings when grouped by family. Bill preview follows the displayed family order.");
         preview.EnabledChanged+=(_,_)=>{
             if(preview.Enabled && (Selected().Count==0 || loadedScope!=Scope() || !CurrentUser.HasPermission("Fees.View")))preview.Enabled=false;
         };
@@ -44,7 +46,7 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
         foreach(var (field,label,width) in new[]{("AdmissionNumber","Adm. / QR No.",115),("StudentName","Student",170),
             ("FatherName","Father",170),("CampusName","Campus",120),("ClassSection","Class – Section",140),
             ("AcademicYear","Academic Year",115),("Outstanding","Outstanding (Rs.)",140)})
-            Grid.Columns.Add(new DataGridViewTextBoxColumn{Name=field,DataPropertyName=field,HeaderText=label,ReadOnly=true,MinimumWidth=width,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill});
+            Grid.Columns.Add(new DataGridViewTextBoxColumn{Name=field,DataPropertyName=field,HeaderText=label,ReadOnly=true,MinimumWidth=width,AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill,SortMode=DataGridViewColumnSortMode.NotSortable});
         Grid.Columns["Outstanding"].DefaultCellStyle.Format="N0";
         Grid.Columns["Outstanding"].DefaultCellStyle.Alignment=DataGridViewContentAlignment.MiddleRight;
         Grid.DataSource=selectionSource;
@@ -53,10 +55,12 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
         foreach(var lookup in new[]{campus,year,cls,section})lookup.SelectedIndexChanged+=(_,_)=>FiltersChanged();
         comparison.SelectedIndexChanged+=(_,_)=>{UpdateAmountFields();FiltersChanged();};
         amount.TextChanged+=(_,_)=>FiltersChanged();through.TextChanged+=(_,_)=>FiltersChanged();
+        orderBy.SelectedIndexChanged+=(_,_)=>ApplyOrder();
+        billGrouping.SelectedIndexChanged+=(_,_)=>ApplyOrder();
 
         var card=HumanUi.Card("Bulk Bills","Filter and load students, then preview the selected bills.");
         var filters=ReportUi.Bar(5,("Campus",campus),("Academic Year",year),("Class",cls),("Section",section),("Bill grouping",billGrouping),
-            ("Student balance",comparison),("Amount (Rs.)",amount),("Through (Rs.)",through),("Paper format",paper));
+            ("Student balance",comparison),("Amount (Rs.)",amount),("Through (Rs.)",through),("Paper format",paper),("Order by",orderBy));
         filters.AutoSize=true;filters.AutoSizeMode=AutoSizeMode.GrowAndShrink;filters.Dock=DockStyle.Fill;
         var body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Margin=Padding.Empty};
         body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
@@ -81,7 +85,27 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
     private void UpdateAmountFields(){amount.Enabled=comparison.SelectedIndex>0;through.Enabled=comparison.SelectedIndex==(int)BillBalanceComparison.Between;}
     private void FiltersChanged(){preview.Enabled=false;if(loadedScope is not null)SetStatus("Filters changed. Load Students to refresh the list.",PageStatusKind.Warning);}
     private void Commit(){Grid.EndEdit();selectionSource.EndEdit();}
-    private List<int> Selected()=>roster?.AsEnumerable().Where(row=>row.Field<bool>("Include")).Select(row=>row.Field<int>("AdmissionId")).ToList()??new();
+    private List<int> Selected()=>selectionSource.List.Cast<DataRowView>().Where(row=>row.Row.Field<bool>("Include"))
+        .Select(row=>row.Row.Field<int>("AdmissionId")).ToList();
+    private void ApplyOrder()
+    {
+        if(roster is null||IsBusy)return;
+        Commit();
+        ApplyRosterOrder();
+        UpdateSummary();
+    }
+    private void ApplyRosterOrder()
+    {
+        if(roster is null)return;
+        if(!roster.Columns.Contains("__BillOrder"))roster.Columns.Add("__BillOrder",typeof(int));
+        var rows=OutstandingBillSelection.Order(roster,(BillSortOrder)orderBy.SelectedIndex,billGrouping.SelectedIndex==1);
+        changingSelection=true;selectionSource.RaiseListChangedEvents=false;
+        try {
+            for(int index=0;index<rows.Length;index++)rows[index]["__BillOrder"]=index;
+            roster.DefaultView.Sort="__BillOrder ASC";
+        }
+        finally {selectionSource.RaiseListChangedEvents=true;selectionSource.ResetBindings(false);changingSelection=false;}
+    }
     private void UpdateSummary()
     {
         var ids=Selected();decimal total=roster?.AsEnumerable().Where(row=>row.Field<bool>("Include")).Sum(row=>Convert.ToDecimal(row["Outstanding"]))??0m;
@@ -125,26 +149,27 @@ public sealed class OutstandingBillsPage : V2Page,IBusyPage
                 if(IsDisposed||scope!=Scope()||CurrentUser.UserId!=user||!CurrentUser.HasPermission("Fees.View"))return;
                 var next=OutstandingBillSelection.Select(source,scope);selectionSource.DataSource=null;roster?.Dispose();roster=next;loadedScope=scope;
                 selectionSource.DataSource=roster.DefaultView;
+                ApplyRosterOrder();
                 SetStatus($"{roster.Rows.Count} students match. Balances and readiness are reviewed before numbered bills are prepared.");
             },this);
         }
         catch(Exception ex){if(!IsDisposed){loadedScope=null;preview.Enabled=false;Fail(ex);}}
-        finally{if(!IsDisposed)UpdateSummary();}
+        finally{if(!IsDisposed){ApplyRosterOrder();UpdateSummary();}}
     }
     private async Task PreviewAsync()
     {
         if(IsBusy||!CurrentUser.HasPermission("Fees.View"))return;
-        Commit();var scope=Scope();var ids=Selected();bool a4=paper.SelectedIndex==1,byFamily=billGrouping.SelectedIndex==1;
+        Commit();var scope=Scope();var ids=Selected();bool a4=paper.SelectedIndex==1,byFamily=billGrouping.SelectedIndex==1;int sort=orderBy.SelectedIndex;
         if(ids.Count==0||scope!=loadedScope||!Valid(scope))return;
         try { await RunBusyAsync(BusyMessage,async()=>{
             using var fresh=await readBalances(scope);
-            if(IsDisposed||scope!=Scope())return;
+            if(IsDisposed||scope!=Scope()||sort!=orderBy.SelectedIndex||byFamily!=(billGrouping.SelectedIndex==1))return;
             var eligible=fresh.AsEnumerable().Where(row=>scope.Matches(Convert.ToDecimal(row["Outstanding"]))).Select(row=>row.Field<int>("AdmissionId")).ToHashSet();
             if(ids.Any(id=>!eligible.Contains(id))){loadedScope=null;preview.Enabled=false;Warn("Some selected students no longer match the filters. Load Students again before printing.");return;}
-            await OutstandingBillsPreview.ShowAsync(FindForm(),ids,()=>!IsDisposed&&scope==Scope()&&ids.SequenceEqual(Selected())&&byFamily==(billGrouping.SelectedIndex==1),Warn,a4,byFamily);
+            await OutstandingBillsPreview.ShowAsync(FindForm(),ids,()=>!IsDisposed&&scope==Scope()&&sort==orderBy.SelectedIndex&&ids.SequenceEqual(Selected())&&byFamily==(billGrouping.SelectedIndex==1),Warn,a4,byFamily);
         },this); }
         catch(Exception ex){if(!IsDisposed)Fail(ex);}
-        finally{if(!IsDisposed)UpdateSummary();}
+        finally{if(!IsDisposed){ApplyRosterOrder();UpdateSummary();}}
     }
     private static Task<DataTable> ReadBalancesAsync(OutstandingBillScope scope)=>DatabaseHelper.QuerySqlAsync(OutstandingBillSelection.Query,
         DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@CampusId",scope.Campus),DatabaseHelper.Int("@AcademicYearId",scope.Year),

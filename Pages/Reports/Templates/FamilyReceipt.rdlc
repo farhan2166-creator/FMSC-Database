@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
   <Body>
     <ReportItems>
@@ -2351,7 +2351,7 @@
                     </TablixMember>
                     <TablixMember>
                       <Visibility>
-                        <Hidden>=Len(First(Fields!ChildCampusName.Value, "ReceiptStudentGroup")) = 0</Hidden>
+                        <Hidden>=Not First(Fields!ShowChildCampus.Value, "ReceiptStudentGroup")</Hidden>
                       </Visibility>
                     </TablixMember>
                     <TablixMember>
@@ -2769,7 +2769,11 @@
         <Field Name="ShowGroupSummary">
           <DataField>ShowGroupSummary</DataField>
         </Field>
-      <Field Name="ParentRelationLabel"><DataField>ParentRelationLabel</DataField></Field><Field Name="ChildReceiptDeductionCaption"><DataField>ChildReceiptDeductionCaption</DataField></Field><Field Name="ChildReceiptSummaryDeductionCaption"><DataField>ChildReceiptSummaryDeductionCaption</DataField></Field><Field Name="ChildReceiptDeductionAmount"><DataField>ChildReceiptDeductionAmount</DataField></Field><Field Name="ChildReceiptNetPayable"><DataField>ChildReceiptNetPayable</DataField></Field><Field Name="ChildShowReceiptDeduction"><DataField>ChildShowReceiptDeduction</DataField></Field><Field Name="GroupReceiptDeductionCaption"><DataField>GroupReceiptDeductionCaption</DataField></Field><Field Name="GroupReceiptSummaryDeductionCaption"><DataField>GroupReceiptSummaryDeductionCaption</DataField></Field><Field Name="GroupReceiptDeductionAmount"><DataField>GroupReceiptDeductionAmount</DataField></Field><Field Name="GroupReceiptNetPayable"><DataField>GroupReceiptNetPayable</DataField></Field><Field Name="GroupShowReceiptDeduction"><DataField>GroupShowReceiptDeduction</DataField></Field></Fields>
+      <Field Name="ParentRelationLabel"><DataField>ParentRelationLabel</DataField></Field><Field Name="ChildReceiptDeductionCaption"><DataField>ChildReceiptDeductionCaption</DataField></Field><Field Name="ChildReceiptSummaryDeductionCaption"><DataField>ChildReceiptSummaryDeductionCaption</DataField></Field><Field Name="ChildReceiptDeductionAmount"><DataField>ChildReceiptDeductionAmount</DataField></Field><Field Name="ChildReceiptNetPayable"><DataField>ChildReceiptNetPayable</DataField></Field><Field Name="ChildShowReceiptDeduction"><DataField>ChildShowReceiptDeduction</DataField></Field><Field Name="GroupReceiptDeductionCaption"><DataField>GroupReceiptDeductionCaption</DataField></Field><Field Name="GroupReceiptSummaryDeductionCaption"><DataField>GroupReceiptSummaryDeductionCaption</DataField></Field><Field Name="GroupReceiptDeductionAmount"><DataField>GroupReceiptDeductionAmount</DataField></Field><Field Name="GroupReceiptNetPayable"><DataField>GroupReceiptNetPayable</DataField></Field><Field Name="GroupShowReceiptDeduction"><DataField>GroupShowReceiptDeduction</DataField></Field>  <Field Name="ShowChildCampus">
+          <DataField>ShowChildCampus</DataField>
+          <rd:TypeName>System.Boolean</rd:TypeName>
+        </Field>
+      </Fields>
     </DataSet>
   </DataSets>
   <ConsumeContainerWhitespace>true</ConsumeContainerWhitespace>

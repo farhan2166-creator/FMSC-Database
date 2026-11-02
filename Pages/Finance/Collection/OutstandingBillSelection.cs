@@ -1,6 +1,7 @@
 namespace FMSC_SMS.Pages.Finance.Collection;
 
 internal enum BillBalanceComparison { Any, AtLeast, MoreThan, AtMost, LessThan, Exactly, Between }
+internal enum BillSortOrder { Default, AdmissionNumber, StudentName, ClassSection, HighestBalance, LowestBalance }
 
 internal sealed record OutstandingBillScope(int Campus,int Year,int Class,int Section,
     BillBalanceComparison Comparison,decimal Amount,decimal Through)
@@ -26,8 +27,9 @@ internal static class OutstandingBillSelection
           S.StudentName,S.FatherName,CA.CampusName,AY.YearName AcademicYear,
           CCS.CampusId,E.AcademicYearId,CCS.ClassId,CCS.SectionId,
           CONCAT(C.ClassName,CASE WHEN NULLIF(LTRIM(RTRIM(SEC.SectionName)),N'') IS NULL THEN N'' ELSE CONCAT(N' – ',SEC.SectionName) END) ClassSection,
-          B.Outstanding
+          B.Outstanding,FM.FamilyId,C.DisplayOrder ClassOrder,SEC.DisplayOrder SectionOrder,CA.DisplayOrder CampusOrder
         FROM dbo.Students S
+        LEFT JOIN dbo.FamilyMembers FM ON FM.AdmissionId=S.AdmissionId
         OUTER APPLY(SELECT TOP(1) E.* FROM dbo.Enrollments E WHERE E.AdmissionId=S.AdmissionId
           ORDER BY CASE WHEN E.Status=N'Active' THEN 0 ELSE 1 END,E.EnrollmentId DESC) E
         LEFT JOIN dbo.CampusClassSections CCS ON CCS.ClassSectionId=E.ClassSectionId
@@ -57,6 +59,30 @@ internal static class OutstandingBillSelection
             selected["Include"]=true;result.Rows.Add(selected);
         }
         return result;
+    }
+
+    internal static DataRow[] Order(DataTable roster,BillSortOrder order,bool byFamily)
+    {
+        string Text(DataRow row,string field)=>row.Table.Columns.Contains(field)&&!row.IsNull(field)?Convert.ToString(row[field])??"":"";
+        int Position(DataRow row,string field)=>int.TryParse(Text(row,field),out int value)?value:int.MaxValue;
+        var numbers=Comparer<string>.Create(FMSC_SMS.Core.AdmissionNumbers.Compare);
+        IEnumerable<DataRow> rows=roster.AsEnumerable();
+        IOrderedEnumerable<DataRow> ordered=(order==BillSortOrder.Default&&!byFamily||order==BillSortOrder.ClassSection)
+            ? rows.OrderBy(row=>Position(row,"ClassOrder")).ThenBy(row=>Position(row,"SectionOrder"))
+                .ThenBy(row=>Text(row,"ClassSection"),StringComparer.CurrentCultureIgnoreCase).ThenBy(row=>Position(row,"CampusOrder"))
+            : order switch {
+                BillSortOrder.StudentName=>rows.OrderBy(row=>Text(row,"StudentName"),StringComparer.CurrentCultureIgnoreCase),
+                BillSortOrder.HighestBalance=>rows.OrderByDescending(row=>Convert.ToDecimal(row["Outstanding"])),
+                BillSortOrder.LowestBalance=>rows.OrderBy(row=>Convert.ToDecimal(row["Outstanding"])),
+                _=>rows.OrderBy(row=>Text(row,"AdmissionNumber"),numbers)
+            };
+        ordered=ordered.ThenBy(row=>Text(row,"AdmissionNumber"),numbers).ThenBy(row=>Convert.ToInt32(row["AdmissionId"]));
+        if(!byFamily)return ordered.ToArray();
+        // Rank families by their first child in the chosen order, retaining
+        // every loaded sibling together. Standalone students remain separate.
+        return ordered.GroupBy(row=>Position(row,"FamilyId") is >0 and <int.MaxValue
+                ? "F"+Text(row,"FamilyId"):"S"+Text(row,"AdmissionId"))
+            .SelectMany(group=>group).ToArray();
     }
 
 }

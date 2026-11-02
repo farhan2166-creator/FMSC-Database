@@ -28,8 +28,11 @@ internal static partial class Program
                 {
                     int index=Array.FindIndex(rows,row=>row.Descendants(ns+"Textbox").Any(box=>(string?)box.Attribute("Name")==name));
                     string prefix=ReferenceEquals(doc,family)?"Child":"";
-                    Check(members[index].Element(ns+"Visibility")!.Value.Contains("Fields!"+prefix+field+".Value"),
-                        "Campus and class rows each collapse according to their own value");
+                    string hidden=members[index].Element(ns+"Visibility")!.Value;
+                    Check(name=="ChildCampus"
+                        ? ReferenceEquals(doc,family)?hidden.Contains("Not First(Fields!ShowChildCampus.Value"):hidden=="true"
+                        : hidden.Contains("Fields!"+prefix+field+".Value"),
+                        "Campus rows omit duplicate header information while class rows retain their own visibility");
                 }
             }
             foreach(string name in new[]{"ReceiptNumber","PeriodHeader","FeeHeader","AmountHeader","FeePeriod","FeeDescription","LineAmount"})
@@ -69,6 +72,18 @@ internal static partial class Program
         }
         Check(!source.Columns.Contains("ChildReceiptDeductionAmount"),"Print preparation leaves the original receipt data unchanged");
         Check(render("aligned-family-example",source)==1,"The supplied mixed-credit family example renders on one continuous slip");
+        using(var display=FamilyFeeDocumentPresentation.Receipt(source))
+            Check(display.AsEnumerable().All(row=>row.Field<string>("CampusName")=="Campus Boys"&&!row.Field<bool>("ShowChildCampus")),
+                "Same-campus siblings show campus in the document heading only");
+        using(var mixed=source.Copy())
+        {
+            foreach(DataRow row in mixed.Rows)
+                if(Convert.ToString(row["ChildAdmissionNumberText"])=="249")row["ChildCampusName"]="Campus Girls";
+            using(var display=FamilyFeeDocumentPresentation.Receipt(mixed))
+                Check(display.AsEnumerable().All(row=>row.Field<string>("CampusName")=="Multiple campuses"&&row.Field<bool>("ShowChildCampus")),
+                    "Mixed-campus siblings retain campus under each child's details");
+            Check(render("mixed-campus-family-example",mixed)==1,"Mixed-campus child details render on one continuous receipt");
+        }
         using var oneStudent=students.Clone();oneStudent.ImportRow(students.Rows[1]);
         using var oneLine=lines.Clone();oneLine.ImportRow(lines.Rows[1]);
         h["ReceiptNumber"]="R-2026-00007";h["CashReceived"]=200m;h["CashApplied"]=200m;h["DiscountApplied"]=300m;

@@ -1,5 +1,18 @@
 # Changelog
 
+## Campus details on bills and receipts — 2026-11-02
+
+- Omit repeated student campus lines when the common campus already appears in
+  the document heading. Mixed-campus family documents retain each child's campus.
+  This is a print-only change; saved bills and receipt snapshots are preserved.
+
+## Outstanding bill ordering — 2026-11-02
+
+- Add Order by choices for admission number, name, class/section and outstanding
+  balance in either direction. Default individual ordering follows class/section;
+  default family ordering keeps siblings together by their lowest admission number.
+  Ordering preserves checkboxes and the preview follows the displayed bill order.
+
 ## Bulk outstanding bill preparation — 2026-11-02
 
 - Read selected students and posted charges in two batches for the initial review,

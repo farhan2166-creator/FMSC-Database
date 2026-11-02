@@ -150,14 +150,20 @@ internal static class FamilyFeeDocumentPresentation
         string childKey=rows[0].Table.Columns.Contains("ReceiptStudentKey")?"ReceiptStudentKey":"BillStudentKey";
         bool showSummary=visible.Select(row=>row[childKey]).Distinct().Count()!=1;
         var campuses=visible
-            .Select(row=>Convert.ToString(row["ChildCampusName"])??"").Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            .Select(row=>(Convert.ToString(row["ChildCampusName"])??"").Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         string heading=campuses.Length==0||campuses.Any(string.IsNullOrWhiteSpace)?"":campuses.Length==1?campuses[0]:"Multiple campuses";
-        foreach(var row in rows){row["CampusName"]=heading;row["ShowGroupSummary"]=showSummary;}
+        foreach(var row in rows)
+        {
+            row["CampusName"]=heading;row["ShowGroupSummary"]=showSummary;
+            string campus=(Convert.ToString(row["ChildCampusName"])??"").Trim();
+            row["ShowChildCampus"]=campus.Length>0&&!campus.Equals(heading,StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     private static void AddSummaryColumns(DataTable data)
     {
         data.Columns.Add("ShowChildDocument",typeof(bool)).DefaultValue=false;
+        data.Columns.Add("ShowChildCampus",typeof(bool)).DefaultValue=false;
         data.Columns.Add("ShowGroupSummary",typeof(bool)).DefaultValue=false;
         foreach(string field in new[]{"GroupFeeTotal","GroupDiscount","GroupPayable","GroupReceived","GroupDue","GroupCreditApplied","GroupPreviouslySettled"})
             data.Columns.Add(field,typeof(decimal)).DefaultValue=0m;

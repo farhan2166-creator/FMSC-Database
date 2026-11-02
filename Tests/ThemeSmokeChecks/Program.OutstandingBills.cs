@@ -8,6 +8,7 @@ internal static partial class Program
 {
     private static void CheckOutstandingBills()
     {
+        CheckOutstandingBillOrder();
         OutstandingBillScope Scope(BillBalanceComparison comparison,decimal amount=1000,decimal through=2000)=>new(0,0,0,0,comparison,amount,through);
         foreach(var comparison in Enum.GetValues<BillBalanceComparison>())
         {
@@ -55,6 +56,13 @@ internal static partial class Program
             Check(Button("Preview Selected Bills").Enabled,"Loaded owing students can be previewed");
             var grid=(DataGridView)typeof(V2Page).GetField("Grid",flags)!.GetValue(page)!;
             Check(grid.Rows.Count==3&&grid.Columns["CampusName"].Visible&&grid.Columns["ClassSection"].Visible,"Grid distinguishes campus and class/section");
+            Check(Field<ModernComboBox>("orderBy").SelectedIndex==0,"Bill ordering defaults to the grouping's standard order");
+            grid.Rows[0].Cells["Include"].Value=false;
+            Field<ModernComboBox>("orderBy").SelectedIndex=(int)BillSortOrder.HighestBalance;
+            Check(((DataRowView)grid.Rows[0].DataBoundItem).Row.Field<int>("AdmissionId")==3,"Order selector immediately sorts the loaded balances");
+            var selectedIds=(List<int>)typeof(OutstandingBillsPage).GetMethod("Selected",flags)!.Invoke(page,null)!;
+            Check(selectedIds.SequenceEqual(new[]{3,2})&&Button("Preview Selected Bills").Enabled,"Sorting preserves checks and supplies preview IDs in displayed order without reloading");
+            Field<ModernComboBox>("orderBy").SelectedIndex=0;
             ClickButton(Button("Clear Selection"));
             Check(grid.Rows.Cast<DataGridViewRow>().All(row=>Equals(row.Cells["Include"].Value,false)),"Clear Selection unchecks every displayed row after an asynchronous load");
             ClickButton(Button("Select All"));
@@ -95,7 +103,7 @@ internal static partial class Program
                 var filterBar=Field<LookupBox>("campus").Parent!.Parent!;
                 var filterBounds=filterBar.RectangleToScreen(filterBar.ClientRectangle);
                 foreach(var control in new Control[]{Field<LookupBox>("campus"),Field<LookupBox>("year"),Field<LookupBox>("cls"),Field<LookupBox>("section"),
-                    Field<ModernComboBox>("comparison"),Field<ModernComboBox>("paper"),Field<ModernComboBox>("billGrouping"),Field<ModernNumericTextBox>("amount"),Field<ModernNumericTextBox>("through")})
+                    Field<ModernComboBox>("comparison"),Field<ModernComboBox>("paper"),Field<ModernComboBox>("billGrouping"),Field<ModernComboBox>("orderBy"),Field<ModernNumericTextBox>("amount"),Field<ModernNumericTextBox>("through")})
                 {
                     var bounds=control.RectangleToScreen(control.ClientRectangle);
                     Check(control.Visible&&control.Height>=AppMetrics.InputControlHeight&&bounds.Top>=filterBounds.Top&&bounds.Bottom<=filterBounds.Bottom,
@@ -120,5 +128,25 @@ internal static partial class Program
             Check(!File.Exists(Path.Combine(AppContext.BaseDirectory,"Reports","FeeReminder.rdlc")),"The retired reminder report is not shipped");
         }
         finally{CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Item5);}
+    }
+
+    private static void CheckOutstandingBillOrder()
+    {
+        using var rows=new DataTable();
+        foreach(string column in new[]{"AdmissionId","FamilyId","ClassOrder","SectionOrder","CampusOrder"})rows.Columns.Add(column,typeof(int));
+        foreach(string column in new[]{"AdmissionNumber","StudentName","ClassSection"})rows.Columns.Add(column);
+        rows.Columns.Add("Outstanding",typeof(decimal));
+        rows.Rows.Add(1,10,10,1,1,"10","Zara","Ten - A",100m);
+        rows.Rows.Add(2,10,2,1,1,"2a","Sara","Two - A",400m);
+        rows.Rows.Add(3,20,2,2,1,"3","Ali","Two - B",200m);
+        rows.Rows.Add(4,DBNull.Value,2,1,1,"2","Bilal","Two - A",300m);
+        int[] Order(BillSortOrder order,bool family=false)=>OutstandingBillSelection.Order(rows,order,family).Select(row=>row.Field<int>("AdmissionId")).ToArray();
+        Check(Order(BillSortOrder.Default).SequenceEqual(new[]{4,2,3,1}),"Individual default respects numeric class display order, section and natural admission numbers");
+        Check(Order(BillSortOrder.Default,true).SequenceEqual(new[]{4,2,1,3}),"Family default keeps siblings together by the family's lowest admission number");
+        Check(Order(BillSortOrder.AdmissionNumber).SequenceEqual(new[]{4,2,3,1}),"Admission sorting places 2 before 2a and 10");
+        Check(Order(BillSortOrder.StudentName).SequenceEqual(new[]{3,4,2,1}),"Student name ordering is alphabetical");
+        Check(Order(BillSortOrder.HighestBalance).SequenceEqual(new[]{2,4,3,1})&&Order(BillSortOrder.LowestBalance).SequenceEqual(new[]{1,3,4,2}),"Balance ordering supports both directions");
+        Check(Order(BillSortOrder.HighestBalance,true).SequenceEqual(new[]{2,1,4,3}),"Custom family sorting ranks by the first matching child while keeping siblings adjacent");
+        Check(Order(BillSortOrder.ClassSection).SequenceEqual(Order(BillSortOrder.Default)),"Explicit class order matches the individual default");
     }
 }
