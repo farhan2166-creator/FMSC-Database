@@ -6,9 +6,7 @@ namespace FMSC_SMS.Core;
 // Shared read-only billing entry point for registration and the family counter.
 internal static class FeeBillPreview
 {
-    private const string MembersSql = """
-        EXEC dbo.RequirePermission @UserId,@Permission;
-        DECLARE @Family int=(SELECT FamilyId FROM dbo.FamilyMembers WHERE AdmissionId=@Admission);
+    private const string MemberSelect = """
         SELECT FM.FamilyId,FM.FamilyMemberId,S.AdmissionId,S.StudentName,S.FatherName,S.Gender,
             S.AdmissionNumber,S.QuickReference,S.RegistrationNumber,S.Status,E.EnrollmentId,E.Status EnrollmentStatus,
             E.BillingReady,E.PlacementConfirmedAt,E.ReturnConfirmedAt,AY.YearName AcademicYear,
@@ -23,9 +21,31 @@ internal static class FeeBillPreview
         LEFT JOIN dbo.CampusClassSections CCS ON CCS.ClassSectionId=E.ClassSectionId
         LEFT JOIN dbo.Classes C ON C.ClassId=CCS.ClassId
         LEFT JOIN dbo.Sections SEC ON SEC.SectionId=CCS.SectionId
+        """;
+
+    private const string MembersSql = """
+        EXEC dbo.RequirePermission @UserId,@Permission;
+        DECLARE @Family int=(SELECT FamilyId FROM dbo.FamilyMembers WHERE AdmissionId=@Admission);
+        """ + "\n" + MemberSelect + "\n" + """
         WHERE S.AdmissionId=@Admission OR (@Family IS NOT NULL AND FM.FamilyId=@Family)
         ORDER BY COALESCE(C.DisplayOrder,-1) DESC,S.StudentName,S.AdmissionId;
         """;
+
+    // Initial bulk review needs only the explicitly selected children. Issuance
+    // still uses the family-scoped reads below to recheck membership and dues.
+    internal static Task<DataTable> ReadSelectedMembersAsync(int[] selected) => DatabaseHelper.QuerySqlAsync(
+        "EXEC dbo.RequirePermission @UserId,N'Fees.View';\n" + MemberSelect + "\n" +
+        "WHERE S.AdmissionId IN (SELECT CONVERT(int,[value]) FROM OPENJSON(@Ids));",
+        DatabaseHelper.Int("@UserId",CurrentUser.UserId),
+        DatabaseHelper.P("@Ids",System.Text.Json.JsonSerializer.Serialize(selected)));
+
+    internal static async Task<DataTable> ReadSelectedChargesAsync(int[] selected)
+    {
+        var charges=await DatabaseHelper.QueryUserAsync("GetFeeVisitCharges",
+            DatabaseHelper.P("@StudentIdsJson",System.Text.Json.JsonSerializer.Serialize(selected)));
+        try{await FeeCarryForwardLabels.ApplyAsync(charges);return charges;}
+        catch{charges.Dispose();throw;}
+    }
 
     private const string ChargesSql = """
         EXEC dbo.RequirePermission @UserId,N'Fees.View';

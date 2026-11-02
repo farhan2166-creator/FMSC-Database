@@ -1,5 +1,12 @@
 # Changelog
 
+## Bulk outstanding bill preparation — 2026-11-02
+
+- Read selected students and posted charges in two batches for the initial review,
+  instead of repeating those reads per student. Carry-forward labels are classified
+  together. Each bill still rechecks membership, readiness and dues before issuance;
+  numbering, partial-failure recovery and finalized print layouts are unchanged.
+
 ## PDF and financial document presentation — 2026-11-02
 
 - Management PDF exports now share Print Preview's school/scope headings,

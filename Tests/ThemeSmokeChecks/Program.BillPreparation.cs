@@ -5,6 +5,7 @@ internal static partial class Program
 {
     private static void CheckBillPreparationChoices()
     {
+        CheckBulkBillReview();
         var accounts=new[]{
             new FeeBillSelection.Student(1,10,"101","Ali",100m,"Ready for Billing",""),
             new FeeBillSelection.Student(2,10,"102","Sara",200m,"Ready for Billing",""),
@@ -77,5 +78,62 @@ internal static partial class Program
         Check(combined.AsEnumerable().Select(r=>r.Field<int>("ReceiptPageKey")).Distinct().Count()==2,"One direct preview retains a separate document group for every bill");
         Check(combined.AsEnumerable().Select(r=>r.Field<string>("ReceiptNumber")).SequenceEqual(new[]{"FB-TEST","B-TEST"}),"Mixed preview preserves each original bill number");
         Check(Convert.ToString(combined.Rows[1]["BillStudentKey"])=="103","Standalone students remain their own bill in a family-grouped batch");
+    }
+
+    private static void CheckBulkBillReview()
+    {
+        DataTable Members()
+        {
+            var table=new DataTable();
+            table.Columns.Add("AdmissionId",typeof(int));table.Columns.Add("FamilyId",typeof(int));
+            foreach(string field in new[]{"AdmissionNumber","QuickReference","StudentName","Status","EnrollmentStatus"})table.Columns.Add(field);
+            table.Columns.Add("BillingReady",typeof(bool));table.Columns.Add("PlacementConfirmedAt",typeof(DateTime));
+            table.Rows.Add(1,10,"101",null,"Ali","Active","Active",true,DateTime.Today);
+            table.Rows.Add(2,10,"102",null,"Sara","Active","Active",false,DateTime.Today);
+            table.Rows.Add(3,DBNull.Value,"103",null,"Ahmed","Active","Active",true,DateTime.Today);
+            table.Rows.Add(4,20,null,"QR-104","Settled","Pending","Pending",false,DBNull.Value);
+            return table;
+        }
+        DataTable Charges()
+        {
+            var table=new DataTable();table.Columns.Add("AdmissionId",typeof(int));table.Columns.Add("Due",typeof(decimal));
+            table.Rows.Add(1,100m);table.Rows.Add(2,200m);table.Rows.Add(1,50m);table.Rows.Add(3,300m);
+            return table;
+        }
+        int memberReads=0,chargeReads=0;
+        bool membersDisposed=false,chargesDisposed=false;
+        var members=Members();var charges=Charges();
+        members.Disposed+=(_,_)=>membersDisposed=true;charges.Disposed+=(_,_)=>chargesDisposed=true;
+        var review=OutstandingBillsPreview.ReadAccountsAsync(new[]{1,2,3,4,1},ids=> {
+            memberReads++;Check(ids.SequenceEqual(new[]{1,2,3,4}),"Bulk review reads only distinct selected students");return Task.FromResult(members);
+        },ids=> {chargeReads++;return Task.FromResult(charges);}).GetAwaiter().GetResult();
+        Check(memberReads==1&&chargeReads==1,"Initial bill review uses two batch reads regardless of sibling count");
+        Check(review.Select(s=>s.Due).SequenceEqual(new[]{150m,200m,300m,0m}),"Batch review keeps each child's charges separate, including zero dues");
+        Check(review[0].Notice==""&&review[1].Notice.Contains("Sara")&&!review[1].Notice.Contains("Ali"),"Readiness notices remain specific to the selected child");
+        Check(FeeBillSelection.Groups(review,true).Select(g=>string.Join(",",g)).SequenceEqual(new[]{"1,2","3"}),"Batched family review preserves standalone and settled-student grouping");
+        Check(review[0].Reference=="101"&&review[2].FamilyId is null,"Batch review preserves official references and students without a family");
+        Check(review[3].Reference=="QR-104"&&review[3].Readiness=="Pending Registration","Pending children retain their temporary references and registration readiness");
+        Check(membersDisposed&&chargesDisposed,"Successful batch review releases both query tables");
+        bool rejected=false;
+        try { OutstandingBillsPreview.ReadAccountsAsync(new[]{999},_=>Task.FromResult(Members()),_=>Task.FromResult(Charges())).GetAwaiter().GetResult(); }
+        catch(InvalidOperationException){rejected=true;}
+        Check(rejected,"A missing selected student stops bill preparation");
+        membersDisposed=false;members=Members();members.Disposed+=(_,_)=>membersDisposed=true;
+        rejected=false;
+        try { OutstandingBillsPreview.ReadAccountsAsync(new[]{1},_=>Task.FromResult(members),_=>throw new InvalidOperationException("Read failed")).GetAwaiter().GetResult(); }
+        catch(InvalidOperationException ex){rejected=ex.Message=="Read failed";}
+        Check(rejected&&membersDisposed,"A failed charge read stops preparation and releases the successful member read");
+        var largeMembers=Members();var largeCharges=Charges();
+        for(int id=5;id<=25;id++)
+        {
+            largeMembers.Rows.Add(id,20,id.ToString(),null,"Child "+id,"Active","Active",true,DateTime.Today);
+            largeCharges.Rows.Add(id,10m);
+        }
+        memberReads=chargeReads=0;
+        review=OutstandingBillsPreview.ReadAccountsAsync(Enumerable.Range(1,25).ToArray(),
+            _=>{memberReads++;return Task.FromResult(largeMembers);},
+            _=>{chargeReads++;return Task.FromResult(largeCharges);}).GetAwaiter().GetResult();
+        Check(review.Length==25&&memberReads==1&&chargeReads==1&&review.Sum(s=>s.Due)==860m,
+            "A 25-student review uses two reads and retains every student's exact dues");
     }
 }

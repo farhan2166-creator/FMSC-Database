@@ -12,19 +12,8 @@ internal static class OutstandingBillsPreview
         var institution=await InstitutionProfile.GetPrintIdentityAsync();
         if(!Current())return;
         if(string.IsNullOrWhiteSpace(institution.Name)){notify("Check School Profile before printing bills.");return;}
-        var accounts=new List<FeeBillSelection.Student>();
-        foreach(int id in students.Distinct())
-        {
-            using var members=await FeeBillPreview.ReadMembersAsync(id,"Fees.View");
-            if(!Current())return;
-            using var charges=await FeeBillPreview.ReadChargesAsync(id,new[]{id});
-            if(!Current())return;
-            var member=members.AsEnumerable().First(row=>Convert.ToInt32(row["AdmissionId"])==id);
-            accounts.Add(new(id,member.IsNull("FamilyId")?null:Convert.ToInt32(member["FamilyId"]),
-                AdmissionNumbers.ForId(id),Convert.ToString(member["StudentName"])??"",
-                charges.AsEnumerable().Sum(row=>Convert.ToDecimal(row["Due"])),FamilyBillingData.Readiness(member),
-                FamilyBillingData.IncompleteNotice(members,new[]{id})));
-        }
+        var accounts=await ReadAccountsAsync(students,FeeBillPreview.ReadSelectedMembersAsync,FeeBillPreview.ReadSelectedChargesAsync);
+        if(!Current())return;
         if(!accounts.Any(s=>s.Due>0m)){notify("There are no posted outstanding charges for these students.");return;}
         var selected=accounts.ToArray();
         string notice=string.Join("\n",selected.Where(s=>s.Notice.Length>0).Select(s=>s.Notice));
@@ -63,6 +52,41 @@ internal static class OutstandingBillsPreview
             else StudentBillReport.ShowData(owner,combined,a4);
         }
         finally{foreach(var saved in savedBills)saved.Dispose();}
+    }
+
+    internal static async Task<FeeBillSelection.Student[]> ReadAccountsAsync(IReadOnlyList<int> students,
+        Func<int[],Task<DataTable>> readMembers,Func<int[],Task<DataTable>> readCharges)
+    {
+        int[] ids=students.Distinct().ToArray();
+        if(ids.Length==0||ids.Any(id=>id<=0))throw new ArgumentException("Select students before preparing bills.",nameof(students));
+        // Capture synchronous delegate failures as tasks too, so both reads are
+        // settled before disposing either result.
+        async Task<DataTable> Read(Func<int[],Task<DataTable>> query)=>await query(ids);
+        var membersTask=Read(readMembers);
+        var chargesTask=Read(readCharges);
+        try
+        {
+            await Task.WhenAll(membersTask,chargesTask);
+            var members=await membersTask;
+            var charges=await chargesTask;
+            var byStudent=members.AsEnumerable().ToDictionary(row=>Convert.ToInt32(row["AdmissionId"]));
+            var dues=charges.AsEnumerable().GroupBy(row=>Convert.ToInt32(row["AdmissionId"]))
+                .ToDictionary(group=>group.Key,group=>group.Sum(row=>Convert.ToDecimal(row["Due"])));
+            return ids.Select(id=> {
+                if(!byStudent.TryGetValue(id,out var member))
+                    throw new InvalidOperationException("A selected student could not be found. Reload students before printing.");
+                return new FeeBillSelection.Student(id,member.IsNull("FamilyId")?null:Convert.ToInt32(member["FamilyId"]),
+                    member.IsNull("AdmissionNumber")?AdmissionNumbers.Read(member,"QuickReference"):AdmissionNumbers.Read(member),
+                    Convert.ToString(member["StudentName"])??"",dues.GetValueOrDefault(id),
+                    FamilyBillingData.Readiness(member),FamilyBillingData.IncompleteNotice(members,new[]{id}));
+            }).ToArray();
+        }
+        finally
+        {
+            // A failed read must also release the other query's successful result.
+            if(membersTask.IsCompletedSuccessfully)membersTask.Result.Dispose();
+            if(chargesTask.IsCompletedSuccessfully)chargesTask.Result.Dispose();
+        }
     }
 
     // Merge saved documents for one preview; each original bill keeps its number and page key.
