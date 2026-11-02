@@ -64,20 +64,25 @@ try {
     Scenario @() 6 6 ''
     Scenario @('readme.txt') 6 6 ''
     Scenario @('5.sql','6.sql') 6 6 ''
-    Scenario @('8.sql') 6 8 'backup:6->8,apply:8'
-    Scenario @('10.sql','2.sql','1.sql') 1 10 'backup:1->10,apply:2,apply:10'
+    Scenario @('7.sql','8.sql') 6 8 'backup:6->8,apply:7,apply:8'
+    Scenario @('4.sql','2.sql','3.sql','1.sql') 1 4 'backup:1->4,apply:2,apply:3,apply:4'
     Scenario @('1.sql','2.sql') 10 10 ''
-    Scenario @('8.SQL') 6 8 'backup:6->8,apply:8'
+    Scenario @('7.SQL','8.sql') 6 8 'backup:6->8,apply:7,apply:8'
     Scenario @('notes.sql') 6 6 '' 'Invalid migration filename'
     Scenario @('08.sql') 6 8 '' 'Invalid migration filename'
     Scenario @('9.sql') 6 8 '' 'supported schema version'
     Scenario @('8.sql') 6 9 '' 'Available migrations stop'
+    # Gap refusals must happen before New-PreMigrationBackup is called.
+    Scenario @('8.sql') 6 8 '' 'Missing required migration 7.sql'
+    Scenario @('7.sql','9.sql') 6 9 '' 'Missing required migration 8.sql'
+    Scenario @('66.sql','68.sql','69.sql') 65 69 '' 'Missing required migration 67.sql'
+    Scenario @('66.sql','67.sql','68.sql','69.sql') 65 69 'backup:65->69,apply:66,apply:67,apply:68,apply:69'
     $script:backupFails=$true
-    Scenario @('8.sql') 6 8 'backup:6->8' 'backup failed'
+    Scenario @('7.sql') 6 7 'backup:6->7' 'backup failed'
     $script:backupFails=$false; $script:sqlFails=$true
-    Scenario @('8.sql','9.sql') 6 9 'backup:6->9,apply:8' 'sql failed'
+    Scenario @('7.sql','8.sql','9.sql') 6 9 'backup:6->9,apply:7' 'sql failed'
     $script:sqlFails=$false; $script:wrongVersion=$true
-    Scenario @('8.sql','9.sql') 6 9 'backup:6->9,apply:8' 'expected database version'
+    Scenario @('7.sql','8.sql','9.sql') 6 9 'backup:6->9,apply:7' 'expected database version'
     $script:wrongVersion=$false
     # Inspect the real runner's same-connection wrapper through an inert sqlcmd replacement.
     function Invoke-FakeSqlcmd { param($S,[switch]$E,$d,[switch]$C,[switch]$b,$f,$i)
