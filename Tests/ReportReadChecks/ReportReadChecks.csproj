@@ -10,6 +10,10 @@
     <Compile Include="../../Core/ReceiptPrintAmounts.cs" Link="ReceiptPrintAmounts.cs" />
     <Compile Include="../../Core/ReportPaginator.cs" Link="ReportPaginator.cs" />
     <Compile Include="../../Core/OutstandingReportFilter.cs" Link="OutstandingReportFilter.cs" />
+    <Compile Include="../../Core/ReportDatePeriod.cs" Link="ReportDatePeriod.cs" />
+    <Compile Include="../../Core/ReportSettingsFile.cs" Link="ReportSettingsFile.cs" />
+    <Compile Include="../../Core/ReportViewOperations.cs" Link="ReportViewOperations.cs" />
+    <Compile Include="../../Core/AtomicTextFile.cs" Link="AtomicTextFile.cs" />
     <Compile Include="../../Pages/Reports/Finance/CreditBalanceReportData.cs" Link="CreditBalanceReportData.cs" />
     <Compile Include="../../Pages/Reports/Finance/ConcessionSummaryData.cs" Link="ConcessionSummaryData.cs" />
     <Compile Include="../../Pages/Reports/Finance/MonthlyFeeReconciliationData.cs" Link="MonthlyFeeReconciliationData.cs" />

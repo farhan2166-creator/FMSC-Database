@@ -981,6 +981,9 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     protected virtual IReadOnlyList<ReportColumnDef>? ReportColumnCatalog => null;
     /// <summary>The columns shown until the operator chooses otherwise. Null means the catalogue's DefaultVisible flags.</summary>
     protected virtual IReadOnlyList<string>? ReportDefaultColumnKeys => null;
+    protected virtual IReadOnlyList<string> ReportRequiredColumnKeys => Array.Empty<string>();
+    /// <summary>Opt-in report pages refresh their dynamic catalogue after typed rows bind.</summary>
+    protected void RefreshReportColumnLayout() => ApplyReportColumnLayout();
     /// <summary>The title printed on the PDF. Defaults to the page's navigation title.</summary>
     protected virtual string ReportExportTitle() => NavigationTitle;
     /// <summary>The line printed under the PDF title. Defaults to the page's header context.</summary>
@@ -1020,7 +1023,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             if (usable.Count > 0)
-                return usable;
+                return ReportRequiredColumnKeys.Where(known.Contains).Except(usable,StringComparer.OrdinalIgnoreCase).Concat(usable).ToArray();
         }
         return DefaultReportColumns(catalog);
     }
@@ -1049,7 +1052,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             "Choose the columns for this report",
             catalog,
             ResolveReportColumns(catalog),
-            DefaultReportColumns(catalog));
+            DefaultReportColumns(catalog),ReportRequiredColumnKeys);
         if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
             return;
         SetReportColumns(dialog.ResultKeys);

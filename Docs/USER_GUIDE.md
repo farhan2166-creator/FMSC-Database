@@ -194,6 +194,30 @@ Saved collection receipts show each included fee's saved amount due before that 
 
 ## Report review and advance credit
 
+Named **Saved Views** are available in Collections & Receipts, Outstanding &
+Aging, Billing & Discounts, Student Credit Balance Register, Monthly Fee
+Reconciliation, Certificate Issue Register and Class Marks & Attendance Sheets.
+Set the filters and grouping, run the report and choose **Columns** where offered,
+then **Save View**. Select a saved name and click **Apply View**, review the restored
+settings, then run/load the report. Saving under an existing name asks before
+replacing it; Rename View and Delete View manage the selected saved name.
+
+For dated reports, choose **Fixed dates**, **All dates**, **Today**, **This month**,
+**Previous month** or **This calendar year**. Relative periods resolve when applied
+and each time the report runs. Editing a date switches to Fixed dates. Monthly
+Reconciliation continues to include whole billing months. Student Reports keeps
+its existing Views selector and loading behavior; it also gains Rename View and
+the Date period choices. Earlier saved student views retain their fixed/all-date
+meaning.
+
+Views are saved for the signed-in user on this computer, using the existing local
+report-settings file. They store settings, not results or selected students.
+Class-sheet views require a fresh Load Students and selection review. If a saved
+location or certificate option is unavailable, the new shared toolbar refuses
+the view and restores the previous filters. Receipt references and total-label
+columns remain visible where needed for grouped reports. See
+[saved-view details and verification](SAVED_REPORT_VIEWS.md).
+
 Collections & Receipts now offers **Account Credit** as a payment-method filter.
 Choose CSV in Export for data rows only; formatted PDF/Print retain subtotals.
 Receipt page counts exclude headings and totals.

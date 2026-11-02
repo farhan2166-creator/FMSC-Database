@@ -584,7 +584,7 @@ namespace FMSC_SMS.Core
                     return true;
             return false;
         }
-        private static bool IsRawDatabaseColumn(string name)
+        internal static bool IsRawDatabaseColumn(string name)
         {
             if (string.IsNullOrEmpty(name))
                 return false;

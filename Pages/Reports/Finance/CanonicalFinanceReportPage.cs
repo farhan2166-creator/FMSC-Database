@@ -36,6 +36,12 @@ public abstract class CanonicalFinanceReportPage : V2Page
     private bool _scopeEdited;
     private bool _applyingScope;
     private bool _runningReport;
+    private bool _lookupsReady;
+    private readonly string _presetKey;
+    private readonly ReportSavedViewsBar _savedViews;
+    private readonly ModernButton _columnsButton;
+    private IReadOnlyList<ReportColumnDef>? _availableColumns;
+    private string _boundColumnLayout="";
     protected CanonicalFinanceReportPage(
         string title,
         string description,
@@ -54,6 +60,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         _usesDates = usesDates;
         _usesYear = usesYear;
         _scopePreferenceKey = $"finance.{exportName}.last-scope";
+        _presetKey=$"finance.{exportName}";
         if (usesDates)
         {
             From.ShowCheckBox = To.ShowCheckBox = true;
@@ -71,6 +78,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         _print = AddBusyAction(UiText.Actions.Print, PrintAsync, "Secondary");
         FinanceHelp.Attach(this,_print,"Print the report already generated on screen. It does not receive money or change student fees.","Printing a report with Rs. 1,000 outstanding leaves the student's outstanding balance at Rs. 1,000.");
         _export = AddExportAction(exportName);
+        _columnsButton=AddColumnsAction();
         var reportActions = new List<ModernButton> { run, _print };
         if (classOutstandingPrint)
         {
@@ -79,6 +87,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
             reportActions.Add(_classOutstandingButton);
         }
         reportActions.Add(_export);
+        reportActions.Add(_columnsButton);
         reportActions.AddRange(AdditionalReportActions());
         RelocateFromActions(reportActions.ToArray());
         Defer(BindLookupsAsync);
@@ -92,7 +101,8 @@ public abstract class CanonicalFinanceReportPage : V2Page
         if (grouping) fields.Add((GroupingCaption, GroupBy));
         fields.AddRange(AdditionalReportFilters());
         UiHelper.SetGridPlaceholderMessage(Grid, UiText.EmptyGrid.RunReport);
-        SetContent(ReportUi.CompactLayout(ReportUi.Bar(fields.ToArray()), Grid, title, () => {
+        var content=ReportUi.CompactLayout(ReportUi.Bar(fields.ToArray()), Grid, title, () => {
+            _savedViews?.ResetDates();
             _scopeEdited = true;
             ReportLayoutStore.SetPreference(_scopePreferenceKey, "");
             _displayed = null;
@@ -102,7 +112,10 @@ public abstract class CanonicalFinanceReportPage : V2Page
             ReportAvailabilityChanged();
             InvalidateReport();
             SetStatus("Filters cleared. Choose filters, then press Run Report.");
-        }, reportActions.ToArray()));
+        }, reportActions.ToArray());
+        _savedViews=new ReportSavedViewsBar(_presetKey,CaptureSavedView,RestoreSavedView,(message,warning)=>SetStatus(message,warning),
+            ()=>_lookupsReady && !_runningReport,usesDates ? From : null,usesDates ? To : null);
+        SetContent(_savedViews.Wrap(content));
         Grid.Parent?.Controls.Add(_summary);
         Grid.BringToFront();
         View.SelectedIndexChanged += (_, _) => { UpdateViewControls(); FiltersChanged(); };
@@ -134,6 +147,43 @@ public abstract class CanonicalFinanceReportPage : V2Page
     protected virtual void ReportAvailabilityChanged()
     {
         if (_classOutstandingButton is not null) _classOutstandingButton.Enabled=CanPrintClassOutstanding;
+        if (_columnsButton is not null) _columnsButton.Enabled=CurrentReportAvailable && ReportColumnCatalog is { Count:>0 };
+        _savedViews?.RefreshAvailability();
+    }
+    protected override string ReportLayoutKey => $"{_presetKey}.{ViewName}.{(GroupBy.Enabled ? GroupName : "")}";
+    protected override IReadOnlyList<ReportColumnDef>? ReportColumnCatalog => _boundColumnLayout==ReportLayoutKey ? _availableColumns : null;
+    protected override IReadOnlyList<string> ReportRequiredColumnKeys => _procedure=="GetCollectionsAndReceiptsReport" && ViewName=="Receipts"
+        ? new[] { "Receipt / Reference" } : AppendReportTotals && ReportColumnCatalog is { Count:>0 } ? new[] { ReportColumnCatalog[0].Key } : Array.Empty<string>();
+    protected override void OnReportPageBound()
+    {
+        _availableColumns=ReportAvailableColumns.FromGrid(Grid);_boundColumnLayout=ReportLayoutKey;
+        RefreshReportColumnLayout();base.OnReportPageBound();
+    }
+    private IEnumerable<(string Key,Control Control)> SavedFields()
+    {
+        yield return ("View",View);yield return ("Grouping",GroupBy);
+        if (_usesDates) { yield return ("From",From);yield return ("To",To); }
+        if (_usesYear) yield return ("Year",Year);
+        yield return ("Campus",Campus);yield return ("Class",Class);yield return ("Section",Section);
+        yield return ("Payment method",PaymentMethod);
+        foreach(var (caption,control) in AdditionalReportFilters()) yield return (caption,control);
+    }
+    private Dictionary<string,string> CaptureSavedView()
+    {
+        var state=ReportFilterState.Capture(SavedFields().Where(f=>f.Control is not ModernComboBox combo || combo.Items.Count>0));
+        var columns=ReportColumnCatalog is not null ? CurrentReportColumns() : ReportLayoutStore.GetColumns(ReportLayoutKey);
+        state["$columns"]=System.Text.Json.JsonSerializer.Serialize(columns);return state;
+    }
+    private void RestoreSavedView(IReadOnlyDictionary<string,string> state)
+    {
+        _scopeEdited=true;
+        // View changes rebuild the grouping choices synchronously before Grouping is restored.
+        ReportFilterState.Restore(SavedFields().Where(f=>f.Control is not ModernComboBox combo || combo.Items.Count>0),state);
+        if (state.TryGetValue("$columns",out string? columns))
+            RememberReportColumns(ReportLayoutKey,System.Text.Json.JsonSerializer.Deserialize<string[]?>(columns));
+        _displayed=null;_appliedSignature=_filterSummary="";
+        _print.Enabled=_export.Enabled=false;_summary.Text="View applied. Run the report to see current totals.";
+        InvalidateReport();ReportAvailabilityChanged();
     }
     protected bool CurrentReportAvailable => !_runningReport && _displayed is not null && _appliedSignature == Signature();
     protected virtual Task PreviewClassOutstandingAsync() => Task.CompletedTask;
@@ -161,8 +211,10 @@ public abstract class CanonicalFinanceReportPage : V2Page
                 Class.Bind(await classesTask, "ClassId", "ClassName", "All");
                 Section.Bind(await sectionsTask, "SectionId", "SectionName", "All");
                 if (!_scopeEdited && _appliedSignature.Length == 0) RestoreLastScope();
+                _lookupsReady=true;
             }
             finally { _applyingScope = false; }
+            _savedViews.RefreshAvailability();
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
     }
@@ -229,13 +281,16 @@ public abstract class CanonicalFinanceReportPage : V2Page
     private async Task RunAsync()
     {
         _scopeEdited = true;
-        string requested = Signature();
+        string requested;
         ReportScopeSelection scopeToRemember = CurrentScope();
         try
         {
+            _savedViews.ResolveDates();
+            requested=Signature();
             if (_usesDates && From.Enabled && !ReportUi.ValidDateRange(_rangeValidator ??= CreateValidator(), From, To)) return;
             if (!ValidateAdditionalFilters()) return;
             _runningReport = true;
+            _savedViews.RefreshAvailability();
             _print.Enabled = _export.Enabled = false;
             _summary.Text = "Generating report…";
             SqlParameter[] parameters = BuildParameters().ToArray();

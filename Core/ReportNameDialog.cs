@@ -30,6 +30,7 @@ public sealed class ReportNameDialog : ApplicationWindowForm
         };
         name.Dock = DockStyle.Top;
         name.Text = initial;
+        name.MaxLength = 60;
         var ok = new ModernButton {
             Text = UiText.Actions.Save,
             ThemeRole = "Primary",

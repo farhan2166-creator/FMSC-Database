@@ -19,6 +19,7 @@ public sealed class ClassSheetsPage : V2Page
     private bool rebinding, loading, changingSelection;
     private int rosterRevision;
     private Scope? loadedScope;
+    private readonly ReportSavedViewsBar savedViews;
     private sealed record Scope(int Campus, int Year, int Class, int Section);
     private Scope CurrentScope() => new(campus.SelectedId, year.SelectedId, klass.SelectedId, section.SelectedId);
 
@@ -109,15 +110,28 @@ public sealed class ClassSheetsPage : V2Page
         buttons.Dock = DockStyle.Top;
         root.Controls.Add(buttons, 0, 1);
         root.Controls.Add(studentsCard, 0, 2);
-        SetContent(root, "Load students, choose who to print, then open Print Preview. Attendance is marked by hand on the printed sheet.");
+        savedViews=new ReportSavedViewsBar("students.class-sheets",()=>ReportFilterState.Capture(SavedFields()),RestoreSavedView,
+            (message,warning)=>SetStatus(message,warning),()=>placements is not null && !loading);
+        SetContent(savedViews.Wrap(root), "Load students, choose who to print, then open Print Preview. Attendance is marked by hand on the printed sheet.");
         UpdateSheetFields();
         UiHelper.SetGridPlaceholderMessage(Grid, "Choose a campus and year, then press Load Students.");
         foreach (var filter in new[] { campus, year, klass, section })
             filter.SelectedIndexChanged += (_, _) => InvalidateRoster();
+        campus.SelectedIndexChanged+=(_,_)=>{ if (savedViews.IsApplying) BindClasses(); };
+        klass.SelectedIndexChanged+=(_,_)=>{ if (savedViews.IsApplying) BindSections(); };
         campus.UserSelectionChanged += (_, _) => BindClasses();
         klass.UserSelectionChanged += (_, _) => BindSections();
         UpdateSelection();
         Defer(LoadLookupsAsync);
+    }
+    private (string Key,Control Control)[] SavedFields() => new (string,Control)[] {
+        ("Campus",campus),("Year",year),("Class",klass),("Section",section),("Sheet",sheet),
+        ("Attendance month",attendanceMonth),("Exam",exam),("Subject",subject),("Exam date",examDate),("Teacher",teacher),("Search",search)
+    };
+    private void RestoreSavedView(IReadOnlyDictionary<string,string> state)
+    {
+        ReportFilterState.Restore(SavedFields(),state);
+        InvalidateRoster();
     }
 
     private async Task LoadLookupsAsync()
@@ -135,6 +149,7 @@ public sealed class ClassSheetsPage : V2Page
             year.Bind(years, "AcademicYearId", "YearName");
             HumanUi.SelectCurrentAcademicYear(year, years);
             BindClasses();
+            savedViews.RefreshAvailability();
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
     }
@@ -207,6 +222,7 @@ public sealed class ClassSheetsPage : V2Page
 
     private void UpdateSelection(bool showStatus = true)
     {
+        savedViews?.RefreshAvailability();
         int count = roster?.AsEnumerable().Count(row => row.Field<bool>("Include")) ?? 0;
         bool current = roster is not null && loadedScope == CurrentScope();
         previewButton.Enabled = CanPreviewSelection();

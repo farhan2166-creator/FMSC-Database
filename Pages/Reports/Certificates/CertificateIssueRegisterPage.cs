@@ -16,6 +16,9 @@ public sealed class CertificateIssueRegisterPage : V2Page
     private IReadOnlyList<ReportPrintMetric> printMetrics=Array.Empty<ReportPrintMetric>();
     private protected override IReadOnlyList<ReportPrintMetric>? ReportPrintMetrics() => printMetrics;
     private bool running,hasRows;
+    private readonly ReportSavedViewsBar savedViews;
+    private readonly ModernButton columns;
+    private IReadOnlyList<ReportColumnDef>? availableColumns;
 
     public CertificateIssueRegisterPage() : base("Certificate Issue Register",
         "Recorded issues and saved certificates. Saved record only does not confirm printing or collection. Dates filter Recorded On; only permitted certificate sources are included.")
@@ -35,10 +38,13 @@ public sealed class CertificateIssueRegisterPage : V2Page
         from.ValueChanged+=(_,_) => FiltersChanged(); to.ValueChanged+=(_,_) => FiltersChanged(); search.TextChanged+=(_,_) => FiltersChanged();
         var run=AddBusyAction("Run Report",RunAsync,"Primary");
         print=AddBusyAction(UiText.Actions.Print,PrintAsync,"Secondary"); export=AddExportAction("FMSC_Certificate_Issue_Register");
-        RelocateFromActions(run,print,export);
-        SetContent(ReportUi.CompactLayout(ReportUi.Bar(("Certificate Type",type),("Recipient Type",recipient),
+        columns=AddColumnsAction();columns.Enabled=false;
+        RelocateFromActions(run,print,export,columns);
+        var content=ReportUi.CompactLayout(ReportUi.Bar(("Certificate Type",type),("Recipient Type",recipient),
             ("From Recorded Date (optional)",from),("To Recorded Date (optional)",to),("Entry",entry),("Collection",collection),("Find",search)),
-            Grid,"Certificate Issue Register",ClearReport,run,print,export));
+            Grid,"Certificate Issue Register",ClearReport,run,print,export,columns);
+        savedViews=new ReportSavedViewsBar("certificates.issue-register",CaptureSavedView,RestoreSavedView,(message,warning)=>SetStatus(message,warning),()=>!running && CanRead,from,to);
+        SetContent(savedViews.Wrap(content));
         Grid.Parent?.Controls.Add(summary); Grid.BringToFront();
         UiHelper.SetGridPlaceholderMessage(Grid,UiText.EmptyGrid.RunReport);
         print.Enabled=export.Enabled=false;
@@ -50,16 +56,40 @@ public sealed class CertificateIssueRegisterPage : V2Page
         type.Text,recipient.Text,entry.Text,collection.Text,search.Text.Trim(),from.Checked,from.Value.Date,to.Checked,to.Value.Date);
     protected override string ReportFilterSignature() => Signature();
     protected override string ReportExportSubtitle() => subtitle;
+    protected override string ReportLayoutKey => "certificates.issue-register.columns";
+    protected override IReadOnlyList<ReportColumnDef>? ReportColumnCatalog => availableColumns;
+    protected override void OnReportPageBound()
+    {
+        availableColumns=ReportAvailableColumns.FromGrid(Grid);RefreshReportColumnLayout();base.OnReportPageBound();
+    }
+    private (string Key,Control Control)[] SavedFields() => new (string,Control)[] {
+        ("Type",type),("Recipient",recipient),("From",from),("To",to),("Entry",entry),("Collection",collection),("Search",search)
+    };
+    private Dictionary<string,string> CaptureSavedView()
+    {
+        var state=ReportFilterState.Capture(SavedFields());
+        state["$columns"]=System.Text.Json.JsonSerializer.Serialize(availableColumns is null ? ReportLayoutStore.GetColumns(ReportLayoutKey) : CurrentReportColumns());return state;
+    }
+    private void RestoreSavedView(IReadOnlyDictionary<string,string> state)
+    {
+        ReportFilterState.Restore(SavedFields(),state);
+        if (state.TryGetValue("$columns",out var value)) RememberReportColumns(ReportLayoutKey,System.Text.Json.JsonSerializer.Deserialize<string[]?>(value));
+        ClearReport();columns.Enabled=false;
+    }
     private void ClearReport()
     {
+        savedViews?.ResetDates();
         applied=subtitle=""; hasRows=false; print.Enabled=export.Enabled=false;
         summary.Text="Run the report to see totals."; InvalidateReport();
+        columns.Enabled=false;
     }
     private void FiltersChanged()
     {
         if (running) CancelPendingReport();
+        savedViews?.RefreshAvailability();
         if (applied.Length==0) return;
         bool current=CanRead && applied==Signature(); print.Enabled=export.Enabled=current && hasRows && !running;
+        columns.Enabled=current && hasRows && !running;
         if (current) RestoreReportStale(); else MarkReportStale();
         SetStatus(current ? UiText.Reports.MatchesFilters : UiText.Reports.FiltersChanged,!current);
     }
@@ -67,6 +97,7 @@ public sealed class CertificateIssueRegisterPage : V2Page
     private async Task RunAsync()
     {
         if (!CanRead) { Warn("Report and certificate access are required."); return; }
+        savedViews.ResolveDates();
         if (!ReportUi.ValidDateRange(validator,from,to)) return;
         string requested=Signature();
         string query=CertificateIssueRegisterData.BuildQuery(CurrentUser.HasPermission("Certificates.Create"),CurrentUser.HasPermission("Students.Leave"));
@@ -81,6 +112,7 @@ public sealed class CertificateIssueRegisterPage : V2Page
         try
         {
             running=true; hasRows=false; print.Enabled=export.Enabled=false; summary.Text="Generating report…";
+            columns.Enabled=false;savedViews.RefreshAvailability();
             DataTable? rows=null;
             await BindReportAsync(token => Task.Run(() => rows=CertificateIssueRegisterData.Display(DatabaseHelper.QuerySql(query,parameters)),token));
             if (IsDisposed) return;
@@ -91,12 +123,13 @@ public sealed class CertificateIssueRegisterPage : V2Page
             subtitle=captured+" | "+summary.Text+" | Saved record only does not confirm printing or collection.";
             applied=requested; hasRows=rows.Rows.Count>0;
             bool current=CanRead && ReportMatchesCurrentFilters(requested); print.Enabled=export.Enabled=current && hasRows;
+            columns.Enabled=current && hasRows;
         }
         catch (Exception ex)
         {
             if (!IsDisposed) { applied=subtitle=""; summary.Text="Could not generate the report. Run Report to retry."; Fail(ex); }
         }
-        finally { running=false; }
+        finally { running=false;if (!IsDisposed) savedViews.RefreshAvailability(); }
     }
     private async Task PrintAsync()
     {
