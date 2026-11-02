@@ -19,13 +19,6 @@ public static class UiDesignSystem
         public static Font Section => AppTheme.HeadingFont;
         public static Font PageTitle => AppTheme.PageTitleFont;
     }
-    public static class Surfaces
-    {
-        public static Color Page => AppTheme.PageBackground;
-        public static Color Card => AppTheme.Surface;
-        public static Color Subtle => AppTheme.SurfaceSecondary;
-        public static Color Border => AppTheme.Border;
-    }
     public static class Actions
     {
         public const string Primary = "Primary";

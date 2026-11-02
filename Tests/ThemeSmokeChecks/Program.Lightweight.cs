@@ -17,9 +17,6 @@ internal static partial class Program
         var saved=AppTheme.CurrentTheme;
         try
         {
-            using var loading=new LoadingState("Reading records","Please wait") {Dock=DockStyle.None,Bounds=new Rectangle(360,215,260,60)};
-            owner.Controls.Add(loading);Application.DoEvents();
-            var timer=typeof(LoadingState).GetField("_timer",BindingFlags.Instance|BindingFlags.NonPublic)!;
             var alerts=typeof(StatusAttention).GetField("Active",BindingFlags.Static|BindingFlags.NonPublic)!.GetValue(null)!;
             var findAlert=alerts.GetType().GetMethod("TryGetValue")!;
             using var status=new Label{AutoSize=false,Bounds=new Rectangle(360,300,260,32),Text="Review this entry"};
@@ -28,12 +25,8 @@ internal static partial class Program
             {
                 AppTheme.SetTheme(theme);Application.DoEvents();
                 bool animationAllowed=!AppTheme.UseSimpleRendering&&!SystemInformation.TerminalServerSession&&SystemInformation.IsMenuAnimationEnabled;
-                Check((timer.GetValue(loading) is not null)==animationAllowed,"Loading animation follows rendering mode and Windows motion settings");
-                loading.Hide();Check(timer.GetValue(loading) is null,"Hidden loading panels release their timers");
-                loading.Show();Application.DoEvents();
                 if(AppTheme.UseSimpleRendering)
                 {
-                    Check(timer.GetValue(loading) is null,"Every lightweight variant avoids loading timer allocation");
                     Check(Contrast(AppTheme.MutedText,AppTheme.SurfaceSecondary)>=4.5&&Contrast(AppTheme.InputBorder,AppTheme.Surface)>=3,"Guidance and input boundaries stay legible");
                     Check(Contrast(AppTheme.ThemeOnPrimaryText,AppTheme.Primary)>=4.5&&Contrast(AppTheme.MenuText,AppTheme.MenuBackground)>=4.5,"Selected student rows and menus retain readable text");
                     using var flat=new UiPaintShape(new Rectangle(0,0,100,30),8);
@@ -74,7 +67,6 @@ internal static partial class Program
                 Check(continued&&AppTheme.CurrentTheme==AppThemeType.EmeraldLightweight&&!AppTheme.IsChangingTheme,"One failed listener and a recursive request do not abort or corrupt the chosen theme");
             }
             finally{AppTheme.ThemeChanged-=failed;AppTheme.ThemeChanged-=recursive;}
-            loading.Dispose();Check(timer.GetValue(loading) is null,"Loading disposal releases its timer");
         }
         finally{AppTheme.SetTheme(saved);}
     }

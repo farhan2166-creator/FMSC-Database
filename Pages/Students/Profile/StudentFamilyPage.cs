@@ -120,13 +120,6 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
         root.Controls.Add(membersCard, 0, 1);
         SetContent(root);
     }
-    private static DataTable NewStudentLookupTable()
-    {
-        var dt = new DataTable();
-        dt.Columns.Add("AdmissionId", typeof(int));
-        dt.Columns.Add("Display", typeof(string));
-        return dt;
-    }
     private async Task LoadStudentsAsync(int? preserveAdmissionId = null, bool initialSelection = false)
     {
         try

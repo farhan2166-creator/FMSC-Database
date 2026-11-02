@@ -865,20 +865,6 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage, IUnsavedChanges
         /* QuickFix is now async Task. */
         _ = QuickFix(rowView.Row);
     }
-    /* Clicking an enrollment row loads it into the form (OnGridSelectionChanged) and brings the form up beside the list. */
-    private void OnGridCellClick(DataGridViewCellEventArgs e)
-    {
-        if (gridMode != "Enrollments" || e.RowIndex < 0 || student.SelectedId <= 0)
-            return;
-        if (Grid.Rows[e.RowIndex].DataBoundItem is DataRowView rowView &&
-            rowView.Row.Table.Columns.Contains("EnrollmentId") &&
-            rowView.Row["EnrollmentId"] != DBNull.Value &&
-            Convert.ToInt32(rowView.Row["EnrollmentId"]) != selectedEnrollmentId)
-        {
-            OnGridSelectionChanged();
-        }
-        OpenCorrections(CorrectionTab.Enrollment);
-    }
     private async Task LoadEnrollments(int modeVersion)
     {
         enrollmentsRaw = new DataTable();
@@ -1108,37 +1094,6 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage, IUnsavedChanges
             host.Controls.Add(new FMSC_SMS.Pages.Students.Admissions.StudentAdmissionPage(preselectAdmissionId: selected) { Dock = DockStyle.Fill });
             host.ShowDialog(FindForm());
         }
-    }
-    private async Task SelectStudentByAdmissionId(int admissionId)
-    {
-        DataTable all = await StudentSearchCache.GetAllAsync();
-        DataRow? found = FindCachedStudent(all, admissionId);
-        if (found is null)
-        {
-            /* Admitted since the list was read. */
-            StudentSearchCache.Invalidate();
-            all = await StudentSearchCache.GetAllAsync();
-            found = FindCachedStudent(all, admissionId);
-        }
-        if (IsDisposed)
-            return;
-        if (found is not null)
-            student.SetStudent(found);
-        await LoadStudentSnapshot();
-    }
-    private static DataRow? FindCachedStudent(DataTable all, int admissionId)
-    {
-        if (!all.Columns.Contains("AdmissionId"))
-            return null;
-        foreach (DataRow row in all.Rows)
-        {
-            if (row["AdmissionId"] != DBNull.Value &&
-                Convert.ToInt32(row["AdmissionId"]) == admissionId)
-            {
-                return row;
-            }
-        }
-        return null;
     }
     private void SelectEnrollmentRow(int enrollmentId)
     {

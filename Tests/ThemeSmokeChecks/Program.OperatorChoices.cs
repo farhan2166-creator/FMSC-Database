@@ -98,11 +98,10 @@ internal static partial class Program
                 CurrentUser.SignIn(7781,"Concession fixture","Administrator",false,Array.Empty<string>());Click(reviewBill);
                 Check(picker.SelectedBillId==901L&&picker.DialogResult==DialogResult.OK,"The operator can select exactly the fully paid purchase instead of changing another purchase under the same fee");
             }
-            using var promotion=new FMSC_SMS.Pages.Students.Enrollment.BulkPromotionPage(null,false);
-            var carry=(CheckBox)typeof(FMSC_SMS.Pages.Students.Enrollment.BulkPromotionPage).GetField("carryConcessions",flags)!.GetValue(promotion)!;
+            using var promotion=new FMSC_SMS.Pages.Students.Enrollment.StudentPlacementPage(null,false);
+            var carry=(CheckBox)typeof(FMSC_SMS.Pages.Students.Enrollment.StudentPlacementPage).GetField("carry",flags)!.GetValue(promotion)!;
             Check(carry.Enabled&&!carry.Checked,"Promotion exposes a deliberate carry-concession choice with the legacy reset default");
-            typeof(FMSC_SMS.Pages.Students.Enrollment.BulkPromotionPage).GetField("busyCount",flags)!.SetValue(promotion,1);
-            typeof(FMSC_SMS.Pages.Students.Enrollment.BulkPromotionPage).GetMethod("ApplyState",flags)!.Invoke(promotion,null);
+            ((Control)typeof(FMSC_SMS.Pages.Students.Enrollment.StudentPlacementPage).GetField("pageContent",flags)!.GetValue(promotion)!).Enabled=false;
             Check(!carry.Enabled,"Promotion holds the concession policy while processing");
         }
         finally{CurrentUser.SignIn(previous.UserId,previous.Username,previous.RoleName,previous.MustChangePassword,previous.Permissions);}

@@ -440,41 +440,6 @@ public sealed class StudentTransferReadmissionPage : V2Page
             Fail(ex);
         }
     }
-    private void BindDestinationCampuses()
-    {
-        try
-        {
-            var raw =
-                DatabaseHelper.QueryUser("GetCampuses");
-            if (selectedOperation != "Re-Admit" &&
-                currentEnrollmentCampusId > 0 &&
-                raw.Columns.Contains("CampusId"))
-            {
-                var rows =
-                    raw.AsEnumerable()
-                        .Where(row =>
-                            Convert.ToInt32(row["CampusId"]) !=
-                            currentEnrollmentCampusId);
-                raw =
-                    rows.Any()
-                        ? rows.CopyToDataTable()
-                        : raw.Clone();
-            }
-            suppressDestinationEvents = true;
-            try
-            {
-                campus.Bind(raw, "CampusId", "CampusName");
-            }
-            finally
-            {
-                suppressDestinationEvents = false;
-            }
-        }
-        catch (Exception ex)
-        {
-            Fail(ex);
-        }
-    }
     private void BindYears()
     {
         try
@@ -897,46 +862,6 @@ public sealed class StudentTransferReadmissionPage : V2Page
         if (index + 1 < rows.Count) result.ImportRow(rows[index + 1]);
         return result;
     }
-
-    private void BindDestinationClasses()
-    {
-        try
-        {
-            var raw =
-                DatabaseHelper.QueryUser("GetClasses");
-            if (selectedOperation == "Transfer Class")
-            {
-                raw = AdjacentClasses(raw, currentEnrollmentClassId);
-            }
-            else if (selectedOperation != "Re-Admit" &&
-                currentEnrollmentClassId > 0 &&
-                raw.Columns.Contains("ClassId"))
-            {
-                var rows =
-                    raw.AsEnumerable()
-                        .Where(row =>
-                            Convert.ToInt32(row["ClassId"]) !=
-                            currentEnrollmentClassId);
-                raw =
-                    rows.Any()
-                        ? rows.CopyToDataTable()
-                        : raw.Clone();
-            }
-            suppressDestinationEvents = true;
-            try
-            {
-                cls.Bind(raw, "ClassId", "ClassName");
-            }
-            finally
-            {
-                suppressDestinationEvents = false;
-            }
-        }
-        catch (Exception ex)
-        {
-            Fail(ex);
-        }
-    }
     private void LoadClassSections()
     {
         classSection.ClearLookup();
@@ -977,10 +902,6 @@ public sealed class StudentTransferReadmissionPage : V2Page
         {
             Fail(ex);
         }
-    }
-    private void LoadSectionsForCurrentPlacement()
-    {
-        BindDestinationLookups();
     }
     private (int ClassSectionId, string? Note)
         ResolveDestinationClassSection(int campusId, int classId, int currentSectionId, string destinationLabel, bool requireActive)

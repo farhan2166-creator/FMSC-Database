@@ -11,7 +11,7 @@ internal static partial class Program
         using var profile=new DataTable();profile.Columns.Add("SchoolName");
         var school=profile.Rows.Add("Fictional School");
         foreach(string name in selectedReports ?? new[]{"AdmissionForm","ClassMarksSheet","ClassAttendanceSheet",
-            "ClassMonthlyAttendanceSheet","ClassOutstandingCharges","ClassSectionSummary","FeeAgingReport",
+            "ClassMonthlyAttendanceSheet","ClassOutstandingCharges","ClassSectionSummary",
             "BankAccountOpeningCertificate","CharacterCertificate","CollegeLeaveCertificate","DateOfBirthCertificate",
             "LeaveCertificate","NoObjectionCertificate","ProvisionalCertificate","RegularLecturerCertificate",
             "RegularStudentCertificate","SportsCertificate"})

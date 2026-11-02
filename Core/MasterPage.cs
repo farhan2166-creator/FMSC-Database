@@ -595,53 +595,6 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
             }
         });
     }
-    private static Control? FindManagerButton(
-    Control fieldControl)
-    {
-        Control? parent = fieldControl.Parent;
-        if (parent is null)
-            return null;
-        foreach (Control child in parent.Controls)
-        {
-            if (child is not TableLayoutPanel host)
-                continue;
-            foreach (Control hostChild in host.Controls)
-            {
-                if (hostChild is ModernButton button &&
-                    string.Equals(
-                        Convert.ToString(button.Tag),
-                        $"Manage:{GetControlKey(fieldControl)}",
-                        StringComparison.OrdinalIgnoreCase))
-                {
-                    return button;
-                }
-            }
-        }
-        return null;
-    }
-    private static string? GetControlKey(
-        Control control)
-    {
-        foreach (Control parent in GetParents(control))
-        {
-            foreach (Control child in parent.Controls)
-            {
-                if (child == control)
-                    return child.Tag?.ToString();
-            }
-        }
-        return null;
-    }
-    private static IEnumerable<Control> GetParents(
-        Control control)
-    {
-        Control? current = control.Parent;
-        while (current is not null)
-        {
-            yield return current;
-            current = current.Parent;
-        }
-    }
     protected bool TryGetEditorControl(
     string fieldKey,
     out Control? control)

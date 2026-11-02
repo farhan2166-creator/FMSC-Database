@@ -184,7 +184,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     private readonly ModernTextBox viewCampus = PlacementViewField();
     private readonly ModernTextBox viewYear = PlacementViewField();
     private Label? viewYearCaption;
-    private readonly ModernTextBox viewTerm = PlacementViewField();
     private readonly ModernTextBox viewClass = PlacementViewField();
     private readonly ModernTextBox viewSection = PlacementViewField();
     private readonly ModernTextBox viewTransport = PlacementViewField();
@@ -411,14 +410,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             /* A dirty check must never throw, and it must never invent a prompt. */
             _admissionBaseline = null;
         }
-    }
-    /// <summary>The live form's signature, with the pending photo counted as part of it. The baseline is captured without that part; see the overload below.</summary>
-    private string AdmissionSignature()
-    {
-        var text = new System.Text.StringBuilder();
-        foreach (AdmissionPart part in AdmissionParts(pendingPhoto: _pendingPhotoData is not null))
-            text.Append(part.Value).Append('|');
-        return text.ToString();
     }
     /// <summary>Everything the operator can type or tick, in one comparable string.</summary>
     private List<AdmissionPart> AdmissionParts(bool pendingPhoto)
@@ -2346,15 +2337,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             suggestionLoadsInFlight.Remove(field);
         }
     }
-    private static string FirstNonBlank(params string?[] values)
-    {
-        foreach (var value in values)
-        {
-            if (!string.IsNullOrWhiteSpace(value))
-                return value!;
-        }
-        return string.Empty;
-    }
     private static void AddSuggestionIfNew(ModernTextBox field, string? value)
     {
         value = value?.Trim();
@@ -2504,29 +2486,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             feePreviewEnrollmentId=enrollmentId;
         }
         finally { settingFeePreviewMonth=false; }
-    }
-    private static string FeeWaiverSummary(DataTable table,DateTime month)
-    {
-        var notes=new List<string>();
-        foreach(DataRow row in table.Rows)
-        {
-            if(Convert.ToDecimal(row["StandardAmount"])<=0 || Convert.ToDecimal(row["NetAmount"])!=0
-                || row["EffectiveFrom"]==DBNull.Value
-                || row["EffectiveTo"]!=DBNull.Value && Convert.ToDateTime(row["EffectiveTo"])<month) continue;
-            DateTime start=Convert.ToDateTime(row["EffectiveFrom"]);
-            string period=row["EffectiveTo"]==DBNull.Value ? $"from {start:MMMM yyyy}"
-                : $"{start:MMM yyyy}–{Convert.ToDateTime(row["EffectiveTo"]):MMM yyyy}";
-            string note=$"{row["FeeTypeName"]}: No fee {period}";
-            if(row["EffectiveTo"]!=DBNull.Value)
-            {
-                DateTime resume=Convert.ToDateTime(row["EffectiveTo"]).AddMonths(1);
-                DataRow? next=table.AsEnumerable().FirstOrDefault(r=>Equals(r["FeeTypeId"],row["FeeTypeId"])
-                    && r["EffectiveFrom"]!=DBNull.Value && Convert.ToDateTime(r["EffectiveFrom"])==resume);
-                if(next!=null) note+=$"; Rs. {Convert.ToDecimal(next["NetAmount"]):N0} from {resume:MMM yyyy}";
-            }
-            notes.Add(note+".");
-        }
-        return string.Join("  |  ",notes);
     }
     private async Task LoadAvailableFeeOptionsAsync(int campusId, int yearId, int classId)
     {
@@ -3447,13 +3406,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             ? Convert.ToString(row[columnName]) ?? string.Empty
             : string.Empty;
     }
-    private static decimal GetDecimalColumn(DataRow row, string columnName)
-    {
-        return row.Table.Columns.Contains(columnName) &&
-               row[columnName] != DBNull.Value
-            ? Convert.ToDecimal(row[columnName])
-            : 0m;
-    }
     private void CollectPaymentNow()
     {
         if (!FeeCollectionAccess.CanUse(CurrentUser.HasPermission)) { Warn("Fee Collection requires both Collect Fee and View Fees access."); return; }
@@ -3632,15 +3584,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             Fail(ex);
         }
     }
-    private sealed class BillLineItem
-    {
-        public long ChargeId { get; init; }
-        public string FeeName { get; init; } = string.Empty;
-        public string BillingMonth { get; init; } = string.Empty;
-        public decimal Amount { get; init; }
-        public decimal DiscountAmount { get; init; }
-        public decimal GrossAmount { get; init; }
-    }
     private async Task RefreshConfirmReturnAvailabilityAsync(int admissionId, int version)
     {
         if (confirmReturnButton is null) return;
@@ -3791,41 +3734,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         dialog.ShowDialog(FindForm());
         if (!IsDisposed && currentAdmissionId == admissionId)
             await LoadStudentForEditAsync(admissionId);
-    }
-
-    private static async Task<int> GetActiveEnrollmentIdAsync(int admissionId)
-    {
-        var raw =
-            await DatabaseHelper.QueryUserAsync(
-                "GetStudentEnrollments",
-                DatabaseHelper.Int(
-                    "@AdmissionId",
-                    admissionId));
-        if (raw.Rows.Count == 0)
-            return 0;
-        foreach (DataRow row in raw.Rows)
-        {
-            if (string.Equals(
-                    GetTextColumn(row, "Status"),
-                    "Active",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return GetIntColumn(row, "EnrollmentId");
-            }
-        }
-        return GetIntColumn(raw.Rows[0], "EnrollmentId");
-    }
-    private static string FormatBillMonth(object value)
-    {
-        if (value is null || value == DBNull.Value)
-            return string.Empty;
-        return DateTime.TryParse(
-                Convert.ToString(value),
-                out DateTime date)
-            ? date.ToString(
-                "MMM-yyyy",
-                System.Globalization.CultureInfo.InvariantCulture)
-            : Convert.ToString(value) ?? string.Empty;
     }
     private async Task OpenPossibleSiblingSearch()
     {
@@ -4115,73 +4023,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
         else if (result.Outcome == PhotoSaveOutcome.Saved) photoInfo.Text = "Photo saved.";
         UpdatePhotoActions();
         return result.Outcome is PhotoSaveOutcome.Saved or PhotoSaveOutcome.NoPendingPhoto;
-    }
-    private static TableLayoutPanel BuildGrid(
-    int columns,
-    params (string Caption, Control Control, bool Required)[] fields)
-    {
-        int rows =
-            (fields.Length + columns - 1) / columns;
-        const int horizontalGap = 12;
-        var table = new TableLayoutPanel {
-            Dock = DockStyle.Fill,
-            ColumnCount = columns,
-            RowCount = rows,
-            Padding = new Padding(
-                2,
-                2,
-                2,
-                0),
-            Margin = new Padding(0)
-        };
-        const float fieldWidth = 45F;
-        for (int column = 0;
-             column < columns;
-             column++)
-        {
-            table.ColumnStyles.Add(
-                new ColumnStyle(
-                    SizeType.Percent,
-                    fieldWidth));
-        }
-        for (int row = 0;
-             row < rows;
-             row++)
-        {
-            table.RowStyles.Add(
-                new RowStyle(
-                    SizeType.Absolute,
-                    AppMetrics.FieldRowHeight));
-        }
-        for (int i = 0;
-             i < fields.Length;
-             i++)
-        {
-            int column = i % columns;
-            int row = i / columns;
-            var field = HumanUi.Field(
-                fields[i].Caption,
-                fields[i].Control,
-                fields[i].Required);
-            int leftGap =
-                column == 0
-                    ? 0
-                    : horizontalGap / 2;
-            int rightGap =
-                column == columns - 1
-                    ? 0
-                    : horizontalGap / 2;
-            field.Margin = new Padding(
-                leftGap,
-                0,
-                rightGap,
-                0);
-            table.Controls.Add(
-                field,
-                column,
-                row);
-        }
-        return table;
     }
     private bool IsPendingRegistration => _workspaceStudentStatus == "Pending";
     private bool legacySetupPending;

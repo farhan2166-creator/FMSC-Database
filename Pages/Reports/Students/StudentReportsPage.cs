@@ -594,15 +594,6 @@ public partial class StudentReportsPage : V2Page
                 break;
         }
     }
-    private void SelectCurrentYearIfNone()
-    {
-        if (year.SelectedId > 0 || _years is null || !_years.Columns.Contains("IsCurrent"))
-            return;
-        var current = _years.AsEnumerable().FirstOrDefault(r =>
-            r["IsCurrent"] != DBNull.Value && Convert.ToBoolean(r["IsCurrent"]));
-        if (current is not null)
-            SelectId(year, Convert.ToInt32(current["AcademicYearId"]));
-    }
     /// <summary>Date ranges are optional for lists, admissions, and movements.</summary>
     private bool LimitOn =>
         (_mode == ModeAdmissions || _mode == ModeList || _mode == ModeChanges) && limitDate.Checked;
@@ -755,22 +746,6 @@ public partial class StudentReportsPage : V2Page
         if (_raw is null)
             _shape = ComputeShape(ReadView(), Array.Empty<string>());
         OnFilterChanged();
-    }
-    // campus / class / section
-    private void ResetChildrenWhenParentCleared(LookupBox parent, params LookupBox[] children)
-    {
-        if (_cascading || parent.SelectedId > 0)
-            return;
-        _cascading = true;
-        try
-        {
-            foreach (LookupBox child in children)
-                SelectId(child, 0);
-        }
-        finally
-        {
-            _cascading = false;
-        }
     }
     private void OnParentChanged(bool classes, bool sections)
     {

@@ -731,45 +731,6 @@ public partial class MasterPage
             _reorderProcedure!,
             parameters.ToArray());
     }
-    private void NormalizeDisplayOrder(
-        Dictionary<string, object?> currentValues)
-    {
-        if (!HasReorderConfiguration)
-            return;
-        DataTable table =
-            QueryCurrentTable();
-        var rows =
-            GetOrderedScopeRows(
-                table,
-                currentValues);
-        if (rows.Count == 0)
-            return;
-        var ids =
-            rows.Select(GetOrderId)
-                .Where(id => id > 0)
-                .ToList();
-        if (ids.Count == 0)
-            return;
-        bool alreadyNormalized =
-            rows.Count == ids.Count &&
-            rows.Select(
-                    row =>
-                        Convert.ToInt32(
-                            row["DisplayOrder"] ==
-                            DBNull.Value
-                                ? 0
-                                : row["DisplayOrder"],
-                            CultureInfo.InvariantCulture))
-                .Select(
-                    (order, index) =>
-                        order == index + 1)
-                .All(x => x);
-        if (alreadyNormalized)
-            return;
-        Reorder(
-            currentValues,
-            ids);
-    }
     private void SelectGridRow(
         int id)
     {
@@ -1115,20 +1076,6 @@ public partial class MasterPage
                 Fail(ex);
         }
         return false;
-    }
-    private bool IsOrderColumn(
-        int columnIndex)
-    {
-        if (columnIndex < 0 ||
-            columnIndex >= Grid.Columns.Count)
-        {
-            return false;
-        }
-        string name =
-            Grid.Columns[columnIndex].Name;
-        return name is
-            "__OrderUp" or
-            "__OrderDown";
     }
     private int FirstOrderRowIndex()
     {

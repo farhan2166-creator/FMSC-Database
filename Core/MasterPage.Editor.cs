@@ -888,35 +888,6 @@ public partial class MasterPage
             return true;
         return base.ProcessCmdKey(ref msg, keyData);
     }
-    private bool AdvanceEditorOnEnter()
-    {
-        Control? active = FindForm()?.ActiveControl;
-        if (active is null ||
-            active is TextBoxBase { Multiline: true } ||
-            active is ComboBox { DroppedDown: true } ||
-            active is not (TextBoxBase or ComboBox or DateTimePicker))
-        {
-            return false;
-        }
-        var ordered = _controls.Values
-            .Where(c => c.Visible && c.Enabled)
-            .OrderBy(c => c.TabIndex)
-            .ToList();
-        int index = ordered.FindIndex(c => c == active || c.Contains(active));
-        if (index < 0)
-            return false;
-        for (int i = index + 1; i < ordered.Count; i++)
-        {
-            if (FocusInside(ordered[i]))
-                return true;
-        }
-        if (_saveButton is { Enabled: true, Visible: true })
-        {
-            _saveButton.PerformClick();
-            return true;
-        }
-        return false;
-    }
     private static bool FocusInside(Control control)
     {
         if (control.CanFocus && control.TabStop && control.Focus())
@@ -1173,40 +1144,5 @@ public partial class MasterPage
         return code.Length > maxLength
             ? code[..maxLength]
             : code;
-    }
-    private int GetNextDisplayOrder(
-        Dictionary<string, object?> currentValues)
-    {
-        DataTable table = QueryCurrentTable();
-        var rows =
-            GetOrderedScopeRows(
-                table,
-                currentValues);
-        return rows.Count + 1;
-    }
-    private int GetCurrentDisplayOrder(
-        Dictionary<string, object?> currentValues)
-    {
-        DataTable table = QueryCurrentTable();
-        if (!table.Columns.Contains("DisplayOrder"))
-            return 0;
-        foreach (DataRow row in table.Rows)
-        {
-            if (RowId(row) != _id ||
-                !SameOrderScope(row, currentValues))
-            {
-                continue;
-            }
-            if (row["DisplayOrder"] != DBNull.Value &&
-                int.TryParse(
-                    Convert.ToString(
-                        row["DisplayOrder"],
-                        CultureInfo.InvariantCulture),
-                    out int order))
-            {
-                return order;
-            }
-        }
-        return GetNextDisplayOrder(currentValues);
     }
 }

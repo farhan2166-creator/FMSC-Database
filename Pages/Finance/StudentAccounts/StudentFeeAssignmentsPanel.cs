@@ -396,10 +396,6 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
             return "Scheduled";
         return "Active";
     }
-    private void SetMonthOptions(DataTable assignments, DateTime selectedMonth)
-    {
-        ReferenceMonth = selectedMonth;
-    }
     private void UpdateMonthView()
     {
         if (enrollmentId <= 0) return;
@@ -448,8 +444,6 @@ public sealed class StudentFeeAssignmentsPanel : UserControl
                 _ => 2
             };
     }
-    private static bool HasEnded(DataGridViewRow row) =>
-        AssignmentStatus(row.Cells["EffectiveFrom"].Tag!, row.Cells["EffectiveTo"].Tag!, DateTime.Today) == "Historical";
     private static string FormatMonth(object value)
     {
         if (value == null || value == DBNull.Value)

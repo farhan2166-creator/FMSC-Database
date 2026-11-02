@@ -7,7 +7,7 @@ internal static partial class Program
 {
     private static void CheckFeeDocuments(List<FeeDocumentReviewSample>? review=null)
     {
-        foreach(string retired in new[]{"AdmissionBill.rdlc","FeePaymentReceipt.rdlc"})
+        foreach(string retired in new[]{"AdmissionBill.rdlc","FeePaymentReceipt.rdlc","FeeAgingReport.rdlc"})
             Check(!File.Exists(Path.Combine(AppContext.BaseDirectory,"Reports",retired)),"Retired templates are absent from the built application");
         foreach(var (template,dataSet) in new[]{(StudentBillReport.TemplateFile,StudentBillReport.DataSetName),
             (FamilyBillReport.TemplateFile,FamilyBillReport.DataSetName),(StudentReceiptReport.TemplateFile,StudentReceiptReport.DataSetName),

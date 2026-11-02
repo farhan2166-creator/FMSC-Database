@@ -1248,17 +1248,6 @@ public class StudentPicker : Panel, IValidationTarget, IAccessibleInput
         path.CloseFigure();
         return path;
     }
-    // Row helpers
-    private static string ReadText(
-        DataRow row,
-        string column) =>
-        row.Table.Columns.Contains(column) &&
-        row[column] != DBNull.Value
-            ? Convert
-                  .ToString(row[column])
-                  ?.Trim() ??
-              string.Empty
-            : string.Empty;
     private static int ReadInt(
         DataRow row,
         string column)

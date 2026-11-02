@@ -1836,7 +1836,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             Fail(ex);
         }
     }
-    private async Task LoadCharges() => await LoadChargesAsync(++loadVersion);
     private async Task LoadChargesAsync(int version)
     {
         charges.Rows.Clear();
@@ -2466,7 +2465,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             SetSiblingHint("" );
         }
     }
-    private async Task LoadRecentPayments() => await LoadRecentPaymentsAsync(++loadVersion);
     private async Task LoadRecentPaymentsAsync(int version)
     {
         familyPaymentBreakdowns.Clear();
@@ -4146,39 +4144,6 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             out decimal value)
                 ? value
                 : 0m;
-    }
-    private static DataTable FilterAdmissionId(
-        DataTable source,
-        int admissionId)
-    {
-        if (!source.Columns.Contains(
-                "AdmissionId"))
-        {
-            return source.Clone();
-        }
-        var result =
-            source.Clone();
-        foreach (DataRow row in source.Rows)
-        {
-            if (row["AdmissionId"] ==
-                DBNull.Value)
-            {
-                continue;
-            }
-            if (!int.TryParse(
-                    Convert.ToString(
-                        row["AdmissionId"]),
-                    out int id))
-            {
-                continue;
-            }
-            if (id ==
-                admissionId)
-            {
-                result.ImportRow(row);
-            }
-        }
-        return result;
     }
     private static int GetInt(
         DataRow row,
