@@ -1,47 +1,20 @@
 # Owner decisions and business invariants
 
-**Consolidated:** 21 October 2026  
-**Purpose:** One locator for consequential policies recorded across the audit reports. The dated reports remain the evidence; this summary does **not** rerun tests or certify the current build.
-
-Read [the master audit](FMSC_MASTER_AUDIT.md) for release gates and dated findings, [the audit index](README.md) for source reports, and [the UI style guide](../Docs/Design/UI_STYLE_GUIDE.md) for presentation conventions. Comments beside the applicable C# code preserve especially easy-to-miss rules; **code, SQL and compatibility checks remain authoritative for current behavior**.
+Consolidated in [Business Decisions](../Docs/BUSINESS_DECISIONS.md#owner-decisions-and-invariants).
+The complete dated record, decisions and verification limits are preserved there.
 
 ## Enforced or recorded application behavior
 
-**31 October 2026 — Registration simplification:** Admission owns pending child
-registration and sibling confirmation. Confirm/Cancel/Reopen belong to the
-student's row in Student & Siblings, not the main toolbar. Cancelled registrations
-reuse the same student identity through a reviewed reopening with a new pending
-placement, retaining cancelled episodes and all financial/family history. The
-separate Family Admission navigation entry is retired. See the
-[decision and implementation evidence](../Docs/Decisions/ADMISSION_REGISTRATION_SIMPLIFICATION.md).
-
-**31 October 2026 — Academic-year editing:** The owner approved locking Start/End
-dates once a year is referenced by student enrolment (including legacy/historical
-records) or promotion history. Name/Remarks corrections and Current remain
-editable. Implemented by `Migrations/63.sql` and `AcademicYearsPage`; see the
-isolated SQL and native `--academic-year-date-lock` checks. This entry records the
-decision and implementation, not complete release acceptance.
-
-| Area | Rule to preserve | Source / implementation | Evidence boundary |
-|---|---|---|---|
-| Fee collection and family payments | Posting a fee creates dues; collecting records settlement. A family collection may use one family receipt, but each child's allocations, discounts and dues stay attached to that child. Student advance settles fees without new cash. A successful collection must not be repeated merely because receipt printing fails. | [Finance wording record](../Docs/FINANCE_WORDING_REVIEW_2026-10-20.md), [FeeCollectionPage](../Pages/Finance/Collection/FeeCollectionPage.cs) | Reconfirm live SQL, lost-response and print/reprint routes for each release candidate. |
-| Daily collection closing | Refund/correction adjustment rows have no operator-entered **Actual Amount**: blank is intentional and must not become zero. Ordinary methods require actual amounts in whole rupees; fractional values are rejected without silent rounding. Display and printing must preserve legitimate existing historical precision. Closing reconciles money; it does not edit student payments. | [DailyCollectionClosingPage](../Pages/Finance/Collection/DailyCollectionClosingPage.cs), [UFA-07/08](Reviews/FMSC_END_USER_FLOW_AUDIT_2026-10-14.md), [master correction status](FMSC_MASTER_AUDIT.md) | Source-fixed in the recorded correction; physical print and disposable SQL/operator acceptance remain distinct gates. |
-| Monthly posting reversal | A reversal is **whole-school and all-or-nothing** for the eligible latest posting in the academic year. Later posting, payment history or ineligible placement can block reversal. The current snapshot and reason are checked; reversal does not erase paid transaction history. | [FeePostingReversalPage](../Pages/Finance/Billing/FeePostingReversalPage.cs), [end-user audit flow coverage](Reviews/FMSC_END_USER_FLOW_AUDIT_2026-10-14.md) | Eligibility must still be enforced at the database write; UI preview is not permission to bypass it. |
-| Quick Registration | Saving a pending quick registration does **not** itself confirm admission or allocate the final official admission number. Confirmation is a separate Pending Registrations/admission-review step; printing a bill and collecting payment are separate operations. On uncertain save results, check recorded outcome before retrying. | [QuickRegistrationFormPage](../Pages/Students/Admissions/QuickRegistrationFormPage.cs), [StudentAdmissionPage](../Pages/Students/Admissions/StudentAdmissionPage.cs), [historical audit index](Archive/FMSC_HISTORICAL_AUDITS.md) | Preserve the request recovery safeguards and verify actual interrupted-save/restart scenarios on disposable data. |
-| Student posting hold and resume | A temporary hold stops automatic and ordinary manual fee posting while retained dues remain collectible. Resume reuses the identity, preserves placement start, and explicitly reviews billing month, selected waived fees, unbilled annual fees and optional advance. Refunds and certificates remain recorded. Existing Left records require individual reviewed adoption; certificate presence is not a blanket resume barrier. | [Owner discussion](Reviews/FMSC_Student_Hold_Resume_Discussion_2026-10-21.md), [implementation/operator policy](../Docs/STUDENT_POSTING_HOLDS.md), [migration 30](../Migrations/30.sql), [hold/resume dialog](../Pages/Students/Admissions/StudentPostingHoldDialog.cs) | Implemented from starting commit `c3184b6` on 21 October 2026; migration 30 applied to the authorized school database after a verified backup and unchanged-record checks. Disposable SQL/native desktop checks passed; school-operator acceptance remains separate. |
-| Fees, discounts and plans | A class rate or future fee-plan change must not silently alter already posted bills. Discount is a reduction **from** the full fee; adjusting a recorded payment is different from refunding cash. Where a reduction affects paid amounts, the choice of advance versus refund must remain explicit. | [Finance wording record](../Docs/FINANCE_WORDING_REVIEW_2026-10-20.md), [UiText.Fees](../Core/UiText.cs) | Do not simplify critical financial explanations while trimming routine UI guidance. |
-| Setup draft discard | The shared master editor's explicit **New Record** action intentionally discards its current draft without a new confirmation. Record switching and leaving the page retain their existing safeguards. Small Classes/Sections setup drafts follow the owner-accepted exception; embedded bulk fee drafts do not. | [MasterPage owner-decision comment](../Core/MasterPage.cs), [UFA-03 and status](FMSC_MASTER_AUDIT.md) | Do not introduce blanket unsaved-draft prompts as a cosmetic consistency change. |
-| Backup and restore | Restoring school data is potentially destructive. Unknown or foreign backups must not be treated as compatible; older verified backups must warn of newer-record loss. Keep existing safety-copy, recovery and rollback precautions. Never use a DACPAC to overwrite a school's attached MDF/LDF. | [BackupRestorePage](../Pages/Administration/BackupRestorePage.cs), [master release gates](FMSC_MASTER_AUDIT.md) | Installation, operator-account access, actual backup and rollback remain unverified release gates unless separately evidenced. |
-| Roles and access | Preserve the owner-approved Administrator/Accountant role boundary and explicit granted permissions. Shortcut visibility and screen access must follow the same destination authorization, not sidebar visibility. | [Master audit](FMSC_MASTER_AUDIT.md), [UFA-06/09](Reviews/FMSC_END_USER_FLOW_AUDIT_2026-10-14.md), [PermissionCatalog](../Core/PermissionCatalog.cs) | Do not broaden permissions as part of audit organization or UI cleanup. |
+See the [preserved section](../Docs/BUSINESS_DECISIONS.md#owner-decisions-and-invariants-enforced-or-recorded-application-behavior).
 
 ## Approved target policy that is **not yet proven implemented**
 
-**Database/installer transition — do not mark complete.** The owner's target is: fresh installations use a verified matching detached MDF/LDF pair supplied outside the private repository; already compatible school databases retain every record; older, newer or structurally incompatible databases are refused **without** upgrades or replacement. However, the [dated master migration-retirement review](FMSC_MASTER_AUDIT.md) and [post-merge audit](Reviews/FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md) found that the installer still allowed older-schema upgrade paths and lacked equivalent full pre-activation compatibility verification at their reviewed revisions. **Do not delete migration files, startup compatibility requirements, recovery contracts or installation rollback until the independent detached-snapshot and installer verification gate passes.** This is an approved *target*, not a claim about current runtime behavior.
+See the [preserved section](../Docs/BUSINESS_DECISIONS.md#owner-decisions-and-invariants-approved-target-policy-that-is-not-yet-proven-implemented).
 
 ## UI consistency — design constraints, not database rules
 
-The visual design is almost final. Full-page workspaces retain the shared title treatment; short context/subtitles are **optional only when useful**. Embedded workspace headers may deliberately be hidden. Preserve Finance and Admissions workflows, the approved Fee Collection layout, warnings, consent, confirmations, status/error messages and accessibility. Propose copy-only improvements first; screenshots, scaling/theme checks and owner approval precede layout changes. See [UI guidance audit, G01–G17](Reviews/FMSC_UI_Guidance_Audit_2026-10-20.md) and the [style guide](../Docs/Design/UI_STYLE_GUIDE.md).
+See the [preserved section](../Docs/BUSINESS_DECISIONS.md#owner-decisions-and-invariants-ui-consistency--design-constraints-not-database-rules).
 
 ## Maintenance rule
 
-When a decision is new or materially changes, update this locator **and** the nearest relevant code comment/test or owner policy document. State the date and reviewed commit; do not turn a historical pass into a current guarantee. Keep underlying audit evidence immutable, and do not repeat historical reports in new files.
+See the [preserved section](../Docs/BUSINESS_DECISIONS.md#owner-decisions-and-invariants-maintenance-rule).

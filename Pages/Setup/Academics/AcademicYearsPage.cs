@@ -1,5 +1,7 @@
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Setup.Academics;
+// BD-23: any enrollment or promotion usage locks year dates; Name/Remarks/Current remain editable.
+// The transactional SQL guard must also reject stale-form date changes.
 public sealed class AcademicYearsPage : MasterPage
 {
     private FormValidator? _yearValidator;

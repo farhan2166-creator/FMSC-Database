@@ -1,5 +1,7 @@
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Reports.Finance;
+// BD-20: current dues/credit and filtered period totals are distinct; no running ledger or net debt is invented.
+// Receipts access must not grant statement SQL/export; retain each reader and correction writer's permissions.
 public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
 {
     private readonly StudentPicker studentSearch = new();

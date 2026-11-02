@@ -13,7 +13,7 @@ public sealed class ReverseChargeDialog : ApplicationWindowForm
     };
     /* True from the moment the write leaves for the server until it has answered. */
     private bool saving;
-    /* UX - the missing reason is marked on its field, not shown in a message box. */
+    /* Mark a missing reason on its field. */
     private readonly FormValidator validator = new();
     private readonly ModernButton cancelButton = new() {
         Text = UiText.Actions.Cancel,

@@ -98,7 +98,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
         _ = LoadFiltersAsync();
         Shown += (_, _) => searchBox.Focus();
         KeyDown += (_, e) => {
-            /* UX - a drop-down that is open owns Esc/Enter (close the list / pick the item). The dialog used to close, or run a search, underneath it. */
+            /* An open dropdown owns Esc/Enter; do not close the dialog or search underneath it. */
             bool listOpen = ActiveControl is ComboBox { DroppedDown: true };
             if (listOpen)
                 return;
@@ -114,7 +114,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
             }
             else if (e.KeyCode == Keys.Enter && ActiveControl is ButtonBase)
             {
-                /* UX - Enter on a focused button presses THAT button (Reset, Open Student, Close). It used to run a search instead, whatever had focus. */
+                /* Enter invokes the focused button instead of always searching. */
             }
             else if (e.KeyCode == Keys.Enter)
             {
@@ -124,13 +124,13 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
             }
             else if (e.KeyCode == Keys.Down && ActiveControl is TextBox && resultsGrid.Rows.Count > 0)
             {
-                /* UX - from the search box, Down goes straight to the results so the whole type -> Enter -> Down -> Enter path works without the mouse or Tab. */
+                /* Down moves from search input to results for keyboard selection. */
                 e.SuppressKeyPress = true;
                 resultsGrid.Focus();
             }
         };
     }
-    /* UX - Enter on the results grid must open the student. ProcessCmdKey runs first and is deterministic. */
+    /* ProcessCmdKey opens the selected result before the grid consumes Enter. */
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
         if (keyData == Keys.Enter && resultsGrid.ContainsFocus && !resultsGrid.IsCurrentCellInEditMode && GetSelectedAdmissionId() > 0)
@@ -439,7 +439,7 @@ public sealed class StudentSearchDialog : ApplicationWindowForm
                     : "1 student found. Press Enter to open the record.")
                 : $"{filtered.Count:N0} student(s) found. The first one is selected - "
                   + "press Down to choose another, then Enter to open.";
-            /* UX - one match: hand focus to the result so Enter opens it. */
+            /* Focus a single result so Enter can open it. */
             if (filtered.Count == 1 && !resultsGrid.Focused && ActiveControl is TextBox)
                 resultsGrid.Focus();
         }

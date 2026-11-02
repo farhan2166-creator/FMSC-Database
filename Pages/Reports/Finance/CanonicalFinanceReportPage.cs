@@ -2,6 +2,8 @@ using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Reports.Finance;
 /// <summary>Shared behavior for the three canonical finance reports. The same captured table feeds the grid, printer and CSV export.</summary>
+// BD-26/27: sort before pagination and reuse the same captured result for print/export.
+// Academic month blocks and custom dates select the same bounds; each report retains its own date meaning.
 public abstract class CanonicalFinanceReportPage : V2Page
 {
     protected readonly ModernDatePicker From = new() { Format = DateTimePickerFormat.Custom, CustomFormat = "dd-MM-yyyy", Value = DateTime.Today.AddMonths(-1) };

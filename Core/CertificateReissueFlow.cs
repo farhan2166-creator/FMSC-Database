@@ -3,6 +3,8 @@ using Microsoft.Data.SqlClient;
 
 namespace FMSC_SMS.Core;
 
+// BD-21: Issue Again prepares a separate copy without undoing leaving, enrollment or fees.
+// Do not revive the removed cancel/void or replacement-from-cancelled-copy workflow.
 internal sealed class CertificateReissueException(string message,Exception? inner=null) : InvalidOperationException(message,inner);
 
 /// <summary>A reviewed new copy, with the existing durable intent and outcome checks.</summary>

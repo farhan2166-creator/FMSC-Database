@@ -4,6 +4,8 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.StudentAccounts;
 
 /// <summary>Choose fee terms and confirm on one screen; validate the financial snapshot before saving.</summary>
+// BD-10/11/12: Admissions and Collection share fee rules, but Collection deliberately starts with one month.
+// Agreement changes and issued-bill corrections are distinct; paid reductions require a reviewed advance/refund choice.
 public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
 {
     private readonly int assignment;

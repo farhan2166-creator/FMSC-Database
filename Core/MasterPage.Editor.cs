@@ -880,7 +880,7 @@ public partial class MasterPage
         }
         return values;
     }
-    /* UX - the editor had no Enter key at all: typing a name and pressing Enter did nothing (with a system beep). */
+    /* Enter advances through editable fields via the shared focus navigator. */
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
         if (keyData == Keys.Enter && !_saving &&
@@ -1002,7 +1002,7 @@ public partial class MasterPage
                 else
                     Warn($"{entity} saved successfully, but the records list could not refresh. Refresh the records before continuing.");
             }
-            /* UX - the editor is empty and ready for the next record: the cursor goes back to its first field instead of nowhere. */
+            /* Return focus to the first editor field after saving. */
             focusAfterSave = null;
             focusNewRecord = true;
         }

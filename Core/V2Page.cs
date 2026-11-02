@@ -759,7 +759,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             async (_, _) => {
                 if (button is null || !button.Enabled)
                     return;
-                /* UX - disabling the button that has keyboard focus makes Windows move focus to whatever comes next. */
+                /* Preserve focus before disabling the active action button. */
                 Form? owningForm = FindForm();
                 bool buttonHadFocus = button.Focused;
                 button.Enabled = false;
@@ -769,7 +769,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                 void NoteEnabledChange(object? sender, EventArgs e) =>
                     pageChangedEnabled = true;
                 button.EnabledChanged += NoteEnabledChange;
-                /* UX - "Saving…" / "Collecting payment…" in the status line while the operation runs. */
+                /* Show progress inline while the action runs. */
                 BusyScope? progressScope = progress is null ? null : BeginBusy(progress);
                 try
                 {
@@ -813,7 +813,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
                     SetStatus(text, kind);
             },
             FindForm());
-    /// <summary>UX - the loading variant: a message only, nothing disabled ("Loading students…", "Loading history…").</summary>
+    /// <summary>Show loading progress without disabling controls.</summary>
     protected BusyScope BeginLoading(string message) => BeginBusy(message);
     /// <summary>Run inside a busy scope and reject concurrent submissions.</summary>
     protected async Task<bool> RunBusyAsync(
@@ -837,7 +837,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         }
         return true;
     }
-    /// <summary>UX - the page's inline-validation helper, wired to this page: the one-line summary.</summary>
+    /// <summary>Create inline validation with this page's summary.</summary>
     private FormValidator? _requiredFieldsValidator;
     protected bool ValidateRequiredInputs(Control? root = null)
     {
@@ -1343,7 +1343,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             _reportLoads.Complete(ticket);
         }
     }
-    /* UX - a failed load leaves the grid saying so, inline, instead of looking like "no records". */
+    /* Distinguish a failed load from an empty result. */
     private bool MarkReportGridFailed(CancellationTokenSource cts)
     {
         if (!cts.IsCancellationRequested && !IsDisposed)

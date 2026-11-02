@@ -8,6 +8,8 @@ namespace FMSC_SMS.Pages.Students.Enrollment;
 public enum StudentPlacementTask { AnnualPromotion, Transfer, Correction, History }
 
 /// <summary>Dedicated placement pages sharing the same lifecycle and recovery rules.</summary>
+// BD-08/09: same-year transfer/correction is distinct from next-year promotion; section-only moves do not reprice fees.
+// Keep reviewed plan/recovery identity and require return confirmation before new-placement billing.
 public sealed class StudentPlacementPage : V2Page, IBusyPage
 {
     private readonly int operation;

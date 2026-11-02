@@ -230,9 +230,8 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
         /* A bare "Save" does not say what is being saved. Kept short by construction, so the existing action-bar width fitting still applies unchanged. */
         string saveActionText = "Save " + MasterEntityNaming.Singularize(NavigationTitle);
         var save = AddAction(saveActionText, Save, "Success");
-        /* Owner decision: starting a new record deliberately discards edits immediately, without
-           an unsaved-change confirmation. Keep confirmations for record switching
-           and leaving the page; do not add one to this explicit discard action. */
+        /* BD-25: New Record deliberately discards its draft without confirmation.
+           Record switching and leaving keep their own unsaved-change safeguards. */
         string clearActionText = "New Record";
         var clear = AddAction(clearActionText, (_, _) => {
             if (_saving || !CanChangeRecord())

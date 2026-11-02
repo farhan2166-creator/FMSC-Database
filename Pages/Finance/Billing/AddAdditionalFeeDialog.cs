@@ -65,7 +65,7 @@ public sealed class AdditionalFeeEntry : UserControl
         AutoSize = true, Dock = DockStyle.Fill,
         Font = AppTheme.SmallFont, ForeColor = AppTheme.MutedText
     };
-    /* UX - what is wrong is marked on the fields, all at once, instead of one message box. */
+    /* Mark all invalid fields together before submission. */
     private readonly FormValidator validator = new();
     public static int PreferredHeight =>
         3 * AppMetrics.FieldRowHeight + AppMetrics.ButtonRowHeight + AppScale.Scale(108);

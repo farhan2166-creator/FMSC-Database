@@ -8,6 +8,8 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 
 // Keep preview validation and the existing stored procedure inside one transaction.
 // Locks protect the comparison through the procedure's nested transaction/commit.
+// BD-01/02/33: preserve the pending identity and durable request outcome; recheck placement/fees at commit.
+// Only verified rollback is a correctable refusal; timeouts and lost responses stay uncertain.
 internal static class QuickRegistrationWriter
 {
     internal const string FeeQuery = """

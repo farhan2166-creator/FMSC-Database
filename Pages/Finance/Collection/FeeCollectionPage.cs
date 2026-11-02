@@ -3145,7 +3145,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             const string transactionType = "Collection";
             if (paymentDate.Value.Date > DateTime.Today)
             {
-                /* UX - marked on the date field itself; the summary line carries the same words. */
+                /* Keep the date-field error and validation summary consistent. */
                 MarkCollectionField(paymentDate, "Not in the future");
                 return;
             }

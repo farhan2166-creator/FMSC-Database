@@ -119,7 +119,7 @@ public abstract class ContextPage : V2Page
     private readonly HashSet<Control> _contextBlockedControls = new();
     private readonly HashSet<Control> _contextControlsChangedWhileLoading = new();
     private readonly List<(Control Control, bool Enabled)> _contextRestoreState = new();
-    /* UX fix - picking the next item in a picker with the Down arrow fires its SelectedIndexChanged. */
+    /* Arrow-key selection changes can fire while the picker is still handling input. */
     private Control? _contextFocusToRestore;
     private LookupBox? _pendingTabSource;
     private LookupBox? _pendingTabTarget;

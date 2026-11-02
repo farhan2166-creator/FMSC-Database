@@ -6,6 +6,8 @@ using FMSC_SMS.Pages.Students.Dialogs;
 using FMSC_SMS.Pages.Students.Enrollment;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Admissions;
+// BD-01: the sibling panel excludes the loaded child; its main Save/registration actions operate on that child.
+// Keep sibling row actions, pending confirmation and cancelled-registration reopening on the existing identity.
 public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges, IBusyPage
 {
     protected override int ActionStatusWidth => 240;
@@ -287,7 +289,7 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
     private AdmissionSubmission? unconfirmedAdmission;
     private bool savedAdmissionReadyForNext;
     private bool saveBusy;
-    /* UX - inline validation, the post-save "what next" strip, and the toolbar buttons a running save must not be interrupted by. */
+    /* Keep validation, post-save guidance and busy actions in the same form. */
     private FormValidator? admissionValidator;
     private ModernButton? findButton;
     private ModernButton? newAdmissionButton;

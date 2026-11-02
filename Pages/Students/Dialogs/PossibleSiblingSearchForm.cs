@@ -111,7 +111,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
         Shown += (_, _) =>
             Search();
     }
-    /* UX - Enter did nothing anywhere on this dialog. The grid consumes Enter itself, so this is handled in ProcessCmdKey, which runs before it. */
+    /* Handle Enter before the grid consumes it. */
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
         if (keyData == Keys.Enter && ActiveControl is not ButtonBase and not ComboBox { DroppedDown: true })
@@ -455,7 +455,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
             if (resultsGrid.CurrentRow is null ||
                 !resultsGrid.Columns.Contains("AdmissionId"))
             {
-                /* UX - nothing was attempted, so this is said in the form's own status line. */
+                /* Report a skipped action inline. */
                 status.Text = "Select the correct student from the list first.";
                 return;
             }
@@ -527,7 +527,7 @@ public sealed class PossibleSiblingSearchForm : ApplicationWindowForm
             AddedSibling = true;
             LoadCurrentFamilyIds();
             Search();
-            /* UX - a completed add is reported in the status line, after the refreshed search result, rather than in a message box the operator has to dismiss. */
+            /* Show add success inline after refreshing results. */
             status.Text = $"{studentName} has been added as a sibling.";
         }
         catch (Exception ex)

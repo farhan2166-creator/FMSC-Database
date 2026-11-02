@@ -1,5 +1,5 @@
 namespace FMSC_SMS.Core;
-/// <summary>UX - one shared, non-modal "work in progress" state. Scopes nest: each one restores what it captured, in reverse order.</summary>
+/// <summary>Nested, non-modal busy state; restore captured state in reverse order.</summary>
 public sealed class BusyScope : IDisposable
 {
     private sealed class Captured

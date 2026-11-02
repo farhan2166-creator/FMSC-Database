@@ -34,7 +34,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
     private DataTable studentResults => student.Source;
     private DataTable certificateResults = new();
     private int currentClassId;
-    /* Finding 4 - the enrolment a new certificate would attach to. dbo.CreateLeaveCertificate scopes its "already issued" refusal to THIS leaving episode (its @CheckEnrollmentId block). */
+    /* Finding 4 / BD-21: duplicate checks use this leaving episode, not all prior certificates. */
     private int currentEnrollmentId;
     /* Finding 7 - true only when the leave date on screen came from the student's recorded withdrawal date. When it did not, the date is a deliberate choice. */
     private bool leaveDatePrefilled;
@@ -240,7 +240,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
             LoadStudentDates(admissionId);
             currentClassId =
                 GetInt(row, "ClassId");
-            // Finding 4 - which leaving episode a new certificate would belong to.
+            // Finding 4 / BD-21: enrollment for the new leaving episode.
             currentEnrollmentId =
                 GetInt(row, "EnrollmentId");
             currentClass.Text =
@@ -423,7 +423,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
         HideGridColumn("IssuedByUserId");
         HideGridColumn("LeaveRecordId");
         HideGridColumn("CertificateType");
-        // Finding 4 - read by the page (see HasCertificateForCurrentEnrollment), not shown.
+        // Finding 4: retain the hidden episode key for duplicate checks.
         HideGridColumn("EnrollmentId");
         CertificateCollectionFlow.FormatGrid(Grid);
         CertificateRecordOrder.FitColumns(Grid);
@@ -546,7 +546,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
             SetStatus("Search for and select a college student.");
             return;
         }
-        /* Finding 4 - a selected issuance is reported first now: with a re-admitted student the create guidance below is shown for the NEW leaving episode while the earlier episode's issuances… */
+        /* Finding 4 / BD-21: selected-copy guidance takes precedence over the new leaving episode. */
         if (hasSelectedIssue)
         {
             if (!selectedIssueCollected)
@@ -574,7 +574,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
                 SetStatus("This student is not active. A new college leaving certificate cannot be created.", true);
                 return;
             }
-            // Finding 4 - say where the rows in the list come from.
+            // Finding 4: identify the listed leaving episode.
             string earlierEpisodeNote =
                 hasCertificate
                     ? "A leaving certificate from an earlier placement is listed below; it stays there for printing. "
@@ -631,7 +631,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
     }
     private int CountDuplicateIssues()
     {
-        /* Finding 4 - dbo.IssueLeaveCertificate counts duplicates per LeaveRecordId, and Issue Again always acts on the newest record. */
+        /* Finding 4 / BD-21: duplicates are per LeaveRecordId; Issue Again uses its newest record. */
         int newestRecordId = selectedLeaveRecordId>0?selectedLeaveRecordId:GetExistingLeaveRecordId();
         int count = 0;
         foreach (DataRow row in certificateResults.Rows)
@@ -699,7 +699,7 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges
                 Warn("Select a college student first.");
                 return;
             }
-            /* Finding 4 - scoped to this leaving episode, exactly as dbo.CreateLeaveCertificate scopes its own refusal. */
+            /* Finding 4 / BD-21: match SQL duplicate refusal to the current leaving episode. */
             if (HasCertificateForCurrentEnrollment())
             {
                 Warn("This student already has a leaving certificate for this placement.");

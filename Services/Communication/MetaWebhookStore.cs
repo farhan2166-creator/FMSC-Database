@@ -5,6 +5,8 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Services.Communication;
 
 // The external ingress performs signature/account/time validation itself. UI stores cannot invoke raw ingestion.
+// BD-35/36: webhook checks use communication contracts independently of main schema version.
+// Preserve authenticated provider evidence, idempotency and delivery history.
 public sealed class MetaWebhookStore(Func<SqlConnection> connections,int actor,string secret,string businessAccount,string phoneId)
 {
     public async Task<bool> ReceiveAsync(byte[] body,string signature,DateTimeOffset now,CancellationToken token)

@@ -4,6 +4,8 @@ using System.Text.Json.Nodes;
 namespace FMSC_SMS.Core;
 
 /// <summary>Shared startup/restore contract for the current application schema.</summary>
+// BD-29/30/31: keep version, structure and recovery guards; a DACPAC is not a replacement for school data.
+// Historical no-upgrade targets do not justify removing numbered migrations or retained operational/audit readers.
 internal static class DatabaseCompatibility
 {
     private static readonly Lazy<string> Requirements = new(LoadRequirements);

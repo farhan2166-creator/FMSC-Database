@@ -2,6 +2,7 @@ using FMSC_SMS.Pages.Security;
 
 namespace FMSC_SMS.Core;
 
+// BD-22: derive year choices from saved academic-year evidence; do not restore the removed Passed Exam gate.
 internal static class CharacterCertificateOptions
 {
     internal static readonly string[] Conduct={"Good","Very Good","Excellent"};

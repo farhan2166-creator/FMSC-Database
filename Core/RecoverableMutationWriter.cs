@@ -7,6 +7,8 @@ using FMSC_SMS.Pages.Security;
 namespace FMSC_SMS.Core;
 
 /// <summary>One existing business procedure and its request marker commit together.</summary>
+// BD-33: persist request identity before submitting; an uncertain reply must be reconciled before retry.
+// A print failure does not authorize replaying the committed financial or identity operation.
 internal static class RecoverableMutationWriter
 {
     internal static string PayloadHash(MutationKind kind,int user,params SqlParameter[] parameters)

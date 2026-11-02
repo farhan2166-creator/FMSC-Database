@@ -220,7 +220,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         saveButton.Click += async (_, _) => {
             if (savingGrid || !saveButton.Enabled)
                 return;
-            /* UX - commit a cell that is still being typed in, so the value on screen is the value that is saved. */
+            /* Commit the active cell before reading values for save. */
             if (!grid.EndEdit()) return;
             savingGrid = true;
             saveButton.Enabled = false;
@@ -240,7 +240,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
                     campus.SelectedValue != null &&
                     classes.Count > 0 &&
                     feeTypeRows.Count > 0;
-                /* UX - disabling the grid during the write dropped keyboard focus; hand it back so the person can carry on typing (or land on the first cell that needs fixing)… */
+                /* Restore grid focus after writing, or focus the first invalid cell. */
                 if (!IsDisposed && grid.CanFocus)
                     grid.Focus();
             }
@@ -842,7 +842,7 @@ public sealed class FeeRateMatrixForm : ApplicationWindowForm, IUnsavedChanges, 
         if (invalidCount > 0)
         {
             summaryLabel.Text = $"{invalidCount} cell(s) have an invalid amount - fix the highlighted cells and try again.";
-            /* UX - take the person to the first cell that needs fixing. */
+            /* Focus the first invalid cell. */
             if (firstInvalidCell != null)
                 grid.CurrentCell = firstInvalidCell;
             return;

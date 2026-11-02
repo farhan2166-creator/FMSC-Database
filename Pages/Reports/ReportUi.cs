@@ -11,7 +11,7 @@ internal static class ReportUi
         ChoiceFilters.Remove(choice);
         ChoiceFilters.Add(choice, new ChoiceFilter(defaultIndex));
     }
-    /// <summary>UX - the shared "From must not be after To" check for the dated reports, shown on the To picker itself ("Earlier than From") instead of in a message box.</summary>
+    /// <summary>Validate From/To order inline on the To picker.</summary>
     public static bool ValidDateRange(FormValidator validator, ModernDatePicker from, ModernDatePicker to)
     {
         validator.Begin();

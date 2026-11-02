@@ -8,6 +8,7 @@ namespace FMSC_SMS.Core;
 /// reject old placements or historical corrections solely because they
 /// were later disabled. SQL still owns permissions and financial safety.
 /// </summary>
+// BD-08: active catalog choices govern new placements; later deactivation must not invalidate recorded history.
 internal static class ActiveClassSectionPolicy
 {
     private const string ActiveIdsSql =

@@ -6,7 +6,7 @@ public sealed class ChangeUsernameForm : ApplicationWindowForm
     readonly ModernButton save = new() { SavesChanges = true, Text = "Change Username", Dock = DockStyle.Fill };
     /* True from the moment the rename is sent until it returns. */
     bool savingUsername;
-    /* UX - a missing username is marked on the field, not shown in a message box. */
+    /* Mark a missing username inline. */
     readonly FormValidator validator = new();
     public ChangeUsernameForm()
     {
@@ -27,7 +27,7 @@ public sealed class ChangeUsernameForm : ApplicationWindowForm
             if (!save.Enabled)
                 return;
             save.Enabled = false;
-            /* UX - the button itself says the write is under way. */
+            /* Show write progress on the action button. */
             string idleText = save.Text;
             save.Text = "Saving…";
             /* FormClosing reads this. */

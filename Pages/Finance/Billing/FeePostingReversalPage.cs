@@ -4,6 +4,8 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Finance.Billing;
 
 /// <summary>Undo only the latest current-year month, for the whole school, with no payment history.</summary>
+// BD-16: reverse the latest eligible posting whole-school and atomically; never offer per-student exclusions.
+// SQL must recheck payment history, later postings and the reviewed snapshot.
 public sealed class FeePostingReversalPage : V2Page, IBusyPage
 {
     private readonly LookupBox monthBox = new();

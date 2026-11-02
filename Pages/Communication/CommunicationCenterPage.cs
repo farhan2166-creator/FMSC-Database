@@ -7,6 +7,8 @@ using FMSC_SMS.Services.Communication;
 
 namespace FMSC_SMS.Pages.Communication;
 
+// BD-35/36: opening this optional module neither installs it nor starts live dispatch.
+// Use reviewed contacts/consent and templates; queued or simulated messages are not delivered messages.
 public sealed partial class CommunicationCenterPage : V2Page,IBusyPage,IUnsavedChanges
 {
     private readonly SqlCommunicationStore store;

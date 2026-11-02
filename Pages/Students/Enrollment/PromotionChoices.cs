@@ -1,5 +1,7 @@
 namespace FMSC_SMS.Pages.Students.Enrollment;
 
+// BD-09: choose the next class from the full program catalog before validating destination availability.
+// A missing intermediate campus assignment must not silently skip a class.
 internal static class PromotionChoices
 {
     // Find the next catalog class before applying campus availability: a missing

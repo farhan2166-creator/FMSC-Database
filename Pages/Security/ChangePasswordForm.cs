@@ -8,7 +8,7 @@ public sealed class ChangePasswordForm : ApplicationWindowForm
     readonly ModernButton save = new() { SavesChanges = true, Text = "Change Password", Dock = DockStyle.Fill };
     /* Keep the dialog open while the password change is being saved. */
     bool savingPassword;
-    /* UX - a missing or mismatched password is marked on the field, not shown in a message box. */
+    /* Mark missing or mismatched passwords inline. */
     readonly FormValidator validator = new();
     public ChangePasswordForm()
     {
@@ -29,7 +29,7 @@ public sealed class ChangePasswordForm : ApplicationWindowForm
             if (!save.Enabled)
                 return;
             save.Enabled = false;
-            /* UX - the button itself says the write is under way (the hash alone takes a moment). */
+            /* Show write progress on the action button. */
             string idleText = save.Text;
             save.Text = "Saving…";
             /* FormClosing reads this. */

@@ -1,6 +1,8 @@
 using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Setup.Academics;
+// BD-24: catalogs are global; creating/renaming a row does not save campus assignments.
+// Refresh pending matrix changes by IDs; only Apply Changes commits assignments.
 public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
 {
     private readonly Dictionary<(int ClassId, int SectionId), bool> catalogDraft = new();

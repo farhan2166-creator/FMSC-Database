@@ -1,5 +1,10 @@
 # FMSC_SMS — Master Audit and Release Status
 
+**Documentation consolidation — 2 November 2026:** current business rules live in
+[C#](../Core/BusinessDecisions.cs) and the [decision handbook](../Docs/BUSINESS_DECISIONS.md).
+[Review history](REVIEW_HISTORY.md) preserves dated reports and their original finding IDs.
+This reorganization does not rerun or upgrade the evidence recorded below.
+
 **Updated:** 14 October 2026  
 **Reviewed source:** [`14aba80a8751322e04aa028f960e0a68efaf08f2`](https://github.com/farhan2166-creator/FMSC-Database/commit/14aba80a8751322e04aa028f960e0a68efaf08f2) for the read-only migration-retirement verification below. Historical findings retain their original source freezes.
 **Historical evidence:** [FMSC_HISTORICAL_AUDITS.md](Archive/FMSC_HISTORICAL_AUDITS.md)

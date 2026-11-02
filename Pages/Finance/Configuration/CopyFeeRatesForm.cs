@@ -448,7 +448,7 @@ public sealed class CopyFeeRatesForm : ApplicationWindowForm
     }
     private void Apply()
     {
-        /* UX - a repeated click/Enter after the copy committed must not ask again. */
+        /* Ignore queued repeat input after a committed copy. */
         if (Applied)
             return;
         preview.EndEdit();

@@ -2,6 +2,8 @@ using FMSC_SMS.Core;
 using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Students.Admissions;
 
+// BD-02/04/07: reopening a cancelled pending identity is distinct from readmitting an admitted former student.
+// Historical placement, activation/billing dates and recorded departure remain separate decisions.
 internal sealed class CloseAdmissionDialog : ApplicationWindowForm
 {
     private readonly ModernDatePicker date=HumanUi.Date(),waiveFrom=HumanUi.Date();

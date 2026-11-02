@@ -434,7 +434,7 @@ public sealed class TransferFeeSyncDialog : ApplicationWindowForm
         if(CanApplyDestinationFees){keepOption.Checked=false;currentMonthOption.Checked=true;}
         else keepOption.Checked=true;
         RefreshComparison();
-        /* UX - the decision on this dialog is the choice below the grid, not the grid. */
+        /* The explicit policy choice, not the grid selection, determines the transfer decision. */
         AcceptButton = confirmButton;
         CancelButton = cancelButton;
         ActiveControl = CanApplyDestinationFees ? currentMonthOption : keepOption;

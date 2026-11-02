@@ -463,7 +463,7 @@ namespace FMSC_SMS.Core
             MutedText;
         public static Color ButtonShadow =>
             Color.FromArgb(42, Math.Max(0, Border.R - 18), Math.Max(0, Border.G - 18), Math.Max(0, Border.B - 18));
-        // Control heights IMPORTANT: Scale(int) already applies ControlSizeScale. The previous implementation applied ControlSizeScale twice: Scale(40, ControlSizeScale) This has been corrected to: Scale(40)
+        // Scale(int) already applies ControlSizeScale; do not scale control heights twice.
         public static int InputHeight =>
             AppScale.Scale(40);
         public static int ButtonHeight =>

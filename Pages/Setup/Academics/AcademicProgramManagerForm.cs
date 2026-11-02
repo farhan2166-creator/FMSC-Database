@@ -256,7 +256,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
     }
     private void SaveProgram()
     {
-        /* UX - a click/Enter that was already queued when the save finished must not save twice. */
+        /* Ignore queued repeat input after a completed save. */
         if (savedSuccessfully)
             return;
         validator.Begin();
@@ -326,7 +326,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
         catch (Exception ex)
         {
             ModernMessageDialog.Show(this, DbMessage.UserMessage(ex), "Program", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            /* UX - a refusal is usually a duplicate name: put the cursor there. */
+            /* Focus the name field after a save refusal. */
             name.Focus();
         }
     }

@@ -1,39 +1,27 @@
-# Audit index
+# Audit reference
 
-**Start here:** [Master audit and release status](FMSC_MASTER_AUDIT.md) for outstanding release gates, then [Owner decisions and invariants](OWNER_DECISIONS_AND_INVARIANTS.md) for business-rule boundaries. Both link to dated evidence. **No single report is proof that the current application or installer is release-ready.**
+- [Master audit and release status](FMSC_MASTER_AUDIT.md): recorded findings,
+  baselines and remaining release gates. Read each entry's date and evidence scope.
+- [Business-decision handbook](../Docs/BUSINESS_DECISIONS.md): current rules and
+  the complete dated decision records, including the former owner-invariants summary.
+- [Source-resident business rules](../Core/BusinessDecisions.cs): self-contained
+  C# policy record with stable BD identifiers and comments at implementation sites.
+- [Consolidated review history](REVIEW_HISTORY.md): original investigation text,
+  finding IDs, fixes, commits, test results and limitations from the dated reviews.
+- [Earlier Git-based archive](Archive/FMSC_HISTORICAL_AUDITS.md): older report
+  revision links. Those external records are not a claim of present acceptance.
 
-## Current reference documents
+## Maintenance
 
-| File | Role | Update policy |
-|---|---|---|
-| [Master audit and release status](FMSC_MASTER_AUDIT.md) | Consolidated finding status, reviewed baselines and release gates | Append dated, evidenced status changes rather than create competing status reports |
-| [Owner decisions and invariants](OWNER_DECISIONS_AND_INVARIANTS.md) | Business rules and approved-but-not-yet-implemented policies, with code references | Update when decisions or source-enforced boundaries change |
+Update the C# rule record and nearest invariant comment when a business decision
+changes; update the handbook's current-rule section to match. Keep the historical
+record, date and supersession explicit rather than rewriting past evidence.
 
-## Dated reviews and verification
+Append new investigations to the review history with the inspected revision,
+scope and verification limits. Do not create competing release-status summaries.
+The existing filenames under Reviews and the older Docs audit paths are
+compatibility redirects; their original section headings preserve incoming links.
 
-| Record | Purpose | Interpretation |
-|---|---|---|
-| [PDF / financial RDLC presentation — 2 Nov 2026](Reviews/FMSC_PDF_FINANCE_PRESENTATION_2026-11-02.md) | PDF/preview consistency, monetary clarity and parent documents | Main `806440f`; portable visual samples, native Windows printing unverified |
-| [End-user flow audit — 14 Oct 2026](Reviews/FMSC_END_USER_FLOW_AUDIT_2026-10-14.md) | UFA-01–09 discovery and full source coverage | Original findings at their reviewed baseline; consult master for later corrections |
-| [Post-merge project audit — 14 Oct 2026](Reviews/FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md) | PMA release/installer findings and evidence | Baseline-specific release assessment, not a new verification |
-| [UI improvements review](Reviews/UI_IMPROVEMENTS_REVIEW.md) | Earlier UI changes, portable tests and Windows acceptance checklist | Implementation history; native acceptance remains separate |
-| [UI guidance audit — 20 Oct 2026](Reviews/FMSC_UI_Guidance_Audit_2026-10-20.md) | G01–G17 wording and consistency proposals | **Read-only review:** no UI changes authorized |
-| [Audit fix verification — 13 Oct 2026](Archive/AUDIT_FIX_VERIFICATION_2026-10-13.md) | Dated test/verification execution | Historical evidence, not current-build certification |
-
-## Immutable historical evidence
-
-[Historical audit archive](Archive/FMSC_HISTORICAL_AUDITS.md) indexes the original full reports, IDs, accepted decisions, test evidence and Git revisions. Preserve frozen evidence and original finding identifiers; do not overwrite a historic observation to make it sound currently resolved.
-
-## Related documentation
-
-- [UI style guide](../Docs/Design/UI_STYLE_GUIDE.md), [finance wording review](../Docs/FINANCE_WORDING_REVIEW_2026-10-20.md), and [UI tuning guide](../Docs/Design/UI_TUNING_GUIDE.md)
-- [Help source audit](../Docs/FAQ_AUDIT_REPORT.md) and [coverage matrix](../Docs/FAQ_COVERAGE_MATRIX.md)
-- [Windows verification](../Docs/WINDOWS_VERIFICATION_2026-10-16.md), [release checklist](../Docs/RELEASE_CHECKLIST.md), and [documentation index](../Docs/README.md)
-
-## Filing and maintenance rules
-
-1. Keep `Audit/FMSC_MASTER_AUDIT.md` as the one status register; record new evidence with the inspected commit, date, and still-open acceptance gates. Do not equate a historical CI pass with a current runtime result.
-2. Keep business rules summarized in `Audit/OWNER_DECISIONS_AND_INVARIANTS.md` and write concise invariant comments next to their implementations where a future edit could silently change semantics. Comments do not replace SQL constraints and automated tests.
-3. Put new independent investigations in `Reviews/` with a descriptive date and scope; put superseded verification evidence in `Archive/` only when its original links remain intact.
-4. Preserve existing report filenames and evidence links unless a rename is demonstrably needed; their current descriptive names are stable and changing them would break cross-repository references.
-5. Never add school database MDF/LDF files, personal records or credentials to GitHub.
+Build/test success, real installer acceptance, operator acceptance and physical
+printing are separate evidence. Reorganizing documentation proves none of them.
+Never include school data, credentials or private backups in the audit record.

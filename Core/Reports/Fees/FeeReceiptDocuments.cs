@@ -1,6 +1,8 @@
 namespace FMSC_SMS.Core;
 
 /// <summary>Loads saved collections and routes them to the matching receipt report.</summary>
+// BD-18/19: reprint saved participants, visit lines, plans and balances; never substitute today's family or fees.
+// A fee-change acknowledgement records changes without receiving cash or applying credit.
 internal static class FeeReceiptDocuments
 {
     internal static async Task<bool> TryShowAsync(Form? owner,InstitutionProfile.PrintIdentity institution,string receiptNumber,int? selectedChild=null)

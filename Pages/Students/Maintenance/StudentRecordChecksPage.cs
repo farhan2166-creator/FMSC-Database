@@ -585,7 +585,7 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage, IUnsavedChanges
         statusDraftBaseline=enrollmentDraftBaseline=null;
         selectedEnrollmentId = 0;
         creatingEnrollment=false;UpdateEnrollmentActions();
-        /* (#10) - a student switch has to clear the ENROLLMENT editor as well as the status one. ClearForm already resets these five; this is the switch path. */
+        /* (#10) Clear both enrollment and status editors when switching students. */
         enrollmentStatusCombo.SelectedIndex = -1;
         classSection.SelectedIndex = -1;
         academicYear.SelectedIndex = -1;
@@ -742,7 +742,7 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage, IUnsavedChanges
             findingsRaw = await DatabaseHelper.QueryUserAsync(
                 "CheckStudentConsistency",
                 DatabaseHelper.NullableInt("@AdmissionId", admissionId));
-            /* (#8) - a scan for ONE student must land only while that student is still selected, or its findings are shown as the current student's. */
+            /* (#8) Apply scan results only while the same student remains selected. */
             if (IsDisposed ||
                 modeVersion != gridModeVersion ||
                 (admissionId.HasValue &&
@@ -862,7 +862,6 @@ public sealed class StudentRecordChecksPage : V2Page, IBusyPage, IUnsavedChanges
             return;
         if (Grid.Rows[e.RowIndex].DataBoundItem is not DataRowView rowView)
             return;
-        /* QuickFix is now async Task. */
         _ = QuickFix(rowView.Row);
     }
     private async Task LoadEnrollments(int modeVersion)

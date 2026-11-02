@@ -10,7 +10,7 @@ namespace FMSC_SMS.Core
         private bool _thousandsSeparator;
         private bool _trimTrailingZeros;
         private bool _refreshingDisplay;
-        /* UX - true while the box holds typed text that has not been committed to _value. The Value getter now commits pending typing first. */
+        /* Pending text is committed by the Value getter before callers read it. */
         private bool _textEdited;
         private readonly ToolTip _invalidValueTip = new() { AutoPopDelay = 3000, InitialDelay = 0, ReshowDelay = 0 };
         public event EventHandler? ValueChanged;

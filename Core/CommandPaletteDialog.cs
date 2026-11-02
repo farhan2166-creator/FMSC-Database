@@ -99,7 +99,7 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
     {
         results.BeginUpdate();
         results.Items.Clear();
-        /* UX - every word typed has to match, in any order ("fee coll" or "collection fee"), instead of the whole phrase having to appear exactly as typed. */
+        /* Match every search word in any order. */
         var words = query.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         foreach (var command in source)
         {

@@ -7,6 +7,8 @@ namespace FMSC_SMS.Pages.Finance.Collection;
 /// <summary>Reconciliation records are separate from student payments.</summary>
 // Owner policy (BL-08): closing is a revisable snapshot, not a lock on backdated transactions.
 // Later payment changes require review and reapproval; retain previous revisions.
+// BD-17: closing is a revisable reconciliation snapshot, not a lock on backdated transactions.
+// Adjustment Actual Amount stays blank; ordinary inputs use whole rupees without rounding historical totals.
 public sealed class DailyCollectionClosingPage : V2Page, IUnsavedChanges, IBusyPage
 {
     private readonly ModernDatePicker day = HumanUi.Date();

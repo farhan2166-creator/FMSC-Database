@@ -11,7 +11,7 @@ public sealed class FirstRunSetupForm : ApplicationWindowForm
     /* The sibling security forms guard typed input on close; this one did not, so the administrator credentials typed here were thrown away by the window's close button. */
     private bool savedSuccessfully;
     private bool discardConfirmed;
-    /* UX - missing or mismatched entries are marked on the fields (and in the status line), not shown in message boxes. */
+    /* Mark missing or mismatched setup fields inline. */
     private readonly FormValidator validator = new();
     public FirstRunSetupForm()
     {

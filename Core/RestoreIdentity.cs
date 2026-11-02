@@ -2,6 +2,8 @@ using Microsoft.Data.SqlClient;
 
 namespace FMSC_SMS.Services.Backup;
 
+// BD-29/30: reject unknown/foreign backup identity and retain safety-copy/rollback recovery.
+// The owner supplies detached release data; missing development MDF/LDF files are not a deployment-policy change.
 internal sealed class BackupIdentityException(string message) : Exception(message);
 
 // A database name and valid backup checksum do not identify the school records.

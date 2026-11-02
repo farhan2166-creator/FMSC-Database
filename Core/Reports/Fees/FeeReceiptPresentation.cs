@@ -2,6 +2,8 @@ namespace FMSC_SMS.Core;
 
 // Print-only deductions. Account credit is a payment source, so retain the saved
 // discount, payable and settlement values and combine them only on the paper.
+// BD-28: captions name only applicable Discount/Waived/Credit; unknown historical types use Discount.
+// Free is a sibling concession, not Waived; caption selection must not change settlement arithmetic.
 internal static class FeeReceiptPresentation
 {
     internal static DataTable Prepare(DataTable source)

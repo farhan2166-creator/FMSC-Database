@@ -421,7 +421,7 @@ namespace FMSC_SMS.Core
             path.CloseFigure();
             return path;
         }
-        /* UX - lets a form that opted in with FormFlow.EnterMovesToNext turn Enter in a single-line box into "go to the next field". */
+        /* FormFlow opt-in makes Enter advance from single-line inputs. */
         private sealed class InnerTextBox : TextBox
         {
             protected override bool ProcessCmdKey(ref Message msg, Keys keyData)

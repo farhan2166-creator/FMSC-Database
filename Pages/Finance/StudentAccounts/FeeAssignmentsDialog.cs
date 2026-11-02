@@ -65,9 +65,9 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
 {
     private readonly int enrollmentId;
     private readonly ModernComboBox feeType = HumanUi.Combo();
-    /* UX - field problems are marked on the fields, all at once, not shown in message boxes. */
+    /* Mark all invalid fields together before submission. */
     private readonly FormValidator validator = new();
-    /* UX - "nothing left to add" is said inline, under the field, instead of in a message box. */
+    /* Show an empty choice set inline. */
     private readonly Label availabilityNote = new() {
         AutoSize = true,
         Dock = DockStyle.Top,
@@ -196,7 +196,7 @@ public sealed class AddFeeAssignmentForm : ApplicationWindowForm
             feeType.Enabled = available.Rows.Count > 0;
             if (available.Rows.Count == 0)
             {
-                /* UX - nothing to add is a state, not an event: said under the field, with Add Fee already disabled above, and no message box to dismiss. */
+                /* When no fee can be added, disable Add Fee and explain inline. */
                 availabilityNote.Text =
                     configured != null
                         ? "Every recurring class fee is already assigned. Use Add Charge in Fee Collection for books, examinations, and other purchases."

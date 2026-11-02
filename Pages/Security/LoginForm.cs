@@ -7,7 +7,7 @@ public sealed class LoginForm : ApplicationWindowForm
     readonly ModernTextBox user = HumanUi.TextBox(false, 100);
     readonly ModernTextBox pass = HumanUi.TextBox(false, 100);
     readonly ModernButton login = new() { Text = "Sign In", Dock = DockStyle.Fill };
-    /* UX - a missing username or password is marked on the field. A WRONG password is a real refusal and still says so in a dialog. */
+    /* Validate missing credentials inline; rejected credentials still use the refusal dialog. */
     readonly FormValidator validator = new();
     public LoginForm() : this(AttemptSignIn) { }
     internal LoginForm(Func<string, string, (bool Success, string Message, Exception? ConnectionFailure)> signIn)
@@ -256,7 +256,7 @@ public sealed class LoginForm : ApplicationWindowForm
     }
     async void Login_Click(object? s, EventArgs e)
     {
-        /* UX - say what is missing, in the field that is missing it, before spending a database round trip on an attempt that cannot succeed. */
+        /* Reject missing credentials before querying the database. */
         if (!login.Enabled)
             return;
         validator.Begin();

@@ -10,6 +10,8 @@ internal interface IQuickRegistrationTransaction
     void Rollback();
 }
 
+// BD-01/33: a saved pending registration is not confirmed admission or an official number.
+// Keep database/operator/request-bound outcome checks separate from corrected submissions.
 internal static class QuickRegistrationSaveCoordinator
 {
     internal static SavedQuickRegistration ReadResponse(DataSet response)

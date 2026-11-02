@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 namespace FMSC_SMS.Core;
-/// <summary>UX - one shared "Enter moves to the next field" behaviour for data-entry forms and pages. Nothing is disabled or blocked, and Tab / Shift+Tab are unchanged.</summary>
+/// <summary>Opt-in Enter navigation; preserve normal Tab and Shift+Tab behavior.</summary>
 public static class FormFlow
 {
     internal static void ScheduleInitialFocus(Control host, Control scope, Func<bool> isCurrent)

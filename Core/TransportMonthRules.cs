@@ -1,5 +1,7 @@
 namespace FMSC_SMS.Core;
 
+// BD-15: use the transport cutoff, not admission cutoff; on/after cutoff starts next month.
+// Protect paid/part-paid months and retain older unpaid dues.
 internal static class TransportMonthRules
 {
     internal static DateTime First(DateTime date)=>new(date.Year,date.Month,1);

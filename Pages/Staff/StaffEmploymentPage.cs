@@ -1,5 +1,6 @@
 using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Staff;
+// BD-37: reject future hire dates and leaving dates before hire; keep Add/Edit Job entry points distinct.
 public sealed class StaffEmploymentPage : MasterPage
 {
     // Employment history is an active feature, separate from staff assignment

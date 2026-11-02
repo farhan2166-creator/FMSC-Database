@@ -1,5 +1,15 @@
 # Documentation index
 
+## Start here
+
+- [Business decisions](BUSINESS_DECISIONS.md): current rules and the complete dated decision records.
+- [C# policy record](../Core/BusinessDecisions.cs): self-contained rules preserved with the implementation.
+- [Consolidated audit history](../Audit/REVIEW_HISTORY.md): findings, fixes and verification at their original dates.
+- [Master audit](../Audit/FMSC_MASTER_AUDIT.md): recorded status and release gates, not a current-build certification.
+
+Older decision/review paths are short redirects with their original section headings.
+Operator guides, deployment runbooks and evidence files remain separate because they serve different tasks.
+
 ## Using and maintaining the application
 
 - [Operator guide](USER_GUIDE.md) and [operator decisions](OPERATOR_CONTROL.md)

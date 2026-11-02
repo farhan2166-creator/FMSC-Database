@@ -9,6 +9,8 @@ namespace FMSC_SMS.Pages.Students.Admissions;
 /// Placement start remains class history. Resume billing and restoration are explicit
 /// school decisions; a certificate does not itself prohibit lifting a hold.
 /// </summary>
+// BD-05/06: a hold stops posting, not existing-dues collection; resume must explicitly review restoration and credit.
+// Preserve placement start, old refunds and certificates; do not convert Left records to holds automatically.
 internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
 {
     private readonly int admission;

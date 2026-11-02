@@ -4,6 +4,8 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Core;
 
 /// <summary>Shared physical handover and deliberate-copy actions. Reading or printing never collects a copy.</summary>
+// BD-21: printing does not mark collected; collection locks that saved copy.
+// Preserve issue/collection history and use Issue Again for a separate copy, never certificate cancellation.
 internal sealed class CertificateCollectionFlow(string kind)
 {
     internal readonly ModernButton Collect = new() { Text="Mark Collected",Width=150 };
