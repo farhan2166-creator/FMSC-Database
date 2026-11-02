@@ -56,7 +56,7 @@ jobs:
         timeout-minutes: 12
         run: |
           $ErrorActionPreference = 'Stop'
-          $suites = @('--class-section-setup', '--registration-workflow', '--placement-workspace', '--fee-account', '--fee-documents', '--collection-fee-actions', '--billing-grid')
+          $suites = @('--report-purpose', '--class-section-setup', '--registration-workflow', '--placement-workspace', '--fee-account', '--fee-documents', '--collection-fee-actions', '--billing-grid')
           foreach ($suite in $suites) {
             Write-Output "Checking $suite"
             & dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- $suite
@@ -79,6 +79,11 @@ jobs:
 
       - name: Run portable audit regression checks
         run: dotnet run --project Tests/AuditFixChecks/AuditFixChecks.csproj -c Release
+
+      - name: Run report data and RDLC regressions
+        run: |
+          dotnet run --project Tests/ReportReadChecks/ReportReadChecks.csproj -c Release
+          dotnet run --project Tests/ReportRdlcChecks/ReportRdlcChecks.csproj -c Release
 
       - name: Run offline Help Center catalog and search checks
         run: dotnet run --project Tests/HelpChecks/HelpChecks.csproj -c Release

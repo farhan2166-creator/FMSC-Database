@@ -45,7 +45,7 @@ internal static partial class Program
         var dates=new DataTable();foreach(string column in new[]{"Recorded On","Certificate Date","Collected On"}) dates.Columns.Add(column,typeof(DateTime));
         dates.Rows.Add(new DateTime(2026,10,23,14,35,0),new DateTime(2026,10,21),DBNull.Value);
         var display=CertificateIssueRegisterData.Display(dates);
-        Check((string)display.Rows[0]["Recorded On"]==new DateTime(2026,10,23,14,35,0).ToString("dd-MMM-yyyy HH:mm"),"Certificate issue time survives grid, CSV, PDF and RDLC projection");
-        Check((string)display.Rows[0]["Certificate Date"]==new DateTime(2026,10,21).ToString("dd-MMM-yyyy") && display.Rows[0]["Collected On"]==DBNull.Value,"Certificate date and uncollected blank stay distinct");
+        Check((string)display.Rows[0]["Recorded On"]==new DateTime(2026,10,23,14,35,0).ToString("dd-MM-yyyy HH:mm"),"Certificate issue time survives grid, CSV, PDF and RDLC projection");
+        Check((string)display.Rows[0]["Certificate Date"]==new DateTime(2026,10,21).ToString("dd-MM-yyyy") && display.Rows[0]["Collected On"]==DBNull.Value,"Certificate date and uncollected blank stay distinct");
     }
 }

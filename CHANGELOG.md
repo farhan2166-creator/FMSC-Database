@@ -1,5 +1,13 @@
 # Changelog
 
+## Report purpose improvements — 2026-11-02
+
+- Split unpaid balances into overdue, due today and future amounts; family debt
+  includes standalone students. Migration 70 changes the report reader only.
+- Concession Summary uses an explicit as-of date and the latest effective term
+  per enrolled fee instead of summing historical agreements.
+- Clarify current-roster attendance printing and run report data/RDLC suites in CI.
+
 ## Class and section setup consolidation — 2026-11-02
 
 - Manage Classes and Manage Sections now open from Campus Classes / Sections;

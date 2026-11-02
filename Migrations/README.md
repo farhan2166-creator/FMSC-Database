@@ -58,7 +58,16 @@ See `Docs/BACKUP_RECOVERY.md` for recovery guidance.
 
 ---
 
-## Current target: schema 69
+## Current target: schema 70
+
+Migration 70 changes only GetOutstandingAndAgingReport output. Charges, Students
+and Families include Overdue Amount, Due Today, Not Yet Due and Due Date Missing. Families includes
+unlinked students as standalone groups. Existing financial balances, charge
+eligibility and payment writers are unchanged. Apply after 69 using the verified
+backup and transaction workflow above. The DACPAC remains a reference snapshot;
+it does not replace these migrations or school data.
+
+## Previous target: schema 69
 
 Migration `69.sql` enforces the approved transfer classification at the
 SQL writer boundary: `TransferEnrollmentClass` requires a different ClassId.

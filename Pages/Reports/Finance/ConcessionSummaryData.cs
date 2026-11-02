@@ -4,18 +4,26 @@ internal static class ConcessionSummaryData
 {
     internal const string Query = """
         EXEC dbo.RequirePermission @UserId,N'Reports.View';
-        SELECT A.AdmissionId,CA.CampusName [Campus],C.ClassName [Class],F.FeeTypeName [Fee Type],
+        ;WITH Terms AS (
+            SELECT A.*,ROW_NUMBER() OVER(PARTITION BY A.EnrollmentId,A.FeeTypeId
+                ORDER BY COALESCE(A.EffectiveFrom,E.BillingStartDate,E.EnrollmentDate) DESC,A.StudentFeeAssignmentId DESC) TermRank
+            FROM dbo.StudentFeeAssignments A
+            JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId AND E.AdmissionId=A.AdmissionId
+            JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId
+            WHERE A.CancelledAt IS NULL AND E.Status<>N'Cancelled'
+              AND E.EnrollmentDate<=@AsOfDate AND (E.LeavingDate IS NULL OR E.LeavingDate>=@AsOfDate)
+              AND @AsOfDate BETWEEN Y.StartDate AND Y.EndDate
+              AND COALESCE(A.EffectiveFrom,E.BillingStartDate,E.EnrollmentDate)<=@AsOfDate
+              AND COALESCE(A.EffectiveTo,Y.EndDate)>=@AsOfDate
+        )
+        SELECT A.AdmissionId,P.CampusId,P.ClassId,A.FeeTypeId,CA.CampusName [Campus],C.ClassName [Class],F.FeeTypeName [Fee Type],
             A.Frequency [Frequency],A.ConcessionLabel [Concession],A.DiscountAmount [Assigned Discount]
-        FROM dbo.StudentFeeAssignments A
-        JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId
-        JOIN dbo.AcademicYears Y ON Y.AcademicYearId=E.AcademicYearId
+        FROM Terms A JOIN dbo.Enrollments E ON E.EnrollmentId=A.EnrollmentId
         JOIN dbo.CampusClassSections P ON P.ClassSectionId=E.ClassSectionId
         JOIN dbo.Campuses CA ON CA.CampusId=P.CampusId
         JOIN dbo.Classes C ON C.ClassId=P.ClassId
         JOIN dbo.FeeTypes F ON F.FeeTypeId=A.FeeTypeId
-        WHERE A.CancelledAt IS NULL AND A.ConcessionLabel IS NOT NULL
-          AND (@FromDate IS NULL OR COALESCE(A.EffectiveTo,Y.EndDate)>=@FromDate)
-          AND (@ToDate IS NULL OR COALESCE(A.EffectiveFrom,E.BillingStartDate)<=@ToDate)
+        WHERE A.TermRank=1 AND A.ConcessionLabel IS NOT NULL
           AND (@CampusId=0 OR P.CampusId=@CampusId) AND (@ClassId=0 OR P.ClassId=@ClassId)
           AND (@SectionId=0 OR P.SectionId=@SectionId);
         """;
@@ -26,7 +34,7 @@ internal static class ConcessionSummaryData
         result.Columns.Add("Students",typeof(int)); result.Columns.Add("Assignments",typeof(int));
         result.Columns.Add("Assigned Discount / Cycle (Rs.)",typeof(decimal));
         string Text(DataRow r,string key) => Convert.ToString(r[key]) ?? "";
-        var groups = source.AsEnumerable().GroupBy(r => (Campus:Text(r,"Campus"),Class:Text(r,"Class"),Fee:Text(r,"Fee Type"),Frequency:Text(r,"Frequency"),Concession:Text(r,"Concession")));
+        var groups = source.AsEnumerable().GroupBy(r => (Campus:Text(r,"Campus"),Class:Text(r,"Class"),Fee:Text(r,"Fee Type"),CampusId:r.Table.Columns.Contains("CampusId")?Text(r,"CampusId"):"",ClassId:r.Table.Columns.Contains("ClassId")?Text(r,"ClassId"):"",FeeId:r.Table.Columns.Contains("FeeTypeId")?Text(r,"FeeTypeId"):"",Frequency:Text(r,"Frequency"),Concession:Text(r,"Concession")));
         foreach (var group in groups.OrderBy(g=>g.Key.Campus).ThenBy(g=>g.Key.Class).ThenBy(g=>g.Key.Fee).ThenBy(g=>g.Key.Frequency).ThenBy(g=>g.Key.Concession))
             result.Rows.Add(group.Key.Campus,group.Key.Class,group.Key.Fee,group.Key.Frequency,group.Key.Concession,
                 group.Select(r=>Convert.ToInt32(r["AdmissionId"])).Distinct().Count(),group.Count(),group.Sum(r=>Convert.ToDecimal(r["Assigned Discount"])));

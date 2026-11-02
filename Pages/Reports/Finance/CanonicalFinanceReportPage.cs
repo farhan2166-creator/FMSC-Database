@@ -213,7 +213,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
     {
         string Pick(LookupBox box, string label) => $"{label}: {(box.SelectedId > 0 ? box.Text : "All")}";
         var parts = new List<string> { $"View: {ViewName}" };
-        if (_usesDates) parts.Add($"Period: {(From.Checked ? From.Value.ToString("dd-MM-yyyy") : "Any start")} to {(To.Checked ? To.Value.ToString("dd-MM-yyyy") : "Any end")}");
+        if (_usesDates && From.Enabled) parts.Add($"Period: {(From.Checked ? From.Value.ToString("dd-MM-yyyy") : "Any start")} to {(To.Checked ? To.Value.ToString("dd-MM-yyyy") : "Any end")}");
         if (_usesYear) parts.Add(Pick(Year, "Year"));
         parts.Add(Pick(Campus, "Campus"));
         parts.Add(Pick(Class, "Class"));
@@ -231,7 +231,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         ReportScopeSelection scopeToRemember = CurrentScope();
         try
         {
-            if (_usesDates && !ReportUi.ValidDateRange(_rangeValidator ??= CreateValidator(), From, To)) return;
+            if (_usesDates && From.Enabled && !ReportUi.ValidDateRange(_rangeValidator ??= CreateValidator(), From, To)) return;
             if (!ValidateAdditionalFilters()) return;
             _runningReport = true;
             _print.Enabled = _export.Enabled = false;
