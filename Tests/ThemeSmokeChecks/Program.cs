@@ -594,6 +594,11 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} bill line identity checks (no database connection).");
             return;
         }
+        if(args.Contains("--fee-document-review-pack"))
+        {
+            CheckFeeDocumentReviewPack();
+            return;
+        }
         if(args.Contains("--fee-documents"))
         {
             CheckFeeDocuments();

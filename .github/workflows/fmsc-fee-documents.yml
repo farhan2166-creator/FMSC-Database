@@ -2,6 +2,16 @@ name: Fee document rendering
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main, test/fee-document-scenario-pack]
+    paths:
+      - 'Core/Reports/Fees/**'
+      - 'Pages/Reports/Templates/*Bill.rdlc'
+      - 'Pages/Reports/Templates/*Receipt.rdlc'
+      - 'Tests/ThemeSmokeChecks/Program.Fee*.cs'
+      - 'Tests/ThemeSmokeChecks/Program.Receipt*.cs'
+      - 'Tests/ThemeSmokeChecks/Program.FamilyDocumentSections.cs'
+      - '.github/workflows/fmsc-fee-documents.yml'
   pull_request:
     paths:
       - 'Core/AdmissionBillReport*.cs'
@@ -10,17 +20,22 @@ on:
       - 'Tests/ThemeSmokeChecks/Program.FamilyDocumentSections.cs'
       - 'Pages/Reports/Templates/*Bill.rdlc'
       - 'Pages/Reports/Templates/*Receipt.rdlc'
-      - 'Tests/ThemeSmokeChecks/Program.FeeDocuments.cs'
+      - 'Tests/ThemeSmokeChecks/Program.Fee*.cs'
+      - 'Tests/ThemeSmokeChecks/Program.Receipt*.cs'
       - '.github/workflows/fmsc-fee-documents.yml'
 
 permissions:
   contents: read
 
+concurrency:
+  group: fee-document-scenarios-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   render:
     name: Render fictional bills and receipts
     runs-on: windows-2022
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -29,11 +44,30 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - name: Render fee documents without a database
-        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --fee-documents
-      - name: Upload fictional document previews
+        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --fee-document-review-pack
+      - name: Upload fictional document scenario pack
+        id: samples
+        if: ${{ always() && hashFiles('artifacts/fee-documents/*.pdf') != '' }}
         uses: actions/upload-artifact@v7
         with:
-          name: fee-document-previews
-          path: artifacts/fee-documents/
+          name: fee-document-scenarios-${{ github.run_id }}
+          path: |
+            artifacts/fee-documents/*.pdf
+            artifacts/fee-documents/*.png
+            artifacts/fee-documents/REVIEW-INDEX.html
+            artifacts/fee-documents/provenance.json
+            Docs/FEE_DOCUMENT_REVIEW_PACK.md
           if-no-files-found: error
           retention-days: 7
+      - name: Link review pack in the workflow summary
+        if: ${{ always() && steps.samples.outcome == 'success' }}
+        shell: pwsh
+        env:
+          REVIEW_ARTIFACT_URL: ${{ steps.samples.outputs.artifact-url }}
+        run: |
+          "[Download bill and receipt scenario pack]($env:REVIEW_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+          if (Test-Path artifacts/fee-documents/provenance.json) {
+            $review = Get-Content artifacts/fee-documents/provenance.json -Raw | ConvertFrom-Json
+            "Scenarios: $($review.ScenarioCount). PDF pages: $($review.PageCount). Checks: $($review.Checks)." >> $env:GITHUB_STEP_SUMMARY
+          }
+          'Open REVIEW-ALL.pdf for every scenario, or REVIEW-INDEX.html for names, individual PDFs and first-page previews. Check provenance.json and this run status before treating partial output as a passing result.' >> $env:GITHUB_STEP_SUMMARY

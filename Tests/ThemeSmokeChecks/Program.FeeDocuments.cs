@@ -5,7 +5,7 @@ using System.Xml.Linq;
 
 internal static partial class Program
 {
-    private static void CheckFeeDocuments()
+    private static void CheckFeeDocuments(List<FeeDocumentReviewSample>? review=null)
     {
         foreach(string retired in new[]{"AdmissionBill.rdlc","FeePaymentReceipt.rdlc"})
             Check(!File.Exists(Path.Combine(AppContext.BaseDirectory,"Reports",retired)),"Retired templates are absent from the built application");
@@ -111,7 +111,9 @@ internal static partial class Program
             }
             using var report=new LocalReport();report.LoadReportDefinition(new StringReader(definition));
             report.DataSources.Add(new ReportDataSource(xml.Descendants(ns+"DataSet").Single().Attribute("Name")!.Value,data));
-            byte[] pdf=report.Render("PDF");File.WriteAllBytes(Path.Combine(folder,name+".pdf"),pdf);
+            using var roll=review is not null && bill && !annual
+                ? FeeBillRollDocument.Render(path,xml.Descendants(ns+"DataSet").Single().Attribute("Name")!.Value,data) : null;
+            byte[] pdf=roll?.ExportPdf()??report.Render("PDF");File.WriteAllBytes(Path.Combine(folder,name+".pdf"),pdf);
             using var parsed=PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdf),PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
             if(name=="family-six-child-receipt")
             {
@@ -132,9 +134,12 @@ internal static partial class Program
                     &&System.Text.RegularExpressions.Regex.Matches(csv,"Nov-2026").Count==2,
                     "Every student prints both October and November, even when the preceding bill or sibling has the same months");
             }
-            byte[] png=report.Render("IMAGE","<DeviceInfo><OutputFormat>PNG</OutputFormat><DpiX>130</DpiX><DpiY>130</DpiY></DeviceInfo>");
+            byte[] png=roll is null?report.Render("IMAGE","<DeviceInfo><OutputFormat>PNG</OutputFormat><DpiX>130</DpiX><DpiY>130</DpiY></DeviceInfo>")
+                : FeeReviewFirstPage(roll.Pages[0]);
             File.WriteAllBytes(Path.Combine(folder,name+".png"),png);
             Check(pdf.Length>1000 && png.Length>1000,"Established RDLC renders a real PDF and PNG");
+            review?.Add(new FeeDocumentReviewSample(name,bill?"Bill":"Receipt",annual?"A4 sheet":roll is null?"Receipt slip":"Fitted thermal bill",
+                parsed.PageCount,Path.GetFileName(file)));
             return parsed.PageCount;
         }
         void CheckCashOnly(string name,DataTable source)
@@ -223,6 +228,7 @@ internal static partial class Program
             Check(Convert.ToDecimal(credit.Rows[0]["TotalPaid"])==8700m && Convert.ToDecimal(credit.Rows[0]["CashReceived"])==0m
                 && Convert.ToDecimal(credit.Rows[0]["CreditRemaining"])==50m,"Credit-only receipt distinguishes settlement, new money and remaining credit");
             Check(Render("individual-credit-receipt",credit)==1,"A six-line credit settlement prints on one receipt page");
+            if(review is not null)CheckFeeReviewReceiptCases(credit,(name,data,a4)=>Render(name,data,annual:a4));
             CheckCashOnly("individual-cash-only-receipt",credit);
             using var legacy=credit.Copy();foreach(DataRow row in legacy.Rows) {row["ShowSettlement"]=false;row["ReceiptNumber"]="FMSC-2026-0100";}
             Check(Render("legacy-individual-receipt",legacy)==1,"Original cash receipt fields remain printable through the RDLC template");
@@ -366,6 +372,17 @@ internal static partial class Program
             using var studentBill=StudentBillReport.FromGroupedData(bill);
             Check(Render("individual-bill",studentBill)==1,"Individual bill uses the established receipt design");
             Check(Render("individual-bill-a4",studentBill,annual:true)>=1,"A4 bill printing reuses the approved bill RDLC on a sheet");
+            if(review is not null)
+            {
+                using var longBill=studentBill.Copy();
+                foreach(DataRow row in longBill.Rows)
+                {
+                    row["StudentName"]="Muhammad Abdul Rahman Example Student With A Long Recorded Name";
+                    row["FatherName"]="Abdul Hameed Example Parent With A Long Recorded Name";
+                    row["FeeDescription"]="Annual examination preparation and supplementary learning materials fee";
+                }
+                Check(Render("long-names-and-fees-bill",longBill)>=1,"Long bill names and fee labels render through the fitted thermal print path");
+            }
         }
         using(var waivedCharges=charges.Clone())
         {
