@@ -8,16 +8,19 @@ public sealed class ReportColumnDialog : ApplicationWindowForm
     private readonly Label count = new();
     private readonly IReadOnlyList<ReportColumnDef> catalog;
     private readonly IReadOnlyList<string> defaultKeys;
+    private readonly IReadOnlyList<string> requiredKeys;
     /// <summary>The ticked columns in the order chosen. Valid after the dialog returns OK.</summary>
     public IReadOnlyList<string> ResultKeys { get; private set; } = Array.Empty<string>();
     public ReportColumnDialog(
         string title,
         IReadOnlyList<ReportColumnDef> catalog,
         IReadOnlyList<string> currentKeys,
-        IReadOnlyList<string> defaultKeys)
+        IReadOnlyList<string> defaultKeys,
+        IReadOnlyList<string>? requiredKeys=null)
     {
         this.catalog = catalog;
         this.defaultKeys = defaultKeys;
+        this.requiredKeys=requiredKeys ?? Array.Empty<string>();
         Text = "Choose columns";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -59,8 +62,8 @@ public sealed class ReportColumnDialog : ApplicationWindowForm
         var hint = new Label {
             Dock = DockStyle.Top,
             Height = AppScale.S(46),
-            Text = "Tick the columns you want, then use Move up / Move down to set their order. " +
-                   "The grid, the PDF and the CSV all follow this choice.",
+            Text = "Choose columns and use Move up / Move down to set their order. " +
+                   "The grid, print and export follow this choice."+(requiredKeys.Count>0 ? " Required references stay selected." : ""),
             Font = AppTheme.NormalFont,
             ForeColor = AppTheme.MutedText,
             TextAlign = ContentAlignment.TopLeft
@@ -88,6 +91,10 @@ public sealed class ReportColumnDialog : ApplicationWindowForm
                 BeginInvoke(new Action(UpdateCount));
             else
                 UpdateCount();
+        };
+        list.ItemCheck+=(_,e)=>{
+            if (e.NewValue==CheckState.Unchecked && list.Items[e.Index].Tag is ReportColumnDef def
+                && this.requiredKeys.Contains(def.Key,StringComparer.OrdinalIgnoreCase)) e.NewValue=CheckState.Checked;
         };
         list.DoubleClick += (_, _) => Toggle();
         count.Dock = DockStyle.Bottom;
@@ -142,6 +149,7 @@ public sealed class ReportColumnDialog : ApplicationWindowForm
         list.Items.Clear();
         list.Groups.Clear();
         var chosen = new HashSet<string>(keys, StringComparer.OrdinalIgnoreCase);
+        chosen.UnionWith(requiredKeys);
         var groupNames = new List<string>();
         var seenGroups = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var def in catalog)

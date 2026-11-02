@@ -145,6 +145,7 @@ public partial class StudentReportsPage : V2Page
         var classSummary = AddBusyAction("Class Summary A4", PreviewClassSummaryAsync, "Secondary");
         var columnsButton = AddColumnsAction();
         var saveView = AddAction("Save View", (_, _) => SaveCurrentView(), "Secondary");
+        renameViewButton=AddAction("Rename View",(_,_)=>RenameSelectedView(),"Secondary");
         openAdmissionsButton = AddBusyAction("Open Admissions", OpenSelectedAdmissionsAsync, "Secondary");
         openAdmissionsButton.Enabled = false;
         openAdmissionsButton.EnabledChanged += (_, _) => {
@@ -155,9 +156,12 @@ public partial class StudentReportsPage : V2Page
         var export = AddExportAction("FMSC_Student_Report");
         printButton = AddBusyAction("Print Preview", PreviewReportAsync, "Secondary");
         printButton.Enabled = false;
-        RelocateFromActions(viewReport, resetFilters, columnsButton, printButton, saveView, deleteViewButton, export, openAdmissionsButton, classSummary);
+        RelocateFromActions(viewReport, resetFilters, columnsButton, printButton, saveView, renameViewButton, deleteViewButton, export, openAdmissionsButton, classSummary);
         exportButton = export;
         deleteViewButton.Enabled = false;
+        renameViewButton.Enabled=false;
+        datePeriod.Items.AddRange(ReportDatePeriod.Choices);datePeriod.SelectedItem="All dates";
+        Disposed+=(_,_)=>limitDate.Dispose();
         foreach (var (key, text) in ModeChoices)
             mode.Items.Add(new Choice(key, text));
         _suppress = true;
@@ -198,6 +202,7 @@ public partial class StudentReportsPage : V2Page
             columnsButton,
             printButton,
             saveView,
+            renameViewButton,
             deleteViewButton,
             export,
             openAdmissionsButton,
@@ -347,7 +352,7 @@ public partial class StudentReportsPage : V2Page
         AddField("Transport", transportFilter, true);
         AddField("Change type", changeType, true);
         AddField("Search", search, true);
-        AddField(string.Empty, limitDate, true);
+        AddField("Date period", datePeriod, true);
         AddField("From", from, true);
         AddField("To", to, true);
         AddField(string.Empty, inactive, true);
@@ -431,10 +436,17 @@ public partial class StudentReportsPage : V2Page
             else
                 OnFilterChanged();
         };
-        limitDate.CheckedChanged += (_, _) => OnFilterChanged();
+        datePeriod.SelectedIndexChanged+=(_,_)=>{
+            if (_suppress) return;
+            ResolveStudentDatePeriod();UpdateEnabledState();OnFilterChanged();
+        };
+        limitDate.CheckedChanged += (_, _) => {
+            if (!_suppress && !resolvingDatePeriod) datePeriod.SelectedItem=limitDate.Checked ? ReportDatePeriod.Fixed : "All dates";
+            OnFilterChanged();
+        };
         inactive.CheckedChanged += (_, _) => OnFilterChanged();
-        from.ValueChanged += (_, _) => OnFilterChanged();
-        to.ValueChanged += (_, _) => OnFilterChanged();
+        from.ValueChanged += (_, _) => StudentDateEdited();
+        to.ValueChanged += (_, _) => StudentDateEdited();
     }
     // modes, presets, choices
     private static readonly (string Key, string Text)[] ModeChoices =
@@ -544,6 +556,7 @@ public partial class StudentReportsPage : V2Page
     /// <summary>A preset is only a starting arrangement: how to group, how to sort, and which switches to throw.</summary>
     private void ApplyPreset(string key, bool keepFilters)
     {
+        datePeriod.SelectedItem="All dates";
         SelectKey(transportFilter, "");
         SelectKey(completionFilter, "");
         switch (key)
@@ -621,6 +634,7 @@ public partial class StudentReportsPage : V2Page
             to.Value = DateTime.Today;
             SelectKey(views, string.Empty);
             deleteViewButton.Enabled = false;
+            renameViewButton.Enabled=false;
             rangeValidator?.ClearAll();
             _comparisonBaseYearId = -1;
             RefreshClassSectionLists(classes: true, sections: true);
@@ -675,7 +689,7 @@ public partial class StudentReportsPage : V2Page
         completionFilter.Enabled = !byId;
         ShowField(changeType, changes);
         ShowField(search, register || changes);
-        ShowField(limitDate, register || changes);
+        ShowField(datePeriod, register || changes);
         ShowField(from, register || changes);
         ShowField(to, register || changes);
         ShowField(inactive, _mode == ModeList);
@@ -684,6 +698,7 @@ public partial class StudentReportsPage : V2Page
         cls.Enabled = !byId && cls.Items.Count > 1;
         section.Enabled = !byId && section.Items.Count > 1;
         status.Enabled = gender.Enabled = limitDate.Enabled = !byId;
+        datePeriod.Enabled=!byId;
         transportFilter.Enabled = !byId;
         compareYear.Enabled = strength && year.SelectedId > 0 && compareYear.Items.Count > 1;
         from.Enabled = to.Enabled = !byId && LimitOn;
@@ -702,8 +717,8 @@ public partial class StudentReportsPage : V2Page
         Explain(section, byId ? "Clear the Admission Number search to use this filter." : "No sections are available for the selected campus and class.");
         Explain(compareYear, "Choose an Academic Year first. Compare To offers other years only.");
         Explain(inactive, byId ? "Admission Number search includes former students automatically." : "Status already determines whether active or former students are shown.");
-        Explain(from, byId ? "Dates are ignored for Admission Number search." : "Turn on Limit by date to use this date.");
-        Explain(to, byId ? "Dates are ignored for Admission Number search." : "Turn on Limit by date to use this date.");
+        Explain(from, byId ? "Dates are ignored for Admission Number search." : "Choose a date period to use this date.");
+        Explain(to, byId ? "Dates are ignored for Admission Number search." : "Choose a date period to use this date.");
         Explain(split, "Choose Group by first to split grouped totals.");
         guide.Text = byId ? "Admission Number search finds that student directly. Other filters are disabled until you clear or change Search."
             : ModeHint(_mode);
@@ -716,6 +731,7 @@ public partial class StudentReportsPage : V2Page
             return;
         SelectKey(views, "");
         deleteViewButton.Enabled = false;
+        renameViewButton.Enabled=false;
         SwitchMode(chosen, applyPreset: true);
         await RunAsync();
     }
@@ -1142,6 +1158,7 @@ public partial class StudentReportsPage : V2Page
     }
     private async Task RunAsync()
     {
+        ResolveStudentDatePeriod();
         int revision = ++_reportRevision;
         string requested = FilterSignature();
         try
@@ -1354,6 +1371,7 @@ public partial class StudentReportsPage : V2Page
                 views.Items.Add(new Choice("saved:" + view.Name, "My view: " + view.Name));
             SelectKey(views, selectKey.Length > 0 ? "saved:" + selectKey : "");
             deleteViewButton.Enabled = SelectedSavedViewName().Length > 0;
+            renameViewButton.Enabled=deleteViewButton.Enabled;
         }
         finally
         {
@@ -1376,8 +1394,9 @@ public partial class StudentReportsPage : V2Page
         ["change"] = SelectedText(changeType, "Name"),
         ["search"] = search.Text.Trim(),
         ["limit"] = limitDate.Checked ? "1" : "0",
-        ["from"] = from.Value.Date.ToString("yyyy-MM-dd"),
-        ["to"] = to.Value.Date.ToString("yyyy-MM-dd"),
+        ["datePeriod"] = datePeriod.Text,
+        ["from"] = from.Value.Date.ToString("yyyy-MM-dd",System.Globalization.CultureInfo.InvariantCulture),
+        ["to"] = to.Value.Date.ToString("yyyy-MM-dd",System.Globalization.CultureInfo.InvariantCulture),
         ["inactive"] = inactive.Checked ? "1" : "0",
         ["transport"] = SelectedKey(transportFilter),
         ["completion"] = SelectedKey(completionFilter),
@@ -1391,7 +1410,7 @@ public partial class StudentReportsPage : V2Page
         string? name = ReportNameDialog.Prompt(
             FindForm(),
             "Save view",
-            "Name this view (everything on this page is saved with it):",
+            "Name this view (filters, arrangement and columns):",
             suggestion);
         if (name is null)
             return;
@@ -1451,6 +1470,7 @@ public partial class StudentReportsPage : V2Page
         string key = SelectedKey(views);
         string name = SelectedSavedViewName();
         deleteViewButton.Enabled = name.Length > 0;
+        renameViewButton.Enabled=deleteViewButton.Enabled;
         var ready = StudentReportQuickViews.All.FirstOrDefault(view => "ready:" + view.Key == key);
         if (ready is not null)
         {
@@ -1462,6 +1482,7 @@ public partial class StudentReportsPage : V2Page
             state["search"] = state["status"] = state["gender"] = "";
             state["compare"] = "0";
             state["limit"] = state["inactive"] = "0";
+            state["datePeriod"]="All dates";
             state["transport"] = ready.Transport;
             state["completion"] = ready.Completion;
             state["columns"] = ready.Columns;
@@ -1475,6 +1496,7 @@ public partial class StudentReportsPage : V2Page
             .FirstOrDefault(v => string.Equals(v.Name, name, StringComparison.CurrentCultureIgnoreCase));
         if (view is null)
             return;
+        if (!SavedLocationsAvailable(view.State)) return;
         ApplyState(view.State);
         await RunAsync();
     }
@@ -1516,6 +1538,7 @@ public partial class StudentReportsPage : V2Page
             SelectText(changeType, "Name", Get(state, "change"));
             search.Text = Get(state, "search");
             limitDate.Checked = Get(state, "limit") == "1";
+            datePeriod.SelectedItem=Get(state,"datePeriod",limitDate.Checked ? ReportDatePeriod.Fixed : "All dates");
             inactive.Checked = Get(state, "inactive") == "1";
             SelectKey(transportFilter, Get(state, "transport"));
             SelectKey(completionFilter, Get(state, "completion"));
@@ -1523,6 +1546,7 @@ public partial class StudentReportsPage : V2Page
                 from.Value = fromDate;
             if (DateTime.TryParse(Get(state, "to"), out var toDate))
                 to.Value = toDate;
+            ResolveStudentDatePeriod();
             UpdateEnabledState();
             SetPageHeaderText(string.Empty, ModeContext(_mode));
         }

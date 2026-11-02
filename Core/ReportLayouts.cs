@@ -78,12 +78,17 @@ public static class ReportLayoutStore
     public static ReportPersistenceResult SaveView(string pageKey, ReportSavedView view)
     {
         lock (Gate) return Update(data => {
+            string name=ReportViewOperations.ValidName(view.Name);
             if (!data.Views.TryGetValue(pageKey, out var views))
                 data.Views[pageKey] = views = new List<ReportSavedView>();
-            views.RemoveAll(v => string.Equals(v.Name, view.Name, StringComparison.CurrentCultureIgnoreCase));
-            views.Add(view);
+            views.RemoveAll(v => string.Equals(v.Name, name, StringComparison.CurrentCultureIgnoreCase));
+            views.Add(new ReportSavedView { Name=name,State=new Dictionary<string,string>(view.State) });
             return true;
         });
+    }
+    public static ReportPersistenceResult RenameView(string pageKey,string original,string replacement)
+    {
+        lock (Gate) return Update(data => ReportViewOperations.Rename(data,pageKey,original,replacement));
     }
     public static ReportPersistenceResult DeleteView(string pageKey, string name)
     {
