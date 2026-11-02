@@ -12,7 +12,14 @@ internal static partial class Program
     }
     private static void Main(string[] args)
     {
+        if(args.Contains("--xlsx-export"))
+        {
+            CheckXlsxExport();
+            Console.WriteLine($"PASS: {checks} Excel workbook type, formatting, data and atomic-save checks.");
+            return;
+        }
         CheckReceipts(); CheckOutstanding(); CheckCredit(); CheckConcessions(); CheckReceiptRdlc(); CheckQueryContracts(); CheckNewReports(); CheckPrintPresentation(); CheckSavedViews(); CheckReportOrdering();
+        CheckXlsxExport();
         if (args.Contains("--sql")) CheckSql();
         Console.WriteLine($"PASS: {checks} focused report data, grouping, totals, filtering and layout checks" + (args.Contains("--sql") ? " including disposable SQL queries." : ". SQL integration was not requested."));
     }

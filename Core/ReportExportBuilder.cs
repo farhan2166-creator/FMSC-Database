@@ -7,7 +7,8 @@ internal static class ReportExportBuilder
     internal static DataTable Build(
         DataTable source,
         IEnumerable<DataGridViewColumn> gridColumns,
-        IEnumerable<string> dateColumnKeys)
+        IEnumerable<string> dateColumnKeys,
+        bool preserveDateTypes=false)
     {
         DataGridViewColumn[] visible = gridColumns.Where(c => c.Visible)
             .OrderBy(c => c.DisplayIndex).ToArray();
@@ -29,7 +30,7 @@ internal static class ReportExportBuilder
             while (export.Columns.Contains(uniqueHeader))
                 uniqueHeader = $"{header} ({++suffix})";
             bool asDate = dates.Contains(sourceColumn.ColumnName);
-            export.Columns.Add(uniqueHeader, asDate ? typeof(string) : sourceColumn.DataType);
+            export.Columns.Add(uniqueHeader, asDate && !preserveDateTypes ? typeof(string) : sourceColumn.DataType);
             if (asDate)
                 dateOrdinals.Add(sourceColumns.Count - 1);
         }
@@ -41,7 +42,7 @@ internal static class ReportExportBuilder
                 object value = sourceRow[sourceColumns[index]];
                 row[index] = dateOrdinals.Contains(index)
                     ? value is DateTime date
-                        ? date.ToString("dd-MM-yyyy", CultureInfo.CurrentCulture)
+                        ? preserveDateTypes ? date.Date : date.ToString("dd-MM-yyyy", CultureInfo.CurrentCulture)
                         : DBNull.Value
                     : value;
             }

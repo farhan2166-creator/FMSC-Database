@@ -16,8 +16,8 @@ public sealed class CollectionsReceiptsReportPage : CanonicalFinanceReportPage
     }
     private protected override ReportPaginator.Page CreateReportPage(DataTable source, int index, int pageSize) =>
         CollectionReceiptGrouping.Page(source, index, pageSize);
-    protected override DataTable SelectExportRows(DataTable source, bool asCsv) =>
-        asCsv ? CollectionReceiptGrouping.DetailsOnly(source) : source;
+    protected override DataTable SelectExportRows(DataTable source, bool dataOnly) =>
+        dataOnly ? CollectionReceiptGrouping.DetailsOnly(source) : source;
     protected override int ExportRecordCount(DataTable source) => CollectionReceiptGrouping.Layout(source)?.Count(r=>r.Kind=="Detail") ?? source.Rows.Count;
     protected override string CsvExportLabel => "CSV data rows only (*.csv)";
     protected override string GroupingCaption => "Group By";

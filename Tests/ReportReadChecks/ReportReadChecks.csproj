@@ -3,6 +3,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
     <PackageReference Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="180.140.0" />
+    <PackageReference Include="ClosedXML" Version="0.105.1" />
     <Using Include="System.Data" />
     <Compile Include="../../Core/CollectionReceiptGrouping.cs" Link="CollectionReceiptGrouping.cs" />
     <Compile Include="../../Core/CollectionReceiptRdlc.cs" Link="CollectionReceiptRdlc.cs" />
@@ -14,6 +15,8 @@
     <Compile Include="../../Core/ReportSettingsFile.cs" Link="ReportSettingsFile.cs" />
     <Compile Include="../../Core/ReportViewOperations.cs" Link="ReportViewOperations.cs" />
     <Compile Include="../../Core/AtomicTextFile.cs" Link="AtomicTextFile.cs" />
+    <Compile Include="../../Core/AtomicExportFile.cs" Link="AtomicExportFile.cs" />
+    <Compile Include="../../Core/XlsxTableExporter.cs" Link="XlsxTableExporter.cs" />
     <Compile Include="../../Pages/Reports/Finance/CreditBalanceReportData.cs" Link="CreditBalanceReportData.cs" />
     <Compile Include="../../Pages/Reports/Finance/ConcessionSummaryData.cs" Link="ConcessionSummaryData.cs" />
     <Compile Include="../../Pages/Reports/Finance/MonthlyFeeReconciliationData.cs" Link="MonthlyFeeReconciliationData.cs" />

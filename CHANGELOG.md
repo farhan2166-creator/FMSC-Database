@@ -1,5 +1,14 @@
 # Changelog
 
+## Excel report export — 2026-11-02
+
+- Add Excel (.xlsx) to the existing report Export dialog, with the selected
+  columns, full report result and current ordering. Freeze headings and enable
+  spreadsheet filters; preserve numeric amounts, dates and textual references.
+- Grouped collection workbooks use data rows without inserted group totals.
+  Workbook generation uses ClosedXML and the existing atomic export publisher;
+  Microsoft Excel, SQL changes and additional screen controls are not required.
+
 ## Action shortcut coverage — 2026-11-02
 
 - Add shortcuts for bill preview, report columns, saved-view renaming, filter

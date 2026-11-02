@@ -194,6 +194,14 @@ Saved collection receipts show each included fee's saved amount due before that 
 
 ## Report review and advance credit
 
+The existing **Export** dialog now also offers **Excel workbook (.xlsx)**.
+It exports the chosen columns in their current order and the complete generated
+report across all pages. Amounts stay numeric, dates stay usable as Excel dates,
+and phone/CNIC/admission/receipt references remain text so their digits and
+leading zeros are preserved. Headings are frozen and Excel filters are enabled.
+Collections & Receipts uses its data rows, excluding inserted group headings and
+subtotals, as CSV already does. Microsoft Excel is not required to create the file.
+
 Finance reports and Certificate Issue Register offer optional **Order by** choices
 suited to the current view. **Default** is selected automatically; there is no need
 to choose an order before running a report. To override it, choose an order and

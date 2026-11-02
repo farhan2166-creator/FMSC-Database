@@ -291,6 +291,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} departure layout and lifecycle review checks (no database connection).");
             return;
         }
+        if(args.Contains("--spreadsheet-export"))
+        {
+            CheckSpreadsheetExport();
+            Console.WriteLine($"PASS: {checks} Excel projection, typed-date and full-result checks (no database connection).");
+            return;
+        }
         if(args.Contains("--report-ordering"))
         {
             CheckReportOrderingControls();
