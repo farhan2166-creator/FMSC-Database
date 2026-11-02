@@ -1,7 +1,7 @@
 namespace FMSC_SMS.Core;
 
 /// <summary>Named settings in the existing per-user report store. Applying never runs a query.</summary>
-internal sealed class ReportSavedViewsBar : FlowLayoutPanel
+internal sealed partial class ReportSavedViewsBar : FlowLayoutPanel
 {
     private readonly string pageKey;
     private readonly int actor=CurrentUser.UserId;
@@ -14,12 +14,14 @@ internal sealed class ReportSavedViewsBar : FlowLayoutPanel
     private readonly ModernButton apply,save,rename,delete;
     private bool resolving;
     internal bool IsApplying { get; private set; }
+    internal bool IsResolvingDates=>resolving;
     internal string DatePeriod => from is null ? ReportDatePeriod.Fixed : period.Text;
 
     internal ReportSavedViewsBar(string pageKey,Func<Dictionary<string,string>> capture,
         Action<IReadOnlyDictionary<string,string>> restore,Action<string,bool> status,Func<bool>? ready=null,
-        ModernDatePicker? from=null,ModernDatePicker? to=null)
+        ModernDatePicker? from=null,ModernDatePicker? to=null,Func<DataTable?>? academicYears=null,Action<int>? selectAcademicYear=null)
     {
+        this.academicYears=academicYears;this.selectAcademicYear=selectAcademicYear;
         this.pageKey=pageKey;this.capture=capture;this.restore=restore;this.status=status;this.ready=ready ?? (()=>true);this.from=from;this.to=to;
         Dock=DockStyle.Top; AutoSize=true; WrapContents=true; Margin=Padding.Empty;
         Padding=new Padding(0,0,0,AppMetrics.SpacingSm); BackColor=AppTheme.PageBackground;
@@ -27,8 +29,9 @@ internal sealed class ReportSavedViewsBar : FlowLayoutPanel
         apply=Button("Apply View",ApplySelected);save=Button("Save View",SaveCurrent);rename=Button("Rename View",RenameSelected);delete=Button("Delete View",DeleteSelected);
         if (from is not null && to is not null)
         {
-            period.Items.AddRange(ReportDatePeriod.Choices);period.SelectedIndex=0;Controls.Add(ChoiceField("Dates",period,245));
-            period.SelectedIndexChanged+=(_,_) => { if (!IsApplying) ResolveDates(); };
+            period.Items.AddRange(DateChoices);period.SelectedIndex=0;Controls.Add(ChoiceField("Dates",period,245));
+            period.SelectedIndexChanged+=(_,_) => DateChoiceChanged();
+            if(academicYears is not null) { changePeriod=Button("Change Period",()=>ChooseAcademicPeriod(false));changePeriod.Visible=false; }
             EventHandler manual=(_,_) => { if (!IsApplying && !resolving) period.SelectedItem=ReportDatePeriod.Fixed; };
             from.ValueChanged+=manual;to.ValueChanged+=manual;
             Disposed+=(_,_) => { from.ValueChanged-=manual;to.ValueChanged-=manual; };
@@ -58,7 +61,9 @@ internal sealed class ReportSavedViewsBar : FlowLayoutPanel
     internal void RefreshAvailability()
     {
         bool available=actor>0 && actor==CurrentUser.UserId && ready() && !IsApplying;
-        save.Enabled=views.Enabled=period.Enabled=available;
+        save.Enabled=views.Enabled=available;
+        period.Enabled=available && (from?.Enabled ?? true);
+        if(changePeriod is not null) { changePeriod.Visible=ReportAcademicPeriod.Months(DatePeriod)>0;changePeriod.Enabled=period.Enabled; }
         apply.Enabled=rename.Enabled=delete.Enabled=available && views.SelectedIndex>0;
     }
     private bool Available()
@@ -76,34 +81,37 @@ internal sealed class ReportSavedViewsBar : FlowLayoutPanel
     }
     internal Dictionary<string,string> Snapshot()
     {
-        var state=capture();state["$version"]="1";state["$dates"]=DatePeriod;return state;
+        var state=capture();state["$version"]="1";state["$dates"]=DatePeriod;SaveAcademicPeriod(state);return state;
     }
     internal void ApplyState(IReadOnlyDictionary<string,string> state)
     {
         if (!Available()) return;
         if (state.GetValueOrDefault("$version")!="1") throw new ReportViewValidationException("This saved view uses an unsupported format.");
         string dates=state.GetValueOrDefault("$dates") ?? ReportDatePeriod.Fixed;
-        if (!ReportDatePeriod.Choices.Contains(dates)) throw new ReportViewValidationException("The saved date period is not supported.");
+        if (!DateChoices.Contains(dates)) throw new ReportViewValidationException("The saved date period is not supported.");
         var previous=capture();string previousPeriod=DatePeriod;
+        int oldYear=academicYearId;DateTime? oldStart=academicStart;
         IsApplying=true;
         try
         {
+            RestoreAcademicPeriod(state,dates);
             restore(state);
             if (from is not null) period.SelectedItem=dates;
             ResolveDates();
         }
         catch
         {
+            academicYearId=oldYear;academicStart=oldStart;
             restore(previous);
             if (from is not null) period.SelectedItem=previousPeriod;
             throw;
         }
-        finally { IsApplying=false;RefreshAvailability(); }
+        finally { IsApplying=false;lastDatePeriod=DatePeriod;RefreshAvailability(); }
     }
     internal void ResolveDates()
     {
-        if (from is null || to is null || DatePeriod==ReportDatePeriod.Fixed || resolving) return;
-        var range=ReportDatePeriod.Resolve(DatePeriod,DateTime.Today);
+        if (from is null || to is null || !from.Enabled || DatePeriod==ReportDatePeriod.Fixed || resolving) return;
+        var range=ReportAcademicPeriod.Months(DatePeriod)>0?ResolveAcademicPeriod():ReportDatePeriod.Resolve(DatePeriod,DateTime.Today);
         resolving=true;
         try
         {

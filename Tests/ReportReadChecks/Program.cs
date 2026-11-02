@@ -12,6 +12,11 @@ internal static partial class Program
     }
     private static void Main(string[] args)
     {
+        if(args.Contains("--academic-periods"))
+        {
+            CheckAcademicPeriods();Console.WriteLine($"PASS: {checks} academic period boundary checks.");return;
+        }
+        CheckAcademicPeriods();
         if(args.Contains("--xlsx-export"))
         {
             CheckXlsxExport();

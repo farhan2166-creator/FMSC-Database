@@ -19,6 +19,33 @@ internal static partial class Program
         try
         {
             CurrentUser.SignIn(fixtureActor,"Saved-view fixture","Administrator",false,Array.Empty<string>());
+            using(var academicFrom=new ModernDatePicker {ShowCheckBox=true})
+            using(var academicTo=new ModernDatePicker {ShowCheckBox=true})
+            using(var years=new DataTable())
+            {
+                years.Columns.Add("AcademicYearId",typeof(int));years.Columns.Add("YearName");
+                years.Columns.Add("StartDate",typeof(DateTime));years.Columns.Add("EndDate",typeof(DateTime));
+                years.Rows.Add(7,"2026–27",new DateTime(2026,4,1),new DateTime(2027,3,31));
+                var dateFields=new (string Key,Control Control)[]{("From",academicFrom),("To",academicTo)};
+                using var academicBar=new ReportSavedViewsBar("synthetic.academic",()=>ReportFilterState.Capture(dateFields),
+                    s=>ReportFilterState.Restore(dateFields,s),(_,_)=>{},()=>true,academicFrom,academicTo,()=>years);
+                var quarter=academicBar.Snapshot();quarter["$dates"]="3 months";quarter["$academicYear"]="7";quarter["$academicStart"]="2026-07-01";
+                academicBar.ApplyState(quarter);
+                Check(academicFrom.Value.Date==new DateTime(2026,7,1)&&academicTo.Value.Date==new DateTime(2026,9,30)
+                    &&academicFrom.Checked&&academicTo.Checked,"Academic periods populate both inclusive date bounds");
+                var savedQuarter=academicBar.Snapshot();
+                Check(savedQuarter["$academicYear"]=="7"&&savedQuarter["$academicStart"]=="2026-07-01","Saved views retain the academic year and chosen block");
+                academicTo.Value=academicTo.Value.AddDays(-1);
+                Check(academicBar.DatePeriod==ReportDatePeriod.Fixed,"Editing a month-period date switches to custom dates without opening a dialog");
+                academicBar.ApplyState(savedQuarter);
+                years.Rows[0]["EndDate"]=new DateTime(2026,8,15);academicBar.ResolveDates();
+                Check(academicTo.Value.Date==new DateTime(2026,8,15),"Running a saved period respects the currently loaded academic-year bounds");
+                var invalid=new Dictionary<string,string>(savedQuarter);invalid["$academicYear"]="999";
+                bool invalidRefused=false;try { academicBar.ApplyState(invalid); }catch(ReportViewValidationException){invalidRefused=true;}
+                Check(invalidRefused&&academicBar.Snapshot()["$academicYear"]=="7"&&academicTo.Value.Date==new DateTime(2026,8,15),"Unavailable academic years roll back period metadata and dates");
+                using var picker=new ReportAcademicPeriodDialog(years,3,7,new DateTime(2026,7,1));
+                Check(picker.YearId==7&&picker.SelectedRange?.To==new DateTime(2026,8,15),"The period dialog offers clipped ranges for the selected academic year");
+            }
             using var scope=new LookupBox { BindingContext=new BindingContext() };
             var places=new DataTable();places.Columns.Add("Id",typeof(int));places.Columns.Add("Name");places.Rows.Add(1,"Boys");places.Rows.Add(2,"Girls");
             scope.Bind(places,"Id","Name","All");scope.SelectedValue=2;

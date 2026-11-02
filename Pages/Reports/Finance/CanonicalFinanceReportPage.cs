@@ -119,7 +119,8 @@ public abstract class CanonicalFinanceReportPage : V2Page
             SetStatus("Filters cleared. Choose filters, then press Run Report.");
         }, reportActions.ToArray());
         _savedViews=new ReportSavedViewsBar(_presetKey,CaptureSavedView,RestoreSavedView,(message,warning)=>SetStatus(message,warning),
-            ()=>_lookupsReady && !_runningReport,usesDates ? From : null,usesDates ? To : null);
+            ()=>_lookupsReady && !_runningReport,usesDates ? From : null,usesDates ? To : null,
+            usesDates ? ()=>Year.DataSource as DataTable : null,usesYear ? id=>Year.SelectedValue=id : null);
         SetContent(_savedViews.Wrap(content));
         Grid.Parent?.Controls.Add(_summary);
         Grid.BringToFront();
@@ -131,6 +132,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         To.ValueChanged += (_, _) => FiltersChanged();
         foreach (var lookup in new[] { Campus, Year, Class, Section })
             lookup.SelectedIndexChanged += (_, _) => {
+                if (ReferenceEquals(lookup,Year)) _savedViews?.AcademicYearChanged();
                 if (!_applyingScope) _scopeEdited = true;
                 FiltersChanged();
             };
@@ -209,6 +211,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
     protected override void OnWorkspaceStateRestoring() => _scopeEdited = true;
     protected abstract IEnumerable<SqlParameter> BuildParameters();
     protected virtual bool IsSummaryView => false;
+    protected bool ResolvingReportDates=>_savedViews?.IsResolvingDates??false;
     protected string ViewName => View.Text;
     protected string GroupName => GroupBy.Text;
     protected string MethodName => PaymentMethod.Text == "All" ? string.Empty : PaymentMethod.Text;

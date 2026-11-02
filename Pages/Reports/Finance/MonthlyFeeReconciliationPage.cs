@@ -16,6 +16,7 @@ public sealed class MonthlyFeeReconciliationPage : CanonicalFinanceReportPage
             picker.Value=new DateTime(picker.Value.Year,picker.Value.Month,1);
             picker.Checked=false;
             picker.ValueChanged += (_,_) => {
+                if(ResolvingReportDates)return;
                 var month=new DateTime(picker.Value.Year,picker.Value.Month,1);
                 if (picker.Value!=month)
                 {
