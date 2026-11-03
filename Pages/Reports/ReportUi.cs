@@ -55,11 +55,19 @@ internal static class ReportUi
             Dock = DockStyle.Fill,
             Font = AppTheme.NormalFont,
             ForeColor = AppTheme.Text,
+            AutoEllipsis = true,
             TextAlign = ContentAlignment.MiddleLeft
         }, 0, 0);
         HumanUi.ApplyFieldInputLayout(control);
         panel.Controls.Add(control, 0, 1);
+        ReportFilterLayout.ConstrainField(panel, control);
         return panel;
+    }
+    internal static Panel FormField(string caption, Control control, bool required = false)
+    {
+        var field = HumanUi.Field(caption, control, required);
+        ReportFilterLayout.ConstrainField((TableLayoutPanel)field, control);
+        return field;
     }
     public static TableLayoutPanel Bar(params (string Caption, Control Control)[] fields)
         => Bar(int.MaxValue, fields);
@@ -86,37 +94,7 @@ internal static class ReportUi
             fieldControl.Margin = new Padding(0);
             table.Controls.Add(fieldControl, i, 0);
         }
-        var fieldPanels = table.Controls.Cast<Control>().ToArray();
-        bool arranging = false;
-        void ArrangeFields()
-        {
-            if (arranging || table.IsDisposed) return;
-            var arrangement = ReportFilterArrangement.For(fields.Length,
-                Math.Min(table.ClientSize.Width - table.Padding.Horizontal,
-                    maximumColumns == int.MaxValue ? int.MaxValue : maximumColumns * AppScale.Scale(150)), AppScale.Scale(150));
-            if (table.ColumnCount == arrangement.Columns && table.RowCount == arrangement.Rows) return;
-            arranging = true;
-            table.SuspendLayout();
-            try
-            {
-                table.RowCount = Math.Max(table.RowCount, arrangement.Rows);
-                table.ColumnCount = arrangement.Columns;
-                table.ColumnStyles.Clear();
-                for (int i = 0; i < arrangement.Columns; i++)
-                    table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f / arrangement.Columns));
-                for (int i = 0; i < fieldPanels.Length; i++)
-                    table.SetCellPosition(fieldPanels[i], new TableLayoutPanelCellPosition(
-                        i % arrangement.Columns, i / arrangement.Columns));
-                table.RowCount = arrangement.Rows;
-                table.RowStyles.Clear();
-                for (int i = 0; i < arrangement.Rows; i++)
-                    table.RowStyles.Add(new RowStyle(SizeType.Absolute, rowHeight));
-                table.Height = rowHeight * arrangement.Rows + table.Padding.Vertical;
-            }
-            finally { table.ResumeLayout(true); arranging = false; }
-        }
-        table.SizeChanged += (_, _) => ArrangeFields();
-        table.HandleCreated += (_, _) => ArrangeFields();
+        ReportFilterLayout.Fit(table, rowHeight, maximumColumns);
         return table;
     }
     public static void BindSimple(LookupBox box, DataTable table, string id, string text)

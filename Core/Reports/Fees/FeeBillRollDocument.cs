@@ -91,9 +91,10 @@ internal sealed class FeeBillRollDocument : IDisposable
         catch{result.Dispose();throw;}
     }
 
-    internal byte[] ExportPdf()
+    internal byte[] ExportPdf(string? title = null)
     {
         using var combined=new PdfDocument();
+        if(title is not null)combined.Info.Title=title;
         foreach(var page in Pages)
         {
             using var stream=new MemoryStream(page.Pdf);using var source=PdfReader.Open(stream,PdfDocumentOpenMode.Import);

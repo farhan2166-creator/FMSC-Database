@@ -62,17 +62,8 @@ internal static class RdlcReportPrinter
     // The overview uses the exact same pages and geometry as printing.
     internal static List<MemoryStream> RenderPages(LocalReport report, PageSettings settings)
     {
-        string Inches(int value) => (value / 100d).ToString(CultureInfo.InvariantCulture) + "in";
-        int width = settings.Landscape ? settings.PaperSize.Height : settings.PaperSize.Width;
-        int height = settings.Landscape ? settings.PaperSize.Width : settings.PaperSize.Height;
-        var deviceInfo = new XElement("DeviceInfo",
-            new XElement("OutputFormat", "EMF"),
-            new XElement("StartPage", 0), new XElement("EndPage", 0),
-            new XElement("PageWidth", Inches(width)), new XElement("PageHeight", Inches(height)),
-            new XElement("MarginLeft", Inches(settings.Margins.Left)),
-            new XElement("MarginRight", Inches(settings.Margins.Right)),
-            new XElement("MarginTop", Inches(settings.Margins.Top)),
-            new XElement("MarginBottom", Inches(settings.Margins.Bottom)));
+        var deviceInfo = XElement.Parse(PageDeviceInfo(settings));
+        deviceInfo.Add(new XElement("OutputFormat","EMF"),new XElement("StartPage",0),new XElement("EndPage",0));
         var pages = new List<MemoryStream>();
         try
         {
@@ -91,6 +82,16 @@ internal static class RdlcReportPrinter
             foreach (var page in pages) page.Dispose();
             throw;
         }
+    }
+    internal static string PageDeviceInfo(PageSettings settings)
+    {
+        string Inches(int value) => (value / 100d).ToString(CultureInfo.InvariantCulture) + "in";
+        int width = settings.Landscape ? settings.PaperSize.Height : settings.PaperSize.Width;
+        int height = settings.Landscape ? settings.PaperSize.Width : settings.PaperSize.Height;
+        return new XElement("DeviceInfo",
+            new XElement("PageWidth",Inches(width)),new XElement("PageHeight",Inches(height)),
+            new XElement("MarginLeft",Inches(settings.Margins.Left)),new XElement("MarginRight",Inches(settings.Margins.Right)),
+            new XElement("MarginTop",Inches(settings.Margins.Top)),new XElement("MarginBottom",Inches(settings.Margins.Bottom))).ToString();
     }
 }
 

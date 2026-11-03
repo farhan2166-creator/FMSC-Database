@@ -79,6 +79,7 @@ public sealed class OutstandingAgingReportPage : CanonicalFinanceReportPage
     private void UpdateStatementAction()
     {
         if (openStatement is null) return;
+        openStatement.Visible = CanOpenStudentAccount;
         openStatement.Enabled = CurrentReportAvailable && ViewName is "Students" or "Charges"
             && CanOpenStudentAccount && Grid.CurrentRow?.DataBoundItem is DataRowView;
     }

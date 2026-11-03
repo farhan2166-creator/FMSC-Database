@@ -42,7 +42,7 @@ internal static partial class Program
             Check(!collections.IsHandleCreated&&!outstanding.IsHandleCreated,"Form inspection executes no SQL initialization");
             CurrentUser.SignIn(2,"Reports only","Viewer",false,new[]{"Reports.View"});
             using var reportsOnly=new ReportsHomePage((Action<Func<Control>,string,string>)((_,_,_)=>{}));
-            Check(!ReleaseReportControls(reportsOnly).Any(c=>c.Text=="Student Credit Balance Register"),"Credit tile is absent without fee-view permission");
+            Check(!ReleaseReportControls(reportsOnly).Any(c=>c.Text=="Student Advance Balance Register"),"Advance balance tile is absent without fee-view permission");
             using var restricted=new OutstandingAgingReportPage();
             var denied=(ModernButton)typeof(OutstandingAgingReportPage).GetField("openStatement",flags)!.GetValue(restricted)!;
             Check(!denied.Visible&&!denied.Enabled,"Open Statement is hidden without statement permission");

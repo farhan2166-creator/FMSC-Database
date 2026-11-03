@@ -5,7 +5,10 @@ namespace FMSC_SMS.Core;
 
 internal static class GridReportPreview
 {
-    internal sealed record Report(string Definition, DataTable Data);
+    internal sealed record Report(string Definition, DataTable Data)
+    {
+        internal string Title { get; init; } = "Report";
+    }
     internal static Report Build(string institution,string title,string subtitle,DataTable source,string printedBy,string moneyFormat="#,##0.##",IReadOnlyList<ReportPrintMetric>? summaryMetrics=null)
     {
         if(source.Columns.Count==0)throw new ArgumentException("Choose at least one report column.",nameof(source));
@@ -142,11 +145,12 @@ internal static class GridReportPreview
                 E("PageFooter",E("Height","0.30in"),E("PrintOnFirstPage",true),E("PrintOnLastPage",true),E("ReportItems",footerItems),E("Style")),
                 E("PageHeight",landscape?"8.27in":"11.69in"),E("PageWidth",landscape?"11.69in":"8.27in"),
                 E("LeftMargin","0.5in"),E("RightMargin","0.5in"),E("TopMargin","0.35in"),E("BottomMargin","0.35in"),E("Style")),E("ConsumeContainerWhitespace",true)));
-        return new(document.ToString(),data);
+        return new(document.ToString(),data) { Title=title };
     }
     internal static void ExportPdf(string path,Report report)
     {
         using var local=new Microsoft.Reporting.WinForms.LocalReport();
+        local.DisplayName=report.Title;
         local.LoadReportDefinition(new StringReader(report.Definition));
         local.DataSources.Add(new Microsoft.Reporting.WinForms.ReportDataSource("ReportData",report.Data));
         byte[] bytes=local.Render("PDF");

@@ -36,6 +36,9 @@ internal static partial class Program
         Check(heights[0]<heights[2]&&heights[2]<heights[1]&&heights[0]<heights[1]/2,"Short and medium bills keep their own heights instead of inheriting the longest one");
         string folder=Path.GetFullPath("artifacts/bill-roll-heights");Directory.CreateDirectory(folder);
         byte[] exported=roll.ExportPdf();File.WriteAllBytes(Path.Combine(folder,"mixed-length-bills.pdf"),exported);
+        var searchIndex=ReportPageSearchIndex.FromPdf(exported);
+        Check(searchIndex.FindPages("FB-LONG").SequenceEqual(new[]{2}),"Search maps a long family bill to its actual physical slip page");
+        Check(searchIndex.FindPages("FB-MEDIUM").SequenceEqual(new[]{3}),"Search works across mixed-height bill pages without guessing by source row");
         using(var pdf=PdfReader.Open(new MemoryStream(exported),PdfDocumentOpenMode.Import))
         {
             Check(pdf.PageCount==3,"Combined PDF contains three complete bills");
@@ -99,6 +102,12 @@ internal static partial class Program
                 using var image=new Bitmap(form.Width,form.Height);form.DrawToBitmap(image,new Rectangle(Point.Empty,image.Size));image.Save(Path.Combine(folder,"preview.png"));
                 Walk(form).OfType<ModernButton>().Single(b=>b.Text=="Next").PerformClick();
                 Check(Walk(form).OfType<ModernButton>().Any(b=>b.Text=="Print page 2"),"Navigation and Print this page target the selected bill");
+                var search=Walk(form).OfType<ReportPreviewSearchBar>().Single();
+                var flags=BindingFlags.Instance|BindingFlags.NonPublic;
+                ((ModernTextBox)typeof(ReportPreviewSearchBar).GetField("query",flags)!.GetValue(search)!).Text="FB-MEDIUM";
+                var found=(Task)typeof(ReportPreviewSearchBar).GetMethod("FindAsync",flags)!.Invoke(search,new object[]{1})!;
+                PumpUntil(()=>found.IsCompleted,"Thermal preview search completes");found.GetAwaiter().GetResult();
+                Check(Walk(form).OfType<ModernButton>().Any(b=>b.Text=="Print page 3"),"Thermal preview search updates navigation and Print this page to the matching bill");
             }
             catch(Exception ex){error=ex;}
             finally{form.Close();}

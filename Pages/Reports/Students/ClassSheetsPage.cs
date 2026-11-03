@@ -56,11 +56,11 @@ public sealed class ClassSheetsPage : V2Page
             ("Date (optional)", examDate), ("Teacher (optional)", teacher), ("Find Student", search)
         };
         var fieldOf = new Dictionary<Control, Control>();
-        var monthField = HumanUi.Field("Month", attendanceMonth, true);
+        var monthField = ReportUi.FormField("Month", attendanceMonth, true);
         monthField.Visible = false;
         for (int i = 0; i < inputs.Length; i++)
         {
-            var field = HumanUi.Field(inputs[i].Caption, inputs[i].Input, i < 2);
+            var field = ReportUi.FormField(inputs[i].Caption, inputs[i].Input, i < 2);
             fieldOf[inputs[i].Input] = field;
             Control cell = field;
             if (inputs[i].Input == exam)
@@ -297,7 +297,7 @@ public sealed class ClassSheetsPage : V2Page
                 ? MonthlyAttendanceSheetData.Create(group, school, month, teacherText)
                 : ClassSheetData.Create(group, school, examText, subjectText, dateText, teacherText,
                     showFatherForMatchingNames: !attendance));
-            string title = monthly ? "Monthly Attendance Register" : attendance ? "Exam Attendance Sheet" : "Marks Sheet";
+            string title = monthly ? "Monthly Class Attendance Register" : attendance ? "Class Exam Attendance Sheet" : "Class Marks Sheet";
             string template = monthly ? "ClassMonthlyAttendanceSheet.rdlc" : attendance ? "ClassAttendanceSheet.rdlc" : "ClassMarksSheet.rdlc";
             RdlcReportPreview.Show(FindForm(), title,
                 Path.Combine(AppContext.BaseDirectory, "Reports", template),

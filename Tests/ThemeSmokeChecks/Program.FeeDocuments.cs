@@ -116,6 +116,15 @@ internal static partial class Program
                 ? FeeBillRollDocument.Render(path,xml.Descendants(ns+"DataSet").Single().Attribute("Name")!.Value,data) : null;
             byte[] pdf=roll?.ExportPdf()??report.Render("PDF");File.WriteAllBytes(Path.Combine(folder,name+".pdf"),pdf);
             using var parsed=PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdf),PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+            if(annual && file==StudentReceiptReport.TemplateFile)
+            {
+                var search=ReportPageSearchIndex.FromPdf(pdf);
+                string admission=Convert.ToString(data.Rows[0]["AdmissionNumberText"])!;
+                Check(search.FindPages(admission).Length>0,"A4 receipt-sheet search finds the printed admission number");
+                if(name=="bulk-annual-search")
+                    Check(parsed.PageCount>1&&search.FindPages("FR-ANNUAL-14").Contains(parsed.PageCount),
+                        "The last receipt in a multi-column A4 batch maps to its actual final printed page");
+            }
             if(name=="family-six-child-receipt")
             {
                 var printed=new List<MemoryStream>();
@@ -234,6 +243,12 @@ internal static partial class Program
             using var legacy=credit.Copy();foreach(DataRow row in legacy.Rows) {row["ShowSettlement"]=false;row["ReceiptNumber"]="FMSC-2026-0100";}
             Check(Render("legacy-individual-receipt",legacy)==1,"Original cash receipt fields remain printable through the RDLC template");
             Check(Render("annual-receipt-sheet",legacy,StudentReceiptReport.TemplateFile,annual:true)==1,"Annual printing uses StudentReceipt.rdlc with its native adjustment rows");
+            using var bulk=legacy.Clone();
+            for(int receipt=0;receipt<15;receipt++)foreach(DataRow original in legacy.Rows)
+            {
+                bulk.ImportRow(original);var row=bulk.Rows[^1];row["ReceiptPageKey"]=receipt+1;row["ReceiptNumber"]="FR-ANNUAL-"+receipt;
+            }
+            Render("bulk-annual-search",bulk,StudentReceiptReport.TemplateFile,annual:true);
         }
         using(var partialHeader=header.Copy())
         using(var partialStudents=students.Copy())
