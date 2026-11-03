@@ -35,6 +35,20 @@ raw-data route and selected columns; no layout-derived fields are added to it.
 
 ## Receipt and bill presentation
 
+Owner decision — 3 November 2026: show deduction magnitudes with a minus sign in
+printed reports, direct PDFs and Excel. This covers posted/assigned discounts,
+waived/concession amounts, refunds and payment corrections. Detail rows, group
+subtotals, authoritative totals and print summary cards use the same signs.
+Excel cells contain signed numbers, so sums reconcile with the visible figures.
+Source tables, SQL, saved documents, financial calculations and raw CSV values
+remain unchanged. A reversed deduction is an increase; do not use absolute
+values or prefix another minus to an already signed transaction. Percentages,
+counts, credit payment sources and held credit balances keep their own meaning.
+Individual bill/receipt deductions already use minus signs; family bill discount
+and previous-settlement totals and family receipt deductions now match them.
+Older bill captions saying Concessions included remain informational: their
+saved net amount must not have that same concession subtracted a second time.
+
 Owner decision — 2 November 2026: receipt and bill presentation is restored to
 its finalized form before PR #74. Individual receipts use Net payable,
 Payment received and Total, with the original print-only combined discount/credit

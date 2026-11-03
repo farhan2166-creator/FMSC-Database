@@ -2068,7 +2068,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(First(Fields!GroupReceiptDeductionAmount.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Value>=Format(-First(Fields!GroupReceiptDeductionAmount.Value, "ReceiptPageGroup"), "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>

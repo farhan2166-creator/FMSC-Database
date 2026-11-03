@@ -39,6 +39,9 @@ internal static class XlsxTableExporter
                         }
                     }
                     else if(value is bool flag)cell.Value=flag;
+                    // Keep signed deductions numeric, so Excel sums agree with
+                    // the visible figures rather than hiding signs in a format.
+                    else if(value is decimal money)cell.Value=(double)ReportMoneyPresentation.Amount(source,money);
                     else if(Type.GetTypeCode(value.GetType()) is TypeCode.Byte or TypeCode.SByte or TypeCode.Int16 or TypeCode.UInt16
                         or TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Int64 or TypeCode.UInt64 or TypeCode.Single or TypeCode.Double or TypeCode.Decimal)
                         cell.Value=Convert.ToDouble(value,CultureInfo.InvariantCulture);

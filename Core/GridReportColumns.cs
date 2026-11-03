@@ -29,7 +29,7 @@ internal static class GridReportColumns
         object value=row[index];
         return value switch {
             DBNull=>"",
-            decimal money=>money.ToString(moneyFormat,CultureInfo.CurrentCulture),
+            decimal money=>ReportMoneyPresentation.Amount(row.Table.Columns[index],money).ToString(moneyFormat,CultureInfo.CurrentCulture),
             DateTime date=>date.ToString(row.Table.Columns[index].ColumnName.Contains("Month",StringComparison.OrdinalIgnoreCase)
                 || row.Table.Columns[index].ColumnName.Contains("Period",StringComparison.OrdinalIgnoreCase)?"MMM yyyy":"dd-MM-yyyy",CultureInfo.CurrentCulture),
             _=>RecordTextPolicy.DisplayText(row.Table.Columns[index].ColumnName,Convert.ToString(value,CultureInfo.CurrentCulture)??"")

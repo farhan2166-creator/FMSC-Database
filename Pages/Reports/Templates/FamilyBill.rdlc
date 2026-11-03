@@ -1496,7 +1496,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(First(Fields!GroupDiscount.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Value>=Format(-First(Fields!GroupDiscount.Value, "ReceiptPageGroup"), "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>
@@ -1634,7 +1634,7 @@
                         <Paragraph>
                           <TextRuns>
                             <TextRun>
-                              <Value>=Format(First(Fields!GroupPreviouslySettled.Value, "ReceiptPageGroup"), "N0")</Value>
+                              <Value>=Format(-First(Fields!GroupPreviouslySettled.Value, "ReceiptPageGroup"), "N0")</Value>
                               <Style>
                                 <FontFamily>Segoe UI</FontFamily>
                                 <FontSize>6.5pt</FontSize>

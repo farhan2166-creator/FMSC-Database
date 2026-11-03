@@ -40,7 +40,8 @@ internal static class GridReportPreview
                 var column = columns[i];
                 printed["C" + i] = GridReportColumns.DisplayValue(row,column,moneyFormat);
                 if (receiptLayout is not null && column.Numeric)
-                    printed["N" + i] = row.IsNull(column.Fields[0]) ? 0m : Convert.ToDecimal(row[column.Fields[0]]);
+                    printed["N" + i] = row.IsNull(column.Fields[0]) ? 0m
+                        : ReportMoneyPresentation.Amount(source.Columns[column.Fields[0]],Convert.ToDecimal(row[column.Fields[0]]));
             }
             if (receiptLayout is not null)
             {

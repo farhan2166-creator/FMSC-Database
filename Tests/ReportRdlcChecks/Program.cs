@@ -37,7 +37,13 @@ foreach(string template in new[]{"StudentBill","FamilyBill","StudentReceipt","Fa
     foreach(var field in dataset.Element(ns+"Fields")!.Elements(ns+"Field"))
     {
         string typeName=field.Elements().FirstOrDefault(e=>e.Name.LocalName=="TypeName")?.Value??"System.String";
-        sample.Columns.Add((string)field.Attribute("Name")!,Type.GetType(typeName)??typeof(string));
+        string name=(string)field.Attribute("Name")!;
+        // These templates omit type hints. Supply real deduction magnitudes and
+        // visibility flags so the changed expressions are evaluated, not hidden.
+        Type type=name is "GroupDiscount" or "GroupReceiptDeductionAmount" or "GroupPreviouslySettled"?typeof(decimal)
+            :name.StartsWith("Show",StringComparison.Ordinal)||name.StartsWith("ChildShow",StringComparison.Ordinal)?typeof(bool)
+            :Type.GetType(typeName)??typeof(string);
+        sample.Columns.Add(name,type);
     }
     var sampleRow=sample.NewRow();
     foreach(DataColumn column in sample.Columns)
@@ -52,5 +58,13 @@ foreach(string template in new[]{"StudentBill","FamilyBill","StudentReceipt","Fa
     var xmlBytes=actual.Render("XML");
     if(xmlBytes.Length==0 || System.Text.Encoding.UTF8.GetString(xmlBytes).Contains("#Error",StringComparison.Ordinal))
         throw new Exception(template+" did not process financial expressions successfully.");
+    var rendered=XDocument.Load(new MemoryStream(xmlBytes));
+    foreach(string box in template=="FamilyBill"?new[]{"GroupDiscountAmount","GroupPreviouslySettledAmount"}
+        :template=="FamilyReceipt"?new[]{"GroupDiscountAmount"}:Array.Empty<string>())
+    {
+        var amounts=rendered.Descendants().Attributes().Where(attribute=>attribute.Name.LocalName==box).Select(attribute=>attribute.Value).ToArray();
+        if(amounts.Length==0||amounts.Any(value=>value!="-100"))
+            throw new Exception(template+" must print "+box+" as a negative deduction; actual: "+string.Join(",",amounts));
+    }
     Console.WriteLine("PASS: "+template+" actual RDLC compiles and processes synthetic fields to XML");
 }

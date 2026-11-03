@@ -24,7 +24,7 @@ internal static class ReportPrintSummary
         return totals.Columns.Cast<DataColumn>().Select(column => {
             object value = totals.Rows[0][column];
             string text = value is DBNull ? "0" : value is decimal money
-                ? "Rs. " + money.ToString("#,##0.##", CultureInfo.CurrentCulture)
+                ? "Rs. " + ReportMoneyPresentation.Amount(column,money).ToString("#,##0.##", CultureInfo.CurrentCulture)
                 : Convert.ToString(value, CultureInfo.CurrentCulture) ?? "0";
             return new ReportPrintMetric(Caption(column.ColumnName), text);
         }).ToArray();
@@ -42,7 +42,7 @@ internal static class ReportPrintSummary
             string key = colon >= 0 ? part[..colon].Trim() : "";
             if (labels.Contains(key))
             {
-                if (authoritative is null) metrics.Add(new(Caption(key), part[(colon + 1)..].Trim()));
+                if (authoritative is null) metrics.Add(new(Caption(key), ReportMoneyPresentation.LegacyMetric(key,part[(colon + 1)..].Trim())));
             }
             else if (part.Length > 0) scope.Add(part.Replace("Period: Any start to Any end", "Period: All dates", StringComparison.OrdinalIgnoreCase));
         }

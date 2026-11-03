@@ -8,6 +8,7 @@
     <Compile Include="../../Core/CollectionReceiptGrouping.cs" Link="CollectionReceiptGrouping.cs" />
     <Compile Include="../../Core/CollectionReceiptRdlc.cs" Link="CollectionReceiptRdlc.cs" />
     <Compile Include="../../Core/ReportPrintSummary.cs" Link="ReportPrintSummary.cs" />
+    <Compile Include="../../Core/ReportMoneyPresentation.cs" Link="ReportMoneyPresentation.cs" />
     <Compile Include="../../Core/ReportContextProjection.cs" Link="ReportContextProjection.cs" />
     <Compile Include="../../Core/ReportPaginator.cs" Link="ReportPaginator.cs" />
     <Compile Include="../../Core/OutstandingReportFilter.cs" Link="OutstandingReportFilter.cs" />

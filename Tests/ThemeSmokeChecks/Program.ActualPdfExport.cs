@@ -14,7 +14,12 @@ internal static partial class Program
         receipts.Columns.Add("Date",typeof(DateTime));
         foreach(string name in new[]{"Money Received","Refunds","Corrections","Credit Applied","Adjusted Collection"})receipts.Columns.Add(name,typeof(decimal));
         var numbers=new[]{"R-2026-00001","FR-2026-00002","R-2026-00003"};
-        for(int index=0;index<numbers.Length;index++)receipts.Rows.Add(numbers[index],"Individual","Hamid s/o Ali",index==2?"Campus Girls":"Campus Boys","One – A","Cash","Fixture",new DateTime(2026,11,3),100m,0m,0m,0m,100m);
+        for(int index=0;index<numbers.Length;index++)
+        {
+            decimal cash=index==0?100m:0m,refund=index==1?20m:0m,correction=index==2?30m:0m;
+            receipts.Rows.Add(numbers[index],"Individual","Hamid s/o Ali",index==2?"Campus Girls":"Campus Boys","One – A",
+                index==0?"Cash":index==1?"Refund":"Correction","Fixture",new DateTime(2026,11,3),cash,refund,correction,0m,cash-refund-correction);
+        }
         var sample=ReceiptExportReview(receipts,"Campus",(page,projection)=>{
             // This is the method called by the actual Export button after its file picker and identity checks.
             var document=page.BuildPdfExportDocument(projection,"Fictional Meadow School & College","Fixture");
@@ -26,12 +31,22 @@ internal static partial class Program
             foreach(string number in numbers)
                 Check(printed.AsEnumerable().Any(row=>row.ItemArray.OfType<string>().Any(value=>value.Contains(number,StringComparison.Ordinal))),
                     "The real export handler preserves the exact displayed receipt number "+number);
+            var columns=GridReportColumns.Create(projection,"#,##0.##");
+            foreach(var (field,amount) in new[]{("Refunds",20m),("Corrections",30m)})
+            {
+                int column=columns.FindIndex(item=>item.Fields.Length==1&&projection.Columns[item.Fields[0]].ColumnName==field);
+                Check(printed.AsEnumerable().Any(row=>row.Field<string>("C"+column)==(-amount).ToString("#,##0.##")
+                    &&row.Field<decimal>("N"+column)==-amount),
+                    "The Export handler signs "+field+" consistently for detail rows and grouped subtotal inputs");
+            }
             string path=Path.Combine(folder,"collections-receipts.pdf");
             typeof(V2Page).GetMethod("WritePdfExport",flags)!.Invoke(page,new object[]{path,document});
             var pdf=ReportPageSearchIndex.FromPdf(File.ReadAllBytes(path));
             foreach(string number in numbers)Check(pdf.FindPages(number).Length>0,"The file writer used by Export prints the original reference "+number);
         });
         sample.Rows.Dispose();
+        Check(receipts.Rows[1].Field<decimal>("Refunds")==20m&&receipts.Rows[2].Field<decimal>("Corrections")==30m,
+            "Printing signed deductions leaves original receipt magnitudes intact");
 
         using var students=new DataTable();students.Columns.Add("AdmissionNumber");students.Columns.Add("StudentName");students.Columns.Add("Campus");
         students.Rows.Add("00163","Hamid","Campus Boys");students.Rows.Add("00164","Kausar","Campus Boys");
