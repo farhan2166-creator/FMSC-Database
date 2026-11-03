@@ -40,7 +40,9 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         ? "Finish the certificate editor before leaving the workspace."
         : "Wait for the certificate register to finish loading.";
 
-    public StudentCertificatesWorkspacePage() : base(
+    public StudentCertificatesWorkspacePage() : this(true) { }
+
+    internal StudentCertificatesWorkspacePage(bool initialize) : base(
         "Student Certificates Workspace",
         "Select one student, review saved certificates and open the existing certificate workflow.")
     {
@@ -59,7 +61,7 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         student.UserSelectionChanged += async (_, _) => await ReloadAsync();
         student.SelectionCleared += (_, _) => ClearSelection();
         student.SelectionChangeGuard = _ => !editorOpen;
-        StudentSearchCache.Warm();
+        if (initialize) StudentSearchCache.Warm();
 
         Grid.AutoGenerateColumns = false;
         Grid.ReadOnly = true;
