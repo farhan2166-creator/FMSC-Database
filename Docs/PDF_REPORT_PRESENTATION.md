@@ -129,6 +129,18 @@ checks cover family and standalone groups and reconcile student/family totals.
 
 ## Verification
 
+Legacy class templates — 3 November 2026: Class & Section Summary centers its
+school, title, scope, explanatory note and combined Prepared line. Class
+Outstanding Charges combines its placement and academic-year/generated context
+into centered full-width lines. Marks and exam-attendance sheets center class,
+exam, paper and date context within each of their two copies. Existing monthly
+attendance headings remain centered; its Student Name column heading now matches
+the other centered headings. Data rows, totals, paper sizes and margins are
+preserved. `--report-heading-alignment` renders all five templates to PNG/PDF and
+checks paragraph alignment, report/copy widths, school text geometry and complete
+page rendering. These samples are also in the single CI review PDF. No migration
+is needed.
+
 Billing Summary async regression — 3 November 2026: the shared finance loader
 captures the total-row setting on the UI thread before awaiting data. The previous
 worker-thread continuation evaluated Billing Summary's view-dependent property and

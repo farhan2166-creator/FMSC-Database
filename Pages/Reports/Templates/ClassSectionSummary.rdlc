@@ -17,7 +17,7 @@
               </TextRun>
             </TextRuns>
             <Style>
-              <TextAlign>Left</TextAlign>
+              <TextAlign>Center</TextAlign>
             </Style>
           </Paragraph>
         </Paragraphs>
@@ -82,7 +82,7 @@
               </TextRun>
             </TextRuns>
             <Style>
-              <TextAlign>Left</TextAlign>
+              <TextAlign>Center</TextAlign>
             </Style>
           </Paragraph>
         </Paragraphs>
@@ -113,7 +113,7 @@
               </TextRun>
             </TextRuns>
             <Style>
-              <TextAlign>Left</TextAlign>
+              <TextAlign>Center</TextAlign>
             </Style>
           </Paragraph>
         </Paragraphs>
@@ -130,7 +130,7 @@
           <PaddingBottom>3pt</PaddingBottom>
         </Style>
       </Textbox>
-      <Textbox Name="PreparedLabel">
+      <Textbox Name="Prepared">
         <CanGrow>true</CanGrow>
         <KeepTogether>true</KeepTogether>
         <Paragraphs>
@@ -142,31 +142,6 @@
                   <FontSize>8pt</FontSize>
                 </Style>
               </TextRun>
-            </TextRuns>
-            <Style>
-              <TextAlign>Left</TextAlign>
-            </Style>
-          </Paragraph>
-        </Paragraphs>
-        <Top>1.1811in</Top>
-        <Left>0in</Left>
-        <Height>0.19685in</Height>
-        <Width>0.59055in</Width>
-        <ZIndex>4</ZIndex>
-        <Style>
-          <VerticalAlign>Middle</VerticalAlign>
-          <PaddingLeft>3pt</PaddingLeft>
-          <PaddingRight>3pt</PaddingRight>
-          <PaddingTop>3pt</PaddingTop>
-          <PaddingBottom>3pt</PaddingBottom>
-        </Style>
-      </Textbox>
-      <Textbox Name="Prepared">
-        <CanGrow>true</CanGrow>
-        <KeepTogether>true</KeepTogether>
-        <Paragraphs>
-          <Paragraph>
-            <TextRuns>
               <TextRun>
                 <Value>=First(Fields!Generated.Value, "ClassSummaryData")</Value>
                 <Style>
@@ -175,19 +150,19 @@
               </TextRun>
             </TextRuns>
             <Style>
-              <TextAlign>Left</TextAlign>
+              <TextAlign>Center</TextAlign>
             </Style>
           </Paragraph>
         </Paragraphs>
         <Top>1.1811in</Top>
-        <Left>0.59055in</Left>
+        <Left>0cm</Left>
         <Height>0.19685in</Height>
-        <Width>7.04724in</Width>
+        <Width>19.4cm</Width>
         <ZIndex>4</ZIndex>
         <Style>
           <VerticalAlign>Middle</VerticalAlign>
-          <PaddingLeft>0pt</PaddingLeft>
-          <PaddingRight>3pt</PaddingRight>
+          <PaddingLeft>2pt</PaddingLeft>
+          <PaddingRight>2pt</PaddingRight>
           <PaddingTop>3pt</PaddingTop>
           <PaddingBottom>3pt</PaddingBottom>
         </Style>
@@ -278,7 +253,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Left</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -312,7 +287,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Left</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>
@@ -516,7 +491,7 @@
                             </TextRun>
                           </TextRuns>
                           <Style>
-                            <TextAlign>Right</TextAlign>
+                            <TextAlign>Center</TextAlign>
                           </Style>
                         </Paragraph>
                       </Paragraphs>

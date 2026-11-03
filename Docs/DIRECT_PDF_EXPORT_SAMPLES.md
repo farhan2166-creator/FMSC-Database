@@ -1,13 +1,13 @@
 # Direct Export → PDF samples
 
 The **Direct PDF export samples** Windows workflow runs `--direct-pdf-review`:
-the shared grid PDF and student-identity fixtures, followed by a verified merge of
+the shared grid, student-identity and class-template fixtures, followed by a verified merge of
 their exported PDFs. It starts on relevant main/PR changes or can be run manually.
 Desktop CI runs the same fixture and publishes the same single-file download.
 
 Download **REVIEW-ALL.pdf** from the workflow run or its summary link. It downloads
 directly as a PDF, without a ZIP, individual duplicate files or PNG previews,
-matching the fee-document review workflow. PDF bookmarks navigate eleven report
+matching the fee-document review workflow. PDF bookmarks navigate sixteen report
 scenarios. Every source page, paper size, orientation and page order is preserved;
 wide reports retain all of their pages. The download is retained for seven days,
 separately from installer downloads.
@@ -18,9 +18,10 @@ Subject metadata. Detailed page ranges and individual checksums are generated in
 `artifacts/direct-pdf-review/provenance.json` for local review and CI summary use;
 that metadata file is not bundled with the PDF download.
 
-These samples call the production `GridReportPreview.Build` and
+The grid samples call the production `GridReportPreview.Build` and
 `GridReportPreview.ExportPdf` methods used by the screens' direct **Export → PDF**
-action. They render on Windows with the production reporting engine and font settings.
+action. Class-report samples render the actual production RDLC templates with the
+same Windows reporting engine used by print preview and its PDF export.
 They do not exercise the Save File dialog, school SQL queries or every screen's
 column/filter setup. They are not screenshots or recreated PDF designs.
 
@@ -40,6 +41,12 @@ once, ordered class/section entries, actual payment methods and Payment Received
 captions. Student List, Outstanding & Aging with the combined student
 identity, Student Advance Balance Register — Families, Student Changes and Certificate Issue Register from the report identity
 fixtures are included too. Those samples also use `GridReportPreview.ExportPdf`.
+
+Class & Section Summary, Class Outstanding Charges, Class Marks Sheet, Class Exam
+Attendance Sheet and Class Monthly Attendance Register are included from their
+RDLC templates. Heading checks verify centered text, full report/copy widths and
+the school heading's position in the rendered PDF. The current combined review
+contains 16 scenarios and 22 pages.
 
 The combined file is published only after all fixture suites and the merge checks
 pass. A failed PDF check cannot publish a partial review or reuse a previous

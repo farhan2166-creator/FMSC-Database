@@ -441,6 +441,11 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} character report header and single-page rendering checks; previews in artifacts/report-captions.");
             return;
         }
+        if(args.Contains("--report-heading-alignment"))
+        {
+            CheckReportCaptions(new[]{"ClassSectionSummary","ClassOutstandingCharges","ClassMarksSheet","ClassAttendanceSheet","ClassMonthlyAttendanceSheet"});
+            Console.WriteLine($"PASS: {checks} class report heading alignment, rendered geometry and PDF/PNG checks.");return;
+        }
         if(args.Contains("--report-captions"))
         {
             CheckReportCaptions();

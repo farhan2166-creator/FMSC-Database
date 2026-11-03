@@ -14,6 +14,7 @@ internal static partial class Program
         CheckGridPdfReports();
         CheckReportStudentIdentity();
         CheckCollectionReceiptPresentation();
+        CheckReportCaptions(new[]{"ClassSectionSummary","ClassOutstandingCharges","ClassMarksSheet","ClassAttendanceSheet","ClassMonthlyAttendanceSheet"});
         var samples=new (string Title,string Path)[] {
             ("Collections & Receipts — Whole School","grid-pdf/collections-receipts-export.pdf"),
             ("Collections & Receipts — By Campus","grid-pdf/collections-by-campus-export.pdf"),
@@ -22,6 +23,11 @@ internal static partial class Program
             ("Student List","report-student-identity/student-list.pdf"),
             ("Outstanding & Aging — Student Identity","report-student-identity/outstanding-aging.pdf"),
             ("Student Advance Balance Register — Families","report-student-identity/advance-balance-families.pdf"),
+            ("Class & Section Summary","report-captions/ClassSectionSummary.pdf"),
+            ("Class Outstanding Charges","report-captions/ClassOutstandingCharges.pdf"),
+            ("Class Marks Sheet","report-captions/ClassMarksSheet.pdf"),
+            ("Class Exam Attendance Sheet","report-captions/ClassAttendanceSheet.pdf"),
+            ("Class Monthly Attendance Register","report-captions/ClassMonthlyAttendanceSheet.pdf"),
             ("Student Changes","report-student-identity/student-changes.pdf"),
             ("Certificate Issue Register","report-student-identity/certificate-register.pdf"),
             ("Detailed Financial Report — Wide / Multipage","grid-pdf/wide-multipage-export.pdf"),

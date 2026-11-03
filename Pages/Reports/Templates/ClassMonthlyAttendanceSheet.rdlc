@@ -378,7 +378,8 @@
                                     <FontSize>10pt</FontSize>
                                     <FontWeight>Bold</FontWeight>
                                   </Style>
-                                </TextRun><TextRun>
+                                </TextRun>
+                                <TextRun>
                                   <Value>=First(Fields!ExamDate.Value, "PageGroup")</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
@@ -414,37 +415,43 @@
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>9pt</FontSize>
                                   </Style>
-                                </TextRun><TextRun>
+                                </TextRun>
+                                <TextRun>
                                   <Value> · Class </Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>9pt</FontSize>
                                   </Style>
-                                </TextRun><TextRun>
+                                </TextRun>
+                                <TextRun>
                                   <Value>=First(Fields!ClassName.Value, "PageGroup")</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>9pt</FontSize>
                                   </Style>
-                                </TextRun><TextRun>
+                                </TextRun>
+                                <TextRun>
                                   <Value> / </Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>9pt</FontSize>
                                   </Style>
-                                </TextRun><TextRun>
+                                </TextRun>
+                                <TextRun>
                                   <Value>=First(Fields!SectionName.Value, "PageGroup")</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>9pt</FontSize>
                                   </Style>
-                                </TextRun><TextRun>
+                                </TextRun>
+                                <TextRun>
                                   <Value> · </Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>9pt</FontSize>
                                   </Style>
-                                </TextRun><TextRun>
+                                </TextRun>
+                                <TextRun>
                                   <Value>=First(Fields!YearName.Value, "PageGroup")</Value>
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
@@ -628,7 +635,7 @@
                                               </TextRun>
                                             </TextRuns>
                                             <Style>
-                                              <TextAlign>Left</TextAlign>
+                                              <TextAlign>Center</TextAlign>
                                             </Style>
                                           </Paragraph>
                                         </Paragraphs>
