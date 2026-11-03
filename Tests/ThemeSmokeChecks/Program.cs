@@ -558,6 +558,12 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} blocking-message colour and reset checks across all themes.");
             return;
         }
+        if(args.Contains("--direct-pdf-review"))
+        {
+            CheckDirectPdfReview();
+            Console.WriteLine($"PASS: {checks} direct export, report identity and combined review PDF checks.");
+            return;
+        }
         if(args.Contains("--grid-pdf"))
         {
             CheckGridPdfReports();

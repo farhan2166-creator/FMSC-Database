@@ -8,18 +8,26 @@ on:
       - 'Core/GridReportPreview.cs'
       - 'Core/GridReportColumns.cs'
       - 'Core/ReportExportBuilder.cs'
+      - 'Core/ReportStudentIdentity.cs'
       - 'Core/CollectionReceiptGrouping.cs'
       - 'Core/CollectionReceiptRdlc.cs'
       - 'Tests/ThemeSmokeChecks/Program.GridPdf.cs'
+      - 'Tests/ThemeSmokeChecks/Program.DirectPdfReview.cs'
+      - 'Tests/ThemeSmokeChecks/Program.ReportStudentIdentity.cs'
+      - 'Tests/ThemeSmokeChecks/Program.cs'
       - '.github/workflows/fmsc-direct-pdf-exports.yml'
   pull_request:
     paths:
       - 'Core/GridReportPreview.cs'
       - 'Core/GridReportColumns.cs'
       - 'Core/ReportExportBuilder.cs'
+      - 'Core/ReportStudentIdentity.cs'
       - 'Core/CollectionReceiptGrouping.cs'
       - 'Core/CollectionReceiptRdlc.cs'
       - 'Tests/ThemeSmokeChecks/Program.GridPdf.cs'
+      - 'Tests/ThemeSmokeChecks/Program.DirectPdfReview.cs'
+      - 'Tests/ThemeSmokeChecks/Program.ReportStudentIdentity.cs'
+      - 'Tests/ThemeSmokeChecks/Program.cs'
       - '.github/workflows/fmsc-direct-pdf-exports.yml'
 
 permissions:
@@ -43,39 +51,17 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Generate and verify direct PDF exports
         id: render
-        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --grid-pdf
-      - name: Record export provenance
-        if: ${{ always() && hashFiles('artifacts/grid-pdf/*-export.pdf') != '' }}
-        shell: pwsh
-        env:
-          SAMPLE_COMMIT: ${{ github.sha }}
-          SAMPLE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SAMPLE_CHECK_OUTCOME: ${{ steps.render.outcome }}
-        run: |
-          $samples = @(Get-ChildItem artifacts/grid-pdf/*-export.pdf | ForEach-Object {
-            [ordered]@{ file = $_.Name; sha256 = (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
-          })
-          [ordered]@{
-            sourceCommit = $env:SAMPLE_COMMIT
-            workflowRun = $env:SAMPLE_RUN_URL
-            checkOutcome = $env:SAMPLE_CHECK_OUTCOME
-            data = 'Fictional school, operator and transactions; no school database queried.'
-            renderer = 'Production direct PDF export code on Windows'
-            files = $samples
-          } | ConvertTo-Json -Depth 4 | Set-Content artifacts/grid-pdf/provenance.json -Encoding utf8
-      - name: Upload direct PDF exports
+        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --direct-pdf-review
+      - name: Upload the single direct-export review PDF
         id: samples
-        if: ${{ always() && hashFiles('artifacts/grid-pdf/*-export.pdf') != '' }}
+        if: ${{ success() && hashFiles('artifacts/direct-pdf-review/REVIEW-ALL.pdf') != '' }}
         uses: actions/upload-artifact@v7
         with:
-          name: fmsc-direct-pdf-exports-${{ github.run_id }}
-          path: |
-            artifacts/grid-pdf/*-export.pdf
-            artifacts/grid-pdf/provenance.json
-            Docs/DIRECT_PDF_EXPORT_SAMPLES.md
+          path: artifacts/direct-pdf-review/REVIEW-ALL.pdf
+          archive: false
           retention-days: 7
           if-no-files-found: error
-      - name: Link exported PDFs in the run summary
+      - name: Link the review PDF in the run summary
         if: ${{ always() && steps.samples.outcome == 'success' }}
         shell: pwsh
         env:
@@ -83,6 +69,8 @@ jobs:
           SAMPLE_COMMIT: ${{ github.sha }}
           SAMPLE_CHECK_OUTCOME: ${{ steps.render.outcome }}
         run: |
-          "[Download direct-export PDFs]($env:SAMPLE_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+          "[Download the single direct-export review PDF]($env:SAMPLE_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
           "Source commit: $env:SAMPLE_COMMIT. Export checks: $env:SAMPLE_CHECK_OUTCOME." >> $env:GITHUB_STEP_SUMMARY
-          'Fictional data rendered with the production export code on Windows. Review the PDF files themselves; partial output from a failed check is not a passing result.' >> $env:GITHUB_STEP_SUMMARY
+          $review = Get-Content artifacts/direct-pdf-review/provenance.json -Raw | ConvertFrom-Json
+          "Scenarios: $($review.ScenarioCount). PDF pages: $($review.PageCount). SHA-256: $($review.Sha256)." >> $env:GITHUB_STEP_SUMMARY
+          'The download is REVIEW-ALL.pdf, without a ZIP. Its bookmarks navigate every report scenario, including every page of wide reports. Fictional data rendered with the production export code on Windows.' >> $env:GITHUB_STEP_SUMMARY

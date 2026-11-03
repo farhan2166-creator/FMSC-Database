@@ -1,13 +1,22 @@
 # Direct Export → PDF samples
 
-The **Direct PDF export samples** Windows workflow runs only the existing
-`--grid-pdf` fixture. It starts on this verification branch's push and on relevant
-main/PR changes, or can be started manually. The desktop CI workflow also retains
-its PDF output. Both use the artifact name `fmsc-direct-pdf-exports-<run ID>`.
-Open the relevant workflow run in GitHub Actions and download that artifact;
-the focused workflow also links it in the run summary and records the source
-commit, checks outcome and PDF checksums in `provenance.json`.
-Artifacts are retained for seven days. This is separate from installer downloads.
+The **Direct PDF export samples** Windows workflow runs `--direct-pdf-review`:
+the shared grid PDF and student-identity fixtures, followed by a verified merge of
+their exported PDFs. It starts on relevant main/PR changes or can be run manually.
+Desktop CI runs the same fixture and publishes the same single-file download.
+
+Download **REVIEW-ALL.pdf** from the workflow run or its summary link. It downloads
+directly as a PDF, without a ZIP, individual duplicate files or PNG previews,
+matching the fee-document review workflow. PDF bookmarks navigate nine report
+scenarios. Every source page, paper size, orientation and page order is preserved;
+wide reports retain all of their pages. The download is retained for seven days,
+separately from installer downloads.
+
+The focused workflow summary records the source commit, check outcome, scenario
+and page counts, and combined PDF checksum. The source commit is also in the PDF's
+Subject metadata. Detailed page ranges and individual checksums are generated in
+`artifacts/direct-pdf-review/provenance.json` for local review and CI summary use;
+that metadata file is not bundled with the PDF download.
 
 These samples call the production `GridReportPreview.Build` and
 `GridReportPreview.ExportPdf` methods used by the screens' direct **Export → PDF**
@@ -15,7 +24,8 @@ action. They render on Windows with the production reporting engine and font set
 They do not exercise the Save File dialog, school SQL queries or every screen's
 column/filter setup. They are not screenshots or recreated PDF designs.
 
-The data and school/operator names are fictional. Each PDF ends in `-export.pdf`:
+The data and school/operator names are fictional. The review combines these
+direct exports (individual files remain available when running locally):
 
 - `collections-receipts-export.pdf`: the actual Whole School receipt preparation,
   including the grand total.
@@ -25,11 +35,15 @@ The data and school/operator names are fictional. Each PDF ends in `-export.pdf`
 - `wide-multipage-export.pdf`: a wide table with repeated identity columns.
 - `empty-report-export.pdf`: the empty-result document layout.
 
-The artifact is uploaded even when a later regression check fails, provided at
-least one export PDF was generated. Only generated files are included; a failed
-PDF test may leave an incomplete set. Check the workflow's `--grid-pdf` result
-before treating the set as verified output. The commit is recorded by the
-workflow run; use a run for the version being reviewed.
+It also includes Student List, Outstanding & Aging with the combined student
+identity, Student Changes and Certificate Issue Register from the report identity
+fixtures. Those samples also use `GridReportPreview.ExportPdf`.
+
+The combined file is published only after both fixture suites and the merge checks
+pass. A failed PDF check cannot publish a partial review or reuse a previous
+review file. Desktop CI can retain a completed review if an unrelated later suite
+fails; check the run's overall result separately. Use the workflow run for the
+source version being reviewed.
 
 Earlier files labelled `*-portable.pdf` were diagnostic recreations of the older
 exporter, using substitute measurement and fonts. They are not evidence that the

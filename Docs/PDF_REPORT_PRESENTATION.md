@@ -93,7 +93,8 @@ This verifies the local upgrade and report reader, not a release-package install
 - Native fixtures compile and cover shared preview/export rendering, summary
   cards, decimal precision, selected-field preservation, wide-column pagination,
   current receipt reconciliation and original-snapshot immutability.
-- Desktop CI runs --grid-pdf alongside the existing --fee-documents suite.
+- Desktop CI runs --direct-pdf-review (grid PDF and identity fixtures, plus a
+  bookmarked combined PDF) alongside the existing --fee-documents suite.
 - Desktop CI retains the resulting direct-export PDFs for review. See
   [direct export samples](DIRECT_PDF_EXPORT_SAMPLES.md) for artifact access,
   fictional data and verification limits.

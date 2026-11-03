@@ -35,7 +35,9 @@ internal static partial class Program
             using(var report=new LocalReport())
             {
                 report.LoadReportDefinition(new StringReader(built.Definition));report.DataSources.Add(new ReportDataSource("ReportData",built.Data));
-                byte[] pdf=report.Render("PDF");File.WriteAllBytes(Path.Combine(output,filename+".pdf"),pdf);
+                string pdfPath=Path.Combine(output,filename+".pdf");
+                GridReportPreview.ExportPdf(pdfPath,built);
+                byte[] pdf=File.ReadAllBytes(pdfPath);
                 var index=ReportPageSearchIndex.FromPdf(pdf);
                 using var parsed=UglyToad.PdfPig.PdfDocument.Open(pdf);
                 Check(parsed.NumberOfPages==1,title+" fits a single complete page without horizontal overflow");

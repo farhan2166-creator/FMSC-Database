@@ -56,25 +56,21 @@ jobs:
         timeout-minutes: 12
         run: |
           $ErrorActionPreference = 'Stop'
-          $suites = @('--grid-pdf', '--report-student-identity', '--spreadsheet-export', '--action-shortcuts', '--report-ordering', '--saved-report-views', '--report-purpose', '--class-section-setup', '--registration-workflow', '--placement-workspace', '--fee-account', '--fee-documents', '--collection-fee-actions', '--student-purchase-collection', '--billing-grid')
+          $suites = @('--direct-pdf-review', '--spreadsheet-export', '--action-shortcuts', '--report-ordering', '--saved-report-views', '--report-purpose', '--class-section-setup', '--registration-workflow', '--placement-workspace', '--fee-account', '--fee-documents', '--collection-fee-actions', '--student-purchase-collection', '--billing-grid')
           foreach ($suite in $suites) {
             Write-Output "Checking $suite"
             & dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- $suite
             if ($LASTEXITCODE -ne 0) { throw "$suite failed with exit code $LASTEXITCODE" }
           }
 
-      - name: Retain direct PDF export samples
+      - name: Retain the single direct-export review PDF
         # Fictional fixture data only. These files use the production export
         # builder and Windows PDF renderer, rather than a recreated layout.
-        if: ${{ always() && hashFiles('artifacts/grid-pdf/*-export.pdf') != '' }}
+        if: ${{ always() && hashFiles('artifacts/direct-pdf-review/REVIEW-ALL.pdf') != '' }}
         uses: actions/upload-artifact@v7
         with:
-          name: fmsc-direct-pdf-exports-${{ github.run_id }}
-          path: |
-            artifacts/grid-pdf/*-export.pdf
-            artifacts/report-student-identity/*.pdf
-            artifacts/report-student-identity/*.png
-            Docs/DIRECT_PDF_EXPORT_SAMPLES.md
+          path: artifacts/direct-pdf-review/REVIEW-ALL.pdf
+          archive: false
           retention-days: 7
           if-no-files-found: error
 
