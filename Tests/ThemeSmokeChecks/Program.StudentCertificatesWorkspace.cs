@@ -83,5 +83,42 @@ internal static partial class Program
         }
         catch (InvalidOperationException) { refusedWrongLeaveType = true; }
         Check(refusedWrongLeaveType, "School Leave never displays an unrelated College Leaving episode.");
+
+        // A saved, edited or reissued copy should remain selected when the
+        // workspace re-reads its register. New issue selects the latest copy
+        // of that certificate type; it never selects another student's type.
+        using var copies = StudentCertificateRegisterReader.CreateTable();
+        copies.Rows.Add("Regular", "Regular Student", "01 Nov 2026", "REG-11",
+            "Issue logged", "Not Collected", "—", "01 Nov 2026 09:00",
+            11, 301, new DateTime(2026,11,1,9,0,0));
+        copies.Rows.Add("Character", "Character", "02 Nov 2026", "CHAR-19",
+            "Issue logged", "Collected", "03 Nov 2026", "02 Nov 2026 09:00",
+            19, 501, new DateTime(2026,11,2,9,0,0));
+        copies.Rows.Add("Character", "Character", "03 Nov 2026", "CHAR-19",
+            "Issue logged", "Not Collected", "—", "03 Nov 2026 09:00",
+            19, 502, new DateTime(2026,11,3,9,0,0));
+        copies.DefaultView.Sort = "RecordedAt DESC, RecordId DESC, IssueId DESC";
+        var exact = CertificateWorkspaceSelection.Resolve(copies.DefaultView,
+            new CertificateWorkspaceSelection.Key("Character", 19, 501));
+        Check(exact is not null && Convert.ToInt32(exact["IssueId"]) == 501,
+            "Refresh preserves the exact older selected copy, not merely the certificate reference.");
+        Check(CertificateWorkspaceSelection.FromRow(exact) ==
+            new CertificateWorkspaceSelection.Key("Character", 19, 501),
+            "A selection is represented by its type and exact saved issue ID.");
+        var reissued = CertificateWorkspaceSelection.Resolve(copies.DefaultView,
+            new CertificateWorkspaceSelection.Key("Character", 19, 501, PreferNewest:true));
+        Check(reissued is not null && Convert.ToInt32(reissued["IssueId"]) == 502,
+            "Issue Again returns focus to the newest saved copy of the same certificate type.");
+        var newlyCreated = CertificateWorkspaceSelection.Resolve(copies.DefaultView,
+            new CertificateWorkspaceSelection.Key("Regular", 0, 0, PreferNewest:true));
+        Check(newlyCreated is not null && Convert.ToString(newlyCreated["Kind"]) == "Regular",
+            "Newly created certificates focus their own type.");
+        Check(CertificateWorkspaceSelection.Resolve(copies.DefaultView, null) is { } latest &&
+            Convert.ToInt32(latest["IssueId"]) == 502,
+            "Selecting a student initially shows their latest saved certificate.");
+        var fallback = CertificateWorkspaceSelection.Resolve(copies.DefaultView,
+            new CertificateWorkspaceSelection.Key("Character", 999, 999));
+        Check(fallback is not null && Convert.ToInt32(fallback["IssueId"]) == 502,
+            "If a historical copy disappears, fallback stays inside the same certificate type.");
     }
 }
