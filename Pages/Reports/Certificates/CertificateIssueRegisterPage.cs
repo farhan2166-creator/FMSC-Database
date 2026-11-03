@@ -83,6 +83,7 @@ public sealed class CertificateIssueRegisterPage : V2Page
     private void ClearReport()
     {
         savedViews?.ResetDates();
+        validator.ClearAll();
         applied=subtitle=""; hasRows=false; print.Enabled=export.Enabled=false;
         summary.Text="Run the report to see totals."; InvalidateReport();
         columns.Enabled=false;

@@ -30,6 +30,21 @@ internal static partial class Program
             var reason = Field<ModernTextBox>(dialog, "reason");
             var amount = Field<ModernTextBox>(dialog, "amount");
             var history = Field<DataGridView>(dialog, "history");
+            Check(reason.Parent!.Controls.OfType<Label>().Any(label=>label.Text.Contains("optional")),
+                "Advance remarks are labelled optional");
+            using var creditEntries=new DataTable();
+            creditEntries.Columns.Add("EntryKind");creditEntries.Columns.Add("Amount",typeof(decimal));
+            creditEntries.Columns.Add("Reason");creditEntries.Columns.Add("CreatedAt",typeof(DateTime));
+            creditEntries.Rows.Add("Deposit",500m,"",new DateTime(2026,11,3,9,0,0));
+            using var creditIdentities=new DataTable();
+            creditType.GetMethod("BindHistory",flags)!.Invoke(dialog,new object[]{creditEntries,creditIdentities});
+            Check(history.AutoSizeColumnsMode==DataGridViewAutoSizeColumnsMode.None
+                && history.Columns["TransactionTime"].Visible
+                && history.ColumnHeadersDefaultCellStyle.BackColor==AppTheme.Tint(AppTheme.Primary,0.90f)
+                && history.ColumnHeadersDefaultCellStyle.ForeColor==AppTheme.HeadingText,
+                "Advance history uses shared sizing and current theme headers after binding");
+            Check(Field<ModernButton>(dialog,"save").Text=="Save",
+                "Advance action is a single Save rather than another review step");
             var available = Field<Label>(dialog, "creditBalance");
             available.Text = "Available advance: Rs. 12,345";
             Field<Label>(dialog,"balance").Text = "41 · Example Student\nA plus amount adds to the advance balance; a minus amount reduces it. Transfers move advance money between siblings without receiving new money.";

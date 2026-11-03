@@ -15,11 +15,9 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
         Margin = new Padding(0),
         Padding = new Padding(0)
     };
-    private readonly FlowLayoutPanel membersFlow = new() {
+    private readonly CenteredMemberPanel membersFlow = new() {
         Dock = DockStyle.Fill,
         AutoScroll = true,
-        WrapContents = true,
-        FlowDirection = FlowDirection.LeftToRight,
         Margin = new Padding(0),
         Padding = new Padding(0)
     };
@@ -95,7 +93,7 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
         headHost.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         headHost.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         headHost.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        headHost.Height = AppScale.Scale(150);
+        headHost.Height = AppScale.Scale(166);
         var membersHost = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0) };
         membersHost.Controls.Add(membersFlow);
         membersHost.Controls.Add(emptyStateLabel);
@@ -286,17 +284,22 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
             return;
         }
         emptyStateLabel.Visible = false;
-        var rows = table.Rows.Cast<DataRow>().ToList();
-        // GetStudentFamily orders by class rank (highest first), so the first row is the "head" of the family shown on its own above.
-        var headCard = CreateCard(rows[0], isHead: true);
-        headHost.Controls.Add(headCard, 1, 0);
-        currentMemberAdmissionIds.Add(GetInt(rows[0], "AdmissionId"));
-        currentHeadFatherName = GetText(rows[0], "FatherName");
-        for (int i = 1; i < rows.Count; i++)
+        membersFlow.SuspendLayout();
+        try
         {
-            membersFlow.Controls.Add(CreateCard(rows[i], isHead: false));
-            currentMemberAdmissionIds.Add(GetInt(rows[i], "AdmissionId"));
+            var rows = table.Rows.Cast<DataRow>().ToList();
+            // GetStudentFamily orders by class rank (highest first), so the first row is the "head" of the family shown on its own above.
+            var headCard = CreateCard(rows[0], isHead: true);
+            headHost.Controls.Add(headCard, 1, 0);
+            currentMemberAdmissionIds.Add(GetInt(rows[0], "AdmissionId"));
+            currentHeadFatherName = GetText(rows[0], "FatherName");
+            for (int i = 1; i < rows.Count; i++)
+            {
+                membersFlow.Controls.Add(CreateCard(rows[i], isHead: false));
+                currentMemberAdmissionIds.Add(GetInt(rows[i], "AdmissionId"));
+            }
         }
+        finally { membersFlow.ResumeLayout(true); }
     }
     private static void DisposeMemberCards(Control host)
     {
@@ -441,10 +444,50 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
             ? Convert.ToString(row[columnName]) ?? string.Empty
             : string.Empty;
     }
+    // Center each wrapped row independently, including the final partial row.
+    private sealed class CenteredMemberPanel : Panel
+    {
+        private bool arranging;
+        protected override void OnLayout(LayoutEventArgs e)
+        {
+            if (arranging) return;
+            arranging = true;
+            int originalWidth = ClientSize.Width;
+            try
+            {
+                base.OnLayout(e);
+                var cards = Controls.OfType<FamilyMemberCard>().ToArray();
+                if (cards.Length == 0) { AutoScrollMinSize = Size.Empty; return; }
+                int available = Math.Max(1, ClientSize.Width - Padding.Horizontal);
+                int gap = cards[0].Margin.Horizontal;
+                int width = Math.Max(1, Math.Min(AppScale.Scale(250), available - gap));
+                int slotWidth = width + gap;
+                int slotHeight = cards.Max(card => card.Height + card.Margin.Vertical);
+                int columns = Math.Max(1, available / slotWidth);
+                int rows = (cards.Length + columns - 1) / columns;
+                AutoScrollMinSize = new Size(0, Padding.Vertical + rows * slotHeight);
+                for (int start = 0; start < cards.Length; start += columns)
+                {
+                    int count = Math.Min(columns, cards.Length - start);
+                    int left = Padding.Left + Math.Max(0, (available - count * slotWidth) / 2);
+                    for (int column = 0; column < count; column++)
+                    {
+                        var card = cards[start + column];
+                        card.SetBounds(left + column * slotWidth + card.Margin.Left,
+                            Padding.Top + start / columns * slotHeight + card.Margin.Top + AutoScrollPosition.Y,
+                            width, card.Height);
+                    }
+                }
+            }
+            finally { arranging = false; }
+            if (ClientSize.Width != originalWidth) PerformLayout();
+        }
+    }
     // Show student identity, placement, status and family relationship.
     private sealed class FamilyMemberCard : RoundedPanel
     {
         private readonly Color baseBorderColor;
+        private readonly Color idleBackground;
         public int FamilyMemberId { get; }
         public int AdmissionId { get; }
         public string StudentName { get; }
@@ -465,12 +508,13 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
             AdmissionId = admissionId;
             StudentName = studentName;
             AwaitsReturn=awaitsReturn;
-            Width = AppScale.Scale(220);
-            Height = AppScale.Scale(134);
+            Width = AppScale.Scale(250);
+            Height = AppScale.Scale(150);
             Margin = new Padding(UiDesignSystem.Spacing.Sm);
-            Padding = new Padding(UiDesignSystem.Spacing.Md, UiDesignSystem.Spacing.Sm, UiDesignSystem.Spacing.Md, 0);
+            Padding = new Padding(UiDesignSystem.Spacing.Md);
             CornerRadius = AppTheme.CardRadius;
-            BackColor = isHead ? AppTheme.Tint(AppTheme.Primary, 0.94f) : AppTheme.Surface;
+            idleBackground = isHead ? AppTheme.Tint(AppTheme.Primary, 0.94f) : AppTheme.Surface;
+            BackColor = idleBackground;
             baseBorderColor = isHead ? AppTheme.Primary : AppTheme.Border;
             BorderColor = baseBorderColor;
             ShowBorder = true;
@@ -482,9 +526,9 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
                 Margin = new Padding(0),
                 Padding = new Padding(0)
             };
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(24)));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(20)));
-            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(18)));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.HeadingFont) + AppScale.Scale(4)));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.NormalFont) + AppScale.Scale(3)));
+            layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.TextHeight(AppTheme.NormalFont) + AppScale.Scale(3)));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             var nameLabel = new Label {
                 Text = studentName,
@@ -512,17 +556,21 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
             var registrationLabel = new Label {
                 Text = registrationLine,
                 Dock = DockStyle.Fill,
-                Font = AppTheme.SmallFont,
-                ForeColor = AppTheme.MutedText,
+                Font = AppTheme.NormalFont,
+                ForeColor = AppTheme.Text,
                 TextAlign = ContentAlignment.MiddleLeft,
                 AutoEllipsis = true
             };
             var badge = new Label {
                 Text = relationshipLabel,
-                Dock = DockStyle.Fill,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left,
+                AutoSize = false,
+                Width = AppMetrics.TextWidth(relationshipLabel, AppTheme.FontSmallBold, AppScale.Scale(24)),
+                Height = AppScale.Scale(28),
+                Margin = new Padding(0, AppScale.Scale(5), 0, 0),
                 Font = AppTheme.FontSmallBold,
-                ForeColor = Color.White,
-                BackColor = relationshipColor,
+                ForeColor = relationshipColor,
+                BackColor = AppTheme.Tint(relationshipColor, 0.90f),
                 TextAlign = ContentAlignment.MiddleCenter
             };
             layout.Controls.Add(nameLabel, 0, 0);
@@ -544,7 +592,8 @@ public sealed class StudentFamilyPage : V2Page, IBusyPage
         }
         public void SetSelected(bool selected)
         {
-            BorderColor = selected ? AppTheme.Danger : baseBorderColor;
+            BorderColor = selected ? AppTheme.Primary : baseBorderColor;
+            BackColor = selected ? AppTheme.PrimaryLight : idleBackground;
             Invalidate();
         }
     }

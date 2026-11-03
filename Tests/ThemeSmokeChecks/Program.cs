@@ -1232,6 +1232,10 @@ internal static partial class Program
         Children(layout).OfType<ModernButton>().Single(control => control.Text == "Clear Filters").PerformClick();
         Check(method.SelectedIndex == 0 && view.SelectedIndex == 1, "Clear Filters must reset actual filters while preserving report view choices");
         Check(Children(layout).OfType<Label>().Any(label => label.Text == "No optional filters"), "Counter must update after clearing the choice filter");
+        method.SelectedIndex=1;view.SelectedIndex=0;
+        Children(layout).OfType<ModernButton>().Single(control=>control.Text=="Reset Filters").PerformClick();
+        Check(method.SelectedIndex==0 && view.SelectedIndex==1 && grid.DataSource is null,
+            "Reset Filters restores the launch view and default filters and clears report results");
     }
 
     private static double Contrast(Color a, Color b)

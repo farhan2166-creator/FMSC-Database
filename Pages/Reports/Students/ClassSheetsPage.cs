@@ -20,6 +20,7 @@ public sealed class ClassSheetsPage : V2Page
     private int rosterRevision;
     private Scope? loadedScope;
     private readonly ReportSavedViewsBar savedViews;
+    private int launchYearId;
     private sealed record Scope(int Campus, int Year, int Class, int Section);
     private Scope CurrentScope() => new(campus.SelectedId, year.SelectedId, klass.SelectedId, section.SelectedId);
 
@@ -29,10 +30,22 @@ public sealed class ClassSheetsPage : V2Page
         sheet.Items.AddRange(new object[] { "Marks Sheet", "Exam Attendance Sheet", "Monthly Attendance Register" });
         sheet.SelectedIndex = 0;
         var load = AddBusyAction("Load Students", LoadStudentsAsync, "Primary");
+        Action? restoreDefaults = null;
+        var reset = AddAction("Reset Filters", (_, _) => {
+            // Drop the roster before changing scope to avoid change-filter popups.
+            roster = null;
+            InvalidateRoster();
+            restoreDefaults?.Invoke();
+            if (launchYearId > 0) year.SelectedValue = launchYearId;
+            BindClasses();
+            savedViews?.ResetSelection();
+            UiHelper.SetGridPlaceholderMessage(Grid, "Choose a campus and year, then press Load Students.");
+            SetStatus("Choose a campus and year, then press Load Students.");
+        }, "Secondary");
         previewButton = AddBusyAction("Print Preview", PreviewAsync, "Secondary");
         selectAllButton = AddAction("Select All", (_, _) => SelectStudents(true), "Secondary");
         clearSelectionButton = AddAction("Clear Selection", (_, _) => SelectStudents(false), "Secondary");
-        RelocateFromActions(load, selectAllButton, clearSelectionButton, previewButton);
+        RelocateFromActions(load, reset, selectAllButton, clearSelectionButton, previewButton);
         var fields = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 4, RowCount = 3,
             Height = AppMetrics.FieldRowHeight * 3 };
         for (int i = 0; i < 4; i++) fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
@@ -106,7 +119,8 @@ public sealed class ClassSheetsPage : V2Page
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(details, 0, 0);
-        var buttons = HumanUi.ButtonRow(load, selectAllButton, clearSelectionButton, previewButton);
+        restoreDefaults = ReportUi.CaptureFilterDefaults(fields);
+        var buttons = HumanUi.ButtonRow(load, reset, selectAllButton, clearSelectionButton, previewButton);
         buttons.Dock = DockStyle.Top;
         root.Controls.Add(buttons, 0, 1);
         root.Controls.Add(studentsCard, 0, 2);
@@ -148,6 +162,7 @@ public sealed class ClassSheetsPage : V2Page
             var years = await yearTask;
             year.Bind(years, "AcademicYearId", "YearName");
             HumanUi.SelectCurrentAcademicYear(year, years);
+            launchYearId = year.SelectedId;
             BindClasses();
             savedViews.RefreshAvailability();
         }

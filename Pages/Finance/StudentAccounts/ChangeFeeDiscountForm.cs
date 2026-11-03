@@ -89,8 +89,8 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         else if(!agreementAllowed) scope.Items.Add("Existing Bills Only");
         else scope.Items.AddRange(new object[]{"Saved Fee Plan","Saved Fee Plan and Existing Bills","Existing Bills in This Period"});
         scope.SelectedIndex=0;
-        concession.Items.AddRange(new object[]{"Scholarship","None"});
-        concession.SelectedItem=originalLabel=="Scholarship"?"Scholarship":"None";
+        concession.Items.Add("None");
+        concession.SelectedItem="None";
         concession.FormattingEnabled=true;
         concession.Format+=(_,e)=>e.Value=FeeConcessionLabels.Display(Convert.ToString(e.ListItem)??"");
         paidReduction.Items.AddRange(new object[]{"Keep as advance credit","Refund the excess payment"}); paidReduction.SelectedIndex=0;
@@ -188,9 +188,9 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     {
         string previous=Convert.ToString(concession.SelectedItem)??"";
         concession.Items.Clear();
-        concession.Items.AddRange(WaiverAction?new object[]{"Waived","Free","Scholarship"}:new object[]{"Scholarship","None"});
+        concession.Items.AddRange(WaiverAction?new object[]{"Waived","Free","Scholarship"}:new object[]{"None"});
         concession.SelectedItem=concession.Items.Contains(previous)?previous:
-            WaiverAction?"Waived":originalLabel=="Scholarship"?"Scholarship":"None";
+            WaiverAction?"Waived":"None";
     }
     private void InvalidateReview(bool keepPaidDecision=false,bool updateChoices=true)
     {

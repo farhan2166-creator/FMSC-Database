@@ -11,6 +11,21 @@ internal static class CollectionCreditChecks
         int siblingId=Convert.ToInt32(sibling["AdmissionId"]), siblingEnrollment=Convert.ToInt32(sibling["EnrollmentId"]);
         decimal Credit(int id) => Sql.Money("SELECT COALESCE(SUM(Amount),0) FROM dbo.StudentCreditEntries WHERE AdmissionId=@Id",Sql.P("@Id",id));
         decimal Due(long bill) => Sql.Money("SELECT dbo.GetFeeChargeBalance(@Bill)",Sql.P("@Bill",bill));
+        // Optional remarks must work at the SQL boundary, including request replay.
+        Guid optionalRequest=Guid.NewGuid();
+        SqlParameter[] OptionalDeposit()=>new[]{Sql.P("@UserId",f.Admin),Sql.P("@AdmissionId",admission),
+            Sql.P("@Action","Deposit"),Sql.P("@Amount",100m),Sql.P("@RequestId",optionalRequest)};
+        Sql.Proc("ProcessStudentCredit",OptionalDeposit());
+        Sql.Proc("ProcessStudentCredit",OptionalDeposit());
+        report.Check(Credit(admission)==100m && Sql.Count("SELECT COUNT(*) FROM dbo.StudentCreditEntries WHERE RequestId=@Request",Sql.P("@Request",optionalRequest))==1,
+            "A deposit without remarks replays once without duplicating money");
+        Sql.Proc("ProcessStudentCredit",Sql.P("@UserId",f.Admin),Sql.P("@AdmissionId",admission),Sql.P("@Action","Transfer"),
+            Sql.P("@Amount",100m),Sql.P("@RequestId",Guid.NewGuid()),Sql.P("@Reason",null),Sql.P("@TargetAdmissionId",siblingId));
+        report.Check(Credit(admission)==0m && Credit(siblingId)==100m,"A sibling transfer accepts NULL remarks and conserves credit");
+        Sql.Proc("ProcessStudentCredit",Sql.P("@UserId",f.Admin),Sql.P("@AdmissionId",siblingId),Sql.P("@Action","Refund"),
+            Sql.P("@Amount",100m),Sql.P("@RequestId",Guid.NewGuid()),Sql.P("@Reason","   "));
+        report.Check(Credit(siblingId)==0m && Sql.Count("SELECT COUNT(*) FROM dbo.StudentCreditEntries WHERE AdmissionId IN(@A,@B) AND Reason<>N''",Sql.P("@A",admission),Sql.P("@B",siblingId))==0,
+            "A refund accepts blank remarks and optional notes remain empty in the ledger");
         void Deposit(int id, decimal amount) => Sql.Proc("ProcessStudentCredit", Sql.P("@UserId",f.Admin),
             Sql.P("@AdmissionId",id),Sql.P("@Action","Deposit"),Sql.P("@Amount",amount),
             Sql.P("@RequestId",Guid.NewGuid()),Sql.P("@Reason","Synthetic credit check"));

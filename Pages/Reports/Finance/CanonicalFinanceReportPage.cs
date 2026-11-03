@@ -109,6 +109,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         UiHelper.SetGridPlaceholderMessage(Grid, UiText.EmptyGrid.RunReport);
         var content=ReportUi.CompactLayout(ReportUi.Bar(fields.ToArray()), Grid, title, () => {
             _savedViews?.ResetDates();
+            _rangeValidator?.ClearAll();
             _orderBy.SelectedIndex = 0;
             _scopeEdited = true;
             ReportLayoutStore.SetPreference(_scopePreferenceKey, "");
@@ -118,7 +119,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
             _summary.Text = "Run the report to see totals.";
             ReportAvailabilityChanged();
             InvalidateReport();
-            SetStatus("Filters cleared. Choose filters, then press Run Report.");
+            SetStatus("Choose filters, then press Run Report.");
         }, reportActions.ToArray());
         _savedViews=new ReportSavedViewsBar(_presetKey,CaptureSavedView,RestoreSavedView,(message,warning)=>SetStatus(message,warning),
             ()=>_lookupsReady && !_runningReport,usesDates ? From : null,usesDates ? To : null,

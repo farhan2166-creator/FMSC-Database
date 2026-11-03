@@ -125,6 +125,12 @@ internal sealed partial class ReportSavedViewsBar : FlowLayoutPanel
     {
         if (from is not null) period.SelectedItem=ReportDatePeriod.Fixed;
     }
+    internal void ResetSelection()
+    {
+        if (views.Items.Count > 0) views.SelectedIndex = 0;
+        ResetDates();
+        RefreshAvailability();
+    }
     private void ApplySelected()
     {
         if (!Available() || SelectedName.Length==0) return;

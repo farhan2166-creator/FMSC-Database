@@ -128,7 +128,7 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
             field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         generateStatementButton = CreateFilterButton("View Account", AppTheme.Primary);
         generateStatementButton.Click += async (_, _) => await LoadStatement();
-        var clear = CreateFilterButton("Clear", AppTheme.MutedText);
+        var clear = CreateFilterButton("Reset Filters", AppTheme.MutedText);
         clear.MinimumSize=new Size(AppScale.Scale(90),AppMetrics.ButtonHeight);
         clear.Click += (_, _) => { ClearForm(); };
         SetToolTip(clear, "Clear this statement's selection, dates and displayed results.");
@@ -921,6 +921,9 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
     }
     private void ClearForm()
     {
+        statementDateValidator?.ClearAll();
+        InvalidateAccount();
+        if (accountViews is not null) accountViews.SelectedIndex = 0;
         statementReads.Cancel();
         studentSearchVersion++;
         studentSearch.Clear();

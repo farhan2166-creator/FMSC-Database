@@ -163,10 +163,40 @@ internal static class ReportUi
     internal static Control WorkflowLayout(Control filters, DataGridView grid, string filterTitle, string filterGuidance,
         string resultTitle, string resultGuidance, params Control[] actionButtons)
         => BuildLayout(filters, grid, resultTitle, true, actionButtons, filterTitle: filterTitle,
-            filterGuidance: filterGuidance, resultGuidance: resultGuidance);
+            filterGuidance: filterGuidance, resultGuidance: resultGuidance, includeReset: false);
+    internal static Action CaptureFilterDefaults(Control filters)
+    {
+        var restore = new List<Action>();
+        foreach (Control control in Descendants(filters))
+        {
+            switch (control)
+            {
+                case LookupBox lookup:
+                    restore.Add(() => lookup.SelectedIndex = lookup.Items.Count > 0 ? 0 : -1);
+                    break;
+                case ModernComboBox choice:
+                    int index = ChoiceFilters.TryGetValue(choice, out var filter) ? filter.DefaultIndex : Math.Max(0, choice.SelectedIndex);
+                    restore.Add(() => choice.SelectedIndex = index < choice.Items.Count ? index : -1);
+                    break;
+                case ModernDatePicker date:
+                    DateTime value = date.Value; bool selected = date.Checked;
+                    restore.Add(() => { date.Value = value; if (date.ShowCheckBox) date.Checked = selected; });
+                    break;
+                case ModernTextBox text:
+                    string original = text.Text;
+                    restore.Add(() => text.Text = original);
+                    break;
+                case CheckBox check:
+                    bool originalCheck = check.Checked;
+                    restore.Add(() => check.Checked = originalCheck);
+                    break;
+            }
+        }
+        return () => { foreach (var reset in restore) reset(); };
+    }
     private static Control BuildLayout(Control filters, DataGridView grid, string resultTitle, bool compact, Control[] actionButtons, Action? filtersCleared = null,
         string filterTitle = "Report Filters", string filterGuidance = "Choose the scope below, then run the report. All and unchecked optional dates include every value.",
-        string resultGuidance = "Review the generated report below.")
+        string resultGuidance = "Review the generated report below.", bool includeReset = true)
     {
         var clear = new ModernButton {
             Text = "Clear Filters",
@@ -268,6 +298,27 @@ internal static class ReportUi
                 picker.ValueChanged += (_, _) => RefreshFilterState();
         }
         RefreshFilterState();
+        if (includeReset && !actionButtons.Any(button => button.Text == "Reset Filters"))
+        {
+            var resetDefaults = CaptureFilterDefaults(filters);
+            var reset = new ModernButton { Text = "Reset Filters", ThemeRole = "Secondary" };
+            reset.Click += (_, _) => {
+                resetDefaults();
+                grid.DataSource = null;
+                UiHelper.SetGridPlaceholderMessage(grid, UiText.EmptyGrid.RunReport);
+                UiHelper.SetGridEmptyMessage(grid, UiText.EmptyGrid.RunReport);
+                filtersCleared?.Invoke();
+                // The bar wraps this layout, so find it within the owning report page.
+                for (Control? owner = filters.Parent; owner is not null; owner = owner.Parent)
+                    if (owner is V2Page)
+                    {
+                        foreach (var bar in Descendants(owner).OfType<ReportSavedViewsBar>()) bar.ResetSelection();
+                        break;
+                    }
+                RefreshFilterState();
+            };
+            actionButtons = actionButtons.Take(1).Concat(new Control[] { reset }).Concat(actionButtons.Skip(1)).ToArray();
+        }
         int buttonRowHeight = 0;
         TableLayoutPanel? compactBody = null;
         TableLayoutPanel? compactButtons = null;

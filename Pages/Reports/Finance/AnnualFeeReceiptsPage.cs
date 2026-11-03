@@ -8,6 +8,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
     private bool suppressStudentEvents;
     /* View / Print Ledger reads the selected student and the selected academic year, so its availability is derived from those two selections instead of being left permanently enabled. */
     private ModernButton? ledgerAction;
+    private int launchYearId;
     public bool IsBusy=>BusyOperationRunning;
     public string BusyMessage=>"Annual receipts are being prepared. Wait for the preview before changing the student or year.";
     public AnnualFeeReceiptsPage() : this(true) { }
@@ -17,7 +18,15 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
             "Print a student’s receipts for an academic year, oldest first.")
     {
         var view = AddBusyAction("View / Print Receipts", ViewLedgerAsync, "Primary");
-        RelocateFromActions(view);
+        var reset = AddAction("Reset Filters", (_, _) => {
+            if (IsBusy) return;
+            student.Clear();
+            if (launchYearId > 0) year.SelectedValue = launchYearId;
+            else year.SelectedIndex = year.Items.Count > 0 ? 0 : -1;
+            ApplyActionAvailability();
+            SetStatus("Choose a student and year to view receipts.");
+        }, "Secondary");
+        RelocateFromActions(view, reset);
         ledgerAction = view;
         // The page opens with neither a student nor a year chosen, so the one action it has starts disabled.
         ApplyActionAvailability();
@@ -39,6 +48,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
             "Choose a student and year to print compact receipts in three columns per A4 page.");
         int fieldRowHeight = AppMetrics.FieldRowHeight;
         AppMetrics.FitButtonWidth(view,minWidth:170);
+        AppMetrics.FitButtonWidth(reset,minWidth:128);
         var fieldsTable = new TableLayoutPanel {
             Dock = DockStyle.Top,
             ColumnCount = 3,
@@ -49,16 +59,18 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
         };
         fieldsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,75));
         fieldsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));
-        fieldsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,view.Width+AppMetrics.SpacingSm));
+        fieldsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,view.Width+reset.Width+AppMetrics.SpacingSm*2));
         fieldsTable.RowStyles.Add(new RowStyle(SizeType.Absolute, fieldRowHeight));
         fieldsTable.Controls.Add(HumanUi.Field("Student", student), 0, 0);
         fieldsTable.Controls.Add(HumanUi.Field("Academic Year", year), 1, 0);
         foreach(var field in fieldsTable.Controls.OfType<TableLayoutPanel>())
             field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-        var buttonCell=new Panel { Dock=DockStyle.Fill,Margin=Padding.Empty,
+        var buttonCell=new FlowLayoutPanel { Dock=DockStyle.Fill,Margin=Padding.Empty, WrapContents=false,
             Padding=new Padding(0,Math.Max(16,AppMetrics.TextHeight(AppTheme.FieldCaptionFont)),AppMetrics.SpacingSm,AppMetrics.SpacingSm) };
-        view.Dock=DockStyle.Top;view.Margin=Padding.Empty;
+        view.Dock=DockStyle.None;view.Margin=new Padding(0,0,AppMetrics.SpacingSm,0);
         buttonCell.Controls.Add(view);
+        reset.Margin=Padding.Empty;
+        buttonCell.Controls.Add(reset);
         fieldsTable.Controls.Add(buttonCell, 2, 0);
         selector.Content.Controls.Add(fieldsTable);
         var tip = HumanUi.Card(
@@ -144,6 +156,7 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
                         SetStatus("The statement's academic year is no longer available. Choose a year for receipts.", PageStatusKind.Warning);
                 }
                 else HumanUi.SelectCurrentAcademicYear(year, raw);
+                launchYearId = year.SelectedId;
                 /* Bind selects the blank "-- Select --" row, so the year half of the action's rule is re-derived against the list that was just put in place. */
                 ApplyActionAvailability();
             }
