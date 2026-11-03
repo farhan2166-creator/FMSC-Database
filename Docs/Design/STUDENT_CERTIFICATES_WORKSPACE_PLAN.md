@@ -3,6 +3,26 @@ Date: 2026-11-03
 Base commit: `110de257b93ee897637849b7fbc09f970d2bffb1`
 Status: **STAGE 2 PILOT IMPLEMENTED — preview only; operator acceptance and old-hub retirement still pending**
 
+## Owner-approved correction: true workspace and compact field dialogs
+
+The first pilot incorrectly opened the old full-page editor whenever a certificate was selected. **That arrangement is superseded.**
+
+The corrected pilot keeps the following activities directly in the student-centric workspace:
+
+- Student identity and the consolidated issued-certificate register.
+- Selected certificate/copy details, collection state and recorded reference.
+- Print/Reprint, Mark Collected and Issue Again for the selected saved copy.
+- Choosing any of the eight existing types to prepare a new certificate.
+- Edit Details for an existing saved copy.
+
+Creating or editing shows **only a compact modal with that type's existing details fields and existing Create / Save Changes and recovery controls**, not its old full-page history grid or separate student search. The selected student is locked as read-only context inside the modal. After the operator returns from the modal, the workspace refreshes its register.
+
+For printing, physical collection, or reissue from the workspace, the original certificate editor remains a nonvisual operation owner. Each action delegates to its already-wired handler and existing DB procedure, and continues to check the original state, permissions, issue identity and recovery rules; no second SQL action implementation is introduced.
+
+**Still pending:** actual Windows operator interaction and disposable SQL execution across all eight types, permission/collection/recovery states, exact historical copy print/reprint and behavior under errors. The screenshot fixture is a genuine WinForms render with fictional rows, not an actual installation or database-backed interaction.
+
+The old hub/pages remain unchanged in normal navigation until explicit acceptance. The temporary visual-preview CI workflow is for this branch only and should be removed before final merge, preserving the project's minimal workflow set.
+
 ## Stage 2 preview implementation (3 November 2026)
 
 The owner approved implementation after the Stage 1 design review.
