@@ -173,8 +173,13 @@ internal static class CertificateWorkspaceDetailsDialog
         bottom.Controls.Add(close, 1, 0);
         layout.Controls.Add(bottom);
 
+        bool arranging = false;
         void ArrangeDialog()
         {
+            if (arranging) return;
+            arranging = true;
+            try
+            {
             int pad = AppMetrics.SpacingMd;
             int headerHeight = AppScale.Scale(75);
             int footerHeight = AppScale.Scale(58);
@@ -191,6 +196,35 @@ internal static class CertificateWorkspaceDetailsDialog
                     Math.Max(1, usableHeight - headerHeight - footerHeight));
             }
             finally { layout.ResumeLayout(true); }
+
+            // The Provisional editor changes from 6 columns/3 rows to
+            // 3 columns/5 rows on a narrow dialog. Its old page measures
+            // itself against its hidden full-page root, which can leave the
+            // last two required rows below a 3-row clipping boundary here.
+            // Correct only its existing field-grid height; keep its controls,
+            // validation, buttons, and subject selection unchanged.
+            if (title == "Provisional")
+            {
+                var body = details.Content.Controls.OfType<TableLayoutPanel>()
+                    .FirstOrDefault(panel => panel.Controls.OfType<TableLayoutPanel>()
+                        .Any(child => child.Dock == DockStyle.Top && child.RowCount >= 3));
+                var fields = body?.Controls.OfType<TableLayoutPanel>()
+                    .FirstOrDefault(panel => panel.Dock == DockStyle.Top && panel.RowCount >= 3);
+                if (body is not null && fields is not null)
+                {
+                    int required = fields.RowCount * AppMetrics.FieldRowHeight;
+                    if (fields.Height != required) fields.Height = required;
+                    int row = body.GetRow(fields);
+                    if (row >= 0 && row < body.RowStyles.Count)
+                        body.RowStyles[row].Height = required;
+                    int subjectsHeight = body.Controls.Cast<Control>()
+                        .Where(control => !ReferenceEquals(control, fields))
+                        .Select(control => control.Height).DefaultIfEmpty(0).Max();
+                    body.AutoScroll = body.ClientSize.Height < required + subjectsHeight;
+                }
+            }
+            }
+            finally { arranging = false; }
         }
         layout.SizeChanged += (_, _) => ArrangeDialog();
 
