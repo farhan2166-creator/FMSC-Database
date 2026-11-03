@@ -113,7 +113,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         marksOutOf.PlaceholderText =
             "e.g. 1100";
         grade.DropDownStyle = ComboBoxStyle.DropDownList;
-        grade.Items.AddRange(new[] { "", "A1", "A++", "A+", "A", "B++", "B+", "B", "C+", "C", "D", "E", "F", "U" });
+        grade.Items.AddRange(new[] { "", "A+", "A", "B", "C", "D", "E", "F" });
         grade.Enabled = false;
         otherSubjects.PlaceholderText =
             "Any subjects not in the list below, comma-separated (e.g. Mutala e Quran Hakeem)";
@@ -760,9 +760,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
             marksOutOf.Text =
                 GetInt(row, "MarksOutOf")
                     .ToString();
-            string savedGrade = GetString(row, "Grade").Trim().ToUpperInvariant();
-            if (savedGrade.Length > 0 && !grade.Items.Contains(savedGrade))
-                grade.Items.Add(savedGrade);
+            string savedGrade = StandardGrade(GetString(row, "Grade"));
             grade.Text = savedGrade;
             DateTime? certDate =
                 GetDate(row, "CertificateDate");
@@ -1335,6 +1333,11 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
     }
     private bool IsPeshawarBoard => boardName.Text.Contains("Peshawar", StringComparison.OrdinalIgnoreCase);
 
+    internal static string StandardGrade(string value)=>value.Trim().ToUpperInvariant() switch {
+        "A1" or "A++"=>"A+", "B++" or "B+"=>"B", "C+"=>"C", "U"=>"F",
+        "A+"=>"A+", "A"=>"A", "B"=>"B", "C"=>"C", "D"=>"D", "E"=>"E", "F"=>"F", _=>""
+    };
+
     private void CalculateGrade()
     {
         const System.Globalization.NumberStyles style = System.Globalization.NumberStyles.None;
@@ -1351,7 +1354,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
         decimal percentage = obtained * 100m / total;
         // IBCC's revised scale starts with Part I in 2026 and Part II in 2027.
         bool revised = year >= (examType.SelectedIndex == 1 ? 2026 : 2027);
-        grade.Text = revised
+        string calculatedGrade = revised
             ? percentage switch {
                 >= 96m => "A++", >= 91m => "A+", >= 86m => "A",
                 >= 81m => "B++", >= 76m => "B+", >= 71m => "B",
@@ -1361,6 +1364,7 @@ public sealed class ProvisionalCertificatePage : V2Page, IUnsavedChanges, IBusyP
                 >= 80m => "A1", >= 70m => "A", >= 60m => "B",
                 >= 50m => "C", >= 40m => "D", >= 33m => "E", _ => "F"
             };
+        grade.Text = StandardGrade(calculatedGrade);
     }
 
     private bool CheckEditor(bool showMissing)

@@ -36,6 +36,12 @@ Sports certificates offer six optional performance sentences covering sportsmans
 
 ## Database delivery and checks
 
+Owner grade-label decision — 3 November 2026: Provisional grade choices are A+,
+A, B, C, D, E and F. Existing percentage rules remain in place; their automatic
+results and grades loaded into the editor use the standard labels (A1/A++ → A+,
+B++/B+ → B, C+ → C, U → F). Loading an older record does not expand the dropdown
+with extra variants. This is an editor display change and needs no SQL migration.
+
 Cancellation is removed from the forms and database command in schema 51. The decision and rationale are recorded in [the cancellation decision](Decisions/CERTIFICATE_CANCELLATION_REMOVED.md). Schema 52 removes the cancellation columns and branches after the owner restored a clean schema-48 database. Snapshots containing historical cancelled copies are refused to avoid reviving them.
 
 `Migrations/51.sql` retires the command after schema 50. `Migrations/50.sql` contains the complete schema/procedure/trigger change from schema 49. Apply it through the established transactional migration mechanism after restoring a schema-49 database. Older databases must first receive their intervening migrations. Existing collection timestamps are retained; collection is not invented for previously untracked certificates.
