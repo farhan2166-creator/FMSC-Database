@@ -110,7 +110,7 @@ internal static partial class Program
             decimal money=index switch{0=>2800m,1=>1600m,2 or 3=>200m,7=>10000m,_=>0m};
             decimal refund=index==5?1200m:0m,correction=index==4?1300m:index==6?150m:0m,credit=index==8?2250m:index==9?8700m:0m;
             receipts.Rows.Add(index==8?"Credit #19":$"{(index%3==0?"FR":"R")}-2026-{index+9:D5}",new DateTime(2026,10,index==9?19:18),index%3==0?"Family":"Individual",
-                index%3==0?"Example Student, Example Sibling":"Example Student","Campus Boys","Play Group – F",
+                index%3==0?"Hamid, Kausar":"Hamid","Campus Boys","Play Group – F",
                 credit>0?"Account Credit":refund>0?"Refund":correction>0?"Correction":"Cash",money,refund,correction,credit,money-refund-correction,"operator");
         }
         string totals="   Receipts: 9     Money Received: Rs. 14,800     Refunds: Rs. 1,200     Corrections: Rs. 1,450     Credit Applied: Rs. 10,950     Adjusted Collection: Rs. 12,150";
@@ -120,7 +120,7 @@ internal static partial class Program
             foreach(DataRow row in data.Rows)
             {
                 var children=Enumerable.Range(0,Equals(row["Scope"],"Family")?2:1).Select(index=>new {
-                    AdmissionId=101+index,StudentName=index==0?"Example Student":"Example Sibling",FatherName="Example Parent",Gender=index==0?"M":"F",
+                    AdmissionId=101+index,StudentName=index==0?"Hamid":"Kausar",FatherName="Ali",Gender=index==0?"M":"F",
                     Placements=new[]{new{CampusName=Convert.ToString(row["Campus"]),ClassName="Play Group",SectionName="F"}}
                 }).ToArray();
                 row["__ReceiptStudents"]=JsonSerializer.Serialize(children);
@@ -136,7 +136,8 @@ internal static partial class Program
             var review=ReceiptExportReview(wholeSchool,"Whole School");using var projected=review.Rows;
             Check(!projected.Columns.Contains("Campus")&&!projected.Columns.Cast<DataColumn>().Any(column=>column.ColumnName.StartsWith("__")),
                 "Receipt review cannot reintroduce a campus detail column or private metadata omitted by the application");
-            Check(Render("collections-receipts",review.Title,review.Scope+totals,projected)==1,"Ten payment/credit entries and their whole-school total fit one readable page");
+            int pages=Render("collections-receipts",review.Title,review.Scope+totals,projected);
+            Check(pages==1,$"Ten payment/credit entries and their whole-school total fit one readable page; actual pages: {pages}");
         }
         using(var byCampus=receipts.Copy())
         {
