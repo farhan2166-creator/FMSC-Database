@@ -1,7 +1,7 @@
 using FMSC_SMS.Core;
 using static FMSC_SMS.Core.CertificateUi;
 namespace FMSC_SMS.Pages.Students.Certificates;
-public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBusyPage
+public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBusyPage, IStudentCertificateWorkspaceEditor
 {
     internal override bool FocusEntryField() => CertificateUi.FocusEntry(student, Grid, certificateDate);
     private const string MissingBirthDateMessage = "Date of birth is missing. Add it to the student's Admission record, then reselect the student to create this certificate.";
@@ -798,4 +798,36 @@ public sealed class RegularStudentCertificatePage : V2Page, IUnsavedChanges, IBu
         }
         base.Dispose(disposing);
     }
+
+    /// <summary>Opt-in workspace bridge: use the same selection and saved-copy logic as this editor.</summary>
+    void IStudentCertificateWorkspaceEditor.LoadWorkspaceSelection(DataRow selectedStudent, int recordId, int issueId)
+    {
+        if (IsDisposed || selectedStudent.Table is null ||
+            !selectedStudent.Table.Columns.Contains("AdmissionId") ||
+            CertificateUi.GetInt(selectedStudent, "AdmissionId") <= 0)
+            throw new ArgumentException("A valid selected student is required.", nameof(selectedStudent));
+        student.SetStudent(selectedStudent);
+        StudentChanged();
+        if (recordId > 0)
+        {
+            if (!certificateResults.AsEnumerable().Any(row =>
+                CertificateUi.GetInt(row, "RegularStudentCertificateId") == recordId &&
+                CertificateUi.GetInt(row, "RegularStudentCertificateIssueId") == issueId))
+                throw new InvalidOperationException("The selected saved certificate is no longer available. Refresh the workspace.");
+            SelectCertificate(recordId, issueId);
+        }
+        else
+        {
+            // New preparation stays on the selected student; the ordinary New/Clear
+            // action on the old form still keeps its original behavior.
+            ClearCertificateSelection();
+            className.Text = CertificateUi.GetString(selectedStudent, "ClassName");
+            var dob = CertificateUi.GetDate(selectedStudent, "DateOfBirth");
+            dateOfBirth.Text = dob?.ToString("dd-MMM-yyyy") ?? "Not on record";
+            certificateDate.Value = DateTime.Today;
+            CaptureNewCertificateBaseline();
+            ApplyWorkflowState();
+        }
+    }
+
 }
