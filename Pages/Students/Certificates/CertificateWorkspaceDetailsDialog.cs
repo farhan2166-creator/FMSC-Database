@@ -37,10 +37,10 @@ internal static class CertificateWorkspaceDetailsDialog
         Func<Control> editorFactory) =>
         Build(title, student, 0, 0, editorFactory, loadSelection: false);
 
-    private static ApplicationWindowForm Build(string title, DataRow student,
+    private static Form Build(string title, DataRow student,
         int recordId, int issueId, Func<Control> editorFactory, bool loadSelection)
     {
-        var dialog = new ApplicationWindowForm
+        var dialog = new Form
         {
             Text = recordId > 0 ? "Certificate Details — " + title : "Prepare Certificate — " + title,
             StartPosition = FormStartPosition.CenterParent,
@@ -48,6 +48,8 @@ internal static class CertificateWorkspaceDetailsDialog
                 AppScale.Scale(title is "Leave" or "College Leaving" or "Provisional" ? 720 : 580)),
             MinimumSize = new Size(AppScale.Scale(690), AppScale.Scale(430)),
             BackColor = AppTheme.PageBackground,
+            Font = AppTheme.NormalFont,
+            AutoScaleMode = AutoScaleMode.None,
             ShowInTaskbar = false
         };
 
