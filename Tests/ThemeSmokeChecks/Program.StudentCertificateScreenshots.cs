@@ -86,16 +86,18 @@ internal static partial class Program
                 host.Close();
             }
 
-            CaptureExistingEditor("03-character-certificate-editor.png",
-                new CharacterCertificatePage(false), root, students, sample);
-            CaptureExistingEditor("04-regular-student-certificate-editor.png",
-                new RegularStudentCertificatePage(false), root, students, sample);
-            CaptureExistingEditor("05-leaving-certificate-editor.png",
-                new LeaveCertificatePage(null, false), root, students, sample);
+            CaptureCompactEditor("03-character-certificate-details-dialog.png", "Character",
+                () => new CharacterCertificatePage(false), root, sample);
+            CaptureCompactEditor("04-regular-student-details-dialog.png", "Regular Student",
+                () => new RegularStudentCertificatePage(false), root, sample);
+            CaptureCompactEditor("05-leaving-certificate-details-dialog.png", "Leave",
+                () => new LeaveCertificatePage(null, false), root, sample);
+            CaptureCompactEditor("06-provisional-certificate-details-dialog.png", "Provisional",
+                () => new ProvisionalCertificatePage(false), root, sample);
 
             var files = Directory.GetFiles(root, "*.png");
-            Check(files.Length == 5 && files.All(f => new FileInfo(f).Length > 4000),
-                "Five actual WinForms control images were rendered with fictional fixture data.");
+            Check(files.Length == 6 && files.All(f => new FileInfo(f).Length > 4000),
+                "Six actual WinForms workspace and compact-dialog images were rendered with fictional fixture data.");
             Console.WriteLine("SCREENSHOTS: " + string.Join(", ", files.Select(Path.GetFileName)));
             Console.WriteLine("Noninteractive control render only; no database, operator input, printer, or installation was exercised.");
         }
@@ -123,19 +125,14 @@ internal static partial class Program
         return form;
     }
 
-    private static void CaptureExistingEditor(string name, V2Page page,
-        string folder, DataTable students, DataRow sample)
+    private static void CaptureCompactEditor(string name, string type,
+        Func<Control> factory, string folder, DataRow sample)
     {
-        using (page)
-        using (var host = FixtureHost(page, new Size(1510, 900), page.NavigationTitle))
-        {
-            host.Show(); Application.DoEvents();
-            var picker = Descendants(page).OfType<StudentPicker>().Single();
-            picker.SetSource(students);
-            picker.SetStudent(sample);
-            Capture(host, folder, name);
-            host.Close();
-        }
+        using var dialog = CertificateWorkspaceDetailsDialog.BuildForScreenshot(
+            type, sample, factory);
+        dialog.Show(); Application.DoEvents();
+        Capture(dialog, folder, name);
+        dialog.Close();
     }
 
     private static void Capture(Form form, string folder, string name)
