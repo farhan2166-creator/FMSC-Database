@@ -317,9 +317,8 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         details.Text =
             "Type: " + selected["Certificate Type"] + "   •   Reference: " + selected["Reference"] + Environment.NewLine +
             "Certificate date: " + selected["Certificate Date"] + "   •   " + selected["Entry"] + Environment.NewLine +
-            "Collection: " + selected["Collection"] + "   •   Collected on: " + selected["Collected On"] + Environment.NewLine +
-            "Recorded: " + selected["Recorded On"] + Environment.NewLine +
-            "Edit details in a compact dialog. Print, collect and issue again here.";
+            "Collection: " + selected["Collection"] + "   •   Collected: " + selected["Collected On"] + Environment.NewLine +
+            "Recorded: " + selected["Recorded On"];
     }
 
     private bool TrySelectedCopy(out StudentCertificateRegisterReader.Kind kind,
