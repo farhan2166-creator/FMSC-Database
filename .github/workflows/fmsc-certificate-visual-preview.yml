@@ -34,6 +34,18 @@ jobs:
         shell: pwsh
         run: dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
 
+      - name: Verify certificate identity, collection, and reissue contracts
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $suites = @('--student-certificates-workspace', '--certificate-navigation', '--certificate-submission', '--character-certificate-reprint', '--certificate-reissue-snapshots')
+          foreach ($suite in $suites) {
+            Write-Host "Testing $suite"
+            dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- $suite
+            if ($LASTEXITCODE -ne 0) { throw "$suite failed" }
+          }
+
       - name: Render actual WinForms controls with fictional fixture records
         shell: pwsh
         timeout-minutes: 4
