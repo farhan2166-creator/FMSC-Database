@@ -1192,9 +1192,9 @@ public sealed class CollegeLeaveCertificatePage : V2Page, IUnsavedChanges, IStud
         }
         else
         {
-            // New preparation stays on the selected student; the ordinary New/Clear
-            // action on the old form still keeps its original behavior.
-            ClearCertificateSelection(); ClearCertificateFields(); CaptureDraftBaseline(); ApplyWorkflowState();
+            // Leaving a student is a protected lifecycle decision. Keep the
+            // existing leave episode/fee review and its own New actions intact.
+            ApplyWorkflowState();
         }
     }
 
