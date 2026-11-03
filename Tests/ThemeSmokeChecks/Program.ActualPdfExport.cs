@@ -35,7 +35,10 @@ internal static partial class Program
 
         using var students=new DataTable();students.Columns.Add("AdmissionNumber");students.Columns.Add("StudentName");students.Columns.Add("Campus");
         students.Rows.Add("00163","Hamid","Campus Boys");students.Rows.Add("00164","Kausar","Campus Boys");
-        using var scoped=new PdfContextFixturePage("Campus Boys") {BindingContext=new BindingContext()};scoped.DataGrid.DataSource=students;
+        using var scoped=new PdfContextFixturePage("Campus Boys") {BindingContext=new BindingContext()};
+        foreach(DataColumn field in students.Columns)
+            scoped.DataGrid.Columns.Add(new DataGridViewTextBoxColumn {Name=field.ColumnName,DataPropertyName=field.ColumnName,HeaderText=field.ColumnName,ValueType=field.DataType});
+        scoped.DataGrid.DataSource=students;
         using var raw=ReportExportBuilder.Build(students,scoped.DataGrid.Columns.Cast<DataGridViewColumn>(),Array.Empty<string>());
         var result=scoped.BuildPdfExportDocument(raw,"Fictional Meadow School & College","Fixture");
         using(result.Data)
