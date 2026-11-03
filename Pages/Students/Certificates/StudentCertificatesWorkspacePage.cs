@@ -37,6 +37,7 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
     private bool reading;
     private bool editorOpen;
     private int generation;
+    private CertificateWorkspaceSelection.Key? nextSelection;
 
     public bool IsBusy => reading || editorOpen;
     public string BusyMessage => editorOpen
@@ -196,6 +197,7 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
 
     private void ClearSelection()
     {
+        nextSelection = null;
         generation++;
         reading = false; // Invalidate a stale in-flight read without leaving the page busy.
         records = StudentCertificateRegisterReader.CreateTable();
@@ -215,6 +217,8 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
             return;
         }
 
+        var preferred = nextSelection ?? CertificateWorkspaceSelection.FromRow(CurrentRecord);
+        nextSelection = null;
         int request = ++generation;
         int actor = CurrentUser.UserId;
         string endpoint = DatabaseHelper.DatabaseEndpoint;
@@ -240,11 +244,10 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
 
             records = loaded;
             Grid.DataSource = records.DefaultView;
-            Grid.ClearSelection();
-            try { Grid.CurrentCell = null; } catch (InvalidOperationException) { }
+            SelectAfterRefresh(CertificateWorkspaceSelection.Resolve(records.DefaultView, preferred));
             details.Text = records.Rows.Count == 0
                 ? "No saved certificate records were returned for this student."
-                : "Select an issued copy to review its details and open the existing certificate editor.";
+                : "Select a certificate for details, print/reprint, collection or a new copy.";
             SetStatus(records.Rows.Count + " saved certificate row(s) for the selected student.");
         }
         catch (Exception ex)
@@ -263,6 +266,24 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
                 refresh.Enabled = student.SelectedId > 0;
                 UpdateSelected();
             }
+        }
+    }
+
+    private void SelectAfterRefresh(DataRowView? preferred)
+    {
+        Grid.ClearSelection();
+        try { Grid.CurrentCell = null; } catch (InvalidOperationException) { }
+        if (preferred is null) return;
+        for (int index = 0; index < Grid.Rows.Count; index++)
+        {
+            if (Grid.Rows[index].DataBoundItem is not DataRowView candidate ||
+                !ReferenceEquals(candidate.Row, preferred.Row)) continue;
+            DataGridViewCell? cell = Grid.Rows[index].Cells.Cast<DataGridViewCell>()
+                .FirstOrDefault(item => item.OwningColumn.Visible);
+            if (cell is null) return;
+            Grid.CurrentCell = cell;
+            Grid.Rows[index].Selected = true;
+            return;
         }
     }
 
@@ -356,6 +377,7 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
 
         int actor = CurrentUser.UserId;
         string endpoint = DatabaseHelper.DatabaseEndpoint;
+        nextSelection = new CertificateWorkspaceSelection.Key(kind.Key, recordId, issueId, PreferNewest: recordId == 0);
         editorOpen = true;
         UpdateSelected();
         try
@@ -392,6 +414,8 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         }
         int actor = CurrentUser.UserId;
         string endpoint = DatabaseHelper.DatabaseEndpoint;
+        nextSelection = new CertificateWorkspaceSelection.Key(kind.Key, recordId, issueId,
+            PreferNewest: action == "reissue");
         editorOpen = true;
         Grid.Enabled = false;
         student.Enabled = false;
