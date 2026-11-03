@@ -131,6 +131,17 @@ internal static partial class Program
         using var dialog = CertificateWorkspaceDetailsDialog.BuildForScreenshot(
             type, sample, factory);
         dialog.Show(); Application.DoEvents();
+        var controls = new Control[] { dialog }.Concat(Descendants(dialog));
+        var layoutEvidence = controls
+            .Where(c => c is Form or HumanCard or TableLayoutPanel or FlowLayoutPanel ||
+                c is Panel && c.Controls.Count > 0)
+            .Take(175)
+            .Select(c =>
+                $"{c.GetType().Name}: x={c.Left} y={c.Top} w={c.Width} h={c.Height}" +
+                $" dock={c.Dock} visible={c.Visible} autosize={c.AutoSize}" +
+                $" parent={c.Parent?.GetType().Name} parentSize={c.Parent?.ClientSize}")
+            .ToArray();
+        File.WriteAllLines(Path.Combine(folder, "layout-" + name + ".txt"), layoutEvidence);
         Capture(dialog, folder, name);
         dialog.Close();
     }
