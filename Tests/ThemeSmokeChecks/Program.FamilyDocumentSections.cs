@@ -137,7 +137,7 @@ internal static partial class Program
         {
             foreach(var (key,admission,name,amount,refund,balance) in new[]{(1,"8001","Same Name",100m,40m,40m),(2,"8002","Same Name",200m,0m,0m)})
             {
-                var row=legacy.Rows.Add(key,school.Name,"STUDENT PAYMENT RECEIPT","PARENT COPY","FMSC-2026-0010",name,admission,"Class 1",
+                var row=legacy.Rows.Add(key,school.Name,"STUDENT PAYMENT RECEIPT","PARENT COPY","R-2026-00010",name,admission,"Class 1",
                     "25-10-2026 01:00 PM","","Tuition Fee",amount,0m,amount,balance,"Cash","",false,true,school.ContactNumber,school.Address,"Campus Boys","Parent","Nov-2026");
                 row["OriginalPaid"]=amount;row["NetPaid"]=amount-refund;row["RefundAmount"]=refund;row["ShowAdjustments"]=refund>0m;
             }

@@ -43,6 +43,9 @@ internal static partial class Program
             if(receiptDisplay is not null)data=receiptDisplay;
             if(bill) foreach(DataRow row in data.Rows)
                 if(string.IsNullOrWhiteSpace(Convert.ToString(row["ReceiptNumber"])))row["ReceiptNumber"]=data.Columns.Contains("FamilyRowKind")?"FB-2026-00001":"B-2026-00001";
+            foreach(string number in data.AsEnumerable().Select(row=>Convert.ToString(row["ReceiptNumber"])??"").Distinct())
+                Check(System.Text.RegularExpressions.Regex.IsMatch(number,bill?@"^(?:B|FB)-[0-9]{4}-[0-9]{5,}$":@"^(?:R|FR)-[0-9]{4}-[0-9]{5,}$"),
+                    "Review documents retain production bill/receipt prefixes and five-digit minimum serials");
             string file=data.Columns.Contains("FamilyRowKind")?(bill?"FamilyBill.rdlc":"FamilyReceipt.rdlc"):(bill?"StudentBill.rdlc":"StudentReceipt.rdlc");
             file=templateName??file;
             string path=Path.Combine(AppContext.BaseDirectory,"Reports",file);
@@ -122,7 +125,7 @@ internal static partial class Program
                 string admission=Convert.ToString(data.Rows[0]["AdmissionNumberText"])!;
                 Check(search.FindPages(admission).Length>0,"A4 receipt-sheet search finds the printed admission number");
                 if(name=="bulk-annual-search")
-                    Check(parsed.PageCount>1&&search.FindPages("FR-ANNUAL-14").Contains(parsed.PageCount),
+                    Check(parsed.PageCount>1&&search.FindPages("FR-2026-00114").Contains(parsed.PageCount),
                         "The last receipt in a multi-column A4 batch maps to its actual final printed page");
             }
             if(name=="family-six-child-receipt")
@@ -240,13 +243,13 @@ internal static partial class Program
             Check(Render("individual-credit-receipt",credit)==1,"A six-line credit settlement prints on one receipt page");
             if(review is not null)CheckFeeReviewReceiptCases(credit,(name,data,a4)=>Render(name,data,annual:a4));
             CheckCashOnly("individual-cash-only-receipt",credit);
-            using var legacy=credit.Copy();foreach(DataRow row in legacy.Rows) {row["ShowSettlement"]=false;row["ReceiptNumber"]="FMSC-2026-0100";}
+            using var legacy=credit.Copy();foreach(DataRow row in legacy.Rows) {row["ShowSettlement"]=false;row["ReceiptNumber"]="R-2026-00100";}
             Check(Render("legacy-individual-receipt",legacy)==1,"Original cash receipt fields remain printable through the RDLC template");
             Check(Render("annual-receipt-sheet",legacy,StudentReceiptReport.TemplateFile,annual:true)==1,"Annual printing uses StudentReceipt.rdlc with its native adjustment rows");
             using var bulk=legacy.Clone();
             for(int receipt=0;receipt<15;receipt++)foreach(DataRow original in legacy.Rows)
             {
-                bulk.ImportRow(original);var row=bulk.Rows[^1];row["ReceiptPageKey"]=receipt+1;row["ReceiptNumber"]="FR-ANNUAL-"+receipt;
+                bulk.ImportRow(original);var row=bulk.Rows[^1];row["ReceiptPageKey"]=receipt+1;row["ReceiptNumber"]=$"FR-2026-{receipt+100:D5}";
             }
             Render("bulk-annual-search",bulk,StudentReceiptReport.TemplateFile,annual:true);
         }
@@ -471,12 +474,12 @@ internal static partial class Program
                 var table=new DataTable();table.Columns.Add("BillNumber");table.Columns.Add("IssuedAt",typeof(DateTime));table.Columns.Add("SnapshotXml");
                 table.Rows.Add(number,DateTime.Today,FeeBillDocuments.Snapshot(data));return table;
             }
-            using var savedFamily1=Saved(family,"FB-TEST-1");using var savedFamily2=Saved(family,"FB-TEST-2");
-            using var savedSingle=Saved(original,"B-TEST-3");
+            using var savedFamily1=Saved(family,"FB-2026-00001");using var savedFamily2=Saved(family,"FB-2026-00002");
+            using var savedSingle=Saved(original,"B-2026-00003");
             using var groupedBatch=OutstandingBillsPreview.CombineSaved(new[]{savedFamily1,savedFamily2,savedSingle},true);
             Check(Render("family-batch-separate-pages",groupedBatch)==3,"Two families and a standalone student open in one preview with each bill on a separate page");
             Check(groupedBatch.AsEnumerable().GroupBy(r=>r.Field<int>("ReceiptPageKey")).Select(g=>g.First().Field<string>("ReceiptNumber"))
-                .SequenceEqual(new[]{"FB-TEST-1","FB-TEST-2","B-TEST-3"}),"Grouped batch keeps original bill numbers instead of replacing or combining their totals");
+                .SequenceEqual(new[]{"FB-2026-00001","FB-2026-00002","B-2026-00003"}),"Grouped batch keeps original bill numbers instead of replacing or combining their totals");
         }
     }
 }

@@ -3,7 +3,7 @@ name: '06 - Feature - Fee Document Rendering'
 on:
   workflow_dispatch:
   push:
-    branches: [main, test/fee-document-scenario-pack]
+    branches: [main, test/fee-document-scenario-pack, fix/pdf-review-fidelity]
     paths:
       - 'Core/Reports/Fees/**'
       - 'Pages/Reports/Templates/*Bill.rdlc'

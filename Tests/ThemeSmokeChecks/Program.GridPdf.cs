@@ -1,5 +1,7 @@
 using System.Data;
 using System.Xml.Linq;
+using System.Text.Json;
+using System.Text.RegularExpressions;
 using FMSC_SMS.Core;
 using Microsoft.Reporting.WinForms;
 
@@ -18,6 +20,13 @@ internal static partial class Program
         int Render(string name,string title,string subtitle,DataTable source)
         {
             string before=source.GetXmlForTest();
+            if(source.Columns.Contains("Receipt / Reference"))
+            {
+                using var receiptRows=CollectionReceiptGrouping.DetailsOnly(source);
+                foreach(DataRow row in receiptRows.Rows)
+                    Check(Regex.IsMatch(Convert.ToString(row["Receipt / Reference"])??"",@"^(?:R|FR)-[0-9]{4}-[0-9]{5,}$|^(?:Credit|Payment) #[0-9]+$"),
+                        "Review receipt references use the production R/FR format or a labelled unissued entry");
+            }
             var built=GridReportPreview.Build("Fictional Meadow School & College",title,subtitle,source,"Example Operator");
             var layout=CollectionReceiptGrouping.Layout(source);
             Check(source.GetXmlForTest()==before,"Printing must not modify source rows, values or types");
@@ -71,6 +80,13 @@ internal static partial class Program
             }
             using var report=new LocalReport();report.LoadReportDefinition(new StringReader(built.Definition));report.DataSources.Add(new ReportDataSource("ReportData",built.Data));
             byte[] pdf=report.Render("PDF");File.WriteAllBytes(Path.Combine(folder,name+".pdf"),pdf);
+            if(source.Columns.Contains("Receipt / Reference"))
+            {
+                var search=ReportPageSearchIndex.FromPdf(pdf);
+                Check(search.FindPages("FMSC-").Length==0,"Review PDFs do not substitute FMSC references for R/FR receipts");
+                Check(!columns.Any(column=>column.Caption.Contains("Campus",StringComparison.OrdinalIgnoreCase)),
+                    "Receipt PDF detail columns do not repeat the campus supplied by scope and group headings");
+            }
             File.WriteAllText(Path.Combine(folder,name+".rdlc"),built.Definition);
             using var parsed=PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(pdf),PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
             Check(parsed.PageCount>0&&pdf.Length>1000,"The shared RDLC generates a valid PDF");
@@ -84,7 +100,7 @@ internal static partial class Program
         using(var empty=new DataTable())
         {
             empty.Columns.Add("Student");empty.Columns.Add("Outstanding",typeof(decimal));
-            Check(Render("empty-report","Outstanding","Campus: All",empty)==1,"Empty report is a readable one-page document");
+            Check(Render("empty-report","Outstanding & Aging — Students","View: Students   Campus: All",empty)==1,"Empty report is a readable one-page document");
         }
         using var receipts=new DataTable();
         foreach(string name in new[]{"Receipt / Reference","Date","Scope","Student / Family","Campus","Class / Section","Payment Method","Money Received","Refunds","Corrections","Credit Applied","Adjusted Collection","Received By"})
@@ -93,36 +109,56 @@ internal static partial class Program
         {
             decimal money=index switch{0=>2800m,1=>1600m,2 or 3=>200m,7=>10000m,_=>0m};
             decimal refund=index==5?1200m:0m,correction=index==4?1300m:index==6?150m:0m,credit=index==8?2250m:index==9?8700m:0m;
-            receipts.Rows.Add(index==8?"Credit #19":$"FMSC-2026-{index+9:D4}",new DateTime(2026,10,index==9?19:18),index%3==0?"Family":"Individual",
-                index%3==0?"Example Student, Example Sibling":"Example Student","Campus Boys","Play Group - F",
+            receipts.Rows.Add(index==8?"Credit #19":$"{(index%3==0?"FR":"R")}-2026-{index+9:D5}",new DateTime(2026,10,index==9?19:18),index%3==0?"Family":"Individual",
+                index%3==0?"Example Student, Example Sibling":"Example Student","Campus Boys","Play Group – F",
                 credit>0?"Account Credit":refund>0?"Refund":correction>0?"Correction":"Cash",money,refund,correction,credit,money-refund-correction,"operator");
         }
-        string totals="View: Receipts   Period: Any start to Any end   Campus: Campus Boys   Class: All   Section: All   Receipts: 10     Money Received: Rs. 14,800     Refunds: Rs. 1,200     Corrections: Rs. 1,450     Credit Applied: Rs. 10,950     Adjusted Collection: Rs. 12,150";
+        string totals="   Receipts: 9     Money Received: Rs. 14,800     Refunds: Rs. 1,200     Corrections: Rs. 1,450     Credit Applied: Rs. 10,950     Adjusted Collection: Rs. 12,150";
+        receipts.Columns.Add("__ReceiptStudents");receipts.Columns.Add("__ReceiptSnapshot");
+        void DescribeReceipts(DataTable data)
+        {
+            foreach(DataRow row in data.Rows)
+            {
+                var children=Enumerable.Range(0,Equals(row["Scope"],"Family")?2:1).Select(index=>new {
+                    AdmissionId=101+index,StudentName=index==0?"Example Student":"Example Sibling",FatherName="Example Parent",Gender=index==0?"M":"F",
+                    Placements=new[]{new{CampusName=Convert.ToString(row["Campus"]),ClassName="Play Group",SectionName="F"}}
+                }).ToArray();
+                row["__ReceiptStudents"]=JsonSerializer.Serialize(children);
+                row["__ReceiptSnapshot"]=JsonSerializer.Serialize(new {
+                    Students=children.Select(child=>new{child.AdmissionId,child.StudentName,child.FatherName,child.Gender}),
+                    Lines=children.Select(child=>new{child.AdmissionId,child.Placements[0].CampusName,child.Placements[0].ClassName,child.Placements[0].SectionName})
+                });
+            }
+        }
         using(var wholeSchool=receipts.Copy())
         {
-            // Match the screen's PrepareReportData step before the shared export.
-            CollectionReceiptGrouping.Apply(wholeSchool,"Whole School");
-            Check(Render("collections-receipts","Collections & Receipts",totals,wholeSchool)==1,"Ten receipts and their actual whole-school total fit one readable A4 landscape page");
+            DescribeReceipts(wholeSchool);
+            var review=ReceiptExportReview(wholeSchool,"Whole School");using var projected=review.Rows;
+            Check(!projected.Columns.Contains("Campus")&&!projected.Columns.Cast<DataColumn>().Any(column=>column.ColumnName.StartsWith("__")),
+                "Receipt review cannot reintroduce a campus detail column or private metadata omitted by the application");
+            Check(Render("collections-receipts",review.Title,review.Scope+totals,projected)==1,"Ten payment/credit entries and their whole-school total fit one readable page");
         }
         using(var byCampus=receipts.Copy())
         {
             for(int row=5;row<byCampus.Rows.Count;row++)byCampus.Rows[row]["Campus"]="Campus Girls";
-            CollectionReceiptGrouping.Apply(byCampus,"Campus");
-            var groupedLayout=CollectionReceiptGrouping.Layout(byCampus)!;
+            DescribeReceipts(byCampus);
+            var review=ReceiptExportReview(byCampus,"Campus");using var projected=review.Rows;
+            var groupedLayout=CollectionReceiptGrouping.Layout(projected)!;
             Check(groupedLayout.Count(row=>row.Kind=="Heading")==2 && groupedLayout.Count(row=>row.Kind=="Subtotal")==2,
                 "The campus sample includes two real receipt groups and their subtotals");
-            Render("collections-by-campus","Collections & Receipts",totals.Replace("Campus: Campus Boys","Campus: All")+"   Grouped by: Campus",byCampus);
+            Render("collections-by-campus",review.Title,review.Scope+totals,projected);
         }
-        var receiptColumns=GridReportColumns.Create(receipts,"#,##0.##");
+        using var selectedReceipts=ReceiptExportReview(receipts,"Whole School").Rows;
+        var receiptColumns=GridReportColumns.Create(selectedReceipts,"#,##0.##");
         Check(receiptColumns.Count==9,"Receipt identity fields share cells instead of squeezing thirteen columns");
         Check(receiptColumns.Single(c=>c.Caption=="Receipt / Date").Minimum>=1.3,"Receipt references and dates have a readable minimum width");
         using var outstanding=new DataTable();
         foreach(string name in new[]{"Adm. / QR No.","Student","Campus","Class / Section","Open Charges (Net)","Settled on Open Charges","Outstanding","Oldest Due Date","Aging"})
             outstanding.Columns.Add(name,name=="Oldest Due Date"?typeof(DateTime):new[]{"Open Charges (Net)","Settled on Open Charges","Outstanding"}.Contains(name)?typeof(decimal):typeof(string));
-        outstanding.Rows.Add("101","Example Student","Campus Boys","Play Group - F",6900m,0m,6900m,new DateTime(2026,10,19),"Due Today");
-        outstanding.Rows.Add("QR-102","Example Sibling","Campus Girls","Play Group - F",6900m,0m,6900m,new DateTime(2026,10,19),"Due Today");
-        outstanding.Rows.Add("103","Another Student","Campus Girls","Class 10 - A",2500m,1700m,800m,new DateTime(2027,1,1),"Not Yet Due");
-        Check(Render("outstanding-aging","Outstanding & Aging","View: Students   Campus: All   Students Owing: 3     Total Outstanding: Rs. 14,600     Overdue: Rs. 0     90+ Days: Rs. 0",outstanding)==1,"Outstanding report fits one clear page");
+        outstanding.Rows.Add("101","Example Student","Campus Boys","Play Group – F",6900m,0m,6900m,new DateTime(2026,10,19),"Due Today");
+        outstanding.Rows.Add("QR-102","Example Sibling","Campus Girls","Play Group – F",6900m,0m,6900m,new DateTime(2026,10,19),"Due Today");
+        outstanding.Rows.Add("103","Another Student","Campus Girls","Class 10 – A",2500m,1700m,800m,new DateTime(2027,1,1),"Not Yet Due");
+        Check(Render("outstanding-aging","Outstanding & Aging — Students","View: Students   Campus: All   Aging date: 19-10-2026   Students Owing: 3     Total Outstanding: Rs. 14,600     Overdue: Rs. 0     90+ Days: Rs. 0",outstanding)==1,"Outstanding report fits one clear page");
         using(var summaryRows=new DataTable())
         {
             summaryRows.Columns.Add("Charge Date");summaryRows.Columns.Add("Gross Billed",typeof(decimal));
@@ -152,7 +188,7 @@ internal static partial class Program
         for(int row=0;row<36;row++)wide.Rows.Add(new object[]{(row+1).ToString(),"Example student "+(row+1)}.Concat(Enumerable.Range(0,16).Select(column=>(object)(1234567.89m+row+column))).ToArray());
         var plan=GridReportColumns.Create(wide,"#,##0.##");
         Check(GridReportColumns.Bands(plan,10.67).Count>1,"Extra-wide reports split into identified sections instead of shrinking to tiny text");
-        Check(Render("wide-multipage","Detailed Financial Report","Campus: All   Records: 36",wide)>1,"Wide reports paginate without overflowing the sheet");
+        Check(Render("wide-multipage","Wide layout check","Synthetic layout stress case   Records: 36",wide)>1,"Wide reports paginate without overflowing the sheet");
     }
 }
 

@@ -105,10 +105,10 @@ internal static partial class Program
 
         using var certificates=new DataTable();
         foreach(string name in new[]{"Recorded On","Certificate Type","Certificate No.","Recipient Type","Recipient","Student / Staff No.","Certificate Date","Entry","Issue Type","Recorded By","Collection","Collected On","Collected By"})certificates.Columns.Add(name);
-        certificates.Rows.Add("03-11-2026 11:40","Character","CC-2026-001","Student","Kausar","163","02-11-2026","Issue logged","Original","Operator","Collected","03-11-2026 12:00","Ali");
+        certificates.Rows.Add("03-11-2026 11:40","Character","CC-2026-0001","Student","Kausar","163","02-11-2026","Issue logged","Original","Operator","Collected","03-11-2026 12:00","Ali");
         var certificatePlan=Plan(certificates);
         Check(certificatePlan.Count==4 && Cell(certificates,certificatePlan.Single(c=>c.Presentation==GridReportColumns.Kind.Recipient)).Contains("163 - Kausar"),"Certificate register groups certificate, recipient, recording and collection details");
-        Render("certificate-register","Certificate Issue Register",certificates,"163 - Kausar","CC-2026-001","By: Ali","03-11-2026 12:00");
+        Render("certificate-register","Certificate Issue Register",certificates,"163 - Kausar","CC-2026-0001","By: Ali","03-11-2026 12:00");
 
         using var creditSource=new DataTable();
         foreach(string name in new[]{"Adm. / QR No.","Student","Father Name","__StudentGender","Family","Campus","Class / Section","Student Status"})creditSource.Columns.Add(name);

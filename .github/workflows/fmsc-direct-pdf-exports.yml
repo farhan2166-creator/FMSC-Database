@@ -3,7 +3,7 @@ name: '07 - Feature - Direct PDF Exports'
 on:
   workflow_dispatch:
   push:
-    branches: [main, chore/direct-pdf-export-evidence]
+    branches: [main, chore/direct-pdf-export-evidence, fix/pdf-review-fidelity]
     paths:
       - 'Core/GridReportPreview.cs'
       - 'Core/GridReportColumns.cs'
@@ -22,6 +22,7 @@ on:
       - 'Tests/ThemeSmokeChecks/Program.ReportStudentIdentity.cs'
       - 'Tests/ThemeSmokeChecks/Program.ReportCaptions.cs'
       - 'Tests/ThemeSmokeChecks/Program.CollectionReceiptPresentation.cs'
+      - 'Tests/ThemeSmokeChecks/Program.ReceiptExportReview.cs'
       - 'Tests/ThemeSmokeChecks/Program.cs'
       - '.github/workflows/fmsc-direct-pdf-exports.yml'
   pull_request:
@@ -43,6 +44,7 @@ on:
       - 'Tests/ThemeSmokeChecks/Program.ReportStudentIdentity.cs'
       - 'Tests/ThemeSmokeChecks/Program.ReportCaptions.cs'
       - 'Tests/ThemeSmokeChecks/Program.CollectionReceiptPresentation.cs'
+      - 'Tests/ThemeSmokeChecks/Program.ReceiptExportReview.cs'
       - 'Tests/ThemeSmokeChecks/Program.cs'
       - '.github/workflows/fmsc-direct-pdf-exports.yml'
 
@@ -67,7 +69,16 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Generate and verify direct PDF exports
         id: render
-        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --direct-pdf-review
+        shell: pwsh
+        run: |
+          & dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --direct-pdf-review 2>&1 | Tee-Object -Variable renderOutput
+          $renderExit = $LASTEXITCODE
+          if ($renderExit -ne 0) {
+            $detail = ($renderOutput | Select-Object -Last 40) -join "`n"
+            $detail = $detail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Direct PDF review failed::$detail"
+          }
+          exit $renderExit
       - name: Upload the single direct-export review PDF
         id: samples
         if: ${{ success() && hashFiles('artifacts/direct-pdf-review/REVIEW-ALL.pdf') != '' }}

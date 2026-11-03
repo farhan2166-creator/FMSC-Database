@@ -5,6 +5,13 @@ the shared grid, student-identity and class-template fixtures, followed by a ver
 their exported PDFs. It starts on relevant main/PR changes or can be run manually.
 Desktop CI runs the same fixture and publishes the same single-file download.
 
+Receipt examples pass through the actual Collections & Receipts page's captions,
+column selection and export projection. Campus is shown in filter/group headings,
+without repeating a campus column in every detail row. Fictional references use
+the production R/FR formats; an unissued credit entry stays labelled Credit #.
+Titles include the report view, and the deliberately artificial wide table is
+labelled as a layout check rather than an application report.
+
 Download **REVIEW-ALL.pdf** from the workflow run or its summary link. It downloads
 directly as a PDF, without a ZIP, individual duplicate files or PNG previews,
 matching the fee-document review workflow. PDF bookmarks navigate sixteen report

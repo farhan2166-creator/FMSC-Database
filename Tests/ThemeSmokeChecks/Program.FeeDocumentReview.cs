@@ -46,7 +46,7 @@ internal static partial class Program
         using var bank=source.Copy();
         foreach(DataRow row in bank.Rows)
         {
-            row["ReceiptNumber"]="R-FICTIONAL-BANK-001";row["PaymentMethod"]="Bank";
+            row["ReceiptNumber"]="R-2026-00002";row["PaymentMethod"]="Bank";
             row["CashReceived"]=row["TotalPaid"];row["CreditApplied"]=0m;row["CreditRemaining"]=0m;
             row["CreditRetained"]=0m;row["ShowCreditRemaining"]=false;
         }

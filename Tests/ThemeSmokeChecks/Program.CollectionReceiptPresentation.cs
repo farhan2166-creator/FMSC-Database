@@ -1,7 +1,5 @@
-using System.Reflection;
 using System.Text.Json;
 using FMSC_SMS.Core;
-using FMSC_SMS.Pages.Reports.Finance;
 using Microsoft.Reporting.WinForms;
 
 internal static partial class Program
@@ -23,7 +21,7 @@ internal static partial class Program
                 new{AdmissionId=1,ClassName="Four",SectionName="M",CampusName="Campus Boys"},new{AdmissionId=2,ClassName="Four",SectionName="M",CampusName="Campus Girls"}}
         });
         var row=rows.NewRow();
-        row["Receipt / Reference"]="FR-FICTIONAL-001";row["Date"]=new DateTime(2026,11,3);row["Scope"]="Family";
+        row["Receipt / Reference"]="FR-2026-00001";row["Date"]=new DateTime(2026,11,3);row["Scope"]="Family";
         row["Student / Family"]="Hadia, Hamid, Kausar";row["Campus"]="Multiple";row["Class / Section"]="Multiple";
         row["Payment Method"]="Cash + Account Credit";row["Received By"]="Example Operator";row["__ReceiptStudents"]=roster;row["__ReceiptSnapshot"]=snapshot;
         row["Money Received"]=8000m;row["Refunds"]=0m;row["Corrections"]=0m;row["Credit Applied"]=1700m;row["Adjusted Collection"]=8000m;rows.Rows.Add(row);
@@ -63,20 +61,13 @@ internal static partial class Program
             CollectionReceiptPresentation.Apply(brothers);
             Check(brothers.Rows[0].Field<string>("Student / Family")=="Hamid s/o Ali, Ahmad s/o Khan","Different recorded fathers are not incorrectly presented as a shared parent");
         }
-        using var page=new CollectionsReceiptsReportPage();
-        var flags=BindingFlags.Instance|BindingFlags.NonPublic;
-        var grid=(DataGridView)typeof(V2Page).GetField("Grid",flags)!.GetValue(page)!;
-        foreach(DataColumn field in rows.Columns)grid.Columns.Add(new DataGridViewTextBoxColumn{Name=field.ColumnName,DataPropertyName=field.ColumnName,HeaderText=field.ColumnName});
-        typeof(CollectionsReceiptsReportPage).GetMethod("OnReportPageBound",flags)!.Invoke(page,null);
-        Check(!grid.Columns["Campus"].Visible && grid.Columns["Class / Section"].Visible,"The actual receipt page omits campus while retaining class/section");
-        Check(grid.Columns["Money Received"].HeaderText=="Payment Received","Grid and column chooser display Payment Received while retaining the saved column key");
-        using var export=ReportExportBuilder.Build(rows,grid.Columns.Cast<DataGridViewColumn>(),new[]{"Date"});
+        var review=ReceiptExportReview(rows,"Whole School");using var export=review.Rows;
         Check(!export.Columns.Contains("Campus") && export.Columns.Contains("Payment Received") && !export.Columns.Cast<DataColumn>().Any(c=>c.ColumnName.StartsWith("__")),"CSV/Excel/PDF projection contains meaningful visible fields without private metadata");
         var totals=new DataTable();totals.Columns.Add("Money Received",typeof(decimal));totals.Rows.Add(8000m);
         var metrics=ReportPrintSummary.FromTotals(totals);
         Check(metrics.Single().Label=="Payment Received" && ReportPrintSummary.Split("Money Received: Rs. 8,000").Metrics.Single().Label=="Payment Received","Structured and legacy print totals both use Payment Received");
         string folder=Path.GetFullPath("artifacts/collection-receipt-presentation");Directory.CreateDirectory(folder);
-        var built=GridReportPreview.Build("Fictional Meadow School & College","Collections & Receipts — Receipts","View: Receipts   Campus: All",export,"Example Operator",summaryMetrics:metrics);
+        var built=GridReportPreview.Build("Fictional Meadow School & College",review.Title,review.Scope,export,"Example Operator",summaryMetrics:metrics);
         using(built.Data)
         {
             string path=Path.Combine(folder,"family-receipts.pdf");GridReportPreview.ExportPdf(path,built);

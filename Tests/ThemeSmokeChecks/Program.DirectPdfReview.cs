@@ -30,7 +30,7 @@ internal static partial class Program
             ("Class Monthly Attendance Register","report-captions/ClassMonthlyAttendanceSheet.pdf"),
             ("Student Changes","report-student-identity/student-changes.pdf"),
             ("Certificate Issue Register","report-student-identity/certificate-register.pdf"),
-            ("Detailed Financial Report — Wide / Multipage","grid-pdf/wide-multipage-export.pdf"),
+            ("Wide Layout Check — Multipage","grid-pdf/wide-multipage-export.pdf"),
             ("Empty Result Layout","grid-pdf/empty-report-export.pdf")
         };
         string commit=Environment.GetEnvironmentVariable("GITHUB_SHA")??"Local build";

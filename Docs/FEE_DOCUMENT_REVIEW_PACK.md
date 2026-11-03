@@ -6,6 +6,12 @@ templates with static fixture data. It never connects to a school database,
 issues a real numbered document, posts a payment or sends pages to a printer.
 The application templates, wording and fonts are unchanged by this review setup.
 
+Fictional bill/receipt references use B/FB and R/FR with a year and at least five
+serial digits, matching the SQL number generator. This also applies to the bank,
+legacy-data and annual batch examples; no FMSC or invented ANNUAL/TEST reference
+formats are substituted in the review PDFs. Separate legacy-reference lookup
+checks still cover older saved numbers without rewriting them.
+
 Download **REVIEW-ALL.pdf** from the workflow's Artifacts section
 or the link in its run summary. It is retained for seven days and downloads
 directly as a PDF, without a ZIP or extraction. It contains all generated pages in one
