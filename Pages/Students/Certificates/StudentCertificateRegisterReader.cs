@@ -70,6 +70,51 @@ internal static class StudentCertificateRegisterReader
         return table;
     }
 
+    /// <summary>Testable, SQL-free projection; the reader is responsible for calling an authorized procedure.</summary>
+    internal static void AppendRecords(DataTable result, Kind kind, DataTable source, int admissionId)
+    {
+        if (!source.Columns.Contains(kind.RecordKey))
+            throw new InvalidOperationException(kind.Reader + " did not return " + kind.RecordKey + ".");
+        if (kind.IssueKey is not null && !source.Columns.Contains(kind.IssueKey))
+            throw new InvalidOperationException(kind.Reader + " did not return " + kind.IssueKey + ".");
+        if (!source.Columns.Contains("AdmissionId"))
+            throw new InvalidOperationException(kind.Reader + " did not identify the student.");
+
+        foreach (DataRow row in source.Rows)
+        {
+            if (Number(row, "AdmissionId") != admissionId)
+                throw new InvalidOperationException("A certificate reader returned another student's record.");
+            if (kind.LeaveType is not null && source.Columns.Contains("CertificateType") &&
+                !string.Equals(Text(row, "CertificateType"), kind.LeaveType, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("A leaving certificate reader returned an unexpected certificate type.");
+
+            int recordId = Number(row, kind.RecordKey);
+            if (recordId <= 0) continue;
+            int issueId = kind.IssueKey is null ? 0 : Number(row, kind.IssueKey);
+            bool savedOnly = kind.IssueKey is not null && issueId <= 0;
+            DateTime? certificateDate = Date(row, "CertificateDate", "LeaveDate");
+            DateTime? activity = Date(row, "IssuedAt", "CreatedAt", "CertificateDate", "LeaveDate");
+            DateTime? collected = Date(row, "CollectedAt");
+            string collection = savedOnly ? "Not tracked" : Text(row, "CollectionStatus");
+            if (string.IsNullOrWhiteSpace(collection))
+                collection = collected.HasValue ? "Collected" : "Not Collected";
+
+            result.Rows.Add(
+                kind.Key,
+                kind.Caption,
+                certificateDate?.ToString("dd MMM yyyy") ?? "—",
+                Text(row, "CertificateNumber") is { Length: > 0 } certificateNumber
+                    ? certificateNumber : "Record #" + recordId,
+                savedOnly ? "Saved record only" : "Issue logged",
+                collection,
+                collected?.ToString("dd MMM yyyy") ?? "—",
+                activity?.ToString("dd MMM yyyy HH:mm") ?? "—",
+                recordId,
+                issueId,
+                activity ?? DateTime.MinValue);
+        }
+    }
+
     /// <summary>
     /// The underlying procedures already enforce certificate read permissions.
     /// An optional report permission is intentionally NOT required for this workspace.
@@ -94,46 +139,7 @@ internal static class StudentCertificateRegisterReader
                 parameters.Add(DatabaseHelper.Int("@UserId", userId));
 
             using var source = DatabaseHelper.QueryUser(kind.Reader, parameters.ToArray());
-            if (!source.Columns.Contains(kind.RecordKey))
-                throw new InvalidOperationException(kind.Reader + " did not return " + kind.RecordKey + ".");
-            if (kind.IssueKey is not null && !source.Columns.Contains(kind.IssueKey))
-                throw new InvalidOperationException(kind.Reader + " did not return " + kind.IssueKey + ".");
-            if (!source.Columns.Contains("AdmissionId"))
-                throw new InvalidOperationException(kind.Reader + " did not identify the student.");
-
-            foreach (DataRow row in source.Rows)
-            {
-                if (Number(row, "AdmissionId") != admissionId)
-                    throw new InvalidOperationException("A certificate reader returned another student's record.");
-                if (kind.LeaveType is not null && source.Columns.Contains("CertificateType") &&
-                    !string.Equals(Text(row, "CertificateType"), kind.LeaveType, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidOperationException("A leaving certificate reader returned an unexpected certificate type.");
-
-                int recordId = Number(row, kind.RecordKey);
-                if (recordId <= 0) continue;
-                int issueId = kind.IssueKey is null ? 0 : Number(row, kind.IssueKey);
-                bool savedOnly = kind.IssueKey is not null && issueId <= 0;
-                DateTime? certificateDate = Date(row, "CertificateDate", "LeaveDate");
-                DateTime? activity = Date(row, "IssuedAt", "CreatedAt", "CertificateDate", "LeaveDate");
-                DateTime? collected = Date(row, "CollectedAt");
-                string collection = savedOnly ? "Not tracked" : Text(row, "CollectionStatus");
-                if (string.IsNullOrWhiteSpace(collection))
-                    collection = collected.HasValue ? "Collected" : "Not Collected";
-
-                result.Rows.Add(
-                    kind.Key,
-                    kind.Caption,
-                    certificateDate?.ToString("dd MMM yyyy") ?? "—",
-                    Text(row, "CertificateNumber") is { Length: > 0 } certificateNumber
-                        ? certificateNumber : "Record #" + recordId,
-                    savedOnly ? "Saved record only" : "Issue logged",
-                    collection,
-                    collected?.ToString("dd MMM yyyy") ?? "—",
-                    activity?.ToString("dd MMM yyyy HH:mm") ?? "—",
-                    recordId,
-                    issueId,
-                    activity ?? DateTime.MinValue);
-            }
+            AppendRecords(result, kind, source, admissionId);
         }
         result.DefaultView.Sort = "RecordedAt DESC, [Certificate Type] ASC, RecordId DESC, IssueId DESC";
         return result;
