@@ -4,7 +4,7 @@ namespace FMSC_SMS.Core;
 internal static class ReportStudentIdentity
 {
     private const string MetadataKey="FMSC.ReportStudentParents";
-    internal const string SourceColumnKey="FMSC.ReportSourceColumn";
+    internal const string SourceColumnKey=ReportContextProjection.SourceColumnKey;
     private sealed record Parent(string Name,string Gender);
     private static string Key(string value)=>new(value.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
     internal static bool IsStudent(string name)=>Key(name) is "student" or "studentname";

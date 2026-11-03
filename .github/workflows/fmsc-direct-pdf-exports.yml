@@ -3,9 +3,14 @@ name: '07 - Feature - Direct PDF Exports'
 on:
   workflow_dispatch:
   push:
-    branches: [main, chore/direct-pdf-export-evidence, fix/pdf-review-fidelity]
+    branches: [main, chore/direct-pdf-export-evidence, fix/pdf-review-fidelity, fix/direct-pdf-export-context]
     paths:
       - 'Core/GridReportPreview.cs'
+      - 'Core/ReportContextProjection.cs'
+      - 'Core/V2Page.cs'
+      - 'Pages/Reports/Finance/CanonicalFinanceReportPage.cs'
+      - 'Pages/Reports/Students/StudentReportsPage.cs'
+      - 'Tests/ThemeSmokeChecks/Program.ActualPdfExport.cs'
       - 'Core/GridReportColumns.cs'
       - 'Core/ReportExportBuilder.cs'
       - 'Core/ReportPrintSummary.cs'
@@ -28,6 +33,11 @@ on:
   pull_request:
     paths:
       - 'Core/GridReportPreview.cs'
+      - 'Core/ReportContextProjection.cs'
+      - 'Core/V2Page.cs'
+      - 'Pages/Reports/Finance/CanonicalFinanceReportPage.cs'
+      - 'Pages/Reports/Students/StudentReportsPage.cs'
+      - 'Tests/ThemeSmokeChecks/Program.ActualPdfExport.cs'
       - 'Core/GridReportColumns.cs'
       - 'Core/ReportExportBuilder.cs'
       - 'Core/ReportPrintSummary.cs'

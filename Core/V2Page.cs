@@ -899,6 +899,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             if (table.Columns.Count == 0) { Warn("Choose at least one report column before printing."); return; }
             string signature = ReportFilterSignature();
             string title = ReportExportTitle(), subtitle = ReportExportSubtitle();
+            string? campusContext=ReportCampusContext;
             var metrics=ReportPrintMetrics();
             int actor=CurrentUser.UserId;
             string printedBy=CurrentUser.Username;
@@ -906,7 +907,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             if (IsDisposed) return;
             if (CurrentUser.UserId!=actor || _reportStale || signature != ReportFilterSignature()) { Warn("Filters changed. Run the report again before printing."); return; }
             if (string.IsNullOrWhiteSpace(institution)) { Warn("Complete School Profile before printing."); return; }
-            GridReportPreview.Show(FindForm(), institution, title, subtitle, table, printedBy,summaryMetrics:metrics);
+            GridReportPreview.Show(FindForm(), institution, title, subtitle, table, printedBy,summaryMetrics:metrics,campusContext:campusContext);
         }
         catch (Exception ex) { if (!IsDisposed) Fail(ex); }
         finally { _previewingReport = false; }
@@ -988,6 +989,7 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     protected virtual string ReportExportTitle() => NavigationTitle;
     /// <summary>The line printed under the PDF title. Defaults to the page's header context.</summary>
     protected virtual string ReportExportSubtitle() => _contextText;
+    protected virtual string? ReportCampusContext => null;
     private protected virtual IReadOnlyList<ReportPrintMetric>? ReportPrintMetrics() => null;
     /// <summary>True when the chosen columns include data the report has not loaded yet.</summary>
     protected virtual bool ReportLayoutNeedsReload(IReadOnlyList<string> keys) => false;
@@ -1366,6 +1368,9 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
     protected virtual DataTable SelectExportRows(DataTable source, bool dataOnly) => source;
     private protected virtual void WritePdfExport(string path, GridReportPreview.Report report) =>
         GridReportPreview.ExportPdf(path,report);
+    internal GridReportPreview.Report BuildPdfExportDocument(DataTable projection,string institution,string printedBy) =>
+        GridReportPreview.Build(institution,ReportExportTitle(),ReportExportSubtitle(),projection,printedBy,
+            summaryMetrics:ReportPrintMetrics(),campusContext:ReportCampusContext);
     protected virtual int ExportRecordCount(DataTable source) => ReportPrintSummary.DetailCount(source);
     protected virtual string CsvExportLabel => "CSV file (*.csv)";
     private void BindReportPage()
@@ -1535,8 +1540,6 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
         try
         {
             string filePath = dialog.FileName;
-            string title = ReportExportTitle();
-            string subtitle = ReportExportSubtitle();
             bool exportAsCsv = string.Equals(
                 Path.GetExtension(filePath),
                 ".csv",
@@ -1568,13 +1571,12 @@ public abstract class V2Page : UserControl, IWorkspaceStateHost
             {
                 int actor=CurrentUser.UserId;
                 string printedBy=CurrentUser.Username, signature=ReportFilterSignature();
-                var metrics=ReportPrintMetrics();
                 string institution=await InstitutionProfile.GetNameAsync();
                 if (IsDisposed) return;
                 if (CurrentUser.UserId!=actor || _reportStale || signature!=ReportFilterSignature())
                 { Warn("Filters or user changed. Run the report again before exporting."); return; }
                 if (string.IsNullOrWhiteSpace(institution)) { Warn("Complete School Profile before exporting a PDF."); return; }
-                pdfReport=GridReportPreview.Build(institution,title,subtitle,exportTable,printedBy,summaryMetrics:metrics);
+                pdfReport=BuildPdfExportDocument(exportTable,institution,printedBy);
             }
             using var pdfData=pdfReport?.Data;
             SetStatus($"Exporting {rowCount:N0} record(s)...");

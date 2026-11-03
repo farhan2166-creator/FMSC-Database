@@ -275,6 +275,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
         ? NavigationTitle : $"{NavigationTitle} — {ViewName}";
     protected override string ReportExportSubtitle() =>
         _filterSummary.Length == 0 ? base.ReportExportSubtitle() : _filterSummary;
+    protected override string? ReportCampusContext => Campus.SelectedId>0?Campus.Text:null;
     protected void FiltersChanged()
     {
         if (_runningReport)

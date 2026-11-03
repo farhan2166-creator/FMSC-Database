@@ -925,6 +925,7 @@ public partial class StudentReportsPage : V2Page
         }
     }
     // V2Page report hooks
+    protected override string? ReportCampusContext => campus.SelectedId>0?campus.Text:null;
     protected override string ReportLayoutKey => _shape.Key;
     protected override IReadOnlyList<ReportColumnDef>? ReportColumnCatalog => _shape.Catalog;
     protected override IReadOnlyList<string>? ReportDefaultColumnKeys => _shape.DefaultKeys;

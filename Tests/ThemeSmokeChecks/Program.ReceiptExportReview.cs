@@ -6,7 +6,7 @@ using FMSC_SMS.Pages.Reports.Finance;
 internal static partial class Program
 {
     // Exercise the page's actual captions, column selection and export projection.
-    private static (DataTable Rows,string Title,string Scope) ReceiptExportReview(DataTable source,string grouping)
+    private static (DataTable Rows,string Title,string Scope) ReceiptExportReview(DataTable source,string grouping,Action<V2Page,DataTable>? inspectExport=null)
     {
         const BindingFlags flags=BindingFlags.Instance|BindingFlags.NonPublic;
         using var prepared=source.Copy();
@@ -33,6 +33,8 @@ internal static partial class Program
         var rows=ReportExportBuilder.Build(prepared,grid.Columns.Cast<DataGridViewColumn>(),new[]{"Date"});
         string title=(string)typeof(CanonicalFinanceReportPage).GetMethod("ReportExportTitle",flags)!.Invoke(page,null)!;
         string scope=(string)typeof(CanonicalFinanceReportPage).GetMethod("FiltersText",flags)!.Invoke(page,null)!;
+        typeof(CanonicalFinanceReportPage).GetField("_filterSummary",flags)!.SetValue(page,scope);
+        inspectExport?.Invoke(page,rows);
         return(rows,title,scope);
     }
 }

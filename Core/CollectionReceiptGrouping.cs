@@ -4,7 +4,10 @@ namespace FMSC_SMS.Core;
 internal static class CollectionReceiptGrouping
 {
     internal const string LayoutKey = "Fmsc.CollectionReceiptLayout";
-    internal sealed record RowLayout(string Kind, string GroupKey, string Label);
+    internal sealed record RowLayout(string Kind, string GroupKey, string Label)
+    {
+        internal bool CampusInHeading { get; init; }
+    }
     internal static RowLayout[]? Layout(DataTable data) =>
         data.ExtendedProperties[LayoutKey] is RowLayout[] rows && rows.Length == data.Rows.Count ? rows : null;
 
@@ -119,11 +122,11 @@ internal static class CollectionReceiptGrouping
                 DataRow heading = data.NewRow();
                 heading["Receipt / Reference"] = grouping + ": " + label;
                 data.Rows.Add(heading);
-                layout.Add(new("Heading", groupKey, grouping + ": " + label));
+                layout.Add(new("Heading", groupKey, grouping + ": " + label) { CampusInHeading=true });
                 foreach (DataRow row in group)
                 {
                     data.ImportRow(row);
-                    layout.Add(new("Detail", groupKey, grouping + ": " + label));
+                    layout.Add(new("Detail", groupKey, grouping + ": " + label) { CampusInHeading=true });
                 }
                 Total("TOTAL — " + label, group, "Subtotal", groupKey, grouping + ": " + label);
             }

@@ -1,5 +1,13 @@
 # Shared report PDF and print presentation — 2 November 2026
 
+The application's Export button now builds its PDF through
+`V2Page.BuildPdfExportDocument`. The shared print/PDF projection omits a selected
+campus column only when that same campus is supplied by the report heading, or
+each receipt's group heading supplies it. Different/mixed campuses remain visible
+when the broader context does not cover them. Source rows, CSV/Excel selections,
+financial values and stored reference numbers are unchanged. The default applies
+to the direct-PDF report pages; it does not change numbered RDLC bills/receipts.
+
 Management PDF export now uses the same GridReportPreview RDLC definition and
 projected data as Print Preview. The shared document includes the school name,
 report title, captured filters, authoritative summary cards, a logical detail-row

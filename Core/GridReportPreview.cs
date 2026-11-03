@@ -9,9 +9,11 @@ internal static class GridReportPreview
     {
         internal string Title { get; init; } = "Report";
     }
-    internal static Report Build(string institution,string title,string subtitle,DataTable source,string printedBy,string moneyFormat="#,##0.##",IReadOnlyList<ReportPrintMetric>? summaryMetrics=null)
+    internal static Report Build(string institution,string title,string subtitle,DataTable source,string printedBy,string moneyFormat="#,##0.##",IReadOnlyList<ReportPrintMetric>? summaryMetrics=null,string? campusContext=null)
     {
         if(source.Columns.Count==0)throw new ArgumentException("Choose at least one report column.",nameof(source));
+        using var printSource=ReportContextProjection.ForPdf(source,campusContext);
+        source=printSource;
         XNamespace ns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";
         XElement E(string name,params object[] content)=>new(ns+name,content);
         string Inch(double value)=>value.ToString("0.####",CultureInfo.InvariantCulture)+"in";
@@ -157,9 +159,9 @@ internal static class GridReportPreview
         AtomicExportFile.Publish(path,temp=>File.WriteAllBytes(temp,bytes),PdfTableExporter.ValidatePdf);
     }
 
-    internal static void Show(IWin32Window? owner, string institution, string title, string subtitle, DataTable source, string printedBy, string moneyFormat = "#,##0.##",IReadOnlyList<ReportPrintMetric>? summaryMetrics=null)
+    internal static void Show(IWin32Window? owner, string institution, string title, string subtitle, DataTable source, string printedBy, string moneyFormat = "#,##0.##",IReadOnlyList<ReportPrintMetric>? summaryMetrics=null,string? campusContext=null)
     {
-        var report = Build(institution, title, subtitle, source, printedBy, moneyFormat,summaryMetrics);
+        var report = Build(institution, title, subtitle, source, printedBy, moneyFormat,summaryMetrics,campusContext);
         using var printedData=report.Data;
         RdlcReportPreview.Show(owner, title, "", "ReportData", report.Data, reportDefinition: report.Definition);
     }

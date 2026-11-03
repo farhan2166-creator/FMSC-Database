@@ -5,6 +5,12 @@ the shared grid, student-identity and class-template fixtures, followed by a ver
 their exported PDFs. It starts on relevant main/PR changes or can be run manually.
 Desktop CI runs the same fixture and publishes the same single-file download.
 
+The Windows checks also call the actual Export-button PDF document builder and
+file writer on a Collections & Receipts page. They verify its real title/captions,
+exact R/FR references, and the shared campus-context rule used by direct-PDF
+reports. Raw export data keeps its fields and leading zeros; stored legacy
+references are preserved rather than renumbered.
+
 Receipt examples pass through the actual Collections & Receipts page's captions,
 column selection and export projection. Campus is shown in filter/group headings,
 without repeating a campus column in every detail row. Fictional references use

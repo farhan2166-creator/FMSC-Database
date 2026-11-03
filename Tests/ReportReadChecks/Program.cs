@@ -24,7 +24,7 @@ internal static partial class Program
             return;
         }
         CheckReceipts(); CheckOutstanding(); CheckCredit(); CheckConcessions(); CheckReceiptRdlc(); CheckQueryContracts(); CheckNewReports(); CheckPrintPresentation(); CheckSavedViews(); CheckReportOrdering();CheckSavedOrderAliases();
-        CheckXlsxExport();
+        CheckXlsxExport();CheckPdfContext();
         if (args.Contains("--sql")) CheckSql();
         Console.WriteLine($"PASS: {checks} focused report data, grouping, totals, filtering and layout checks" + (args.Contains("--sql") ? " including disposable SQL queries." : ". SQL integration was not requested."));
     }

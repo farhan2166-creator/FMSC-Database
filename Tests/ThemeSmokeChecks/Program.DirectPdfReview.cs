@@ -11,6 +11,7 @@ internal static partial class Program
         string finalPath=Path.Combine(folder,"REVIEW-ALL.pdf"),pendingPath=Path.Combine(folder,"REVIEW-ALL.pending.pdf");
         // A failed rerun must not advertise the previous successful review file.
         File.Delete(finalPath);
+        CheckActualPdfExportContext();
         CheckGridPdfReports();
         CheckReportStudentIdentity();
         CheckCollectionReceiptPresentation();
