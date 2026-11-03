@@ -47,18 +47,17 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
 
     internal StudentCertificatesWorkspacePage(bool initialize) : base(
         "Student Certificates Workspace",
-        "Select one student, review saved certificates and open the existing certificate workflow.")
+        "Select a student to review, edit, print or reissue certificates.")
     {
         if (!CertificateWorkspaceAccess.CanOpenHub(CurrentUser.HasPermission))
             throw new UnauthorizedAccessException("Certificate access is required.");
 
         UseWrappingToolbar();
-        open = AddAction("View / Edit Details…", (_, _) => OpenSelected(), "Primary");
+        open = AddAction("Edit Details…", (_, _) => OpenSelected(), "Primary");
         printAction = AddBusyAction("Print / Reprint", () => RunWorkspaceActionAsync("print"), "Secondary");
         collectAction = AddBusyAction("Mark Collected", () => RunWorkspaceActionAsync("collect"), "Secondary");
         reissueAction = AddBusyAction("Issue Again", () => RunWorkspaceActionAsync("reissue"), "Secondary");
-        refresh = AddBusyAction("Refresh Certificates", ReloadAsync, "Secondary");
-        var find = AddAction("Change Student", (_, _) => { if (!reading) student.ShowMatches(); }, "Secondary");
+        refresh = AddBusyAction("Refresh", ReloadAsync, "Secondary");
         open.Enabled = printAction.Enabled = collectAction.Enabled = reissueAction.Enabled = false;
         refresh.Enabled = false;
 
@@ -77,34 +76,24 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         Grid.Columns.Add(new DataGridViewTextBoxColumn
         {
             Name = "Type", HeaderText = "Certificate Type", DataPropertyName = "Certificate Type",
-            FillWeight = 135, MinimumWidth = 145
+            FillWeight = 32, MinimumWidth = 128
         });
         Grid.Columns.Add(new DataGridViewTextBoxColumn
         {
             Name = "Date", HeaderText = "Certificate Date", DataPropertyName = "Certificate Date",
-            FillWeight = 110, MinimumWidth = 105
+            FillWeight = 23, MinimumWidth = 105
         });
         Grid.Columns.Add(new DataGridViewTextBoxColumn
         {
             Name = "Reference", HeaderText = "Reference", DataPropertyName = "Reference",
-            FillWeight = 115, MinimumWidth = 95
+            FillWeight = 24, MinimumWidth = 92
         });
-        Grid.Columns.Add(new DataGridViewTextBoxColumn
-        {
-            Name = "Entry", HeaderText = "Entry", DataPropertyName = "Entry",
-            FillWeight = 105, MinimumWidth = 105
-        });
-        Grid.Columns.Add(new DataGridViewTextBoxColumn
+         Grid.Columns.Add(new DataGridViewTextBoxColumn
         {
             Name = "Collection", HeaderText = "Collection", DataPropertyName = "Collection",
-            FillWeight = 100, MinimumWidth = 95
+            FillWeight = 21, MinimumWidth = 95
         });
-        Grid.Columns.Add(new DataGridViewTextBoxColumn
-        {
-            Name = "Recorded", HeaderText = "Recorded On", DataPropertyName = "Recorded On",
-            FillWeight = 140, MinimumWidth = 145
-        });
-        Grid.SelectionChanged += (_, _) => UpdateSelected();
+         Grid.SelectionChanged += (_, _) => UpdateSelected();
         Grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) OpenSelected(); };
         Grid.DataSource = records.DefaultView;
 
@@ -117,15 +106,15 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60));
         header.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        var searchCard = HumanUi.Card("Student", "Search by admission number, student or father name.");
+        var searchCard = HumanUi.Card("Student");
         searchCard.Content.Controls.Add(HumanUi.Field("Student / Admission No.", student, true));
-        var identityCard = HumanUi.Card("Selected Student", "Current recorded student details.");
+        var identityCard = HumanUi.Card("Selected Student");
         identityCard.Content.Controls.Add(identity);
         identityCard.Margin = new Padding(AppMetrics.SpacingSm, 0, 0, 0);
         header.Controls.Add(searchCard, 0, 0);
         header.Controls.Add(identityCard, 1, 0);
 
-        var types = HumanUi.Card("Prepare New Certificate", "The existing editor opens with this student selected.");
+        var types = HumanUi.Card("Issue New", "Select certificate type.");
         var typeButtons = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill, AutoScroll = true,
@@ -154,10 +143,10 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         };
         types.Content.Controls.Add(typeButtons);
 
-        var registerCard = HumanUi.Card("Issued Certificates", "Select an actual saved record or issue; double-click to open.");
+        var registerCard = HumanUi.Card("Issued Certificates", "Select an issued copy to see its details.");
         registerCard.Content.Controls.Add(Grid);
 
-        var selectedCard = HumanUi.Card("Selected Certificate", "Actions remain in the original certificate editor.");
+        var selectedCard = HumanUi.Card("Selected Certificate");
         selectedCard.Content.Controls.Add(details);
 
         var right = new TableLayoutPanel
@@ -165,8 +154,8 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
             Margin = Padding.Empty, Padding = Padding.Empty
         };
-        right.RowStyles.Add(new RowStyle(SizeType.Percent, 73));
-        right.RowStyles.Add(new RowStyle(SizeType.Percent, 27));
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 61));
+        right.RowStyles.Add(new RowStyle(SizeType.Percent, 39));
         selectedCard.Margin = new Padding(0, AppMetrics.SpacingSm, 0, 0);
         right.Controls.Add(registerCard, 0, 0);
         right.Controls.Add(selectedCard, 0, 1);
@@ -176,8 +165,8 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
             Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
             Margin = Padding.Empty, Padding = Padding.Empty
         };
-        main.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 23));
-        main.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 77));
+        main.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 24));
+        main.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 76));
         main.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         types.Margin = new Padding(0, 0, AppMetrics.SpacingSm, 0);
         main.Controls.Add(types, 0, 0);
@@ -188,12 +177,12 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
             Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
             Margin = Padding.Empty, Padding = Padding.Empty
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(148)));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(132)));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(header, 0, 0);
         root.Controls.Add(main, 0, 1);
         SetContent(root);
-        SetStatus("Select a student to view their certificates. Printing and collection remain separate actions.");
+        SetStatus("Select a student. Certificate actions are available in this workspace.");
     }
 
     private static string Field(DataRow row, string name)
@@ -305,14 +294,11 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
             return;
         }
         details.Text =
-            "Type: " + selected["Certificate Type"] + Environment.NewLine +
-            "Reference: " + selected["Reference"] + Environment.NewLine +
-            "Certificate date: " + selected["Certificate Date"] + Environment.NewLine +
-            "Entry: " + selected["Entry"] + Environment.NewLine +
-            "Collection: " + selected["Collection"] + Environment.NewLine +
-            "Collected on: " + selected["Collected On"] + Environment.NewLine +
-            "Recorded on: " + selected["Recorded On"] + Environment.NewLine +
-            "Edit opens the existing fields in a compact dialog. Print, collect and issue again stay here.";
+            "Type: " + selected["Certificate Type"] + "   •   Reference: " + selected["Reference"] + Environment.NewLine +
+            "Certificate date: " + selected["Certificate Date"] + "   •   " + selected["Entry"] + Environment.NewLine +
+            "Collection: " + selected["Collection"] + "   •   Collected on: " + selected["Collected On"] + Environment.NewLine +
+            "Recorded: " + selected["Recorded On"] + Environment.NewLine +
+            "Edit details in a compact dialog. Print, collect and issue again here.";
     }
 
     private bool TrySelectedCopy(out StudentCertificateRegisterReader.Kind kind,
