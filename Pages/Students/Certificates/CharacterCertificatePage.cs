@@ -802,5 +802,30 @@ public sealed class CharacterCertificatePage : V2Page, IUnsavedChanges, IBusyPag
         }
     }
 
+
+    // Workspace action surface: same legacy handlers, same validation/permissions,
+    // no duplicate certificate persistence, rendering or reissue implementation.
+    bool IStudentCertificateWorkspaceEditor.CanPrintFromWorkspace => printButton.Enabled;
+    bool IStudentCertificateWorkspaceEditor.CanCollectFromWorkspace => collectButton.Enabled;
+    bool IStudentCertificateWorkspaceEditor.CanIssueAgainFromWorkspace => issueAgainButton.Enabled;
+
+    void IStudentCertificateWorkspaceEditor.PrintFromWorkspace()
+    {
+        if (!printButton.Enabled) throw new InvalidOperationException("This saved copy cannot be printed in its current state.");
+        PrintSelected();
+    }
+
+    void IStudentCertificateWorkspaceEditor.CollectFromWorkspace()
+    {
+        if (!collectButton.Enabled) throw new InvalidOperationException("This saved copy is not currently eligible for collection.");
+        MarkCollected();
+    }
+
+    Task IStudentCertificateWorkspaceEditor.IssueAgainFromWorkspaceAsync()
+    {
+        if (!issueAgainButton.Enabled) throw new InvalidOperationException("Only the eligible latest collected copy may be issued again.");
+        return IssueAgain();
+    }
+
 }
 
