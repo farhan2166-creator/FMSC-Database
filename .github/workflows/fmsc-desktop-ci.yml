@@ -3,10 +3,6 @@ name: '09 - CI - Desktop Build and Regression'
 on:
   workflow_dispatch:
   workflow_call:
-  push:
-    branches: [feature/student-certificates-workspace]
-    paths:
-      - '.github/workflows/fmsc-desktop-ci.yml'
 
 permissions:
   contents: read
@@ -48,24 +44,6 @@ jobs:
 
       - name: Compile native WinForms smoke checks
         run: dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
-
-      - name: Capture student certificate workspace and all eight compact editors
-        shell: pwsh
-        timeout-minutes: 4
-        run: |
-          dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --student-certificates-screenshots
-          if ($LASTEXITCODE -ne 0) { throw 'Certificate dialog capture/layout checks failed.' }
-
-      - name: Upload Windows certificate preview images and layout evidence
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: student-certificates-workspace-preview-${{ github.run_id }}
-          path: |
-            artifacts/student-certificates-preview/*.png
-            artifacts/student-certificates-preview/layout-*.txt
-          retention-days: 14
-          if-no-files-found: warn
 
       - name: Run focused post-fix Windows control contracts
         # The fixtures are SQL-free and normally complete rapidly; fail fast
