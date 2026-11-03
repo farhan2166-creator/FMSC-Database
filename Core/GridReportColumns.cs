@@ -35,6 +35,16 @@ internal static class GridReportColumns
         };
     }
     private static string Key(string text)=>new(text.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+    internal static string DisplayValue(DataRow row,Column column,string moneyFormat)
+    {
+        if(column.Caption=="Student / Admission")
+        {
+            int student=column.Fields.FirstOrDefault(index=>ReportStudentIdentity.IsStudent(row.Table.Columns[index].ColumnName),-1);
+            int admission=column.Fields.FirstOrDefault(index=>ReportStudentIdentity.IsAdmission(row.Table.Columns[index].ColumnName),-1);
+            if(student>=0&&admission>=0)return ReportStudentIdentity.FormatCell(row,admission,student);
+        }
+        return string.Join("\n",column.Fields.Select(index=>Value(row,index,moneyFormat)).Where(value=>value.Length>0));
+    }
     internal static List<Column> Create(DataTable source,string moneyFormat)
     {
         int Find(params string[] names)=>source.Columns.Cast<DataColumn>().Where(c=>names.Any(name=>Key(name)==Key(c.ColumnName))).Select(c=>c.Ordinal).DefaultIfEmpty(-1).First();
@@ -52,9 +62,7 @@ internal static class GridReportColumns
         Merge("Method\nReceived By",Find("Payment Method","Method"),Find("Received By"),Find("Reference"));
         Merge("Oldest Due\nAging",Find("Oldest Due Date","Due Date"),Find("Aging"));
         Merge("Period\nCharged On",Find("Charge Month","Billing Month","Month"),Find("Charge Date"));
-        // Very wide charge reports benefit from one student identification cell.
-        if(source.Columns.Count-consumed.Count>9)
-            Merge("Student / Admission",Find("Student","Student Name"),Find("Adm. / QR No.","Admission Number","Adm. No."));
+        Merge("Student / Admission",Find("Student","Student Name","StudentName"),Find("Adm. / QR No.","Admission Number","Adm. No.","AdmissionNumberText"));
 
         using var bitmap=new Bitmap(1,1);using var graphics=Graphics.FromImage(bitmap);
         using var bodyFont=new Font("Segoe UI",9f);using var headerFont=new Font("Segoe UI",8.5f,FontStyle.Bold);
@@ -72,7 +80,8 @@ internal static class GridReportColumns
             };
             bool numeric=fields.Length==1 && Type.GetTypeCode(field.DataType) is TypeCode.Byte or TypeCode.SByte or TypeCode.Int16 or TypeCode.UInt16 or TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Int64 or TypeCode.UInt64 or TypeCode.Single or TypeCode.Double or TypeCode.Decimal;
             double headerMinimum=caption.Split(new[]{' ','\n','/'},StringSplitOptions.RemoveEmptyEntries).Select(word=>Measure(word,headerFont)).DefaultIfEmpty(.3).Max()+.10;
-            double contentMinimum=source.AsEnumerable().SelectMany(row=>fields.Select(i=>Value(row,i,moneyFormat)))
+            var renderedColumn=new Column(caption,fields,numeric,0,0);
+            double contentMinimum=source.AsEnumerable().Select(row=>DisplayValue(row,renderedColumn,moneyFormat))
                 .SelectMany(value=>numeric?new[]{value}:value.Split(new[]{' ','\r','\n'},StringSplitOptions.RemoveEmptyEntries))
                 .Distinct().Select(value=>Measure(value,bodyFont)).DefaultIfEmpty(.3).Max()+.10;
             bool identity=caption.Contains("Student",StringComparison.OrdinalIgnoreCase)||caption.Contains("Father",StringComparison.OrdinalIgnoreCase)||caption.Contains("Name",StringComparison.OrdinalIgnoreCase);

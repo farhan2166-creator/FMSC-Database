@@ -36,7 +36,7 @@ internal static class GridReportPreview
             for (int i = 0; i < columns.Count; i++)
             {
                 var column = columns[i];
-                printed["C" + i] = string.Join("\n", column.Fields.Select(index => GridReportColumns.Value(row, index, moneyFormat)).Where(value => value.Length > 0));
+                printed["C" + i] = GridReportColumns.DisplayValue(row,column,moneyFormat);
                 if (receiptLayout is not null && column.Numeric)
                     printed["N" + i] = row.IsNull(column.Fields[0]) ? 0m : Convert.ToDecimal(row[column.Fields[0]]);
             }

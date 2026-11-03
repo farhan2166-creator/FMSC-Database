@@ -50,6 +50,7 @@ internal static class ReportExportBuilder
         }
         if (source.ExtendedProperties[CollectionReceiptGrouping.LayoutKey] is CollectionReceiptGrouping.RowLayout[] layout)
             export.ExtendedProperties[CollectionReceiptGrouping.LayoutKey] = layout;
+        ReportStudentIdentity.CopyPrintMetadata(source,export);
         return export;
     }
 
