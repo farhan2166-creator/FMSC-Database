@@ -511,6 +511,7 @@
                   <FontStyle>Normal</FontStyle>
                   <FontFamily>Segoe UI</FontFamily>
                   <FontSize>12pt</FontSize>
+                  <FontWeight>Bold</FontWeight>
                 </Style>
               </TextRun>
             </TextRuns>

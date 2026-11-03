@@ -951,6 +951,93 @@
           </Border>
         </Style>
       </Textbox>
+      <Textbox Name="txtAdmissionDate">
+        <CanGrow>true</CanGrow>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>=First(Fields!AdmissionDateText.Value, "AdmissionFormData")</Value>
+                <Style>
+                  <FontFamily>Segoe UI</FontFamily>
+                  <FontSize>9pt</FontSize>
+                </Style>
+              </TextRun>
+            </TextRuns>
+            <Style>
+              <TextAlign>Center</TextAlign>
+            </Style>
+          </Paragraph>
+        </Paragraphs>
+        <Top>1.005in</Top>
+        <Left>4.65875in</Left>
+        <Height>0.2in</Height>
+        <Width>1.34125in</Width>
+        <ZIndex>33</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Textbox>
+      <Textbox Name="lblAdmissionDate">
+        <CanGrow>true</CanGrow>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>|   Admission Date:</Value>
+                <Style>
+                  <FontFamily>Segoe UI</FontFamily>
+                  <FontSize>9pt</FontSize>
+                </Style>
+              </TextRun>
+            </TextRuns>
+            <Style>
+              <TextAlign>Left</TextAlign>
+            </Style>
+          </Paragraph>
+        </Paragraphs>
+        <Top>1.005in</Top>
+        <Left>3.53681in</Left>
+        <Height>0.2in</Height>
+        <Width>1.0525in</Width>
+        <ZIndex>34</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Textbox>
+      <Textbox Name="txtRegistrationNumber">
+        <CanGrow>true</CanGrow>
+        <Paragraphs>
+          <Paragraph>
+            <TextRuns>
+              <TextRun>
+                <Value>=First(Fields!RegistrationNumber.Value, "AdmissionFormData")</Value>
+                <Style>
+                  <FontFamily>Segoe UI</FontFamily>
+                  <FontSize>9pt</FontSize>
+                </Style>
+              </TextRun>
+            </TextRuns>
+            <Style>
+              <TextAlign>Center</TextAlign>
+            </Style>
+          </Paragraph>
+        </Paragraphs>
+        <Top>1.02667in</Top>
+        <Left>2.13528in</Left>
+        <Height>0.2in</Height>
+        <Width>1.38764in</Width>
+        <ZIndex>35</ZIndex>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Textbox>
       <Textbox Name="lblAdmissionNumber">
         <CanGrow>true</CanGrow>
         <Paragraphs>
@@ -972,13 +1059,12 @@
         <Top>1.005in</Top>
         <Height>0.2in</Height>
         <Width>0.82in</Width>
-        <ZIndex>33</ZIndex>
+        <ZIndex>36</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
           </Border>
         </Style>
-        <Left>0in</Left>
       </Textbox>
       <Textbox Name="txtAdmissionNumber">
         <CanGrow>true</CanGrow>
@@ -994,21 +1080,20 @@
               </TextRun>
             </TextRuns>
             <Style>
-              <TextAlign>Left</TextAlign>
+              <TextAlign>Center</TextAlign>
             </Style>
           </Paragraph>
         </Paragraphs>
         <Top>1.005in</Top>
+        <Left>0.82in</Left>
         <Height>0.2in</Height>
-        <Width>0.48in</Width>
-        <ZIndex>33</ZIndex>
+        <Width>0.67444in</Width>
+        <ZIndex>37</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
           </Border>
-          <PaddingLeft>0pt</PaddingLeft>
         </Style>
-        <Left>0.82in</Left>
       </Textbox>
       <Textbox Name="lblRegistrationNumber">
         <CanGrow>true</CanGrow>
@@ -1029,106 +1114,15 @@
           </Paragraph>
         </Paragraphs>
         <Top>1.005in</Top>
+        <Left>1.55in</Left>
         <Height>0.2in</Height>
-        <Width>0.62in</Width>
-        <ZIndex>33</ZIndex>
+        <Width>0.54361in</Width>
+        <ZIndex>38</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
           </Border>
-          <PaddingLeft>0pt</PaddingLeft>
         </Style>
-        <Left>1.3in</Left>
-      </Textbox>
-      <Textbox Name="txtRegistrationNumber">
-        <CanGrow>true</CanGrow>
-        <Paragraphs>
-          <Paragraph>
-            <TextRuns>
-              <TextRun>
-                <Value>=First(Fields!RegistrationNumber.Value, "AdmissionFormData")</Value>
-                <Style>
-                  <FontFamily>Segoe UI</FontFamily>
-                  <FontSize>9pt</FontSize>
-                </Style>
-              </TextRun>
-            </TextRuns>
-            <Style>
-              <TextAlign>Left</TextAlign>
-            </Style>
-          </Paragraph>
-        </Paragraphs>
-        <Top>1.005in</Top>
-        <Height>0.2in</Height>
-        <Width>1.28in</Width>
-        <ZIndex>33</ZIndex>
-        <Style>
-          <Border>
-            <Style>None</Style>
-          </Border>
-          <PaddingLeft>0pt</PaddingLeft>
-        </Style>
-        <Left>1.92in</Left>
-      </Textbox>
-      <Textbox Name="lblAdmissionDate">
-        <CanGrow>true</CanGrow>
-        <Paragraphs>
-          <Paragraph>
-            <TextRuns>
-              <TextRun>
-                <Value>|   Admission Date:</Value>
-                <Style>
-                  <FontFamily>Segoe UI</FontFamily>
-                  <FontSize>9pt</FontSize>
-                </Style>
-              </TextRun>
-            </TextRuns>
-            <Style>
-              <TextAlign>Left</TextAlign>
-            </Style>
-          </Paragraph>
-        </Paragraphs>
-        <Top>1.005in</Top>
-        <Height>0.2in</Height>
-        <Width>1.24in</Width>
-        <ZIndex>33</ZIndex>
-        <Style>
-          <Border>
-            <Style>None</Style>
-          </Border>
-          <PaddingLeft>0pt</PaddingLeft>
-        </Style>
-        <Left>3.2in</Left>
-      </Textbox>
-      <Textbox Name="txtAdmissionDate">
-        <CanGrow>true</CanGrow>
-        <Paragraphs>
-          <Paragraph>
-            <TextRuns>
-              <TextRun>
-                <Value>=First(Fields!AdmissionDateText.Value, "AdmissionFormData")</Value>
-                <Style>
-                  <FontFamily>Segoe UI</FontFamily>
-                  <FontSize>9pt</FontSize>
-                </Style>
-              </TextRun>
-            </TextRuns>
-            <Style>
-              <TextAlign>Left</TextAlign>
-            </Style>
-          </Paragraph>
-        </Paragraphs>
-        <Top>1.005in</Top>
-        <Height>0.2in</Height>
-        <Width>1.56in</Width>
-        <ZIndex>33</ZIndex>
-        <Style>
-          <Border>
-            <Style>None</Style>
-          </Border>
-          <PaddingLeft>0pt</PaddingLeft>
-        </Style>
-        <Left>4.44in</Left>
       </Textbox>
       <Textbox Name="boxPhoto">
         <Paragraphs>
@@ -1153,7 +1147,7 @@ Photograph</Value>
         <Left>6.07in</Left>
         <Height>1.20333in</Height>
         <Width>1.2in</Width>
-        <ZIndex>34</ZIndex>
+        <ZIndex>39</ZIndex>
         <Style>
           <Border>
             <Style>Solid</Style>
@@ -1178,7 +1172,7 @@ Photograph</Value>
         <Top>1.245in</Top>
         <Height>0.02in</Height>
         <Width>7.27in</Width>
-        <ZIndex>35</ZIndex>
+        <ZIndex>40</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1207,7 +1201,7 @@ Photograph</Value>
         <Top>1.6in</Top>
         <Height>0.22in</Height>
         <Width>7.27in</Width>
-        <ZIndex>36</ZIndex>
+        <ZIndex>41</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1237,7 +1231,7 @@ Photograph</Value>
         <Top>1.86in</Top>
         <Height>0.24in</Height>
         <Width>1.1in</Width>
-        <ZIndex>37</ZIndex>
+        <ZIndex>42</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1266,7 +1260,7 @@ Photograph</Value>
         <Left>1.1in</Left>
         <Height>0.24in</Height>
         <Width>6.17in</Width>
-        <ZIndex>38</ZIndex>
+        <ZIndex>43</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1294,7 +1288,7 @@ Photograph</Value>
         <Top>2.1in</Top>
         <Height>0.24in</Height>
         <Width>1.1in</Width>
-        <ZIndex>39</ZIndex>
+        <ZIndex>44</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1323,7 +1317,7 @@ Photograph</Value>
         <Left>1.1in</Left>
         <Height>0.24in</Height>
         <Width>2.55in</Width>
-        <ZIndex>40</ZIndex>
+        <ZIndex>45</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1352,7 +1346,7 @@ Photograph</Value>
         <Left>3.75in</Left>
         <Height>0.24in</Height>
         <Width>1.1in</Width>
-        <ZIndex>41</ZIndex>
+        <ZIndex>46</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1381,7 +1375,7 @@ Photograph</Value>
         <Left>4.85in</Left>
         <Height>0.24in</Height>
         <Width>2.42in</Width>
-        <ZIndex>42</ZIndex>
+        <ZIndex>47</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1409,7 +1403,7 @@ Photograph</Value>
         <Top>2.34in</Top>
         <Height>0.24in</Height>
         <Width>1.1in</Width>
-        <ZIndex>43</ZIndex>
+        <ZIndex>48</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1438,7 +1432,7 @@ Photograph</Value>
         <Left>1.1in</Left>
         <Height>0.24in</Height>
         <Width>2.55in</Width>
-        <ZIndex>44</ZIndex>
+        <ZIndex>49</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1467,7 +1461,7 @@ Photograph</Value>
         <Left>3.75in</Left>
         <Height>0.24in</Height>
         <Width>1.1in</Width>
-        <ZIndex>45</ZIndex>
+        <ZIndex>50</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1496,7 +1490,7 @@ Photograph</Value>
         <Left>4.85in</Left>
         <Height>0.24in</Height>
         <Width>2.42in</Width>
-        <ZIndex>46</ZIndex>
+        <ZIndex>51</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1524,7 +1518,7 @@ Photograph</Value>
         <Top>2.58in</Top>
         <Height>0.24in</Height>
         <Width>1.1in</Width>
-        <ZIndex>47</ZIndex>
+        <ZIndex>52</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1553,7 +1547,7 @@ Photograph</Value>
         <Left>1.1in</Left>
         <Height>0.24in</Height>
         <Width>2.55in</Width>
-        <ZIndex>48</ZIndex>
+        <ZIndex>53</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1582,7 +1576,7 @@ Photograph</Value>
         <Left>3.75in</Left>
         <Height>0.24in</Height>
         <Width>1.1in</Width>
-        <ZIndex>49</ZIndex>
+        <ZIndex>54</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1611,7 +1605,7 @@ Photograph</Value>
         <Left>4.85in</Left>
         <Height>0.24in</Height>
         <Width>2.42in</Width>
-        <ZIndex>50</ZIndex>
+        <ZIndex>55</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1639,7 +1633,7 @@ Photograph</Value>
         <Top>2.82in</Top>
         <Height>0.24in</Height>
         <Width>1.1in</Width>
-        <ZIndex>51</ZIndex>
+        <ZIndex>56</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1668,7 +1662,7 @@ Photograph</Value>
         <Left>1.1in</Left>
         <Height>0.24in</Height>
         <Width>2.55in</Width>
-        <ZIndex>52</ZIndex>
+        <ZIndex>57</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1696,7 +1690,7 @@ Photograph</Value>
         <Top>3.06in</Top>
         <Height>0.24in</Height>
         <Width>1.1in</Width>
-        <ZIndex>53</ZIndex>
+        <ZIndex>58</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1725,7 +1719,7 @@ Photograph</Value>
         <Left>1.1in</Left>
         <Height>0.24in</Height>
         <Width>6.17in</Width>
-        <ZIndex>54</ZIndex>
+        <ZIndex>59</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1753,7 +1747,7 @@ Photograph</Value>
         <Top>3.34in</Top>
         <Height>0.22in</Height>
         <Width>7.27in</Width>
-        <ZIndex>55</ZIndex>
+        <ZIndex>60</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1783,7 +1777,7 @@ Photograph</Value>
         <Top>3.6in</Top>
         <Height>0.24in</Height>
         <Width>1.1in</Width>
-        <ZIndex>56</ZIndex>
+        <ZIndex>61</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1812,7 +1806,7 @@ Photograph</Value>
         <Left>1.1in</Left>
         <Height>0.24in</Height>
         <Width>2.55in</Width>
-        <ZIndex>57</ZIndex>
+        <ZIndex>62</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1841,7 +1835,7 @@ Photograph</Value>
         <Left>3.75in</Left>
         <Height>0.24in</Height>
         <Width>1.1in</Width>
-        <ZIndex>58</ZIndex>
+        <ZIndex>63</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1870,7 +1864,7 @@ Photograph</Value>
         <Left>4.85in</Left>
         <Height>0.24in</Height>
         <Width>2.42in</Width>
-        <ZIndex>59</ZIndex>
+        <ZIndex>64</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1898,7 +1892,7 @@ Photograph</Value>
         <Left>3.97in</Left>
         <Height>0.18in</Height>
         <Width>3.3in</Width>
-        <ZIndex>60</ZIndex>
+        <ZIndex>65</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1937,7 +1931,7 @@ Photograph</Value>
         <Top>8.65in</Top>
         <Height>0.2in</Height>
         <Width>7.27in</Width>
-        <ZIndex>61</ZIndex>
+        <ZIndex>66</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
@@ -1964,7 +1958,7 @@ Photograph</Value>
         <Top>8.21889in</Top>
         <Height>0.18in</Height>
         <Width>3.3in</Width>
-        <ZIndex>62</ZIndex>
+        <ZIndex>67</ZIndex>
         <Style>
           <Border>
             <Style>None</Style>
