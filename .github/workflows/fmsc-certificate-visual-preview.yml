@@ -58,7 +58,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: student-certificates-preview-png-${{ github.run_id }}
-          path: artifacts/student-certificates-preview/*.png
+          path: |
+            artifacts/student-certificates-preview/*.png
+            artifacts/student-certificates-preview/layout-*.txt
           retention-days: 14
           if-no-files-found: warn
 
