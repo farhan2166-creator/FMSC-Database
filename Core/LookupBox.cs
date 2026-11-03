@@ -27,7 +27,7 @@ public sealed class LookupBox : ModernComboBox
                 : 0;
 
     /// <param name="blankText">Text of the leading blank row.</param>
-    public void Bind(DataTable dt, string id, string text, string blankText = "-- Select --")
+    public void Bind(DataTable dt, string id, string text, string blankText = "-- Select --", bool includeBlank = true)
     {
         ArgumentNullException.ThrowIfNull(dt);
         if (!dt.Columns.Contains(id))
@@ -37,15 +37,19 @@ public sealed class LookupBox : ModernComboBox
 
         DataSource = null;
         DataTable lookup = dt.Clone();
-        DataRow blank = lookup.NewRow();
-        if (lookup.Columns[id]!.DataType == typeof(int))
-            blank[id] = 0;
-        else if (lookup.Columns[id]!.AllowDBNull)
-            blank[id] = DBNull.Value;
-        else
-            blank[id] = Convert.ChangeType(0, lookup.Columns[id]!.DataType);
-        blank[text] = blankText;
-        lookup.Rows.Add(blank);
+        DataRow? blank = null;
+        if (includeBlank)
+        {
+            blank = lookup.NewRow();
+            if (lookup.Columns[id]!.DataType == typeof(int))
+                blank[id] = 0;
+            else if (lookup.Columns[id]!.AllowDBNull)
+                blank[id] = DBNull.Value;
+            else
+                blank[id] = Convert.ChangeType(0, lookup.Columns[id]!.DataType);
+            blank[text] = blankText;
+            lookup.Rows.Add(blank);
+        }
         foreach (DataRow row in LookupDisplayOrder.ForBinding(dt, id).Rows)
             lookup.ImportRow(row);
 

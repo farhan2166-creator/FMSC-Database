@@ -240,9 +240,13 @@ public partial class MasterPage
         try
         {
             using Form dialog = field.ManageDialogFactory();
+            var managed = dialog as IManagedLookupDialog;
+            if (field.LookupParentField is { } parentField &&
+                _controls.TryGetValue(parentField, out var contextControl) &&
+                contextControl is ModernComboBox contextCombo)
+                managed?.SetParentContext(Convert.ToString(contextCombo.SelectedItem));
             if (dialog.ShowDialog(FindForm()) != DialogResult.OK)
                 return;
-            var managed = dialog as IManagedLookupDialog;
             int selectedId = managed?.SelectedId ?? 0;
             bool hasParent =
                 !string.IsNullOrWhiteSpace(field.LookupParentField) &&

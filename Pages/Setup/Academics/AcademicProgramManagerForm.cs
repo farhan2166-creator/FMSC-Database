@@ -15,6 +15,23 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
     public string? SelectedParentValue { get; private set; }
     /* Prevent a queued click from repeating a completed save. */
     private bool savedSuccessfully;
+    private string? parentType;
+    public void SetParentContext(string? parentValue)
+    {
+        if (parentValue is not ("School" or "College")) return;
+        parentType = parentValue;
+        if (existing.DataSource is DataTable programs)
+        {
+            suppressProgramSelection = true;
+            try
+            {
+                existing.DataSource = new DataView(programs) { RowFilter = $"ProgramType = '{parentType}'" };
+            }
+            finally { suppressProgramSelection = false; }
+        }
+        Text = $"Manage {parentType} Programs";
+        BeginNewProgram();
+    }
     public AcademicProgramManagerForm()
     {
         Text = "Manage Programs";
@@ -39,7 +56,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
             TabStop = false
         };
         var subtitle = new Label {
-            Text = "Define a new program or edit an existing program.",
+            Text = "Manage school stages and college study streams.",
             Dock = DockStyle.Top,
             Height = Math.Max(
                 24,
@@ -111,14 +128,20 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
         }
         fields.Height = fields.Padding.Vertical + (4 * fieldRowHeight);
         fields.Margin = Padding.Empty;
-        fields.Controls.Add(LabelFor("Existing Program"), 0, 0);
+        fields.Controls.Add(LabelFor("Select Program"), 0, 0);
         fields.Controls.Add(existing, 1, 0);
-        fields.Controls.Add(LabelFor("Program Type"), 0, 1);
+        fields.Controls.Add(LabelFor("Type"), 0, 1);
         fields.Controls.Add(programType, 1, 1);
         fields.Controls.Add(LabelFor("Code"), 0, 2);
         fields.Controls.Add(code, 1, 2);
-        fields.Controls.Add(LabelFor("Program Name"), 0, 3);
+        fields.Controls.Add(LabelFor("Name"), 0, 3);
         fields.Controls.Add(name, 1, 3);
+        code.PlaceholderText = "e.g. PRI, FSC-PM";
+        name.PlaceholderText = "e.g. Primary, Middle, F.Sc (Pre-Medical)";
+        UiAccessibility.Describe(existing, "Select Program");
+        UiAccessibility.Describe(programType, "Program Type", "School or College");
+        UiAccessibility.Describe(code, "Program Code");
+        UiAccessibility.Describe(name, "Program Name", "School stage or college study stream");
         existing.SelectedIndexChanged +=
             Existing_SelectedIndexChanged;
         add.Click += (_, _) =>
@@ -216,6 +239,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
             typeIndex >= 0
                 ? typeIndex
                 : -1;
+        programType.Enabled = false;
         code.Text =
             Convert.ToString(
                 row["ProgramCode"]) ?? string.Empty;
@@ -241,10 +265,12 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
         }
         SelectedId = 0;
         SelectedParentValue = null;
-        programType.SelectedIndex = -1;
+        programType.SelectedIndex = parentType is null ? -1 : programType.Items.IndexOf(parentType);
+        programType.Enabled = parentType is null;
         code.Clear();
         name.Clear();
-        programType.Focus();
+        if (programType.Enabled) programType.Focus();
+        else code.Focus();
     }
     /* Set while LoadPrograms binds the list: that bind raises Existing_SelectedIndexChanged programmatically and must not prompt. */
     private bool suppressProgramSelection;

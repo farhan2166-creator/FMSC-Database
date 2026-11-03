@@ -353,9 +353,7 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
         {
             suppressCampusChanged = true;
             campus.Bind(
-                DatabaseHelper.QueryUser("GetCampuses"), "CampusId", "CampusName");
-            if (campus.Items.Count > 1)
-                campus.SelectedIndex = 1;
+                DatabaseHelper.QueryUser("GetCampuses"), "CampusId", "CampusName", includeBlank: false);
             BindClasses();
             BindSections();
             suppressCampusChanged = false;

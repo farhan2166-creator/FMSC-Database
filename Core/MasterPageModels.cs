@@ -20,6 +20,7 @@ public sealed record FieldSpec(
 
 public interface IManagedLookupDialog
 {
+    void SetParentContext(string? parentValue) { }
     int SelectedId { get; }
     string? SelectedParentValue { get; }
 }
