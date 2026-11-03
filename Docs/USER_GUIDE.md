@@ -293,7 +293,7 @@ Printing/exporting this register does not issue, reissue or collect certificates
 
 ### Manage classes and sections from campus assignments
 
-Open School Setup → Campus Classes / Sections. Use Manage Classes or Manage
+Open School Setup → Campus - Classes / Sections. Use Manage Classes or Manage
 Sections to add/edit the school-wide catalogs, manage class programs, reorder
 records, or delete records when existing usage safeguards allow it. Renames apply
 to all campuses. Adding a class or section does not assign it automatically.

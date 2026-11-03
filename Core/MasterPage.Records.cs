@@ -990,7 +990,7 @@ public partial class MasterPage
     {
         if (_recordsTable is null)
             return;
-        string term = (_recordSearchBox?.Text ?? string.Empty).Trim();
+        string term = _recordsSearchHidden ? string.Empty : (_recordSearchBox?.Text ?? string.Empty).Trim();
         int selectedId = 0;
         if (Grid.SelectedRows.Count == 1)
         {

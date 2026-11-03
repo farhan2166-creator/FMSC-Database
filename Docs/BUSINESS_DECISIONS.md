@@ -226,7 +226,7 @@ Never repair a historical year by renaming dates or deleting its usage.
 
 ### BD-24
 
-Setup catalogs (2 Nov): Campus Classes / Sections is the setup entry point;
+Setup catalogs (2 Nov): Campus - Classes / Sections is the setup entry point;
 dialogs retain the complete global class/section editors. Rename is school-wide;
 creating a catalog row does not assign it to a campus. Apply Changes alone saves
 assignments. Restore unsaved matrix differences by IDs after catalog refresh;
@@ -627,7 +627,7 @@ Original source: `Docs/Decisions/CLASS_SECTION_SETUP_CONSOLIDATION.md`. Original
 <a id="class-section-setup-consolidation-class-and-section-setup-consolidation--2-november-2026"></a>
 ## Class and section setup consolidation — 2 November 2026
 
-Campus Classes / Sections is the single setup entry point. Manage Classes and
+Campus - Classes / Sections is the single setup entry point. Manage Classes and
 Manage Sections open the complete existing editors in separate dialogs. Programs,
 class/section editing, ordering, usage checks and guarded deletion are retained.
 The old Classes & Sections workspace/navigation wrapper is removed.

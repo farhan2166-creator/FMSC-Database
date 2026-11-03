@@ -51,7 +51,7 @@ Permissions remain attached to each existing action. User/role administration re
 | Certificates Center | Student Certificates — `StudentCertificatesPage` |
 | Student Lifecycle / Transfer / Re-Admit | Transfers / Re-Admission — `StudentTransferReadmissionPage` |
 | Student Status Console / Status Check | Student Record Checks — `StudentRecordChecksPage` |
-| Assign Classes to Campus | Campus Classes / Sections — `CampusClassSectionAssignmentsPage` |
+| Assign Classes to Campus | Campus - Classes / Sections — `CampusClassSectionAssignmentsPage` |
 | Adjust Fees / Refunds | Student Fee Corrections — `PaymentCorrectionReview` |
 | Post Fees to Students | Fee Posting — `FeePostingWorkspace` |
 | Fee Setup | Fee Rate Setup — `FeeConfigurationWorkspace` |

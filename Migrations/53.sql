@@ -1,4 +1,4 @@
--- Readiness must use the active placements offered in Campus Classes / Sections.
+-- Readiness must use the active placements offered in Campus - Classes / Sections.
 -- Inactive assignments remain available for student and billing history only.
 SET XACT_ABORT ON; SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON;
 IF @@TRANCOUNT=0 THROW 51000,'Migration 53 requires an outer transaction.',1;

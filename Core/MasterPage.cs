@@ -171,6 +171,17 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
     protected virtual string EntryTabCaption => "Entry";
     protected virtual string RecordsTabCaption => "Records";
     private HumanCard? _editorCard;
+    private HumanCard? _recordsCard;
+    private Control? _recordsToolbar;
+    private bool _recordsSearchHidden;
+    internal void HideRecordsChrome()
+    {
+        if (_recordsCard is null) return;
+        _recordsSearchHidden = true;
+        _recordsCard.Header.Visible = false;
+        if (_recordsToolbar is not null) _recordsToolbar.Visible = false;
+        _recordsCard.Content.Padding = Padding.Empty;
+    }
     private TabControl? _entryRecordsTabs;
     private DataTable? _recordsTable;
     private ModernTextBox? _recordSearchBox;
@@ -349,6 +360,8 @@ public partial class MasterPage : V2Page, IUnsavedChanges, IBusyPage
                 : "Previously saved records. Click a row to edit it.",
             Accent);
         var recordsToolbar = BuildRecordsToolbar();
+        _recordsToolbar = recordsToolbar;
+        _recordsCard = gridCard;
         gridCard.Content.Controls.Add(Grid);
         gridCard.Content.Controls.Add(recordsToolbar);
         Control host;

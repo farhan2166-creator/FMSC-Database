@@ -180,7 +180,7 @@ Remarks and Current remain editable; age alone does not lock an unused year.
 Names use consecutive four-digit years. SQL must reject stale date changes too.
 Never repair a historical year by renaming dates or deleting its usage.
 
-BD-24 Setup catalogs (2 Nov): Campus Classes / Sections is the setup entry point;
+BD-24 Setup catalogs (2 Nov): Campus - Classes / Sections is the setup entry point;
 dialogs retain the complete global class/section editors. Rename is school-wide;
 creating a catalog row does not assign it to a campus. Apply Changes alone saves
 assignments. Restore unsaved matrix differences by IDs after catalog refresh;

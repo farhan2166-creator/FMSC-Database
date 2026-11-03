@@ -73,7 +73,7 @@
 
 ## Class and section setup consolidation — 2026-11-02
 
-- Manage Classes and Manage Sections now open from Campus Classes / Sections;
+- Manage Classes and Manage Sections now open from Campus - Classes / Sections;
   the separate Classes & Sections navigation page is retired.
 - Full catalog editing, ordering, programs and safe deletion remain available.
   Catalog refresh preserves pending campus ticks by ID without saving them.

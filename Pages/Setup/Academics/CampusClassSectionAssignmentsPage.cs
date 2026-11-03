@@ -30,10 +30,6 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
     private bool updatingMatrix;
     private bool matrixReady;
     private readonly Dictionary<(int ClassId, int SectionId), bool> savedAssignments = new();
-    private readonly Label assignmentSummary = new() {
-        Dock = DockStyle.Fill, AutoSize = false, Font = AppTheme.NormalFont,
-        ForeColor = AppTheme.MutedText, Padding = new Padding(4, 6, 4, 6)
-    };
     private readonly List<ModernButton> matrixActions = new();
     private ModernButton applyButton = null!;
     private Point? assignmentAnchor;
@@ -103,17 +99,14 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
         controlsRow.SizeChanged += (_, _) => CenterTools();
         tools.SizeChanged += (_, _) => CenterTools();
         var matrixLayout = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3,
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2,
             Margin = Padding.Empty, Padding = Padding.Empty
         };
         matrixLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         matrixLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, actionHeight + AppScale.Scale(16)));
-        matrixLayout.RowStyles.Add(new RowStyle(SizeType.Absolute,
-            AppMetrics.TextHeight(assignmentSummary.Font) + assignmentSummary.Padding.Vertical));
         matrixLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         matrixLayout.Controls.Add(controlsRow, 0, 0);
-        matrixLayout.Controls.Add(assignmentSummary, 0, 1);
-        matrixLayout.Controls.Add(matrix, 0, 2);
+        matrixLayout.Controls.Add(matrix, 0, 1);
         matrixCard.Content.Controls.Add(matrixLayout);
         SetContent(matrixCard);
         UiHelper.ApplyGridPresentation(matrix);
@@ -361,11 +354,12 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
             suppressCampusChanged = true;
             campus.Bind(
                 DatabaseHelper.QueryUser("GetCampuses"), "CampusId", "CampusName");
+            if (campus.Items.Count > 1)
+                campus.SelectedIndex = 1;
             BindClasses();
             BindSections();
             suppressCampusChanged = false;
             LoadCampusMatrix();
-            SetStatus("Select a campus to configure its class and section assignments.");
         }
         catch (Exception ex)
         {
@@ -650,22 +644,17 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
 
     private void UpdateAssignmentSummary()
     {
-        int assigned = 0, additions = 0, removals = 0;
+        int additions = 0, removals = 0;
         if (matrixReady)
         {
             foreach (var cell in AssignmentCells())
             {
                 bool selected = Convert.ToBoolean(cell.Value ?? false);
                 bool saved = savedAssignments[(Convert.ToInt32(cell.OwningRow.Tag), sections[cell.ColumnIndex - 1].SectionId)];
-                if (selected) assigned++;
                 if (selected && !saved) additions++;
                 if (!selected && saved) removals++;
             }
         }
-        int highlighted = matrixReady ? HighlightedCells().Length : 0;
-        assignmentSummary.Text = matrixReady
-            ? $"{assigned:N0} assigned combinations  ·  {highlighted:N0} highlighted  ·  Pending: {additions:N0} additions, {removals:N0} removals"
-            : "Select a campus to load assignments.";
         foreach (var button in matrixActions) button.Enabled = matrixReady && matrix.Rows.Count > 0 && sections.Count > 0;
         applyButton.Enabled = resetButton.Enabled = matrixReady && additions + removals > 0;
     }

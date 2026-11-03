@@ -18,24 +18,20 @@ internal sealed class ClassSectionCatalogDialog : ApplicationWindowForm, IBusyPa
         MinimumSize = new Size(AppScale.Scale(850), AppScale.Scale(600));
         Editor = classes ? new ClassesPage(false) : new SectionsPage(false);
         Editor.PrepareForEmbedding(keepActions: true);
+        Editor.HideRecordsChrome();
         Editor.Dock = DockStyle.Fill;
-        var notice = new Label {
-            Text = "Shared across all campuses. Adding a record does not assign it to a campus. Renaming affects all campuses using it.",
-            Dock = DockStyle.Fill, AutoSize = true, Padding = new Padding(12),
-            Font = AppTheme.NormalFont, ForeColor = AppTheme.MutedText
-        };
         var close = new ModernButton { Text = UiText.Actions.Close, ThemeRole = "Secondary", AutoSize = true };
         close.Click += (_, _) => Close();
         var root = new TableLayoutPanel {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, Padding = new Padding(8)
+            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Padding = new Padding(8)
         };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        root.Controls.Add(notice, 0, 0);
-        root.Controls.Add(Editor, 0, 1);
-        root.Controls.Add(HumanUi.ButtonRow(close), 0, 2);
+        root.Controls.Add(Editor, 0, 0);
+        var closeRow = HumanUi.ButtonRow(close);
+        closeRow.Dock = DockStyle.Fill;
+        root.Controls.Add(closeRow, 0, 1);
         Controls.Add(root);
         CancelButton = close;
         FormClosing += (_, e) => {
