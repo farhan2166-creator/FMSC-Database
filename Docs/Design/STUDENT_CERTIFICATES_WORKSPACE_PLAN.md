@@ -1,7 +1,20 @@
 # Student Certificates Workspace — Stage 1 design and reuse review
 Date: 2026-11-03
 Base commit: `110de257b93ee897637849b7fbc09f970d2bffb1`
-Status: **PROPOSAL — requires owner approval before implementation**
+Status: **STAGE 2 PILOT IMPLEMENTED — preview only; operator acceptance and old-hub retirement still pending**
+
+## Stage 2 preview implementation (3 November 2026)
+
+The owner approved implementation after the Stage 1 design review.
+
+- `StudentCertificatesWorkspacePage.cs` provides a student-first search/context, a saved-certificate register, selection details and access to the eight existing editors.
+- `StudentCertificateRegisterReader.cs` projects the existing certificate-specific record readers into a read-only cross-type register, retaining exact record ID and issue ID. It does not require the separate Reports.View privilege or add write operations.
+- The eight existing student certificate editors now implement a minimal `IStudentCertificateWorkspaceEditor` context entry that reuses their original `StudentChanged` and exact selected-copy methods.
+- The old `StudentCertificatesPage` still opens from normal sidebar navigation. Its **Try Student Workspace (Preview)** button is the only trial entry; no old editor, SQL object or RDLC was retired.
+- `Tests/ThemeSmokeChecks/Program.StudentCertificatesWorkspace.cs` adds SQL-free identity, projection and permission tests, available as `--student-certificates-workspace`. The existing desktop CI includes them without a new permanent workflow.
+- Windows Release build, native WinForms compilation, post-fix controls and targeted regression checks (including the new suite) passed during [CI run 41689116066](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/41689116066). This does **not** assert hands-on Windows usability or live database certificate operations were tested.
+
+**Open acceptance gates:** inspect the pilot at normal/small Windows resolutions; exercise all eight types against a disposable authorized SQL fixture; verify specific historical issue/copy selection, permission-matrix behavior, unsaved/recovery handling, actual saved RDLC output, and collection locks before switching default navigation or removing the old hub.
 
 ## Intent and boundaries
 
