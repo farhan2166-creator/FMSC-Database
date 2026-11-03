@@ -71,7 +71,10 @@ internal static class CertificateWorkspaceDetailsDialog
             .FirstOrDefault(card => Descendants(card).OfType<StudentPicker>().Any())
             ?? throw new InvalidOperationException("The existing certificate details card could not be found.");
         details.Parent?.Controls.Remove(details);
-        details.Dock = DockStyle.Fill;
+        details.Dock = DockStyle.None;  // The dialog sizes it explicitly; no old table-row preferred-height feedback.
+        details.AutoSize = false;
+        details.MinimumSize = Size.Empty;
+        details.MaximumSize = Size.Empty;
 
         // The workspace already chose the student; the dialog must not open a
         // second search or allow an unrelated student to be selected.
@@ -91,15 +94,14 @@ internal static class CertificateWorkspaceDetailsDialog
                 button.Visible = false;
         }
 
-        var layout = new TableLayoutPanel
+        // A simple fixed-band panel avoids WinForms TableLayoutPanel stealing
+        // hundreds of pixels for an inherited legacy field-card preferred size.
+        // The details card is explicitly allocated ALL remaining vertical space.
+        var layout = new Panel
         {
-            Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3,
-            Margin = Padding.Empty, Padding = new Padding(AppMetrics.SpacingMd)
+            Dock = DockStyle.Fill,
+            Margin = Padding.Empty, Padding = Padding.Empty
         };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(75)));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.Scale(58)));
 
         var context = new Label
         {
@@ -111,8 +113,8 @@ internal static class CertificateWorkspaceDetailsDialog
             BackColor = AppTheme.PageBackground, Font = AppTheme.NormalFont,
             TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true
         };
-        layout.Controls.Add(context, 0, 0);
-        layout.Controls.Add(details, 0, 1);
+        layout.Controls.Add(context);
+        layout.Controls.Add(details);
 
         var bottom = new TableLayoutPanel
         {
@@ -139,10 +141,32 @@ internal static class CertificateWorkspaceDetailsDialog
         close.Click += (_, _) => dialog.Close();
         bottom.Controls.Add(guidance, 0, 0);
         bottom.Controls.Add(close, 1, 0);
-        layout.Controls.Add(bottom, 0, 2);
+        layout.Controls.Add(bottom);
+
+        void ArrangeDialog()
+        {
+            int pad = AppMetrics.SpacingMd;
+            int headerHeight = AppScale.Scale(75);
+            int footerHeight = AppScale.Scale(58);
+            int usableWidth = Math.Max(1, layout.ClientSize.Width - 2 * pad);
+            int usableHeight = Math.Max(1, layout.ClientSize.Height - 2 * pad);
+            layout.SuspendLayout();
+            try
+            {
+                context.Bounds = new Rectangle(pad, pad, usableWidth, headerHeight);
+                bottom.Bounds = new Rectangle(pad,
+                    Math.Max(pad, layout.ClientSize.Height - pad - footerHeight),
+                    usableWidth, footerHeight);
+                details.Bounds = new Rectangle(pad, pad + headerHeight, usableWidth,
+                    Math.Max(1, usableHeight - headerHeight - footerHeight));
+            }
+            finally { layout.ResumeLayout(true); }
+        }
+        layout.SizeChanged += (_, _) => ArrangeDialog();
 
         dialog.Controls.Add(layout);
         layout.BringToFront();
+        ArrangeDialog();
         ModalPageCloseGuard.Attach(dialog, editor);
 
         // Run after existing page handle creation/deferred initialization, then
