@@ -28,7 +28,19 @@ internal static class CertificateWorkspaceDetailsDialog
     internal static void Show(IWin32Window? owner, string title, DataRow student,
         int recordId, int issueId, Func<Control> editorFactory)
     {
-        using var dialog = new ApplicationWindowForm
+        using var dialog = Build(title, student, recordId, issueId, editorFactory, loadSelection: true);
+        dialog.ShowDialog(owner);
+    }
+
+    /// <summary>Renders the real compact modal without touching SQL during CI previews.</summary>
+    internal static Form BuildForScreenshot(string title, DataRow student,
+        Func<Control> editorFactory) =>
+        Build(title, student, 0, 0, editorFactory, loadSelection: false);
+
+    private static ApplicationWindowForm Build(string title, DataRow student,
+        int recordId, int issueId, Func<Control> editorFactory, bool loadSelection)
+    {
+        var dialog = new ApplicationWindowForm
         {
             Text = recordId > 0 ? "Certificate Details — " + title : "Prepare Certificate — " + title,
             StartPosition = FormStartPosition.CenterParent,
@@ -62,7 +74,10 @@ internal static class CertificateWorkspaceDetailsDialog
         // The workspace already chose the student; the dialog must not open a
         // second search or allow an unrelated student to be selected.
         foreach (StudentPicker picker in Descendants(details).OfType<StudentPicker>())
+        {
+            picker.SetStudent(student);
             picker.Enabled = false;
+        }
 
         // Avoid an old New/Clear button clearing the locked student context.
         // Original Create/Save Changes and recovery controls remain attached,
@@ -130,7 +145,7 @@ internal static class CertificateWorkspaceDetailsDialog
 
         // Run after existing page handle creation/deferred initialization, then
         // use the existing StudentChanged + LoadCertificates + SelectSavedCopy.
-        dialog.Shown += (_, _) => dialog.BeginInvoke(new Action(() =>
+        if (loadSelection) dialog.Shown += (_, _) => dialog.BeginInvoke(new Action(() =>
         {
             if (dialog.IsDisposed || editor.IsDisposed) return;
             try
@@ -147,6 +162,6 @@ internal static class CertificateWorkspaceDetailsDialog
             }
         }));
 
-        dialog.ShowDialog(owner);
+        return dialog;
     }
 }
