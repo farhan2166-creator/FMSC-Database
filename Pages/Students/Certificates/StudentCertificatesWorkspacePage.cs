@@ -385,6 +385,16 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
 
 internal interface IStudentCertificateWorkspaceEditor
 {
-    /// <summary>Use the normal existing selection/record-loading flow, without an event hack.</summary>
+    /// <summary>Use the existing editor's student and exact copy selection, without synthetic events.</summary>
     void LoadWorkspaceSelection(DataRow selectedStudent, int recordId, int issueId);
+
+    // Real existing workflow state, NOT synthetic statuses from the register.
+    bool CanPrintFromWorkspace { get; }
+    bool CanCollectFromWorkspace { get; }
+    bool CanIssueAgainFromWorkspace { get; }
+
+    // These delegate to the very same handlers used by the original forms.
+    void PrintFromWorkspace();
+    void CollectFromWorkspace();
+    Task IssueAgainFromWorkspaceAsync();
 }
