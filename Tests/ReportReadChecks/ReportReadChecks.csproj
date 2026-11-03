@@ -13,6 +13,7 @@
     <Compile Include="../../Core/ReportDatePeriod.cs" Link="ReportDatePeriod.cs" />
     <Compile Include="../../Core/ReportAcademicPeriod.cs" Link="ReportAcademicPeriod.cs" />
     <Compile Include="../../Core/ReportRowOrder.cs" Link="ReportRowOrder.cs" />
+    <Compile Include="../../Core/StudentIdentityText.cs" Link="StudentIdentityText.cs" />
     <Compile Include="../../Core/ReportSettingsFile.cs" Link="ReportSettingsFile.cs" />
     <Compile Include="../../Core/ReportViewOperations.cs" Link="ReportViewOperations.cs" />
     <Compile Include="../../Core/AtomicTextFile.cs" Link="AtomicTextFile.cs" />

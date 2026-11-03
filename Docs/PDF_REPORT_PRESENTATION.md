@@ -110,6 +110,23 @@ The applier subsequently created and verified
 `FMSC_DB_BeforeMigration_v74_to_v75_20261103_133143.bak`, applied 75 in its normal
 transaction and passed the same 32 comparisons against the upgraded database.
 
+## Family advance-balance identity — 3 November 2026
+
+The Families view now retains admission references, names and parent details when
+grouping advance balances. One member reads `163 - Kausar d/o Ali`; siblings keep
+their names/references together and append a shared father once. Student reports,
+receipt families and advance families share the same plain-text formatter.
+Empty family codes fall back to public admission references. Current/latest
+class/section entries follow the member order, and actual campus names replace
+the generic Multiple campuses label. These placement fields share a printed cell.
+The source query, ledger sums, student counts, latest activity and per-student
+minimum filtering are unchanged. No migration is required.
+
+The native identity fixture renders the family report in the single CI review PDF
+and verifies parent formatting, fallback references, ordered placements, balances,
+counts, minimum filtering and source immutability. Portable credit projection
+checks cover family and standalone groups and reconcile student/family totals.
+
 ## Verification
 
 Billing Summary async regression — 3 November 2026: the shared finance loader

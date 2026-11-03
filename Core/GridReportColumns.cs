@@ -129,7 +129,7 @@ internal static class GridReportColumns
             double contentMinimum=source.AsEnumerable().Select(row=>DisplayValue(row,renderedColumn,moneyFormat))
                 .SelectMany(value=>numeric?new[]{value}:value.Split(new[]{' ','\r','\n'},StringSplitOptions.RemoveEmptyEntries))
                 .Distinct().Select(value=>Measure(value,bodyFont)).DefaultIfEmpty(.3).Max()+.10;
-            bool identity=caption.Contains("Student",StringComparison.OrdinalIgnoreCase)||caption.Contains("Father",StringComparison.OrdinalIgnoreCase)||caption.Contains("Name",StringComparison.OrdinalIgnoreCase);
+            bool identity=presentation==Kind.Family||caption.Contains("Student",StringComparison.OrdinalIgnoreCase)||caption.Contains("Father",StringComparison.OrdinalIgnoreCase)||caption.Contains("Name",StringComparison.OrdinalIgnoreCase);
             bool receipt=caption.StartsWith("Receipt",StringComparison.OrdinalIgnoreCase);
             bool isPlacement=presentation==Kind.Placement||caption.StartsWith("Campus",StringComparison.OrdinalIgnoreCase);
             double minimum=Math.Max(headerMinimum,Math.Min(contentMinimum,numeric?1.65:identity?2.1:receipt?1.8:1.4));

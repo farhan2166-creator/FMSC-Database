@@ -1,4 +1,5 @@
 using System.Data;
+using FMSC_SMS.Core;
 namespace FMSC_SMS.Pages.Reports.Finance;
 
 internal static class CreditBalanceReportData
@@ -52,15 +53,20 @@ internal static class CreditBalanceReportData
         else
         {
             result = new DataTable();
-            foreach (string c in new[] { "Family / Student", "Members", "Campus" }) result.Columns.Add(c);
+            foreach (string c in new[] { "Family / Student", "Members", "Campus", "Class / Section" }) result.Columns.Add(c);
             result.Columns.Add("Students",typeof(int)); result.Columns.Add("Available Credit",typeof(decimal)); result.Columns.Add("Last Activity",typeof(DateTime));
             foreach (var group in selected.GroupBy(r => r.IsNull("FamilyId") ? "Student:"+r["AdmissionId"] : "Family:"+r["FamilyId"]))
             {
                 var first = group.First();
-                string label = first.IsNull("FamilyId") ? "Student: "+first["Adm. / QR No."] : Convert.ToString(first["Family"])!;
-                string[] campuses = group.Select(r => Convert.ToString(r["Campus"])!).Distinct().ToArray();
-                result.Rows.Add(label,string.Join(", ",group.Select(r => $"{r["Student"]} ({r["Adm. / QR No."]})")),
-                    campuses.Length == 1 ? campuses[0] : "Multiple campuses",group.Count(),
+                string references=string.Join(", ",group.Select(r=>Convert.ToString(r["Adm. / QR No."])??"").Where(value=>value.Length>0));
+                string label = first.IsNull("FamilyId") ? "Student: "+references : Convert.ToString(first["Family"])??"";
+                if(string.IsNullOrWhiteSpace(label))label=references.Length>0?"Family: "+references:"Family";
+                string[] campuses = group.Select(r => Convert.ToString(r["Campus"])??"").Where(value=>value.Length>0).Distinct().ToArray();
+                string members=StudentIdentityText.Family(group.Select(r=>new StudentIdentityText.Member(
+                    Convert.ToString(r["Adm. / QR No."])??"",Convert.ToString(r["Student"])??"",Convert.ToString(r["Father Name"])??"",
+                    source.Columns.Contains("__StudentGender")?Convert.ToString(r["__StudentGender"])??"":"")));
+                string placements=string.Join("\n",group.Select(r=>Convert.ToString(r["Class / Section"]) is {Length:>0} placement?placement:"Not recorded"));
+                result.Rows.Add(label,members,string.Join(", ",campuses),placements,group.Count(),
                     group.Sum(r => Convert.ToDecimal(r["Available Credit"])),group.Max(r => Convert.ToDateTime(r["Last Activity"])));
             }
         }

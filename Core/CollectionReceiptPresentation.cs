@@ -17,21 +17,8 @@ internal static class CollectionReceiptPresentation
         if(label.Length==0)label=string.Join(" – ",new[]{klass,section}.Where(text=>text.Length>0));
         return new(label,Text(value,"CampusName"));
     }
-    private static string Names(IReadOnlyList<Student> students)
-    {
-        if(students.Count==1)return ReportStudentIdentity.Format("",students[0].Name,students[0].Father,students[0].Gender);
-        string[] parents=students.Select(student=>RecordTextPolicy.DisplayText("FatherName",student.Father)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        if(parents.Length==1)
-        {
-            string names=string.Join(", ",students.Select(student=>RecordTextPolicy.DisplayText("StudentName",student.Name)));
-            if(parents[0].Length==0)return names;
-            string[] relations=students.Select(student=>student.Gender.Trim().ToUpperInvariant() switch {
-                "FEMALE" or "F" or "GIRL"=>"d/o","MALE" or "M" or "BOY"=>"s/o",_=>"s/d/o"
-            }).Distinct().ToArray();
-            return $"{names} {(relations.Length==1?relations[0]:"s/d/o")} {parents[0]}";
-        }
-        return string.Join(", ",students.Select(student=>ReportStudentIdentity.Format("",student.Name,student.Father,student.Gender)));
-    }
+    private static string Names(IReadOnlyList<Student> students)=>StudentIdentityText.Family(students.Select(student=>
+        new StudentIdentityText.Member("",RecordTextPolicy.DisplayText("StudentName",student.Name),RecordTextPolicy.DisplayText("FatherName",student.Father),student.Gender)));
     internal static void Apply(DataTable rows)
     {
         if(!rows.Columns.Contains("__ReceiptStudents"))return;

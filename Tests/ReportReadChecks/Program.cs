@@ -110,7 +110,8 @@ internal static partial class Program
         Check((decimal)totals.Rows[0]["Credit held"]==1200m,"Credit register totals sum positive student balances once");
         var (families,_) = CreditBalanceReportData.Create(data,true,0m);
         Check(families.Rows.Count==3,"Unlinked students remain separate instead of forming a fake family");
-        Check((decimal)families.Rows[0]["Available Credit"]==850m && (string)families.Rows[0]["Campus"]=="Multiple campuses","Family total and mixed campus label");
+        Check((decimal)families.Rows[0]["Available Credit"]==850m && (string)families.Rows[0]["Campus"]=="Boys, Girls","Family total and actual campus names");
+        Check(families.Rows[0].Field<string>("Class / Section")=="Class 1 – A\nClass 2 – A" && families.Rows[0].Field<string>("Members")!.Contains("1001 - One, 1002 - Two s/d/o Parent"),"Family identities retain references and shared father, with classes in matching order");
         Check(families.AsEnumerable().Sum(r=>r.Field<decimal>("Available Credit"))==1200m,"Family totals reconcile with student totals");
         var (minimum,minimumTotals)=CreditBalanceReportData.Create(data,true,200m);
         Check(minimum.Rows.Count==2 && (decimal)minimumTotals.Rows[0]["Credit held"]==950m,"Minimum credit is per student as labelled");

@@ -44,12 +44,6 @@ internal static class ReportStudentIdentity
     {
         name=RecordTextPolicy.DisplayText("StudentName",name);
         parent=RecordTextPolicy.DisplayText("FatherName",parent);
-        string identity=string.Join(" - ",new[]{reference.Trim(),name}.Where(value=>value.Length>0));
-        if(parent.Length==0)return identity;
-        if(name.Length==0)return string.Join("\n",new[]{identity,"Father: "+parent}.Where(value=>value.Length>0));
-        string relation=gender.Trim().ToUpperInvariant() switch {
-            "FEMALE" or "F" or "GIRL"=>"d/o", "MALE" or "M" or "BOY"=>"s/o", _=>"child of"
-        };
-        return $"{identity} {relation} {parent}";
+        return StudentIdentityText.Format(reference,name,parent,gender);
     }
 }

@@ -118,5 +118,32 @@ internal static partial class Program
         using(credit.Rows)using(credit.Totals)
         using(var creditExport=Project(credit.Rows,credit.Rows.Columns.Cast<DataColumn>().Where(c=>!c.ColumnName.StartsWith("__")).Select(c=>(c.ColumnName,c.ColumnName)).ToArray()))
             Check(Cell(creditExport,Plan(creditExport)[0]).Contains("163 - Kausar d/o Ali"),"Advance balance report preserves recorded gender through its explicit projection");
+
+        creditSource.Columns.Add("AdmissionId",typeof(int));creditSource.Columns.Add("FamilyId",typeof(int));
+        creditSource.Rows[0]["AdmissionId"]=1;creditSource.Rows[0]["FamilyId"]=10;creditSource.Rows[0]["Family"]="";
+        var singleFamily=CreditBalanceReportData.Create(creditSource,true,0);
+        using(singleFamily.Rows)using(singleFamily.Totals)
+        {
+            Check(singleFamily.Rows.Rows[0].Field<string>("Family / Student")=="Family: 163","Missing family code falls back to a public student reference");
+            Check(singleFamily.Rows.Rows[0].Field<string>("Members")=="163 - Kausar d/o Ali","A one-member family retains admission, student and father like the student debt report");
+        }
+        var brother=creditSource.NewRow();brother.ItemArray=creditSource.Rows[0].ItemArray;
+        brother["AdmissionId"]=2;brother["Adm. / QR No."]="164";brother["Student"]="Hamid";brother["__StudentGender"]="Male";
+        brother["Campus"]="Campus Boys";brother["Class / Section"]="Eight – M";brother["Available Credit"]=250m;creditSource.Rows.Add(brother);
+        string sourceBefore=creditSource.GetXmlForTest();
+        var familyCredit=CreditBalanceReportData.Create(creditSource,true,0);
+        using(familyCredit.Rows)using(familyCredit.Totals)
+        using(var familyExport=Project(familyCredit.Rows,familyCredit.Rows.Columns.Cast<DataColumn>().Select(c=>(c.ColumnName,c.ColumnName)).ToArray()))
+        {
+            var familyPlan=Plan(familyExport);
+            Check(Cell(familyExport,familyPlan[0]).Contains("163 - Kausar, 164 - Hamid s/d/o Ali"),"Family members retain each admission reference and append their shared father once");
+            Check(familyCredit.Rows.Rows[0].Field<string>("Class / Section")=="Four - F\nEight – M" && familyCredit.Rows.Rows[0].Field<string>("Campus")=="Campus Girls, Campus Boys","Family placements follow the member order and identify actual campuses");
+            Check(familyCredit.Rows.Rows.Count==1 && familyCredit.Rows.Rows[0].Field<decimal>("Available Credit")==750m && familyCredit.Rows.Rows[0].Field<int>("Students")==2 && familyCredit.Totals.Rows[0].Field<decimal>("Credit held")==750m,"Readable family identities preserve balances, student counts and totals");
+            Render("advance-balance-families","Student Advance Balance Register — Families",familyExport,"163 - Kausar, 164 - Hamid s/d/o Ali","Family: 163, 164","750","Eight – M");
+        }
+        var minimumCredit=CreditBalanceReportData.Create(creditSource,true,300m);
+        using(minimumCredit.Rows)using(minimumCredit.Totals)
+            Check(minimumCredit.Rows.Rows.Count==1 && minimumCredit.Rows.Rows[0].Field<string>("Members")=="163 - Kausar d/o Ali" && minimumCredit.Totals.Rows[0].Field<decimal>("Credit held")==500m,"Minimum credit remains a per-student filter before family grouping");
+        Check(creditSource.GetXmlForTest()==sourceBefore,"Family presentation never modifies source student or ledger values");
     }
 }

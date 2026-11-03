@@ -21,6 +21,7 @@ internal static partial class Program
             ("Outstanding & Aging — Compact","grid-pdf/outstanding-aging-export.pdf"),
             ("Student List","report-student-identity/student-list.pdf"),
             ("Outstanding & Aging — Student Identity","report-student-identity/outstanding-aging.pdf"),
+            ("Student Advance Balance Register — Families","report-student-identity/advance-balance-families.pdf"),
             ("Student Changes","report-student-identity/student-changes.pdf"),
             ("Certificate Issue Register","report-student-identity/certificate-register.pdf"),
             ("Detailed Financial Report — Wide / Multipage","grid-pdf/wide-multipage-export.pdf"),

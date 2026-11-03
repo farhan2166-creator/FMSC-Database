@@ -47,6 +47,7 @@ internal static partial class Program
                 CREATE TABLE dbo.FeeTypes(FeeTypeId int PRIMARY KEY,FeeTypeName nvarchar(100));
                 CREATE TABLE dbo.StudentFeeAssignments(AdmissionId int,EnrollmentId int,FeeTypeId int,Frequency nvarchar(30),ConcessionLabel nvarchar(100),DiscountAmount decimal(12,2),CancelledAt datetime2,EffectiveFrom date,EffectiveTo date);
                 INSERT dbo.Students VALUES(1,N'1001',NULL,N'One',N'Parent',N'Active'),(2,N'1002',NULL,N'Two',N'Parent',N'Active'),(3,NULL,N'QR-3',N'Three',N'Parent',N'Pending'),(4,N'1004',NULL,N'Four',N'Parent',N'Active'),(5,N'1005',NULL,N'Five',N'Parent',N'Active'),(6,N'1006',NULL,N'Six',N'Parent',N'Active');
+                ALTER TABLE dbo.Students ADD Gender nvarchar(20) NULL;
                 INSERT dbo.Families VALUES(10,N'FAM-10'),(20,N'FAM-20');INSERT dbo.FamilyMembers VALUES(1,10),(2,10),(6,20);
                 INSERT dbo.StudentCreditEntries VALUES(1,1000,'2026-10-01'),(1,-200,'2026-10-02'),(1,-100,'2026-10-03'),(2,100,'2026-10-03'),(2,50,'2026-10-04'),(3,100,'2026-10-03'),(4,500,'2026-10-01'),(4,-500,'2026-10-02'),(5,-20,'2026-10-01'),(6,250,'2026-10-01');
                 INSERT dbo.Campuses VALUES(1,N'Boys',1),(2,N'Girls',2);INSERT dbo.Classes VALUES(1,N'Class 1',1);INSERT dbo.Sections VALUES(1,N'A',1);
