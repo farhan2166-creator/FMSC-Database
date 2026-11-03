@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--student-certificates-workspace"))
+        {
+            CheckStudentCertificatesWorkspace();
+            Console.WriteLine($"PASS: {checks} student certificates workspace projection, identity, and permission checks (no database connection).");
+            return;
+        }
         if(args.Contains("--finance-report-async"))
         {
             CheckFinanceReportAsync();Console.WriteLine($"PASS: {checks} delayed Billing Summary, thread access, total and print/export checks.");return;
