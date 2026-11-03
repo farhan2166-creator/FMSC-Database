@@ -109,7 +109,7 @@ internal static class CertificateWorkspaceDetailsDialog
                 Environment.NewLine + "Selected student: " +
                 CertificateUi.GetString(student, "StudentName") +
                 "  ·  " + CertificateUi.GetString(student, "AdmissionNumber"),
-            Dock = DockStyle.Fill, ForeColor = AppTheme.HeadingText,
+            Dock = DockStyle.None, ForeColor = AppTheme.HeadingText,
             BackColor = AppTheme.PageBackground, Font = AppTheme.NormalFont,
             TextAlign = ContentAlignment.MiddleLeft, AutoEllipsis = true
         };
@@ -118,7 +118,7 @@ internal static class CertificateWorkspaceDetailsDialog
 
         var bottom = new TableLayoutPanel
         {
-            Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 1,
+            Dock = DockStyle.None, ColumnCount = 2, RowCount = 1,
             Margin = Padding.Empty, Padding = Padding.Empty
         };
         bottom.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
