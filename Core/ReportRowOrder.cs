@@ -12,6 +12,19 @@ internal static class ReportRowOrder
         public override string ToString() => Label;
     }
 
+    internal static Choice? FindSavedChoice(IEnumerable<Choice> choices,string label)
+    {
+        var available=choices.ToArray();
+        var exact=available.FirstOrDefault(choice=>choice.Label==label);
+        if(exact is not null)return exact;
+        // Older views saved the former caption. Keep their column and direction.
+        bool? descending=label switch {
+            "Money received: highest first"=>true,"Money received: lowest first"=>false,_=>null
+        };
+        return descending is bool direction
+            ? available.FirstOrDefault(choice=>choice.Column=="Money Received"&&choice.Descending==direction) : null;
+    }
+
     internal static IReadOnlyList<Choice> Choices(string report, string view, string grouping = "")
     {
         var choices = new List<Choice> { new("Default") };

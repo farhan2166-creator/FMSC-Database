@@ -42,6 +42,8 @@ internal static class ReportFilterState
                     break;
                 case ModernComboBox combo when kind=="choice":
                     object? choice=combo.Items.Cast<object>().FirstOrDefault(item => Convert.ToString(item)==payload);
+                    if(choice is null && key=="Order by")
+                        choice=ReportRowOrder.FindSavedChoice(combo.Items.OfType<ReportRowOrder.Choice>(),payload);
                     if (choice is null) throw new ReportViewValidationException($"The saved {key} option is unavailable for this report or your permissions.");
                     combo.SelectedItem=choice;
                     break;

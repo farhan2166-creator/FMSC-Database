@@ -68,23 +68,27 @@ internal static class CollectionReceiptGrouping
         var layout = new List<RowLayout>();
         data.Rows.Clear();
         string Text(DataRow row, string column) => Convert.ToString(row[column])?.Trim() ?? "";
+        // Group location sets independently of saved child order; keep detail rows unchanged.
+        string Canonical(IEnumerable<string> values) => string.Join(", ",values.Select(value=>value.Trim())
+            .Where(value=>value.Length>0).Distinct(StringComparer.Ordinal).OrderBy(value=>value,StringComparer.Ordinal));
         (string Campus, string Class, string Section) Key(DataRow row)
         {
-            string campus = Text(row, "Campus");
+            string campus = Canonical(Text(row, "Campus").Split(", ",StringSplitOptions.RemoveEmptyEntries));
             if (campus.Length == 0) campus = "Unassigned campus";
             if (grouping == "Campus") return (campus, "", "");
             var placements=Text(row,"Class / Section").Split('\n',StringSplitOptions.RemoveEmptyEntries)
                 .SelectMany(line=>line.Split(" / ",StringSplitOptions.RemoveEmptyEntries)).ToArray();
-            string Part(string placement,bool section)
+            string ClassName(string placement)
             {
                 int separator=placement.LastIndexOf(" – ",StringComparison.Ordinal);
-                return separator<0?(section?"":placement):section?placement[(separator+3)..]:placement[..separator];
+                return separator<0?placement:placement[..separator];
             }
-            string cls=string.Join(", ",placements.Select(placement=>Part(placement,false)).Distinct());
-            string section=string.Join(", ",placements.Select(placement=>Part(placement,true)).Where(text=>text.Length>0).Distinct());
+            string cls=Canonical(placements.Select(ClassName));
             if (cls.Length == 0) cls = "Unassigned class";
             if (cls == "Multiple") cls = "Multiple classes / sections";
-            return (campus, cls, grouping == "Section" ? section : "");
+            // Retain class/section pairs: One–A + Two–B differs from One–B + Two–A.
+            string sections=Canonical(placements);
+            return grouping=="Section" ? (campus,"",sections.Length==0||sections=="Multiple"?cls:sections) : (campus,cls,"");
         }
         void Total(string label, IEnumerable<DataRow> rows, string kind, string key, string groupLabel)
         {
@@ -110,7 +114,8 @@ internal static class CollectionReceiptGrouping
             {
                 var key = group.Key;
                 string groupKey = "Group" + groupIndex++;
-                string label = string.Join(" / ", new[] { key.Campus, key.Class, key.Section }.Where(s => s.Length > 0));
+                string campusLabel=Text(group.First(),"Campus");
+                string label = string.Join(" / ", new[] { campusLabel.Length>0?campusLabel:key.Campus, key.Class, key.Section }.Where(s => s.Length > 0));
                 DataRow heading = data.NewRow();
                 heading["Receipt / Reference"] = grouping + ": " + label;
                 data.Rows.Add(heading);

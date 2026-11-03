@@ -55,6 +55,8 @@ internal static partial class Program
                 ClickTask(form,0);
                 Check(Field<ModernComboBox>(form,"action").SelectedIndex==0&&Field<ModernComboBox>(form,"concession").Text=="None",
                     "Give Discount opens its fields without classifying an ordinary discount as Scholarship.");
+                Check(Field<ModernComboBox>(form,"concession").Items.Cast<object>().SequenceEqual(new object[]{"None"}),
+                    "A new ordinary discount does not acquire legacy partial-scholarship choices.");
                 Field<ModernTextBox>(form,"amount").Text="2000";
                 Check(Field<Label>(form,"taskNote").Text.Contains("Rs. 8,000"),"The draft immediately shows the selected fee's resulting net amount.");
                 Check(!Field<ModernTextBox>(form,"newRate").Visible,"A discount does not display the fee-rate correction input.");

@@ -23,7 +23,7 @@ internal static partial class Program
             Console.WriteLine($"PASS: {checks} Excel workbook type, formatting, data and atomic-save checks.");
             return;
         }
-        CheckReceipts(); CheckOutstanding(); CheckCredit(); CheckConcessions(); CheckReceiptRdlc(); CheckQueryContracts(); CheckNewReports(); CheckPrintPresentation(); CheckSavedViews(); CheckReportOrdering();
+        CheckReceipts(); CheckOutstanding(); CheckCredit(); CheckConcessions(); CheckReceiptRdlc(); CheckQueryContracts(); CheckNewReports(); CheckPrintPresentation(); CheckSavedViews(); CheckReportOrdering();CheckSavedOrderAliases();
         CheckXlsxExport();
         if (args.Contains("--sql")) CheckSql();
         Console.WriteLine($"PASS: {checks} focused report data, grouping, totals, filtering and layout checks" + (args.Contains("--sql") ? " including disposable SQL queries." : ". SQL integration was not requested."));
@@ -65,6 +65,7 @@ internal static partial class Program
         CollectionReceiptGrouping.Apply(mixed,"Section");
         Check(CollectionReceiptGrouping.DetailsOnly(mixed).Rows.Count==1,"Mixed-location family receipt remains intact");
         Check(mixed.AsEnumerable().Count(r=>Equals(r[0],"FR-1"))==1,"Mixed family is not counted under several sections");
+        CheckReceiptLocationOrder();
     }
     private static void CheckOutstanding()
     {

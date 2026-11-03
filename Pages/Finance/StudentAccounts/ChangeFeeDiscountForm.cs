@@ -44,6 +44,7 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     private bool UpdateAgreement => billId is null && agreementAllowed && scope.SelectedIndex is 0 or 1;
     private bool ApplyBills => billId is not null || !agreementAllowed || scope.SelectedIndex is 1 or 2;
     private bool FullWaiver => WaiverAction || RateAction && originalWaiver;
+    private bool OriginalPartialScholarship => originalLabel=="Scholarship"&&!originalWaiver;
     private decimal ChosenDiscount => FullWaiver || RemoveAction ? 0m : RateAction ? originalDiscount :
         ParseWholeAmount(string.IsNullOrWhiteSpace(amount.Text)?"0":amount.Text);
     private static decimal ParseWholeAmount(string text)=>InputParse.TryWholeAmount(text,out decimal value)
@@ -89,8 +90,8 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
         else if(!agreementAllowed) scope.Items.Add("Existing Bills Only");
         else scope.Items.AddRange(new object[]{"Saved Fee Plan","Saved Fee Plan and Existing Bills","Existing Bills in This Period"});
         scope.SelectedIndex=0;
-        concession.Items.Add("None");
-        concession.SelectedItem="None";
+        concession.Items.AddRange(OriginalPartialScholarship?new object[]{"Scholarship","None"}:new object[]{"None"});
+        concession.SelectedIndex=0;
         concession.FormattingEnabled=true;
         concession.Format+=(_,e)=>e.Value=FeeConcessionLabels.Display(Convert.ToString(e.ListItem)??"");
         paidReduction.Items.AddRange(new object[]{"Keep as advance credit","Refund the excess payment"}); paidReduction.SelectedIndex=0;
@@ -188,9 +189,11 @@ public sealed partial class ChangeFeeDiscountForm : ApplicationWindowForm
     {
         string previous=Convert.ToString(concession.SelectedItem)??"";
         concession.Items.Clear();
-        concession.Items.AddRange(WaiverAction?new object[]{"Waived","Free","Scholarship"}:new object[]{"None"});
+        // Keep a legacy partial scholarship editable without creating new partial scholarships.
+        concession.Items.AddRange(WaiverAction?new object[]{"Waived","Free","Scholarship"}:
+            OriginalPartialScholarship?new object[]{"Scholarship","None"}:new object[]{"None"});
         concession.SelectedItem=concession.Items.Contains(previous)?previous:
-            WaiverAction?"Waived":"None";
+            WaiverAction?"Waived":OriginalPartialScholarship?"Scholarship":"None";
     }
     private void InvalidateReview(bool keepPaidDecision=false,bool updateChoices=true)
     {

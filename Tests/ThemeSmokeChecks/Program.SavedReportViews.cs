@@ -19,6 +19,20 @@ internal static partial class Program
         try
         {
             CurrentUser.SignIn(fixtureActor,"Saved-view fixture","Administrator",false,Array.Empty<string>());
+            using(var ordering=new ModernComboBox())
+            {
+                ordering.Items.AddRange(ReportRowOrder.Choices("GetCollectionsAndReceiptsReport","Receipts").Cast<object>().ToArray());
+                foreach(bool descending in new[]{true,false})
+                {
+                    var orderingFields=new[]{("Order by",(Control)ordering)};
+                    var old=new Dictionary<string,string>{{"Order by","choice:Money received: "+(descending?"highest first":"lowest first")}};
+                    ReportFilterState.Restore(orderingFields,old);
+                    Check(ordering.SelectedItem is ReportRowOrder.Choice choice&&choice.Column=="Money Received"&&choice.Descending==descending,
+                        "An older saved view restores its amount ordering through the actual control-state reader");
+                    Check(ReportFilterState.Capture(orderingFields)["Order by"].StartsWith("choice:Payment received:"),
+                        "Saving a restored view writes the current caption");
+                }
+            }
             using(var academicFrom=new ModernDatePicker {ShowCheckBox=true})
             using(var academicTo=new ModernDatePicker {ShowCheckBox=true})
             using(var years=new DataTable())

@@ -33,11 +33,29 @@ internal static partial class Program
             }
             Check(!Field<ModernButton>("review").Enabled&&!Field<ModernTextBox>("amount").Visible,"A fee review starts with an explicit task choice rather than every scenario's controls");
             Field<ModernComboBox>("action").SelectedIndex=0;Field<ModernComboBox>("scope").SelectedIndex=1;
+            var labels=Field<ModernComboBox>("concession");
+            Check(Convert.ToString(labels.SelectedItem)=="Scholarship","Editing a legacy partial scholarship starts with its original label");
+            Field<ModernTextBox>("amount").Text="1500";
+            Microsoft.Data.SqlClient.SqlParameter[] PreviewArgs()=>(Microsoft.Data.SqlClient.SqlParameter[])typeof(ChangeFeeDiscountForm)
+                .GetMethod("Args",flags)!.Invoke(form,new object[]{true})!;
+            var scholarshipArgs=PreviewArgs();
+            Check((string)scholarshipArgs.Single(p=>p.ParameterName=="@ConcessionLabel").Value=="Scholarship"
+                &&(decimal)scholarshipArgs.Single(p=>p.ParameterName=="@DiscountAmount").Value==1500m
+                &&!(bool)scholarshipArgs.Single(p=>p.ParameterName=="@FullFeeWaiver").Value,
+                "An edited partial scholarship sends its chosen amount and original label without becoming a full waiver");
+            labels.SelectedItem="None";
+            Check(PreviewArgs().Single(p=>p.ParameterName=="@ConcessionLabel").Value is DBNull,
+                "An operator can explicitly remove the legacy scholarship classification");
+            Field<ModernDatePicker>("throughMonth").Value=new DateTime(year,11,1);
+            Check(Convert.ToString(labels.SelectedItem)=="None","Changing dates does not undo an explicit label removal");
+            labels.SelectedItem="Scholarship";Field<ModernTextBox>("amount").Text="1000";
             var from=Field<ModernDatePicker>("fromMonth");var through=Field<ModernDatePicker>("throughMonth");
             Check(from.Enabled&&through.Enabled,"The operator can choose concession start and end months");
             from.Value=new DateTime(year,5,1);through.Value=new DateTime(year,6,1);Field<ModernTextBox>("reason").Text="Approved temporary scholarship";
             Click(Field<ModernButton>("save"));
             Check(queries.Count==1&&RefusesClose(),"Concession review locks its inputs and keeps its modal owner until the result is known");
+            Check((string)queries[0].Single(p=>p.ParameterName=="@ConcessionLabel").Value=="Scholarship",
+                "The actual SQL review retains the partial scholarship classification");
             Check((DateTime)queries[0].Single(p=>p.ParameterName=="@EffectiveFrom").Value==new DateTime(year,5,1)&&
                 (DateTime)queries[0].Single(p=>p.ParameterName=="@EffectiveThrough").Value==new DateTime(year,6,1),"The chosen period reaches the SQL review unchanged");
             through.Value=new DateTime(year,7,1);replies.Dequeue().SetResult(Plan());
