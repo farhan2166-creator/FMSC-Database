@@ -1,0 +1,50 @@
+name: 'Preview - Student Certificate WinForms Screenshots'
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/student-certificates-workspace]
+    paths:
+      - '.github/workflows/fmsc-certificate-visual-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    name: Render sample certificate screens (fictional data)
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install .NET 8 SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Compile WinForms screenshot fixture
+        shell: pwsh
+        run: dotnet build Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release
+
+      - name: Render actual WinForms controls with fictional fixture records
+        shell: pwsh
+        timeout-minutes: 4
+        run: |
+          dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --student-certificates-screenshots
+          if ($LASTEXITCODE -ne 0) { throw "Certificate screenshot capture failed." }
+
+      - name: Upload noninteractive screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: student-certificates-preview-png-${{ github.run_id }}
+          path: artifacts/student-certificates-preview/*.png
+          retention-days: 14
+          if-no-files-found: warn
+
+# This is noninteractive UI rendering, not a claim of actual operator or SQL testing.
+# The screenshots contain only fictional records; no school DB/printer is used.
