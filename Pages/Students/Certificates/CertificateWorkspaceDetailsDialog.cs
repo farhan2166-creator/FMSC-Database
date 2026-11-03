@@ -78,10 +78,40 @@ internal static class CertificateWorkspaceDetailsDialog
 
         // The workspace already chose the student; the dialog must not open a
         // second search or allow an unrelated student to be selected.
-        foreach (StudentPicker picker in Descendants(details).OfType<StudentPicker>())
+        foreach (StudentPicker picker in Descendants(details).OfType<StudentPicker>().ToArray())
         {
             picker.SetStudent(student);
-            picker.Enabled = false;
+            if (picker.Parent is TableLayoutPanel field)
+            {
+                // Keep the original picker alive for its existing student identity
+                // and save logic, but do not display a second editable search.
+                var position = field.GetCellPosition(picker);
+                field.Controls.Remove(picker);
+                editor.Controls.Add(picker);
+                picker.Dock = DockStyle.None;
+                picker.Bounds = new Rectangle(-10000, -10000, 1, 1);
+                picker.Enabled = false;
+                var display = new Label
+                {
+                    Text = CertificateUi.GetString(student, "AdmissionNumber") + " — " +
+                        CertificateUi.GetString(student, "StudentName"),
+                    Dock = DockStyle.Top,
+                    Height = AppMetrics.InputControlHeight,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Font = AppTheme.NormalFont,
+                    ForeColor = AppTheme.Text,
+                    BackColor = AppTheme.SurfaceElevated,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Padding = new Padding(AppMetrics.SpacingSm, 0, 0, 0),
+                    AutoEllipsis = true
+                };
+                field.Controls.Add(display, position.Column, position.Row);
+                foreach (Label caption in field.Controls.OfType<Label>())
+                    if (!ReferenceEquals(caption, display) &&
+                        caption.Text.StartsWith("Student", StringComparison.OrdinalIgnoreCase))
+                        caption.Text = "Selected Student";
+            }
+            else picker.Enabled = false;
         }
 
         // Avoid an old New/Clear button clearing the locked student context.
@@ -177,7 +207,7 @@ internal static class CertificateWorkspaceDetailsDialog
             try
             {
                 bridge.LoadWorkspaceSelection(student, recordId, issueId);
-                close.Focus();
+                if (!FormFlow.FocusFirstInput(details)) close.Focus();
             }
             catch (Exception ex)
             {
