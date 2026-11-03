@@ -76,15 +76,23 @@ internal sealed class CertificateCollectionFlow(string kind)
         Status="Collected copy — details are locked. Print this saved copy or use Issue Again for a new copy.";
         return row is not null&&locked;
     }
+    private Action? collectSelected;
+    private Action? issueAgainSelected;
+
+    // These share the exact old button handlers. The consolidated workspace can
+    // invoke them without showing a second history grid or synthesizing SQL writes.
+    internal void CollectFromWorkspace() => collectSelected?.Invoke();
+    internal void IssueAgainFromWorkspace() => issueAgainSelected?.Invoke();
+
     internal void Wire(Control owner,Func<int> selected,Action<int> reload,Func<bool> dirty)
     {
-        Collect.Click+=(_,_)=>{
+        collectSelected=()=>{
             if(busy||!Collect.Enabled||dirty())return;
             string? name=CertificateCollectionDialog.Show(owner);
             if(name is null)return;
             Run(owner,()=>DatabaseHelper.ExecuteUser("CollectCertificateCopy",DatabaseHelper.P("@Kind",kind),DatabaseHelper.Int("@CopyId",selected()),DatabaseHelper.P("@CollectedBy",name),VersionParameter(expectedVersion)),reload,selected());
         };
-        IssueAgain.Click+=(_,_)=>{
+        issueAgainSelected=()=>{
             if(busy||!IssueAgain.Enabled)return;
             if(!ModernMessageDialog.Confirm(owner.FindForm(),"Create another copy using current student/staff details and the saved certificate details? The collected copy stays locked. Review and correct the new copy before handing it over.","Issue Certificate Again",defaultYes:false))return;
             int id=selected();if(pendingIssue is null||pendingSource!=id){pendingIssue=Guid.NewGuid();pendingSource=id;}
@@ -94,6 +102,8 @@ internal sealed class CertificateCollectionFlow(string kind)
                 next=Convert.ToInt32(result.Rows[0]["CopyId"]);pendingIssue=null;
             },_=>reload(next),id);
         };
+        Collect.Click += (_,_)=>CollectFromWorkspace();
+        IssueAgain.Click += (_,_)=>IssueAgainFromWorkspace();
     }
     private void Run(Control owner,Action action,Action<int> reload,int id)
     {
