@@ -1,4 +1,4 @@
-name: '08 - Release - Full Readiness Checks'
+name: '01 - Release - Full Readiness Checks'
 
 # Publishing a release/* branch is an explicit request for full release checks.
 # Ordinary feature branches and main retain their existing trigger policy.

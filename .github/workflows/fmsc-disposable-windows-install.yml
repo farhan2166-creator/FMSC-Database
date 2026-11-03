@@ -1,4 +1,4 @@
-name: '09 - Release - Windows Installation Acceptance'
+name: '02 - Release - Windows Installation Acceptance'
 
 on:
   workflow_dispatch:
