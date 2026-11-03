@@ -34,6 +34,12 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--student-certificates-screenshots"))
+        {
+            CaptureStudentCertificateScreenshots();
+            Console.WriteLine($"PASS: {checks} synthetic WinForms capture checks.");
+            return;
+        }
         if (args.Contains("--student-certificates-workspace"))
         {
             CheckStudentCertificatesWorkspace();
