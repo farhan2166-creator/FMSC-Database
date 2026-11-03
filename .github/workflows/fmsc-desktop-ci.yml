@@ -3,8 +3,6 @@ name: '09 - CI - Desktop Build and Regression'
 on:
   workflow_dispatch:
   workflow_call:
-  push:
-    branches: [feature/student-certificates-workspace]
 
 permissions:
   contents: read
