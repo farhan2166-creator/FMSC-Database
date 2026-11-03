@@ -280,11 +280,28 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
     private void UpdateSelected()
     {
         var selected = CurrentRecord;
-        open.Enabled = !reading && !editorOpen && selected is not null;
+        bool available = !reading && !editorOpen && selected is not null;
+        var kind = selected is null ? null : StudentCertificateRegisterReader.Kinds
+            .FirstOrDefault(item => item.Key == Convert.ToString(selected["Kind"]));
+        bool permitted = available && kind is not null &&
+            StudentCertificateRegisterReader.Allowed(kind, CurrentUser.HasPermission);
+        int record = selected is null ? 0 : Convert.ToInt32(selected["RecordId"]);
+        int issue = selected is null ? 0 : Convert.ToInt32(selected["IssueId"]);
+        bool hasCopy = record > 0 && (kind?.IssueKey is null || issue > 0);
+        bool collected = selected is not null &&
+            string.Equals(Convert.ToString(selected["Collection"]), "Collected",
+                StringComparison.OrdinalIgnoreCase);
+
+        open.Enabled = permitted && record > 0;
+        printAction.Enabled = permitted && hasCopy &&
+            (kind!.Leaving || CurrentUser.HasPermission("Certificates.Print"));
+        collectAction.Enabled = permitted && hasCopy && !collected;
+        reissueAction.Enabled = permitted && hasCopy && collected;
+
         if (selected is null)
         {
             if (records.Rows.Count > 0)
-                details.Text = "Select a saved certificate to review its details.";
+                details.Text = "Select an issued copy to review its details and available actions.";
             return;
         }
         details.Text =
@@ -295,95 +312,160 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
             "Collection: " + selected["Collection"] + Environment.NewLine +
             "Collected on: " + selected["Collected On"] + Environment.NewLine +
             "Recorded on: " + selected["Recorded On"] + Environment.NewLine +
-            "Open the original editor to print, issue again or mark collected when permitted.";
+            "Edit opens the existing fields in a compact dialog. Print, collect and issue again stay here.";
+    }
+
+    private bool TrySelectedCopy(out StudentCertificateRegisterReader.Kind kind,
+        out int recordId, out int issueId)
+    {
+        kind = null!;
+        recordId = issueId = 0;
+        if (CurrentRecord is not DataRowView row) return false;
+        string key = Convert.ToString(row["Kind"]) ?? "";
+        var selected = StudentCertificateRegisterReader.Kinds.FirstOrDefault(item => item.Key == key);
+        if (selected is null ||
+            !StudentCertificateRegisterReader.Allowed(selected, CurrentUser.HasPermission))
+            return false;
+        kind = selected;
+        recordId = Convert.ToInt32(row["RecordId"]);
+        issueId = Convert.ToInt32(row["IssueId"]);
+        return recordId > 0;
     }
 
     private void OpenSelected()
     {
-        if (reading || editorOpen || CurrentRecord is not DataRowView row) return;
-        string key = Convert.ToString(row["Kind"]) ?? "";
-        var kind = StudentCertificateRegisterReader.Kinds.FirstOrDefault(item => item.Key == key);
-        if (kind is null) return;
-        int recordId = Convert.ToInt32(row["RecordId"]);
-        int issueId = Convert.ToInt32(row["IssueId"]);
-        if (kind.IssueKey is not null && issueId <= 0)
-        {
-            Warn("This is a legacy saved record without a tracked issue. Open the certificate type to review its existing history.");
+        if (reading || editorOpen || !TrySelectedCopy(out var kind, out int recordId, out int issueId))
             return;
-        }
         OpenEditor(kind, recordId, issueId);
     }
 
-    private static Control CreateEditor(string key) => key switch
+    private static Control CreateEditor(string key, bool initialize = true) => key switch
     {
-        "Regular" => new RegularStudentCertificatePage(),
-        "Character" => new CharacterCertificatePage(),
-        "Leave" => new LeaveCertificatePage(),
-        "College" => new CollegeLeaveCertificatePage(),
-        "DOB" => new DateOfBirthCertificatePage(),
-        "Sports" => new SportsCertificatePage(),
-        "NOC" => new NoObjectionCertificatePage(),
-        "Provisional" => new ProvisionalCertificatePage(),
+        "Regular" => initialize ? new RegularStudentCertificatePage() : new RegularStudentCertificatePage(false),
+        "Character" => initialize ? new CharacterCertificatePage() : new CharacterCertificatePage(false),
+        "Leave" => initialize ? new LeaveCertificatePage() : new LeaveCertificatePage(null, false),
+        "College" => initialize ? new CollegeLeaveCertificatePage() : new CollegeLeaveCertificatePage(false),
+        "DOB" => initialize ? new DateOfBirthCertificatePage() : new DateOfBirthCertificatePage(false),
+        "Sports" => initialize ? new SportsCertificatePage() : new SportsCertificatePage(false),
+        "NOC" => initialize ? new NoObjectionCertificatePage() : new NoObjectionCertificatePage(false),
+        "Provisional" => initialize ? new ProvisionalCertificatePage() : new ProvisionalCertificatePage(false),
         _ => throw new ArgumentOutOfRangeException(nameof(key))
     };
 
     private void OpenEditor(StudentCertificateRegisterReader.Kind kind, int recordId, int issueId)
     {
-        if (reading || editorOpen || !StudentCertificateRegisterReader.Allowed(kind, CurrentUser.HasPermission)) return;
-        int admissionId = student.SelectedId;
+        if (reading || editorOpen || !StudentCertificateRegisterReader.Allowed(kind, CurrentUser.HasPermission))
+            return;
         DataRow? studentRow = student.SelectedRow;
-        if (admissionId <= 0 || studentRow is null)
+        if (student.SelectedId <= 0 || studentRow is null)
         {
-            Warn("Select a student before opening a certificate.");
+            Warn("Select a student before preparing certificate details.");
+            return;
+        }
+        if (kind.IssueKey is not null && recordId > 0 && issueId <= 0)
+        {
+            Warn("This historical record has no saved issue copy. Review the certificate type before editing.");
             return;
         }
 
+        int actor = CurrentUser.UserId;
+        string endpoint = DatabaseHelper.DatabaseEndpoint;
         editorOpen = true;
-        open.Enabled = refresh.Enabled = false;
+        UpdateSelected();
         try
         {
-            using var dialog = new ApplicationWindowForm
-            {
-                Text = kind.Caption + " Certificate",
-                StartPosition = FormStartPosition.CenterParent,
-                Width = AppScale.Scale(1240),
-                Height = AppScale.Scale(800),
-                MinimumSize = new Size(AppScale.Scale(980), AppScale.Scale(620)),
-                BackColor = AppTheme.PageBackground
-            };
-            var page = CreateEditor(kind.Key);
-            page.Dock = DockStyle.Fill;
-            dialog.Controls.Add(page);
-            ModalPageCloseGuard.Attach(dialog, page);
-            dialog.Shown += (_, _) => dialog.BeginInvoke(new Action(() =>
-            {
-                if (dialog.IsDisposed || page.IsDisposed) return;
-                try
-                {
-                    if (!StudentCertificateRegisterReader.Allowed(kind, CurrentUser.HasPermission) ||
-                        CurrentUser.UserId <= 0)
-                    {
-                        dialog.Close();
-                        return;
-                    }
-                    ((IStudentCertificateWorkspaceEditor)page).LoadWorkspaceSelection(studentRow, recordId, issueId);
-                }
-                catch (Exception ex)
-                {
-                    Fail(ex);
-                    dialog.Close();
-                }
-            }));
-            dialog.ShowDialog(FindForm());
+            // The modal displays ONLY the existing details card and its actual
+            // Save/Create controls. It does not open the former full-page editor.
+            CertificateWorkspaceDetailsDialog.Show(FindForm(), kind.Caption, studentRow,
+                recordId, issueId, () => CreateEditor(kind.Key));
         }
         catch (Exception ex) { Fail(ex); }
         finally
         {
             editorOpen = false;
+            if (!IsDisposed && CurrentUser.UserId == actor &&
+                DatabaseHelper.DatabaseEndpoint == endpoint)
+                _ = ReloadAsync(); // Return to the consolidated register after edits.
+        }
+    }
+
+    private async Task RunWorkspaceActionAsync(string action)
+    {
+        if (reading || editorOpen || !TrySelectedCopy(out var kind, out int recordId, out int issueId))
+            return;
+        if (kind.IssueKey is not null && issueId <= 0)
+        {
+            Warn("This record has no saved issued copy. Open the certificate type to review it.");
+            return;
+        }
+        DataRow? selected = student.SelectedRow;
+        if (selected is null || student.SelectedId <= 0)
+        {
+            Warn("Select the student before continuing.");
+            return;
+        }
+        int actor = CurrentUser.UserId;
+        string endpoint = DatabaseHelper.DatabaseEndpoint;
+        editorOpen = true;
+        Grid.Enabled = false;
+        student.Enabled = false;
+        UpdateSelected();
+        Control? editor = null;
+        try
+        {
+            // Keep the genuine existing editor alive as a nonvisual action
+            // owner. No old full-page navigation or duplicated write path.
+            editor = CreateEditor(kind.Key, initialize: false);
+            editor.Dock = DockStyle.None;
+            editor.Location = new Point(-10000, -10000);
+            editor.Size = new Size(AppScale.Scale(1100), AppScale.Scale(780));
+            Controls.Add(editor);
+            editor.CreateControl();
+            var workflow = (IStudentCertificateWorkspaceEditor)editor;
+            workflow.LoadWorkspaceSelection(selected, recordId, issueId);
+
+            if (CurrentUser.UserId != actor ||
+                DatabaseHelper.DatabaseEndpoint != endpoint ||
+                !StudentCertificateRegisterReader.Allowed(kind, CurrentUser.HasPermission))
+                throw new UnauthorizedAccessException("Certificate access changed. Refresh the workspace.");
+
+            switch (action)
+            {
+                case "print":
+                    if (!workflow.CanPrintFromWorkspace)
+                        throw new InvalidOperationException("This copy cannot be printed until its existing requirements are satisfied.");
+                    workflow.PrintFromWorkspace();
+                    break;
+                case "collect":
+                    if (!workflow.CanCollectFromWorkspace)
+                        throw new InvalidOperationException("This copy cannot be marked collected in its current state.");
+                    workflow.CollectFromWorkspace();
+                    break;
+                case "reissue":
+                    if (!workflow.CanIssueAgainFromWorkspace)
+                        throw new InvalidOperationException("Select the eligible latest collected copy to issue again.");
+                    await workflow.IssueAgainFromWorkspaceAsync();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(action));
+            }
+        }
+        catch (Exception ex) { Fail(ex); }
+        finally
+        {
+            if (editor is not null)
+            {
+                Controls.Remove(editor);
+                editor.Dispose();
+            }
+            editorOpen = false;
             if (!IsDisposed)
             {
-                open.Enabled = CurrentRecord is not null;
-                _ = ReloadAsync(); // Read only: refresh records after any editor changes.
+                Grid.Enabled = true;
+                student.Enabled = true;
+                if (CurrentUser.UserId == actor && DatabaseHelper.DatabaseEndpoint == endpoint)
+                    await ReloadAsync();
+                else ClearSelection();
             }
         }
     }
