@@ -46,7 +46,7 @@ internal static class ReportRowOrder
                     Text("Student / family", view == "Receipts" ? "Student / Family" : "Student");
                     Text("Class / section", "Class / Section", ValueKind.Reference);
                 }
-                Amount(view == "Detailed Transactions" ? "Collection amount" : "Money received",
+                Amount(view == "Detailed Transactions" ? "Collection amount" : "Payment received",
                     view == "Detailed Transactions" ? "Collection Amount" : "Money Received");
                 if (view != "Detailed Transactions") Amount("Adjusted collection", "Adjusted Collection");
                 break;

@@ -166,9 +166,10 @@ public abstract class CanonicalFinanceReportPage : V2Page
     protected override IReadOnlyList<ReportColumnDef>? ReportColumnCatalog => _boundColumnLayout==ReportLayoutKey ? _availableColumns : null;
     protected override IReadOnlyList<string> ReportRequiredColumnKeys => _procedure=="GetCollectionsAndReceiptsReport" && ViewName=="Receipts"
         ? new[] { "Receipt / Reference" } : AppendReportTotals && ReportColumnCatalog is { Count:>0 } ? new[] { ReportColumnCatalog[0].Key } : Array.Empty<string>();
+    protected virtual IReadOnlyList<ReportColumnDef> DefineReportColumns()=>ReportAvailableColumns.FromGrid(Grid);
     protected override void OnReportPageBound()
     {
-        _availableColumns=ReportAvailableColumns.FromGrid(Grid);_boundColumnLayout=ReportLayoutKey;
+        _availableColumns=DefineReportColumns();_boundColumnLayout=ReportLayoutKey;
         RefreshReportColumnLayout();base.OnReportPageBound();
         LockGridOrder();
     }
@@ -382,7 +383,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
             object value = row[column];
             string shown = value == DBNull.Value ? "0" : value is decimal money
                 ? $"Rs. {money:N0}" : Convert.ToString(value) ?? "0";
-            return $"{column.ColumnName}: {shown}";
+            return $"{ReportPrintSummary.Caption(column.ColumnName)}: {shown}";
         }));
     }
     private static void AppendAuthoritativeTotalRow(DataTable data, DataTable? totals)

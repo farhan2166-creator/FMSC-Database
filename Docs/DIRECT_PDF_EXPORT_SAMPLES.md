@@ -7,7 +7,7 @@ Desktop CI runs the same fixture and publishes the same single-file download.
 
 Download **REVIEW-ALL.pdf** from the workflow run or its summary link. It downloads
 directly as a PDF, without a ZIP, individual duplicate files or PNG previews,
-matching the fee-document review workflow. PDF bookmarks navigate nine report
+matching the fee-document review workflow. PDF bookmarks navigate ten report
 scenarios. Every source page, paper size, orientation and page order is preserved;
 wide reports retain all of their pages. The download is retained for seven days,
 separately from installer downloads.
@@ -35,11 +35,13 @@ direct exports (individual files remain available when running locally):
 - `wide-multipage-export.pdf`: a wide table with repeated identity columns.
 - `empty-report-export.pdf`: the empty-result document layout.
 
-It also includes Student List, Outstanding & Aging with the combined student
+It also includes a family receipt with grouped sibling names and the shared father
+once, ordered class/section entries, actual payment methods and Payment Received
+captions. Student List, Outstanding & Aging with the combined student
 identity, Student Changes and Certificate Issue Register from the report identity
-fixtures. Those samples also use `GridReportPreview.ExportPdf`.
+fixtures are included too. Those samples also use `GridReportPreview.ExportPdf`.
 
-The combined file is published only after both fixture suites and the merge checks
+The combined file is published only after all fixture suites and the merge checks
 pass. A failed PDF check cannot publish a partial review or reuse a previous
 review file. Desktop CI can retain a completed review if an unrelated later suite
 fails; check the run's overall result separately. Use the workflow run for the

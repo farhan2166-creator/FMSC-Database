@@ -13,9 +13,11 @@ internal static partial class Program
         File.Delete(finalPath);
         CheckGridPdfReports();
         CheckReportStudentIdentity();
+        CheckCollectionReceiptPresentation();
         var samples=new (string Title,string Path)[] {
             ("Collections & Receipts — Whole School","grid-pdf/collections-receipts-export.pdf"),
             ("Collections & Receipts — By Campus","grid-pdf/collections-by-campus-export.pdf"),
+            ("Family Receipts — Names, Classes and Payment Methods","collection-receipt-presentation/family-receipts.pdf"),
             ("Outstanding & Aging — Compact","grid-pdf/outstanding-aging-export.pdf"),
             ("Student List","report-student-identity/student-list.pdf"),
             ("Outstanding & Aging — Student Identity","report-student-identity/outstanding-aging.pdf"),

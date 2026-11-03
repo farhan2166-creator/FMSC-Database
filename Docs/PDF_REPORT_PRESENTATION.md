@@ -64,7 +64,7 @@ selected column order. Hidden parent/gender metadata supports Outstanding & Agin
 without exposing extra export columns; the advance balance reader carries recorded
 gender through its student projection. No student or financial records are changed.
 Migration `74.sql` updates the outstanding reader; app, installer and current SQL
-fixture schema pins are 74. Its procedure body differs from migration 70 only in
+fixture schema pins were 74 for that change. Its procedure body differs from migration 70 only in
 the parent/gender metadata additions.
 
 Native verification: `--report-student-identity` renders Student List, Outstanding
@@ -82,6 +82,33 @@ final schema 74 were checked. Hashes of all eight Students, Charges, Families an
 Aging detail/summary result sets matched their pre-migration hashes after removing
 only the new private metadata columns; Students and Charges expose both fields.
 This verifies the local upgrade and report reader, not a release-package install.
+
+## Collections receipt details — 3 November 2026
+
+Receipt rows keep multiple family members' names together and append their shared
+father once: `Hadia, Hamid, Kausar s/d/o Ali`. All-male or all-female groups use s/o
+or d/o. Different recorded fathers are kept with their own children. Saved receipt
+names and fathers take precedence over current student details. The class/section
+column lists one entry per student in the same order, including repeated classes;
+historical receipt lines take precedence over later placements. Campus remains
+available for filters/grouping but is omitted from the receipt table.
+
+Migration 75 returns private snapshot/roster metadata and the actual distinct
+payment methods (for example `Cash + Account Credit`) instead of Mixed. Display,
+summary, print and export captions use Payment Received. Existing raw column keys
+remain compatible with saved layouts. Financial aggregation, receipt identity,
+permissions, filters and summary calculations remain unchanged. The app, installer
+and current SQL fixture contexts require schema 75.
+
+Native `--collection-receipt-presentation` checks cover sibling formatting,
+historical class order, repeated classes, missing data, the real column catalogue,
+export metadata exclusion, unchanged amounts and rendered PDF text. Its fictional
+sample joins the single CI review PDF. A live rollback-only migration check
+compared all 32 detail/summary result sets across views, method filters and campus
+scopes; column types and values matched apart from method text/private metadata.
+The applier subsequently created and verified
+`FMSC_DB_BeforeMigration_v74_to_v75_20261103_133143.bak`, applied 75 in its normal
+transaction and passed the same 32 comparisons against the upgraded database.
 
 ## Verification
 

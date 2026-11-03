@@ -34,6 +34,10 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--collection-receipt-presentation"))
+        {
+            CheckCollectionReceiptPresentation();Console.WriteLine($"PASS: {checks} collection receipt roster, placement, method, caption and PDF checks.");return;
+        }
         if(args.Contains("--report-student-identity"))
         {
             CheckReportStudentIdentity();

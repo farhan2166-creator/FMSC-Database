@@ -24,6 +24,10 @@ internal static partial class Program
         while(folder is not null && !File.Exists(Path.Combine(folder.FullName,"fmsc.dacpac")))folder=folder.Parent;
         if(folder is null)throw new InvalidOperationException("Run checks from a checkout containing fmsc.dacpac.");
         string migration=File.ReadAllText(Path.Combine(folder.FullName,"Migrations","70.sql"));
+        string collectionMigration=File.ReadAllText(Path.Combine(folder.FullName,"Migrations","75.sql"));
+        new TSql160Parser(true).Parse(new StringReader(collectionMigration),out var collectionErrors);
+        Check(collectionErrors.Count==0,"Migration 75 parses: "+string.Join("; ",collectionErrors.Select(e=>e.Message)));
+        Check(collectionMigration.Contains("[__ReceiptStudents]")&&collectionMigration.Contains("A.__ReceiptSnapshot")&&!collectionMigration.Contains("THEN N'Mixed'"),"Collections exposes roster metadata and actual distinct methods");
         new TSql160Parser(true).Parse(new StringReader(migration),out var migrationErrors);
         Check(migrationErrors.Count==0,"Migration 70 parses as SQL Server syntax: "+string.Join("; ",migrationErrors.Select(e=>e.Message)));
         Check(migration.Contains("LEFT JOIN dbo.FamilyMembers") && migration.Contains("CASE WHEN F.FamilyId IS NULL THEN M.AdmissionId END"),

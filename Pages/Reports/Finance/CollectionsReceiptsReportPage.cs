@@ -4,7 +4,7 @@ namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed class CollectionsReceiptsReportPage : CanonicalFinanceReportPage
 {
     public CollectionsReceiptsReportPage() : base(
-        "Collections & Receipts", "Money received, refunds and corrections. Credit applied is separate and is not new money.",
+        "Collections & Receipts", "Payments received, refunds and corrections. Credit applied is shown separately.",
         "GetCollectionsAndReceiptsReport", "FMSC_Collections_Receipts",
         new[] { "Receipts", "Detailed Transactions", "Summary" },
         new[] { "Day", "Week", "Month", "Payment Method", "Class", "Campus", "Fee Type" },
@@ -21,6 +21,8 @@ public sealed class CollectionsReceiptsReportPage : CanonicalFinanceReportPage
     protected override int ExportRecordCount(DataTable source) => CollectionReceiptGrouping.Layout(source)?.Count(r=>r.Kind=="Detail") ?? source.Rows.Count;
     protected override string CsvExportLabel => "CSV data rows only (*.csv)";
     protected override string GroupingCaption => "Group By";
+    protected override IReadOnlyList<ReportColumnDef> DefineReportColumns()=>base.DefineReportColumns()
+        .Where(column=>ViewName!="Receipts"||column.Key!="Campus").ToArray();
     protected override void UpdateViewControls()
     {
         base.UpdateViewControls();
@@ -38,8 +40,11 @@ public sealed class CollectionsReceiptsReportPage : CanonicalFinanceReportPage
     protected override void PrepareReportData(DataTable data, SqlParameter[] parameters)
     {
         if (Equals(parameters.Single(p => p.ParameterName == "@View").Value, "Receipts"))
+        {
+            CollectionReceiptPresentation.Apply(data);
             CollectionReceiptGrouping.Apply(data,
                 Convert.ToString(parameters.Single(p => p.ParameterName == "@GroupBy").Value) ?? "Whole School");
+        }
     }
     protected override bool IsSummaryView => ViewName == "Summary";
     protected override IEnumerable<SqlParameter> BuildParameters()

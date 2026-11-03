@@ -117,7 +117,7 @@ internal static class GridReportColumns
             int index=field.Ordinal;if(consumed.Contains(index))continue;
             var (caption,fields,presentation)=groups.GetValueOrDefault(index,(field.ColumnName,new[]{index},Kind.Standard));
             caption=caption switch {
-                "Money Received"=>"Money\nReceived", "Gross Received"=>"Gross\nReceived",
+                "Money Received" or "Payment Received"=>"Payment\nReceived", "Gross Received"=>"Gross\nReceived",
                 "Credit Applied"=>"Credit\nApplied", "Adjusted Collection"=>"Adjusted\nCollection",
                 "Open Charges (Net)"=>"Open Charges\n(Net)","Settled on Open Charges"=>"Settled on\nOpen Charges",
                 _=>caption

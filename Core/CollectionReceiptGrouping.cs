@@ -73,10 +73,15 @@ internal static class CollectionReceiptGrouping
             string campus = Text(row, "Campus");
             if (campus.Length == 0) campus = "Unassigned campus";
             if (grouping == "Campus") return (campus, "", "");
-            string placement = Text(row, "Class / Section");
-            int separator = placement.LastIndexOf(" – ", StringComparison.Ordinal);
-            string cls = separator < 0 ? placement : placement[..separator];
-            string section = separator < 0 ? "" : placement[(separator + 3)..];
+            var placements=Text(row,"Class / Section").Split('\n',StringSplitOptions.RemoveEmptyEntries)
+                .SelectMany(line=>line.Split(" / ",StringSplitOptions.RemoveEmptyEntries)).ToArray();
+            string Part(string placement,bool section)
+            {
+                int separator=placement.LastIndexOf(" – ",StringComparison.Ordinal);
+                return separator<0?(section?"":placement):section?placement[(separator+3)..]:placement[..separator];
+            }
+            string cls=string.Join(", ",placements.Select(placement=>Part(placement,false)).Distinct());
+            string section=string.Join(", ",placements.Select(placement=>Part(placement,true)).Where(text=>text.Length>0).Distinct());
             if (cls.Length == 0) cls = "Unassigned class";
             if (cls == "Multiple") cls = "Multiple classes / sections";
             return (campus, cls, grouping == "Section" ? section : "");

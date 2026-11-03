@@ -58,7 +58,18 @@ See `Docs/BACKUP_RECOVERY.md` for recovery guidance.
 
 ---
 
-## Current target: schema 74
+## Current target: schema 75
+
+Migration `75.sql` adds private receipt snapshot/student roster details and lists
+the actual distinct payment methods in `GetCollectionsAndReceiptsReport`.
+Collections & Receipts displays names with s/o or d/o and class/section entries
+in the same student order, using saved receipt names and placements where present.
+The receipt view omits its campus column. Financial aggregation, filtering,
+receipt identities and summary totals are unchanged; saved records are not edited.
+The visible amount label is Payment Received; existing column keys stay compatible
+with saved report layouts. Apply after 74 using the workflow above.
+
+## Previous target: schema 74
 
 Migration `74.sql` adds read-only father name and gender metadata to the student
 and charge views of `GetOutstandingAndAgingReport`. Print/PDF can show admission
@@ -191,7 +202,7 @@ For an approved upgrade starting at a supported schema between 19 and 69, apply 
 
 # Apply the database changes later
 
-The current application requires **schema 74**. SQL changes are checked in here;
+The current application requires **schema 75**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,

@@ -85,10 +85,11 @@ public sealed class ReportColumnDialog : ApplicationWindowForm
             if (list.Columns.Count > 0)
                 list.Columns[0].Width = list.ClientSize.Width;
         };
-        // ItemChecked fires after the new state is applied. During the constructor (Fill) there is no window handle yet, and BeginInvoke would throw - update directly then.
+        // Defer native checkbox notifications on the list's own handle: its
+        // items can still be entering the native control before the form exists.
         list.ItemChecked += (_, _) => {
-            if (IsHandleCreated)
-                BeginInvoke(new Action(UpdateCount));
+            if (list.IsHandleCreated)
+                list.BeginInvoke(new Action(UpdateCount));
             else
                 UpdateCount();
         };
@@ -230,9 +231,9 @@ public sealed class ReportColumnDialog : ApplicationWindowForm
     }
     private void UpdateCount()
     {
-        if (IsDisposed)
+        if (IsDisposed || Disposing)
             return;
-        int checkedCount = list.Items.Cast<ListViewItem>().Count(i => i.Checked);
+        int checkedCount = list.Items.Cast<ListViewItem>().Count(i => i is {Checked:true});
         count.Text = $"{checkedCount} of {list.Items.Count} columns shown";
     }
     private void Accept()
