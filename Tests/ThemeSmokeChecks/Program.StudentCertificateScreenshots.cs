@@ -94,10 +94,21 @@ internal static partial class Program
                 () => new LeaveCertificatePage(null, false), root, sample);
             CaptureCompactEditor("06-provisional-certificate-details-dialog.png", "Provisional",
                 () => new ProvisionalCertificatePage(false), root, sample);
+            CaptureCompactEditor("07-date-of-birth-details-dialog.png", "Date of Birth",
+                () => new DateOfBirthCertificatePage(false), root, sample);
+            CaptureCompactEditor("08-sports-certificate-details-dialog.png", "Sports",
+                () => new SportsCertificatePage(false), root, sample);
+            CaptureCompactEditor("09-no-objection-details-dialog.png", "No Objection",
+                () => new NoObjectionCertificatePage(false), root, sample);
+            DataRow collegeStudent = students.Rows.Add(42, "Zara Ali", "SYN-2026-042",
+                "Rashid Ali", "College Campus", "Year 2", "B", "Active",
+                new DateTime(2007, 5, 12), 102, 11, "College");
+            CaptureCompactEditor("10-college-leaving-details-dialog.png", "College Leaving",
+                () => new CollegeLeaveCertificatePage(false), root, collegeStudent);
 
             var files = Directory.GetFiles(root, "*.png");
-            Check(files.Length == 6 && files.All(f => new FileInfo(f).Length > 4000),
-                "Six actual WinForms workspace and compact-dialog images were rendered with fictional fixture data.");
+            Check(files.Length == 10 && files.All(f => new FileInfo(f).Length > 4000),
+                "All eight actual certificate details dialogs and two workspace layouts render with fictional fixture data.");
             Console.WriteLine("SCREENSHOTS: " + string.Join(", ", files.Select(Path.GetFileName)));
             Console.WriteLine("Noninteractive control render only; no database, operator input, printer, or installation was exercised.");
         }
@@ -131,6 +142,27 @@ internal static partial class Program
         using var dialog = CertificateWorkspaceDetailsDialog.BuildForScreenshot(
             type, sample, factory);
         dialog.Show(); Application.DoEvents();
+        var card = Descendants(dialog).OfType<HumanCard>()
+            .FirstOrDefault(item => item.Parent is Panel && item.Width > AppScale.Scale(500));
+        Check(card is not null && card.Height > AppScale.Scale(250) &&
+            card.Right <= dialog.ClientSize.Width && card.Bottom <= dialog.ClientSize.Height,
+            type + " shows its existing details card inside the compact dialog.");
+        Check(Descendants(card!).OfType<ModernButton>().Any(button =>
+                button.Text.Contains("Create", StringComparison.OrdinalIgnoreCase) ||
+                button.Text.Contains("Save", StringComparison.OrdinalIgnoreCase)),
+            type + " retains its genuine original save/create buttons.");
+
+        if (type == "Provisional")
+        {
+            var fields = Descendants(card).OfType<TableLayoutPanel>()
+                .FirstOrDefault(table => table.Dock == DockStyle.Top && table.RowCount >= 3);
+            Check(fields is not null && fields.RowCount == 5 &&
+                fields.Height >= fields.RowCount * AppMetrics.FieldRowHeight,
+                "The provisional modal allocates all five required rows at CI window width.");
+            Check(fields?.Parent is TableLayoutPanel body &&
+                body.RowStyles[body.GetRow(fields)].Height >= fields.Height,
+                "The provisional fields are not clipped by the original full-page row budget.");
+        }
         var controls = new Control[] { dialog }.Concat(Descendants(dialog));
         var layoutEvidence = controls
             .Where(c => c is Form or HumanCard or TableLayoutPanel or FlowLayoutPanel ||
