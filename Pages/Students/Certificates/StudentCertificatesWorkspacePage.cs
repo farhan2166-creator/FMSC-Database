@@ -30,6 +30,9 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
     };
     private readonly ModernButton open;
     private readonly ModernButton refresh;
+    private readonly ModernButton printAction;
+    private readonly ModernButton collectAction;
+    private readonly ModernButton reissueAction;
     private DataTable records = StudentCertificateRegisterReader.CreateTable();
     private bool reading;
     private bool editorOpen;
@@ -50,10 +53,13 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
             throw new UnauthorizedAccessException("Certificate access is required.");
 
         UseWrappingToolbar();
-        open = AddAction("Open Selected Certificate", (_, _) => OpenSelected(), "Primary");
+        open = AddAction("View / Edit Details…", (_, _) => OpenSelected(), "Primary");
+        printAction = AddBusyAction("Print / Reprint", () => RunWorkspaceActionAsync("print"), "Secondary");
+        collectAction = AddBusyAction("Mark Collected", () => RunWorkspaceActionAsync("collect"), "Secondary");
+        reissueAction = AddBusyAction("Issue Again", () => RunWorkspaceActionAsync("reissue"), "Secondary");
         refresh = AddBusyAction("Refresh Certificates", ReloadAsync, "Secondary");
         var find = AddAction("Change Student", (_, _) => { if (!reading) student.ShowMatches(); }, "Secondary");
-        open.Enabled = false;
+        open.Enabled = printAction.Enabled = collectAction.Enabled = reissueAction.Enabled = false;
         refresh.Enabled = false;
 
         student.PlaceholderText = StudentPicker.SearchPlaceholder;
@@ -207,7 +213,7 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         Grid.DataSource = records.DefaultView;
         identity.Text = "Select a student to see saved certificates.";
         details.Text = "Select a saved certificate to review its recorded details.";
-        open.Enabled = refresh.Enabled = false;
+        open.Enabled = printAction.Enabled = collectAction.Enabled = reissueAction.Enabled = refresh.Enabled = false;
     }
 
     private async Task ReloadAsync()
@@ -227,7 +233,7 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         bool leaving = CertificateWorkspaceAccess.CanOpenLeaving(CurrentUser.HasPermission);
         records = StudentCertificateRegisterReader.CreateTable();
         Grid.DataSource = records.DefaultView;
-        open.Enabled = refresh.Enabled = false;
+        open.Enabled = printAction.Enabled = collectAction.Enabled = reissueAction.Enabled = refresh.Enabled = false;
         identity.Text = Field(selected, "StudentName") + "  ·  " + Field(selected, "AdmissionNumber") +
             Environment.NewLine + "Father: " + Field(selected, "FatherName") +
             "  ·  " + Field(selected, "CampusName") + " / " + Field(selected, "ClassName") +
