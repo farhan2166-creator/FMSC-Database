@@ -6,6 +6,10 @@ on:
     branches: [feature/student-certificates-workspace]
     paths:
       - '.github/workflows/fmsc-certificate-visual-preview.yml'
+      - 'Pages/Students/Certificates/**'
+      - 'Core/CertificateCollectionFlow.cs'
+      - 'Tests/ThemeSmokeChecks/Program.StudentCertificateScreenshots.cs'
+      - 'Tests/ThemeSmokeChecks/Program.cs'
 
 permissions:
   contents: read
