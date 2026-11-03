@@ -64,6 +64,7 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
         if (initialize) StudentSearchCache.Warm();
 
         Grid.AutoGenerateColumns = false;
+        Grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         Grid.ReadOnly = true;
         Grid.MultiSelect = false;
         Grid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
@@ -201,6 +202,7 @@ public sealed class StudentCertificatesWorkspacePage : V2Page, IBusyPage
     private void ClearSelection()
     {
         generation++;
+        reading = false; // Invalidate a stale in-flight read without leaving the page busy.
         records = StudentCertificateRegisterReader.CreateTable();
         Grid.DataSource = records.DefaultView;
         identity.Text = "Select a student to see saved certificates.";
