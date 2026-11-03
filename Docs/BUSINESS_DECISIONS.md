@@ -356,6 +356,10 @@ subjects prefill certificates but remain operator-editable.
 Global record search: the dashboard text box keeps feature/page navigation;
 Ctrl+K separately searches students, saved bills/receipts and payment references.
 Default to All; an optional permitted record type filters SQL before limiting results.
+Name/admission lookups include saved document participants, never today's family;
+open the matched child's account while keeping the original document unchanged.
+Do not duplicate a saved receipt's linked payment aliases for a person lookup;
+keep those aliases searchable by number and keep standalone legacy entries.
 Limit results and cancel stale reads; recheck permissions, actor and database
 endpoint before displaying/opening. Explicit selected-record IDs override saved
 workspace selections and keep normal busy/unsaved-work guards. Open saved

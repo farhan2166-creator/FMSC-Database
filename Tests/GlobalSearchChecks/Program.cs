@@ -14,6 +14,8 @@ internal static partial class Program
         foreach(string value in new[]{"","A",new string('a',121)})Check(!GlobalSearchInput.CanSearch(value),"Empty, broad one-letter and oversized lookups do not query records");
         Check(GlobalSearchInput.EscapeLike("a%_[~") == "a~%~_~[~~","LIKE metacharacters are literal search text");
         Check(GlobalSearchInput.Words("one two three four five six seven").Length==7,"No part of a long person name is silently discarded");
+        Check(GlobalSearchInput.Normalize("  Ali\t\u00a0 Example\r\n ")=="Ali Example","Pasted whitespace collapses without changing name spelling");
+        Check(GlobalSearchInput.Words("Ali\tExample\nKhan").SequenceEqual(new[]{"Ali","Example","Khan"}),"Every whitespace-separated name part remains a keyword");
         foreach(string query in new[]{GlobalRecordSearch.Query,GlobalRecordSearch.ReadBill,GlobalRecordSearch.ReadReceiptIdentity,GlobalRecordSearch.ReadPayment})
         {
             var fragment=new TSql160Parser(true).Parse(new StringReader(query),out var errors);

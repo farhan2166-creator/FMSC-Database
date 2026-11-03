@@ -2,7 +2,7 @@ name: Global record search checks
 on:
   workflow_dispatch:
   push:
-    branches: [main, feat/global-record-search]
+    branches: [main, feat/global-record-search, feat/search-student-documents]
     paths:
       - 'Core/Global*.cs'
       - 'Core/CommandPaletteDialog.cs'
@@ -46,12 +46,29 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not create the owned disposable SQL instance.' }
           try {
             $env:FMSC_GLOBAL_SEARCH_SQL_CONNECTION = "Server=(localdb)\$instance;Initial Catalog=master;Integrated Security=true;TrustServerCertificate=true"
-            & dotnet run --project Tests/GlobalSearchChecks/GlobalSearchChecks.csproj -c Release -- --sql
-            if ($LASTEXITCODE -ne 0) { throw 'Global search contracts or disposable SQL checks failed.' }
+            & dotnet run --project Tests/GlobalSearchChecks/GlobalSearchChecks.csproj -c Release -- --sql 2>&1 | Tee-Object -Variable searchOutput
+            if ($LASTEXITCODE -ne 0) {
+              $detail = ($searchOutput | Select-Object -Last 40) -join "`n"
+              $detail = $detail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+              Write-Output "::error title=Global search SQL checks failed::$detail"
+              throw 'Global search contracts or disposable SQL checks failed.'
+            }
+            Write-Output "::notice title=Global search SQL checks::$($searchOutput | Select-Object -Last 1)"
           } finally {
             & sqllocaldb stop $instance -k
             & sqllocaldb delete $instance
             Remove-Item Env:FMSC_GLOBAL_SEARCH_SQL_CONNECTION -ErrorAction SilentlyContinue
           }
       - name: Search dialog, cancellation and separate feature navigation
-        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --global-search
+        shell: pwsh
+        run: |
+          & dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release -- --global-search 2>&1 | Tee-Object -Variable searchOutput
+          $searchExit = $LASTEXITCODE
+          if ($searchExit -ne 0) {
+            $detail = ($searchOutput | Select-Object -Last 40) -join "`n"
+            $detail = $detail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Global search dialog checks failed::$detail"
+          } else {
+            Write-Output "::notice title=Global search dialog checks::$($searchOutput | Select-Object -Last 1)"
+          }
+          exit $searchExit

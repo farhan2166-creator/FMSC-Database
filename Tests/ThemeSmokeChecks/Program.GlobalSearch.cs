@@ -45,6 +45,8 @@ internal static partial class Program
             Check(search.Text=="B-2026-00015"&&results.Items.Count==0,"Type filtering retains input and rejects another record kind");
             filter.SelectedItem=GlobalSearchScope.All;
             PumpUntil(()=>results.Items.OfType<GlobalSearchRecord>().Any(),"Choosing All restores matching records");
+            search.Text="  Ali  Example  ";
+            PumpUntil(()=>reads.LastOrDefault()=="Ali Example","Extra spaces in pasted names do not change the lookup keywords");
             CurrentUser.SignIn(9912,"Revoked fixture","Operator",false,new[]{"Students.View"});
             typeof(CommandPaletteDialog).GetMethod("Accept",flags)!.Invoke(records,null);
             Check(records.SelectedRecord is null,"Revoked financial access blocks opening a visible result");

@@ -17,7 +17,7 @@ internal sealed class SavedFinancialDocumentPage : V2Page,IBusyPage
     public bool IsBusy=>busy;
     public string BusyMessage=>"The saved financial record is being opened. Wait for it to finish.";
     internal SavedFinancialDocumentPage(GlobalSearchRecord target,Action<Func<Control>,string,string> navigate)
-        :base(target.Kind=="Bill"?"Saved Bill":"Saved Receipt",target.Reference+" · "+target.Name)
+        :base(target.Kind=="Bill"?"Saved Bill":target.Kind=="Receipt"?"Saved Receipt":"Payment Reference",target.Reference+" · "+target.Name)
     {
         this.target=target;this.navigate=navigate;
         open=AddBusyAction("Open Saved Document",()=>Guard(OpenAsync),"Primary");open.Enabled=false;

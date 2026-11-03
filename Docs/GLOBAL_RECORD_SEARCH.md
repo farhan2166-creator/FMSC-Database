@@ -17,6 +17,18 @@ order; former/pending records remain searchable. Numeric fragments of at least
 three digits may match document numbers. Results are limited to 20; type more
 of the name/reference to narrow them. LIKE punctuation is literal input.
 
+Bills and Receipts also accept student/father names and admission references.
+Family documents match their saved participants, including a child who has since
+left; current family membership does not change those matches. Results identify
+the matched child, and Open Student Account opens that child's account. This
+lookup uses current student identity; document previews retain their saved data.
+Among equally ranked documents, the newest appear first across document types.
+Name/admission lookups show a saved receipt once; its linked payment references
+remain independently searchable by number. Standalone legacy payments remain
+separate entries. Missing legacy participant metadata falls back to the primary
+student. Pasted whitespace is normalized, and missing admission references read
+Not assigned rather than exposing an internal student key as an admission number.
+
 Queries start after a short typing delay. New input and closing cancel pending
 work; late responses and responses belonging to another operator/endpoint are
 ignored. Search errors remain inline. Blank or broad one-letter queries do not
