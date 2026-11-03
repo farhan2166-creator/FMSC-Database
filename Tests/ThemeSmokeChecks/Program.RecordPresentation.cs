@@ -15,6 +15,13 @@ internal static partial class Program
             "Leaving-certificate attendance text is title case in the database parameter");
         Check((string)FMSC_SMS.DatabaseHelper.P("@BoardName","bise peshawar").Value=="BISE Peshawar",
             "Known abbreviations retain their proper spelling");
+        foreach (string acronym in new[] { "ICS", "FA" })
+        {
+            Check((string)RecordTextPolicy.NormalizeParameter("@ProgramName",acronym.ToLowerInvariant())! == acronym,
+                "Program saves preserve the " + acronym + " acronym");
+            Check(RecordTextPolicy.DisplayText("ProgramName",acronym.ToLowerInvariant()) == acronym,
+                "Previously saved program names display " + acronym + " in uppercase");
+        }
         foreach(string parameter in new[]{"@AdmissionNumber","@RollNumber","@Email","@Remarks"})
             Check((string)FMSC_SMS.DatabaseHelper.P(parameter,"ab12@example.com").Value=="ab12@example.com",
                 parameter+" retains its original content");

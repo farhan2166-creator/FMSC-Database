@@ -23,7 +23,8 @@ internal static class RecordTextPolicy
     {
         ["FMSC"]="FMSC",["SSC"]="SSC",["HSSC"]="HSSC",["BISE"]="BISE",["CNIC"]="CNIC",
         ["BPS"]="BPS",["BS"]="BS",["MS"]="MS",["BA"]="BA",["MA"]="MA",
-        ["BSc"]="BSc",["MSc"]="MSc",["MPhil"]="MPhil",["PhD"]="PhD",["IT"]="IT"
+        ["BSc"]="BSc",["MSc"]="MSc",["MPhil"]="MPhil",["PhD"]="PhD",["IT"]="IT",
+        ["ICS"]="ICS",["FA"]="FA"
     };
     private static readonly Dictionary<string,string> DisplayAliases=new(StringComparer.OrdinalIgnoreCase)
     {
