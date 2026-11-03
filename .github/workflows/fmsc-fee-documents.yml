@@ -1,4 +1,4 @@
-name: Fee document rendering
+name: '06 - Feature - Fee Document Rendering'
 
 on:
   workflow_dispatch:

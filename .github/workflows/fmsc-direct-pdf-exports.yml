@@ -1,4 +1,4 @@
-name: Direct PDF export samples
+name: '07 - Feature - Direct PDF Exports'
 
 on:
   workflow_dispatch:

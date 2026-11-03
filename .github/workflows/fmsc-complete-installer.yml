@@ -1,4 +1,4 @@
-name: FMSC Complete Windows Installer ZIP
+name: '10 - Package - Complete Windows Installer ZIP'
 
 on:
   workflow_dispatch:

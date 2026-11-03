@@ -1,4 +1,4 @@
-name: FMSC Disposable Windows Installation Acceptance
+name: '09 - Release - Windows Installation Acceptance'
 
 on:
   workflow_dispatch:

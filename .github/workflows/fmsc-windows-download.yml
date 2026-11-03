@@ -1,4 +1,4 @@
-name: FMSC Private Windows Application ZIP
+name: '11 - Package - Windows App-Only ZIP'
 
 on:
   workflow_dispatch:

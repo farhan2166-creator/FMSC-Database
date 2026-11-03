@@ -1,4 +1,4 @@
-name: FMSC .NET Desktop CI
+name: '02 - CI - Desktop Build and Regression'
 
 on:
   workflow_dispatch:

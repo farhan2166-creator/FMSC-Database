@@ -1,4 +1,4 @@
-name: FMSC Actions Run Retention
+name: '12 - Maintenance - Actions Run Retention'
 
 on:
   schedule:

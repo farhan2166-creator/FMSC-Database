@@ -1,4 +1,4 @@
-name: Global record search checks
+name: '05 - Feature - Global Record Search'
 on:
   workflow_dispatch:
   push:

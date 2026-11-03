@@ -1,4 +1,4 @@
-name: FMSC Level 1 lifecycle SQL
+name: '03 - CI - SQL Lifecycle Checks'
 
 on:
   workflow_dispatch:

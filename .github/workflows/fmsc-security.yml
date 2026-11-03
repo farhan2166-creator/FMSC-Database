@@ -1,4 +1,4 @@
-name: FMSC Security Checks
+name: '01 - CI - Security Checks'
 
 on:
   workflow_dispatch:

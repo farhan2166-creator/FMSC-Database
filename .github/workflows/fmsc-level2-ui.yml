@@ -1,4 +1,4 @@
-name: FMSC Level 2 UI infrastructure
+name: '04 - CI - Level 2 UI Infrastructure'
 on:
   workflow_dispatch:
     inputs:
