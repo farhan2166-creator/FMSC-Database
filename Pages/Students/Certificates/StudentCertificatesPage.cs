@@ -14,6 +14,8 @@ public sealed class StudentCertificatesPage : V2Page
         : base(PageTitles.StudentCertificates, "Choose a certificate to create, issue or print.")
     {
         this.navigate = navigate;
+        // Preview only: leave the existing certificate type cards and default navigation intact.
+        AddAction("Try Student Workspace (Preview)", (_, _) => OpenWorkspacePreview(), "Secondary");
         var root = new TableLayoutPanel {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
@@ -158,5 +160,30 @@ public sealed class StudentCertificatesPage : V2Page
         ModalPageCloseGuard.Attach(dialog,control);
         dialog.ShowDialog(FindForm());
     }
+
+    private void OpenWorkspacePreview()
+    {
+        if (!CertificateWorkspaceAccess.CanOpenHub(CurrentUser.HasPermission)) return;
+        if (navigate is not null)
+        {
+            navigate(() => new StudentCertificatesWorkspacePage(),
+                "Certificates", "Student Certificates Workspace Preview");
+            return;
+        }
+        using var dialog = new ApplicationWindowForm
+        {
+            Text = "Student Certificates Workspace Preview",
+            StartPosition = FormStartPosition.CenterParent,
+            Width = AppScale.Scale(1320),
+            Height = AppScale.Scale(850),
+            MinimumSize = new Size(AppScale.Scale(980), AppScale.Scale(620)),
+            BackColor = AppTheme.PageBackground
+        };
+        var page = new StudentCertificatesWorkspacePage { Dock = DockStyle.Fill };
+        dialog.Controls.Add(page);
+        ModalPageCloseGuard.Attach(dialog, page);
+        dialog.ShowDialog(FindForm());
+    }
+
 }
 
