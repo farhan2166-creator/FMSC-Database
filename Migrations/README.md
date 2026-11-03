@@ -58,7 +58,17 @@ See `Docs/BACKUP_RECOVERY.md` for recovery guidance.
 
 ---
 
-## Current target: schema 70
+## Current target: schema 71
+
+Migration `71.sql` adds editable starter programs: School → Primary, Middle,
+Secondary; College → F.Sc (Pre-Medical), F.Sc (Pre-Engineering), ICS, I.Com, FA.
+Custom programs remain available. Existing names within the same type are
+reused without edits; suggested codes already in use are left to their owners
+and the new starter gets no code. New programs follow existing display order.
+No classes, campus assignments, students or history are moved or rewritten.
+Apply after schema 70 using the backup and transaction workflow above.
+
+## Previous target: schema 70
 
 Migration 70 changes only GetOutstandingAndAgingReport output. Charges, Students
 and Families include Overdue Amount, Due Today, Not Yet Due and Due Date Missing. Families includes
@@ -152,7 +162,7 @@ For an approved upgrade starting at a supported schema between 19 and 69, apply 
 
 # Apply the database changes later
 
-The current application requires **schema 70**. SQL changes are checked in here;
+The current application requires **schema 71**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,

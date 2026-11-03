@@ -6,7 +6,7 @@ Application: FMSC School Management System 1.1.0-rc.2. Database schema: **69**.
 ## Integration update — 2 November 2026
 
 Reconciled with main `db5f8b3` (class/section consolidation and report fixes).
-The current application, installer and SQL fixture contexts require schema 70.
+The current application, installer and SQL fixture contexts require schema 71.
 The schema-69 baseline above is historical. Retain migrations 67–69 header repairs
 and the installer gap guard; do not overwrite newer report migration 70 or
 reintroduce already-fixed shortcut signatures. PR 71 overlaps this repair and
