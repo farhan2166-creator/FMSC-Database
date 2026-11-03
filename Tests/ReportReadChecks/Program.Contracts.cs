@@ -32,12 +32,25 @@ internal static partial class Program
             "All three debt views expose missing-date money instead of losing it from the split");
         Check(migration.Contains("DueDate < @AsOfDate") && migration.Contains("DueDate = @AsOfDate") && migration.Contains("DueDate > @AsOfDate"),
             "Debt reader separates overdue, due today and future charges");
+        string identityMigration=File.ReadAllText(Path.Combine(folder.FullName,"Migrations","74.sql"));
+        new TSql160Parser(true).Parse(new StringReader(identityMigration),out var identityErrors);
+        Check(identityErrors.Count==0,"Migration 74 parses as SQL Server syntax: "+string.Join("; ",identityErrors.Select(e=>e.Message)));
+        Check(System.Text.RegularExpressions.Regex.Matches(identityMigration,@"FatherName \[__StudentFatherName\], Gender \[__StudentGender\]").Count==2,
+            "Student and charge debt views return private recorded parent/gender metadata");
+        string Procedure(string sql)=>sql[sql.IndexOf("CREATE OR ALTER PROCEDURE",StringComparison.Ordinal)..sql.IndexOf("\nGO\nINSERT",StringComparison.Ordinal)].Replace("\r","");
+        // Strip only the four metadata additions, then compare the entire reader:
+        // permissions, grouping, arithmetic, filtering and sort must remain identical.
+        string withoutMetadata=identityMigration.Replace("\r","")
+            .Replace("S.StudentName, S.FatherName, S.Gender,","S.StudentName,")
+            .Replace("StudentName [Student], FatherName [__StudentFatherName], Gender [__StudentGender],","StudentName [Student],")
+            .Replace("AdmissionNumber, StudentName, FatherName, Gender, CampusName","AdmissionNumber, StudentName, CampusName");
+        Check(Procedure(withoutMetadata)==Procedure(migration.Replace("\r","")),"Migration 74 changes only parent/gender metadata; all financial logic is byte-for-byte preserved");
         using var archive=ZipFile.OpenRead(Path.Combine(folder.FullName,"fmsc.dacpac"));
         using var stream=archive.GetEntry("model.xml")!.Open();var model=XDocument.Load(stream);
         var columns=model.Descendants().Where(e=>(string?)e.Attribute("Type") is "SqlSimpleColumn" or "SqlComputedColumn").Select(e=>(string?)e.Attribute("Name")).ToHashSet();
         var required=new Dictionary<string,string[]> {
             ["StudentCreditEntries"]=new[]{"AdmissionId","Amount","CreatedAt"},
-            ["Students"]=new[]{"AdmissionId","AdmissionNumber","QuickReference","StudentName","FatherName","Status"},
+            ["Students"]=new[]{"AdmissionId","AdmissionNumber","QuickReference","StudentName","FatherName","Gender","Status"},
             ["Families"]=new[]{"FamilyId","FamilyCode"},["FamilyMembers"]=new[]{"AdmissionId","FamilyId"},
             ["Enrollments"]=new[]{"AdmissionId","EnrollmentId","EnrollmentDate","LeavingDate","Status","ClassSectionId","AcademicYearId","BillingStartDate"},
             ["StudentFeeAssignments"]=new[]{"StudentFeeAssignmentId","AdmissionId","EnrollmentId","FeeTypeId","Frequency","ConcessionLabel","DiscountAmount","CancelledAt","EffectiveFrom","EffectiveTo"},

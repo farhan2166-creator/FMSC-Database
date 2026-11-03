@@ -34,6 +34,11 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--report-student-identity"))
+        {
+            CheckReportStudentIdentity();
+            Console.WriteLine($"PASS: {checks} report identity, natural column order, projection and rendered PDF checks.");return;
+        }
         if (args.Contains("--registration-workflow"))
         {
             CheckRegistrationWorkflow();

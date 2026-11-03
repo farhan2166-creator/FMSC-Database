@@ -12,7 +12,7 @@ internal static class CreditBalanceReportData
             FROM dbo.StudentCreditEntries GROUP BY AdmissionId HAVING SUM(Amount)>0
         )
         SELECT S.AdmissionId,COALESCE(S.AdmissionNumber,S.QuickReference,CONCAT(N'ID-',S.AdmissionId)) [Adm. / QR No.],
-            S.StudentName [Student],S.FatherName [Father Name],F.FamilyId,COALESCE(F.FamilyCode,N'') [Family],
+            S.StudentName [Student],S.FatherName [Father Name],S.Gender [__StudentGender],F.FamilyId,COALESCE(F.FamilyCode,N'') [Family],
             COALESCE(CA.CampusName,N'Unassigned') [Campus],
             CONCAT(CL.ClassName,CASE WHEN NULLIF(SEC.SectionName,N'') IS NULL THEN N'' ELSE CONCAT(N' – ',SEC.SectionName) END) [Class / Section],
             C.AvailableCredit [Available Credit],C.LastActivity [Last Activity],S.Status [Student Status]
@@ -43,6 +43,11 @@ internal static class CreditBalanceReportData
             string[] fields = { "Adm. / QR No.", "Student", "Father Name", "Family", "Campus", "Class / Section", "Available Credit", "Last Activity", "Student Status" };
             foreach (string field in fields) result.Columns.Add(field,source.Columns[field]!.DataType);
             foreach (var row in selected) result.Rows.Add(fields.Select(field=>row[field]).ToArray());
+            if(source.Columns.Contains("__StudentGender"))
+            {
+                result.Columns.Add("__StudentGender",typeof(string));
+                for(int index=0;index<selected.Length;index++)result.Rows[index]["__StudentGender"]=selected[index]["__StudentGender"];
+            }
         }
         else
         {

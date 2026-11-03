@@ -41,6 +41,48 @@ The existing narrow paper width and automatic roll sizing are retained. The A4
 annual receipt selector now correctly describes three columns. No schema version
 change or SQL migration is required for these presentation changes.
 
+## Natural report columns — 3 November 2026
+
+The shared print/PDF layout now orders identity, current placement, historical
+admission/leaving or change details, contacts, dates, counts and financial amounts.
+Selected fields are grouped into labelled cells where they belong together:
+
+- Student/admission/father: `163 - Kausar d/o Ali`, with selected DOB and student
+  status on separate labelled lines. The recorded gender determines s/o or d/o;
+  unknown gender uses `child of`. Missing parents leave admission and name only.
+- Campus, current class/section and academic year share a placement column.
+  Admission and leaving classes remain distinct from current placement. Change
+  reports label previous/new class and status as From/To, even when values match.
+- Certificate registers group certificate, recipient/reference, recording and
+  collection details. Collection dates and collectors remain identifiable.
+- Receipt/date, payment method/receiver, family/members and oldest-due/aging
+  details share cells. Counts and financial measures retain separate columns;
+  their values and calculations are unchanged.
+
+Column selection is respected. CSV and Excel retain separate raw fields and the
+selected column order. Hidden parent/gender metadata supports Outstanding & Aging
+without exposing extra export columns; the advance balance reader carries recorded
+gender through its student projection. No student or financial records are changed.
+Migration `74.sql` updates the outstanding reader; app, installer and current SQL
+fixture schema pins are 74. Its procedure body differs from migration 70 only in
+the parent/gender metadata additions.
+
+Native verification: `--report-student-identity` renders Student List, Outstanding
+& Aging, Student Changes and Certificate Issue Register samples to PNG and PDF in
+`artifacts/report-student-identity`. It checks selected-field coverage, identity
+fallbacks, column order, unchanged numeric/export data and one-page sample output.
+`--grid-pdf` checks receipt totals, selected fields and wide-report pagination.
+Portable report checks parse migration 74 and compare its financial logic with 70.
+
+Local SQL verification — 3 November 2026: the standalone applier accepted the
+73 → 74 plan after the app/installer schema pins were aligned. It created and
+verified `FMSC_DB_BeforeMigration_v73_to_v74_20261103_123458.bak`, then applied 74
+inside its normal transaction wrapper. The expected installed MDF identity and
+final schema 74 were checked. Hashes of all eight Students, Charges, Families and
+Aging detail/summary result sets matched their pre-migration hashes after removing
+only the new private metadata columns; Students and Charges expose both fields.
+This verifies the local upgrade and report reader, not a release-package install.
+
 ## Verification
 
 - Portable report checks cover authoritative summaries, money/count formatting,

@@ -30,7 +30,8 @@ internal static class ReportExportBuilder
             while (export.Columns.Contains(uniqueHeader))
                 uniqueHeader = $"{header} ({++suffix})";
             bool asDate = dates.Contains(sourceColumn.ColumnName);
-            export.Columns.Add(uniqueHeader, asDate && !preserveDateTypes ? typeof(string) : sourceColumn.DataType);
+            var exportedColumn=export.Columns.Add(uniqueHeader, asDate && !preserveDateTypes ? typeof(string) : sourceColumn.DataType);
+            exportedColumn.ExtendedProperties[ReportStudentIdentity.SourceColumnKey]=sourceColumn.ColumnName;
             if (asDate)
                 dateOrdinals.Add(sourceColumns.Count - 1);
         }

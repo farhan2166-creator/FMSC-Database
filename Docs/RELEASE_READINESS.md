@@ -2,7 +2,7 @@
 
 > **Historical evidence — NOT a current release approval (reviewed 2026-11-01).**
 > This document records a **schema-21** operator-control release and its exact
-> 2026 test commit. The current application and installer require **schema 73**.
+> 2026 test commit. The current application and installer require **schema 74**.
 > Do not reuse the success statement, artifact checksum, or schema-21 procedure
 > list below as certification of the current source. Consult the current release
 > checklist and record new same-commit evidence before deployment.

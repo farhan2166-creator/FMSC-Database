@@ -56,7 +56,7 @@ jobs:
         timeout-minutes: 12
         run: |
           $ErrorActionPreference = 'Stop'
-          $suites = @('--grid-pdf', '--spreadsheet-export', '--action-shortcuts', '--report-ordering', '--saved-report-views', '--report-purpose', '--class-section-setup', '--registration-workflow', '--placement-workspace', '--fee-account', '--fee-documents', '--collection-fee-actions', '--student-purchase-collection', '--billing-grid')
+          $suites = @('--grid-pdf', '--report-student-identity', '--spreadsheet-export', '--action-shortcuts', '--report-ordering', '--saved-report-views', '--report-purpose', '--class-section-setup', '--registration-workflow', '--placement-workspace', '--fee-account', '--fee-documents', '--collection-fee-actions', '--student-purchase-collection', '--billing-grid')
           foreach ($suite in $suites) {
             Write-Output "Checking $suite"
             & dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- $suite
@@ -72,6 +72,8 @@ jobs:
           name: fmsc-direct-pdf-exports-${{ github.run_id }}
           path: |
             artifacts/grid-pdf/*-export.pdf
+            artifacts/report-student-identity/*.pdf
+            artifacts/report-student-identity/*.png
             Docs/DIRECT_PDF_EXPORT_SAMPLES.md
           retention-days: 7
           if-no-files-found: error

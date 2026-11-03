@@ -58,7 +58,16 @@ See `Docs/BACKUP_RECOVERY.md` for recovery guidance.
 
 ---
 
-## Current target: schema 73
+## Current target: schema 74
+
+Migration `74.sql` adds read-only father name and gender metadata to the student
+and charge views of `GetOutstandingAndAgingReport`. Print/PDF can show admission
+number, student and parent together, using the recorded gender for s/o or d/o.
+These private fields do not appear as extra grid, CSV or Excel columns. Charge
+selection, balance calculations, sorting and totals remain unchanged.
+Apply after 73 using the backup and transaction workflow above.
+
+## Previous target: schema 73
 
 Migration `73.sql` makes remarks optional in `ProcessStudentCredit` for deposits,
 refunds and sibling transfers. Omitted, NULL and blank remarks are stored as an
@@ -182,7 +191,7 @@ For an approved upgrade starting at a supported schema between 19 and 69, apply 
 
 # Apply the database changes later
 
-The current application requires **schema 73**. SQL changes are checked in here;
+The current application requires **schema 74**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,
