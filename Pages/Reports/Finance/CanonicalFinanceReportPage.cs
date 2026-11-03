@@ -330,6 +330,9 @@ public abstract class CanonicalFinanceReportPage : V2Page
             var asOf = parameters.FirstOrDefault(p => p.ParameterName == "@AsOfDate");
             if (asOf?.Value is DateTime date) summary += $"   Aging date: {date:dd-MM-yyyy}";
             var transform = CaptureResultTransform(parameters);
+            // Subclasses may consult view controls here. Capture before the
+            // provider continuation moves onto a worker thread.
+            bool appendTotals = AppendReportTotals;
             var order = (ReportRowOrder.Choice)_orderBy.SelectedItem!;
             await BindReportAsync(async token => {
                 DataSet result = await ReadReportAsync(parameters, token).ConfigureAwait(false);
@@ -338,7 +341,7 @@ public abstract class CanonicalFinanceReportPage : V2Page
                 totals = result.Tables.Count > 1 ? result.Tables[1] : null;
                 // Outstanding totals already appear above the grid. Keep its rows
                 // limited to actual records so pagination does not count a total.
-                if (AppendReportTotals)
+                if (appendTotals)
                     AppendAuthoritativeTotalRow(captured, totals);
                 (captured, totals) = transform(captured, totals);
                 captured = ReportRowOrder.Apply(captured, order);

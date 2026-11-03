@@ -112,6 +112,14 @@ transaction and passed the same 32 comparisons against the upgraded database.
 
 ## Verification
 
+Billing Summary async regression — 3 November 2026: the shared finance loader
+captures the total-row setting on the UI thread before awaiting data. The previous
+worker-thread continuation evaluated Billing Summary's view-dependent property and
+read a WinForms dropdown, causing the logged cross-thread report failure. Native
+`--finance-report-async` runs the actual Billing Summary page with a delayed
+fictional response, verifies the headings and authoritative total, and checks that
+print/export become available without a failure dialog. No SQL change is required.
+
 - Portable report checks cover authoritative summaries, money/count formatting,
   total/detail counts and new due-status metrics.
 - Reporting-engine checks compile/process the actual StudentBill, FamilyBill,

@@ -34,6 +34,10 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--finance-report-async"))
+        {
+            CheckFinanceReportAsync();Console.WriteLine($"PASS: {checks} delayed Billing Summary, thread access, total and print/export checks.");return;
+        }
         if(args.Contains("--collection-receipt-presentation"))
         {
             CheckCollectionReceiptPresentation();Console.WriteLine($"PASS: {checks} collection receipt roster, placement, method, caption and PDF checks.");return;

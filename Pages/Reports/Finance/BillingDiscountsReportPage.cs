@@ -2,16 +2,18 @@ using Microsoft.Data.SqlClient;
 namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed class BillingDiscountsReportPage : CanonicalFinanceReportPage
 {
+    private readonly Func<SqlParameter[],CancellationToken,Task<DataSet>>? reportReader;
     private readonly FMSC_SMS.Core.ModernDatePicker asOf = new() {
         Format=DateTimePickerFormat.Custom,CustomFormat="dd-MM-yyyy",Value=DateTime.Today
     };
-    public BillingDiscountsReportPage() : base(
+    public BillingDiscountsReportPage() : this(null) { }
+    internal BillingDiscountsReportPage(Func<SqlParameter[],CancellationToken,Task<DataSet>>? reportReader) : base(
         "Billing & Discounts", "Review billed fees, discounts and net amounts payable.",
         "GetBillingAndDiscountsReport", "FMSC_Billing_Discounts",
         new[] { "Billing Summary", "Billing Detail", "Discount Detail", "Concession Assignments", "Concession Summary" },
         new[] { "Day", "Week", "Month", "Class", "Campus", "Fee Type" },
         true, false, false, true)
-    { asOf.ValueChanged += (_,_) => FiltersChanged(); }
+    { this.reportReader=reportReader;asOf.ValueChanged += (_,_) => FiltersChanged(); }
     protected override IEnumerable<(string,Control)> AdditionalReportFilters() => new[] { ("Concession summary as of",(Control)asOf) };
     protected override string AdditionalFilterSignature => ViewName=="Concession Summary" ? asOf.Value.Date.ToString("yyyy-MM-dd") : "";
     protected override void UpdateViewControls()
@@ -26,6 +28,7 @@ public sealed class BillingDiscountsReportPage : CanonicalFinanceReportPage
     protected override bool AppendReportTotals => ViewName != "Concession Summary" && base.AppendReportTotals;
     protected override async Task<DataSet> ReadReportAsync(SqlParameter[] parameters, CancellationToken token)
     {
+        if(reportReader is not null)return await reportReader(parameters,token).ConfigureAwait(false);
         if (!Equals(parameters.Single(p=>p.ParameterName=="@View").Value,"Concession Summary"))
             return await base.ReadReportAsync(parameters,token);
         var queryParameters=parameters.Concat(new[] { DatabaseHelper.Int("@UserId",CurrentUser.UserId), DatabaseHelper.Date("@AsOfDate",asOf.Value.Date) }).ToArray();
