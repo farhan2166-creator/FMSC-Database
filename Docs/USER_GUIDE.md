@@ -221,7 +221,7 @@ chosen order; earlier saved views use Default. Student Reports retains its
 existing Sort by control. Bills/receipts retain their finalized wording.
 
 Named **Saved Views** are available in Collections & Receipts, Outstanding &
-Aging, Billing & Discounts, Student Credit Balance Register, Monthly Fee
+Aging, Billing & Discounts, Student Advance Balance Register, Monthly Fee
 Reconciliation, Certificate Issue Register and Class Marks & Attendance Sheets.
 Set the filters and grouping, run the report and choose **Columns** where offered,
 then **Save View**. Select a saved name and click **Apply View**, review the restored
@@ -259,7 +259,7 @@ In Billing & Discounts, **Concession Summary** shows assigned discount rates per
 billing cycle. Monthly and yearly rows remain separate; these are not amounts
 already deducted on posted bills.
 
-**Student Credit Balance Register**, under Reports > Finance, lists current
+**Student Advance Balance Register**, under Reports > Finance, lists current
 positive advance credit by student or family, with latest credit activity. It
 requires report-view and fee-view access. Location filters use current/latest
 placement; the minimum credit filter applies to each student before family totals.

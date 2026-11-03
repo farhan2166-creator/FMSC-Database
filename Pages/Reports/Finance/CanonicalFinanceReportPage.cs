@@ -270,6 +270,8 @@ public abstract class CanonicalFinanceReportPage : V2Page
         $"{From.Checked}:{From.Value.Date:yyyy-MM-dd}", $"{To.Checked}:{To.Value.Date:yyyy-MM-dd}",
         Campus.SelectedId, Year.SelectedId, Class.SelectedId, Section.SelectedId, AdditionalFilterSignature, _orderBy.Text);
     protected override string ReportFilterSignature() => Signature();
+    protected override string ReportExportTitle() => string.IsNullOrWhiteSpace(ViewName)
+        ? NavigationTitle : $"{NavigationTitle} — {ViewName}";
     protected override string ReportExportSubtitle() =>
         _filterSummary.Length == 0 ? base.ReportExportSubtitle() : _filterSummary;
     protected void FiltersChanged()

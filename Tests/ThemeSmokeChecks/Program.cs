@@ -571,6 +571,10 @@ internal static partial class Program
         {
             CheckBillRollHeights();Console.WriteLine($"PASS: {checks} independent bill-height, complete-slip, PDF, printer and preview checks.");return;
         }
+        if(args.Contains("--report-document-tools"))
+        {
+            CheckReportDocumentTools();Console.WriteLine($"PASS: {checks} report naming, export filename and printed-page search checks (no database connection).");return;
+        }
         if(args.Contains("--bill-preparation"))
         {
             CheckBillPreparationChoices();Console.WriteLine($"PASS: {checks} bill grouping, explicit selection, receipt child copy and batch recovery checks.");return;
@@ -1215,6 +1219,7 @@ internal static partial class Program
 
     private static void CheckChoiceFilters(Form form)
     {
+        CheckReportFilterSizing();
         var reportUi = typeof(AppTheme).Assembly.GetType("FMSC_SMS.Pages.Reports.ReportUi")!;
         using var filters = new Panel { Height = 50 };
         var method = new ModernComboBox { Width = 250 };

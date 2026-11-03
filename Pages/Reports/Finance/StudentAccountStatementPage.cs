@@ -120,12 +120,10 @@ public sealed partial class StudentAccountStatementPage : V2Page, IBusyPage
             AppMetrics.TextHeight(AppTheme.FieldCaptionFont) + AppMetrics.InputControlHeight
             + AppMetrics.SpacingSm + Math.Max(studentSearch.Margin.Vertical, from.Margin.Vertical));
         filterGrid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        filterGrid.Controls.Add(HumanUi.Field("Student", studentSearch), 0, 0);
+        filterGrid.Controls.Add(ReportUi.FormField("Student", studentSearch), 0, 0);
         filterGrid.SetColumnSpan(studentSearch.Parent!, 2);
-        filterGrid.Controls.Add(HumanUi.Field("From (optional)", from), 2, 0);
-        filterGrid.Controls.Add(HumanUi.Field("To (optional)", to), 3, 0);
-        foreach (TableLayoutPanel field in filterGrid.Controls.OfType<TableLayoutPanel>())
-            field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        filterGrid.Controls.Add(ReportUi.FormField("From (optional)", from), 2, 0);
+        filterGrid.Controls.Add(ReportUi.FormField("To (optional)", to), 3, 0);
         generateStatementButton = CreateFilterButton("View Account", AppTheme.Primary);
         generateStatementButton.Click += async (_, _) => await LoadStatement();
         var clear = CreateFilterButton("Reset Filters", AppTheme.MutedText);

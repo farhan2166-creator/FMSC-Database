@@ -61,10 +61,8 @@ public sealed class AnnualFeeReceiptsPage : V2Page, IBusyPage
         fieldsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,25));
         fieldsTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,view.Width+reset.Width+AppMetrics.SpacingSm*2));
         fieldsTable.RowStyles.Add(new RowStyle(SizeType.Absolute, fieldRowHeight));
-        fieldsTable.Controls.Add(HumanUi.Field("Student", student), 0, 0);
-        fieldsTable.Controls.Add(HumanUi.Field("Academic Year", year), 1, 0);
-        foreach(var field in fieldsTable.Controls.OfType<TableLayoutPanel>())
-            field.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+        fieldsTable.Controls.Add(ReportUi.FormField("Student", student), 0, 0);
+        fieldsTable.Controls.Add(ReportUi.FormField("Academic Year", year), 1, 0);
         var buttonCell=new FlowLayoutPanel { Dock=DockStyle.Fill,Margin=Padding.Empty, WrapContents=false,
             Padding=new Padding(0,Math.Max(16,AppMetrics.TextHeight(AppTheme.FieldCaptionFont)),AppMetrics.SpacingSm,AppMetrics.SpacingSm) };
         view.Dock=DockStyle.None;view.Margin=new Padding(0,0,AppMetrics.SpacingSm,0);

@@ -5,7 +5,7 @@ namespace FMSC_SMS.Pages.Reports.Finance;
 public sealed class CreditBalanceReportPage : CanonicalFinanceReportPage
 {
     private readonly ModernNumericTextBox minimum = new() { Minimum = 0, Maximum = 1000000000m, ZeroAsPlaceholder = true };
-    public CreditBalanceReportPage() : base("Student Credit Balance Register",
+    public CreditBalanceReportPage() : base("Student Advance Balance Register",
         "Advance credit held for students. This is not outstanding fees or new income. Location filters use the current or latest placement.",
         "CreditBalanceRegister", "FMSC_Credit_Balances", new[] { "Students", "Families" }, Array.Empty<string>(),false,false,false,false)
     {

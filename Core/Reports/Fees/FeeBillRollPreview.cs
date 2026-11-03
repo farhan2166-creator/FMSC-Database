@@ -7,6 +7,7 @@ internal static class FeeBillRollPreview
 {
     internal static void Show(Form? owner,string title,string path,string dataSetName,DataTable display)
     {
+        title=ReportDocumentNaming.PreviewTitle(title,path,display);
         using var document=FeeBillRollDocument.Render(path,dataSetName,display);
         Show(owner,title,document);
     }
@@ -57,9 +58,9 @@ internal static class FeeBillRollPreview
             if(dialog.ShowDialog(form)==DialogResult.OK)printer=(PrinterSettings)job.PrinterSettings.Clone();
         });
         var export=Button("Export PDF",()=>{
-            using var dialog=new SaveFileDialog {Filter="PDF document (*.pdf)|*.pdf",DefaultExt="pdf",AddExtension=true,FileName=title,Title="Export report"};
+            using var dialog=new SaveFileDialog {Filter="PDF document (*.pdf)|*.pdf",DefaultExt="pdf",AddExtension=true,FileName=ReportDocumentNaming.ExportFileName(title),Title="Export report"};
             if(dialog.ShowDialog(form)==DialogResult.OK)AtomicExportFile.Publish(dialog.FileName,
-                file=>File.WriteAllBytes(file,document.ExportPdf()),PdfTableExporter.ValidatePdf);
+                file=>File.WriteAllBytes(file,document.ExportPdf(title)),PdfTableExporter.ValidatePdf);
         });
         ModernButton? previous=null,next=null;
         void Navigate(int page)
@@ -71,6 +72,11 @@ internal static class FeeBillRollPreview
         previous=Button("Previous",()=>Navigate(selected-1));toolbar.Controls.Add(number);toolbar.Controls.Add(label);
         var go=Button("Go",()=>Navigate((int)number.Value));next=Button("Next",()=>Navigate(selected+1));
         toolbar.Controls.Add(zoom);toolbar.Controls.Add(view);var close=Button("Close",form.Close);
+        var search=new ReportPreviewSearchBar(form,()=>{
+            byte[] pdf=document.ExportPdf(title);
+            return Task.Run(()=>ReportPageSearchIndex.FromPdf(pdf));
+        },Navigate);
+        toolbar.Controls.Add(search);
         void ApplyZoom()
         {
             string text=Convert.ToString(zoom.SelectedItem)??"Fit page";

@@ -17,6 +17,7 @@ internal static class RdlcReportPreview
         bool enableExternalImages = false,
         bool allowMultiplePages = true)
     {
+        title = ReportDocumentNaming.PreviewTitle(title, reportPath, data);
         using var printData=RecordTextPolicy.PrintCopy(data);
         Rectangle workingArea = owner is Control ownerControl
             ? Screen.FromControl(ownerControl).WorkingArea
@@ -47,6 +48,7 @@ internal static class RdlcReportPreview
             ShowToolBar = false
         };
         viewer.LocalReport.EnableExternalImages = enableExternalImages;
+        viewer.LocalReport.DisplayName = title;
         if (reportDefinition is null) viewer.LocalReport.ReportPath = reportPath;
         else viewer.LocalReport.LoadReportDefinition(new StringReader(reportDefinition));
         viewer.LocalReport.DataSources.Clear();
@@ -210,6 +212,11 @@ internal static class RdlcReportPreview
             });
             toolbar.Controls.Add(pageView);
         }
+        var search = new ReportPreviewSearchBar(form, () => {
+            byte[] pdf = viewer.LocalReport.Render("PDF",RdlcReportPrinter.PageDeviceInfo(viewer.GetPageSettings()));
+            return Task.Run(() => ReportPageSearchIndex.FromPdf(pdf));
+        }, NavigateTo);
+        toolbar.Controls.Add(search);
         void ApplyPageView()
         {
             bool multiple = pageView?.SelectedIndex == 1;
@@ -281,16 +288,16 @@ internal static class RdlcReportPreview
         });
         form.ShortcutController.RegisterShortcut(go, Keys.Control | Keys.Home, "Ctrl+Home", () => NavigateTo(1));
         form.ShortcutController.RegisterShortcut(go, Keys.Control | Keys.End, "Ctrl+End", () => NavigateTo(Math.Max(1, viewer.GetTotalPages())));
-        BindToolbarAction(form, pageSetup, Keys.Alt | Keys.P, "Alt+P", () => Execute("set up", () => { viewer.PageSetupDialog(); overview.ClearPages(); ApplyPageView(); }));
+        BindToolbarAction(form, pageSetup, Keys.Alt | Keys.P, "Alt+P", () => Execute("set up", () => { viewer.PageSetupDialog(); overview.ClearPages(); search.ResetIndex(); ApplyPageView(); }));
         BindToolbarAction(form, exportPdf, Keys.Alt | Keys.E, "Alt+E", () => {
             Execute("export", () => {
                 using var dialog = new SaveFileDialog {
                     Filter = "PDF document (*.pdf)|*.pdf", DefaultExt = "pdf", AddExtension = true,
-                    FileName = string.Concat(form.Text.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c)),
+                    FileName = ReportDocumentNaming.ExportFileName(form.Text),
                     Title = "Export report"
                 };
                 if (dialog.ShowDialog(form) != DialogResult.OK) return;
-                byte[] bytes = viewer.LocalReport.Render("PDF");
+                byte[] bytes = viewer.LocalReport.Render("PDF",RdlcReportPrinter.PageDeviceInfo(viewer.GetPageSettings()));
                 AtomicExportFile.Publish(dialog.FileName, temporary => File.WriteAllBytes(temporary, bytes), PdfTableExporter.ValidatePdf);
             });
         });
@@ -379,6 +386,7 @@ internal static class RdlcReportPreview
         form.ShortcutController.RefreshHints();
         void SetReady(bool ready)
         {
+            search.Enabled = ready;
             print.Enabled = printCurrent.Enabled = pageSetup.Enabled = exportPdf.Enabled = zoom.Enabled = pageNumber.Enabled = go.Enabled = ready;
             printPageMenu.Enabled = ready;
             if (pageView is not null) pageView.Enabled = ready;

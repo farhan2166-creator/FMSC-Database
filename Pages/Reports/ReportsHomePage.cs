@@ -107,7 +107,7 @@ public sealed class ReportsHomePage : V2Page
                         "Finance",
                         () => new MonthlyFeeReconciliationPage()),
                     ..(CurrentUser.HasPermission("Fees.View") ? new ReportDefinition[] {
-                        new("Student Credit Balance Register", "Current advance balances by student or family, with latest credit activity.",
+                        new("Student Advance Balance Register", "Current advance balances by student or family, with latest credit activity.",
                             "Finance", () => new CreditBalanceReportPage())
                     } : Array.Empty<ReportDefinition>()),
                     ..(CurrentUser.HasPermission("Fees.Statement.View") ? new ReportDefinition[] {
