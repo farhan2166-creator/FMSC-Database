@@ -457,9 +457,20 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             Margin = new Padding(6, 2, 8, 2),
             /* Quick Navigation searches pages and features, not students. */
             PlaceholderText = "Search features...",
-            /* Exclude the click-only Quick Navigation launcher from tab order. */
+            /* Keep the Quick Navigation launcher out of the page's tab order. */
             TabStop = false
         };
+        var featureSearchBox = _globalSearchBox;
+        int featureSearchVersion = 0;
+        bool featureSearchOpen = false;
+        void OpenFeatureSearch()
+        {
+            if(featureSearchOpen || featureSearchBox.IsDisposed)return;
+            featureSearchVersion++;
+            featureSearchOpen=true;
+            try { ShowCommandPalette(featureSearchBox.Text.Trim()); }
+            finally { featureSearchOpen=false; }
+        }
         /* Reject typed digits and remove pasted digits from feature search. */
         _globalSearchBox.KeyPress += (_, e) => {
             if (!char.IsDigit(e.KeyChar))
@@ -467,20 +478,27 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             e.Handled = true;
             System.Media.SystemSounds.Beep.Play();
         };
-        _globalSearchBox.TextChanged += (_, _) => {
-            string text = _globalSearchBox.Text;
+        _globalSearchBox.TextChanged += async (_, _) => {
+            int version = ++featureSearchVersion;
+            string text = featureSearchBox.Text;
             string clean = CommandPaletteDialog.StripDigits(text);
-            if (string.Equals(clean, text, StringComparison.Ordinal))
+            if (!string.Equals(clean, text, StringComparison.Ordinal))
+            {
+                int caret = Math.Max(0, featureSearchBox.SelectionStart - (text.Length - clean.Length));
+                featureSearchBox.Text = clean;
+                featureSearchBox.SelectionStart = Math.Min(caret, clean.Length);
                 return;
-            int caret = Math.Max(0, _globalSearchBox.SelectionStart - (text.Length - clean.Length));
-            _globalSearchBox.Text = clean;
-            _globalSearchBox.SelectionStart = Math.Min(caret, clean.Length);
+            }
+            if(string.IsNullOrWhiteSpace(clean) || featureSearchOpen)return;
+            await Task.Delay(300);
+            if(IsDisposed || featureSearchBox.IsDisposed || version!=featureSearchVersion || !featureSearchBox.ContainsFocus)return;
+            OpenFeatureSearch();
         };
         _globalSearchBox.KeyDown += (_, e) => {
             if (e.KeyCode != Keys.Enter)
                 return;
             e.SuppressKeyPress = true;
-            ShowCommandPalette(_globalSearchBox.Text.Trim());
+            OpenFeatureSearch();
         };
         _commandButton = new ModernButton {
             Text = "⌘  Ctrl+K",

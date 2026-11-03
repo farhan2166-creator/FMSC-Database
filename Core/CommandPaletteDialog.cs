@@ -80,7 +80,7 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
         if(readRecords is not null)
         {
             results.DrawMode=DrawMode.OwnerDrawFixed;
-            results.ItemHeight=AppMetrics.TextHeight(AppTheme.NormalFont)*2+AppScale.S(10);
+            results.ItemHeight=AppMetrics.TextHeight(AppTheme.BodyBoldFont)+AppMetrics.TextHeight(AppTheme.NormalFont)+AppScale.S(20);
             results.DrawItem+=DrawResult;
         }
         searchStatus.Dock=DockStyle.Bottom;searchStatus.Height=AppScale.S(32);
@@ -209,10 +209,17 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
         object item=results.Items[e.Index];
         string title=item is GlobalSearchRecord record?record.Heading:((NavigationCommand)item).Caption;
         string detail=item is GlobalSearchRecord row?row.Context:"Page navigation";
-        var top=new Rectangle(e.Bounds.Left+6,e.Bounds.Top+3,e.Bounds.Width-12,e.Bounds.Height/2);
-        var bottom=new Rectangle(top.Left,top.Bottom,top.Width,e.Bounds.Height/2-3);
-        TextRenderer.DrawText(e.Graphics,title,AppTheme.NormalFont,top,color,TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine);
-        TextRenderer.DrawText(e.Graphics,detail,AppTheme.SmallFont,bottom,selected?color:AppTheme.MutedText,TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine);
+        int inset=AppScale.S(10);
+        var top=new Rectangle(e.Bounds.Left+inset,e.Bounds.Top+AppScale.S(7),Math.Max(0,e.Bounds.Width-inset*2),AppMetrics.TextHeight(AppTheme.BodyBoldFont));
+        var bottom=new Rectangle(top.Left,top.Bottom+AppScale.S(3),top.Width,AppMetrics.TextHeight(AppTheme.NormalFont));
+        const TextFormatFlags flags=TextFormatFlags.EndEllipsis|TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix|TextFormatFlags.VerticalCenter;
+        TextRenderer.DrawText(e.Graphics,title,AppTheme.BodyBoldFont,top,color,flags);
+        TextRenderer.DrawText(e.Graphics,detail,AppTheme.NormalFont,bottom,color,flags);
+        if(!selected)
+        {
+            using var divider=new Pen(AppTheme.Border);
+            e.Graphics.DrawLine(divider,top.Left,e.Bounds.Bottom-1,e.Bounds.Right-inset,e.Bounds.Bottom-1);
+        }
         e.DrawFocusRectangle();
     }
     protected override void OnFormClosed(FormClosedEventArgs e)
