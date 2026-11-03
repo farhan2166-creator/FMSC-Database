@@ -11,6 +11,8 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
     private readonly ModernButton add;
     private readonly ModernButton save;
     private readonly ModernButton cancel;
+    private readonly ModernButton delete;
+    private bool programsDeleted;
     public int SelectedId { get; private set; }
     public string? SelectedParentValue { get; private set; }
     /* Prevent a queued click from repeating a completed save. */
@@ -41,7 +43,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(AppScale.Scale(560), AppScale.Scale(420));
+        ClientSize = new Size(AppScale.Scale(660), AppScale.Scale(420));
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         var title = new Label {
@@ -101,6 +103,12 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
             ThemeRole = "Secondary",
             TabIndex = 8
         };
+        delete = new ModernButton {
+            Text = "Delete", ThemeRole = "Danger", Enabled = false,
+            Width = AppScale.Scale(105), Height = AppMetrics.ButtonHeight, TabIndex = 9
+        };
+        UiAccessibility.Describe(delete, "Delete Program", "Only programs without linked classes can be deleted.");
+        delete.Click += (_, _) => DeleteProgram();
         /* Cancel closes immediately when no save is running. */
         cancel.Click += (_, _) => {
             DialogResult = DialogResult.Cancel;
@@ -149,7 +157,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
         save.Click += (_, _) =>
             SaveProgram();
         var buttons =
-            HumanUi.ButtonRow(add, save, cancel);
+            HumanUi.ButtonRow(add, save, delete, cancel);
         buttons.Dock = DockStyle.Top;
         buttons.TabStop = false;
         int buttonRowHeight = buttons.GetPreferredSize(Size.Empty).Height + buttons.Margin.Vertical;
@@ -183,12 +191,15 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
             buttonRowHeight;
         ClientSize =
             new Size(
-                AppScale.Scale(560),
+                AppScale.Scale(660),
                 Math.Max(AppScale.Scale(420), requiredClientHeight));
         AcceptButton = save;
         CancelButton = cancel;
         FormFlow.EnterMovesToNext(this);
         Disposed += (_, _) => validator.Dispose();
+        FormClosing += (_, _) => {
+            if (programsDeleted && !savedSuccessfully) DialogResult = DialogResult.OK;
+        };
         TabStop = true;
         LoadPrograms();
         BeginNewProgram();
@@ -213,8 +224,8 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
                 "ProgramName";
             existing.ValueMember =
                 "AcademicProgramId";
-            existing.DataSource =
-                dt;
+            existing.DataSource = parentType is null ? (object)dt :
+                new DataView(dt) { RowFilter = $"ProgramType = '{parentType}'" };
             existing.SelectedIndex =
                 -1;
         }
@@ -248,6 +259,13 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
                 row["ProgramName"]) ?? string.Empty;
         SelectedId =
             Convert.ToInt32(row["AcademicProgramId"]);
+        delete.Enabled = false;
+        try
+        {
+            delete.Enabled = Convert.ToInt32(DatabaseHelper.ScalarUser("GetAcademicProgramUsageCount",
+                DatabaseHelper.Int("@AcademicProgramId", SelectedId))) == 0;
+        }
+        catch (Exception ex) { AppExceptionHandler.LogNonFatal(ex, "Checking program deletion availability"); }
     }
     private void BeginNewProgram()
     {
@@ -265,6 +283,7 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
         }
         SelectedId = 0;
         SelectedParentValue = null;
+        delete.Enabled = false;
         programType.SelectedIndex = parentType is null ? -1 : programType.Items.IndexOf(parentType);
         programType.Enabled = parentType is null;
         code.Clear();
@@ -354,6 +373,26 @@ public sealed class AcademicProgramManagerForm : ApplicationWindowForm, IManaged
             ModernMessageDialog.Show(this, DbMessage.UserMessage(ex), "Program", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             /* Focus the name field after a save refusal. */
             name.Focus();
+        }
+    }
+    private void DeleteProgram()
+    {
+        if (SelectedId <= 0 || savedSuccessfully || !delete.Enabled ||
+            existing.SelectedItem is not DataRowView row) return;
+        string savedName = Convert.ToString(row["ProgramName"]) ?? string.Empty;
+        if (!ModernMessageDialog.Confirm(this, $"Delete the program \"{savedName}\"? This cannot be undone.", "Delete Program")) return;
+        delete.Enabled = false;
+        try
+        {
+            DatabaseHelper.ExecuteUser("DeleteAcademicProgram", DatabaseHelper.Int("@AcademicProgramId", SelectedId));
+            programsDeleted = true;
+            BeginNewProgram();
+            LoadPrograms();
+        }
+        catch (Exception ex)
+        {
+            ModernMessageDialog.Show(this, DbMessage.UserMessage(ex), "Delete Program", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            LoadSelected();
         }
     }
 }

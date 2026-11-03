@@ -58,7 +58,17 @@ See `Docs/BACKUP_RECOVERY.md` for recovery guidance.
 
 ---
 
-## Current target: schema 71
+## Current target: schema 72
+
+Migration `72.sql` adds `DeleteAcademicProgram` and `GetAcademicProgramUsageCount`.
+Both require `System.Setup`. Deletion is refused if any class references the
+program; transaction locks and foreign keys protect against concurrent use.
+There is no cascading deletion or reassignment. Manage Programs disables Delete
+for linked programs, confirms deletion of an unused program, and refreshes the
+current School/College list and the calling class editor after deletion.
+Apply after 71 using the backup and transaction workflow above.
+
+## Previous target: schema 71
 
 Migration `71.sql` adds editable starter programs: School → Primary, Middle,
 Secondary; College → F.Sc (Pre-Medical), F.Sc (Pre-Engineering), ICS, I.Com, FA.
@@ -162,7 +172,7 @@ For an approved upgrade starting at a supported schema between 19 and 69, apply 
 
 # Apply the database changes later
 
-The current application requires **schema 71**. SQL changes are checked in here;
+The current application requires **schema 72**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,

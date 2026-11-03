@@ -1,5 +1,7 @@
 {
   "objects": [
+    { "schema": "dbo", "name": "DeleteAcademicProgram", "type": "P " },
+    { "schema": "dbo", "name": "GetAcademicProgramUsageCount", "type": "P " },
     { "schema": "dbo", "name": "RegistrationReopenRequests", "type": "U " },
     { "schema": "dbo", "name": "ReopenPendingRegistration", "type": "P " },
     { "schema": "dbo", "name": "StudentPlacementPlans", "type": "U " },
