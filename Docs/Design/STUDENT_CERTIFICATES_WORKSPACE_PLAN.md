@@ -1,7 +1,19 @@
 # Student Certificates Workspace — Stage 1 design and reuse review
 Date: 2026-11-03
 Base commit: `110de257b93ee897637849b7fbc09f970d2bffb1`
-Status: **STAGE 2 PILOT IMPLEMENTED — preview only; operator acceptance and old-hub retirement still pending**
+Status: **TRUE WORKSPACE PILOT IMPLEMENTED; ALL 8 COMPACT DIALOGS RENDER-TESTED — real operator and disposable SQL acceptance still pending**
+
+## Windows verification and continued implementation (4 November 2026)
+
+The second design iteration now preserves the exact selected copy after a register refresh and focuses the newest copy of the operated-on certificate type after creating or issuing another copy. This is handled by the small SQL-free `CertificateWorkspaceSelection` helper; no display number or approximate name is used as a copy identity. Synthetic checks cover original older issue, new creation, new issue, fallback, and first-selection behavior.
+
+The compact Provisional dialog also now allocates five rows at narrower widths, exposing the **Marks Obtained, Marks Out Of, Grade and Other Subjects** fields that the first compact rendering had clipped. Its original field controls and validation remain unchanged and its content scrolls when necessary.
+
+**Windows CI 09 passed in full:** [run 41706223026](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/41706223026). This covered desktop Release build, native WinForms compile, SQL-free certificate workspace/refocus tests, existing targeted regressions, security-independent resource/audit/report checks and disposable publishing. In that same run, the real WinForms screenshot fixture rendered **two workspace sizes and all eight type-specific compact dialogs**, with explicit structural assertions for modal save controls and Provisional fields. [Screenshot run/artifact](https://github.com/farhan2166-creator/FMSC-Database/actions/runs/41706223026).
+
+The one-time branch-only desktop workflow trigger and screenshot upload steps were **removed after successful verification**. No new permanent workflow was retained. The existing desktop CI still executes `--student-certificates-workspace`; the optional screenshot fixture remains runnable on an actual Windows environment with `--student-certificates-screenshots`.
+
+**Not yet accepted:** actual saving against a disposable authorized SQL database, correct copy refresh after real DB writes, physical printing/preview, collection locks, error/recovery behavior, staff permissions and operator approval at different Windows sizes. These are hard blockers for replacing default navigation or merging this draft PR.
 
 ## Owner-approved correction: true workspace and compact field dialogs
 
@@ -21,7 +33,7 @@ For printing, physical collection, or reissue from the workspace, the original c
 
 **Still pending:** actual Windows operator interaction and disposable SQL execution across all eight types, permission/collection/recovery states, exact historical copy print/reprint and behavior under errors. The screenshot fixture is a genuine WinForms render with fictional rows, not an actual installation or database-backed interaction.
 
-The old hub/pages remain unchanged in normal navigation until explicit acceptance. The temporary visual-preview CI workflow is for this branch only and should be removed before final merge, preserving the project's minimal workflow set.
+The old hub/pages remain unchanged in normal navigation until explicit acceptance. Temporary CI triggers and the retired preview screenshot workflow have been removed; the project retains its minimal workflow set.
 
 ## Stage 2 preview implementation (3 November 2026)
 
