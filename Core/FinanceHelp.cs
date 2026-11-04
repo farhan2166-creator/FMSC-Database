@@ -49,8 +49,8 @@ internal static class FinanceHelp
     {
         Topic.ReceiveMoney=>("Enter only the new money received in this transaction. Existing advance money is separate.",
             "Rs. 1,000 is due. Receive Rs. 700 now and leave Rs. 300 outstanding, unless advance money also covers it."),
-        Topic.UseAdvance=>("Use money already held for this student to pay fees. This does not receive new money.",
-            "Rs. 1,000 is due and Rs. 300 advance is available. Use that advance and receive the remaining Rs. 700."),
+        Topic.UseAdvance=>("Use this student\'s held advance only in a collection dated today. Backdated collections cannot use advance. This is not new cash.",
+            "For a collection dated today, Rs. 1,000 due can use Rs. 300 advance and Rs. 700 new money."),
         Topic.AdvanceBalance=>("Money held for this student until an operator chooses to use it in Fee Collection. Posting fees does not spend it.",
             "An advance of Rs. 500 can pay Rs. 200 during collection, leaving Rs. 300 available."),
         Topic.FamilySplit=>("The suggested split finishes junior classes first, then moves up. Within each child, monthly fees are oldest first, followed by other fees from smallest remaining balance to largest. Same-class siblings use the lower admission number first. You can change the split before saving.",
