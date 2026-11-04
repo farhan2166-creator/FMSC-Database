@@ -1386,8 +1386,29 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         menu.Items.Add(new ToolStripMenuItem("Help && FAQ", null,
             (_, _) => OpenHelpCenterAfterAccountMenuCloses()));
         menu.Items.Add(new ToolStripMenuItem("Check for Updates", null, (_, _) => {
-            using var updateDialog = new UpdateConnectionForm();
-            updateDialog.ShowDialog(this);
+            var existingUpdate = Application.OpenForms.OfType<UpdateConnectionForm>().FirstOrDefault();
+            if (existingUpdate is not null) { existingUpdate.Activate(); return; }
+            var updateDialog = new UpdateConnectionForm();
+            updateDialog.FormClosed += (_, _) => {
+            if (updateDialog.InstallationRequested is { } prepared && ConfirmLeaveCurrentPage() &&
+                MessageBox.Show(this, "Close FMSC and start the update installer? Save your work before continuing. " +
+                    "Windows will ask for permission to run the installer.", "Install FMSC Update",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+            {
+                try
+                {
+                    UpdateInstallerHandoff.Launch(prepared);
+                    Close(); // The normal FormClosing guard remains authoritative.
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+                    InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    MessageBox.Show(this, "The update installer could not start: " + error.Message,
+                        "FMSC Update", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
+            };
+            updateDialog.Show(this); // Keep the application usable during download/preparation.
         }) {
             ToolTipText = "Authorize this computer and check the private FMSC update feed manually."
         });

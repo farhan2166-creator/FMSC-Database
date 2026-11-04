@@ -40,7 +40,7 @@ try {
     }
     foreach ($relative in @('FMSC_SMS/FMSC_SMS.exe', 'FMSC_SMS/FMSC_SMS.dll',
         'FMSC_SMS/FMSC_SMS.deps.json', 'FMSC_SMS/FMSC_SMS.runtimeconfig.json',
-        'core.ps1', 'Install FMSC_SMS.bat', 'Tools/SqlLocalDB.msi')) {
+        'FMSC_SMS/UpdateSupport/core.ps1', 'core.ps1', 'Install FMSC_SMS.bat', 'Tools/SqlLocalDB.msi')) {
         $file = Join-Path $release $relative
         if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0) {
             throw "Full publish did not copy its required output: $relative"
@@ -48,6 +48,7 @@ try {
     }
     foreach ($pair in @(
         ,@('Installer/core.ps1', 'core.ps1')
+        ,@('Installer/core.ps1', 'FMSC_SMS/UpdateSupport/core.ps1')
     )) {
         $expected = (Get-FileHash -LiteralPath (Join-Path $ProjectDirectory $pair[0]) -Algorithm SHA256).Hash
         $actual = (Get-FileHash -LiteralPath (Join-Path $release $pair[1]) -Algorithm SHA256).Hash
@@ -57,6 +58,14 @@ try {
     $sourceSql = @(Get-ChildItem -LiteralPath (Join-Path $ProjectDirectory 'Migrations') -Filter '*.sql' -File)
     $copiedSql = @(Get-ChildItem -LiteralPath (Join-Path $release 'Migrations') -Filter '*.sql' -File)
     if ($sourceSql.Count -ne $copiedSql.Count) { throw 'Packaged migration inventory differs from source.' }
+    $updateSql = @(Get-ChildItem -LiteralPath (Join-Path $application 'UpdateSupport/Migrations') -Filter '*.sql' -File)
+    if ($sourceSql.Count -ne $updateSql.Count) { throw 'Update support migration inventory differs from source.' }
+    foreach ($file in $sourceSql) {
+        if ((Get-FileHash -LiteralPath $file.FullName).Hash -ne
+            (Get-FileHash -LiteralPath (Join-Path $application ('UpdateSupport/Migrations/' + $file.Name))).Hash) {
+            throw "Update migration content differs: $($file.Name)"
+        }
+    }
     # Exercise the actual copied helper, not merely its source-tree counterpart.
     # Use a child scope so the test's mocked process/console commands stay local.
     & (Join-Path $ProjectDirectory 'Tools/TestInstallerLocalDb.ps1') -InstallerPath (Join-Path $release 'core.ps1')

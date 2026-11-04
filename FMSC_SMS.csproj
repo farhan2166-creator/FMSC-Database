@@ -31,6 +31,8 @@
 		<FileVersion>1.1.0.0</FileVersion>
 	</PropertyGroup>
 	<ItemGroup>
+		<Content Include="Installer/core.ps1" Link="UpdateSupport/core.ps1" CopyToPublishDirectory="PreserveNewest" />
+		<Content Include="Migrations/*.sql" Link="UpdateSupport/Migrations/%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="Assets\academics.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>

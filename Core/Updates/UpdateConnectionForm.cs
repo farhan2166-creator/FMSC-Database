@@ -19,6 +19,9 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
     private readonly ModernButton _copy;
     private readonly ModernButton _check;
     private readonly ModernButton _download;
+    private readonly ModernButton _install;
+    internal PreparedUpdate? InstallationRequested { get; private set; }
+    private PreparedUpdate? _prepared;
     private VerifiedUpdate? _release;
     private UpdateDownloadChoice _method;
     private static string InstalledVersion => typeof(UpdateConnectionForm).Assembly
@@ -102,6 +105,14 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         _download = new ModernButton { Text = "Download Update", ThemeRole = "Primary",
             Width = AppScale.S(175), Height = AppMetrics.ButtonHeight, Enabled = false };
         _download.Click += async (_, _) => await DownloadAsync();
+        _install = new ModernButton { Text = "Install Update", ThemeRole = "Primary",
+            Width = AppScale.S(150), Height = AppMetrics.ButtonHeight, Enabled = false };
+        _install.Click += (_, _) => {
+            if (_prepared is null) return;
+            InstallationRequested = _prepared;
+            DialogResult = DialogResult.Yes;
+            Close();
+        };
         var close = new ModernButton { Text = "Close", ThemeRole = "Secondary",
             Width = AppScale.S(100), Height = AppMetrics.ButtonHeight, DialogResult = DialogResult.OK };
         _generate.Click += (_, _) => GenerateKey();
@@ -127,7 +138,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         };
         var later = new ModernButton { Text = "Remind Me Later", ThemeRole = "Secondary",
             Width = AppScale.S(160), Height = AppMetrics.ButtonHeight, DialogResult = DialogResult.Cancel };
-        actions.Controls.AddRange(new Control[] { _generate, _copy, _check, _download, later, close });
+        actions.Controls.AddRange(new Control[] { _generate, _copy, _check, _download, _install, later, close });
         content.Controls.Add(intro, 0, 0);
         content.Controls.Add(instructions, 0, 1);
         content.Controls.Add(_publicKey, 0, 2);
@@ -188,6 +199,8 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         _generate.Enabled = false;
         _download.Enabled = false;
         _release = null;
+        _prepared = null;
+        _install.Enabled = false;
         _status.Text = "Checking the private update repository without interrupting FMSC...";
         try
         {
@@ -208,8 +221,10 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
             _status.Text = "Latest version: " + release.Manifest.Version + "\n" +
                 (_method == UpdateDownloadChoice.NotNewer ? "FMSC is up to date." :
                  _method == UpdateDownloadChoice.RequiresDatabaseInstaller ?
-                 "This update requires database migration through the existing installer. Contact the software owner." :
+                 "Update available — Full package; database migration will run through the installer after FMSC closes. " +
+                    (archive.Length / 1048576d).ToString("N1") + " MB." :
                  "Update available — " + _method + ", approximately " + (archive.Length / 1048576d).ToString("N1") + " MB.");
+            if (_method == UpdateDownloadChoice.RequiresDatabaseInstaller) _method = UpdateDownloadChoice.Full;
             _download.Enabled = _method is UpdateDownloadChoice.Full or UpdateDownloadChoice.Incremental;
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
@@ -240,16 +255,20 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         {
             var release = _release;
             string root = Path.Combine(UpdateDeviceKey.StateDirectory, "prepared-" + Guid.NewGuid().ToString("N"));
-            await Task.Run(async () =>
+            var prepared = await Task.Run(async () =>
             {
                 await using var session = await UpdateGitSession.OpenAsync(token);
                 return await UpdateReleasePreparer.PrepareAsync(release, session, _method,
                     AppContext.BaseDirectory, root, token, progress);
             }, token);
+            await Task.Run(() => UpdateInstallerHandoff.Validate(prepared), token);
             if (!IsDisposed && !Disposing)
-                _status.Text = "Update downloaded and application files verified. FMSC can continue running. " +
-                    "Installation is not yet available from this dialog; contact the software owner. " +
-                    "Prepared files: " + root;
+            {
+                _prepared = prepared;
+                _install.Enabled = true;
+                _status.Text = "Update and installer files verified. You can continue working. " +
+                    "Choose Install Update when ready to close FMSC safely.";
+            }
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException

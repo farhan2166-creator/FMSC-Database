@@ -21,6 +21,7 @@ try
     options.TryGetValue("previous-version", out string? previousVersion);
     if ((previous is null) != (previousVersion is null))
         throw new ArgumentException("previous-dir and previous-version must be supplied together.");
+    ValidateReleaseInput(current, version, schema);
     var manifest = PackageBuilder.Build(current, output, version, schema, previous, previousVersion);
     Console.WriteLine($"Prepared application update {manifest.Version}; " +
         $"delta: {(manifest.Incremental is null ? "unavailable" : manifest.ChangedFiles.Count + " changed files")}. " +
@@ -54,6 +55,21 @@ static Dictionary<string, string> Parse(string[] args)
 static string Required(Dictionary<string, string> args, string key) =>
     args.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
         ? value : throw new ArgumentException("Missing --" + key);
+
+static void ValidateReleaseInput(string current, string version, int schema)
+{
+    string script = File.ReadAllText(Path.Combine(current, "UpdateSupport", "core.ps1"));
+    string declaredVersion = System.Text.RegularExpressions.Regex.Match(script,
+        @"(?m)^\$AppVersion = '([^']+)'\r?$").Groups[1].Value;
+    string declaredSchema = System.Text.RegularExpressions.Regex.Match(script,
+        @"(?m)^\$DatabaseVersion = '([0-9]+)'\r?$").Groups[1].Value;
+    string actualVersion = System.Diagnostics.FileVersionInfo.GetVersionInfo(Path.Combine(current, "FMSC_SMS.dll"))
+        .ProductVersion?.Split('+')[0] ?? "";
+    if (version != actualVersion || version != declaredVersion || schema.ToString() != declaredSchema)
+        throw new InvalidDataException("Requested version/schema does not match the published application and installer.");
+    if (!Directory.EnumerateFiles(Path.Combine(current, "UpdateSupport", "Migrations"), "*.sql").Any())
+        throw new InvalidDataException("Numbered installer migrations are missing from the published update.");
+}
 
 internal static class PackageBuilder
 {

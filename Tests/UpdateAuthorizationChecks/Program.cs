@@ -5,6 +5,7 @@ using FMSC_SMS.Core.Updates;
 
 if (!OperatingSystem.IsWindows())
     throw new PlatformNotSupportedException("DPAPI must be exercised on Windows.");
+UpdateHandoffTests.Run();
 
 int checks = 0;
 void Require(bool valid, string reason)

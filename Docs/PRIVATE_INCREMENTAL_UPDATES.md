@@ -150,9 +150,8 @@ The school's **SSH authorization key is separate** and is still required.
    Download / Prepare dialog. It now shows installed/latest versions, method,
    approximate size and chunk progress; Close cancels preparation. Remind Me
    Later dismisses this manual check (it does not schedule a notification).
-4. Complete safe post-exit update activation and re-use the existing installer,
-   with pre-migration backup, numbered migration validation and rollback
-   acceptance on disposable Windows/LocalDB.
+4. Complete disposable Windows/LocalDB acceptance of the connected installer
+   handoff, including actual pre-migration backup, migration and rollback recovery.
 5. Accept the guarded manual publisher described below against the private
    distribution. Long-term history rotation still needs a concrete reviewed
    maintenance procedure and owner approval before any destructive operation.
@@ -215,9 +214,41 @@ reaching it; no automatic history cleanup is authorized or performed.
   tab navigation code was changed for the updater.
 - Python release checks could not run: Python is unavailable on this machine.
 
-**Not production complete:** Install Update remains unavailable. The existing
-installer expects a complete installer layout, while updater archives contain
-application files. No unsafe direct invocation or replacement installer was
-added. Bundled Git/SSH, verified installer payload delivery, safe shutdown,
-post-exit activation, migration/rollback acceptance, transport failure tests,
-resume and real private-distribution acceptance remain required.
+## Connected installer handoff (follow-up implementation)
+
+- Published applications now include `UpdateSupport/core.ps1` and all numbered
+  migrations. Their bytes are covered by the same full/incremental file manifest.
+  The production packaging CLI refuses version/schema values that differ from
+  the published application DLL and bundled installer, and refuses missing migrations.
+- The existing update window opens without blocking dashboard work. Only one
+  window is opened. Schema-changing releases can download a full package without
+  running SQL during preparation.
+- Install Update is enabled only after handoff validation of the staged inventory,
+  installer version and schema. Dashboard unsaved/busy guards and explicit close
+  confirmation precede launch; the normal close guard remains active.
+- The existing installer runs in an elevated external PowerShell process, waits
+  for the original process identity to exit, and refuses another Windows user.
+  If closure is cancelled, it times out without replacing files or running SQL.
+  Automatic handoff supports the existing standard installation directory only.
+  Disposable Level 2 builds cannot initiate activation.
+- Update mode requires the existing MDF and LDF. Its template paths are disabled;
+  a missing school database fails instead of creating/replacing one. Existing
+  database registration/identity checks, verified pre-migration backup, sequential
+  numbered migrations, compatibility check and folder activation/rollback are reused.
+- Hash/inventory checks run again after process exit and against the installer copy
+  before migrations. An exclusive installer mutex prevents concurrent activation.
+  Restart remains the existing installer's success-only user choice.
+- New offline tests cover process timeout/identity/user refusal, actual process-exit
+  waiting, installer version/schema mismatch, changed/unlisted files, path traversal
+  and database-payload refusal. They never launch activation or connect to SQL.
+- Release build, authorization/handoff fixtures, migration and LocalDB safeguard
+  checks passed. The disposable full PortableRelease publish passed, including
+  installer and migration content checks. The local post-fix control rerun passed
+  all 1,973 checks; the earlier communication-focus failure did not reproduce.
+- Desktop CI run `41854489676` for the preceding commit passed every step,
+  including Python checks, post-fix controls and admission/finance regressions.
+
+**Not production complete:** The handoff is implemented and offline checks pass;
+real activation/migration/recovery acceptance remains unverified. Bundled Git/SSH,
+transport failure/resume tests and private-distribution acceptance remain required.
+No live installer, database or distribution package was changed in these tests.

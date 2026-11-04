@@ -1,4 +1,24 @@
+param(
+    [string]$PreparedRoot = '',
+    [int]$OriginalProcessId = 0,
+    [long]$OriginalStartTicks = 0,
+    [string]$OriginalUserSid = ''
+)
 $ErrorActionPreference = 'Stop'
+function Wait-OriginalFmscExit {
+    param([int]$ProcessId, [long]$StartTicks, [string]$UserSid, [int]$TimeoutMilliseconds = 120000)
+    if ($ProcessId -le 0 -or $StartTicks -le 0 -or
+        $UserSid -ne [Security.Principal.WindowsIdentity]::GetCurrent().User.Value) {
+        throw 'Update must run as the original Windows user, with a valid application process identity.'
+    }
+    $original = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
+    if ($original) {
+        if ($original.StartTime.ToUniversalTime().Ticks -ne $StartTicks) {
+            throw 'The original process identity changed. Update stopped.'
+        }
+        if (-not $original.WaitForExit($TimeoutMilliseconds)) { throw 'FMSC did not exit. No update was installed.' }
+    }
+}
 $AppName = 'FMSC School Management System'
 $AppVersion = '1.1.0-rc.2'
 $DatabaseVersion = '76'
@@ -16,6 +36,19 @@ $LiveMdf = Join-Path $DatabaseDir 'FMSC_DB.mdf'
 $LiveLdf = Join-Path $DatabaseDir 'FMSC_DB_log.ldf'
 $TemplateMdf = Join-Path $DatabaseSource 'FMSC_DB.mdf'
 $TemplateLdf = Join-Path $DatabaseSource 'FMSC_DB_log.ldf'
+if ($PreparedRoot) {
+    # Update mode is existing-installation only. Never seed a missing database.
+    Wait-OriginalFmscExit -ProcessId $OriginalProcessId -StartTicks $OriginalStartTicks -UserSid $OriginalUserSid
+    if (-not (Test-Path -LiteralPath $LiveMdf -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $LiveLdf -PathType Leaf)) {
+        throw 'An existing complete school database is required. Update will never copy template database files.'
+    }
+    $AppSource = Join-Path $PreparedRoot 'application'
+    $MigrationsDir = Join-Path $AppSource 'UpdateSupport/Migrations'
+    $DatabaseSource = Join-Path $PreparedRoot 'NO_DATABASE_TEMPLATES_ALLOWED'
+    $TemplateMdf = Join-Path $DatabaseSource 'FMSC_DB.mdf'
+    $TemplateLdf = Join-Path $DatabaseSource 'FMSC_DB_log.ldf'
+}
 $LogFile = Join-Path $DatabaseDir 'Install.log'
 $SqlInstance = '(localdb)\MSSQLLocalDB'
 $DatabaseName = 'FMSC_DB'
@@ -982,7 +1015,49 @@ function Invoke-LocalDbMsiInstallation {
     Write-Success 'SQL Server LocalDB installed through the Microsoft setup wizard.'
 }
 
+function Test-PreparedUpdate {
+    param([string]$Root, [string]$Version, [int]$Schema, [string]$Application = '')
+    if (-not $Application) { $Application = Join-Path $Root 'application' }
+    $application = [IO.Path]::GetFullPath($Application)
+    $manifest = Get-Content -LiteralPath (Join-Path $Root 'metadata/update-manifest.json') -Raw | ConvertFrom-Json
+    if ($manifest.format -ne 'fmsc-app-update/v1' -or $manifest.version -ne $Version -or
+        $manifest.requiredDatabaseSchema -ne $Schema -or @($manifest.files).Count -eq 0) {
+        throw 'Prepared update does not match this installer version/schema.'
+    }
+    $entries = @(Get-ChildItem -LiteralPath $application -Force -Recurse)
+    if (@($entries | Where-Object { $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count) {
+        throw 'Links are forbidden in a prepared update.'
+    }
+    $seen = @{}
+    foreach ($file in $manifest.files) {
+        $name = [string]$file.path
+        if (-not $name -or $name.Contains('\') -or $name.Contains(':') -or
+            $name.StartsWith('/') -or @($name.Split('/') | Where-Object { $_ -in @('', '.', '..') }).Count -or
+            $name -match '(?i)\.(mdf|ldf)$' -or $seen.ContainsKey($name)) { throw 'Unsafe update file path.' }
+        $seen[$name] = $true
+        $path = [IO.Path]::GetFullPath((Join-Path $application $name))
+        if (-not $path.StartsWith($application + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase)) {
+            throw 'Prepared update path escapes application directory.'
+        }
+        $info = Get-Item -LiteralPath $path -ErrorAction Stop
+        if ($info.PSIsContainer -or $info.Length -ne $file.length -or
+            (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $file.sha256) {
+            throw "Prepared update file verification failed: $name"
+        }
+    }
+    if (@($entries | Where-Object { -not $_.PSIsContainer }).Count -ne $seen.Count -or
+        -not $seen.ContainsKey('FMSC_SMS.exe') -or -not $seen.ContainsKey('UpdateSupport/core.ps1')) {
+        throw 'Prepared application inventory is incomplete or contains unlisted files.'
+    }
+}
+
 try {
+    $script:InstallerMutex = New-Object Threading.Mutex($false, 'Global\FMSCInstallerActivation')
+    $script:InstallerLockHeld = $false
+    try { $script:InstallerLockHeld = $script:InstallerMutex.WaitOne(0) }
+    catch [Threading.AbandonedMutexException] { $script:InstallerLockHeld = $true }
+    if (-not $script:InstallerLockHeld) { throw 'Another FMSC installer is active. No update was installed.' }
+    if ($PreparedRoot) { Test-PreparedUpdate -Root $PreparedRoot -Version $AppVersion -Schema ([int]$DatabaseVersion) }
     Show-Banner
     Write-Log '================================================'
     Write-Log 'FMSC SMS installation started.'
@@ -1430,6 +1505,9 @@ try {
     Pause-Long
     Write-Section `
         'STEP 7 OF 8  -  APPLICATION ACTIVATION AND DATABASE UPDATE'
+    if ($PreparedRoot) {
+        Test-PreparedUpdate -Root $PreparedRoot -Version $AppVersion -Schema ([int]$DatabaseVersion) -Application $AppStagingDir
+    }
     Invoke-PendingMigrations -Directory $MigrationsDir -RequiredVersion (Convert-ToDbVersion $DatabaseVersion)
     $verification = Invoke-InstallationDatabaseCheck -Application (Join-Path $AppStagingDir 'FMSC_SMS.exe')
     if ($verification -notin @(0,10)) {
@@ -1654,4 +1732,8 @@ catch {
     Read-Host `
         '  Press ENTER to close'
     exit 1
+}
+finally {
+    if ($script:InstallerLockHeld) { $script:InstallerMutex.ReleaseMutex() }
+    if ($script:InstallerMutex) { $script:InstallerMutex.Dispose() }
 }
