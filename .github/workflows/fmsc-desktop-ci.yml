@@ -39,6 +39,9 @@ jobs:
       - name: Validate signed incremental/full update packages and isolated staging
         run: dotnet run --project Tools/UpdatePackages/UpdatePackages.csproj -c Release -- --self-test
 
+      - name: Validate private update broker credential and redirect policy
+        run: dotnet run --project Apps/UpdateBroker/UpdateBroker.csproj -c Release -- --self-test
+
       - name: Restore application
         run: dotnet restore FMSC_SMS.sln
 
