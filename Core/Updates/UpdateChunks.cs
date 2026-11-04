@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 namespace FMSC_SMS.Core.Updates;
 
 /// <summary>
-/// Split ZIPs into signed, ordinary Git blobs under GitHub's 100 MiB per-blob
+/// Split ZIPs into hash-verified, ordinary Git blobs under GitHub's 100 MiB per-blob
 /// ceiling. Reconstruct only into a new staging file, hash checking each part
 /// and then the complete archive. The original ZIP is a LOCAL build product,
 /// not a distribution-repository object.
