@@ -198,6 +198,8 @@ internal static class DistributionSnapshot
     private static void VerifyParts(string directory, UpdateArchive archive)
     {
         UpdateManifestPolicy.ValidateArchive(archive);
+        using var fullArchiveHash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        var buffer = new byte[64 * 1024];
         foreach (var part in archive.Parts)
         {
             string path = Path.Combine(directory, part.Name);
@@ -206,7 +208,14 @@ internal static class DistributionSnapshot
                 info.Length != part.Length ||
                 !StringComparer.OrdinalIgnoreCase.Equals(UpdateChunks.Sha256(path), part.Sha256))
                 throw new InvalidDataException("Update archive part failed signed verification: " + part.Name);
+            using var source = info.OpenRead();
+            int read;
+            while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
+                fullArchiveHash.AppendData(buffer, 0, read);
         }
+        string reconstructedDigest = Convert.ToHexString(fullArchiveHash.GetHashAndReset());
+        if (!StringComparer.OrdinalIgnoreCase.Equals(reconstructedDigest, archive.Sha256))
+            throw new InvalidDataException("The combined ZIP hash does not match the signed full-archive digest.");
     }
 
     private static void CopyVerifiedPackage(string inputDir, string destination, RSA key)
