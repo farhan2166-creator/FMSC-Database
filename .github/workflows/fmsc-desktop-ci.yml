@@ -44,6 +44,9 @@ jobs:
       - name: Validate two-version signed distribution snapshots and retirement
         run: dotnet run --project Tools/UpdateDistribution/UpdateDistribution.csproj -c Release -- --self-test
 
+      - name: Validate private Git SSH key enrollment and Windows DPAPI protection
+        run: dotnet run --project Tests/UpdateAuthorizationChecks/UpdateAuthorizationChecks.csproj -c Release
+
       - name: Restore application
         run: dotnet restore FMSC_SMS.sln
 
