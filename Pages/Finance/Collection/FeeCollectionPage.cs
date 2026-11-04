@@ -221,15 +221,31 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         }
         return base.FocusEntryField();
     }
-    private void QueueLoadedAmountFocus(int expectedAdmissionId)
+    // The student picker can release focus while its popup closes during an async
+    // load. Check the actual active control rather than assuming that a delayed
+    // student.ContainsFocus test will still be true.
+    private bool OperatorMovedFocusAwayFromStudent()
+    {
+        Form? form = FindForm();
+        if (form?.ContainsFocus != true) return true;
+        Control? active = form.ActiveControl;
+        while (active is ContainerControl parent && parent.ActiveControl is Control child &&
+               !ReferenceEquals(active, child))
+            active = child;
+        return active is not null && !ReferenceEquals(active, form) &&
+            !ReferenceEquals(active, this) && !ReferenceEquals(active, student) &&
+            !student.Contains(active);
+    }
+    private void QueueLoadedAmountFocus(int expectedAdmissionId, bool pickerSelection = false)
     {
         if (IsDisposed || !IsHandleCreated) return;
         int version = loadVersion;
-        // Wait for navigation and busy-control restoration to finish before focusing.
+        // Run after the picker popup, enrollment bind and busy-control restoration.
         BeginInvoke((Action)(() => {
             if (IsDisposed || !Visible || !Enabled || IsBusy || version != loadVersion ||
                 admissionId != expectedAdmissionId || student.SelectedId != expectedAdmissionId ||
-                FindForm()?.Enabled != true || paymentAmount.ContainsFocus) return;
+                FindForm()?.Enabled != true || paymentAmount.ContainsFocus ||
+                (pickerSelection && OperatorMovedFocusAwayFromStudent())) return;
             FocusEntryField();
         }));
     }
@@ -438,17 +454,18 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             }
             if (student.SelectedId <= 0)
                 return;
+            // Capture intent before awaiting SQL: popup closure and rebinding
+            // can alter focus while student details are being loaded.
+            int expectedAdmission = student.SelectedId;
+            bool advanceFromPicker = student.ContainsFocus;
             await SelectStudent();
-            // Only advance a deliberate picker selection; an async load must not
-            // take focus back from an operator who has already moved elsewhere.
-            if (!IsDisposed && student.ContainsFocus &&
-                admissionId == student.SelectedId && HasOutstandingCharges())
-            {
-                paymentAmount.Focus();
-                paymentAmount.SelectAll();
-            }
+            if (advanceFromPicker && !IsDisposed && admissionId == expectedAdmission &&
+                student.SelectedId == expectedAdmission)
+                QueueLoadedAmountFocus(expectedAdmission, pickerSelection: true);
         };
-        enrollment.SelectedIndexChanged += async (_, _) => {
+        // Programmatic Bind/ClearLookup/SelectedValue fires SelectedIndexChanged.
+        // Reload fees only when the operator actually commits another placement.
+        enrollment.UserSelectionChanged += async (_, _) => {
             // The counter loads its fixed group explicitly after the primary account.
             // An event-driven primary-only read must not overwrite that group's allocations later.
             if(counterIds is not null && counterLoading)return;
@@ -1689,7 +1706,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             await RefreshTransportButtonAsync();
             return;
         }
-        /* Clearing enrollment triggers loads that advance loadVersion. */
+        /* Clearing the lookup does not start a competing charge load. */
         version = loadVersion;
         try
         {
@@ -1845,6 +1862,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             await Task.WhenAll(
                 LoadChargesAsync(version),
                 LoadRecentPaymentsAsync(version));
+            // A newer student or placement selection wins over this stale load.
+            if (IsDisposed || version != loadVersion ||
+                student.SelectedId != selectedAdmissionId) return;
             UpdateOperationMode();
             /* Loading fees does not imply that the parent is paying the full balance. */
             RefreshEnteredPaymentAllocation();
