@@ -157,16 +157,17 @@ BEGIN CATCH SELECT ERROR_NUMBER() ErrorNumber,@@TRANCOUNT Transactions; END CATC
  [void](Query "DECLARE @R uniqueidentifier=NEWID(); EXEC dbo.ProcessStudentCredit @UserId=1,@AdmissionId=1,@Action=N'Deposit',@Amount=100,@RequestId=@R,@Reason=N'Fictional change after review';")
  Refused { Decision 'Hold' $today $keep $false $plan.Tables[0].Rows[0].Snapshot } 'Changed account credit invalidates a stale decision before saving.'
  [void](SaveDecision 'Hold' $today $waive)
- $withCredit=@{'@BillingFromMonth'=$month;'@TargetEnrollmentId'=1;'@RestoreBills'="[$tuition]";'@ApplyAvailableCredit'=$true}
- $plan=Decision 'Resume' $today $withCredit
- Check ($plan.Tables[0].Rows[0].CreditToApply -eq 2100 -and $plan.Tables[0].Rows[0].ResultingOutstanding -eq 7900) 'Resume preview includes only the chosen available advance.'
- [void](Decision 'Resume' $today $withCredit $false $plan.Tables[0].Rows[0].Snapshot)
- Check ((Number 'SELECT SUM(dbo.GetFeeChargeBalance(BillingChargeId)) FROM dbo.BillingCharges;') -eq 7900) 'Applying advance matches the reviewed resulting outstanding.'
+ $withoutCredit=@{'@BillingFromMonth'=$month;'@TargetEnrollmentId'=1;'@RestoreBills'="[$tuition]";'@ApplyAvailableCredit'=$false}
+ $plan=Decision 'Resume' $today $withoutCredit
+ Check ($plan.Tables[0].Rows[0].CreditToApply -eq 0 -and $plan.Tables[0].Rows[0].ResultingOutstanding -eq 10000) 'Resume previews restored dues without spending available advance.'
+ [void](Decision 'Resume' $today $withoutCredit $false $plan.Tables[0].Rows[0].Snapshot)
+ Check ((Number 'SELECT SUM(dbo.GetFeeChargeBalance(BillingChargeId)) FROM dbo.BillingCharges;') -eq 10000) 'Restoration posts dues without applying advance.'
+ Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=1;') -eq 2100) 'Advance remains held for later Fee Collection.'
  # Refunds remain refunds when the original fee is restored.
  $refund=@{'@MonthlyFeePolicy'='FromMonth';'@WaiveFromMonth'=$month;'@PaidReductionAction'='Refund'}
  [void](SaveDecision 'Hold' $today $refund)
- $refundTotal=Number "SELECT -SUM(TotalAmount) FROM dbo.FeePayments WHERE PaymentMethod=N'Refund';"
- Check ($refundTotal -eq 2100) 'The paid portion can be recorded as an explicit refund.'
+ $refundTotal=Number "SELECT COALESCE(-SUM(TotalAmount),0) FROM dbo.FeePayments WHERE PaymentMethod=N'Refund';"
+ Check ($refundTotal -eq 0) 'Unpaid restored fees cause no fictitious cash refund.'
  [void](SaveDecision 'Resume' $today $restore)
  Check ((Number "SELECT -SUM(TotalAmount) FROM dbo.FeePayments WHERE PaymentMethod=N'Refund';") -eq $refundTotal) 'Restoration preserves recorded refunds.'
  Check ((Number 'SELECT SUM(dbo.GetFeeChargeBalance(BillingChargeId)) FROM dbo.BillingCharges;') -eq 10000) 'Restoration creates dues without falsely restoring the refunded payment.'
