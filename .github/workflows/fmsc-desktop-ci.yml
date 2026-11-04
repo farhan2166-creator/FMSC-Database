@@ -41,6 +41,9 @@ jobs:
       - name: Validate signed incremental/full update packages and isolated staging
         run: dotnet run --project Tools/UpdatePackages/UpdatePackages.csproj -c Release -- --self-test
 
+      - name: Validate owner-protected signing identity and signature verification
+        run: dotnet run --project Tools/UpdateSigning/UpdateSigning.csproj -c Release -- --self-test
+
       - name: Validate two-version signed distribution snapshots and retirement
         run: dotnet run --project Tools/UpdateDistribution/UpdateDistribution.csproj -c Release -- --self-test
 
