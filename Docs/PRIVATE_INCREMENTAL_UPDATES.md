@@ -1,107 +1,119 @@
-# FMSC private GitHub Releases updater — implementation plan
+# FMSC direct private GitHub updater — agreed design
 
-**Status: packaging/staging foundation completed; GitHub authorization choice pending.
-No update feature is active on school computers.**
+**Status: signed update packaging and non-disruptive staging foundation implemented.
+The GitHub distribution repository, direct authorization, Windows UI and installer
+integration are NOT yet implemented. Nothing is enabled on school PCs.**
 
-## Owner decisions — confirmed
+## Confirmed owner decisions
 
-- No VPS, web application, hosted broker, third-party licensing API or separate SQL service.
-- GitHub Releases deliver both **private** full and changed-file incremental packages.
-- School administrator can manually select **Check for Updates** from the existing
-  FMSC Account/Help menu; unattended checks are optional and not required now.
-- Download and staging must not interrupt the running FMSC application.
-- Update installation, file replacement and any SQL migrations run only after a
-  safe application exit / explicit restart consent.
-- Keep the full ZIP as fallback whenever the incremental baseline has changed,
-  verification fails, or the delta for the installed version is unavailable.
-- Preserve installed MDF/LDF, school identity and records. The existing
-  `Installer/core.ps1` applies numbered SQL migrations with its verified
-  backup/safe activation checks where necessary.
-- **Do not reset application or database schema version to 1 yet.**
+- Two separate private GitHub repositories:
+  - `FMSC-Database`: application source, tests, migrations and build pipeline,
+    accessible only to development/maintainers.
+  - `FMSC-Updates`: approved signed update files, version manifest and the
+    current two update versions only; NO application source or school data.
+- **No hosted service, cloud VPS, broker, new API backend or additional database.**
+- School staff do not require GitHub accounts. A school computer generates its
+  own SSH key pair; only its **public key** is authorized as a read-only deploy
+  key in the private distribution repository. Its private key is stored locally
+  using Windows DPAPI and appropriately restricted filesystem permissions.
+- `Account/Help -> Check for Updates` manually initiates the check. No forced
+  background network check or application shutdown.
+- Download changed-file incremental packages where the installed baseline
+  exactly matches an available delta, otherwise use the complete new version.
+  Reconstruct and verify the new application in isolated staging while the
+  school application keeps working.
+- Only the existing installer/update helper activates the new application
+  **after a safe exit**. Pending SQL migrations require the existing verified
+  pre-migration backup, sequential migrations and compatibility checks.
+  Never replace school MDF/LDF files from the distribution repository.
+- Leave both existing application and database schema version numbers alone.
+  Resetting either version to 1 is explicitly deferred.
 
-## Security constraint: GitHub private Releases need authorization
+## Two-version distribution retention policy
 
-**An email address alone does not authorize a private release download.**
-The person must authenticate to a GitHub account with access to the private
-distribution repository. A permanent code embedded in every installed binary
-is extractable and cannot authenticate a school to GitHub.
+Retain only the **two newest approved update versions** in the distribution
+repository's **current published file tree**. For example:
 
-Preferred authorization under review:
+| New release | Keep | Remove from current tree |
+|---|---|---|
+| 1.1 | 1.1 | — |
+| 1.2 | 1.1, 1.2 | — |
+| 1.3 | 1.2, 1.3 | 1.1 |
+| 1.4 | 1.3, 1.4 | 1.2 |
 
-1. Create/keep the *source repository* private and accessible only to developers.
-2. Create a **separate private distribution repository** containing just approved
-   releases/manifests; source does not belong in this repository.
-3. Put the distribution repository in a GitHub **organization** to make the
-   school's GitHub account a genuinely **read-only** collaborator. GitHub's
-   documented personal-account repository collaborator model does not reliably
-   offer read-only access; do not give a school write permissions to releases.
-4. Create a GitHub App limited to that distribution repository with Contents:read,
-   and enable device authorization. FMSC uses the official GitHub device flow
-   to show a temporary verification code; school admin signs in via GitHub in a
-   browser and authorizes each computer once.
-5. Use GitHub App *user access* and refresh tokens for private release API calls,
-   **never an installation private key, client secret or master PAT embedded in
-   the desktop application**. Tokens for device-flow grants can refresh without
-   a client secret. Protect saved credentials per Windows user using DPAPI.
-   Handle revocation/expiration by requesting sign-in again.
-6. Use the authenticated releases API, not unchecked private download URLs.
-   Verify every publisher-signed manifest and SHA-256 digest independently of
-   GitHub authorization before any application installation.
+The publisher must not remove the oldest version until the latest full and
+delta packages, the signed metadata and integrity checks have all succeeded.
+The published `latest` manifest is changed **last**, so clients never see a
+partially uploaded version. Publishing/retention automation does not exist yet.
 
-Alternative: authorized school enters a dedicated fine-grained GitHub
-`Contents:read` personal access token, secured through DPAPI. More setup and
-secret-management burden, but simpler to implement. Each computer should get a
-separate revocable token. **Do not ask users to save email alone.**
+**Old installations must still upgrade.** A school running v1.1 when v1.4 is
+latest downloads the **full v1.4 package**, not a delta that depends on deleted
+versions. Retained migration scripts must allow every supported older database
+schema to advance sequentially; package retention does NOT permit deleting
+required SQL migrations.
 
-Any GitHub account with release download permission can obtain and retain the
-distributed **application binaries**. No GitHub-only method can revoke binaries
-already downloaded; this is separate from software licensing.
+**Git history caveat:** removing files from the current Git tree does not remove
+the original binaries from historic commits or guarantee storage reduction.
+The distribution repository must use a deliberate history/storage maintenance
+strategy (for example a snapshot-only publishing branch with controlled history
+replacement and shallow, fresh client fetches). This requires a separate
+publisher design and fail-safe tests; merely issuing `git rm` is insufficient.
+No source history will be rewritten as part of update retention.
 
-## Existing branch implementation
+**Git size caveat:** GitHub rejects ordinary Git blobs above 100 MiB (the
+commonly described 100 MB limit). Large app/full-update packages need deterministic
+smaller pieces with signed length/hash entries, or another approved GitHub-native
+storage format. This is not implemented by the current ZIP packager yet. Avoid
+growing distribution Git history through repeated large binaries.
 
-- `Core/Updates/UpdateManifest.cs`: strict validation, signed RSA-PSS/SHA-256
-  manifest parsing, semantic versions, exact-baseline incremental selection,
-  complete ZIP fallback, and SQL-schema mismatch deferral to installer.
-- `Core/Updates/UpdateStager.cs`: reconstruct complete target application
-  offline in a separate verified staging location, without touching the
-  installed application.
-- `Tools/UpdatePackages`: signed manifest + full ZIP + changed-file ZIP
-  builder, with self-tests exercising fallback, tampering, old-file deletion and
-  non-disruptive staging.
-- `.github/workflows/fmsc-desktop-ci.yml`: existing desktop CI runs the update
-  package/staging self-tests. No separate hosted-broker job.
+## Authentication versus update availability
 
-## Next implementation stages (pending owner's auth choice)
+SSH read-only deploy keys authorize **Git repository file access**. They do
+**not** authorize downloading a separate GitHub Release asset directly through
+the Releases API. Therefore the agreed school-facing delivery route is to fetch
+signed update files held in the **private distribution repository itself**.
+The developer can still run ordinary GitHub Actions builds; their 14-day
+artifacts are staging outputs, NOT the retained school update feed.
 
-1. **GitHub Release packaging workflow** — after existing release-readiness
-   checks and owner approval, package signed full + incremental assets and
-   numbered migration files. Publish **only** in the private distribution
-   repository with immutable version labels and stable release channels.
-2. **Direct GitHub authentication** — browser device flow or school-supplied
-   fine-grained token; secure Windows credential storage and explicit disconnect.
-3. **Manual UI check** — Account/Help -> Check for Updates. Query the GitHub
-   Releases API asynchronously, compare installed app + supported schema, show
-   new version, notes and Update Now / Remind Me Later. Offline is not an error
-   that disrupts normal school activity.
-4. **Resilient package download** — authenticated GitHub release asset retrieval,
-   retry, size/hash/signature verification, exact delta-baseline check and full
-   fallback. Keep running application untouched.
-5. **Installer integration** — reconstruct a complete staged app; on approved
-   safe exit, run a separately launched update helper that can activate the
-   verified application through existing folder-staging/rollback semantics.
-   Package necessary migration scripts; run the existing SQL installer logic
-   and pre-migration backup instead of patching SQL files directly. Record
-   migration-safe rollback/recovery instructions.
-6. **Acceptance** — WinForms/manual GitHub authentication, network interruption,
-   revoked credential, tampered release, crash/reboot recovery, full fallback,
-   Windows file locking, and disposable LocalDB copy upgrade/rollback tests.
-   No live school database until reviewed and explicitly approved.
+Each authorized computer has a unique deploy key so losing one computer allows
+revoking just that key. A shared plaintext key in an installer, a school's SQL
+database table, or an unencrypted config file is not acceptable. Implement
+enrollment with a verifiable public-key exchange that shows the operator exactly
+which key they are approving; never accept a self-declared email as proof of
+authorization.
 
-## Local offline regression test
+## Existing implementation on the feature branch
 
-```powershell
-dotnet run --project Tools/UpdatePackages/UpdatePackages.csproj -- --self-test
-```
+- `Core/Updates/UpdateManifest.cs`: RSA-PSS/SHA-256 signed manifest; version
+  comparison and exact baseline / full-fallback selection; database schema
+  mismatch routes to installer.
+- `Core/Updates/UpdateStager.cs`: reconstruct and validate complete target in
+  an isolated directory without touching the current installation.
+- `Tools/UpdatePackages`: full ZIP + changed-file ZIP + signed metadata with
+  synthetic safety tests.
+- Existing desktop CI invokes the packaging/staging tests.
+- The mistakenly introduced hosted `Apps/UpdateBroker` was **removed**.
+  No cloud service has been deployed.
 
-The current packager has no credentials and does not publish to GitHub.
-All updates remain *draft-only* until the above stages are complete.
+## Remaining implementation
+
+1. Create/prepare a separate private distribution repository, with approval
+   controls, per-device read-only deploy-key enrollment and a signed latest feed.
+2. Implement signed package splitting and reconstruction for files that exceed
+   GitHub's per-file blob limit; test large full packages end-to-end.
+3. Implement private Git authorization using the Windows-protected per-device
+   SSH key; use fresh, shallow fetches so distribution history maintenance cannot
+   strand installed clients.
+4. Integrate manual Check for Updates UI in the existing Account/Help menu, with
+   offline handling, Update Now / Remind Me Later, and no impact on active work.
+5. Stage packages while application runs; after confirmed safe exit, hand off to
+   the existing installer/helper. Package and validate all migration scripts,
+   perform backup/compatibility checks and provide rollback guidance.
+6. Publish only after release-readiness tests and full artifact verification.
+   Implement safe two-version retention, including explicit Git history
+   management restricted to the distribution repository.
+7. Test revoked credentials, offline/retry, tampered manifests, package splits,
+   old-installed-version full fallback, Windows file locking, and disposable
+   database migration/backup/rollback before any school deployment.
+
+No application or school database migration has been performed by this branch.
