@@ -94,8 +94,10 @@ use follows the reviewed manual collection order, restricted to its owner unless
 transferred explicitly. Future posted fees may be prepaid deliberately only in
 collection; posting and automatic billing do not consume advance. Credit use is
 settlement, never new cash, and confirmed collection saves a receipt snapshot.
-This 4 Nov owner decision supersedes the earlier automatic-use rule. No silent
-money rounding.
+Advance is allowed only when the collection date is today; backdated
+collections may use cash, not advance, subject to existing enrollment-date
+validation. The 4 Nov owner decision supersedes earlier automatic credit use.
+No silent money rounding.
 
 BD-13 Collection: posting creates dues; collection settles them. Partial and family
 collection keep each child's allocations, concessions and debt attached to that
