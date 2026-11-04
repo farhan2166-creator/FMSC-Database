@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../Core/Updates/UpdateManifest.cs" Link="UpdateManifest.cs" />
+    <Compile Include="../../Core/Updates/UpdateStager.cs" Link="UpdateStager.cs" />
   </ItemGroup>
 </Project>
