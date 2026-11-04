@@ -1,16 +1,18 @@
 # FMSC direct private GitHub updater — agreed design
 
-**Status: signed update packaging, bounded archive chunking and non-disruptive staging foundation implemented.
-The GitHub distribution repository, direct authorization, Windows UI and installer
-integration are NOT yet implemented. Nothing is enabled on school PCs.**
+**Status: private distribution repository created, with signed packaging, bounded chunking,
+non-disruptive staging and a two-version snapshot preparation CLI on the draft branch.
+Actual publishing, device authentication, Windows UI and installer integration remain pending.
+Nothing is enabled on school PCs.**
 
 ## Confirmed owner decisions
 
-- Two separate private GitHub repositories:
-  - `FMSC-Database`: application source, tests, migrations and build pipeline,
-    accessible only to development/maintainers.
-  - `FMSC-Updates`: approved signed update files, version manifest and the
-    current two update versions only; NO application source or school data.
+- Two separate GitHub repositories:
+  - `FMSC-Database`: source, tests, migrations and build pipeline. **Currently public;
+    owner will change its visibility to private later.** Do not assume that it is private.
+  - `FMSC-Updates`: **created and verified private**. Reserved for signed update
+    files, the version pointer and the current two approved versions only;
+    NO application source or school data.
 - **No hosted service, cloud VPS, broker, new API backend or additional database.**
 - School staff do not require GitHub accounts. A school computer generates its
   own SSH key pair; only its **public key** is authorized as a read-only deploy
@@ -43,8 +45,11 @@ repository's **current published file tree**. For example:
 
 The publisher must not remove the oldest version until the latest full and
 delta packages, the signed metadata and integrity checks have all succeeded.
-The published `latest` manifest is changed **last**, so clients never see a
-partially uploaded version. Publishing/retention automation does not exist yet.
+The staged `channel/stable.json` pointer identifies the current and previous
+approved release. The final Git publisher must switch the complete validated
+snapshot as **one atomic commit**, never upload partial files to the live feed.
+Snapshot preparation exists; Git push and server-side retention/history pruning
+have **not** been implemented.
 
 **Old installations must still upgrade.** A school running v1.1 when v1.4 is
 latest downloads the **full v1.4 package**, not a delta that depends on deleted
@@ -97,17 +102,22 @@ authorization.
   (up to 90 MiB each), with signature/hash verification and synthetic tests.
 - `Core/Updates/UpdateChunks.cs`: verifies each download part and recombines
   them into a complete hash-verified ZIP in an isolated staging location.
-- Existing desktop CI invokes the packaging/staging tests.
+- `Tools/UpdateDistribution`: validates the publisher signature and every
+  chunk, prepares an independent snapshot containing the newest one or two
+  approved versions, and removes older releases from the new **tree** without
+  deleting predecessor snapshots. It copies only part files, not oversized ZIPs.
+- Existing desktop CI includes packaging, staging and distribution snapshot tests.
 - The mistakenly introduced hosted `Apps/UpdateBroker` was **removed**.
   No cloud service has been deployed.
 
 ## Remaining implementation
 
-1. Create/prepare a separate private distribution repository, with approval
-   controls, per-device read-only deploy-key enrollment and a signed latest feed.
-2. Connect existing signed package splitting to the distribution publisher
-   and authenticated client download, including network interruption and
-   real large-file Windows tests.
+1. `FMSC-Updates` is created private with a README. Configure release approvals,
+   per-device read-only deploy-key enrollment and the signed latest feed.
+   The source repository remains public until the owner changes it.
+2. Connect the new snapshot preparation tool to a guarded private-repository
+   publishing action and authenticated client download, including network
+   interruption and real large-file Windows tests.
 3. Implement private Git authorization using the Windows-protected per-device
    SSH key; use fresh, shallow fetches so distribution history maintenance cannot
    strand installed clients.
