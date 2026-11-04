@@ -8,6 +8,12 @@ internal static partial class Program
     private static void CheckCollectionCounterLayout()
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        // The enrollment caption renders an official admission number. Supply a
+        // fictional cache so programmatic binding never opens a school database.
+        typeof(AdmissionNumbers).GetField("_numbers",BindingFlags.Static|BindingFlags.NonPublic)!
+            .SetValue(null,new Dictionary<int,string>{{41,"41"},{42,"42"}});
+        typeof(AdmissionNumbers).GetField("_loadedAt",BindingFlags.Static|BindingFlags.NonPublic)!
+            .SetValue(null,DateTime.UtcNow);
         Directory.CreateDirectory("artifacts/collection-counter-layout");
         foreach (int[] selected in new[] { new[] { 41 }, new[] { 41, 42 } })
         {
@@ -24,6 +30,12 @@ internal static partial class Program
             typeof(FeeCollectionPage).GetField("enrollmentId",flags)!.SetValue(page,91);
             typeof(FeeCollectionPage).GetField("counterLoading",flags)!.SetValue(page,false);
             typeof(FeeCollectionPage).GetField("suppressPaymentEvents",flags)!.SetValue(page,true);
+            // FocusEntryField intentionally requires a real outstanding charge.
+            // Seed one before expecting Amount to become the preferred control.
+            var charges=Field<DataGridView>("charges");
+            var initialCharge=charges.Rows[charges.Rows.Add()];
+            initialCharge.Cells["BillingChargeId"].Value=7001L;
+            initialCharge.Cells["Balance"].Value=500m;
             var amount=Field<ModernTextBox>("paymentAmount");amount.Text="1250";
             Field<ModernTextBox>("reference").Focus();
             Check(page.FocusEntryField()&&amount.ContainsFocus,
@@ -53,10 +65,6 @@ internal static partial class Program
                     "Binding and selecting the default enrollment do not launch competing charge loads");
 
                 var picker=Field<StudentPicker>("student");
-                var charges=Field<DataGridView>("charges");
-                var row=charges.Rows[charges.Rows.Add()];
-                row.Cells["BillingChargeId"].Value=7001L;
-                row.Cells["Balance"].Value=500m;
                 picker.SetStudent(41,"41 - Synthetic student");
                 var queueFocus=typeof(FeeCollectionPage).GetMethod("QueueLoadedAmountFocus",flags)!;
                 Field<ModernTextBox>("reference").Focus();
@@ -92,7 +100,7 @@ internal static partial class Program
                 picture.Save($"artifacts/collection-counter-layout/payment-{selected.Length}.png");
             }
             Check(!scroll.VerticalScroll.Visible && summary.Bottom <= scroll.ClientSize.Height,
-                "Payment fields and receipt actions fit the usual family dialog without an unnecessary scrollbar");
+                $"Payment fields fit the family counter (scroll={scroll.VerticalScroll.Visible}, summaryBottom={summary.Bottom}, viewport={scroll.ClientSize.Height}, selected={selected.Length})");
             foreach(string name in new[]{"discountAmount","paymentAmount","method","reference","remarks"})
             {
                 var input=Field<Control>(name);
