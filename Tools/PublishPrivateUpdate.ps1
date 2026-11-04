@@ -5,7 +5,7 @@ param([Parameter(Mandatory=$true)][string]$ApplicationDirectory,
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:GITHUB_EVENT_NAME -ne 'workflow_dispatch' -or
-    $env:GITHUB_REF -ne 'refs/heads/main' -or $env:GITHUB_REPOSITORY -ne 'farhan2166-creator/FMSC-Database') {
+    $env:GITHUB_REF -ne 'refs/heads/main' -or $env:GITHUB_REPOSITORY -ne 'farhan2166-creator/FMSC-Source') {
     throw 'Publication is permitted only from the owner-triggered source main workflow.'
 }
 if (-not $env:FMSC_UPDATES_PUBLISH_TOKEN) { throw 'Configure the owner-only FMSC_UPDATES_PUBLISH_TOKEN repository secret.' }

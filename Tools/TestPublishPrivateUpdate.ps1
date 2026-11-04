@@ -28,7 +28,7 @@ try {
     $env:FMSC_UPDATES_PUBLISH_TOKEN = $null
     foreach ($scenario in @('local','push','branch','fork','missing-token')) {
         $env:GITHUB_ACTIONS = 'true'; $env:GITHUB_EVENT_NAME = 'workflow_dispatch'
-        $env:GITHUB_REF = 'refs/heads/main'; $env:GITHUB_REPOSITORY = 'farhan2166-creator/FMSC-Database'
+        $env:GITHUB_REF = 'refs/heads/main'; $env:GITHUB_REPOSITORY = 'farhan2166-creator/FMSC-Source'
         switch ($scenario) {
             local { $env:GITHUB_ACTIONS = 'false' }
             push { $env:GITHUB_EVENT_NAME = 'push' }

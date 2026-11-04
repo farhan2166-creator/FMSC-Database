@@ -6,7 +6,7 @@ has been published and no school installation has been updated.
 
 ## Owner decisions
 
-- `FMSC-Database` contains app source and the existing CI. It is **currently
+- `FMSC-Source` contains app source and the existing CI. It is **currently
   public**; the owner plans to make it private later.
 - `FMSC-Updates` is a **separate private** GitHub repository used ONLY to
   distribute approved packages and release metadata.
@@ -174,7 +174,7 @@ invent, reset or commit a version number. A duplicate published version is refus
 
 One-time credential setup: create a fine-grained GitHub personal access token
 limited to **FMSC-Updates**, with **Contents: Read and write**, and store it as
-the **FMSC_UPDATES_PUBLISH_TOKEN** Actions repository secret in **FMSC-Database**.
+the **FMSC_UPDATES_PUBLISH_TOKEN** Actions repository secret in **FMSC-Source**.
 The ordinary source GITHUB_TOKEN cannot write a different private repository.
 Do not paste the token into source, workflow inputs, school enrollment or the app.
 School computers continue to use their individual read-only SSH deploy keys.

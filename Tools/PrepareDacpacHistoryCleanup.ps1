@@ -17,7 +17,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$OutputDirectory,
     [ValidateNotNullOrEmpty()]
-    [string]$Repository = 'https://github.com/farhan2166-creator/FMSC-Database.git'
+    [string]$Repository = 'https://github.com/farhan2166-creator/FMSC-Source.git'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'

@@ -326,82 +326,82 @@ schema 56 needs migrations 57 and 58. Schema 57 needs only migration 58.
 SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 GO
-:r "C:\FMSC-Database\Migrations\20.sql"
+:r "C:\FMSC-Source\Migrations\20.sql"
 GO
-:r "C:\FMSC-Database\Migrations\21.sql"
+:r "C:\FMSC-Source\Migrations\21.sql"
 GO
-:r "C:\FMSC-Database\Migrations\22.sql"
+:r "C:\FMSC-Source\Migrations\22.sql"
 GO
-:r "C:\FMSC-Database\Migrations\23.sql"
+:r "C:\FMSC-Source\Migrations\23.sql"
 GO
-:r "C:\FMSC-Database\Migrations\24.sql"
+:r "C:\FMSC-Source\Migrations\24.sql"
 GO
-:r "C:\FMSC-Database\Migrations\25.sql"
+:r "C:\FMSC-Source\Migrations\25.sql"
 GO
-:r "C:\FMSC-Database\Migrations\26.sql"
+:r "C:\FMSC-Source\Migrations\26.sql"
 GO
-:r "C:\FMSC-Database\Migrations\27.sql"
+:r "C:\FMSC-Source\Migrations\27.sql"
 GO
-:r "C:\FMSC-Database\Migrations\28.sql"
+:r "C:\FMSC-Source\Migrations\28.sql"
 GO
-:r "C:\FMSC-Database\Migrations\29.sql"
+:r "C:\FMSC-Source\Migrations\29.sql"
 GO
-:r "C:\FMSC-Database\Migrations\30.sql"
+:r "C:\FMSC-Source\Migrations\30.sql"
 GO
-:r "C:\FMSC-Database\Migrations\31.sql"
+:r "C:\FMSC-Source\Migrations\31.sql"
 GO
-:r "C:\FMSC-Database\Migrations\32.sql"
+:r "C:\FMSC-Source\Migrations\32.sql"
 GO
-:r "C:\FMSC-Database\Migrations\33.sql"
+:r "C:\FMSC-Source\Migrations\33.sql"
 GO
-:r "C:\FMSC-Database\Migrations\34.sql"
+:r "C:\FMSC-Source\Migrations\34.sql"
 GO
-:r "C:\FMSC-Database\Migrations\35.sql"
+:r "C:\FMSC-Source\Migrations\35.sql"
 GO
-:r "C:\FMSC-Database\Migrations\36.sql"
+:r "C:\FMSC-Source\Migrations\36.sql"
 GO
-:r "C:\FMSC-Database\Migrations\37.sql"
+:r "C:\FMSC-Source\Migrations\37.sql"
 GO
-:r "C:\FMSC-Database\Migrations\38.sql"
+:r "C:\FMSC-Source\Migrations\38.sql"
 GO
-:r "C:\FMSC-Database\Migrations\39.sql"
+:r "C:\FMSC-Source\Migrations\39.sql"
 GO
-:r "C:\FMSC-Database\Migrations\40.sql"
+:r "C:\FMSC-Source\Migrations\40.sql"
 GO
-:r "C:\FMSC-Database\Migrations\41.sql"
+:r "C:\FMSC-Source\Migrations\41.sql"
 GO
-:r "C:\FMSC-Database\Migrations\42.sql"
+:r "C:\FMSC-Source\Migrations\42.sql"
 GO
-:r "C:\FMSC-Database\Migrations\43.sql"
+:r "C:\FMSC-Source\Migrations\43.sql"
 GO
-:r "C:\FMSC-Database\Migrations\44.sql"
+:r "C:\FMSC-Source\Migrations\44.sql"
 GO
-:r "C:\FMSC-Database\Migrations\45.sql"
+:r "C:\FMSC-Source\Migrations\45.sql"
 GO
-:r "C:\FMSC-Database\Migrations\46.sql"
+:r "C:\FMSC-Source\Migrations\46.sql"
 GO
-:r "C:\FMSC-Database\Migrations\47.sql"
+:r "C:\FMSC-Source\Migrations\47.sql"
 GO
-:r "C:\FMSC-Database\Migrations\48.sql"
+:r "C:\FMSC-Source\Migrations\48.sql"
 GO
-:r "C:\FMSC-Database\Migrations\49.sql"
-:r "C:\FMSC-Database\Migrations\50.sql"
+:r "C:\FMSC-Source\Migrations\49.sql"
+:r "C:\FMSC-Source\Migrations\50.sql"
 GO
-:r "C:\FMSC-Database\Migrations\51.sql"
+:r "C:\FMSC-Source\Migrations\51.sql"
 GO
-:r "C:\FMSC-Database\Migrations\52.sql"
+:r "C:\FMSC-Source\Migrations\52.sql"
 GO
-:r "C:\FMSC-Database\Migrations\53.sql"
+:r "C:\FMSC-Source\Migrations\53.sql"
 GO
-:r "C:\FMSC-Database\Migrations\54.sql"
+:r "C:\FMSC-Source\Migrations\54.sql"
 GO
-:r "C:\FMSC-Database\Migrations\55.sql"
+:r "C:\FMSC-Source\Migrations\55.sql"
 GO
-:r "C:\FMSC-Database\Migrations\56.sql"
+:r "C:\FMSC-Source\Migrations\56.sql"
 GO
-:r "C:\FMSC-Database\Migrations\57.sql"
+:r "C:\FMSC-Source\Migrations\57.sql"
 GO
-:r "C:\FMSC-Database\Migrations\58.sql"
+:r "C:\FMSC-Source\Migrations\58.sql"
 GO
 IF XACT_STATE() <> 1
     THROW 51000, 'The upgrade transaction cannot be committed.', 1;

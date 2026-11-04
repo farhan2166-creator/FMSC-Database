@@ -51,7 +51,7 @@ The Windows CI additionally builds and runs focused WinForms page/host tests and
 - [Windows application-only ZIP](.github/workflows/fmsc-windows-download.yml): manual application bundle; **not** a complete installer.
 - [Complete Windows installer ZIP](.github/workflows/fmsc-complete-installer.yml): manual database-free package with installer scripts, migrations, and prerequisites; the owner adds the detached MDF/LDF **after download** for a fresh install.
 
-Run status, download availability and retention are shown in the [Actions tab](https://github.com/farhan2166-creator/FMSC-Database/actions). No GitHub workflow installs onto a school PC or publishes a public release.
+Run status, download availability and retention are shown in the [Actions tab](https://github.com/farhan2166-creator/FMSC-Source/actions). No GitHub workflow installs onto a school PC or publishes a public release.
 
 ## Dependency updates and secret checks
 

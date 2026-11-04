@@ -29,7 +29,7 @@ The installer checks `Migrations` for top-level `*.sql` files. An empty or missi
 ## Before a fresh install
 
 1. Choose the intended **Windows operator account** and confirm it can access the database after elevated installation. LocalDB instances are per-Windows-user; installation as a different administrator is a known cross-account risk.
-2. Download the database-free installer artifact from the [Actions page](https://github.com/farhan2166-creator/FMSC-Database/actions). Verify the exact source commit, successful job, artifact integrity and contents.
+2. Download the database-free installer artifact from the [Actions page](https://github.com/farhan2166-creator/FMSC-Source/actions). Verify the exact source commit, successful job, artifact integrity and contents.
 3. Extract the ZIP **completely** into a normal writable folder. Do not run scripts inside the compressed archive.
 4. Obtain the owner-approved, compatible **detached** database pair. Both `FMSC_DB.mdf` and `FMSC_DB_log.ldf` must come from the **same** verified snapshot. Never copy an attached/live database or replace a production database with a DACPAC.
 5. Put the two files inside the extracted top-level `Database/` folder (beside `core.ps1`); check exact filenames. Neither file belongs in GitHub, email, or CI.
