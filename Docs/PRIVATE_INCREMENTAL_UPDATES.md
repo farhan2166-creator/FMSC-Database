@@ -1,6 +1,6 @@
 # FMSC direct private GitHub updater — agreed design
 
-**Status: signed update packaging and non-disruptive staging foundation implemented.
+**Status: signed update packaging, bounded archive chunking and non-disruptive staging foundation implemented.
 The GitHub distribution repository, direct authorization, Windows UI and installer
 integration are NOT yet implemented. Nothing is enabled on school PCs.**
 
@@ -61,10 +61,14 @@ publisher design and fail-safe tests; merely issuing `git rm` is insufficient.
 No source history will be rewritten as part of update retention.
 
 **Git size caveat:** GitHub rejects ordinary Git blobs above 100 MiB (the
-commonly described 100 MB limit). Large app/full-update packages need deterministic
-smaller pieces with signed length/hash entries, or another approved GitHub-native
-storage format. This is not implemented by the current ZIP packager yet. Avoid
-growing distribution Git history through repeated large binaries.
+commonly described 100 MB limit). Large app/full-update packages use deterministic <=90 MiB chunks with
+publisher-signed length/hash entries. Implemented in
+`Core/Updates/UpdateChunks.cs`. The packager creates local source ZIPs **and**
+the smaller `.zip.part0001`, `.zip.part0002` and subsequent files. The
+future distribution publisher must upload **only the signed manifests and
+chunk files**, never the large un-split source ZIP. Client-side authenticated
+fetch and part reconstruction remain to be wired. Avoid growing Git history
+through repeated large binaries.
 
 ## Authentication versus update availability
 
@@ -89,8 +93,10 @@ authorization.
   mismatch routes to installer.
 - `Core/Updates/UpdateStager.cs`: reconstruct and validate complete target in
   an isolated directory without touching the current installation.
-- `Tools/UpdatePackages`: full ZIP + changed-file ZIP + signed metadata with
-  synthetic safety tests.
+- `Tools/UpdatePackages`: full ZIP + changed-file ZIP + bounded signed part files
+  (up to 90 MiB each), with signature/hash verification and synthetic tests.
+- `Core/Updates/UpdateChunks.cs`: verifies each download part and recombines
+  them into a complete hash-verified ZIP in an isolated staging location.
 - Existing desktop CI invokes the packaging/staging tests.
 - The mistakenly introduced hosted `Apps/UpdateBroker` was **removed**.
   No cloud service has been deployed.
@@ -99,8 +105,9 @@ authorization.
 
 1. Create/prepare a separate private distribution repository, with approval
    controls, per-device read-only deploy-key enrollment and a signed latest feed.
-2. Implement signed package splitting and reconstruction for files that exceed
-   GitHub's per-file blob limit; test large full packages end-to-end.
+2. Connect existing signed package splitting to the distribution publisher
+   and authenticated client download, including network interruption and
+   real large-file Windows tests.
 3. Implement private Git authorization using the Windows-protected per-device
    SSH key; use fresh, shallow fetches so distribution history maintenance cannot
    strand installed clients.
