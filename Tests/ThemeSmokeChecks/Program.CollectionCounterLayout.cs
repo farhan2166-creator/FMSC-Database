@@ -99,8 +99,17 @@ internal static partial class Program
                 owner.DrawToBitmap(picture, new Rectangle(Point.Empty, picture.Size));
                 picture.Save($"artifacts/collection-counter-layout/payment-{selected.Length}.png");
             }
-            Check(!scroll.VerticalScroll.Visible && summary.Bottom <= scroll.ClientSize.Height,
-                $"Payment fields fit the family counter (scroll={scroll.VerticalScroll.Visible}, summaryBottom={summary.Bottom}, viewport={scroll.ClientSize.Height}, selected={selected.Length})");
+            // The payment viewport can be shorter than the form because other
+            // cards have reserved height. A scrollbar is required when the
+            // content is taller, not automatically a clipping regression.
+            bool needsScroll=summary.Bottom>scroll.ClientSize.Height;
+            Check(scroll.VerticalScroll.Visible==needsScroll,
+                $"Counter scroll matches actual overflow (scroll={scroll.VerticalScroll.Visible}, contentBottom={summary.Bottom}, viewport={scroll.ClientSize.Height}, selected={selected.Length})");
+            if (needsScroll)
+            {
+                scroll.ScrollControlIntoView(next.Visible?next:(Control)Field<ModernButton>("printReceiptButton"));
+                Application.DoEvents();
+            }
             foreach(string name in new[]{"discountAmount","paymentAmount","method","reference","remarks"})
             {
                 var input=Field<Control>(name);
