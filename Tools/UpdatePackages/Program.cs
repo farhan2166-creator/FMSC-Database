@@ -7,6 +7,7 @@ try
     if (args.Length == 1 && args[0] == "--self-test")
     {
         SelfTest.Run();
+        UpdatePreparationTests.Run();
         Console.WriteLine("PASS: signed incremental/full update packaging and fallback checks.");
         return;
     }
