@@ -120,6 +120,10 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private readonly CheckBox useAvailableCredit = new() { Text = "Use student advance", Checked = true, AutoSize = true };
     private readonly Label availableCredit = new();
     private readonly Label remainingCredit = new();
+    private readonly Label advanceScopeHint = new() {
+        Dock=DockStyle.Fill,Font=AppTheme.SmallFont,ForeColor=AppTheme.MutedText,
+        Margin=new Padding(0,4,0,0),Visible=false
+    };
     private Control? outstandingSummary;
     private Control? remainingBalanceSummary;
     private Control? creditSummary;
@@ -825,6 +829,11 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         useAvailableCredit.Font = new Font(AppTheme.SmallFont, FontStyle.Bold);
         useAvailableCredit.ForeColor = Color.ForestGreen;
         creditField.Controls.Add(useAvailableCredit, 0, 0);
+        creditField.RowCount=2;
+        creditField.RowStyles[0]=new RowStyle(SizeType.Absolute,Math.Max(1,valueHeight-creditField.Padding.Vertical-creditField.Margin.Vertical));
+        creditField.RowStyles.Add(new RowStyle(SizeType.Absolute,0));
+        creditField.Controls.Add(advanceScopeHint,0,1);creditField.SetColumnSpan(advanceScopeHint,2);
+        creditField.SizeChanged+=(_,_)=>FitAdvanceScopeHint();
         useAvailableCredit.CheckedChanged += (_, _) => {
             if (!suppressPaymentEvents) RefreshEnteredPaymentAllocation();
         };
@@ -2016,7 +2025,8 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         {
             /* The grid follows the Paid field. */
             ClearPayNowAmounts();
-            if (GetCreditAllocations().Count == 0) Warn("Enter an amount greater than zero.");
+            // Loading/changing a student and entering zero are not errors.
+            // ProcessTransaction validates whether cash, discount or advance is actually applied.
             return 0m;
         }
         var discountMap = GetDiscountAllocations();
@@ -2087,22 +2097,29 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     }
     private Dictionary<long, decimal> GetCreditAllocations(Dictionary<long, decimal>? discounts = null)
     {
-        var result = new Dictionary<long, decimal>();
-        if (!useAvailableCredit.Checked) return result;
-        discounts ??= GetDiscountAllocations();
-        var remaining = availableCreditByStudent.ToDictionary(pair => pair.Key, pair => Math.Max(0m, pair.Value));
-        foreach (var row in SettlementRows(discounts))
-        {
-            int owner = GetInt(row.Cells["AdmissionId"].Value);
-            long id = GetLong(row.Cells["BillingChargeId"].Value);
-            if (id <= 0 || !remaining.TryGetValue(owner, out decimal credit) || credit <= 0) continue;
-            decimal due = Math.Max(0m, GetDecimal(row.Cells["Balance"].Value) - discounts.GetValueOrDefault(id));
-            decimal take = Math.Min(due, credit);
-            if (take > 0) { result[id] = take; remaining[owner] -= take; }
-        }
-        return result;
+        return useAvailableCredit.Checked?GetUsableCreditAllocations(discounts):new();
     }
-    private decimal SelectedAvailableCredit() => SelectedBillStudents().Sum(id => availableCreditByStudent.GetValueOrDefault(id));
+    private Dictionary<long,decimal> GetUsableCreditAllocations(Dictionary<long,decimal>? discounts=null)
+    {
+        discounts ??= GetDiscountAllocations();
+        return CollectionCreditAllocation.Build(SettlementRows(discounts).Select(row=>(
+            GetLong(row.Cells["BillingChargeId"].Value),GetInt(row.Cells["AdmissionId"].Value),
+            GetDecimal(row.Cells["Balance"].Value)-discounts.GetValueOrDefault(GetLong(row.Cells["BillingChargeId"].Value)))),
+            availableCreditByStudent,counterIds is null?admissionId:null);
+    }
+    private decimal SelectedAvailableCredit() => counterIds is null
+        ?Math.Max(0m,availableCreditByStudent.GetValueOrDefault(admissionId))
+        :SelectedBillStudents().Sum(id=>Math.Max(0m,availableCreditByStudent.GetValueOrDefault(id)));
+    private void FitAdvanceScopeHint()
+    {
+        if(creditSummary is not TableLayoutPanel field||field.Parent is not TableLayoutPanel summary)return;
+        int width=Math.Max(1,field.ClientSize.Width-field.Padding.Horizontal-advanceScopeHint.Margin.Horizontal);
+        int extra=advanceScopeHint.Text.Length==0?0:TextRenderer.MeasureText(advanceScopeHint.Text,advanceScopeHint.Font,
+            new Size(width,int.MaxValue),TextFormatFlags.WordBreak|TextFormatFlags.TextBoxControl).Height+advanceScopeHint.Margin.Vertical;
+        field.RowStyles[1].Height=extra;
+        float height=SelectedAvailableCredit()>0m?AppScale.Scale(40,AppScale.ControlSizeScale)+extra:0;
+        if(Math.Abs(summary.RowStyles[2].Height-height)>.5f)summary.RowStyles[2].Height=height;
+    }
     // BUSINESS DECISION: Fee Collection receives only the payable fee balance,
     // after discount and the credit checkbox selection. It must never turn an
     // overpayment or an unallocated amount into a credit deposit. Intentional
@@ -3032,8 +3049,13 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         balance.ForeColor = remaining > 0 ? AppTheme.Danger : AppTheme.Text;
         decimal credit = SelectedAvailableCredit();
         decimal usedCredit = GetCreditAllocations(discountMap).Values.Sum();
-        availableCredit.Text = credit.ToString("N0");
+        // The checkbox shows what can pay the listed fees, not a pooled family balance.
+        availableCredit.Text = GetUsableCreditAllocations(discountMap).Values.Sum().ToString("N0");
         remainingCredit.Text = (credit - usedCredit).ToString("N0");
+        advanceScopeHint.Text=counterIds is null&&credit>0m&&SettlementRows().Any(row=>
+            GetInt(row.Cells["AdmissionId"].Value)!=admissionId&&GetRowNetDue(row,discountMap)>0m)
+            ?"Advance applies only to the main student's fees. Transfer in Advance Balance to pay a sibling.":"";
+        advanceScopeHint.Visible=advanceScopeHint.Text.Length>0;
         if (creditSummary is not null && remainingCreditSummary is not null)
         {
             var layout = (TableLayoutPanel)creditSummary.Parent!;
@@ -3045,6 +3067,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             layout.RowStyles[0].Height = due > 0 || credit <= 0 ? AppScale.Scale(40, AppScale.ControlSizeScale) : 0;
             remainingBalanceSummary!.Visible = remaining > 0 || credit <= 0;
             layout.RowStyles[6].Height = remaining > 0 || credit <= 0 ? AppScale.Scale(40, AppScale.ControlSizeScale) : 0;
+            FitAdvanceScopeHint();
         }
         /* Remembered so the next change can tell the untouched default from a figure the operator entered - see lastPayableShown. */
         lastPayableShown =

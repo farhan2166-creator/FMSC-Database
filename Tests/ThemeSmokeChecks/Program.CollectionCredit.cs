@@ -53,28 +53,28 @@ internal static partial class Program
         use.Checked=true; grid.Rows.Clear(); credit.Clear();
         Bill(16,6594,300); Bill(17,6589,400); credit[6594]=400; credit[6589]=100;
         Allocate(300);
-        Check(Cash(0)==0 && Cash(1)==300 && Plan()[17]==100,
-            "Family cash respects each child's own advance without moving unused sibling credit");
+        Check(Cash(0)==0 && Cash(1)==300 && !Plan().ContainsKey(17)&&Payable()==400,
+            "Ordinary collection uses only the main student's advance; selecting a sibling does not opt in their advance");
         grid.Rows.Clear(); credit.Clear();
         Bill(1,6594,400); Bill(2,6594,2500); Bill(3,6589,400);
         credit[6594]=8750; credit[6589]=100;
         Check(use.Checked, "Credit use is checked by default");
         var plan=Plan();
-        Check(plan[1]==400 && plan[2]==2500 && plan[3]==100, "Each child uses only their own credit, including future posted bills");
-        Check(Payable()==300, "Amount to pay excludes available credit without crossing sibling accounts");
+        Check(plan[1]==400 && plan[2]==2500 && !plan.ContainsKey(3), "Only the main student's posted bills use their advance");
+        Check(Payable()==400, "Sibling dues remain payable without borrowing or automatically using sibling advance");
         use.Checked=false;
         Check(Payable()==3300 && Plan().Count==0, "Unticking credit restores the cash balance");
         use.Checked=true;
         discount.Text="2000";
         plan=Plan();
-        Check(plan[2]==500 && Payable()==300, "Largest-fee discount is applied before credit");
+        Check(plan[2]==500 && Payable()==400, "Largest-fee discount is applied before the main student's credit");
         var received = (ModernTextBox)Field("paymentAmount");
         var collect = (Button)Field("executeButton");
         var validator = (FormValidator)Field("collectionValidator");
         void RefreshTotals() => type.GetMethod("UpdateCollectionTotals", flags)!.Invoke(page,null);
-        received.Text="301"; RefreshTotals();
+        received.Text="401"; RefreshTotals();
         Check(!collect.Enabled && validator.IsMarked(received), "Family cash above the balance after credit is rejected inline");
-        received.Text="300"; RefreshTotals();
+        received.Text="400"; RefreshTotals();
         Check(collect.Enabled && !validator.IsMarked(received), "Exactly the remaining cash balance is accepted");
         use.Checked=false; discount.Text="0"; received.Text="3300"; RefreshTotals();
         Check(collect.Enabled, "Without credit the full family balance is accepted");
@@ -93,6 +93,17 @@ internal static partial class Program
             "A fully credit-covered bill rejects cash and never previews an implicit credit deposit");
         received.Text="0"; RefreshTotals();
         Check(collect.Enabled && !validator.IsMarked(received), "Credit-only settlement remains available with zero cash");
+        Check(((Label)Field("availableCredit")).Text=="8,700", "The advance checkbox shows the amount usable against the listed fees");
+        grid.Rows.Clear();credit.Clear();Bill(5,6589,2300m);credit[6594]=5000m;
+        Allocate(0);RefreshTotals();
+        Check(Plan().Count==0&&Payable()==2300m&&((Label)Field("availableCredit")).Text=="0"
+            &&((Label)Field("remainingCredit")).Text=="5,000",
+            "Screenshot regression: the main student's 5000 advance does not settle a sibling's 2300 dues");
+        Check(((Label)Field("advanceScopeHint")).Text.Contains("Transfer in Advance Balance"),
+            "Unusable main-student advance has visible sibling-transfer guidance");
+        Allocate(2300m);received.Text="2300";RefreshTotals();
+        Check(Cash(0)==2300m&&collect.Enabled,"Sibling dues can still be collected in cash while the main student's advance remains untouched");
+        received.Text="0";grid.Rows.Clear();credit.Clear();Bill(4,6594,8700);credit[6594]=8750;RefreshTotals();
         Check(((Label)Field("availableCredit")).Font.Bold && ((Label)Field("availableCredit")).ForeColor==Color.ForestGreen,
             "Available credit is bold green");
         var layout=(TableLayoutPanel)((Control)Field("creditSummary")).Parent!;
@@ -113,6 +124,10 @@ internal static partial class Program
             "After full settlement, remaining credit replaces the empty outstanding summary");
         Check(((Label)Field("collectionResult")).Parent is null, "Transaction text is absent below Next Student");
         page.ConfigureCounter(new[]{6594,6589});
+        grid.Rows.Clear();credit.Clear();Bill(6,6594,300);Bill(7,6589,400);credit[6594]=400;credit[6589]=100;
+        plan=Plan();
+        Check(plan[6]==300&&plan[7]==100&&Payable()==300,
+            "The fixed family counter retains explicit per-child credit without transferring money between children");
         var split=(DataGridView)Field("familyProposal");
         Check(split.Columns["Outstanding"].MinimumWidth>=90 && split.Columns["Proposed"].MinimumWidth>=90,
             "Counter allocation reserves readable widths for owed and payable amounts");

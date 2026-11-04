@@ -669,6 +669,18 @@ Original source: `Docs/Decisions/COLLECTION_FEE_ACTIONS.md`. Original SHA-256: `
 <a id="collection-fee-actions-focused-collection-fee-actions--27-october-2026"></a>
 ## Focused collection fee actions — 27 October 2026
 
+4 November clarification: ordinary Fee Collection uses only the main selected
+student's advance, against that student's own listed fees. Selecting siblings
+does not pool balances or opt in their advance. To use another child's money,
+record an explicit Transfer in Advance Balance and select the recipient as main.
+The checkbox amount shows advance usable against the listed fees; Advance left
+tracks the main student's remaining balance. A short note explains when sibling
+fees need a transfer. Blank/zero cash during allocation is valid, and a credit-only
+collection can save with zero new cash when the owner has fees to settle. The
+separate fixed family counter retains its per-child advance handling without
+crossing account ownership. These are C# allocation/display changes; the SQL
+ownership checks, credit ledger and explicit transfer workflow are unchanged.
+
 28 October follow-up: cancelling an unpaid charge requires both collection and adjustment permission through every UI route and at the SQL write. Migration 60 retains a full cancellation reason, actor and timestamp separately from the bill's existing notes; it does not delete the bill or its history. See [the admission/fee flow fixes](BUSINESS_DECISIONS.md#admission-fee-flow-fixes).
 
 The collection grid shows unpaid fees and newly waived posted fees awaiting a

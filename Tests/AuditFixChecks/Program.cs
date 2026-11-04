@@ -5,6 +5,12 @@ int checks=0;
 void Assert(bool condition,string message){if(!condition)throw new Exception(message);checks++;}
 void Reject(Action action,string message){try{action();}catch(ArgumentException){checks++;return;}throw new Exception(message);}
 
+CollectionCreditScopeChecks.Run(Assert);
+if(args.Contains("--collection-credit"))
+{
+    Console.WriteLine($"PASS: {checks} collection advance ownership and allocation checks.");return;
+}
+
 foreach(decimal amount in new[]{0m,1m,999m,1000.00m,-100m,9999999999m})
 {
     WholeRupees.Require(amount);

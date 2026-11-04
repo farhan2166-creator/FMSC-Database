@@ -21,6 +21,7 @@ internal static partial class Program
         stampField.SetValue(null,DateTime.UtcNow);
         void Reset()
         {
+            type.GetField("admissionId",flags)!.SetValue(page,1);
             type.GetField("suppressPaymentEvents",flags)!.SetValue(page,true);
             type.GetField("suppressDiscountEvents",flags)!.SetValue(page,true);
             grid.Rows.Clear();credit.Clear();discount.Text="0";useCredit.Checked=true;
@@ -83,9 +84,10 @@ internal static partial class Program
                 Check(placed==money && grid.Rows.Cast<DataGridViewRow>().Sum(row=>Convert.ToDecimal(row.Cells["Amount"].Value))==money,
                     "Every proposed rupee is allocated exactly once across class and fee boundaries.");
             }
+            type.GetField("admissionId",flags)!.SetValue(page,3);
             credit[3]=100;Allocate(500);
             Check(Cash(11)==100 && Cash(12)==400 && Cash(31)==0 && CreditPlan()[31]==100,
-                "A senior's own advance stays with the senior and cannot fund the junior's charges.");
+                "With the senior selected as main, their advance stays with them and cannot fund the junior's charges.");
 
             Reset();Bill(10,10,2,"10",true,1,200,true);Bill(20,20,2,"2",false,5,200);
             Allocate(100);
