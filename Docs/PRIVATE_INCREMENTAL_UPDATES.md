@@ -143,6 +143,53 @@ authorization.
 - The mistakenly introduced hosted `Apps/UpdateBroker` was **removed**.
   No cloud service has been deployed.
 
+## Owner-controlled publisher signing (local tooling ready; no real key issued yet)
+
+The owner must create the long-lived publisher key **on their own trusted
+Windows account**, never inside a GitHub Actions log or in this chat. The
+owner-only CLI is `Tools/UpdateSigning`:
+
+```powershell
+# On the FEATURE BRANCH, on the owner's trusted Windows PC:
+dotnet run --project Tools/UpdateSigning/UpdateSigning.csproj -c Release -- initialize
+```
+
+This operation refuses to overwrite an existing identity. It generates RSA-4096
+and stores the PRIVATE half encrypted with DPAPI CurrentUser in
+`%LOCALAPPDATA%\\FMSC\\ReleaseSigning\\publisher-private.dpapi`, and the
+corresponding PUBLIC key beside it in `publisher-public.pem`. No private PEM
+is displayed, generated in the repository, or committed. **Back up the signing
+authority before relying on it**: a DPAPI-protected file cannot be decrypted
+on another Windows account/machine just by copying it. A reviewed secure
+recovery/export workflow is required before production signing.
+
+After owner review, only the PUBLIC PEM may be placed at
+`Core/Updates/publisher-public.pem` in the source. FMSC embeds that public
+key at build time, and silently refuses update installation when the key is
+not provisioned. Do NOT copy the private `.dpapi` file to either GitHub repo
+or to school computers.
+
+Local signing of an approved publish can use:
+
+```powershell
+dotnet run --project Tools/UpdatePackages/UpdatePackages.csproj -c Release -- `
+  --current-dir <approved-publish-directory> `
+  --version <actual-approved-application-version> `
+  --schema <actual-approved-database-schema> `
+  --output-dir <new-empty-package-directory> `
+  --signing-protected-key "$env:LOCALAPPDATA\\FMSC\\ReleaseSigning\\publisher-private.dpapi"
+```
+
+If a verified previous approved app build exists, also provide
+`--previous-dir` and `--previous-version` to generate a delta.
+The full archive always exists, even without a previous build.
+This command does not push to GitHub, touch school SQL or activate an update.
+
+**Automation choice not finalized:** automatic GitHub Actions signing would
+need explicit secure key provisioning in an appropriately protected GitHub
+environment/secrets, rather than this Windows-user DPAPI container. No
+GitHub secret or signing authority was created by the assistant.
+
 ## Remaining implementation
 
 1. `FMSC-Updates` is created private with a README. Enroll each Windows
@@ -154,9 +201,9 @@ authorization.
    publishing action. Signed chunked download/reconstruction code exists;
    test a REAL private Git checkout and interrupted large downloads on Windows
    before allowing a school update.
-3. Provision owner-controlled publisher RSA signing keys (protect the PRIVATE
-   half outside source/distribution) and embed the reviewed PUBLIC key in
-   official FMSC builds. Read-only Git access and manifest/chunk verification
+3. The owner-only DPAPI RSA signing CLI is implemented. Owner must issue and
+   recoverably protect the **real** publisher signing key and embed the
+   reviewed PUBLIC key in official FMSC builds. Read-only Git access and manifest/chunk verification
    now exist, but the manual checker requires this key before recognizing
    updates. Bundle reviewed Git/SSH runtime in the Windows installer so schools
    never need developer tools.
