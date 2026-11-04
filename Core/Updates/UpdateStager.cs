@@ -6,8 +6,8 @@ namespace FMSC_SMS.Core.Updates;
 /// <summary>
 /// Reconstructs a complete new application in a separate, non-live directory.
 /// NEVER replaces in-use files, never runs migrations and never activates a build.
-/// The caller must first verify the manifest's publisher signature and authorize
-/// the download through the private update broker. Activation is a separate,
+/// The caller must first retrieve the manifest via the owner's authenticated
+/// private Git repository and verify downloaded content against its hashes. Activation is a separate,
 /// operator-approved operation after FMSC has exited.
 /// </summary>
 internal static class UpdateStager
@@ -85,7 +85,7 @@ internal static class UpdateStager
                 string path = SafePath(staged, file.Path);
                 var info = new FileInfo(path);
                 if (!info.Exists || info.Length != file.Length || !SameHash(path, file.Sha256))
-                    throw new InvalidDataException("Staged application digest differs from signed release metadata.");
+                    throw new InvalidDataException("Staged application digest differs from update metadata.");
             }
         }
         catch
@@ -118,7 +118,7 @@ internal static class UpdateStager
     {
         var file = new FileInfo(path);
         if (!file.Exists || file.Length != descriptor.Length || !SameHash(path, descriptor.Sha256))
-            throw new InvalidDataException("Downloaded archive failed its signed SHA-256 integrity check.");
+            throw new InvalidDataException("Downloaded archive failed its SHA-256 integrity check.");
     }
 
     private static bool SameHash(string path, string expected)
