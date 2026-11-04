@@ -87,12 +87,14 @@ internal static class PackageBuilder
         const string fullName = "FMSC_SMS-app-full.zip";
         CreateZip(current, currentFiles.Select(f => f.Path), Path.Combine(output, fullName));
         manifest.Full = Archive(output, fullName);
+        manifest.Full.Parts = UpdateChunks.SplitArchive(Path.Combine(output, fullName));
 
         if (previousDir is not null)
         {
             const string deltaName = "FMSC_SMS-app-incremental.zip";
             CreateZip(current, changed, Path.Combine(output, deltaName));
             manifest.Incremental = Archive(output, deltaName);
+            manifest.Incremental.Parts = UpdateChunks.SplitArchive(Path.Combine(output, deltaName));
         }
         byte[] data = UpdateManifestPolicy.Serialize(manifest);
         byte[] signature = privateKey.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
@@ -188,6 +190,38 @@ internal static class SelfTest
             byte[] bytes = File.ReadAllBytes(Path.Combine(output, "update-manifest.json"));
             byte[] signature = File.ReadAllBytes(Path.Combine(output, "update-manifest.sig"));
             var valid = UpdateManifestPolicy.ReadVerified(bytes, signature, publicKey);
+            // Signatures cover every Git-size-compatible part and the complete ZIP.
+            Require(valid.Full.Parts.Count == 1 && valid.Incremental!.Parts.Count == 1,
+                "Ordinary small updates must still carry independently signed part inventories.");
+            string tinyPartsFolder = Path.Combine(root, "tiny-parts");
+            Directory.CreateDirectory(tinyPartsFolder);
+            string smallZip = Path.Combine(tinyPartsFolder, "test.zip");
+            File.WriteAllBytes(smallZip, RandomNumberGenerator.GetBytes(177));
+            var manyParts = UpdateChunks.SplitArchive(smallZip, maximumPartBytes: 40);
+            Require(manyParts.Count == 5 && manyParts.All(part => part.Length <= 40),
+                "Larger archives must be split into Git-compatible bounded parts.");
+            var descriptor = new UpdateArchive
+            {
+                Name = "test.zip",
+                Length = new FileInfo(smallZip).Length,
+                Sha256 = UpdateChunks.Sha256(smallZip),
+                Parts = manyParts
+            };
+            string rebuilt = Path.Combine(root, "rebuilt.zip");
+            UpdateChunks.ReassembleVerified(descriptor, tinyPartsFolder, rebuilt);
+            Require(File.ReadAllBytes(rebuilt).SequenceEqual(File.ReadAllBytes(smallZip)),
+                "Signed archive parts must reconstruct a byte-identical download.");
+            string damagedPart = Path.Combine(tinyPartsFolder, manyParts[2].Name);
+            File.WriteAllBytes(damagedPart, RandomNumberGenerator.GetBytes((int)manyParts[2].Length));
+            try
+            {
+                UpdateChunks.ReassembleVerified(descriptor, tinyPartsFolder,
+                    Path.Combine(root, "tampered-rebuild.zip"));
+                throw new Exception("Tampered chunk was accepted.");
+            }
+            catch (InvalidDataException) { }
+            Require(!File.Exists(Path.Combine(root, "tampered-rebuild.zip")),
+                "Reconstruction must not publish an unverified target ZIP.");
             Require(valid.ChangedFiles.SequenceEqual(new[] { "added.dll", "changed.dll" }), "Only changed files belong in the delta.");
             using (var zip = ZipFile.OpenRead(Path.Combine(output, valid.Incremental!.Name)))
                 Require(zip.Entries.Select(x => x.FullName).SequenceEqual(valid.ChangedFiles), "Delta ZIP contents mismatch.");
