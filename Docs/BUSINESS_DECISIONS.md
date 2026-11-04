@@ -112,9 +112,13 @@ Do not make their defaults identical as a cosmetic consistency change.
 Concessions and money: discount reduces the full fee; correcting a recorded
 payment is distinct from returning cash. Reductions consume unpaid dues first;
 paid differences become the explicitly selected advance or refund. Optional credit
-use follows the reviewed order, oldest due tuition then other due fees; future
-fees do not consume it early. Credit use is settlement, never new cash. Normal
-later billing keeps its existing eligible-credit rules. No silent money rounding.
+use follows the reviewed manual collection order, with each student's
+advance restricted to that student (except an explicit transfer). Future posted
+fees can be prepaid deliberately through collection; ordinary posting and
+automatic billing never consume advance. Credit use is settlement, never new
+cash. The operator confirms collection and its saved receipt records the
+cash/credit split. This owner decision (4 Nov) supersedes earlier automatic
+credit-use guidance. No silent money rounding.
 
 ### BD-13
 
