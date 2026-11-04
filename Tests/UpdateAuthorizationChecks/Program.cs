@@ -111,6 +111,27 @@ try
     {
         checks++;
     }
+    Require(UpdateGitSession.IsAllowedPartPath("versions/1.1.0/FMSC_SMS-app-full.zip.part0001"),
+        "Signed full archive chunk must be an approved private Git path.");
+    Require(UpdateGitSession.IsAllowedPartPath("versions/1.1.0/FMSC_SMS-app-incremental.zip.part0042"),
+        "Signed delta archive chunk must be an approved private Git path.");
+    foreach (string unsafePath in new[]
+    {
+        "versions/1.1.0/../../secrets",
+        "versions/1.1.0/FMSC_SMS-app-full.zip",
+        "versions/1.1.0/FMSC_SMS-app-full.zip.part00001",
+        "versions/1.1.0/FMSC_SMS-app-full.zip.part000A",
+        "versions/1.1.0/FMSC_SMS-app-full.zip.part0001/secret",
+        "versions/1.1.0/private.pem",
+        "versions/not-valid/FMSC_SMS-app-full.zip.part0001"
+    })
+        Require(!UpdateGitSession.IsAllowedPartPath(unsafePath),
+            "Unapproved Git read path was accepted: " + unsafePath);
+    Require(UpdateGitSession.IsAllowedMetadataPath("channel/stable.json") &&
+        UpdateGitSession.IsAllowedMetadataPath("versions/1.1.0/update-manifest.json") &&
+        !UpdateGitSession.IsAllowedMetadataPath("versions/1.1.0/FMSC_SMS.exe") &&
+        !UpdateGitSession.IsAllowedMetadataPath("README.md"),
+        "Git metadata requests must be limited to approved channel and signed manifest paths.");
     Console.WriteLine($"PASS: {checks} Git deploy-key enrollment, DPAPI protection and isolation checks.");
 }
 finally
