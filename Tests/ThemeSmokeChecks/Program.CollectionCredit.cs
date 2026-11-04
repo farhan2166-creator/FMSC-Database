@@ -105,6 +105,18 @@ internal static partial class Program
         received.Text="0"; RefreshTotals();
         Check(collect.Enabled && !validator.IsMarked(received), "Credit-only settlement remains available with zero cash");
         Check(((Label)Field("availableCredit")).Text=="8,700", "The advance checkbox shows the amount usable against the listed fees");
+        var selectedDate=(ModernDatePicker)Field("paymentDate");
+        selectedDate.Value=DateTime.Today.AddDays(-1);
+        RefreshTotals();
+        Check(!use.Enabled && !use.Checked && Plan().Count==0 && Payable()==8700m,
+            "Backdated collection disables advance and restores the full cash payable balance");
+        Check(((Label)Field("advanceScopeHint")).Text.Contains("backdated collection"),
+            "Backdated collection explains why student advance is unavailable");
+        selectedDate.Value=DateTime.Today;
+        Check(use.Enabled && !use.Checked, "Returning to today enables advance without silently opting in");
+        use.Checked=true;RefreshTotals();
+        Check(Plan()[4]==8700m && Payable()==0m,
+            "The operator can deliberately select credit again for a collection dated today");
         grid.Rows.Clear();credit.Clear();Bill(5,6589,2300m);credit[6594]=5000m;
         Allocate(0);RefreshTotals();
         Check(Plan().Count==0&&Payable()==2300m&&((Label)Field("availableCredit")).Text=="0"
