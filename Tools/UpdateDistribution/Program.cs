@@ -158,7 +158,7 @@ internal static class DistributionSnapshot
             throw new InvalidDataException("Unrecognized snapshot format.");
         string versionsDir = Path.Combine(root, "versions");
         var versions = Directory.GetDirectories(versionsDir)
-            .Select(Path.GetFileName).ToArray();
+            .Select(path => Path.GetFileName(path) ?? throw new InvalidDataException("Invalid version directory.")).ToArray();
         if (versions.Length is < 1 or > 2 ||
             !versions.Contains(snapshot.LatestVersion, StringComparer.Ordinal) ||
             (snapshot.PreviousVersion is null
