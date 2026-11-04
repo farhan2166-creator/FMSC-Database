@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using FMSC_SMS.Core.Updates;
+using FMSC_SMS.UpdateSigning;
 
 try
 {
@@ -17,13 +18,17 @@ try
     var output = Required(options, "output-dir");
     var version = Required(options, "version");
     var schema = int.Parse(Required(options, "schema"));
-    var signingKey = Required(options, "signing-private-key");
+    bool hasProtected = options.TryGetValue("signing-protected-key", out var protectedKey);
+    bool hasPlain = options.TryGetValue("signing-private-key", out var plainKey);
+    if (hasProtected == hasPlain)
+        throw new ArgumentException("Supply exactly one of --signing-protected-key or --signing-private-key.");
     options.TryGetValue("previous-dir", out string? previous);
     options.TryGetValue("previous-version", out string? previousVersion);
     if ((previous is null) != (previousVersion is null))
         throw new ArgumentException("previous-dir and previous-version must be supplied together.");
-    using var rsa = RSA.Create();
-    rsa.ImportFromPem(File.ReadAllText(signingKey));
+    using var rsa = hasProtected
+        ? LocalPublisherSigningKey.Open(protectedKey!)
+        : OpenPemKey(plainKey!);
     var manifest = PackageBuilder.Build(current, output, version, schema, previous, previousVersion, rsa);
     Console.WriteLine($"Prepared signed application update {manifest.Version}; " +
         $"delta: {(manifest.Incremental is null ? "unavailable" : manifest.ChangedFiles.Count + " changed files")}. " +
@@ -39,7 +44,7 @@ static Dictionary<string, string> Parse(string[] args)
 {
     if (args.Length == 0 || args.Length % 2 != 0)
         throw new ArgumentException("Expected --current-dir, --output-dir, --version, --schema, " +
-            "--signing-private-key; optional --previous-dir and --previous-version. Or --self-test.");
+            "--signing-protected-key or --signing-private-key; optional --previous-dir and --previous-version. Or --self-test.");
     var result = new Dictionary<string, string>(StringComparer.Ordinal);
     for (int i = 0; i < args.Length; i += 2)
     {
@@ -48,10 +53,21 @@ static Dictionary<string, string> Parse(string[] args)
             throw new ArgumentException("Invalid or duplicate update packaging option.");
     }
     var known = new HashSet<string>(new[] { "current-dir", "output-dir", "version",
-        "schema", "signing-private-key", "previous-dir", "previous-version" }, StringComparer.Ordinal);
+        "schema", "signing-private-key", "signing-protected-key", "previous-dir", "previous-version" }, StringComparer.Ordinal);
     if (result.Keys.Any(key => !known.Contains(key)))
         throw new ArgumentException("Unknown update packaging option.");
     return result;
+}
+
+static RSA OpenPemKey(string path)
+{
+    using var candidate = RSA.Create();
+    candidate.ImportFromPem(File.ReadAllText(path));
+    if (candidate.KeySize < 3072)
+        throw new CryptographicException("Publisher RSA signing key must contain at least 3072 bits.");
+    var key = RSA.Create();
+    key.ImportParameters(candidate.ExportParameters(true));
+    return key;
 }
 
 static string Required(Dictionary<string, string> args, string key) =>
