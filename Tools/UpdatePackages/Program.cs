@@ -193,6 +193,31 @@ internal static class SelfTest
                 Require(zip.Entries.Select(x => x.FullName).SequenceEqual(valid.ChangedFiles), "Delta ZIP contents mismatch.");
             using (var zip = ZipFile.OpenRead(Path.Combine(output, valid.Full.Name)))
                 Require(zip.Entries.Count == 3, "Full ZIP must contain the complete new application.");
+            string stagedDelta = Path.Combine(root, "staged-delta");
+            UpdateStager.Prepare(valid, Path.Combine(output, valid.Incremental!.Name),
+                oldDir, stagedDelta, incremental: true);
+            Require(File.ReadAllText(Path.Combine(stagedDelta, "changed.dll")) == "after" &&
+                File.ReadAllText(Path.Combine(stagedDelta, "FMSC_SMS.exe")) == "exe" &&
+                File.Exists(Path.Combine(stagedDelta, "added.dll")) &&
+                !File.Exists(Path.Combine(stagedDelta, "removed.dll")),
+                "Incremental staging must reconstruct the complete target without obsolete files.");
+            Require(File.ReadAllText(Path.Combine(oldDir, "changed.dll")) == "before",
+                "The running installation must remain unchanged during staging.");
+            string stagedFull = Path.Combine(root, "staged-full");
+            UpdateStager.Prepare(valid, Path.Combine(output, valid.Full.Name),
+                oldDir, stagedFull, incremental: false);
+            Require(File.ReadAllText(Path.Combine(stagedFull, "changed.dll")) == "after",
+                "Full fallback must reconstruct the target application.");
+            File.WriteAllText(Path.Combine(oldDir, "changed.dll"), "tampered base");
+            try
+            {
+                UpdateStager.Prepare(valid, Path.Combine(output, valid.Incremental.Name),
+                    oldDir, Path.Combine(root, "refused-stage"), incremental: true);
+                throw new Exception("Tampered installed base was accepted for delta staging.");
+            }
+            catch (InvalidDataException) { }
+            Require(!Directory.Exists(Path.Combine(root, "refused-stage")),
+                "Failed preflight must not create an activation directory.");
             Require(UpdateManifestPolicy.Choose(valid, "1.1.0-rc.2", 75,
                 valid.BaseFiles.ToDictionary(f => f.Path, f => f.Sha256, StringComparer.OrdinalIgnoreCase))
                 == UpdateDownloadChoice.Incremental, "Clean base must select delta.");
