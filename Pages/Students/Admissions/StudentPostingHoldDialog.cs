@@ -21,7 +21,6 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
     private readonly ModernDatePicker date = HumanUi.Date(), month = HumanUi.Date();
     private readonly ModernComboBox policy = HumanUi.Combo(), payment = HumanUi.Combo(), placement = HumanUi.Combo();
     private readonly ModernTextBox reason = HumanUi.TextBox(true, 500), impact = HumanUi.TextBox(true, 0);
-    private readonly CheckBox credit = new() { Text = "Apply available advance to fees", AutoSize = true };
     private readonly CheckBox annual = new() { Text = "Include this placement's unbilled annual fees", AutoSize = true };
     private readonly DataGridView bills = new() { Dock = DockStyle.Fill, AutoGenerateColumns = false,
         AllowUserToAddRows = false, AllowUserToDeleteRows = false, RowHeadersVisible = false,
@@ -76,7 +75,8 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
             Add(HumanUi.Field("Placement to resume", placement, true), SizeType.Absolute, AppMetrics.FieldRowHeight);
             placement.MaximumSize = Size.Empty;
             var choices = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = true, Margin = Padding.Empty };
-            choices.Controls.Add(credit); choices.Controls.Add(annual); Add(choices, SizeType.AutoSize);
+            choices.Controls.Add(new Label { AutoSize = true, Text = "Advance remains held until Fee Collection." });
+            choices.Controls.Add(annual); Add(choices, SizeType.AutoSize);
             Add(new Label { Text = "Waived fees — tick to restore the charge (no payment is restored)", AutoSize = true }, SizeType.AutoSize);
             bills.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Restore", HeaderText = "Restore?", FillWeight = 16 });
             bills.Columns.Add(new DataGridViewTextBoxColumn { Name = "Fee", HeaderText = "Fee", ReadOnly = true, FillWeight = 40 });
@@ -107,14 +107,12 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
             : "This chooses which issued monthly fees are waived.", resume
             ? "Held in August, back in October: choose August to charge the absence, or October to leave the missing August–September fees uncharged. Tick earlier waived bills separately if you want them restored."
             : "Waiving an unpaid Rs. 400 bill removes Rs. 400 due. If it was paid, review the advance or refund choice before saving.");
-        FinanceHelp.Attach(this, credit, "Use the student's existing advance; this receives no new cash.",
-            "Rs. 500 due and Rs. 200 advance: choosing this settles Rs. 200 and leaves Rs. 300 due.");
         FinanceHelp.Attach(this, annual, "Include only annual fees that have never been issued for the selected placement. Previously reversed annual fees require the existing correction review.",
             "A return in a new academic year may need that placement's annual fee. Tick this to include it in the review. An annual fee already issued is not charged twice.");
         FinanceHelp.Attach(this, payment, FinanceHelp.Topic.PaidReduction);
         FinanceHelp.Attach(this, placement, "Use the same placement when applicable. For a new academic year, prepare its placement through the existing promotion or placement workflow, then select it here.",
             "An October return in the same class keeps its recorded placement start. A return in a later academic year uses that year's prepared placement.");
-        foreach (var control in new Control[] { date, month, policy, payment, placement, credit, annual, reason })
+        foreach (var control in new Control[] { date, month, policy, payment, placement, annual, reason })
         {
             if (control is ModernDatePicker picker) picker.ValueChanged += (_, _) => Reset();
             else if (control is ModernComboBox combo) combo.SelectedIndexChanged += (_, _) => Reset();
@@ -144,7 +142,8 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
         DatabaseHelper.P("@PaidReductionAction", payment.SelectedIndex == 1 ? "Refund" : "Credit"),
         DatabaseHelper.P("@BillingFromMonth", resume ? new DateTime(month.Value.Year, month.Value.Month, 1) : null),
         DatabaseHelper.P("@RestoreBills", JsonSerializer.Serialize(bills.Rows.Cast<DataGridViewRow>().Where(r => Equals(r.Cells["Restore"].Value, true)).Select(r => (long)r.Tag!).OrderBy(x => x))),
-        DatabaseHelper.Bit("@ApplyAvailableCredit", resume && credit.Checked),
+        // Resume records restored/new charges but never consumes advance.
+        DatabaseHelper.Bit("@ApplyAvailableCredit", false),
         DatabaseHelper.P("@TargetEnrollmentId", resume && placement.SelectedValue is int id ? id : null), DatabaseHelper.Bit("@AdoptLeft", adoptLeft),
         DatabaseHelper.Bit("@ChargeAnnualFees", resume && annual.Checked) };
     private async Task LoadAsync()
@@ -195,7 +194,7 @@ internal sealed class StudentPostingHoldDialog : ApplicationWindowForm
             plan = data.Rows[0];
             string Amount(string name) => Money(Convert.ToDecimal(plan[name]));
             impact.Text = $"Current outstanding: Rs. {Amount("Outstanding")}\r\n" + (resume
-                ? $"Waived fees selected for restoration: Rs. {Amount("Restored")}\r\nNew fees to charge: Rs. {Amount("NewCharges")}\r\nAvailable advance: Rs. {Amount("AvailableCredit")}\r\nAdvance to apply: Rs. {Amount("CreditToApply")}\r\n"
+                ? $"Waived fees selected for restoration: Rs. {Amount("Restored")}\r\nNew fees to charge: Rs. {Amount("NewCharges")}\r\nAvailable advance (held for Fee Collection): Rs. {Amount("AvailableCredit")}\r\n"
                 : $"Unpaid fees to waive: Rs. {Amount("Waived")}\r\nPaid amount released as {(payment.SelectedIndex == 1 ? "recorded refund" : "advance")}: Rs. {Amount("ReleasedPaid")}\r\n") +
                 $"Outstanding after saving: Rs. {Amount("ResultingOutstanding")}\r\n\r\n" +
                 (resume ? "No new admission number. Original receipts and recorded refunds remain.\r\n" : "New fee posting stops. Existing dues remain collectible.\r\n") + FeeLines(plan, "ChangedFees", resume ? "Restore" : "Waive") + FeeLines(plan, "AddedFees", "Charge");
