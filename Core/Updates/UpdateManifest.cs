@@ -88,6 +88,8 @@ internal static class UpdateManifestPolicy
             throw new InvalidDataException("Unsupported update manifest format, version or schema.");
         ValidateArchive(manifest.Full);
         ValidateFiles(manifest.Files, allowEmpty: false);
+        if (manifest.BaseFiles is null || manifest.ChangedFiles is null)
+            throw new InvalidDataException("Missing incremental file inventory.");
         if (!manifest.Files.Any(f => string.Equals(f.Path, "FMSC_SMS.exe", StringComparison.OrdinalIgnoreCase)))
             throw new InvalidDataException("The update manifest does not contain the application executable.");
 

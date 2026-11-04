@@ -4,6 +4,17 @@ using FMSC_SMS.Core.Updates;
 
 try
 {
+    if (args.Length == 4 && args[0] == "--prepare-publication" && args[2] == "--workspace")
+    {
+        Console.WriteLine(GitSnapshotPublisher.Prepare(args[1], args[3]));
+        return;
+    }
+    if (args.Length == 4 && args[0] == "--publish-reviewed" && args[2] == "--expected-parent")
+    {
+        GitSnapshotPublisher.Publish(args[1], args[3]);
+        Console.WriteLine("Verified snapshot published atomically. No history rewritten.");
+        return;
+    }
     if (args.SequenceEqual(new[] { "--self-test" }, StringComparer.Ordinal))
     {
         SnapshotTests.Run();
@@ -142,6 +153,7 @@ internal static class DistributionSnapshot
 
     internal static void ValidateSnapshot(string root)
     {
+        var allowed = new HashSet<string>(StringComparer.Ordinal) { "README.md", "channel/stable.json" };
         string pointer = Path.Combine(root, "channel", "stable.json");
         var snapshot = JsonSerializer.Deserialize<UpdateChannel>(
             File.ReadAllBytes(pointer), JsonOptions)
@@ -163,6 +175,20 @@ internal static class DistributionSnapshot
             var manifest = ReadCheckedPackage(Path.Combine(versionsDir, version));
             if (manifest.Version != version)
                 throw new InvalidDataException("Release version does not match its snapshot folder.");
+            allowed.Add("versions/" + version + "/update-manifest.json");
+            foreach (var archive in new[] { manifest.Full, manifest.Incremental }.OfType<UpdateArchive>())
+                foreach (var part in archive.Parts) allowed.Add("versions/" + version + "/" + part.Name);
+        }
+        foreach (string path in Directory.GetFileSystemEntries(root))
+            if (Path.GetFileName(path) != ".git") RejectUnexpected(path);
+        void RejectUnexpected(string path)
+        {
+            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidDataException("Links are prohibited in snapshots.");
+            if (Directory.Exists(path))
+                foreach (string child in Directory.GetFileSystemEntries(path)) RejectUnexpected(child);
+            else if (!allowed.Contains(Path.GetRelativePath(root, path).Replace('\\', '/')))
+                throw new InvalidDataException("Unexpected file in distribution snapshot: " + Path.GetFileName(path));
         }
         if (snapshot.PreviousVersion is not null &&
             UpdateManifestPolicy.CompareVersions(snapshot.LatestVersion, snapshot.PreviousVersion) <= 0)
@@ -273,6 +299,7 @@ internal static class SnapshotTests
                 "Published Git snapshot must contain exactly two versions.");
             Require(!Directory.EnumerateFiles(Path.Combine(root, "snapshot3"), "*.zip", SearchOption.AllDirectories).Any(),
                 "Never include unchunked full ZIPs in Git distribution.");
+            TestPublication(root);
             string corrupt = Path.Combine(root, "snapshot3", "versions", "1.2.0",
                 UpdateChunks.MakeName("FMSC_SMS-app-full.zip", 1));
             File.WriteAllText(corrupt, "tampered download");
@@ -287,7 +314,59 @@ internal static class SnapshotTests
         }
         finally
         {
+            // Git loose objects are read-only on Windows, including in disposable fixtures.
+            foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
+                File.SetAttributes(file, FileAttributes.Normal);
             Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static void TestPublication(string root)
+    {
+        string remote = Path.Combine(root, "remote.git");
+        Directory.CreateDirectory(remote);
+        GitSnapshotPublisher.Git(remote, "init", "--bare", "--initial-branch=main");
+        string seed = Path.Combine(root, "seed");
+        Directory.CreateDirectory(seed);
+        GitSnapshotPublisher.Git(seed, "init", "--initial-branch=main");
+        Identity(seed);
+        File.WriteAllText(Path.Combine(seed, "README.md"), "Disposable distribution");
+        GitSnapshotPublisher.Git(seed, "add", ".");
+        GitSnapshotPublisher.Git(seed, "commit", "-m", "Initialize fixture");
+        GitSnapshotPublisher.Git(seed, "push", remote, "HEAD:main");
+        string expected = GitSnapshotPublisher.Git(seed, "rev-parse", "HEAD").Trim();
+        string publication = Path.Combine(root, "publication");
+        GitSnapshotPublisher.Prepare(Path.Combine(root, "snapshot1"), publication, remote);
+        Require(GitSnapshotPublisher.Git(remote, "rev-parse", "main").Trim() == expected,
+            "Review preparation must not publish.");
+        Identity(publication);
+        GitSnapshotPublisher.Publish(publication, expected, remote);
+        string published = GitSnapshotPublisher.Git(remote, "rev-parse", "main").Trim();
+        Require(published != expected && GitSnapshotPublisher.Git(remote, "rev-parse", "main^").Trim() == expected,
+            "Publication must advance atomically while preserving history.");
+        string stale = Path.Combine(root, "stale-publication");
+        GitSnapshotPublisher.Prepare(Path.Combine(root, "snapshot2"), stale, remote);
+        Identity(stale);
+        string winner = Path.Combine(root, "winner-publication");
+        GitSnapshotPublisher.Prepare(Path.Combine(root, "snapshot2"), winner, remote);
+        Identity(winner);
+        GitSnapshotPublisher.Publish(winner, published, remote);
+        string winnerHead = GitSnapshotPublisher.Git(remote, "rev-parse", "main").Trim();
+        // Make a different competing commit (otherwise identical trees/messages can
+        // yield the same SHA when tests execute in the same second).
+        GitSnapshotPublisher.Git(stale, "config", "user.name", "Competing owner");
+        try { GitSnapshotPublisher.Publish(stale, published, remote); throw new Exception("Concurrent publication accepted."); }
+        catch (IOException) { }
+        Require(GitSnapshotPublisher.Git(remote, "rev-parse", "main").Trim() == winnerHead,
+            "Rejected concurrent publication must leave the winning feed intact.");
+        File.WriteAllText(Path.Combine(root, "snapshot2", "unexpected.secret"), "fixture");
+        try { DistributionSnapshot.ValidateSnapshot(Path.Combine(root, "snapshot2")); throw new Exception("Unlisted file accepted."); }
+        catch (InvalidDataException) { }
+        File.Delete(Path.Combine(root, "snapshot2", "unexpected.secret"));
+        static void Identity(string directory)
+        {
+            GitSnapshotPublisher.Git(directory, "config", "user.name", "FMSC offline test");
+            GitSnapshotPublisher.Git(directory, "config", "user.email", "fixture@example.invalid");
         }
     }
 

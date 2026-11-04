@@ -146,15 +146,78 @@ The school's **SSH authorization key is separate** and is still required.
    oversized archives, Windows file-lock behavior and constrained disk space.
 2. Bundle reviewed Git/SSH binaries or an approved equivalent with the FMSC
    installer. The current manual checker needs Git/SSH installed.
-3. Finish **Download / Prepare**, progress, retry and Remind Me Later controls;
-   do not download entire packages merely to check whether one exists.
+3. Complete persistent chunk resume/retry and acceptance of the connected
+   Download / Prepare dialog. It now shows installed/latest versions, method,
+   approximate size and chunk progress; Close cancels preparation. Remind Me
+   Later dismisses this manual check (it does not schedule a notification).
 4. Complete safe post-exit update activation and re-use the existing installer,
    with pre-migration backup, numbered migration validation and rollback
    acceptance on disposable Windows/LocalDB.
-5. Implement a guarded manual publisher that atomically promotes a verified
-   two-version snapshot and manages distribution Git history/storage.
+5. Accept the guarded manual publisher described below against the private
+   distribution. Long-term history rotation still needs a concrete reviewed
+   maintenance procedure and owner approval before any destructive operation.
 6. Run release-readiness, Windows UI and full integration tests before asking
    for merge or installation at any school.
 
 No GitHub source visibility change, database migration, update publication,
 live installation change or app/schema version reset has been performed.
+
+## Owner publication review and atomic push
+
+After preparing a verified two-version snapshot with the existing CLI:
+
+```powershell
+dotnet run --project Tools/UpdateDistribution -c Release -- --prepare-publication <snapshot-directory> --workspace <new-review-directory>
+```
+
+This fetches distribution `main` into a new disposable Git workspace. It
+requires the snapshot to advance and retain the remote's current latest
+version. Review the printed additions/deletions (including the retired version),
+stored-object size and expected parent commit. Nothing is pushed at this step.
+The owner uses their own Git write authorization, never a school's deploy key.
+Configure the owner's normal Git commit identity before the next command.
+
+Only after approval of that exact snapshot, the owner runs:
+
+```powershell
+dotnet run --project Tools/UpdateDistribution -c Release -- --publish-reviewed <review-directory> --expected-parent <printed-commit>
+```
+
+The tool revalidates manifests, chunk sizes, chunk hashes, combined archive
+hashes and allowed files. It commits and pushes one ordinary fast-forward
+update of `main`. Concurrent publication is rejected without force pushing.
+After a rejected push, prepare a fresh workspace against the current remote.
+No source repository history or distribution history is rewritten.
+
+History storage is bounded by a conservative **1 GiB local Git object budget**:
+preparation refuses further publication above it. This is a stop condition,
+not a claim that tree retention deletes historical binaries or that local
+object size equals GitHub billing. Plan reviewed archival/rotation before
+reaching it; no automatic history cleanup is authorized or performed.
+
+## Verification on 4 November 2026
+
+- Release solution build: passed, zero warnings/errors. Standalone tool sources
+  are excluded from the desktop project, including stale removed signing-tool output.
+- Packaging/preparation regressions: passed (matching delta, older full update,
+  corrupted delta full fallback, schema gate, isolated staging).
+- Snapshot/publication regressions: passed against disposable local Git remotes,
+  including two-version retention, no push during review, fast-forward ancestry,
+  competing-publish rejection, corrupt parts and unexpected files.
+- Windows authorization: 21 checks passed after correcting inherited directory
+  permissions. Credential and transient plaintext SSH directories now allow
+  only the current Windows user before private key material is written.
+- Installer migration and LocalDB recovery contract suites: passed. These are
+  offline safeguard checks, not real SQL migration/recovery acceptance.
+- Windows post-fix control suite: failed communication tab navigation focus
+  assertion in `Program.Communication.cs`. The assertion checks deferred focus
+  transfer in `Core/TabStrip.cs`; it remains unresolved. No communication or
+  tab navigation code was changed for the updater.
+- Python release checks could not run: Python is unavailable on this machine.
+
+**Not production complete:** Install Update remains unavailable. The existing
+installer expects a complete installer layout, while updater archives contain
+application files. No unsafe direct invocation or replacement installer was
+added. Bundled Git/SSH, verified installer payload delivery, safe shutdown,
+post-exit activation, migration/rollback acceptance, transport failure tests,
+resume and real private-distribution acceptance remain required.

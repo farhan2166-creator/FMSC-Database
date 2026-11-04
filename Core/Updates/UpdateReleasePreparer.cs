@@ -42,9 +42,13 @@ internal static class UpdateReleasePreparer
 
         using var document = JsonDocument.Parse(pointer);
         var root = document.RootElement;
-        if (root.GetProperty("format").GetString() != "fmsc-git-updates/v1")
+        if (root.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("format", out var format) || format.ValueKind != JsonValueKind.String ||
+            format.GetString() != "fmsc-git-updates/v1")
             throw new InvalidDataException("Unsupported private update channel.");
-        string version = root.GetProperty("latestVersion").GetString() ?? "";
+        if (!root.TryGetProperty("latestVersion", out var latest) || latest.ValueKind != JsonValueKind.String)
+            throw new InvalidDataException("Missing private update version.");
+        string version = latest.GetString() ?? "";
         if (!UpdateManifestPolicy.IsPublishedVersion(version))
             throw new InvalidDataException("Invalid private update version.");
         string folder = "versions/" + version + "/";
@@ -95,7 +99,8 @@ internal static class UpdateReleasePreparer
     internal static async Task<PreparedUpdate> PrepareAsync(
         VerifiedUpdate release, IUpdateArtifactSource source,
         UpdateDownloadChoice method, string installedFolder,
-        string newStagingRoot, CancellationToken cancellationToken)
+        string newStagingRoot, CancellationToken cancellationToken,
+        IProgress<string>? progress = null)
     {
         ArgumentNullException.ThrowIfNull(release);
         ArgumentNullException.ThrowIfNull(source);
@@ -113,6 +118,10 @@ internal static class UpdateReleasePreparer
         string installed = Path.GetFullPath(installedFolder);
         if (IsInside(stagedRoot, installed) || IsInside(installed, stagedRoot))
             throw new InvalidOperationException("Update staging must not overlap the running application.");
+        long required = checked(validatedManifest.Full.Length * 2 +
+            validatedManifest.Files.Sum(file => file.Length) + 256L * 1024 * 1024);
+        if (new DriveInfo(Path.GetPathRoot(stagedRoot)!).AvailableFreeSpace < required)
+            throw new IOException("Not enough free disk space to download and prepare the complete update safely.");
 
         bool created = false;
         try
@@ -125,7 +134,7 @@ internal static class UpdateReleasePreparer
                 release.ManifestBytes);
             await AttemptAsync(validatedManifest, release.RepositoryVersion, source,
                 installed, stagedRoot, method == UpdateDownloadChoice.Incremental,
-                cancellationToken);
+                cancellationToken, progress);
             return new PreparedUpdate(release.RepositoryVersion,
                 Path.Combine(stagedRoot, "application"), metadata, method, false);
         }
@@ -141,7 +150,7 @@ internal static class UpdateReleasePreparer
             try
             {
                 await AttemptAsync(validatedManifest, release.RepositoryVersion, source,
-                    installed, stagedRoot, false, cancellationToken);
+                    installed, stagedRoot, false, cancellationToken, progress);
                 return new PreparedUpdate(release.RepositoryVersion,
                     Path.Combine(stagedRoot, "application"), Path.Combine(stagedRoot, "metadata"),
                     UpdateDownloadChoice.Full, true);
@@ -162,7 +171,8 @@ internal static class UpdateReleasePreparer
 
     private static async Task AttemptAsync(
         UpdateManifest manifest, string version, IUpdateArtifactSource source,
-        string installed, string root, bool incremental, CancellationToken token)
+        string installed, string root, bool incremental, CancellationToken token,
+        IProgress<string>? progress)
     {
         UpdateArchive archive = incremental
             ? manifest.Incremental ?? throw new InvalidDataException("No incremental package in manifest.")
@@ -175,6 +185,8 @@ internal static class UpdateReleasePreparer
         Directory.CreateDirectory(assembledDir);
         foreach (var part in archive.Parts)
         {
+            progress?.Report("Downloading " + (incremental ? "incremental" : "full") + " update: part " +
+                (archive.Parts.IndexOf(part) + 1) + " of " + archive.Parts.Count);
             token.ThrowIfCancellationRequested();
             string relative = "versions/" + version + "/" + part.Name;
             string target = Path.Combine(partDir, part.Name);
@@ -186,6 +198,7 @@ internal static class UpdateReleasePreparer
                 throw new InvalidDataException("Private Git update part failed its published SHA-256 digest.");
         }
         string zip = Path.Combine(assembledDir, archive.Name);
+        progress?.Report("Verifying download and preparing application files…");
         UpdateChunks.ReassembleVerified(archive, partDir, zip);
         UpdateStager.Prepare(manifest, zip, installed,
             Path.Combine(root, "application"), incremental);

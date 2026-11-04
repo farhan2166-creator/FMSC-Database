@@ -2,6 +2,8 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 namespace FMSC_SMS.Core.Updates;
 
@@ -38,6 +40,7 @@ internal static class UpdateDeviceKey
         string root = storageRoot ?? StateDirectory;
         string credential = Path.Combine(root, CredentialFile);
         Directory.CreateDirectory(root);
+        RestrictDirectory(root);
         if (File.Exists(credential))
             throw new InvalidOperationException(
                 "This Windows user already has an update authorization key. " +
@@ -76,6 +79,19 @@ internal static class UpdateDeviceKey
     }
 
     internal static string GetPublicKey(string? storageRoot = null) => ReadCredential(storageRoot).PublicKey;
+
+    internal static void RestrictDirectory(string root)
+    {
+        var user = WindowsIdentity.GetCurrent().User
+            ?? throw new UnauthorizedAccessException("Cannot identify the Windows update key owner.");
+        var security = new DirectorySecurity();
+        security.SetOwner(user);
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        security.AddAccessRule(new FileSystemAccessRule(user, FileSystemRights.FullControl,
+            InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+            PropagationFlags.None, AccessControlType.Allow));
+        new DirectoryInfo(root).SetAccessControl(security);
+    }
 
     /// <summary>Caller must zero returned bytes after their short-lived use.</summary>
     internal static byte[] OpenPrivateKey(string? storageRoot = null) =>

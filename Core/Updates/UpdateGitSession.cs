@@ -39,6 +39,8 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         try
         {
             Directory.CreateDirectory(root);
+            // Set a user-only ACL BEFORE materializing the short-lived SSH PEM.
+            UpdateDeviceKey.RestrictDirectory(root);
             privateKey = UpdateDeviceKey.OpenPrivateKey();
             string pemPath = Path.Combine(root, "device.pem");
             using (var file = new FileStream(pemPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))

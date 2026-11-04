@@ -6,8 +6,8 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Core.Updates;
 
 /// <summary>
-/// School-facing manual private Git Update Connection. No download, installation or SQL
-/// operation occurs here; nothing is run in the background at startup.
+/// School-facing manual private Git update checking and isolated download.
+/// No installation or SQL operation occurs here, or background check at startup.
 /// A school receives authorization only after the repository owner adds this
 /// computer's public key as a READ-ONLY deploy key in FMSC-Updates.
 /// </summary>
@@ -18,6 +18,12 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
     private readonly ModernButton _generate;
     private readonly ModernButton _copy;
     private readonly ModernButton _check;
+    private readonly ModernButton _download;
+    private VerifiedUpdate? _release;
+    private UpdateDownloadChoice _method;
+    private static string InstalledVersion => typeof(UpdateConnectionForm).Assembly
+        .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+        .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().First().InformationalVersion.Split('+')[0];
     private readonly CancellationTokenSource _lifetime = new();
 
     internal UpdateConnectionForm()
@@ -29,7 +35,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         MinimizeBox = false;
         ShowInTaskbar = false;
         AutoScaleMode = AutoScaleMode.None;
-        ClientSize = new Size(AppScale.S(680), AppScale.S(365));
+        ClientSize = new Size(AppScale.S(760), AppScale.S(445));
         Font = AppTheme.NormalFont;
         BackColor = AppTheme.PageBackground;
 
@@ -49,7 +55,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
 
         var intro = new Label
         {
-            Text = "Authorize this computer to check the private FMSC update repository. " +
+            Text = "Installed version: " + InstalledVersion + "\nAuthorize this computer to check the private FMSC update repository. " +
                 "No GitHub account is needed at the school.",
             Dock = DockStyle.Fill,
             AutoSize = true,
@@ -93,6 +99,9 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
             Width = AppScale.S(155), Height = AppMetrics.ButtonHeight };
         _check = new ModernButton { Text = "Check for Updates", ThemeRole = "Primary",
             Width = AppScale.S(175), Height = AppMetrics.ButtonHeight };
+        _download = new ModernButton { Text = "Download Update", ThemeRole = "Primary",
+            Width = AppScale.S(175), Height = AppMetrics.ButtonHeight, Enabled = false };
+        _download.Click += async (_, _) => await DownloadAsync();
         var close = new ModernButton { Text = "Close", ThemeRole = "Secondary",
             Width = AppScale.S(100), Height = AppMetrics.ButtonHeight, DialogResult = DialogResult.OK };
         _generate.Click += (_, _) => GenerateKey();
@@ -113,10 +122,12 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
 
         var actions = new FlowLayoutPanel
         {
-            Dock = DockStyle.Fill, AutoSize = true, WrapContents = false,
+            Dock = DockStyle.Fill, AutoSize = true, WrapContents = true,
             FlowDirection = FlowDirection.LeftToRight, Margin = Padding.Empty
         };
-        actions.Controls.AddRange(new Control[] { _generate, _copy, _check, close });
+        var later = new ModernButton { Text = "Remind Me Later", ThemeRole = "Secondary",
+            Width = AppScale.S(160), Height = AppMetrics.ButtonHeight, DialogResult = DialogResult.Cancel };
+        actions.Controls.AddRange(new Control[] { _generate, _copy, _check, _download, later, close });
         content.Controls.Add(intro, 0, 0);
         content.Controls.Add(instructions, 0, 1);
         content.Controls.Add(_publicKey, 0, 2);
@@ -126,7 +137,6 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         AcceptButton = close;
         CancelButton = close;
         FormClosing += (_, _) => _lifetime.Cancel();
-        Disposed += (_, _) => _lifetime.Dispose();
         RefreshAuthorization();
     }
 
@@ -176,20 +186,39 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
     {
         _check.Enabled = false;
         _generate.Enabled = false;
+        _download.Enabled = false;
+        _release = null;
         _status.Text = "Checking the private update repository without interrupting FMSC...";
         try
         {
-            var result = await UpdateGitReader.CheckAsync(_lifetime.Token);
+            await using var session = await UpdateGitSession.OpenAsync(_lifetime.Token);
+            if (!await session.HasStableFeedAsync(_lifetime.Token))
+            {
+                _status.Text = "Computer authorized. No approved update has been published yet.";
+                return;
+            }
+            var release = await UpdateReleasePreparer.ReadLatestAsync(session, _lifetime.Token);
             if (IsDisposed || Disposing) return;
-            _status.Text = result.Message +
-                (result.FeedPublished ? " Published version: " + result.Version : "");
+            if (release is null) return;
+            _method = await Task.Run(() => UpdateReleasePreparer.Choose(release, InstalledVersion,
+                int.Parse(DatabaseHelper.RequiredDatabaseSchemaVersion), AppContext.BaseDirectory), _lifetime.Token);
+            if (IsDisposed || Disposing) return;
+            _release = release;
+            var archive = _method == UpdateDownloadChoice.Incremental ? release.Manifest.Incremental! : release.Manifest.Full;
+            _status.Text = "Latest version: " + release.Manifest.Version + "\n" +
+                (_method == UpdateDownloadChoice.NotNewer ? "FMSC is up to date." :
+                 _method == UpdateDownloadChoice.RequiresDatabaseInstaller ?
+                 "This update requires database migration through the existing installer. Contact the software owner." :
+                 "Update available — " + _method + ", approximately " + (archive.Length / 1048576d).ToString("N1") + " MB.");
+            _download.Enabled = _method is UpdateDownloadChoice.Full or UpdateDownloadChoice.Incremental;
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
             // Closing this window cancels the network check. No install is running.
         }
         catch (Exception error) when (error is CryptographicException or IOException or UnauthorizedAccessException
-                                         or InvalidDataException or JsonException)
+                                         or InvalidDataException or JsonException or UpdateGitCommandException
+                                         or System.ComponentModel.Win32Exception or InvalidOperationException)
         {
             if (!IsDisposed && !Disposing)
                 _status.Text = "Unable to check updates safely: " + error.Message;
@@ -199,5 +228,35 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
             if (!IsDisposed && !Disposing)
                 _check.Enabled = UpdateDeviceKey.IsEnrolled;
         }
+    }
+
+    private async Task DownloadAsync()
+    {
+        if (_release is null) return;
+        var token = _lifetime.Token;
+        _download.Enabled = _check.Enabled = false;
+        var progress = new Progress<string>(message => { if (!IsDisposed && !Disposing) _status.Text = message; });
+        try
+        {
+            var release = _release;
+            string root = Path.Combine(UpdateDeviceKey.StateDirectory, "prepared-" + Guid.NewGuid().ToString("N"));
+            await Task.Run(async () =>
+            {
+                await using var session = await UpdateGitSession.OpenAsync(token);
+                return await UpdateReleasePreparer.PrepareAsync(release, session, _method,
+                    AppContext.BaseDirectory, root, token, progress);
+            }, token);
+            if (!IsDisposed && !Disposing)
+                _status.Text = "Update downloaded and application files verified. FMSC can continue running. " +
+                    "Installation is not yet available from this dialog; contact the software owner. " +
+                    "Prepared files: " + root;
+        }
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException
+            or UpdateGitCommandException or System.ComponentModel.Win32Exception)
+        {
+            if (!IsDisposed && !Disposing) { _status.Text = "Update could not be prepared: " + error.Message; _download.Enabled = true; }
+        }
+        finally { if (!IsDisposed && !Disposing) _check.Enabled = true; }
     }
 }
