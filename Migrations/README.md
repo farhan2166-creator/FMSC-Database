@@ -58,7 +58,18 @@ See `Docs/BACKUP_RECOVERY.md` for recovery guidance.
 
 ---
 
-## Current target: schema 75
+## Current target: schema 76
+
+Migration `76.sql` stops automatic application of held student advance during
+fee posting, activation and background billing. The compatibility procedure
+remains callable but cannot create payments or move credit; posting creates
+charges only. In Fee Collection, the operator reviews the student's own
+advance and saves the chosen credit allocation and any cash together with
+an immutable collection receipt. Historical credit payments and legacy receipt
+readers are preserved without rewriting school records. Apply only after
+schema 75 using the normal verified-backup migration workflow.
+
+## Previous target: schema 75
 
 Migration `75.sql` adds private receipt snapshot/student roster details and lists
 the actual distinct payment methods in `GetCollectionsAndReceiptsReport`.
@@ -202,7 +213,7 @@ For an approved upgrade starting at a supported schema between 19 and 69, apply 
 
 # Apply the database changes later
 
-The current application requires **schema 75**. SQL changes are checked in here;
+The current application requires **schema 76**. SQL changes are checked in here;
 merging the code does not execute them against your database.
 
 For the historical chains below ending at 51, continue with `52.sql`, `53.sql`,
