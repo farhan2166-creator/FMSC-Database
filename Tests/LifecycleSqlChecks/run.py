@@ -239,7 +239,11 @@ def main():
         script.write_text(body)
         script.chmod(0o444)  # docker cp retains mode; SQL Server runs as its non-root mssql user.
         execute(docker_command() + ["cp", str(script), container + ":/tmp/level1.sql"])
-        return execute(docker_command() + ["exec", "--env", "SQLCMDPASSWORD", container, "/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-C", "-b", "-d", catalog, "-i", "/tmp/level1.sql"])
+        # -I is important for schema migrations containing CREATE OR ALTER PROC:
+        # SQL Server persists the session's QUOTED_IDENTIFIER flag in each module.
+        # With sqlcmd's default OFF, later DML against filtered/computed indexes
+        # can fail with SQL 1934 even if the caller sets its own session options.
+        return execute(docker_command() + ["exec", "--env", "SQLCMDPASSWORD", container, "/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-C", "-b", "-I", "-d", catalog, "-i", "/tmp/level1.sql"])
 
     def provision(suffix, current_schema=False):
         def checked(label, action):
