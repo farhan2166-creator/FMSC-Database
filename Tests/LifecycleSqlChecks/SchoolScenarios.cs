@@ -152,8 +152,10 @@ internal sealed partial class SchoolScenarios(Fixture f, Report r)
             "Moving a paid difference to credit does not invent a cash refund.");
         Rate(charge, 6000);
         decimal due = Sql.Money("SELECT SUM(dbo.GetFeeChargeBalance(BillingChargeId)) FROM dbo.BillingCharges WHERE BillingChargeId=@C OR CorrectionOfBillingChargeId=@C;", Sql.P("@C", charge));
-        // Tuition has priority over the annual admission bill.
-        r.Check(Credit(child.Student) == 0 && due == 1000, "A later increase uses available credit without negative credit or duplicated liability.");
+        // Fee corrections do not spend held advance: the operator may apply it
+        // only in a dated-today Fee Collection, with a saved settlement receipt.
+        r.Check(Credit(child.Student) == 1000 && due == 2000,
+            $"A later increase leaves advance intact for Fee Collection and records the full unpaid difference (credit={Credit(child.Student)}, due={due}).");
         Rate(charge, 3000);
         r.Check(Sql.Money("SELECT SUM(NetAmount) FROM dbo.BillingCharges WHERE (BillingChargeId=@C OR CorrectionOfBillingChargeId=@C) AND Status<>N'Cancelled';", Sql.P("@C", charge)) == 3000,
             "A repeated up/down correction reconciles original and difference charges to the final 3000 rate.");
