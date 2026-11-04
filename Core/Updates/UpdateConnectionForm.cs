@@ -20,7 +20,15 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
     private readonly ModernButton _check;
     private readonly ModernButton _download;
     private readonly ModernButton _install;
-    internal PreparedUpdate? InstallationRequested { get; private set; }
+    internal event Func<PreparedUpdate, bool>? InstallRequested;
+    private bool _installRequested;
+    private readonly Label _latestVersion;
+    private readonly Label _downloadDetails;
+    private readonly Label _accessStatus;
+    private readonly Panel _authorizationPanel;
+    private readonly ProgressBar _progress;
+    private readonly Func<(bool Enrolled, string PublicKey)> _authorization;
+    private bool _hasAuthorization;
     private PreparedUpdate? _prepared;
     private VerifiedUpdate? _release;
     private UpdateDownloadChoice _method;
@@ -29,152 +37,136 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         .OfType<System.Reflection.AssemblyInformationalVersionAttribute>().First().InformationalVersion.Split('+')[0];
     private readonly CancellationTokenSource _lifetime = new();
 
-    internal UpdateConnectionForm()
+    internal UpdateConnectionForm(Func<(bool Enrolled, string PublicKey)>? authorization = null)
     {
+        _authorization = authorization ?? (() => (UpdateDeviceKey.IsEnrolled,
+            UpdateDeviceKey.IsEnrolled ? UpdateDeviceKey.GetPublicKey() : ""));
         Text = "FMSC — Check for Updates";
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
-        MinimizeBox = false;
-        ShowInTaskbar = false;
+        MaximizeBox = MinimizeBox = ShowInTaskbar = false;
         AutoScaleMode = AutoScaleMode.None;
-        ClientSize = new Size(AppScale.S(760), AppScale.S(445));
+        ClientSize = new Size(AppScale.S(780), AppScale.S(540));
         Font = AppTheme.NormalFont;
         BackColor = AppTheme.PageBackground;
-
-        var content = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1, RowCount = 5,
-            Padding = new Padding(AppScale.S(20)),
-            BackColor = AppTheme.PageBackground
-        };
+        var content = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7,
+            Padding = new Padding(AppScale.S(20)), BackColor = AppTheme.PageBackground };
         content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        content.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.S(95)));
-        content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        content.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-
-        var intro = new Label
-        {
-            Text = "Installed version: " + InstalledVersion + "\nAuthorize this computer to check the private FMSC update repository. " +
-                "No GitHub account is needed at the school.",
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            ForeColor = AppTheme.Text,
-            Margin = new Padding(0, 0, 0, AppScale.S(10))
+        for (int row = 0; row < 7; row++)
+            content.RowStyles.Add(new RowStyle(row == 4 ? SizeType.Percent : SizeType.AutoSize, row == 4 ? 100 : 0));
+        var heading = new Label { Text = "Check for Updates", Font = AppTheme.HeadingFont,
+            AutoSize = true, ForeColor = AppTheme.Text, Margin = new Padding(0, 0, 0, AppScale.S(12)) };
+        var summary = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2,
+            Padding = new Padding(AppScale.S(12)), BackColor = AppTheme.Surface, Margin = new Padding(0, 0, 0, AppScale.S(12)) };
+        summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        summary.Controls.Add(new Label { Text = "Installed version", AutoSize = true, ForeColor = AppTheme.MutedText }, 0, 0);
+        summary.Controls.Add(new Label { Text = "Latest version", AutoSize = true, ForeColor = AppTheme.MutedText }, 1, 0);
+        summary.Controls.Add(new Label { Text = InstalledVersion, AutoSize = true, Font = AppTheme.BodyBoldFont,
+            ForeColor = AppTheme.Text, Margin = new Padding(3, 4, 3, 10) }, 0, 1);
+        _latestVersion = new Label { Text = "Not checked", AutoSize = true, Font = AppTheme.BodyBoldFont,
+            ForeColor = AppTheme.Text, Margin = new Padding(3, 4, 3, 10) };
+        summary.Controls.Add(_latestVersion, 1, 1);
+        _downloadDetails = new Label { Text = "Check for an approved update when you are ready.", AutoSize = true,
+            Dock = DockStyle.Fill, ForeColor = AppTheme.MutedText };
+        summary.Controls.Add(_downloadDetails, 0, 2); summary.SetColumnSpan(_downloadDetails, 2);
+        var access = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
+        var accessButton = Button("Computer access", 150, "Secondary");
+        _accessStatus = new Label { AutoSize = true, ForeColor = AppTheme.MutedText, Margin = new Padding(8, 10, 0, 0) };
+        access.Controls.AddRange(new Control[] { accessButton, _accessStatus });
+        _authorizationPanel = new Panel { Dock = DockStyle.Top, Height = AppScale.S(175), Margin = new Padding(0, 8, 0, 8) };
+        var enrollment = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+        enrollment.RowStyles.Add(new RowStyle(SizeType.Absolute, AppScale.S(48)));
+        enrollment.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        enrollment.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        enrollment.Controls.Add(new Label { Text = "Generate a key and send its public half to the software owner. " +
+            "The owner authorizes this computer for read-only access. No school GitHub account is needed.",
+            Dock = DockStyle.Fill, ForeColor = AppTheme.MutedText }, 0, 0);
+        _publicKey = new TextBox { Dock = DockStyle.Fill, ReadOnly = true, Multiline = true,
+            ScrollBars = ScrollBars.Vertical, WordWrap = true, Font = AppTheme.SmallFont,
+            BackColor = AppTheme.Surface, ForeColor = AppTheme.Text };
+        enrollment.Controls.Add(_publicKey, 0, 1);
+        var keyActions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false };
+        _generate = Button("Generate key", 140, "Secondary");
+        _copy = Button("Copy public key", 155, "Secondary");
+        keyActions.Controls.AddRange(new Control[] { _generate, _copy });
+        enrollment.Controls.Add(keyActions, 0, 2);
+        _authorizationPanel.Controls.Add(enrollment);
+        accessButton.Click += (_, _) => {
+            _authorizationPanel.Visible = !_authorizationPanel.Visible;
+            ClientSize = new Size(AppScale.S(780), AppScale.S(_authorizationPanel.Visible ? 540 : 365));
         };
-        var instructions = new Label
-        {
-            Text = "1. Generate a key.  2. Send ONLY the public key below to the software owner.  " +
-                "3. The owner approves it as a read-only GitHub deploy key.  " +
-                "4. Click Check for Updates.",
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            ForeColor = AppTheme.MutedText,
-            Margin = new Padding(0, 0, 0, AppScale.S(8))
-        };
-        _publicKey = new TextBox
-        {
-            Dock = DockStyle.Fill,
-            ReadOnly = true,
-            Multiline = true,
-            ScrollBars = ScrollBars.Horizontal,
-            WordWrap = false,
-            Font = new Font(FontFamily.GenericMonospace, AppScale.S(9)),
-            BackColor = AppTheme.Surface,
-            ForeColor = AppTheme.Text,
-            Margin = new Padding(0, 0, 0, AppScale.S(10))
-        };
-        _status = new Label
-        {
-            Text = "No update authorization has been prepared.",
-            AutoSize = false,
-            Dock = DockStyle.Fill,
-            TextAlign = ContentAlignment.TopLeft,
-            ForeColor = AppTheme.MutedText,
-            Margin = new Padding(0, 0, 0, AppScale.S(8))
-        };
-        _generate = new ModernButton { Text = "Generate key", ThemeRole = "Secondary",
-            Width = AppScale.S(140), Height = AppMetrics.ButtonHeight };
-        _copy = new ModernButton { Text = "Copy public key", ThemeRole = "Secondary",
-            Width = AppScale.S(155), Height = AppMetrics.ButtonHeight };
-        _check = new ModernButton { Text = "Check for Updates", ThemeRole = "Primary",
-            Width = AppScale.S(175), Height = AppMetrics.ButtonHeight };
-        _download = new ModernButton { Text = "Download Update", ThemeRole = "Primary",
-            Width = AppScale.S(175), Height = AppMetrics.ButtonHeight, Enabled = false };
-        _download.Click += async (_, _) => await DownloadAsync();
-        _install = new ModernButton { Text = "Install Update", ThemeRole = "Primary",
-            Width = AppScale.S(150), Height = AppMetrics.ButtonHeight, Enabled = false };
+        _status = new Label { AutoSize = false, Dock = DockStyle.Fill, ForeColor = AppTheme.Text,
+            Margin = new Padding(0, 12, 0, 8), TextAlign = ContentAlignment.TopLeft };
+        _progress = new ProgressBar { Dock = DockStyle.Top, Height = AppScale.S(6), Style = ProgressBarStyle.Marquee,
+            Visible = false, Margin = new Padding(0, 0, 0, 12) };
+        _check = Button("Check for Updates", 175, "Primary");
+        _download = Button("Download Update", 170, "Primary"); _download.Enabled = false;
+        _install = Button("Install Update", 150, "Primary"); _install.Enabled = false;
         _install.Click += (_, _) => {
-            if (_prepared is null) return;
-            InstallationRequested = _prepared;
-            DialogResult = DialogResult.Yes;
-            Close();
+            if (_prepared is null || _installRequested) return;
+            _installRequested = true; _install.Enabled = false;
+            try { InstallRequested?.Invoke(_prepared); }
+            finally {
+                if (!IsDisposed && !Disposing) { _installRequested = false; _install.Enabled = _prepared is not null; }
+            }
         };
-        var close = new ModernButton { Text = "Close", ThemeRole = "Secondary",
-            Width = AppScale.S(100), Height = AppMetrics.ButtonHeight, DialogResult = DialogResult.OK };
+        var later = Button("Remind Me Later", 160, "Secondary");
+        var close = Button("Close", 100, "Secondary");
+        // This is a modeless window: DialogResult alone never closes it.
+        later.Click += (_, _) => Close();
+        close.Click += (_, _) => Close();
         _generate.Click += (_, _) => GenerateKey();
-        _copy.Click += (_, _) =>
-        {
+        _copy.Click += (_, _) => {
             if (string.IsNullOrWhiteSpace(_publicKey.Text)) return;
-            try
-            {
-                Clipboard.SetText(_publicKey.Text);
-                _status.Text = "Public key copied. Send this public key only, never a private key.";
-            }
-            catch (ExternalException)
-            {
-                _status.Text = "Clipboard unavailable. Select and copy the public key manually.";
-            }
+            try { Clipboard.SetText(_publicKey.Text); _status.Text = "Public key copied."; }
+            catch (ExternalException) { _status.Text = "Clipboard unavailable. Select and copy the public key manually."; }
         };
         _check.Click += async (_, _) => await CheckNowAsync();
-
-        var actions = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill, AutoSize = true, WrapContents = true,
-            FlowDirection = FlowDirection.LeftToRight, Margin = Padding.Empty
-        };
-        var later = new ModernButton { Text = "Remind Me Later", ThemeRole = "Secondary",
-            Width = AppScale.S(160), Height = AppMetrics.ButtonHeight, DialogResult = DialogResult.Cancel };
-        actions.Controls.AddRange(new Control[] { _generate, _copy, _check, _download, _install, later, close });
-        content.Controls.Add(intro, 0, 0);
-        content.Controls.Add(instructions, 0, 1);
-        content.Controls.Add(_publicKey, 0, 2);
-        content.Controls.Add(_status, 0, 3);
-        content.Controls.Add(actions, 0, 4);
+        _download.Click += async (_, _) => await DownloadAsync();
+        var actions = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, Margin = Padding.Empty };
+        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        var updateActions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
+        // Only the action relevant to the current state is shown in this slot.
+        updateActions.Controls.AddRange(new Control[] { _check, _download, _install });
+        _download.Visible = _install.Visible = false;
+        var dismissActions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        dismissActions.Controls.AddRange(new Control[] { later, close });
+        actions.Controls.Add(updateActions, 0, 0); actions.Controls.Add(dismissActions, 1, 0);
+        content.Controls.Add(heading, 0, 0); content.Controls.Add(summary, 0, 1);
+        content.Controls.Add(access, 0, 2); content.Controls.Add(_authorizationPanel, 0, 3);
+        content.Controls.Add(_status, 0, 4); content.Controls.Add(_progress, 0, 5); content.Controls.Add(actions, 0, 6);
         Controls.Add(content);
-        AcceptButton = close;
-        CancelButton = close;
+        AcceptButton = _check; CancelButton = close;
         FormClosing += (_, _) => _lifetime.Cancel();
         RefreshAuthorization();
     }
 
+    private static ModernButton Button(string text, int width, string role) => new() {
+        Text = text, ThemeRole = role, Width = AppScale.S(width), Height = AppMetrics.ButtonHeight,
+        Margin = new Padding(0, 0, AppScale.S(8), 0) };
     private void RefreshAuthorization()
     {
-        bool enrolled = UpdateDeviceKey.IsEnrolled;
-        _generate.Enabled = !enrolled;
-        _check.Enabled = enrolled;
-        _copy.Enabled = enrolled;
-        if (!enrolled)
-        {
-            _publicKey.Text = "";
-            _status.Text = "Generate a new key here; the private half stays protected on this computer.";
-            return;
-        }
         try
         {
-            _publicKey.Text = UpdateDeviceKey.GetPublicKey();
-            _status.Text =
-                "Authorization key prepared. Ask the software owner to approve " +
-                "this public key in FMSC-Updates → Settings → Deploy keys (READ ONLY).";
+            var state = _authorization();
+            _hasAuthorization = state.Enrolled;
+            _generate.Enabled = !state.Enrolled;
+            _generate.Visible = !state.Enrolled;
+            _check.Enabled = _copy.Enabled = state.Enrolled;
+            _publicKey.Text = state.PublicKey;
+            _authorizationPanel.Visible = !state.Enrolled;
+            ClientSize = new Size(AppScale.S(780), AppScale.S(state.Enrolled ? 365 : 540));
+            _accessStatus.Text = state.Enrolled ? "Computer key ready" : "Authorization required";
+            _status.Text = state.Enrolled ? "Select Check for Updates to contact the private update repository." :
+                "Authorize this computer before checking for updates.";
         }
         catch (Exception error) when (error is CryptographicException or IOException or UnauthorizedAccessException or InvalidDataException)
         {
             _publicKey.Text = "";
             _copy.Enabled = false;
             _check.Enabled = false;
+            _hasAuthorization = false;
             _status.Text = "This Windows user's protected authorization could not be read. " +
                 "Contact the software owner; no key was replaced. " + error.GetType().Name;
         }
@@ -202,12 +194,15 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         _prepared = null;
         _install.Enabled = false;
         _status.Text = "Checking the private update repository without interrupting FMSC...";
+        _progress.Visible = true;
         try
         {
             await using var session = await UpdateGitSession.OpenAsync(_lifetime.Token);
             if (!await session.HasStableFeedAsync(_lifetime.Token))
             {
                 _status.Text = "Computer authorized. No approved update has been published yet.";
+                _accessStatus.Text = "Computer authorized";
+                _latestVersion.Text = "No release published";
                 return;
             }
             var release = await UpdateReleasePreparer.ReadLatestAsync(session, _lifetime.Token);
@@ -217,6 +212,8 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
                 int.Parse(DatabaseHelper.RequiredDatabaseSchemaVersion), AppContext.BaseDirectory), _lifetime.Token);
             if (IsDisposed || Disposing) return;
             _release = release;
+            _latestVersion.Text = release.Manifest.Version;
+            _accessStatus.Text = "Computer authorized";
             var archive = _method == UpdateDownloadChoice.Incremental ? release.Manifest.Incremental! : release.Manifest.Full;
             _status.Text = "Latest version: " + release.Manifest.Version + "\n" +
                 (_method == UpdateDownloadChoice.NotNewer ? "FMSC is up to date." :
@@ -226,6 +223,10 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
                  "Update available — " + _method + ", approximately " + (archive.Length / 1048576d).ToString("N1") + " MB.");
             if (_method == UpdateDownloadChoice.RequiresDatabaseInstaller) _method = UpdateDownloadChoice.Full;
             _download.Enabled = _method is UpdateDownloadChoice.Full or UpdateDownloadChoice.Incremental;
+            _download.Visible = _download.Enabled;
+            _install.Visible = false;
+            _downloadDetails.Text = _download.Enabled ? _method + " · approximately " +
+                (archive.Length / 1048576d).ToString("N1") + " MB" : "No download required";
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
         {
@@ -241,7 +242,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         finally
         {
             if (!IsDisposed && !Disposing)
-                _check.Enabled = UpdateDeviceKey.IsEnrolled;
+            { _check.Enabled = _hasAuthorization; _progress.Visible = false; }
         }
     }
 
@@ -250,6 +251,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         if (_release is null) return;
         var token = _lifetime.Token;
         _download.Enabled = _check.Enabled = false;
+        _progress.Visible = true;
         var progress = new Progress<string>(message => { if (!IsDisposed && !Disposing) _status.Text = message; });
         try
         {
@@ -266,6 +268,9 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
             {
                 _prepared = prepared;
                 _install.Enabled = true;
+                _install.Visible = true;
+                _download.Visible = false;
+                _downloadDetails.Text = prepared.Method + " · downloaded and verified";
                 _status.Text = "Update and installer files verified. You can continue working. " +
                     "Choose Install Update when ready to close FMSC safely.";
             }
@@ -276,6 +281,6 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         {
             if (!IsDisposed && !Disposing) { _status.Text = "Update could not be prepared: " + error.Message; _download.Enabled = true; }
         }
-        finally { if (!IsDisposed && !Disposing) _check.Enabled = true; }
+        finally { if (!IsDisposed && !Disposing) { _check.Enabled = true; _progress.Visible = false; } }
     }
 }

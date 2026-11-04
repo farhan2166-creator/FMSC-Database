@@ -20,7 +20,7 @@ function Wait-OriginalFmscExit {
     }
 }
 $AppName = 'FMSC School Management System'
-$AppVersion = '1.1.0-rc.2'
+$AppVersion = '1.1.0-rc.3'
 $DatabaseVersion = '76'
 $ReleaseRoot = $PSScriptRoot
 $AppSource      = Join-Path $ReleaseRoot 'FMSC_SMS'

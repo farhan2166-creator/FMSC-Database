@@ -71,7 +71,20 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     private readonly System.Windows.Forms.Timer billingMonthTimer = new() { Interval = 60000 };
     public MainDashboardForm() : this(null) { }
     internal MainDashboardForm(Action<string, Exception>? navigationFailureReporter)
+        : this(navigationFailureReporter, UpdateInstallerHandoff.Launch, null, UpdateInstallerHandoff.Validate) { }
+
+    private readonly Action<PreparedUpdate> launchUpdate;
+    private readonly Action<PreparedUpdate> validateUpdate;
+    private readonly Func<bool>? confirmUpdate;
+    private PreparedUpdate? pendingUpdate;
+    private bool requestingUpdate;
+
+    internal MainDashboardForm(Action<string, Exception>? navigationFailureReporter,
+        Action<PreparedUpdate> launchUpdate, Func<bool>? confirmUpdate, Action<PreparedUpdate> validateUpdate)
     {
+        this.launchUpdate = launchUpdate;
+        this.confirmUpdate = confirmUpdate;
+        this.validateUpdate = validateUpdate;
         this.navigationFailureReporter = navigationFailureReporter;
         // Shared DPI-aware metrics own geometry; do not add WinForms auto-scaling on top.
         AutoScaleMode = AutoScaleMode.None;
@@ -1389,25 +1402,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             var existingUpdate = Application.OpenForms.OfType<UpdateConnectionForm>().FirstOrDefault();
             if (existingUpdate is not null) { existingUpdate.Activate(); return; }
             var updateDialog = new UpdateConnectionForm();
-            updateDialog.FormClosed += (_, _) => {
-            if (updateDialog.InstallationRequested is { } prepared && ConfirmLeaveCurrentPage() &&
-                MessageBox.Show(this, "Close FMSC and start the update installer? Save your work before continuing. " +
-                    "Windows will ask for permission to run the installer.", "Install FMSC Update",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
-            {
-                try
-                {
-                    UpdateInstallerHandoff.Launch(prepared);
-                    Close(); // The normal FormClosing guard remains authoritative.
-                }
-                catch (Exception error) when (error is IOException or UnauthorizedAccessException or
-                    InvalidOperationException or System.ComponentModel.Win32Exception)
-                {
-                    MessageBox.Show(this, "The update installer could not start: " + error.Message,
-                        "FMSC Update", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-            }
-            };
+            updateDialog.InstallRequested += RequestUpdateInstallation;
             updateDialog.Show(this); // Keep the application usable during download/preparation.
         }) {
             ToolTipText = "Authorize this computer and check the private FMSC update feed manually."
@@ -1731,6 +1726,47 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         SyncActiveNav(_currentModule, _currentTitle);
     }
     /// <summary>Use one unsaved-work confirmation for navigation and application close.</summary>
+    internal bool RequestUpdateInstallation(PreparedUpdate prepared)
+    {
+        if (requestingUpdate || pendingUpdate is not null || IsDisposed || Disposing) return false;
+        requestingUpdate = true;
+        try
+        {
+            validateUpdate(prepared);
+            bool approved = confirmUpdate?.Invoke() ?? ModernMessageDialog.Confirm(this,
+                "Close FMSC and install the prepared update? Windows will ask for permission to run the installer.",
+                "Install FMSC Update");
+            if (!approved) return false;
+            pendingUpdate = prepared;
+            Close(); // Only this close runs the existing busy/unsaved-work guard.
+            // A cancelled close must not leave an update scheduled for a later exit.
+            if (!IsDisposed && !Disposing) { pendingUpdate = null; return false; }
+            return true;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            pendingUpdate = null;
+            ModernMessageDialog.ShowWarning(this, "The update could not be started: " + error.Message, "FMSC Update");
+            return false;
+        }
+        finally { requestingUpdate = false; }
+    }
+
+    protected override void OnFormClosed(FormClosedEventArgs e)
+    {
+        var prepared = pendingUpdate;
+        pendingUpdate = null; // Consume before any close notifications can re-enter.
+        base.OnFormClosed(e);
+        if (prepared is null) return;
+        try { launchUpdate(prepared); }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or
+            InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            ModernMessageDialog.ShowWarning(null, "FMSC closed, but the installer could not start. " +
+                "You can reopen FMSC and try again. " + error.Message, "FMSC Update");
+        }
+    }
+
     private bool ConfirmLeaveCurrentPage()
     {
         /* some work cannot survive the page being disposed or the application exiting. */

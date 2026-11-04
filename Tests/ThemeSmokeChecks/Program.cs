@@ -34,6 +34,10 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if (args.Contains("--update-dialog"))
+        {
+            CheckUpdateDialog(); Console.WriteLine($"PASS: {checks} modeless update dialog, cancellation and single-installer checks."); return;
+        }
         if(args.Contains("--finance-report-async"))
         {
             CheckFinanceReportAsync();Console.WriteLine($"PASS: {checks} delayed Billing Summary, thread access, total and print/export checks.");return;

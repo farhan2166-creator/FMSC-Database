@@ -252,3 +252,29 @@ reaching it; no automatic history cleanup is authorized or performed.
 real activation/migration/recovery acceptance remains unverified. Bundled Git/SSH,
 transport failure/resume tests and private-distribution acceptance remain required.
 No live installer, database or distribution package was changed in these tests.
+
+## Local private-distribution acceptance and dialog corrections
+
+The owner authorized publication of `1.1.0-rc.2.test.1` and installation on the
+owner's test PC using its ProgramData database, with the original detached pair
+untouched. Publication commit `2adfe6a47339a673dea3bbd8b2e5d6495488e5f6` in the
+private distribution was verified against the approved archive hashes. The real
+school transport downloaded the incremental archive, installed all 391 expected
+files and preserved 391 verified baseline files for rollback. The owner confirmed
+existing records open and the manual checker reports up to date. Schema remained
+76: this did not test actual SQL migration, backup restoration or rollback activation.
+
+The owner's test exposed modeless dismissal and owner-close reentrancy defects.
+Release `1.1.0-rc.3` fixes Close and Remind Me Later with explicit close handlers,
+replaces the update window's FormClosed installation callback with a guarded
+request, and launches the installer only after the dashboard accepts closure.
+Cancelled confirmation or closure clears the pending update; ordinary later
+closure cannot start it. The work guard runs once and duplicate requests are
+suppressed. The dialog now separates version/download status, optional computer
+access details and dismissal actions. A focused SQL-free WinForms suite reproduces
+the owned-window close path and tests exactly one inert installer callback.
+
+The owner has approved merging the source after these corrections. Further package
+publication remains owner controlled. Bundled Git/SSH, persistent download resume,
+clean-machine acceptance, full transport acceptance and actual migration/recovery
+tests remain production limitations; successful incremental testing does not close them.

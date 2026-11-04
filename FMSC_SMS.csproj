@@ -26,7 +26,7 @@
 		<SatelliteResourceLanguages>en;en-US;en-GB;ur;ur-PK;ur-IN</SatelliteResourceLanguages>
 		<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 		<ApplicationIcon>Assets\FMSC_Logo Icon.ico</ApplicationIcon>
-		<Version>1.1.0-rc.2</Version>
+		<Version>1.1.0-rc.3</Version>
 		<AssemblyVersion>1.1.0.0</AssemblyVersion>
 		<FileVersion>1.1.0.0</FileVersion>
 	</PropertyGroup>
