@@ -2,7 +2,7 @@
 
 **Status: private distribution repository created, with signed packaging, bounded chunking,
 non-disruptive staging and a two-version snapshot preparation CLI on the draft branch.
-Actual package publishing, verified release download, and installer activation remain pending.
+Actual package publishing, owner-approved signing key provisioning and installer activation remain pending.
 The feature branch now includes a manual authorization/update-connection UI and protected
 per-Windows-user SSH credentials, but it has not been deployed to school PCs.**
 
@@ -112,18 +112,34 @@ authorization.
 - `Core/Updates/UpdateDeviceKey.cs`: generates local RSA-3072 SSH keys,
   stores the private PEM as DPAPI CurrentUser-protected data, and prevents
   silent rekeying. Only the public SSH key is displayed.
-- `Core/Updates/UpdateGitReader.cs`: manually initiated read-only Git
-  connectivity check using strict pinned GitHub SSH host key verification,
-  a temporary ephemeral PEM, and a shallow/partial metadata-only Git fetch.
-  It does **not** download binaries or activate updates.
+- `Core/Updates/UpdateGitSession.cs`: per-session, private read-only Git transport
+  with the published GitHub SSH host key pinned and a shallow partial clone.
+  Reads signed metadata first; retrieves only individually requested release
+  parts on user approval. It never checks out the entire update repository.
+- `Core/Updates/UpdateGitReader.cs`: manual authorization/availability check
+  over the shared Git session, now requiring publisher-signed manifest
+  verification before reporting an installable version.
+- `Core/Updates/UpdateReleasePreparer.cs`: verifies the signed latest manifest
+  against a **public RSA signing key pinned in the application binary**;
+  selects delta versus full using the installed file hashes and schema gate;
+  downloads bounded Git parts, verifies each and the complete ZIP, and
+  reconstructs the target into an isolated staging directory. A bad or stale
+  delta may fall back to the separately verified full package.
+  **No installer activation or SQL migration is implemented by this class.**
+- The trusted publisher public key is intentionally **not yet provisioned**;
+  production downloads are disabled until the owner approves a real signing
+  key and its public half is embedded at build time. A public key fetched
+  from the same Git repository is NOT a trust anchor.
 - `Core/Updates/UpdateConnectionForm.cs` and `MainDashboardForm.cs`:
   Account → Check for Updates; generate/copy public key and test access.
   Reports the private feed version only as unverified metadata until the
   publisher verification key is configured. No startup checks are enabled.
 - `Tests/UpdateAuthorizationChecks`: Windows-only DPAPI, uniqueness,
   key-format and corruption regression checks (CI).
-- Existing desktop CI includes packaging, staging, distribution snapshot and
-  authorization tests.
+- Existing desktop CI includes packaging, staging, distribution snapshot,
+  protected authorization and signed-release preparation tests. The synthetic
+  release tests cover delta/full staging, mutated installed files, damaged
+  downloaded deltas, signature refusal and database schema gating.
 - The mistakenly introduced hosted `Apps/UpdateBroker` was **removed**.
   No cloud service has been deployed.
 
@@ -134,18 +150,20 @@ authorization.
    owner add it in FMSC-Updates → Settings → Deploy keys with **Allow write
    access unchecked**. There is no GitHub account requirement for schools.
    The source repository remains public until the owner changes it.
-2. Connect the new snapshot preparation tool to a guarded private-repository
-   publishing action and authenticated client download, including network
-   interruption and real large-file Windows tests.
-3. **Complete** private SSH read-only metadata check integration with the
-   distribution feed, verify the publisher signature before advertising any
-   version as an installable update, and bundle an approved Git/SSH runtime in
-   the complete Windows installer. The current manual checker relies on
-   `git.exe` and `ssh.exe` being present on Windows; these must not become
-   manual prerequisites for school staff.
+2. Connect the snapshot preparer to a guarded private Git distribution
+   publishing action. Signed chunked download/reconstruction code exists;
+   test a REAL private Git checkout and interrupted large downloads on Windows
+   before allowing a school update.
+3. Provision owner-controlled publisher RSA signing keys (protect the PRIVATE
+   half outside source/distribution) and embed the reviewed PUBLIC key in
+   official FMSC builds. Read-only Git access and manifest/chunk verification
+   now exist, but the manual checker requires this key before recognizing
+   updates. Bundle reviewed Git/SSH runtime in the Windows installer so schools
+   never need developer tools.
 4. The manual Account → Check for Updates entry and authorization dialog are
-   implemented. Add signed update availability, resilient downloading,
-   Update Now / Remind Me Later and offline behavior. Do not interrupt active work.
+   implemented. Signed update availability is wired behind the publisher-key
+   gate; add user approval to download, progress/retries and
+   Update Now / Remind Me Later. Do not interrupt active work.
 5. Stage packages while application runs; after confirmed safe exit, hand off to
    the existing installer/helper. Package and validate all migration scripts,
    perform backup/compatibility checks and provide rollback guidance.
