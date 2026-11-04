@@ -5,7 +5,7 @@ using FMSC_SMS.Core.Updates;
 // Owner-only tool. Uses the owner's Git credentials, never a school deploy key.
 internal static class GitSnapshotPublisher
 {
-    internal const string Remote = "git@github.com:farhan2166-creator/FMSC-Updates.git";
+    internal const string Remote = "https://github.com/farhan2166-creator/FMSC-Updates.git";
 
     internal static string Prepare(string snapshot, string workspace, string remote = Remote)
     {
@@ -14,6 +14,7 @@ internal static class GitSnapshotPublisher
             throw new IOException("Publication workspace must be new.");
         Directory.CreateDirectory(workspace);
         Git(workspace, "init", "--quiet");
+        Git(workspace, "config", "core.autocrlf", "false");
         Git(workspace, "remote", "add", "origin", remote);
         Git(workspace, "fetch", "--quiet", "origin", "main");
         string parent = Git(workspace, "rev-parse", "FETCH_HEAD").Trim();
@@ -65,7 +66,8 @@ internal static class GitSnapshotPublisher
         Git(workspace, "commit", "-m", "Publish verified FMSC update snapshot");
         // A normal fast-forward push updates one ref atomically. Concurrent owner
         // publication is rejected by Git; never force and never expose partial files.
-        Git(workspace, "push", "origin", "HEAD:refs/heads/main");
+        Git(workspace, "-c", "http.version=HTTP/1.1", "-c", "http.postBuffer=134217728",
+            "push", "origin", "HEAD:refs/heads/main");
     }
 
     private static void Copy(string source, string destination)
@@ -90,7 +92,9 @@ internal static class GitSnapshotPublisher
         using var process = Process.Start(start) ?? throw new IOException("Cannot start Git.");
         var output = process.StandardOutput.ReadToEndAsync();
         var error = process.StandardError.ReadToEndAsync();
-        if (!process.WaitForExit(120000)) { process.Kill(true); throw new IOException("Git publication timed out."); }
+        bool transfer = arguments.Any(argument => argument is "push" or "fetch" or "clone");
+        int timeout = transfer ? 15 * 60 * 1000 : 120000;
+        if (!process.WaitForExit(timeout)) { process.Kill(true); throw new IOException("Git publication timed out."); }
         Task.WaitAll(output, error);
         if (process.ExitCode != 0) throw new IOException("Git publication failed: " + error.Result);
         return output.Result;

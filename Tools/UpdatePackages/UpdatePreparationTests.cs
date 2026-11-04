@@ -25,6 +25,27 @@ internal static class UpdatePreparationTests
             string package = Path.Combine(root, "package");
             var packaged = PackageBuilder.Build(newApp, package,
                 "1.1.0", 75, oldApp, "1.0.0");
+            UpdatePackageVerification.Verify(package, oldApp, Path.Combine(root, "publisher-verification"));
+            string extracted = UpdatePackageVerification.ExtractFull(package, Path.Combine(root, "publisher-extraction"));
+            Require(File.ReadAllText(Path.Combine(extracted, "main.dll")) == "after", "Publisher must reconstruct a hash-verified baseline.");
+            try
+            {
+                UpdatePackageVerification.Verify(package, newApp, Path.Combine(root, "wrong-publisher-base"));
+                throw new Exception("Publisher accepted the wrong incremental baseline.");
+            }
+            catch (InvalidDataException) { }
+
+            string checkedPart = Path.Combine(package, packaged.Full.Parts[0].Name);
+            byte[] originalPart = File.ReadAllBytes(checkedPart);
+            byte[] damagedPart = (byte[])originalPart.Clone(); damagedPart[0] ^= 0x40;
+            File.WriteAllBytes(checkedPart, damagedPart);
+            try
+            {
+                UpdatePackageVerification.ExtractFull(package, Path.Combine(root, "damaged-publisher-baseline"));
+                throw new Exception("Publisher accepted a corrupt baseline part.");
+            }
+            catch (InvalidDataException) { }
+            finally { File.WriteAllBytes(checkedPart, originalPart); }
 
             string feed = Path.Combine(root, "feed");
             string published = Path.Combine(feed, "versions", "1.1.0");

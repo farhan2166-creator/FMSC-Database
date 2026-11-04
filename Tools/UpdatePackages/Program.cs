@@ -4,6 +4,18 @@ using FMSC_SMS.Core.Updates;
 
 try
 {
+    if (args.Length == 4 && args[0] == "--extract-release" && args[2] == "--output-dir")
+    {
+        Console.WriteLine("Verified baseline: " + UpdatePackageVerification.ExtractFull(args[1], args[3]));
+        return;
+    }
+    if ((args.Length == 4 || args.Length == 6) && args[0] == "--verify-package" && args[2] == "--output-dir" &&
+        (args.Length == 4 || args[4] == "--baseline-dir"))
+    {
+        UpdatePackageVerification.Verify(args[1], args.Length == 6 ? args[5] : null, args[3]);
+        Console.WriteLine("PASS: package chunks, full ZIP, complete target and incremental reconstruction verified.");
+        return;
+    }
     if (args.Length == 1 && args[0] == "--self-test")
     {
         SelfTest.Run();

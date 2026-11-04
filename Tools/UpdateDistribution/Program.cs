@@ -341,6 +341,9 @@ internal static class SnapshotTests
             "Review preparation must not publish.");
         Identity(publication);
         GitSnapshotPublisher.Publish(publication, expected, remote);
+        Require(GitSnapshotPublisher.Git(remote, "show", "main:channel/stable.json") ==
+            File.ReadAllText(Path.Combine(root, "snapshot1", "channel", "stable.json")),
+            "Publication must preserve the exact verified metadata bytes without newline conversion.");
         string published = GitSnapshotPublisher.Git(remote, "rev-parse", "main").Trim();
         Require(published != expected && GitSnapshotPublisher.Git(remote, "rev-parse", "main^").Trim() == expected,
             "Publication must advance atomically while preserving history.");

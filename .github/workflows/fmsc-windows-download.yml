@@ -1,7 +1,17 @@
-name: '04 - Package - Windows App-Only ZIP'
+name: '04 - Build and Publish Private Update'
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_update:
+        description: 'Publish this approved version to private FMSC-Updates (disable for build only)'
+        required: true
+        type: boolean
+        default: true
+
+concurrency:
+  group: fmsc-owner-private-update-publication
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -14,6 +24,16 @@ jobs:
     timeout-minutes: 45
 
     steps:
+      - name: Check owner publication credential
+        if: inputs.publish_update
+        shell: pwsh
+        env:
+          FMSC_UPDATES_PUBLISH_TOKEN: ${{ secrets.FMSC_UPDATES_PUBLISH_TOKEN }}
+        run: |
+          if (-not $env:FMSC_UPDATES_PUBLISH_TOKEN) {
+            throw 'One-time setup required: add FMSC_UPDATES_PUBLISH_TOKEN with Contents read/write access to FMSC-Updates only.'
+          }
+
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
@@ -43,6 +63,23 @@ jobs:
       - name: Run synthetic performance and lifecycle checks
         run: dotnet run --project Tests/PerformanceChecks/PerformanceChecks.csproj -c Release
 
+      - name: Verify updater packages, retention and safe dialog shutdown
+        shell: pwsh
+        run: |
+          $commands = @(
+            @('Tools/UpdatePackages/UpdatePackages.csproj', '--self-test'),
+            @('Tools/UpdateDistribution/UpdateDistribution.csproj', '--self-test'),
+            @('Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj', '--update-dialog'),
+            @('Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj', '--post-fix')
+          )
+          foreach ($command in $commands) {
+            dotnet run --project $command[0] -c Release -- $command[1]
+            if ($LASTEXITCODE -ne 0) { throw "Updater gate failed: $($command[1])" }
+          }
+          & .\Tools\TestPreparedUpdate.ps1
+          & .\Tools\TestInstallerMigrations.ps1
+          & .\Tools\TestPublishPrivateUpdate.ps1
+
       # The ordinary PortableRelease publish remains subject to its installer/MSI
       # and optional detached-MDF/LDF validation. Only this GitHub Actions
       # app-only bundle skips those full-installer preparation/copy targets.
@@ -56,6 +93,10 @@ jobs:
         shell: pwsh
         run: |
           $root = Join-Path $env:GITHUB_WORKSPACE 'out/windows-x64-app'
+          $version = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $root 'FMSC_SMS.dll')).ProductVersion.Split('+')[0]
+          $installer = Get-Content -LiteralPath (Join-Path $root 'UpdateSupport/core.ps1') -Raw
+          $schema = [regex]::Match($installer, '(?m)^\$DatabaseVersion = ''([0-9]+)''\r?$').Groups[1].Value
+          if (-not $schema) { throw 'Required database schema is missing from the bundled installer.' }
           foreach ($name in @('FMSC_SMS.exe', 'FMSC_SMS.dll', 'FMSC_SMS.deps.json', 'FMSC_SMS.runtimeconfig.json')) {
             if (-not (Test-Path -LiteralPath (Join-Path $root $name) -PathType Leaf)) {
               throw "Missing Windows application output: $name"
@@ -68,11 +109,14 @@ jobs:
             'Source commit: ${{ github.sha }}'
             'Build run: ${{ github.run_number }}'
             'Built with: .NET 8 (self-contained, WinForms)'
+            "Application version: $version"
+            "Required database schema: $schema"
             ''
             'This is NOT a complete installer or a GitHub public Release.'
-            'It contains no student records, MDF/LDF, LocalDB MSI, or database migrations.'
-            'The existing school PC still needs its approved SQL LocalDB setup and compatible schema-6 database.'
-            'For fresh installation or schema migration, use the separately validated installer package.'
+            'It contains no student records, MDF/LDF, backups or LocalDB MSI.'
+            'UpdateSupport contains the existing installer and numbered database migrations.'
+            'Existing school databases are preserved. Pending migrations run only through the post-exit installer safeguards.'
+            'Fresh installations still require the separately validated complete installer and approved database snapshot.'
             'GitHub Actions CI does not run interactive Windows UI, physical printer, or school-database tests.'
           ) | Set-Content -LiteralPath (Join-Path $root 'BUILD_INFO.txt') -Encoding utf8
           $lines = @(Get-ChildItem -LiteralPath $root -File -Recurse | Sort-Object FullName | ForEach-Object {
@@ -81,12 +125,23 @@ jobs:
           })
           $lines | Set-Content -LiteralPath (Join-Path $root 'SHA256SUMS.txt') -Encoding utf8
 
-      # Artifacts are accessible only to authorized viewers of this private repo.
-      # No gh release create, deployment, school SQL connection, or public upload.
-      - name: Upload private Windows ZIP
+      # Source is public: this contains only the current source-built application.
+      # Private feed history/snapshots and credentials must never be artifacts here.
+      - name: Upload Windows application ZIP
         uses: actions/upload-artifact@v7
         with:
           name: FMSC_SMS-Windows-x64-app-only-${{ github.run_number }}
           path: out/windows-x64-app/
           retention-days: 14
           if-no-files-found: error
+
+      - name: Verify and atomically publish approved update
+        if: inputs.publish_update
+        shell: pwsh
+        timeout-minutes: 25
+        env:
+          FMSC_UPDATES_PUBLISH_TOKEN: ${{ secrets.FMSC_UPDATES_PUBLISH_TOKEN }}
+        run: |
+          .\Tools\PublishPrivateUpdate.ps1 `
+            -ApplicationDirectory (Join-Path $env:GITHUB_WORKSPACE 'out/windows-x64-app') `
+            -WorkDirectory (Join-Path $env:RUNNER_TEMP ('fmsc-publication-' + [Guid]::NewGuid().ToString('N')))

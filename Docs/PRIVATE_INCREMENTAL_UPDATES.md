@@ -163,6 +163,50 @@ live installation change or app/schema version reset has been performed.
 
 ## Owner publication review and atomic push
 
+### Normal developer path: one manual GitHub workflow
+
+Use the existing **04 - Build and Publish Private Update** workflow on `main`.
+`publish_update` defaults to true; disable it only for an artifact-only build.
+After editing and testing locally, increase the application version in both
+`FMSC_SMS.csproj` and `Installer/core.ps1`, push approved source to main, and
+select Run workflow. The workflow uses that checked-in version; it does not
+invent, reset or commit a version number. A duplicate published version is refused.
+
+One-time credential setup: create a fine-grained GitHub personal access token
+limited to **FMSC-Updates**, with **Contents: Read and write**, and store it as
+the **FMSC_UPDATES_PUBLISH_TOKEN** Actions repository secret in **FMSC-Database**.
+The ordinary source GITHUB_TOKEN cannot write a different private repository.
+Do not paste the token into source, workflow inputs, school enrollment or the app.
+School computers continue to use their individual read-only SSH deploy keys.
+
+The workflow builds/tests the source, publishes the self-contained application,
+fetches the current private snapshot, reconstructs and verifies its full package
+as an incremental baseline when schemas match, and uses the existing packaging
+and distribution tools. If schemas differ, it prepares a full update. It verifies
+every chunk/ZIP and reconstructs the complete target from both new archives before
+publication. The log/summary identifies version, schema, sizes, retained/retired
+versions and expected Git parent before the final atomic push. Concurrent runs are
+serialized; a concurrent external distribution update is rejected without force.
+Failures before the push leave the current school feed unchanged. Source and school
+databases are never modified by this workflow.
+
+The owner publishing credential is provided only to the runner's Git processes,
+never saved in a remote URL, application or downloadable artifact. The public source
+workflow retains its existing current-application artifact. Private baseline packages,
+history and distribution snapshots stay in runner temporary storage and are not
+uploaded as public artifacts. GitHub no-reply commit identity avoids email-privacy
+push rejection. Buffered HTTPS publication supports the approved large chunks.
+
+On the school side, publication does nothing until someone manually selects
+Account → Check for Updates. There is no automatic download or forced installation.
+
+The new orchestration is covered by offline trigger refusal, real package reconstruction
+and local atomic-publication regressions. Its first authenticated GitHub run still
+requires the owner's one-time secret configuration and manual Run workflow; it was
+not invoked to publish a real update during development.
+
+### Local CLI alternative
+
 After preparing a verified two-version snapshot with the existing CLI:
 
 ```powershell
