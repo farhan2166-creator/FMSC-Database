@@ -33,10 +33,12 @@ internal static class UpdateDeviceKey
     /// Never overwrite an existing private key automatically. The GitHub deploy
     /// key must be explicitly revoked by the owner if the PC is deauthorized.
     /// </summary>
-    internal static string GenerateEnrollment()
+    internal static string GenerateEnrollment(string? storageRoot = null)
     {
-        Directory.CreateDirectory(StateDirectory);
-        if (IsEnrolled)
+        string root = storageRoot ?? StateDirectory;
+        string credential = Path.Combine(root, CredentialFile);
+        Directory.CreateDirectory(root);
+        if (File.Exists(credential))
             throw new InvalidOperationException(
                 "This Windows user already has an update authorization key. " +
                 "Do not replace it without revoking the previous GitHub deploy key.");
@@ -47,7 +49,7 @@ internal static class UpdateDeviceKey
         char[] privatePem = rsa.ExportRSAPrivateKeyPem().ToCharArray();
         byte[] clear = Array.Empty<byte>();
         byte[] sealedKey = Array.Empty<byte>();
-        string temporary = CredentialPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        string temporary = credential + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             clear = JsonSerializer.SerializeToUtf8Bytes(
@@ -61,7 +63,7 @@ internal static class UpdateDeviceKey
             }
             // No overwrite: concurrent enrollment attempts cannot replace a
             // key that has already been approved by the repository owner.
-            File.Move(temporary, CredentialPath, overwrite: false);
+            File.Move(temporary, credential, overwrite: false);
             return publicText;
         }
         finally
@@ -73,22 +75,16 @@ internal static class UpdateDeviceKey
         }
     }
 
-    internal static string GetPublicKey()
-    {
-        var record = ReadCredential();
-        return record.PublicKey;
-    }
+    internal static string GetPublicKey(string? storageRoot = null) => ReadCredential(storageRoot).PublicKey;
 
     /// <summary>Caller must zero returned bytes after their short-lived use.</summary>
-    internal static byte[] OpenPrivateKey()
-    {
-        var record = ReadCredential();
-        return Encoding.ASCII.GetBytes(record.PrivateKey);
-    }
+    internal static byte[] OpenPrivateKey(string? storageRoot = null) =>
+        Encoding.ASCII.GetBytes(ReadCredential(storageRoot).PrivateKey);
 
-    private static DeviceCredential ReadCredential()
+    private static DeviceCredential ReadCredential(string? storageRoot)
     {
-        byte[] encrypted = File.ReadAllBytes(CredentialPath);
+        string credential = Path.Combine(storageRoot ?? StateDirectory, CredentialFile);
+        byte[] encrypted = File.ReadAllBytes(credential);
         if (encrypted.Length is < 32 or > 65536)
             throw new InvalidDataException("Encrypted update authorization file is invalid.");
         byte[] clear = ProtectedData.Unprotect(encrypted, Entropy, DataProtectionScope.CurrentUser);
