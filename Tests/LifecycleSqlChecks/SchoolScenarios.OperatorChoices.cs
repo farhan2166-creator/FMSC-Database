@@ -215,13 +215,15 @@ internal sealed partial class SchoolScenarios
         r.Check(ChainDue(bill)==0&&Credit(child.Student)==500,"A reviewed paid bill reduction remains possible after departure, including a retained future issued bill.");
         SaveTerms(id,month,month,0,6000,agreement:false,bill:bill);
         r.Check(ChainDue(bill)==1500&&Credit(child.Student)==500,"Increasing a closed-placement bill creates its explicit correction chain while preserving available credit.");
-        SqlParameter[] CreditArgs(bool preview,string? snapshot=null)=>TermsArgs(id,month,month,0,preview,snapshot,6000,agreement:false,bill:bill).Concat(new[]{Sql.P("@ApplyAvailableCredit",true)}).ToArray();
+        SqlParameter[] CreditArgs(bool preview,string? snapshot=null)=>TermsArgs(id,month,month,0,preview,snapshot,6000,agreement:false,bill:bill).Concat(new[]{Sql.P("@ApplyAvailableCredit",false)}).ToArray();
         using(var review=ReviewConcession(CreditArgs(true)))
         {
-            r.Check(Convert.ToDecimal(review.Tables[0].Rows[0]["CreditToUse"])==500&&Convert.ToDecimal(review.Tables[0].Rows[0]["RemainingCredit"])==0,"The review states exactly how much available credit will be used.");
+            r.Check(Convert.ToDecimal(review.Tables[0].Rows[0]["CreditToUse"])==0&&Convert.ToDecimal(review.Tables[0].Rows[0]["RemainingCredit"])==500,
+                "Financial corrections leave held advance available for Fee Collection.");
             Sql.Proc("SaveStudentFeeDiscount",CreditArgs(false,Snapshot(review)));
         }
-        r.Check(Credit(child.Student)==0&&Due(Tuition(child.Enrollment))==4500&&ChainDue(bill)==1500,"Explicit credit use settles the oldest tuition first while preserving the later reviewed bill's balance.");
+        r.Check(Credit(child.Student)==500&&Due(Tuition(child.Enrollment))==5000&&ChainDue(bill)==1500,
+            "Closed-bill corrections preserve advance and unrelated tuition dues until collection.");
         r.Check(Sql.Count("SELECT COUNT(*) FROM dbo.Enrollments WHERE EnrollmentId=@E AND Status=N'Left';",Sql.P("@E",child.Enrollment))==1&&Sql.Money("SELECT Amount FROM dbo.StudentFeeAssignments WHERE StudentFeeAssignmentId=@Id;",Sql.P("@Id",id))==5000,
             "Closed-bill corrections do not reopen the placement or rewrite its original fee agreement.");
         await r.Refused("A direct closed-history financial rewrite is still refused",()=>Task.Run(()=>Sql.Query("UPDATE dbo.BillingCharges SET DiscountAmount=DiscountAmount+1 WHERE BillingChargeId=@C;",Sql.P("@C",bill))),57102);
@@ -237,7 +239,7 @@ internal sealed partial class SchoolScenarios
                 command.Parameters.AddRange(TermsArgs(id,month,month,0,false,Snapshot(failedReview),4000,agreement:false,bill:bill));command.ExecuteNonQuery();}),51045);
             using var checkScope=new SqlCommand("SELECT CASE WHEN SESSION_CONTEXT(N'FMSC.BillCorrection') IS NULL AND @@TRANCOUNT=0 THEN 1 ELSE 0 END;",connection);
             r.Check(Convert.ToInt32(checkScope.ExecuteScalar())==1,"The same SQL session restores its correction scope and transaction after failure.");
-            r.Check(ChainDue(bill)==1500&&Credit(child.Student)==0,"An aborted closed-bill correction leaves the exact prior dues and credit.");
+            r.Check(ChainDue(bill)==1500&&Credit(child.Student)==500,"An aborted closed-bill correction leaves the exact prior dues and credit.");
         }
         finally{Sql.Query("DROP TRIGGER dbo.FMSC_ClosedCorrectionRefusal;");}
     }

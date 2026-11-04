@@ -466,7 +466,7 @@ public sealed class FeePostingPage : V2Page, IBusyPage
                     $"\n\n{scopeText}" +
                     $"\n\nTotal net payable: Rs. {net:N0}\n\n" +
                     "Only the listed student/month fees in this preview will be posted. Existing bills are untouched. " +
-                    "This creates bills; it does not record payment. Collect payment in Fee Collection afterward."+
+                    "Posting creates bills only: student advances remain available. Apply any advance and receive cash in Fee Collection afterward."+
                     (reversedCount>0 ? $"\n\n{reversedCount} previously reversed fee(s) will receive new charges because they are included in this preview." : string.Empty),
                     "Post Monthly Fees",
                     defaultYes: false))

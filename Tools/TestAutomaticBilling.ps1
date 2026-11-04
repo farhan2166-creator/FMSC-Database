@@ -140,10 +140,39 @@ try {
  Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=1;') -eq 5000) 'Advance money is retained as available student credit.'
  [void](Query "DECLARE @Request uniqueidentifier='11111111-1111-1111-1111-111111111111'; EXEC dbo.ProcessStudentCredit @UserId=1,@AdmissionId=1,@Action=N'Deposit',@Amount=5000,@RequestId=@Request,@Reason=N'Fictional advance payment';")
  Check ((Number "SELECT COUNT(*) FROM dbo.StudentCreditEntries WHERE EntryKind=N'Deposit';") -eq 1) 'Exact credit-deposit retry does not receive money twice.'
+ # Both automatic posting and its retained compatibility writer must preserve advance.
  [void](Query 'BEGIN TRAN; EXEC dbo.ApplyStudentCredit_Internal @AdmissionId=1,@UserId=1; COMMIT;')
- Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=1;') -eq 0) 'Existing credit automatically settles eligible fees until exhausted.'
- Check ((Number 'SELECT SUM(A.Amount) FROM dbo.FeePaymentAllocations A JOIN dbo.FeePayments P ON P.FeePaymentId=A.FeePaymentId WHERE P.IsCreditApplication=1;') -eq 5000) 'Credit uses the existing authoritative payment allocations.'
- Check ((Number "SELECT dbo.GetFeeChargeBalance(BillingChargeId) FROM dbo.BillingCharges WHERE EnrollmentId=1 AND FeeTypeId=1 AND BillingMonth=DATEADD(month,-2,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1)) AND Status<>N'Cancelled';") -eq 5000) 'Credit settles the oldest tuition first.'
+ Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=1;') -eq 5000) 'Automatic fee posting leaves the student advance untouched.'
+ Check ((Number 'SELECT COUNT(*) FROM dbo.FeePayments WHERE IsCreditApplication=1;') -eq 0) 'The posting compatibility writer creates no credit payments.'
+ # This is an explicit fictional collection, not a billing-triggered settlement.
+ # Credit allocation and its saved receipt share the same transaction.
+ [void](Query @'
+DECLARE @Bill bigint=(SELECT TOP(1) B.BillingChargeId FROM dbo.BillingCharges B
+ WHERE B.EnrollmentId=1 AND B.FeeTypeId=1 AND
+ B.BillingMonth=DATEADD(month,-2,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1)) AND B.Status<>N'Cancelled');
+DECLARE @Before decimal(12,2)=dbo.GetFeeChargeBalance(@Bill);
+DECLARE @CreditJson nvarchar(max)=(SELECT @Bill ChargeId,1 AdmissionId,1 EnrollmentId,
+ CONVERT(decimal(12,2),5000) Amount,@Before ExpectedBalance,
+ CONVERT(decimal(12,2),5000) ExpectedCredit FOR JSON PATH);
+BEGIN TRAN;
+EXEC dbo.ApplyCollectionCredit @UserId=1,@TransactionDate=CONVERT(date,GETDATE()),@CreditsJson=@CreditJson;
+DECLARE @PaymentId int=(SELECT TOP(1) FeePaymentId FROM dbo.FeePayments
+ WHERE AdmissionId=1 AND IsCreditApplication=1 ORDER BY FeePaymentId DESC);
+DECLARE @Lines nvarchar(max)=(SELECT @Bill ChargeId,1 AdmissionId,1 EnrollmentId,
+ @Before AmountBefore,CONVERT(decimal(12,2),0) Discount,
+ CONVERT(decimal(12,2),0) Cash,CONVERT(decimal(12,2),5000) Credit FOR JSON PATH);
+DECLARE @Payments nvarchar(max)=CONCAT('[',@PaymentId,']');
+EXEC dbo.IssueCollectionReceipt @UserId=1,@PrimaryAdmissionId=1,
+ @TransactionDate=CONVERT(date,GETDATE()),@PaymentMethod=N'Account Credit',
+ @Remarks=N'Explicit fictional credit settlement',@StudentIdsJson=N'[1]',
+ @PaymentIdsJson=@Payments,@LinesJson=@Lines,
+ @CashReceived=0,@CreditApplied=5000,@DiscountApplied=0;
+COMMIT;
+'@)
+ Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=1;') -eq 0) 'Explicit collection alone consumes the selected student advance.'
+ Check ((Number 'SELECT SUM(A.Amount) FROM dbo.FeePaymentAllocations A JOIN dbo.FeePayments P ON P.FeePaymentId=A.FeePaymentId WHERE P.IsCreditApplication=1;') -eq 5000) 'Collected credit uses the authoritative payment allocations.'
+ Check ((Number 'SELECT COUNT(*) FROM dbo.CollectionReceiptPayments L JOIN dbo.FeePayments P ON P.FeePaymentId=L.FeePaymentId WHERE P.IsCreditApplication=1;') -eq 1) 'Explicit credit collection saves one durable receipt link.'
+ Check ((Number "SELECT dbo.GetFeeChargeBalance(BillingChargeId) FROM dbo.BillingCharges WHERE EnrollmentId=1 AND FeeTypeId=1 AND BillingMonth=DATEADD(month,-2,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1)) AND Status<>N'Cancelled';") -eq 5000) 'Explicit credit collection settles the selected tuition bill.'
  $dashboard=Query 'EXEC dbo.GetDashboardSummary @UserId=1;'
  Check ($dashboard.Tables[0].Rows[0].FeeCollectedToday -eq 5000) 'Applying credit is not counted as new money on the dashboard.'
  Check ((Number 'SELECT SUM(TotalAmount) FROM dbo.DailyClosingPayments;') -eq 5000) 'Daily closing excludes noncash credit applications.'

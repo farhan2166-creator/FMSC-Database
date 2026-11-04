@@ -60,6 +60,22 @@ internal static class CollectionCreditChecks
         long tuition=Bill(enrollment,f.Tuition), annual=Bill(enrollment,f.AdmissionFee), siblingAnnual=Bill(siblingEnrollment,f.AdmissionFee);
         Deposit(admission,8750); Deposit(siblingId,1000);
         decimal beforeCredit=Credit(admission); decimal beforeDue=Due(tuition);
+        string backdatedCreditJson=System.Text.Json.JsonSerializer.Serialize(new[] {
+            new { ChargeId=tuition, AdmissionId=admission, EnrollmentId=enrollment, Amount=100m,
+                ExpectedBalance=beforeDue, ExpectedCredit=beforeCredit }
+        });
+        await report.Refused("Credit-only collection cannot precede enrollment",()=>Task.Run(()=>{
+            Sql.Query("BEGIN TRAN; EXEC dbo.ApplyCollectionCredit @UserId=@Actor,@TransactionDate=@When,@CreditsJson=@Plan; COMMIT;",
+                Sql.P("@Actor",f.Admin),Sql.P("@When",DateTime.Today.AddYears(-10)),Sql.P("@Plan",backdatedCreditJson));
+        }),54902);
+        report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,
+            "Rejected pre-enrollment credit date changes no account or bill");
+        await report.Refused("Advance is not available for a backdated collection",()=>Task.Run(()=>{
+            Sql.Query("BEGIN TRAN; EXEC dbo.ApplyCollectionCredit @UserId=@Actor,@TransactionDate=@When,@CreditsJson=@Plan; COMMIT;",
+                Sql.P("@Actor",f.Admin),Sql.P("@When",DateTime.Today.AddDays(-1)),Sql.P("@Plan",backdatedCreditJson));
+        }),54902);
+        report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,
+            "Backdated credit refusal preserves the account and existing bill");
         await report.Refused("Changed credit is refused before settlement",()=>Save(null,new[] {Plan(tuition,admission,enrollment,100) with { ExpectedCredit=beforeCredit+1 }}),53104);
         report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,"Stale credit preview changes neither credit nor bills");
         await report.Refused("Sibling credit cannot settle another child's bill",()=>Save(null,new[] {Plan(tuition,siblingId,siblingEnrollment,100)}),53104);
@@ -104,20 +120,23 @@ internal static class CollectionCreditChecks
             "Credit applications are linked to their printable settlement instead of being orphan print references");
         report.Check(snapshot==Convert.ToString(Sql.Scalar("SELECT SnapshotJson FROM dbo.CollectionReceipts WHERE ReceiptNumber=@Receipt",Sql.P("@Receipt",savedReceipt))),
             "Later credit use does not rewrite an earlier receipt's issue-time balances");
+        decimal siblingCreditBefore=Credit(siblingId);
+        int paymentsBeforeCheck=Sql.Count("SELECT COUNT(*) FROM dbo.FeePayments");
         Sql.Query("BEGIN TRAN;EXEC dbo.ApplyStudentCredit_Internal @Student,@UserId;COMMIT;",Sql.P("@Student",siblingId),Sql.P("@UserId",f.Admin));
-        string automatic=Convert.ToString(Sql.Scalar("SELECT TOP(1) ReceiptNumber FROM dbo.FeePayments WHERE AdmissionId=@Student AND IsCreditApplication=1 ORDER BY FeePaymentId DESC",Sql.P("@Student",siblingId)))!;
-        int paymentsBeforePrint=Sql.Count("SELECT COUNT(*) FROM dbo.FeePayments");
+        report.Check(Credit(siblingId)==siblingCreditBefore && Sql.Count("SELECT COUNT(*) FROM dbo.FeePayments")==paymentsBeforeCheck,
+            "Background credit compatibility entry point cannot spend held advance or create a payment");
         using(var connection=DatabaseHelper.GetConnection())
         using(var command=new SqlCommand("dbo.GetCollectionReceipt",connection) {CommandType=CommandType.StoredProcedure})
         using(var adapter=new SqlDataAdapter(command))
         using(var print=new DataSet())
         {
-            command.Parameters.AddRange(new[]{Sql.P("@UserId",f.Admin),Sql.P("@ReceiptNumber",automatic)});adapter.Fill(print);
-            report.Check(print.Tables.Count==3 && Convert.ToDecimal(print.Tables[0].Rows[0]["CashReceived"])==0m
-                && Convert.ToDecimal(print.Tables[0].Rows[0]["CreditApplied"])==500m,
-                "A standalone automatic credit application prints as noncash settlement without guessing a family batch");
+            command.Parameters.AddRange(new[]{Sql.P("@UserId",f.Admin),Sql.P("@ReceiptNumber",savedReceipt)});adapter.Fill(print);
+            report.Check(print.Tables.Count==3 && Convert.ToDecimal(print.Tables[0].Rows[0]["CashReceived"])==3000m
+                && Convert.ToDecimal(print.Tables[0].Rows[0]["CreditApplied"])==1000m
+                && Convert.ToInt32(print.Tables[0].Rows[0]["SnapshotVersion"])>=3,
+                "Explicit fee collection saves a durable cash-plus-credit receipt rather than a legacy fallback");
         }
-        report.Check(Sql.Count("SELECT COUNT(*) FROM dbo.FeePayments")==paymentsBeforePrint,"Reading a receipt never posts another payment or applies credit again");
+        report.Check(Sql.Count("SELECT COUNT(*) FROM dbo.FeePayments")==paymentsBeforeCheck,"Reading a receipt never posts another payment or applies credit again");
         report.Check(CollectionRecoveryJournal.ReadPending() is null,"Confirmed and refused transactions clear the recovery intent");
     }
 }

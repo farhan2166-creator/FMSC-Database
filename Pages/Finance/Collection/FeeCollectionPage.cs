@@ -311,8 +311,17 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             using var returnFocus = new DialogReturnFocus(this);
             using var dialog = new StudentCreditDialog(admissionId);
             dialog.ShowDialog(FindForm());
-            await LoadChargesAsync(loadVersion);
-            await LoadRecentPaymentsAsync(loadVersion);
+            // Cancel/Close without a saved change must not erase the entered payment split.
+            if (!dialog.Changed) return;
+            int refreshVersion = ++loadVersion;
+            await LoadChargesAsync(refreshVersion);
+            if (IsDisposed || refreshVersion != loadVersion) return;
+            // Advance changed: rebuild the cash and credit split from the retained entered amount.
+            // An earlier manual split is explicitly invalidated rather than silently discarded.
+            RefreshEnteredPaymentAllocation();
+            await LoadRecentPaymentsAsync(refreshVersion);
+            if (!IsDisposed && refreshVersion == loadVersion)
+                Info("Advance balance changed. Payment allocations have been recalculated. Review each Pay Now amount before saving.");
         }, "Secondary");
         // Future fees and the consolidated account retain the selected student.
         futureFeesButton =
@@ -501,6 +510,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             if (suppressPaymentDateEvents)
                 return;
             paymentDateEdited = true;
+            RefreshAdvanceDateAvailability();
         };
         ConfigureChargesGrid();
         ConfigurePaymentsGrid();
@@ -923,6 +933,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             return;
         }
         paymentAmount.Text = payable.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        // TextChanged does not run if the numeric text is already identical.
+        // Use Full Amount must still repair a cleared allocation grid.
+        RefreshEnteredPaymentAllocation();
         paymentAmount.Focus();
         paymentAmount.SelectAll();
     }
@@ -2095,9 +2108,23 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         var discounts = GetDiscountAllocations();
         return SettlementRows().Sum(row => GetRowNetDue(row, discounts));
     }
+    private bool CreditAllowedOnSelectedDate() => paymentDate.Value.Date == DateTime.Today;
+    private void RefreshAdvanceDateAvailability()
+    {
+        bool allowed = CreditAllowedOnSelectedDate();
+        useAvailableCredit.Enabled = allowed;
+        useAvailableCredit.Text = allowed ? "Use student advance" : "Advance: today only";
+        if (!allowed && useAvailableCredit.Checked)
+            useAvailableCredit.Checked = false;
+        // Date changes alter the amount owed in cash, even with unchanged payment text.
+        RefreshEnteredPaymentAllocation();
+    }
     private Dictionary<long, decimal> GetCreditAllocations(Dictionary<long, decimal>? discounts = null)
     {
-        return useAvailableCredit.Checked?GetUsableCreditAllocations(discounts):new();
+        // Second UI-level boundary: never plan credit on a dated-back collection,
+        // even if a checkbox was changed programmatically.
+        return CreditAllowedOnSelectedDate() && useAvailableCredit.Checked
+            ? GetUsableCreditAllocations(discounts) : new();
     }
     private Dictionary<long,decimal> GetUsableCreditAllocations(Dictionary<long,decimal>? discounts=null)
     {
@@ -3050,11 +3077,14 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         decimal credit = SelectedAvailableCredit();
         decimal usedCredit = GetCreditAllocations(discountMap).Values.Sum();
         // The checkbox shows what can pay the listed fees, not a pooled family balance.
-        availableCredit.Text = GetUsableCreditAllocations(discountMap).Values.Sum().ToString("N0");
+        availableCredit.Text = (CreditAllowedOnSelectedDate()
+            ? GetUsableCreditAllocations(discountMap).Values.Sum() : 0m).ToString("N0");
         remainingCredit.Text = (credit - usedCredit).ToString("N0");
-        advanceScopeHint.Text=counterIds is null&&credit>0m&&SettlementRows().Any(row=>
-            GetInt(row.Cells["AdmissionId"].Value)!=admissionId&&GetRowNetDue(row,discountMap)>0m)
-            ?"Advance applies only to the main student's fees. Transfer in Advance Balance to pay a sibling.":"";
+        advanceScopeHint.Text=credit>0m&&!CreditAllowedOnSelectedDate()
+            ?"Advance cannot be used for a backdated collection. Select today's date to apply advance."
+            :counterIds is null&&credit>0m&&SettlementRows().Any(row=>
+                GetInt(row.Cells["AdmissionId"].Value)!=admissionId&&GetRowNetDue(row,discountMap)>0m)
+                ?"Advance applies only to the main student's fees. Transfer in Advance Balance to pay a sibling.":"";
         advanceScopeHint.Visible=advanceScopeHint.Text.Length>0;
         if (creditSummary is not null && remainingCreditSummary is not null)
         {
@@ -3170,6 +3200,11 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             {
                 /* Keep the date-field error and validation summary consistent. */
                 MarkCollectionField(paymentDate, "Not in the future");
+                return;
+            }
+            if (paymentDate.Value.Date < DateTime.Today && useAvailableCredit.Checked)
+            {
+                MarkCollectionField(paymentDate, "Advance cannot be used on a backdated collection. Select today or collect cash.");
                 return;
             }
             /* Allocations grouped by student AND enrolment, not one flat list. dbo.ProcessFeeTransaction is scoped to a single (AdmissionId, EnrollmentId) and writes one FeePayments row per call. */
@@ -4146,6 +4181,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         {
             suppressPaymentDateEvents = false;
         }
+        RefreshAdvanceDateAvailability();
     }
     private static decimal GetAmount(
         Control control)

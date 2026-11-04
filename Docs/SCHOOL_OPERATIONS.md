@@ -69,7 +69,9 @@ Fee Type. Load Eligible Fees, review the student/month rows and combined total,
 then Post Eligible Fees. Only unposted eligible months in the current academic
 year appear. The selected range posts in one transaction. Existing charges are
 skipped, so automatic billing will not create them again. Open Fee Collection
-to receive the advance payment; posting bills does not record a payment.
+to receive the advance payment; posting bills does not record a payment or
+consume held student advance. Apply advance only when confirming Fee Collection,
+where cash and credit allocations are saved with a receipt.
 Previously reversed fees are clearly marked and require deliberate confirmation.
 Automatic billing does not silently recreate reversals.
 

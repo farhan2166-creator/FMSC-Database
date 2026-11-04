@@ -1,5 +1,6 @@
 # Audit reference
 
+- [Credit lifecycle audit — 4 November 2026](FMSC_CREDIT_LIFECYCLE_AUDIT_2026-11-04.md): five source-level findings, 18 lifecycle scenarios and verification limits; reviewed main `12f1d8f`, pending discussion.
 - [Master audit and release status](FMSC_MASTER_AUDIT.md): recorded findings,
   baselines and remaining release gates. Read each entry's date and evidence scope.
 - [Business-decision handbook](../Docs/BUSINESS_DECISIONS.md): current rules and

@@ -15,6 +15,8 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
     private readonly Label savedStatus = new() { AutoSize = true, Dock = DockStyle.Fill,
         Padding = new Padding(8), ForeColor = AppTheme.Success, Visible = false };
     private bool busy;
+    // Tracks a confirmed deposit, refund or transfer even if the operator later closes the dialog.
+    public bool Changed { get; private set; }
 
     internal StudentCreditDialog(int studentId, bool loadOnShow = true)
     {
@@ -185,6 +187,7 @@ internal sealed class StudentCreditDialog : ApplicationWindowForm
                 DatabaseHelper.P("@Amount", value), DatabaseHelper.P("@RequestId", request),
                 DatabaseHelper.P("@Reason", remarks), DatabaseHelper.P("@TargetAdmissionId", target));
             journal.Complete();
+            Changed = true;
             string receipt = Convert.ToString(result.Rows[0]["ReceiptNumber"]) ?? "";
             savedStatus.Text = $"Advance {operation.ToLowerInvariant()} saved." + (receipt.Length > 0 ? $" Receipt: {receipt}." : "");
             savedStatus.Visible = true;
