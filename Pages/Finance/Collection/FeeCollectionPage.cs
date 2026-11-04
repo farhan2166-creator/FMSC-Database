@@ -311,8 +311,17 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             using var returnFocus = new DialogReturnFocus(this);
             using var dialog = new StudentCreditDialog(admissionId);
             dialog.ShowDialog(FindForm());
-            await LoadChargesAsync(loadVersion);
-            await LoadRecentPaymentsAsync(loadVersion);
+            // Cancel/Close without a saved change must not erase the entered payment split.
+            if (!dialog.Changed) return;
+            int refreshVersion = ++loadVersion;
+            await LoadChargesAsync(refreshVersion);
+            if (IsDisposed || refreshVersion != loadVersion) return;
+            // Advance changed: rebuild the cash and credit split from the retained entered amount.
+            // An earlier manual split is explicitly invalidated rather than silently discarded.
+            RefreshEnteredPaymentAllocation();
+            await LoadRecentPaymentsAsync(refreshVersion);
+            if (!IsDisposed && refreshVersion == loadVersion)
+                Info("Advance balance changed. Payment allocations have been recalculated. Review each Pay Now amount before saving.");
         }, "Secondary");
         // Future fees and the consolidated account retain the selected student.
         futureFeesButton =
@@ -923,6 +932,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             return;
         }
         paymentAmount.Text = payable.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        // TextChanged does not run if the numeric text is already identical.
+        // Use Full Amount must still repair a cleared allocation grid.
+        RefreshEnteredPaymentAllocation();
         paymentAmount.Focus();
         paymentAmount.SelectAll();
     }
