@@ -14,7 +14,8 @@ internal interface IUpdateArtifactSource
         CancellationToken cancellationToken);
 }
 
-internal sealed record VerifiedUpdate(UpdateManifest Manifest, string RepositoryVersion);
+internal sealed record VerifiedUpdate(UpdateManifest Manifest, string RepositoryVersion,
+    byte[] ManifestBytes, byte[] Signature);
 
 internal sealed record PreparedUpdate(
     string Version,
@@ -60,7 +61,7 @@ internal static class UpdateReleasePreparer
             manifestBytes, signature, pinnedPublisherPublicKey);
         if (!string.Equals(manifest.Version, version, StringComparison.Ordinal))
             throw new InvalidDataException("Signed application version does not match the published channel.");
-        return new VerifiedUpdate(manifest, version);
+        return new VerifiedUpdate(manifest, version, manifestBytes, signature);
     }
 
     internal static UpdateDownloadChoice Choose(
@@ -108,6 +109,9 @@ internal static class UpdateReleasePreparer
         ArgumentNullException.ThrowIfNull(source);
         if (method is UpdateDownloadChoice.NotNewer or UpdateDownloadChoice.RequiresDatabaseInstaller)
             throw new InvalidOperationException("Application-only preparation is forbidden for this update decision.");
+        if (!string.Equals(release.RepositoryVersion, release.Manifest.Version, StringComparison.Ordinal) ||
+            !UpdateManifestPolicy.IsPublishedVersion(release.RepositoryVersion))
+            throw new InvalidDataException("Requested release is not an approved signed version.");
         if (Directory.Exists(newStagingRoot) || File.Exists(newStagingRoot))
             throw new IOException("The update staging root must not already exist.");
         string stagedRoot = Path.GetFullPath(newStagingRoot);
@@ -122,6 +126,10 @@ internal static class UpdateReleasePreparer
             created = true;
             string signedMetadata = Path.Combine(stagedRoot, "signed");
             Directory.CreateDirectory(signedMetadata);
+            File.WriteAllBytes(Path.Combine(signedMetadata, "update-manifest.json"),
+                release.ManifestBytes);
+            File.WriteAllBytes(Path.Combine(signedMetadata, "update-manifest.sig"),
+                release.Signature);
             // The caller MUST have verified the signature through
             // ReadLatestAsync before entering this function. An authenticated
             // Git transport alone does not make the release trustworthy.
