@@ -64,14 +64,26 @@ internal static class CollectionCreditChecks
             new { ChargeId=tuition, AdmissionId=admission, EnrollmentId=enrollment, Amount=100m,
                 ExpectedBalance=beforeDue, ExpectedCredit=beforeCredit }
         });
+        // This isolated direct-SQL boundary test uses a raw batch, whereas the
+        // application uses an RPC command. SQL Server requires these session SET
+        // options for tables with filtered/computed indexes; without them error
+        // 1934 obscures the intended date validation.
+        const string creditBoundaryBatch = """
+            SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON; SET ANSI_PADDING ON;
+            SET ANSI_WARNINGS ON; SET ARITHABORT ON;
+            SET CONCAT_NULL_YIELDS_NULL ON; SET NUMERIC_ROUNDABORT OFF;
+            BEGIN TRAN;
+            EXEC dbo.ApplyCollectionCredit @UserId=@Actor,@TransactionDate=@When,@CreditsJson=@Plan;
+            COMMIT;
+            """;
         await report.Refused("Credit-only collection cannot precede enrollment",()=>Task.Run(()=>{
-            Sql.Query("BEGIN TRAN; EXEC dbo.ApplyCollectionCredit @UserId=@Actor,@TransactionDate=@When,@CreditsJson=@Plan; COMMIT;",
+            Sql.Query(creditBoundaryBatch,
                 Sql.P("@Actor",f.Admin),Sql.P("@When",DateTime.Today.AddYears(-10)),Sql.P("@Plan",backdatedCreditJson));
         }),54902);
         report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,
             "Rejected pre-enrollment credit date changes no account or bill");
         await report.Refused("Advance is not available for a backdated collection",()=>Task.Run(()=>{
-            Sql.Query("BEGIN TRAN; EXEC dbo.ApplyCollectionCredit @UserId=@Actor,@TransactionDate=@When,@CreditsJson=@Plan; COMMIT;",
+            Sql.Query(creditBoundaryBatch,
                 Sql.P("@Actor",f.Admin),Sql.P("@When",DateTime.Today.AddDays(-1)),Sql.P("@Plan",backdatedCreditJson));
         }),54902);
         report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,
