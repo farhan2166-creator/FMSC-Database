@@ -11,6 +11,8 @@
         <!-- Portable shortcut checks build separately with simulated controls. -->
         <Compile Remove="Tests/**/*.cs" />
         <Compile Remove="Apps/**/*.cs" />
+        <!-- Standalone update packaging CLI is not part of the WinForms executable. -->
+        <Compile Remove="Tools/UpdatePackages/**/*.cs" />
     </ItemGroup>
 	<PropertyGroup>
 		<!-- Local verification repositories and generated files are not application inputs. -->
