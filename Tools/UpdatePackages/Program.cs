@@ -1,7 +1,6 @@
 using System.IO.Compression;
 using System.Security.Cryptography;
 using FMSC_SMS.Core.Updates;
-using FMSC_SMS.UpdateSigning;
 
 try
 {
@@ -9,7 +8,7 @@ try
     {
         SelfTest.Run();
         UpdatePreparationTests.Run();
-        Console.WriteLine("PASS: signed incremental/full update packaging and fallback checks.");
+        Console.WriteLine("PASS: SHA-256 verified incremental/full update packaging and fallback checks.");
         return;
     }
 
@@ -18,19 +17,12 @@ try
     var output = Required(options, "output-dir");
     var version = Required(options, "version");
     var schema = int.Parse(Required(options, "schema"));
-    bool hasProtected = options.TryGetValue("signing-protected-key", out var protectedKey);
-    bool hasPlain = options.TryGetValue("signing-private-key", out var plainKey);
-    if (hasProtected == hasPlain)
-        throw new ArgumentException("Supply exactly one of --signing-protected-key or --signing-private-key.");
     options.TryGetValue("previous-dir", out string? previous);
     options.TryGetValue("previous-version", out string? previousVersion);
     if ((previous is null) != (previousVersion is null))
         throw new ArgumentException("previous-dir and previous-version must be supplied together.");
-    using var rsa = hasProtected
-        ? LocalPublisherSigningKey.Open(protectedKey!)
-        : OpenPemKey(plainKey!);
-    var manifest = PackageBuilder.Build(current, output, version, schema, previous, previousVersion, rsa);
-    Console.WriteLine($"Prepared signed application update {manifest.Version}; " +
+    var manifest = PackageBuilder.Build(current, output, version, schema, previous, previousVersion);
+    Console.WriteLine($"Prepared application update {manifest.Version}; " +
         $"delta: {(manifest.Incremental is null ? "unavailable" : manifest.ChangedFiles.Count + " changed files")}. " +
         "Publishing, authorization and application activation are separate release gates.");
 }
@@ -43,8 +35,8 @@ catch (Exception error)
 static Dictionary<string, string> Parse(string[] args)
 {
     if (args.Length == 0 || args.Length % 2 != 0)
-        throw new ArgumentException("Expected --current-dir, --output-dir, --version, --schema, " +
-            "--signing-protected-key or --signing-private-key; optional --previous-dir and --previous-version. Or --self-test.");
+        throw new ArgumentException("Expected --current-dir, --output-dir, --version, --schema; " +
+            "optional --previous-dir and --previous-version. Or --self-test.");
     var result = new Dictionary<string, string>(StringComparer.Ordinal);
     for (int i = 0; i < args.Length; i += 2)
     {
@@ -53,21 +45,10 @@ static Dictionary<string, string> Parse(string[] args)
             throw new ArgumentException("Invalid or duplicate update packaging option.");
     }
     var known = new HashSet<string>(new[] { "current-dir", "output-dir", "version",
-        "schema", "signing-private-key", "signing-protected-key", "previous-dir", "previous-version" }, StringComparer.Ordinal);
+        "schema", "previous-dir", "previous-version" }, StringComparer.Ordinal);
     if (result.Keys.Any(key => !known.Contains(key)))
         throw new ArgumentException("Unknown update packaging option.");
     return result;
-}
-
-static RSA OpenPemKey(string path)
-{
-    using var candidate = RSA.Create();
-    candidate.ImportFromPem(File.ReadAllText(path));
-    if (candidate.KeySize < 3072)
-        throw new CryptographicException("Publisher RSA signing key must contain at least 3072 bits.");
-    var key = RSA.Create();
-    key.ImportParameters(candidate.ExportParameters(true));
-    return key;
 }
 
 static string Required(Dictionary<string, string> args, string key) =>
@@ -77,7 +58,7 @@ static string Required(Dictionary<string, string> args, string key) =>
 internal static class PackageBuilder
 {
     internal static UpdateManifest Build(string currentDir, string outputDir, string version,
-        int schema, string? previousDir, string? previousVersion, RSA privateKey)
+        int schema, string? previousDir, string? previousVersion)
     {
         var current = Path.GetFullPath(currentDir);
         var output = Path.GetFullPath(outputDir);
@@ -114,9 +95,7 @@ internal static class PackageBuilder
             manifest.Incremental.Parts = UpdateChunks.SplitArchive(Path.Combine(output, deltaName));
         }
         byte[] data = UpdateManifestPolicy.Serialize(manifest);
-        byte[] signature = privateKey.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
         File.WriteAllBytes(Path.Combine(output, "update-manifest.json"), data);
-        File.WriteAllBytes(Path.Combine(output, "update-manifest.sig"), signature);
         return manifest;
     }
 
@@ -200,16 +179,12 @@ internal static class SelfTest
             File.WriteAllText(Path.Combine(newDir, "changed.dll"), "after");
             File.WriteAllText(Path.Combine(oldDir, "removed.dll"), "remove me");
             File.WriteAllText(Path.Combine(newDir, "added.dll"), "new file");
-            using var key = RSA.Create(3072);
-            var manifest = PackageBuilder.Build(newDir, output, "1.1.0", 75, oldDir, "1.1.0-rc.2", key);
-            using var publicKey = RSA.Create();
-            publicKey.ImportFromPem(key.ExportRSAPublicKeyPem());
+            var manifest = PackageBuilder.Build(newDir, output, "1.1.0", 75, oldDir, "1.1.0-rc.2");
             byte[] bytes = File.ReadAllBytes(Path.Combine(output, "update-manifest.json"));
-            byte[] signature = File.ReadAllBytes(Path.Combine(output, "update-manifest.sig"));
-            var valid = UpdateManifestPolicy.ReadVerified(bytes, signature, publicKey);
-            // Signatures cover every Git-size-compatible part and the complete ZIP.
+            var valid = UpdateManifestPolicy.ReadValidated(bytes);
+            // The manifest records the length and digest of every Git-compatible part and the ZIP.
             Require(valid.Full.Parts.Count == 1 && valid.Incremental!.Parts.Count == 1,
-                "Ordinary small updates must still carry independently signed part inventories.");
+                "Ordinary small updates must still carry individually hashed part inventories.");
             string tinyPartsFolder = Path.Combine(root, "tiny-parts");
             Directory.CreateDirectory(tinyPartsFolder);
             string smallZip = Path.Combine(tinyPartsFolder, "test.zip");
@@ -227,7 +202,7 @@ internal static class SelfTest
             string rebuilt = Path.Combine(root, "rebuilt.zip");
             UpdateChunks.ReassembleVerified(descriptor, tinyPartsFolder, rebuilt);
             Require(File.ReadAllBytes(rebuilt).SequenceEqual(File.ReadAllBytes(smallZip)),
-                "Signed archive parts must reconstruct a byte-identical download.");
+                "Hash-checked archive parts must reconstruct a byte-identical download.");
             string damagedPart = Path.Combine(tinyPartsFolder, manyParts[2].Name);
             File.WriteAllBytes(damagedPart, RandomNumberGenerator.GetBytes((int)manyParts[2].Length));
             try
@@ -280,25 +255,22 @@ internal static class SelfTest
                 == UpdateDownloadChoice.RequiresDatabaseInstaller, "Schema changes require the existing safe installer.");
             Require(UpdateManifestPolicy.Choose(valid, "1.1.0", 75, corrupted)
                 == UpdateDownloadChoice.NotNewer, "Already updated installations must not update again.");
-            bytes[bytes.Length - 2] ^= 1;
+            // Invalid or truncated repository metadata must be rejected.
+            // A repository writer could replace BOTH a manifest and its SHA-256
+            // hashes: these checks provide integrity, not publisher authenticity.
+            byte[] malformed = (byte[])bytes.Clone();
+            malformed[0] = (byte)'!';
             try
             {
-                _ = UpdateManifestPolicy.ReadVerified(bytes, signature, publicKey);
-                throw new Exception("Tampered publisher signature was accepted.");
+                _ = UpdateManifestPolicy.ReadValidated(malformed);
+                throw new Exception("Malformed update metadata was accepted.");
             }
-            catch (CryptographicException) { }
+            catch (System.Text.Json.JsonException) { }
             foreach (string unsafePath in new[] { "../FMSC_SMS.exe", "/absolute", "C:/evil",
                 "folder\\evil.exe", "CON.txt", "dir//evil" })
                 Require(!UpdateManifestPolicy.IsSafeRelativePath(unsafePath),
                     "Unsafe archive path passed validation: " + unsafePath);
-            using var wrongKey = RSA.Create(3072);
-            try
-            {
-                _ = UpdateManifestPolicy.ReadVerified(
-                    File.ReadAllBytes(Path.Combine(output, "update-manifest.json")), signature, wrongKey);
-                throw new Exception("Wrong publisher key was accepted.");
-            }
-            catch (CryptographicException) { }
+
         }
         finally
         {
