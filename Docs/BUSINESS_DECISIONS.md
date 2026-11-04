@@ -117,7 +117,10 @@ advance restricted to that student (except an explicit transfer). Future posted
 fees can be prepaid deliberately through collection; ordinary posting and
 automatic billing never consume advance. Credit use is settlement, never new
 cash. The operator confirms collection and its saved receipt records the
-cash/credit split. This owner decision (4 Nov) supersedes earlier automatic
+cash/credit split. Advance cannot be applied to a backdated collection,
+even if advance exists now or existed on the selected day; only a collection
+dated today may use it. Older-dated cash collection follows the existing
+admission-date guard. This owner decision (4 Nov) supersedes earlier automatic
 credit-use guidance. No silent money rounding.
 
 ### BD-13
