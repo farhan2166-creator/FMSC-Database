@@ -1,142 +1,107 @@
-# Private, non-disruptive application updates — implementation plan
+# FMSC private GitHub Releases updater — implementation plan
 
-Status: **private broker backend source implemented; integration pending. NOT enabled for school PCs.**
-This is a new delivery capability, not permission to deploy. Keep the existing
-`FMSC_SMS.csproj` application version and `Installer/core.ps1` database version as
-they are. A future reset to version 1 is an explicitly separate change.
+**Status: packaging/staging foundation completed; GitHub authorization choice pending.
+No update feature is active on school computers.**
 
-## Owner decisions
+## Owner decisions — confirmed
 
-- Both source and release packages must remain private.
-- Prefer **changed-file incremental downloads**. Always retain a verified complete
-  application ZIP for fallback. Do not confuse this with binary patching.
-- Check silently without blocking application startup or normal school operations.
-- Ask before installing; users can postpone. Never terminate the running WinForms
-  application or discard unsaved forms.
-- Installation is deferred until the user closes the program or explicitly
-  approves a safe restart. A database migration requires additional maintenance
-  coordination and the established verified-backup installer path.
-- Never download, replace, or migrate a school's MDF/LDF as an app-only update.
+- No VPS, web application, hosted broker, third-party licensing API or separate SQL service.
+- GitHub Releases deliver both **private** full and changed-file incremental packages.
+- School administrator can manually select **Check for Updates** from the existing
+  FMSC Account/Help menu; unattended checks are optional and not required now.
+- Download and staging must not interrupt the running FMSC application.
+- Update installation, file replacement and any SQL migrations run only after a
+  safe application exit / explicit restart consent.
+- Keep the full ZIP as fallback whenever the incremental baseline has changed,
+  verification fails, or the delta for the installed version is unavailable.
+- Preserve installed MDF/LDF, school identity and records. The existing
+  `Installer/core.ps1` applies numbered SQL migrations with its verified
+  backup/safe activation checks where necessary.
+- **Do not reset application or database schema version to 1 yet.**
 
-## What has been implemented (phase 1)
+## Security constraint: GitHub private Releases need authorization
 
-- `Core/Updates/UpdateManifest.cs`: schema-validated, RSA-PSS/SHA-256 **signed**
-  release metadata; safe Windows paths; semantic prerelease comparison; selection
-  of no update, incremental, full, or *database installer required*.
-- `Core/Updates/UpdateStager.cs`: offline isolated reconstruction from a
-  hash-verified delta ZIP (changed files) or full application ZIP; verifies the
-  complete reconstructed target; never modifies the installed application.
-- `Tools/UpdatePackages`: release-package builder creates a full application ZIP,
-  an optional changed-file ZIP, a JSON manifest, and its detached signature.
-  The previous application tree is needed to generate a delta against a specific
-  version. Removed files are omitted from the reconstructed target.
-- The existing desktop-CI workflow now includes a synthetic staging/signature
-  regression test, with no school database or GitHub credentials.
+**An email address alone does not authorize a private release download.**
+The person must authenticate to a GitHub account with access to the private
+distribution repository. A permanent code embedded in every installed binary
+is extractable and cannot authenticate a school to GitHub.
 
-This **does not yet** add any background network request, user dialog, updater
-service, activation process, GitHub Release or license issuance. Nothing runs on
-a student's/school's PC as a result of this phase.
+Preferred authorization under review:
 
-## Implemented service (phase 2 — backend source only)
+1. Create/keep the *source repository* private and accessible only to developers.
+2. Create a **separate private distribution repository** containing just approved
+   releases/manifests; source does not belong in this repository.
+3. Put the distribution repository in a GitHub **organization** to make the
+   school's GitHub account a genuinely **read-only** collaborator. GitHub's
+   documented personal-account repository collaborator model does not reliably
+   offer read-only access; do not give a school write permissions to releases.
+4. Create a GitHub App limited to that distribution repository with Contents:read,
+   and enable device authorization. FMSC uses the official GitHub device flow
+   to show a temporary verification code; school admin signs in via GitHub in a
+   browser and authorizes each computer once.
+5. Use GitHub App *user access* and refresh tokens for private release API calls,
+   **never an installation private key, client secret or master PAT embedded in
+   the desktop application**. Tokens for device-flow grants can refresh without
+   a client secret. Protect saved credentials per Windows user using DPAPI.
+   Handle revocation/expiration by requesting sign-in again.
+6. Use the authenticated releases API, not unchecked private download URLs.
+   Verify every publisher-signed manifest and SHA-256 digest independently of
+   GitHub authorization before any application installation.
 
-- `Apps/UpdateBroker`: .NET 8 HTTPS-only broker with dedicated SQL schema,
-  owner-only local school provisioning, school administrator enrollment of
-  multiple computers, individual revocation, admin key rotation and school
-  disabling. Random credentials are stored as keyed hashes, never plaintext.
-- GitHub App JWT and short-lived contents-read installation-token exchange,
-  restricted to the update repository. Only approved stable assets are relayed.
-- RSA-PSS publisher verification before returning manifests; signed version
-  and archive sizes must match GitHub's release inventory.
-- Broker explicitly refuses to distribute updates while repository is public.
-- Broker self-tests added to existing desktop CI; no production infrastructure
-  or school computer has been enrolled.
-- Deployment steps: [UPDATE_BROKER_DEPLOYMENT.md](UPDATE_BROKER_DEPLOYMENT.md).
+Alternative: authorized school enters a dedicated fine-grained GitHub
+`Contents:read` personal access token, secured through DPAPI. More setup and
+secret-management burden, but simpler to implement. Each computer should get a
+separate revocable token. **Do not ask users to save email alone.**
 
-## Required private distribution architecture (phase 2)
+Any GitHub account with release download permission can obtain and retain the
+distributed **application binaries**. No GitHub-only method can revoke binaries
+already downloaded; this is separate from software licensing.
 
-1. **Release signer (pending provisioning):** generate and securely store a publisher RSA signing key.
-   The private key must be restricted to the approved release-publishing process;
-   desktop clients embed only the pinned public key. Rotate by explicit versioned
-   trust policy; never auto-trust an unknown signing key from a downloaded manifest.
-2. **Private GitHub Releases (publishing still pending):** CI validates a reviewed release SHA, packages
-   self-contained win-x64 binaries (full + delta), and publishes only to a
-   private repository. Do not use short-retention workflow artifacts as a
-   production update feed. The currently public repository must be made private
-   by its owner **before** private packages or signing material are published.
-3. **HTTPS update broker (backend source implemented; deployment pending):** a separately hosted service owns a narrowly scoped
-   GitHub App installation credential with read-only access to private release
-   assets. School PCs never receive GitHub PATs, GitHub App credentials or
-   permanent GitHub asset links. The broker must authorize each installation
-   before serving signed metadata or streaming release assets.
-4. **Installation identity (enrollment API implemented; Windows DPAPI storage pending):** owner-approved enrollment issues a per-installation,
-   revocable credential. Store it through Windows-protected credential storage.
-   Enforce TLS, expiry/revocation, rate limits and release-channel access server
-   side. Do not treat an easily copied machine fingerprint as authentication.
-5. **Client update service (pending):** asynchronously request only the latest signed
-   release manifest; rate-limit and retry on connectivity changes, keep offline
-   failures silent, and show a non-modal update notice. Update Now downloads
-   and stages in an isolated path while the desktop app continues running;
-   Remind Me Later persists a local postponement time.
-6. **Safe activation (pending):** once no school forms are open and the user exits, a
-   separate, verified updater executable promotes the prepared application
-   atomically using the established staging/rollback principles. If the delta
-   fails verification or the installed version differs, download and verify the
-   complete application ZIP instead. If the release requires SQL changes, use
-   the existing installer and its verified pre-migration backup; never attempt a
-   file-only activation against an incompatible database schema.
+## Existing branch implementation
 
-Suggested broker API (contract only; **not deployed**):
+- `Core/Updates/UpdateManifest.cs`: strict validation, signed RSA-PSS/SHA-256
+  manifest parsing, semantic versions, exact-baseline incremental selection,
+  complete ZIP fallback, and SQL-schema mismatch deferral to installer.
+- `Core/Updates/UpdateStager.cs`: reconstruct complete target application
+  offline in a separate verified staging location, without touching the
+  installed application.
+- `Tools/UpdatePackages`: signed manifest + full ZIP + changed-file ZIP
+  builder, with self-tests exercising fallback, tampering, old-file deletion and
+  non-disruptive staging.
+- `.github/workflows/fmsc-desktop-ci.yml`: existing desktop CI runs the update
+  package/staging self-tests. No separate hosted-broker job.
 
-- `POST /v1/enroll`: one-time owner approval / revocable installation credential
-- `GET /v1/updates/latest?channel=stable&platform=win-x64`: authorized manifest,
-  detached signature, and immutable release identifiers
-- `GET /v1/updates/assets/{releaseId}/{assetName}`: authorized, stream-limited
-  private archive; never accept arbitrary GitHub URL or path from a client
-- `POST /v1/updates/receipt`: optional, privacy-preserving success/failure report
+## Next implementation stages (pending owner's auth choice)
 
-## Safety boundaries
+1. **GitHub Release packaging workflow** — after existing release-readiness
+   checks and owner approval, package signed full + incremental assets and
+   numbered migration files. Publish **only** in the private distribution
+   repository with immutable version labels and stable release channels.
+2. **Direct GitHub authentication** — browser device flow or school-supplied
+   fine-grained token; secure Windows credential storage and explicit disconnect.
+3. **Manual UI check** — Account/Help -> Check for Updates. Query the GitHub
+   Releases API asynchronously, compare installed app + supported schema, show
+   new version, notes and Update Now / Remind Me Later. Offline is not an error
+   that disrupts normal school activity.
+4. **Resilient package download** — authenticated GitHub release asset retrieval,
+   retry, size/hash/signature verification, exact delta-baseline check and full
+   fallback. Keep running application untouched.
+5. **Installer integration** — reconstruct a complete staged app; on approved
+   safe exit, run a separately launched update helper that can activate the
+   verified application through existing folder-staging/rollback semantics.
+   Package necessary migration scripts; run the existing SQL installer logic
+   and pre-migration backup instead of patching SQL files directly. Record
+   migration-safe rollback/recovery instructions.
+6. **Acceptance** — WinForms/manual GitHub authentication, network interruption,
+   revoked credential, tampered release, crash/reboot recovery, full fallback,
+   Windows file locking, and disposable LocalDB copy upgrade/rollback tests.
+   No live school database until reviewed and explicitly approved.
 
-- Only signed manifest bytes are trusted; a checksum in an unsigned JSON file
-  cannot by itself establish publisher authenticity.
-- Always verify every entry's expected hash/size and path before activation;
-  refuse absolute/parent traversal paths, duplicates, reparse points and
-  database/secret files.
-- Verify an exact previous application baseline before applying a delta.
-  Mismatch selects full download rather than applying a speculative patch.
-- A staged application is **not** an activated application; stage files outside
-  the live directory, never overwrite running executable/DLL files.
-- A failure during SQL migration is **not** a trigger to retry the full package:
-  stop and use the verified database recovery procedure.
-- Publisher approval and release-readiness checks are mandatory before an update
-  is advertised; nothing is automatically published from feature branches.
-
-## Packaging command (not for a production release until signing is provisioned)
-
-```powershell
-dotnet run --project Tools/UpdatePackages/UpdatePackages.csproj -- `
-  --current-dir out/windows-x64-app `
-  --previous-dir C:\previous-approved-win-x64-app `
-  --previous-version 1.1.0-rc.1 `
-  --version 1.1.0-rc.2 --schema 75 `
-  --output-dir out/signed-update `
-  --signing-private-key C:\secure-release-signing\publisher-private.pem
-```
-
-Use the actual approved previous and current build versions/schema; this is an
-example only. No key or credential should be committed or copied into the ZIP.
-
-For offline validation:
+## Local offline regression test
 
 ```powershell
 dotnet run --project Tools/UpdatePackages/UpdatePackages.csproj -- --self-test
 ```
 
-## Remaining release gates
-
-- Owner's authorization/enrollment model and backend hosting location.
-- Signed release-publishing workflow using **approved** immutable builds.
-- Actual authenticated HTTPS broker, client, non-blocking WinForms notice and
-  safe scheduled-restart activation.
-- Installer integration, migration gates, fault-injection and Windows clone
-  installation/rollback acceptance; no use on a live school database before
-  sign-off.
+The current packager has no credentials and does not publish to GitHub.
+All updates remain *draft-only* until the above stages are complete.
