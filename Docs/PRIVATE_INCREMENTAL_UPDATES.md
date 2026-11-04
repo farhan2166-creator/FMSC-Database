@@ -1,245 +1,160 @@
-# FMSC direct private GitHub updater — agreed design
+# FMSC private Git updater — manual publishing, no publisher signing keys
 
-**Status: private distribution repository created, with signed packaging, bounded chunking,
-non-disruptive staging and a two-version snapshot preparation CLI on the draft branch.
-Actual package publishing, owner-approved signing key provisioning and installer activation remain pending.
-The feature branch now includes a manual authorization/update-connection UI and protected
-per-Windows-user SSH credentials, but it has not been deployed to school PCs.**
+**Status:** The update-packaging, private-repository authorization, integrity
+checks and staging foundations are on the DRAFT feature branch. No update feed
+has been published and no school installation has been updated.
 
-## Confirmed owner decisions
+## Owner decisions
 
-- Two separate GitHub repositories:
-  - `FMSC-Database`: source, tests, migrations and build pipeline. **Currently public;
-    owner will change its visibility to private later.** Do not assume that it is private.
-  - `FMSC-Updates`: **created and verified private**. Reserved for signed update
-    files, the version pointer and the current two approved versions only;
-    NO application source or school data.
-- **No hosted service, cloud VPS, broker, new API backend or additional database.**
-- School staff do not require GitHub accounts. Each enrolled Windows user on
-  a school computer generates an independent RSA-3072 SSH deploy key; only its
-  **public key** is authorized as a read-only deploy key in the private
-  distribution repository. The private half is sealed with Windows DPAPI
-  CurrentUser under `%LOCALAPPDATA%\\FMSC\\Updates`. Another Windows login must
-  enroll separately; no common school key is embedded in the application.
-- `Account/Help -> Check for Updates` manually initiates the check. No forced
-  background network check or application shutdown.
-- Download changed-file incremental packages where the installed baseline
-  exactly matches an available delta, otherwise use the complete new version.
-  Reconstruct and verify the new application in isolated staging while the
-  school application keeps working.
-- Only the existing installer/update helper activates the new application
-  **after a safe exit**. Pending SQL migrations require the existing verified
-  pre-migration backup, sequential migrations and compatibility checks.
-  Never replace school MDF/LDF files from the distribution repository.
-- Leave both existing application and database schema version numbers alone.
-  Resetting either version to 1 is explicitly deferred.
+- `FMSC-Database` contains app source and the existing CI. It is **currently
+  public**; the owner plans to make it private later.
+- `FMSC-Updates` is a **separate private** GitHub repository used ONLY to
+  distribute approved packages and release metadata.
+- The owner **manually publishes** approved updates. There is **NO separate
+  RSA publisher signature, signing private key, public-key pinning, encrypted
+  signing-key backup or GitHub Actions signing secret** requirement.
+- No VPS, hosted broker, licensing API, external SQL service or school GitHub
+  user accounts.
+- Each authorized school Windows user/computer generates a unique SSH key pair.
+  Only its PUBLIC deploy key is added to `FMSC-Updates` with **Allow write
+  access UNCHECKED**. Its private key is stored under
+  `%LOCALAPPDATA%\\FMSC\\Updates` sealed by Windows DPAPI CurrentUser.
+  Windows login changes/reinstalls may require re-enrollment.
+- Account → **Check for Updates** is manual; no automatic program shutdown,
+  replacement, or database migrations while the school works.
+- Prefer a changed-file incremental download for an EXACT matching installed
+  version and file inventory. Otherwise use the full package.
+- A database schema mismatch routes to the existing guarded installer/migration
+  workflow. App-only staging must never bypass the SQL backup/migration guards.
+- Preserve school data/MDF/LDF, installation identity, recovery backups and
+  all needed numbered SQL migrations. Application and schema versions are
+  **unchanged**; resetting either to 1 is deferred.
 
-## Two-version distribution retention policy
+## Trust and verification
 
-Retain only the **two newest approved update versions** in the distribution
-repository's **current published file tree**. For example:
+GitHub private repository write permissions control **who may publish**.
+Authorized school devices use **read-only SSH** with GitHub's known SSH host
+key pinned. They access only the update distribution repository.
 
-| New release | Keep | Remove from current tree |
+The manifest includes SHA-256 checksums and sizes for archive pieces, full
+ZIP/delta ZIP and all installed application files. Clients verify these before
+staging. These checks detect corrupted, incomplete or mismatched downloads.
+
+**Limit:** Hashes in a manifest are NOT a digital signature. Someone who gains
+write access to `FMSC-Updates` could replace a package AND its hashes.
+Protect the owner's GitHub account (2FA) and repository write privileges.
+This is an intentionally accepted security trade-off for manual distribution.
+
+No source code, database files, application signing secret or school SSH private
+key is published in `FMSC-Updates`.
+
+## Update format and distribution layout
+
+```text
+channel/stable.json
+versions/<version>/update-manifest.json
+versions/<version>/FMSC_SMS-app-full.zip.part0001
+versions/<version>/FMSC_SMS-app-full.zip.part0002
+versions/<version>/FMSC_SMS-app-incremental.zip.part0001
+...
+```
+
+`Tools/UpdatePackages` produces a complete ZIP, optional changed-file delta,
+a JSON manifest with SHA-256 hashes and deterministic <=90 MiB chunk files.
+Its local unchunked ZIP is a build intermediate and must NOT be pushed into Git.
+
+Example local packaging on the approved build output:
+
+```powershell
+dotnet run --project Tools/UpdatePackages/UpdatePackages.csproj -c Release -- `
+  --current-dir <approved-publish-directory> `
+  --output-dir <new-empty-package-directory> `
+  --version <approved-application-version> `
+  --schema <approved-database-schema>
+```
+
+To prepare an incremental package also supply `--previous-dir` and
+`--previous-version` from the last approved build. The latest FULL package
+must always be available so schools can skip missed versions.
+
+`Tools/UpdateDistribution` creates a checked, independent publishing snapshot:
+
+```powershell
+dotnet run --project Tools/UpdateDistribution/UpdateDistribution.csproj -c Release -- `
+  --new-package-dir <package-directory> `
+  --output-dir <new-snapshot-directory>
+```
+
+For a later release, also specify `--previous-snapshot-dir` pointing to
+the last published verified snapshot. This tool checks metadata structure,
+part sizes, per-part hashes and reconstructed ZIP hashes and retains only
+the two latest versions in the NEW snapshot. It never performs a Git push.
+
+The owner must publish a **fully validated snapshot atomically** to
+`FMSC-Updates`. Automated Git push/atomic-promotion/history management is
+not implemented yet; do NOT copy half a release into the live feed.
+
+## Two-version retention
+
+| New version | Keep in latest tree | Retire from latest tree |
 |---|---|---|
 | 1.1 | 1.1 | — |
 | 1.2 | 1.1, 1.2 | — |
 | 1.3 | 1.2, 1.3 | 1.1 |
 | 1.4 | 1.3, 1.4 | 1.2 |
 
-The publisher must not remove the oldest version until the latest full and
-delta packages, the signed metadata and integrity checks have all succeeded.
-The staged `channel/stable.json` pointer identifies the current and previous
-approved release. The final Git publisher must switch the complete validated
-snapshot as **one atomic commit**, never upload partial files to the live feed.
-Snapshot preparation exists; Git push and server-side retention/history pruning
-have **not** been implemented.
+Never remove the older version before the newest complete package and manifest
+pass every check. A school left on 1.1 when 1.4 is released must still be able
+to install the full 1.4 release, with ALL required intervening SQL migrations.
 
-**Old installations must still upgrade.** A school running v1.1 when v1.4 is
-latest downloads the **full v1.4 package**, not a delta that depends on deleted
-versions. Retained migration scripts must allow every supported older database
-schema to advance sequentially; package retention does NOT permit deleting
-required SQL migrations.
+Removing old update files from the current tree **does not reclaim historical
+Git blobs**. A bounded distribution history strategy remains a separate
+production gate, limited to `FMSC-Updates`; never rewrite the source history.
 
-**Git history caveat:** removing files from the current Git tree does not remove
-the original binaries from historic commits or guarantee storage reduction.
-The distribution repository must use a deliberate history/storage maintenance
-strategy (for example a snapshot-only publishing branch with controlled history
-replacement and shallow, fresh client fetches). This requires a separate
-publisher design and fail-safe tests; merely issuing `git rm` is insufficient.
-No source history will be rewritten as part of update retention.
+## Implemented on draft PR #84
 
-**Git size caveat:** GitHub rejects ordinary Git blobs above 100 MiB (the
-commonly described 100 MB limit). Large app/full-update packages use deterministic <=90 MiB chunks with
-publisher-signed length/hash entries. Implemented in
-`Core/Updates/UpdateChunks.cs`. The packager creates local source ZIPs **and**
-the smaller `.zip.part0001`, `.zip.part0002` and subsequent files. The
-future distribution publisher must upload **only the signed manifests and
-chunk files**, never the large un-split source ZIP. Client-side authenticated
-fetch and part reconstruction remain to be wired. Avoid growing Git history
-through repeated large binaries.
+- `Core/Updates/UpdateManifest.cs`: validated JSON manifest, path, version,
+  inventory and SHA-256 structure, exact-baseline incremental selection,
+  full fallback, database-schema installer gate.
+- `Core/Updates/UpdateChunks.cs`: deterministic bounded chunking and
+  independently checked chunk/whole-archive reconstruction.
+- `Core/Updates/UpdateStager.cs`: isolated complete application staging;
+  exact file inventory + hashes; never overwrites the live installation.
+- `Core/Updates/UpdateDeviceKey.cs`: separate read-only SSH key for an enrolled
+  Windows user, with DPAPI-protected private key.
+- `Core/Updates/UpdateGitSession.cs`: private read-only Git transport with
+  pinned GitHub SSH host key, shallow metadata fetch and bounded chunk streaming.
+- `Core/Updates/UpdateGitReader.cs`: manually initiated connection and
+  update-version check without a publisher-signature requirement.
+- `Core/Updates/UpdateReleasePreparer.cs`: checks repository manifest
+  metadata, selects a delta or full update, verifies downloaded chunks,
+  reconstructs the ZIP, and prepares the target in an isolated directory.
+- `MainDashboardForm.cs` + `UpdateConnectionForm.cs`: Account → Check for
+  Updates, generate/copy computer's PUBLIC SSH key, test private Git access.
+- `Tools/UpdatePackages`, `Tools/UpdateDistribution` and their regression
+  fixtures: package creation and safe two-version snapshot preparation.
+- Windows Git enrollment/DPAPI tests and existing desktop CI checks.
 
-## Authentication versus update availability
+**Removed:** owner-only `Tools/UpdateSigning`, RSA signature generation,
+`update-manifest.sig`, pinned publisher public-key resource, recovery backup
+requirements, and all signing-key parameters from packaging and snapshot CLI.
+The school's **SSH authorization key is separate** and is still required.
 
-SSH read-only deploy keys authorize **Git repository file access**. They do
-**not** authorize downloading a separate GitHub Release asset directly through
-the Releases API. Therefore the agreed school-facing delivery route is to fetch
-signed update files held in the **private distribution repository itself**.
-The developer can still run ordinary GitHub Actions builds; their 14-day
-artifacts are staging outputs, NOT the retained school update feed.
+## Remaining production gates
 
-Each authorized computer has a unique deploy key so losing one computer allows
-revoking just that key. A shared plaintext key in an installer, a school's SQL
-database table, or an unencrypted config file is not acceptable. Implement
-enrollment with a verifiable public-key exchange that shows the operator exactly
-which key they are approving; never accept a self-declared email as proof of
-authorization.
+1. Test real private Git downloads, revoked deploy keys, network interruption,
+   oversized archives, Windows file-lock behavior and constrained disk space.
+2. Bundle reviewed Git/SSH binaries or an approved equivalent with the FMSC
+   installer. The current manual checker needs Git/SSH installed.
+3. Finish **Download / Prepare**, progress, retry and Remind Me Later controls;
+   do not download entire packages merely to check whether one exists.
+4. Complete safe post-exit update activation and re-use the existing installer,
+   with pre-migration backup, numbered migration validation and rollback
+   acceptance on disposable Windows/LocalDB.
+5. Implement a guarded manual publisher that atomically promotes a verified
+   two-version snapshot and manages distribution Git history/storage.
+6. Run release-readiness, Windows UI and full integration tests before asking
+   for merge or installation at any school.
 
-## Existing implementation on the feature branch
-
-- `Core/Updates/UpdateManifest.cs`: RSA-PSS/SHA-256 signed manifest; version
-  comparison and exact baseline / full-fallback selection; database schema
-  mismatch routes to installer.
-- `Core/Updates/UpdateStager.cs`: reconstruct and validate complete target in
-  an isolated directory without touching the current installation.
-- `Tools/UpdatePackages`: full ZIP + changed-file ZIP + bounded signed part files
-  (up to 90 MiB each), with signature/hash verification and synthetic tests.
-- `Core/Updates/UpdateChunks.cs`: verifies each download part and recombines
-  them into a complete hash-verified ZIP in an isolated staging location.
-- `Tools/UpdateDistribution`: validates the publisher signature and every
-  chunk, prepares an independent snapshot containing the newest one or two
-  approved versions, and removes older releases from the new **tree** without
-  deleting predecessor snapshots. It copies only part files, not oversized ZIPs.
-- `Core/Updates/UpdateDeviceKey.cs`: generates local RSA-3072 SSH keys,
-  stores the private PEM as DPAPI CurrentUser-protected data, and prevents
-  silent rekeying. Only the public SSH key is displayed.
-- `Core/Updates/UpdateGitSession.cs`: per-session, private read-only Git transport
-  with the published GitHub SSH host key pinned and a shallow partial clone.
-  Reads signed metadata first; retrieves only individually requested release
-  parts on user approval. It never checks out the entire update repository.
-- `Core/Updates/UpdateGitReader.cs`: manual authorization/availability check
-  over the shared Git session, now requiring publisher-signed manifest
-  verification before reporting an installable version.
-- `Core/Updates/UpdateReleasePreparer.cs`: verifies the signed latest manifest
-  against a **public RSA signing key pinned in the application binary**;
-  selects delta versus full using the installed file hashes and schema gate;
-  downloads bounded Git parts, verifies each and the complete ZIP, and
-  reconstructs the target into an isolated staging directory. A bad or stale
-  delta may fall back to the separately verified full package.
-  **No installer activation or SQL migration is implemented by this class.**
-- The trusted publisher public key is intentionally **not yet provisioned**;
-  production downloads are disabled until the owner approves a real signing
-  key and its public half is embedded at build time. A public key fetched
-  from the same Git repository is NOT a trust anchor.
-- `Core/Updates/UpdateConnectionForm.cs` and `MainDashboardForm.cs`:
-  Account → Check for Updates; generate/copy public key and test access.
-  Reports the private feed version only as unverified metadata until the
-  publisher verification key is configured. No startup checks are enabled.
-- `Tests/UpdateAuthorizationChecks`: Windows-only DPAPI, uniqueness,
-  key-format and corruption regression checks (CI).
-- Existing desktop CI includes packaging, staging, distribution snapshot,
-  protected authorization and signed-release preparation tests. The synthetic
-  release tests cover delta/full staging, mutated installed files, damaged
-  downloaded deltas, signature refusal and database schema gating.
-- The mistakenly introduced hosted `Apps/UpdateBroker` was **removed**.
-  No cloud service has been deployed.
-
-## Owner-controlled publisher signing (local tooling ready; no real key issued yet)
-
-The owner must create the long-lived publisher key **on their own trusted
-Windows account**, never inside a GitHub Actions log or in this chat. The
-owner-only CLI is `Tools/UpdateSigning`:
-
-```powershell
-# On the FEATURE BRANCH, on the owner's trusted Windows PC:
-dotnet run --project Tools/UpdateSigning/UpdateSigning.csproj -c Release -- initialize
-```
-
-This operation refuses to overwrite an existing identity. It generates RSA-4096
-and stores the PRIVATE half encrypted with DPAPI CurrentUser in
-`%LOCALAPPDATA%\\FMSC\\ReleaseSigning\\publisher-private.dpapi`, and the
-corresponding PUBLIC key beside it in `publisher-public.pem`. No private PEM
-is displayed, generated in the repository, or committed. **Back up the signing
-authority before relying on it**: a DPAPI-protected file cannot be decrypted
-on another Windows account/machine just by copying it. The owner-only CLI
-now includes password-encrypted offline backup and recovery.
-
-Before deploying any school release, create an **encrypted offline recovery
-backup**, for example to a secure removable drive (the destination directory
-must already exist). The CLI prompts for a passphrase **without echoing** it;
-the passphrase never appears in command-line arguments:
-
-```powershell
-dotnet run --project Tools/UpdateSigning/UpdateSigning.csproj -c Release -- `
-  backup "E:\\SecureOffline\\FMSC-publisher-recovery.private.pem"
-```
-
-Recovery on a replacement Windows account/computer uses:
-
-```powershell
-dotnet run --project Tools/UpdateSigning/UpdateSigning.csproj -c Release -- `
-  restore "E:\\SecureOffline\\FMSC-publisher-recovery.private.pem"
-```
-
-Backups use password-encrypted PKCS#8 (AES-256-CBC/PBKDF2), not a plaintext
-private PEM. Keep the offline recovery file and its passphrase in **separate**
-secure locations. Restore refuses to replace an existing signing identity.
-
-After owner review, only the PUBLIC PEM may be placed at
-`Core/Updates/publisher-public.pem` in the source. FMSC embeds that public
-key at build time, and silently refuses update installation when the key is
-not provisioned. Do NOT copy the private `.dpapi` file to either GitHub repo
-or to school computers.
-
-Local signing of an approved publish can use:
-
-```powershell
-dotnet run --project Tools/UpdatePackages/UpdatePackages.csproj -c Release -- `
-  --current-dir <approved-publish-directory> `
-  --version <actual-approved-application-version> `
-  --schema <actual-approved-database-schema> `
-  --output-dir <new-empty-package-directory> `
-  --signing-protected-key "$env:LOCALAPPDATA\\FMSC\\ReleaseSigning\\publisher-private.dpapi"
-```
-
-If a verified previous approved app build exists, also provide
-`--previous-dir` and `--previous-version` to generate a delta.
-The full archive always exists, even without a previous build.
-This command does not push to GitHub, touch school SQL or activate an update.
-
-**Automation choice not finalized:** automatic GitHub Actions signing would
-need explicit secure key provisioning in an appropriately protected GitHub
-environment/secrets, rather than this Windows-user DPAPI container. No
-GitHub secret or signing authority was created by the assistant.
-
-## Remaining implementation
-
-1. `FMSC-Updates` is created private with a README. Enroll each Windows
-   user/computer by generating the public key in FMSC and having the repository
-   owner add it in FMSC-Updates → Settings → Deploy keys with **Allow write
-   access unchecked**. There is no GitHub account requirement for schools.
-   The source repository remains public until the owner changes it.
-2. Connect the snapshot preparer to a guarded private Git distribution
-   publishing action. Signed chunked download/reconstruction code exists;
-   test a REAL private Git checkout and interrupted large downloads on Windows
-   before allowing a school update.
-3. The owner-only DPAPI RSA signing CLI is implemented. Owner must issue and
-   recoverably protect the **real** publisher signing key and embed the
-   reviewed PUBLIC key in official FMSC builds. Read-only Git access and manifest/chunk verification
-   now exist, but the manual checker requires this key before recognizing
-   updates. Bundle reviewed Git/SSH runtime in the Windows installer so schools
-   never need developer tools.
-4. The manual Account → Check for Updates entry and authorization dialog are
-   implemented. Signed update availability is wired behind the publisher-key
-   gate; add user approval to download, progress/retries and
-   Update Now / Remind Me Later. Do not interrupt active work.
-5. Stage packages while application runs; after confirmed safe exit, hand off to
-   the existing installer/helper. Package and validate all migration scripts,
-   perform backup/compatibility checks and provide rollback guidance.
-6. Publish only after release-readiness tests and full artifact verification.
-   Implement safe two-version retention, including explicit Git history
-   management restricted to the distribution repository.
-7. Test revoked credentials, offline/retry, tampered manifests, package splits,
-   old-installed-version full fallback, Windows file locking, and disposable
-   database migration/backup/rollback before any school deployment.
-
-No application or school database migration has been performed by this branch.
+No GitHub source visibility change, database migration, update publication,
+live installation change or app/schema version reset has been performed.
