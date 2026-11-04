@@ -12,4 +12,7 @@
     <Compile Include="../../Core/Updates/UpdateReleasePreparer.cs" Link="UpdateReleasePreparer.cs" />
     <Compile Include="../UpdateSigning/LocalPublisherSigningKey.cs" Link="LocalPublisherSigningKey.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
 </Project>
