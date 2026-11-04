@@ -70,6 +70,12 @@ internal static class CollectionCreditChecks
         }),54902);
         report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,
             "Rejected pre-enrollment credit date changes no account or bill");
+        await report.Refused("Advance is not available for a backdated collection",()=>Task.Run(()=>{
+            Sql.Query("BEGIN TRAN; EXEC dbo.ApplyCollectionCredit @UserId=@Actor,@TransactionDate=@When,@CreditsJson=@Plan; COMMIT;",
+                Sql.P("@Actor",f.Admin),Sql.P("@When",DateTime.Today.AddDays(-1)),Sql.P("@Plan",backdatedCreditJson));
+        }),54902);
+        report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,
+            "Backdated credit refusal preserves the account and existing bill");
         await report.Refused("Changed credit is refused before settlement",()=>Save(null,new[] {Plan(tuition,admission,enrollment,100) with { ExpectedCredit=beforeCredit+1 }}),53104);
         report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,"Stale credit preview changes neither credit nor bills");
         await report.Refused("Sibling credit cannot settle another child's bill",()=>Save(null,new[] {Plan(tuition,siblingId,siblingEnrollment,100)}),53104);
