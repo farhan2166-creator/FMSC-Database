@@ -24,7 +24,7 @@ internal static class UpdateChunks
             throw new InvalidDataException("The application archive is absent or empty.");
         long partCount = (input.Length + maximumPartBytes - 1) / maximumPartBytes;
         if (partCount is < 1 or > 2000)
-            throw new InvalidDataException("Too many chunks for this signed update package.");
+            throw new InvalidDataException("Too many chunks for this checked update package.");
 
         var parts = new List<UpdatePart>((int)partCount);
         using var archive = input.OpenRead();
@@ -83,9 +83,9 @@ internal static class UpdateChunks
                     var sourceInfo = new FileInfo(source);
                     if (!sourceInfo.Exists || sourceInfo.Attributes.HasFlag(FileAttributes.ReparsePoint) ||
                         sourceInfo.Length != part.Length)
-                        throw new InvalidDataException("A signed update archive part is missing or changed.");
+                        throw new InvalidDataException("An update archive part is missing or changed.");
                     if (!StringComparer.OrdinalIgnoreCase.Equals(Sha256(source), part.Sha256))
-                        throw new InvalidDataException("An update archive part failed its signed SHA-256 hash.");
+                        throw new InvalidDataException("An update archive part failed its published SHA-256 hash.");
                     using var input = sourceInfo.OpenRead();
                     input.CopyTo(output);
                 }
@@ -94,7 +94,7 @@ internal static class UpdateChunks
             var finished = new FileInfo(temporary);
             if (finished.Length != descriptor.Length ||
                 !StringComparer.OrdinalIgnoreCase.Equals(Sha256(temporary), descriptor.Sha256))
-                throw new InvalidDataException("The reconstructed update archive failed its signed hash.");
+                throw new InvalidDataException("The reconstructed update archive failed its published SHA-256 hash.");
             File.Move(temporary, destination);
         }
         finally
