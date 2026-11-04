@@ -7,7 +7,7 @@ namespace FMSC_SMS.Core.Updates;
 
 /// <summary>
 /// One temporary, read-only Git connection to the private FMSC distribution.
-/// Fetches the channel and signed manifest first; individual ZIP chunks are
+/// Fetches the update channel and manifest first; individual ZIP chunks are
 /// materialized only on explicit request. No source repo or school database
 /// is accessed and no Git credential is embedded in the application.
 /// </summary>
@@ -103,7 +103,7 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         EnsureOpen();
         if (!IsAllowedPartPath(relativePath) ||
             expectedBytes is < 1 or > UpdateChunks.DefaultMaximumPartBytes)
-            throw new InvalidDataException("Invalid signed update chunk request.");
+            throw new InvalidDataException("Invalid update chunk request.");
         if (File.Exists(destinationFile) || Directory.Exists(destinationFile))
             throw new IOException("The destination update chunk must be a new file.");
         try
@@ -134,7 +134,7 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         var pieces = value.Split('/');
         return pieces.Length == 3 && pieces[0] == "versions" &&
             UpdateManifestPolicy.IsPublishedVersion(pieces[1]) &&
-            (pieces[2] == "update-manifest.json" || pieces[2] == "update-manifest.sig");
+            pieces[2] == "update-manifest.json";
     }
 
     internal static bool IsAllowedPartPath(string value)
