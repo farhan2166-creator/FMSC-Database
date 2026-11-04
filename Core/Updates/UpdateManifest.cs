@@ -177,6 +177,8 @@ internal static class UpdateManifestPolicy
         return ap.Length.CompareTo(bp.Length);
     }
 
+    internal static bool IsPublishedVersion(string? value) => IsVersion(value);
+
     private static bool IsVersion(string? value)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > 100 ||
