@@ -160,8 +160,29 @@ and stores the PRIVATE half encrypted with DPAPI CurrentUser in
 corresponding PUBLIC key beside it in `publisher-public.pem`. No private PEM
 is displayed, generated in the repository, or committed. **Back up the signing
 authority before relying on it**: a DPAPI-protected file cannot be decrypted
-on another Windows account/machine just by copying it. A reviewed secure
-recovery/export workflow is required before production signing.
+on another Windows account/machine just by copying it. The owner-only CLI
+now includes password-encrypted offline backup and recovery.
+
+Before deploying any school release, create an **encrypted offline recovery
+backup**, for example to a secure removable drive (the destination directory
+must already exist). The CLI prompts for a passphrase **without echoing** it;
+the passphrase never appears in command-line arguments:
+
+```powershell
+dotnet run --project Tools/UpdateSigning/UpdateSigning.csproj -c Release -- `
+  backup "E:\\SecureOffline\\FMSC-publisher-recovery.private.pem"
+```
+
+Recovery on a replacement Windows account/computer uses:
+
+```powershell
+dotnet run --project Tools/UpdateSigning/UpdateSigning.csproj -c Release -- `
+  restore "E:\\SecureOffline\\FMSC-publisher-recovery.private.pem"
+```
+
+Backups use password-encrypted PKCS#8 (AES-256-CBC/PBKDF2), not a plaintext
+private PEM. Keep the offline recovery file and its passphrase in **separate**
+secure locations. Restore refuses to replace an existing signing identity.
 
 After owner review, only the PUBLIC PEM may be placed at
 `Core/Updates/publisher-public.pem` in the source. FMSC embeds that public
