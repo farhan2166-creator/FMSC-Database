@@ -78,6 +78,17 @@ internal static partial class Program
         Check(collect.Enabled && !validator.IsMarked(received), "Exactly the remaining cash balance is accepted");
         use.Checked=false; discount.Text="0"; received.Text="3300"; RefreshTotals();
         Check(collect.Enabled, "Without credit the full family balance is accepted");
+        // Simulate a charge-grid reload with unchanged numeric text. Clicking
+        // Use Full Amount must allocate even when TextChanged will not fire.
+        foreach (DataGridViewRow row in grid.Rows)
+        {
+            row.Cells["Amount"].Value=0m;
+            row.Tag=false;
+            row.Cells["Pay"].Value="+";
+        }
+        type.GetMethod("UseFullAmount", flags)!.Invoke(page,null);
+        Check(grid.Rows.Cast<DataGridViewRow>().Sum(row=>Convert.ToDecimal(row.Cells["Amount"].Value))==3300m,
+            "Use Full Amount recalculates a missing allocation even if the displayed amount did not change");
         received.Text="3301"; RefreshTotals();
         Check(!collect.Enabled && validator.IsMarked(received), "Overpayment is rejected even without credit");
         received.Text="3300"; discount.Text="2000"; RefreshTotals();
