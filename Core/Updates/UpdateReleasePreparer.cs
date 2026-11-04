@@ -101,9 +101,12 @@ internal static class UpdateReleasePreparer
         ArgumentNullException.ThrowIfNull(source);
         if (method is UpdateDownloadChoice.NotNewer or UpdateDownloadChoice.RequiresDatabaseInstaller)
             throw new InvalidOperationException("Application-only preparation is forbidden for this update decision.");
-        if (!string.Equals(release.RepositoryVersion, release.Manifest.Version, StringComparison.Ordinal) ||
+        // Reject invalid metadata BEFORE entering the incremental fallback
+        // handler; a malformed manifest must never trigger a full-package stage.
+        var validatedManifest = UpdateManifestPolicy.ReadValidated(release.ManifestBytes);
+        if (!string.Equals(release.RepositoryVersion, validatedManifest.Version, StringComparison.Ordinal) ||
             !UpdateManifestPolicy.IsPublishedVersion(release.RepositoryVersion))
-            throw new InvalidDataException("Requested release does not match its validated manifest version.");
+            throw new InvalidDataException("Requested release does not match the repository manifest version.");
         if (Directory.Exists(newStagingRoot) || File.Exists(newStagingRoot))
             throw new IOException("The update staging root must not already exist.");
         string stagedRoot = Path.GetFullPath(newStagingRoot);
@@ -116,16 +119,11 @@ internal static class UpdateReleasePreparer
         {
             Directory.CreateDirectory(stagedRoot);
             created = true;
-            // Validate the original repository metadata again before creating
-            // any application files; do not trust a manually constructed record.
-            var manifest = UpdateManifestPolicy.ReadValidated(release.ManifestBytes);
-            if (manifest.Version != release.RepositoryVersion)
-                throw new InvalidDataException("Update metadata and requested version differ.");
             string metadata = Path.Combine(stagedRoot, "metadata");
             Directory.CreateDirectory(metadata);
             File.WriteAllBytes(Path.Combine(metadata, "update-manifest.json"),
                 release.ManifestBytes);
-            await AttemptAsync(manifest, release.RepositoryVersion, source,
+            await AttemptAsync(validatedManifest, release.RepositoryVersion, source,
                 installed, stagedRoot, method == UpdateDownloadChoice.Incremental,
                 cancellationToken);
             return new PreparedUpdate(release.RepositoryVersion,
@@ -142,7 +140,7 @@ internal static class UpdateReleasePreparer
             if (Directory.Exists(downloaded)) Directory.Delete(downloaded, true);
             try
             {
-                await AttemptAsync(release.Manifest, release.RepositoryVersion, source,
+                await AttemptAsync(validatedManifest, release.RepositoryVersion, source,
                     installed, stagedRoot, false, cancellationToken);
                 return new PreparedUpdate(release.RepositoryVersion,
                     Path.Combine(stagedRoot, "application"), Path.Combine(stagedRoot, "metadata"),
