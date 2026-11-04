@@ -14,7 +14,6 @@
         <!-- Standalone update packaging CLI is not part of the WinForms executable. -->
         <Compile Remove="Tools/UpdatePackages/**/*.cs" />
         <Compile Remove="Tools/UpdateDistribution/**/*.cs" />
-        <Compile Remove="Tools/UpdateSigning/**/*.cs" />
     </ItemGroup>
 	<PropertyGroup>
 		<!-- Local verification repositories and generated files are not application inputs. -->
@@ -84,8 +83,6 @@
 		<EmbeddedResource Include="Core\DatabaseCompatibilityRequirements.json" />
 		<EmbeddedResource Include="Core\DatabaseMigrationRequirements.json" />
 		<EmbeddedResource Include="Core\PermissionCatalog.json" LogicalName="FMSC_SMS.Core.PermissionCatalog.json" />
-		<!-- Publisher PUBLIC key must be vetted and provisioned before downloads are enabled. -->
-		<EmbeddedResource Include="Core\Updates\publisher-public.pem" LogicalName="FMSC_SMS.Updates.PublisherPublicKey" Condition="Exists('Core\Updates\publisher-public.pem')" />
 		<EmbeddedResource Include="Pages\Students\Admissions\PlacementCorrection.sql" />
 		<EmbeddedResource Include="Pages\Students\Admissions\MissingPlacementWindows.sql" />
 	</ItemGroup>
