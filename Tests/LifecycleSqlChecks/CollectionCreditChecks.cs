@@ -60,6 +60,16 @@ internal static class CollectionCreditChecks
         long tuition=Bill(enrollment,f.Tuition), annual=Bill(enrollment,f.AdmissionFee), siblingAnnual=Bill(siblingEnrollment,f.AdmissionFee);
         Deposit(admission,8750); Deposit(siblingId,1000);
         decimal beforeCredit=Credit(admission); decimal beforeDue=Due(tuition);
+        string backdatedCreditJson=System.Text.Json.JsonSerializer.Serialize(new[] {
+            new { ChargeId=tuition, AdmissionId=admission, EnrollmentId=enrollment, Amount=100m,
+                ExpectedBalance=beforeDue, ExpectedCredit=beforeCredit }
+        });
+        await report.Refused("Credit-only collection cannot precede enrollment",()=>Task.Run(()=>{
+            Sql.Query("BEGIN TRAN; EXEC dbo.ApplyCollectionCredit @UserId=@Actor,@TransactionDate=@When,@CreditsJson=@Plan; COMMIT;",
+                Sql.P("@Actor",f.Admin),Sql.P("@When",DateTime.Today.AddYears(-10)),Sql.P("@Plan",backdatedCreditJson));
+        }),54902);
+        report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,
+            "Rejected pre-enrollment credit date changes no account or bill");
         await report.Refused("Changed credit is refused before settlement",()=>Save(null,new[] {Plan(tuition,admission,enrollment,100) with { ExpectedCredit=beforeCredit+1 }}),53104);
         report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,"Stale credit preview changes neither credit nor bills");
         await report.Refused("Sibling credit cannot settle another child's bill",()=>Save(null,new[] {Plan(tuition,siblingId,siblingEnrollment,100)}),53104);
