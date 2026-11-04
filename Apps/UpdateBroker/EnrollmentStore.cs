@@ -20,6 +20,21 @@ internal sealed class EnrollmentStore
 
     private SqlConnection OpenConnection() => new(_settings.ConnectionString);
 
+    internal async Task VerifySchemaAsync(CancellationToken token = default)
+    {
+        await using var connection = OpenConnection();
+        await connection.OpenAsync(token);
+        await using var command = new SqlCommand(
+            @"SELECT CASE WHEN OBJECT_ID(N'dbo.UpdateSchools',N'U') IS NOT NULL
+              AND OBJECT_ID(N'dbo.UpdateDevices',N'U') IS NOT NULL THEN 1 ELSE 0 END;",
+            connection);
+        if ((int)(await command.ExecuteScalarAsync(token) ?? 0) != 1)
+            throw new InvalidOperationException(
+                "The separate broker database schema is missing. Apply Apps/UpdateBroker/Schema.sql first.");
+    }
+
+
+
     internal async Task<(Guid SchoolId, string AdminCredential)> ProvisionSchoolAsync(
         string displayName, CancellationToken cancellationToken = default)
     {
