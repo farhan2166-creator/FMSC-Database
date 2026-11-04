@@ -143,10 +143,13 @@ internal static class CollectionCreditChecks
         using(var print=new DataSet())
         {
             command.Parameters.AddRange(new[]{Sql.P("@UserId",f.Admin),Sql.P("@ReceiptNumber",savedReceipt)});adapter.Fill(print);
-            report.Check(print.Tables.Count==3 && Convert.ToDecimal(print.Tables[0].Rows[0]["CashReceived"])==3000m
+            // Since migration 56 the reader returns four result sets:
+            // receipt, students, visit lines and saved fee agreements.
+            report.Check(print.Tables.Count==4 && print.Tables[0].Rows.Count==1
+                && Convert.ToDecimal(print.Tables[0].Rows[0]["CashReceived"])==3000m
                 && Convert.ToDecimal(print.Tables[0].Rows[0]["CreditApplied"])==1000m
                 && Convert.ToInt32(print.Tables[0].Rows[0]["SnapshotVersion"])>=3,
-                "Explicit fee collection saves a durable cash-plus-credit receipt rather than a legacy fallback");
+                $"Explicit fee collection returns a durable cash-plus-credit receipt and four saved document result sets (sets={print.Tables.Count}).");
         }
         report.Check(Sql.Count("SELECT COUNT(*) FROM dbo.FeePayments")==paymentsBeforeCheck,"Reading a receipt never posts another payment or applies credit again");
         report.Check(CollectionRecoveryJournal.ReadPending() is null,"Confirmed and refused transactions clear the recovery intent");
