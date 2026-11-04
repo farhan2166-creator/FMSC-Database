@@ -1,4 +1,6 @@
-using System.ComponentModel;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text.Json;
 using FMSC_SMS.Core;
 
 namespace FMSC_SMS.Core.Updates;
@@ -24,7 +26,6 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
-        MinimizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
         AutoScaleMode = AutoScaleMode.None;
@@ -168,7 +169,6 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         catch (Exception error) when (error is CryptographicException or IOException or UnauthorizedAccessException or InvalidOperationException)
         {
             _status.Text = "Unable to prepare this computer's update authorization: " + error.Message;
-            RefreshAuthorization();
         }
     }
 
