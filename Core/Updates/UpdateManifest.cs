@@ -5,10 +5,10 @@ using System.Text.RegularExpressions;
 namespace FMSC_SMS.Core.Updates;
 
 /// <summary>
-/// Immutable, signed RELEASE metadata. No executable is trusted until the raw manifest
-/// bytes have passed RSA-PSS verification against the publisher's pinned public key.
-/// Access is through per-computer read-only SSH credentials for a separate
-/// private distribution repository; no shared key is embedded in FMSC.
+/// Versioned release metadata retrieved from the owner's private Git distribution.
+/// The authenticated read-only SSH connection controls access; SHA-256 digests
+/// detect incomplete or mismatched payloads. Repository write access controls
+/// publication authority; these hashes are not publisher signatures.
 /// </summary>
 internal sealed class UpdateManifest
 {
@@ -69,16 +69,13 @@ internal static class UpdateManifestPolicy
         return JsonSerializer.SerializeToUtf8Bytes(manifest, JsonOptions);
     }
 
-    internal static UpdateManifest ReadVerified(byte[] data, byte[] signature, RSA publisherPublicKey)
+    internal static UpdateManifest ReadValidated(byte[] data)
     {
         ArgumentNullException.ThrowIfNull(data);
-        ArgumentNullException.ThrowIfNull(signature);
-        ArgumentNullException.ThrowIfNull(publisherPublicKey);
-        if (data.Length == 0 || data.Length > MaximumManifestBytes ||
-            !publisherPublicKey.VerifyData(data, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss))
-            throw new CryptographicException("The update manifest publisher signature is invalid.");
+        if (data.Length == 0 || data.Length > MaximumManifestBytes)
+            throw new InvalidDataException("The update manifest is empty or exceeds its maximum size.");
         var manifest = JsonSerializer.Deserialize<UpdateManifest>(data, JsonOptions)
-            ?? throw new InvalidDataException("The signed update manifest is empty.");
+            ?? throw new InvalidDataException("The update manifest is empty.");
         Validate(manifest);
         return manifest;
     }
@@ -106,7 +103,7 @@ internal static class UpdateManifestPolicy
         ValidateArchive(manifest.Incremental ?? throw new InvalidDataException("Missing incremental archive."));
         var changed = FindChanged(manifest.BaseFiles, manifest.Files);
         if (!changed.SequenceEqual(manifest.ChangedFiles, StringComparer.Ordinal))
-            throw new InvalidDataException("The delta file inventory does not match the signed base and target files.");
+            throw new InvalidDataException("The delta file inventory does not match the published base and target files.");
     }
 
     internal static UpdateDownloadChoice Choose(
@@ -235,11 +232,11 @@ internal static class UpdateManifestPolicy
                 !IsSafeRelativePath(part.Name) || part.Name.Contains('/') ||
                 part.Length is < 1 or > UpdateChunks.DefaultMaximumPartBytes ||
                 !IsSha256(part.Sha256) || total > archive.Length - part.Length)
-                throw new InvalidDataException("Unsafe, missing or invalid signed archive part.");
+                throw new InvalidDataException("Unsafe, missing or invalid update archive part.");
             total += part.Length;
         }
         if (total != archive.Length)
-            throw new InvalidDataException("Signed archive parts do not account for the full ZIP length.");
+            throw new InvalidDataException("Update archive parts do not account for the full ZIP length.");
     }
 
     private static bool IsSha256(string? value) =>
