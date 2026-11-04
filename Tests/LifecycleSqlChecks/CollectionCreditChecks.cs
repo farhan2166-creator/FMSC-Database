@@ -64,14 +64,26 @@ internal static class CollectionCreditChecks
             new { ChargeId=tuition, AdmissionId=admission, EnrollmentId=enrollment, Amount=100m,
                 ExpectedBalance=beforeDue, ExpectedCredit=beforeCredit }
         });
+        // This isolated direct-SQL boundary test uses a raw batch, whereas the
+        // application uses an RPC command. SQL Server requires these session SET
+        // options for tables with filtered/computed indexes; without them error
+        // 1934 obscures the intended date validation.
+        const string creditBoundaryBatch = """
+            SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON; SET ANSI_PADDING ON;
+            SET ANSI_WARNINGS ON; SET ARITHABORT ON;
+            SET CONCAT_NULL_YIELDS_NULL ON; SET NUMERIC_ROUNDABORT OFF;
+            BEGIN TRAN;
+            EXEC dbo.ApplyCollectionCredit @UserId=@Actor,@TransactionDate=@When,@CreditsJson=@Plan;
+            COMMIT;
+            """;
         await report.Refused("Credit-only collection cannot precede enrollment",()=>Task.Run(()=>{
-            Sql.Query("BEGIN TRAN; EXEC dbo.ApplyCollectionCredit @UserId=@Actor,@TransactionDate=@When,@CreditsJson=@Plan; COMMIT;",
+            Sql.Query(creditBoundaryBatch,
                 Sql.P("@Actor",f.Admin),Sql.P("@When",DateTime.Today.AddYears(-10)),Sql.P("@Plan",backdatedCreditJson));
         }),54902);
         report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,
             "Rejected pre-enrollment credit date changes no account or bill");
         await report.Refused("Advance is not available for a backdated collection",()=>Task.Run(()=>{
-            Sql.Query("BEGIN TRAN; EXEC dbo.ApplyCollectionCredit @UserId=@Actor,@TransactionDate=@When,@CreditsJson=@Plan; COMMIT;",
+            Sql.Query(creditBoundaryBatch,
                 Sql.P("@Actor",f.Admin),Sql.P("@When",DateTime.Today.AddDays(-1)),Sql.P("@Plan",backdatedCreditJson));
         }),54902);
         report.Check(Credit(admission)==beforeCredit && Due(tuition)==beforeDue,
@@ -131,10 +143,13 @@ internal static class CollectionCreditChecks
         using(var print=new DataSet())
         {
             command.Parameters.AddRange(new[]{Sql.P("@UserId",f.Admin),Sql.P("@ReceiptNumber",savedReceipt)});adapter.Fill(print);
-            report.Check(print.Tables.Count==3 && Convert.ToDecimal(print.Tables[0].Rows[0]["CashReceived"])==3000m
+            // Since migration 56 the reader returns four result sets:
+            // receipt, students, visit lines and saved fee agreements.
+            report.Check(print.Tables.Count==4 && print.Tables[0].Rows.Count==1
+                && Convert.ToDecimal(print.Tables[0].Rows[0]["CashReceived"])==3000m
                 && Convert.ToDecimal(print.Tables[0].Rows[0]["CreditApplied"])==1000m
                 && Convert.ToInt32(print.Tables[0].Rows[0]["SnapshotVersion"])>=3,
-                "Explicit fee collection saves a durable cash-plus-credit receipt rather than a legacy fallback");
+                $"Explicit fee collection returns a durable cash-plus-credit receipt and four saved document result sets (sets={print.Tables.Count}).");
         }
         report.Check(Sql.Count("SELECT COUNT(*) FROM dbo.FeePayments")==paymentsBeforeCheck,"Reading a receipt never posts another payment or applies credit again");
         report.Check(CollectionRecoveryJournal.ReadPending() is null,"Confirmed and refused transactions clear the recovery intent");

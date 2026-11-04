@@ -135,8 +135,9 @@ internal static partial class Program
         using var form = new Form { ClientSize = new Size(1320,900) };
         page.Dock=DockStyle.Fill; form.Controls.Add(page); form.Show(); Application.DoEvents();
         type.GetMethod("UpdateCollectionTotals", flags)!.Invoke(page,null);
-        Check(use.Visible && use.Width >= TextRenderer.MeasureText(use.Text,use.Font).Width + 20,
-            "Credit checkbox fits the payment panel");
+        int captionWidth=TextRenderer.MeasureText(use.Text,use.Font).Width;
+        Check(use.Visible && use.Width >= captionWidth + 20,
+            $"Credit checkbox fits payment panel (width={use.Width}, text={captionWidth}, parent={use.Parent?.ClientSize.Width}, caption='{use.Text}')");
         Directory.CreateDirectory("artifacts/collection-credit");
         using var picture=new Bitmap(form.Width,form.Height);
         form.DrawToBitmap(picture,new Rectangle(Point.Empty,picture.Size));

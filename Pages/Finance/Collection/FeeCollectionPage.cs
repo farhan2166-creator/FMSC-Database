@@ -117,7 +117,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     private Func<Form?,int,int[]?,Func<bool>?,bool,Task> showOutstandingBill = FeeBillPreview.ShowAsync;
     private readonly Dictionary<int,string> receiptReviewTokens=new();
     private readonly Dictionary<int, decimal> availableCreditByStudent = new();
-    private readonly CheckBox useAvailableCredit = new() { Text = "Use student advance", Checked = true, AutoSize = true };
+    private readonly CheckBox useAvailableCredit = new() { Text = "Use advance", Checked = true, AutoSize = true };
     private readonly Label availableCredit = new();
     private readonly Label remainingCredit = new();
     private readonly Label advanceScopeHint = new() {
@@ -2133,7 +2133,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
     {
         bool allowed = CreditAllowedOnSelectedDate();
         useAvailableCredit.Enabled = allowed;
-        useAvailableCredit.Text = allowed ? "Use student advance" : "Advance: today only";
+        useAvailableCredit.Text = allowed ? "Use advance" : "Today only";
         if (!allowed && useAvailableCredit.Checked)
             useAvailableCredit.Checked = false;
         // Date changes alter the amount owed in cash, even with unchanged payment text.
