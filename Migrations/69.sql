@@ -12,6 +12,10 @@ DECLARE @Definition nvarchar(max)=OBJECT_DEFINITION(OBJECT_ID(N'dbo.TransferEnro
 DECLARE @Anchor nvarchar(max)=
   N'IF @OldClassSectionId = @NewClassSectionId
         THROW 52308, ''The destination class/section is the same as the current placement.'', 1;';
+-- SQL exports may preserve LF while the migration file uses CRLF.
+-- Normalize both before matching the otherwise exact expected guard.
+SET @Definition=REPLACE(@Definition,CHAR(13)+CHAR(10),CHAR(10));
+SET @Anchor=REPLACE(@Anchor,CHAR(13)+CHAR(10),CHAR(10));
 IF @Definition IS NULL OR CHARINDEX(@Anchor,@Definition)=0
  OR CHARINDEX(@Anchor,@Definition,CHARINDEX(@Anchor,@Definition)+LEN(@Anchor))<>0
  OR CHARINDEX(N'THROW 52311',@Definition)<>0
