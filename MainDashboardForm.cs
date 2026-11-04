@@ -1,4 +1,5 @@
 using FMSC_SMS.Core;
+using FMSC_SMS.Core.Updates;
 using FMSC_SMS.Pages.Administration;
 using FMSC_SMS.Pages.Dashboard;
 using FMSC_SMS.Pages.Finance.Billing;
@@ -1384,6 +1385,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         }
         menu.Items.Add(new ToolStripMenuItem("Help && FAQ", null,
             (_, _) => OpenHelpCenterAfterAccountMenuCloses()));
+        menu.Items.Add(new ToolStripMenuItem("Check for Updates", null, (_, _) => {
+            using var updateDialog = new UpdateConnectionForm();
+            updateDialog.ShowDialog(this);
+        }) {
+            ToolTipText = "Authorize this computer and check the private FMSC update feed manually."
+        });
         menu.Items.Add(
             new ToolStripMenuItem(
                 "Hot Keys",
