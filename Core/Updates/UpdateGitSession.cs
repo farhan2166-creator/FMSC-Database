@@ -143,12 +143,15 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         if (pieces.Length != 3 || pieces[0] != "versions" ||
             !UpdateManifestPolicy.IsPublishedVersion(pieces[1]))
             return false;
-        return (pieces[2].StartsWith("FMSC_SMS-app-full.zip.part", StringComparison.Ordinal) ||
-                pieces[2].StartsWith("FMSC_SMS-app-incremental.zip.part", StringComparison.Ordinal)) &&
-            pieces[2].Length is >= 31 and <= 49 &&
-            UpdateManifestPolicy.IsSafeRelativePath(pieces[2]) &&
-            pieces[2].Split(".part").Last().Length == 4 &&
-            pieces[2].Split(".part").Last().All(char.IsAsciiDigit);
+        const string full = "FMSC_SMS-app-full.zip.part";
+        const string incremental = "FMSC_SMS-app-incremental.zip.part";
+        string name = pieces[2];
+        string? prefix = name.StartsWith(full, StringComparison.Ordinal) ? full :
+            name.StartsWith(incremental, StringComparison.Ordinal) ? incremental : null;
+        return prefix is not null &&
+            name.Length == prefix.Length + 4 &&
+            name.AsSpan(prefix.Length).ToArray().All(char.IsAsciiDigit) &&
+            UpdateManifestPolicy.IsSafeRelativePath(name);
     }
 
     private void EnsureOpen()
