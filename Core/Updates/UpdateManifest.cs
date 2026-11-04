@@ -7,8 +7,8 @@ namespace FMSC_SMS.Core.Updates;
 /// <summary>
 /// Immutable, signed RELEASE metadata. No executable is trusted until the raw manifest
 /// bytes have passed RSA-PSS verification against the publisher's pinned public key.
-/// Access authorization is handled separately by an HTTPS update broker; never by a
-/// GitHub credential embedded in the desktop application.
+/// Access is through per-computer read-only SSH credentials for a separate
+/// private distribution repository; no shared key is embedded in FMSC.
 /// </summary>
 internal sealed class UpdateManifest
 {
@@ -31,6 +31,14 @@ internal sealed class UpdateFile
 }
 
 internal sealed class UpdateArchive
+{
+    public string Name { get; set; } = "";
+    public long Length { get; set; }
+    public string Sha256 { get; set; } = "";
+    public List<UpdatePart> Parts { get; set; } = new();
+}
+
+internal sealed class UpdatePart
 {
     public string Name { get; set; } = "";
     public long Length { get; set; }
@@ -209,12 +217,27 @@ internal static class UpdateManifestPolicy
         return true;
     }
 
-    private static void ValidateArchive(UpdateArchive archive)
+    internal static void ValidateArchive(UpdateArchive archive)
     {
         if (archive is null || archive.Length <= 0 || !IsSafeRelativePath(archive.Name) ||
             archive.Name.Contains('/') || !archive.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ||
-            !IsSha256(archive.Sha256))
+            !IsSha256(archive.Sha256) || archive.Parts is null ||
+            archive.Parts.Count is < 1 or > 2000)
             throw new InvalidDataException("Unsafe or invalid update archive.");
+        long total = 0;
+        for (int i = 0; i < archive.Parts.Count; i++)
+        {
+            var part = archive.Parts[i];
+            if (part is null ||
+                !string.Equals(part.Name, UpdateChunks.MakeName(archive.Name, i + 1), StringComparison.Ordinal) ||
+                !IsSafeRelativePath(part.Name) || part.Name.Contains('/') ||
+                part.Length is < 1 or > UpdateChunks.DefaultMaximumPartBytes ||
+                !IsSha256(part.Sha256) || total > archive.Length - part.Length)
+                throw new InvalidDataException("Unsafe, missing or invalid signed archive part.");
+            total += part.Length;
+        }
+        if (total != archive.Length)
+            throw new InvalidDataException("Signed archive parts do not account for the full ZIP length.");
     }
 
     private static bool IsSha256(string? value) =>
