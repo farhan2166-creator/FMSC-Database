@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Core/Updates/UpdateManifest.cs" Link="UpdateManifest.cs" />
+    <Compile Include="../../Core/Updates/UpdateStager.cs" Link="UpdateStager.cs" />
+    <Compile Include="../../Core/Updates/UpdateChunks.cs" Link="UpdateChunks.cs" />
+    <Compile Include="../../Core/Updates/UpdateReleasePreparer.cs" Link="UpdateReleasePreparer.cs" />
+  </ItemGroup>
+</Project>

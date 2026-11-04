@@ -11,6 +11,8 @@
         <!-- Portable shortcut checks build separately with simulated controls. -->
         <Compile Remove="Tests/**/*.cs" />
         <Compile Remove="Apps/**/*.cs" />
+        <!-- Standalone update packaging CLI is not part of the WinForms executable. -->
+        <Compile Remove="Tools/**/*.cs" />
     </ItemGroup>
 	<PropertyGroup>
 		<!-- Local verification repositories and generated files are not application inputs. -->
@@ -24,11 +26,13 @@
 		<SatelliteResourceLanguages>en;en-US;en-GB;ur;ur-PK;ur-IN</SatelliteResourceLanguages>
 		<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 		<ApplicationIcon>Assets\FMSC_Logo Icon.ico</ApplicationIcon>
-		<Version>1.1.0-rc.2</Version>
+		<Version>1.1.0-rc.3</Version>
 		<AssemblyVersion>1.1.0.0</AssemblyVersion>
 		<FileVersion>1.1.0.0</FileVersion>
 	</PropertyGroup>
 	<ItemGroup>
+		<Content Include="Installer/core.ps1" Link="UpdateSupport/core.ps1" CopyToPublishDirectory="PreserveNewest" />
+		<Content Include="Migrations/*.sql" Link="UpdateSupport/Migrations/%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="Assets\academics.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
@@ -85,6 +89,7 @@
 	</ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
 		<PackageReference Include="PdfPig" Version="0.1.16" />
 		<PackageReference Include="PDFsharp-MigraDoc-GDI" Version="6.2.4" />
 		<PackageReference Include="ReportViewerCore.WinForms" Version="15.1.33" />

@@ -3,6 +3,8 @@ name: '09 - CI - Desktop Build and Regression'
 on:
   workflow_dispatch:
   workflow_call:
+  push:
+    branches: ['feature/private-incremental-updates']
 
 permissions:
   contents: read
@@ -36,6 +38,15 @@ jobs:
       - name: Validate release versions and permission consumers
         run: python -m unittest discover -s Tools -p 'test_*.py' -v
 
+      - name: Validate SHA-256 incremental/full packages and isolated staging
+        run: dotnet run --project Tools/UpdatePackages/UpdatePackages.csproj -c Release -- --self-test
+
+      - name: Validate two-version checked distribution snapshots and retirement
+        run: dotnet run --project Tools/UpdateDistribution/UpdateDistribution.csproj -c Release -- --self-test
+
+      - name: Validate private Git SSH key enrollment and Windows DPAPI protection
+        run: dotnet run --project Tests/UpdateAuthorizationChecks/UpdateAuthorizationChecks.csproj -c Release
+
       - name: Restore application
         run: dotnet restore FMSC_SMS.sln
 
@@ -50,6 +61,10 @@ jobs:
         # rather than leaving a modal UI regression hung for five minutes.
         timeout-minutes: 2
         run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --post-fix
+
+      - name: Verify modeless update dismissal and accepted-close installer handoff
+        timeout-minutes: 2
+        run: dotnet run --project Tests/ThemeSmokeChecks/ThemeSmokeChecks.csproj -c Release --no-build -- --update-dialog
 
       - name: Run targeted admission, placement and finance regressions
         shell: pwsh
@@ -109,6 +124,10 @@ jobs:
       - name: Test migration discovery, versions and backup ordering
         shell: powershell
         run: .\Tools\TestInstallerMigrations.ps1
+
+      - name: Test prepared update installer integrity without touching SQL
+        shell: powershell
+        run: .\Tools\TestPreparedUpdate.ps1
 
       - name: Build optional communication worker and webhook host
         run: |

@@ -1,0 +1,91 @@
+using System.Reflection;
+using FMSC_SMS;
+using FMSC_SMS.Core;
+using FMSC_SMS.Core.Updates;
+
+internal static partial class Program
+{
+    private static void CheckUpdateDialog()
+    {
+        const BindingFlags fields = BindingFlags.Instance | BindingFlags.NonPublic;
+        ModernButton Find(Control root, string text) => Descendants(root).OfType<ModernButton>().Single(b => b.Text == text);
+        foreach (bool enrolled in new[] { false, true })
+        {
+            foreach (string action in new[] { "Close", "Remind Me Later" })
+            {
+                using var parent = new Form(); parent.Show();
+                using var dialog = new UpdateConnectionForm(() => (enrolled, enrolled ? "ssh-rsa fictional-public-key" : ""));
+                dialog.Show(parent); Application.DoEvents();
+                Check(Find(dialog, "Check for Updates").Enabled == enrolled, "Checking requires a prepared computer key");
+                var panel = (Panel)typeof(UpdateConnectionForm).GetField("_authorizationPanel", fields)!.GetValue(dialog)!;
+                Check(panel.Visible == !enrolled, "Enrolled computers start with compact access details");
+                var buttons = Descendants(dialog).OfType<ModernButton>().Where(b => b.Visible).ToArray();
+                foreach (var button in buttons)
+                    Check(button.Right <= button.Parent!.ClientSize.Width && button.Bottom <= button.Parent.ClientSize.Height,
+                        "Update controls fit their action rows: " + button.Text);
+                if (action == "Close")
+                {
+                    string output = Path.Combine(Environment.CurrentDirectory, "artifacts", "update-dialog-review");
+                    Directory.CreateDirectory(output);
+                    using var bitmap = new Bitmap(dialog.Width, dialog.Height);
+                    dialog.DrawToBitmap(bitmap, new Rectangle(Point.Empty, dialog.Size));
+                    bitmap.Save(Path.Combine(output, enrolled ? "authorized.png" : "enrollment.png"));
+                }
+                Find(dialog, action).PerformClick(); Application.DoEvents();
+                Check(dialog.IsDisposed && !dialog.Visible, action + " actually closes a modeless update window");
+            }
+        }
+        var prepared = new PreparedUpdate("1.2.0", "unused-stage", "unused-metadata", UpdateDownloadChoice.Full, false);
+        using (var parent = new Form())
+        using (var dialog = new UpdateConnectionForm(() => (true, "ssh-rsa fixture")))
+        {
+            parent.Show(); dialog.Show(parent); Application.DoEvents();
+            typeof(UpdateConnectionForm).GetField("_prepared", fields)!.SetValue(dialog, prepared);
+            var install = Find(dialog, "Install Update"); install.Visible = install.Enabled = true;
+            int requests = 0;
+            dialog.InstallRequested += _ => { requests++; install.PerformClick(); return false; };
+            install.PerformClick(); Application.DoEvents();
+            Check(requests == 1 && install.Enabled && !dialog.IsDisposed, "Cancelled install permits retry and suppresses reentrant clicks");
+            Find(dialog, "Close").PerformClick(); Application.DoEvents();
+            Check(requests == 1, "Closing the update window never repeats the install request");
+        }
+        int launched = 0, confirmations = 0;
+        using (var cancelled = new MainDashboardForm(null, _ => launched++, () => { confirmations++; return false; }, _ => { }))
+        {
+            _ = cancelled.Handle; // No Shown/Activated events: never start dashboard SQL/background work.
+            Check(!cancelled.RequestUpdateInstallation(prepared) && launched == 0, "No confirmation leaves FMSC open and launches nothing");
+            cancelled.Close();
+            Check(launched == 0, "A later ordinary close cannot launch a previously declined update");
+        }
+        using (var blocked = new MainDashboardForm(null, _ => launched++, () => true, _ => { }))
+        {
+            _ = blocked.Handle;
+            FormClosingEventHandler cancel = (_, e) => e.Cancel = true;
+            blocked.FormClosing += cancel;
+            Check(!blocked.RequestUpdateInstallation(prepared) && launched == 0 && !blocked.IsDisposed,
+                "Cancelled dashboard closure cannot start an installer");
+            blocked.FormClosing -= cancel;
+            blocked.Close();
+            Check(launched == 0, "Cancelled closure clears the pending installation");
+        }
+        bool closed = false;
+        MainDashboardForm? accepted = null;
+        using (accepted = new MainDashboardForm(null, _ => {
+            Check(closed, "Installer launches only after the dashboard FormClosed notification");
+            launched++;
+            Check(!accepted!.RequestUpdateInstallation(prepared), "A closing dashboard rejects duplicate installation requests");
+        }, () => { confirmations++; return true; }, _ => { }))
+        {
+            _ = accepted.Handle;
+            accepted.FormClosed += (_, _) => closed = true;
+            using var ownedUpdate = new UpdateConnectionForm(() => (true, "ssh-rsa fixture"));
+            ownedUpdate.Show(accepted); Application.DoEvents();
+            typeof(UpdateConnectionForm).GetField("_prepared", fields)!.SetValue(ownedUpdate, prepared);
+            var install = Find(ownedUpdate, "Install Update"); install.Visible = install.Enabled = true;
+            ownedUpdate.InstallRequested += accepted.RequestUpdateInstallation;
+            install.PerformClick(); Application.DoEvents();
+            Check(ownedUpdate.IsDisposed, "Accepted dashboard closure disposes its owned update window without another install request");
+            Check(accepted.IsDisposed && launched == 1 && confirmations == 2, "One accepted update closes FMSC and launches exactly one installer");
+        }
+    }
+}

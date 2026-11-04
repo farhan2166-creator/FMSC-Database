@@ -222,6 +222,11 @@ ServiceFabricBackup/
 *.ndf
 *.bak
 # Private configuration and key containers belong outside source control.
+# NEVER commit publisher signing private material (public publisher key is deliberate).
+**/*private*.pem
+**/*private*.key
+**/*.dpapi
+
 .env
 .env.*
 !.env.example

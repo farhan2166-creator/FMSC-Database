@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+    <Compile Include="../../Core/Updates/UpdateDeviceKey.cs" Link="UpdateDeviceKey.cs" />
+    <Compile Include="../../Core/Updates/UpdateGitReader.cs" Link="UpdateGitReader.cs" />
+    <Compile Include="../../Core/Updates/UpdateGitSession.cs" Link="UpdateGitSession.cs" />
+    <Compile Include="../../Core/Updates/UpdateReleasePreparer.cs" Link="UpdateReleasePreparer.cs" />
+    <Compile Include="../../Core/Updates/UpdateStager.cs" Link="UpdateStager.cs" />
+    <Compile Include="../../Core/Updates/UpdateManifest.cs" Link="UpdateManifest.cs" />
+    <Compile Include="../../Core/Updates/UpdateChunks.cs" Link="UpdateChunks.cs" />
+    <Compile Include="../../Core/Updates/UpdateInstallerHandoff.cs" Link="UpdateInstallerHandoff.cs" />
+  </ItemGroup>
+</Project>
