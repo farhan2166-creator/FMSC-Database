@@ -1862,6 +1862,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             await Task.WhenAll(
                 LoadChargesAsync(version),
                 LoadRecentPaymentsAsync(version));
+            // A newer student or placement selection wins over this stale load.
+            if (IsDisposed || version != loadVersion ||
+                student.SelectedId != selectedAdmissionId) return;
             UpdateOperationMode();
             /* Loading fees does not imply that the parent is paying the full balance. */
             RefreshEnteredPaymentAllocation();
