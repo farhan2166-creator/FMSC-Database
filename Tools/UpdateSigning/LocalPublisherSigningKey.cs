@@ -25,6 +25,50 @@ internal static class LocalPublisherSigningKey
     {
         if (!OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("Publisher key generation requires Windows DPAPI.");
+        using var rsa = RSA.Create(4096);
+        return ProtectAndSave(rsa, folder);
+    }
+
+    /// <summary>Encrypted PKCS#8 backup. No plaintext private PEM is written.</summary>
+    internal static void Backup(string protectedKeyPath, string recoveryPath,
+        ReadOnlySpan<char> passphrase)
+    {
+        if (passphrase.Length < 16)
+            throw new ArgumentException("Recovery passphrase must contain at least 16 characters.");
+        string path = Path.GetFullPath(recoveryPath);
+        if (File.Exists(path) || Directory.Exists(path) ||
+            !path.EndsWith(".pem", StringComparison.OrdinalIgnoreCase))
+            throw new IOException("Backup must be a new .pem file outside the release repository.");
+        string? parent = Path.GetDirectoryName(path);
+        if (parent is null || !Directory.Exists(parent))
+            throw new DirectoryNotFoundException("Create the offline backup destination directory first.");
+        using var rsa = Open(protectedKeyPath);
+        string encryptedPem = rsa.ExportEncryptedPkcs8PrivateKeyPem(
+            passphrase,
+            new PbeParameters(PbeEncryptionAlgorithm.Aes256Cbc, HashAlgorithmName.SHA256,
+                iterationCount: 210_000));
+        using var destination = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        using var writer = new StreamWriter(destination, Encoding.ASCII);
+        writer.Write(encryptedPem);
+        writer.Flush();
+        destination.Flush(flushToDisk: true);
+    }
+
+    internal static (string ProtectedKey, string PublicKey) Restore(
+        string encryptedRecoveryPath, string newFolder, ReadOnlySpan<char> passphrase)
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("Publisher key restore requires Windows DPAPI.");
+        using var rsa = RSA.Create();
+        string encryptedPem = File.ReadAllText(encryptedRecoveryPath, Encoding.ASCII);
+        rsa.ImportFromEncryptedPem(encryptedPem, passphrase);
+        if (rsa.KeySize < 3072)
+            throw new CryptographicException("Recovery signing key is too short.");
+        return ProtectAndSave(rsa, newFolder);
+    }
+
+    private static (string ProtectedKey, string PublicKey) ProtectAndSave(RSA rsa, string folder)
+    {
         string path = Path.GetFullPath(folder);
         string protectedPath = Path.Combine(path, ProtectedFileName);
         string publicPath = Path.Combine(path, PublicFileName);
@@ -38,7 +82,6 @@ internal static class LocalPublisherSigningKey
         string tempPublic = publicPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            using var rsa = RSA.Create(4096);
             secret = Encoding.UTF8.GetBytes(rsa.ExportRSAPrivateKeyPem());
             encrypted = ProtectedData.Protect(secret, Entropy, DataProtectionScope.CurrentUser);
             using (var file = new FileStream(tempProtected, FileMode.CreateNew,
@@ -122,6 +165,27 @@ internal static class LocalPublisherSigningKey
                 throw new Exception("Publisher signing authority was silently replaced.");
             }
             catch (InvalidOperationException) { }
+            string backupFolder = Path.Combine(root, "offline-backup");
+            Directory.CreateDirectory(backupFolder);
+            string recovery = Path.Combine(backupFolder, "publisher-recovery.private.pem");
+            Backup(generated.ProtectedKey, recovery, "test-recovery-password-choose-long".AsSpan());
+            if (!File.ReadAllText(recovery, Encoding.ASCII).Contains(
+                    "BEGIN ENCRYPTED PRIVATE KEY", StringComparison.Ordinal))
+                throw new Exception("Publisher recovery backup was not encrypted.");
+            try
+            {
+                _ = Restore(recovery, Path.Combine(root, "wrong-restore"),
+                    "incorrect-recovery-passphrase".AsSpan());
+                throw new Exception("Incorrect recovery passphrase was accepted.");
+            }
+            catch (CryptographicException) { }
+            var recovered = Restore(recovery, Path.Combine(root, "restored"),
+                "test-recovery-password-choose-long".AsSpan());
+            using var recoveredSigner = Open(recovered.ProtectedKey);
+            if (!CryptographicOperations.FixedTimeEquals(
+                    privateKey.ExportRSAPublicKey(), recoveredSigner.ExportRSAPublicKey()))
+                throw new Exception("Restored publisher identity changed.");
+
             byte[] damaged = File.ReadAllBytes(generated.ProtectedKey);
             damaged[damaged.Length / 2] ^= 0x31;
             File.WriteAllBytes(generated.ProtectedKey, damaged);
