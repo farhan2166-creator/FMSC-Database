@@ -2,8 +2,9 @@
 
 **Status: private distribution repository created, with signed packaging, bounded chunking,
 non-disruptive staging and a two-version snapshot preparation CLI on the draft branch.
-Actual publishing, device authentication, Windows UI and installer integration remain pending.
-Nothing is enabled on school PCs.**
+Actual package publishing, verified release download, and installer activation remain pending.
+The feature branch now includes a manual authorization/update-connection UI and protected
+per-Windows-user SSH credentials, but it has not been deployed to school PCs.**
 
 ## Confirmed owner decisions
 
@@ -14,10 +15,12 @@ Nothing is enabled on school PCs.**
     files, the version pointer and the current two approved versions only;
     NO application source or school data.
 - **No hosted service, cloud VPS, broker, new API backend or additional database.**
-- School staff do not require GitHub accounts. A school computer generates its
-  own SSH key pair; only its **public key** is authorized as a read-only deploy
-  key in the private distribution repository. Its private key is stored locally
-  using Windows DPAPI and appropriately restricted filesystem permissions.
+- School staff do not require GitHub accounts. Each enrolled Windows user on
+  a school computer generates an independent RSA-3072 SSH deploy key; only its
+  **public key** is authorized as a read-only deploy key in the private
+  distribution repository. The private half is sealed with Windows DPAPI
+  CurrentUser under `%LOCALAPPDATA%\\FMSC\\Updates`. Another Windows login must
+  enroll separately; no common school key is embedded in the application.
 - `Account/Help -> Check for Updates` manually initiates the check. No forced
   background network check or application shutdown.
 - Download changed-file incremental packages where the installed baseline
@@ -106,23 +109,43 @@ authorization.
   chunk, prepares an independent snapshot containing the newest one or two
   approved versions, and removes older releases from the new **tree** without
   deleting predecessor snapshots. It copies only part files, not oversized ZIPs.
-- Existing desktop CI includes packaging, staging and distribution snapshot tests.
+- `Core/Updates/UpdateDeviceKey.cs`: generates local RSA-3072 SSH keys,
+  stores the private PEM as DPAPI CurrentUser-protected data, and prevents
+  silent rekeying. Only the public SSH key is displayed.
+- `Core/Updates/UpdateGitReader.cs`: manually initiated read-only Git
+  connectivity check using strict pinned GitHub SSH host key verification,
+  a temporary ephemeral PEM, and a shallow/partial metadata-only Git fetch.
+  It does **not** download binaries or activate updates.
+- `Core/Updates/UpdateConnectionForm.cs` and `MainDashboardForm.cs`:
+  Account → Check for Updates; generate/copy public key and test access.
+  Reports the private feed version only as unverified metadata until the
+  publisher verification key is configured. No startup checks are enabled.
+- `Tests/UpdateAuthorizationChecks`: Windows-only DPAPI, uniqueness,
+  key-format and corruption regression checks (CI).
+- Existing desktop CI includes packaging, staging, distribution snapshot and
+  authorization tests.
 - The mistakenly introduced hosted `Apps/UpdateBroker` was **removed**.
   No cloud service has been deployed.
 
 ## Remaining implementation
 
-1. `FMSC-Updates` is created private with a README. Configure release approvals,
-   per-device read-only deploy-key enrollment and the signed latest feed.
+1. `FMSC-Updates` is created private with a README. Enroll each Windows
+   user/computer by generating the public key in FMSC and having the repository
+   owner add it in FMSC-Updates → Settings → Deploy keys with **Allow write
+   access unchecked**. There is no GitHub account requirement for schools.
    The source repository remains public until the owner changes it.
 2. Connect the new snapshot preparation tool to a guarded private-repository
    publishing action and authenticated client download, including network
    interruption and real large-file Windows tests.
-3. Implement private Git authorization using the Windows-protected per-device
-   SSH key; use fresh, shallow fetches so distribution history maintenance cannot
-   strand installed clients.
-4. Integrate manual Check for Updates UI in the existing Account/Help menu, with
-   offline handling, Update Now / Remind Me Later, and no impact on active work.
+3. **Complete** private SSH read-only metadata check integration with the
+   distribution feed, verify the publisher signature before advertising any
+   version as an installable update, and bundle an approved Git/SSH runtime in
+   the complete Windows installer. The current manual checker relies on
+   `git.exe` and `ssh.exe` being present on Windows; these must not become
+   manual prerequisites for school staff.
+4. The manual Account → Check for Updates entry and authorization dialog are
+   implemented. Add signed update availability, resilient downloading,
+   Update Now / Remind Me Later and offline behavior. Do not interrupt active work.
 5. Stage packages while application runs; after confirmed safe exit, hand off to
    the existing installer/helper. Package and validate all migration scripts,
    perform backup/compatibility checks and provide rollback guidance.
