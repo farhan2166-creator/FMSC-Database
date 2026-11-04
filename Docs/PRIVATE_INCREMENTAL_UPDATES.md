@@ -1,6 +1,6 @@
 # Private, non-disruptive application updates — implementation plan
 
-Status: **in progress on feature/private-incremental-updates; NOT enabled for school PCs.**
+Status: **private broker backend source implemented; integration pending. NOT enabled for school PCs.**
 This is a new delivery capability, not permission to deploy. Keep the existing
 `FMSC_SMS.csproj` application version and `Installer/core.ps1` database version as
 they are. A future reset to version 1 is an explicitly separate change.
@@ -37,32 +37,47 @@ This **does not yet** add any background network request, user dialog, updater
 service, activation process, GitHub Release or license issuance. Nothing runs on
 a student's/school's PC as a result of this phase.
 
+## Implemented service (phase 2 — backend source only)
+
+- `Apps/UpdateBroker`: .NET 8 HTTPS-only broker with dedicated SQL schema,
+  owner-only local school provisioning, school administrator enrollment of
+  multiple computers, individual revocation, admin key rotation and school
+  disabling. Random credentials are stored as keyed hashes, never plaintext.
+- GitHub App JWT and short-lived contents-read installation-token exchange,
+  restricted to the update repository. Only approved stable assets are relayed.
+- RSA-PSS publisher verification before returning manifests; signed version
+  and archive sizes must match GitHub's release inventory.
+- Broker explicitly refuses to distribute updates while repository is public.
+- Broker self-tests added to existing desktop CI; no production infrastructure
+  or school computer has been enrolled.
+- Deployment steps: [UPDATE_BROKER_DEPLOYMENT.md](UPDATE_BROKER_DEPLOYMENT.md).
+
 ## Required private distribution architecture (phase 2)
 
-1. **Release signer:** generate and securely store a publisher RSA signing key.
+1. **Release signer (pending provisioning):** generate and securely store a publisher RSA signing key.
    The private key must be restricted to the approved release-publishing process;
    desktop clients embed only the pinned public key. Rotate by explicit versioned
    trust policy; never auto-trust an unknown signing key from a downloaded manifest.
-2. **Private GitHub Releases:** CI validates a reviewed release SHA, packages
+2. **Private GitHub Releases (publishing still pending):** CI validates a reviewed release SHA, packages
    self-contained win-x64 binaries (full + delta), and publishes only to a
    private repository. Do not use short-retention workflow artifacts as a
    production update feed. The currently public repository must be made private
    by its owner **before** private packages or signing material are published.
-3. **HTTPS update broker:** a separately hosted service owns a narrowly scoped
+3. **HTTPS update broker (backend source implemented; deployment pending):** a separately hosted service owns a narrowly scoped
    GitHub App installation credential with read-only access to private release
    assets. School PCs never receive GitHub PATs, GitHub App credentials or
    permanent GitHub asset links. The broker must authorize each installation
    before serving signed metadata or streaming release assets.
-4. **Installation identity:** owner-approved enrollment issues a per-installation,
+4. **Installation identity (enrollment API implemented; Windows DPAPI storage pending):** owner-approved enrollment issues a per-installation,
    revocable credential. Store it through Windows-protected credential storage.
    Enforce TLS, expiry/revocation, rate limits and release-channel access server
    side. Do not treat an easily copied machine fingerprint as authentication.
-5. **Client update service:** asynchronously request only the latest signed
+5. **Client update service (pending):** asynchronously request only the latest signed
    release manifest; rate-limit and retry on connectivity changes, keep offline
    failures silent, and show a non-modal update notice. Update Now downloads
    and stages in an isolated path while the desktop app continues running;
    Remind Me Later persists a local postponement time.
-6. **Safe activation:** once no school forms are open and the user exits, a
+6. **Safe activation (pending):** once no school forms are open and the user exits, a
    separate, verified updater executable promotes the prepared application
    atomically using the established staging/rollback principles. If the delta
    fails verification or the installed version differs, download and verify the
