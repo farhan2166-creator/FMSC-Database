@@ -42,11 +42,11 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         _authorization = authorization ?? (() => (UpdateDeviceKey.IsEnrolled,
             UpdateDeviceKey.IsEnrolled ? UpdateDeviceKey.GetPublicKey() : ""));
         Text = "FMSC — Check for Updates";
-        StartPosition = FormStartPosition.CenterParent;
+        StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = MinimizeBox = ShowInTaskbar = false;
         AutoScaleMode = AutoScaleMode.None;
-        ClientSize = new Size(AppScale.S(780), AppScale.S(540));
+        ClientSize = new Size(AppScale.S(780), AppScale.S(580));
         Font = AppTheme.NormalFont;
         BackColor = AppTheme.PageBackground;
         var content = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7,
@@ -55,22 +55,28 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         for (int row = 0; row < 7; row++)
             content.RowStyles.Add(new RowStyle(row == 4 ? SizeType.Percent : SizeType.AutoSize, row == 4 ? 100 : 0));
         var heading = new Label { Text = "Check for Updates", Font = AppTheme.HeadingFont,
-            AutoSize = true, ForeColor = AppTheme.Text, Margin = new Padding(0, 0, 0, AppScale.S(12)) };
+            AutoSize = true, Dock = DockStyle.Top, TextAlign = ContentAlignment.MiddleCenter,
+            ForeColor = AppTheme.Text, Margin = new Padding(0, 0, 0, AppScale.S(12)) };
         var summary = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2,
             Padding = new Padding(AppScale.S(12)), BackColor = AppTheme.Surface, Margin = new Padding(0, 0, 0, AppScale.S(12)) };
         summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         summary.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        summary.Controls.Add(new Label { Text = "Installed version", AutoSize = true, ForeColor = AppTheme.MutedText }, 0, 0);
-        summary.Controls.Add(new Label { Text = "Latest version", AutoSize = true, ForeColor = AppTheme.MutedText }, 1, 0);
+        summary.Controls.Add(new Label { Text = "Installed version", AutoSize = true, Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter, ForeColor = AppTheme.MutedText }, 0, 0);
+        summary.Controls.Add(new Label { Text = "Latest version", AutoSize = true, Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleCenter, ForeColor = AppTheme.MutedText }, 1, 0);
         summary.Controls.Add(new Label { Text = InstalledVersion, AutoSize = true, Font = AppTheme.BodyBoldFont,
+            Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
             ForeColor = AppTheme.Text, Margin = new Padding(3, 4, 3, 10) }, 0, 1);
         _latestVersion = new Label { Text = "Not checked", AutoSize = true, Font = AppTheme.BodyBoldFont,
+            Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter,
             ForeColor = AppTheme.Text, Margin = new Padding(3, 4, 3, 10) };
         summary.Controls.Add(_latestVersion, 1, 1);
         _downloadDetails = new Label { Text = "Check for an approved update when you are ready.", AutoSize = true,
-            Dock = DockStyle.Fill, ForeColor = AppTheme.MutedText };
+            Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = AppTheme.MutedText };
         summary.Controls.Add(_downloadDetails, 0, 2); summary.SetColumnSpan(_downloadDetails, 2);
-        var access = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
+        var access = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false, Margin = Padding.Empty };
         var accessButton = Button("Computer access", 150, "Secondary");
         _accessStatus = new Label { AutoSize = true, ForeColor = AppTheme.MutedText, Margin = new Padding(8, 10, 0, 0) };
         access.Controls.AddRange(new Control[] { accessButton, _accessStatus });
@@ -86,18 +92,19 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
             ScrollBars = ScrollBars.Vertical, WordWrap = true, Font = AppTheme.SmallFont,
             BackColor = AppTheme.Surface, ForeColor = AppTheme.Text };
         enrollment.Controls.Add(_publicKey, 0, 1);
-        var keyActions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false };
+        var keyActions = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, WrapContents = false };
         _generate = Button("Generate key", 140, "Secondary");
         _copy = Button("Copy public key", 155, "Secondary");
         keyActions.Controls.AddRange(new Control[] { _generate, _copy });
-        enrollment.Controls.Add(keyActions, 0, 2);
+        enrollment.Controls.Add(CenteredRow(keyActions), 0, 2);
         _authorizationPanel.Controls.Add(enrollment);
         accessButton.Click += (_, _) => {
             _authorizationPanel.Visible = !_authorizationPanel.Visible;
-            ClientSize = new Size(AppScale.S(780), AppScale.S(_authorizationPanel.Visible ? 540 : 365));
+            ClientSize = new Size(AppScale.S(780), AppScale.S(_authorizationPanel.Visible ? 580 : 405));
+            CenterOnOwnerScreen();
         };
         _status = new Label { AutoSize = false, Dock = DockStyle.Fill, ForeColor = AppTheme.Text,
-            Margin = new Padding(0, 12, 0, 8), TextAlign = ContentAlignment.TopLeft };
+            Margin = new Padding(0, 12, 0, 8), TextAlign = ContentAlignment.MiddleCenter };
         _progress = new ProgressBar { Dock = DockStyle.Top, Height = AppScale.S(6), Style = ProgressBarStyle.Marquee,
             Visible = false, Margin = new Padding(0, 0, 0, 12) };
         _check = Button("Check for Updates", 175, "Primary");
@@ -124,17 +131,22 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         };
         _check.Click += async (_, _) => await CheckNowAsync();
         _download.Click += async (_, _) => await DownloadAsync();
-        var actions = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, Margin = Padding.Empty };
-        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100)); actions.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var updateActions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = true, Margin = Padding.Empty };
+        var actions = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Margin = Padding.Empty };
+        actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        var updateActions = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false, Margin = Padding.Empty };
         // Only the action relevant to the current state is shown in this slot.
         updateActions.Controls.AddRange(new Control[] { _check, _download, _install });
         _download.Visible = _install.Visible = false;
-        var dismissActions = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, WrapContents = false, Margin = Padding.Empty };
+        var dismissActions = new FlowLayoutPanel { AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            WrapContents = false, Margin = Padding.Empty };
         dismissActions.Controls.AddRange(new Control[] { later, close });
-        actions.Controls.Add(updateActions, 0, 0); actions.Controls.Add(dismissActions, 1, 0);
+        actions.Controls.Add(CenteredRow(updateActions), 0, 0);
+        var dismissRow = CenteredRow(dismissActions);
+        dismissRow.Margin = new Padding(0, AppScale.S(8), 0, 0);
+        actions.Controls.Add(dismissRow, 0, 1);
         content.Controls.Add(heading, 0, 0); content.Controls.Add(summary, 0, 1);
-        content.Controls.Add(access, 0, 2); content.Controls.Add(_authorizationPanel, 0, 3);
+        content.Controls.Add(CenteredRow(access), 0, 2); content.Controls.Add(_authorizationPanel, 0, 3);
         content.Controls.Add(_status, 0, 4); content.Controls.Add(_progress, 0, 5); content.Controls.Add(actions, 0, 6);
         Controls.Add(content);
         AcceptButton = _check; CancelButton = close;
@@ -144,7 +156,32 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
 
     private static ModernButton Button(string text, int width, string role) => new() {
         Text = text, ThemeRole = role, Width = AppScale.S(width), Height = AppMetrics.ButtonHeight,
-        Margin = new Padding(0, 0, AppScale.S(8), 0) };
+        Margin = new Padding(AppScale.S(4), 0, AppScale.S(4), 0) };
+
+    private static TableLayoutPanel CenteredRow(Control content)
+    {
+        var row = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3, Margin = Padding.Empty };
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        content.Anchor = AnchorStyles.None;
+        row.Controls.Add(content, 1, 0);
+        return row;
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        CenterOnOwnerScreen();
+    }
+
+    private void CenterOnOwnerScreen()
+    {
+        if (!Visible) return;
+        var area = Screen.FromControl(Owner ?? this).WorkingArea;
+        Location = new Point(area.Left + Math.Max(0, (area.Width - Width) / 2),
+            area.Top + Math.Max(0, (area.Height - Height) / 2));
+    }
     private void RefreshAuthorization()
     {
         try
@@ -156,7 +193,8 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
             _check.Enabled = _copy.Enabled = state.Enrolled;
             _publicKey.Text = state.PublicKey;
             _authorizationPanel.Visible = !state.Enrolled;
-            ClientSize = new Size(AppScale.S(780), AppScale.S(state.Enrolled ? 365 : 540));
+            ClientSize = new Size(AppScale.S(780), AppScale.S(state.Enrolled ? 405 : 580));
+            CenterOnOwnerScreen();
             _accessStatus.Text = state.Enrolled ? "Computer key ready" : "Authorization required";
             _status.Text = state.Enrolled ? "Select Check for Updates to contact the private update repository." :
                 "Authorize this computer before checking for updates.";

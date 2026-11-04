@@ -16,9 +16,28 @@ internal static partial class Program
                 using var parent = new Form(); parent.Show();
                 using var dialog = new UpdateConnectionForm(() => (enrolled, enrolled ? "ssh-rsa fictional-public-key" : ""));
                 dialog.Show(parent); Application.DoEvents();
+                var area = Screen.FromControl(parent).WorkingArea;
+                void CheckScreenCenter() => Check(
+                    Math.Abs(dialog.Left + dialog.Width / 2 - (area.Left + area.Width / 2)) <= 2 &&
+                    Math.Abs(dialog.Top + dialog.Height / 2 - (area.Top + area.Height / 2)) <= 2,
+                    "Update window is centered on the owner's screen, including after access details change");
+                CheckScreenCenter();
                 Check(Find(dialog, "Check for Updates").Enabled == enrolled, "Checking requires a prepared computer key");
                 var panel = (Panel)typeof(UpdateConnectionForm).GetField("_authorizationPanel", fields)!.GetValue(dialog)!;
                 Check(panel.Visible == !enrolled, "Enrolled computers start with compact access details");
+                var access = Find(dialog, "Computer access").Parent!;
+                Check(Math.Abs(access.Left + access.Width / 2 - access.Parent!.ClientSize.Width / 2) <= 2,
+                    "Computer access button and status are centered as one group");
+                var checkButton = Find(dialog, "Check for Updates");
+                var center = checkButton.PointToScreen(new Point(checkButton.Width / 2, 0)).X;
+                Check(Math.Abs(center - dialog.PointToScreen(new Point(dialog.ClientSize.Width / 2, 0)).X) <= 2,
+                    "Check for Updates action is centered in the window");
+                Check(Descendants(dialog).OfType<Label>().Where(label =>
+                    label.Text is "Installed version" or "Latest version" or "Not checked" or "Check for Updates")
+                    .All(label => label.TextAlign == ContentAlignment.MiddleCenter),
+                    "Heading and version labels use centered text");
+                Find(dialog, "Computer access").PerformClick(); Application.DoEvents(); CheckScreenCenter();
+                Find(dialog, "Computer access").PerformClick(); Application.DoEvents(); CheckScreenCenter();
                 var buttons = Descendants(dialog).OfType<ModernButton>().Where(b => b.Visible).ToArray();
                 foreach (var button in buttons)
                     Check(button.Right <= button.Parent!.ClientSize.Width && button.Bottom <= button.Parent.ClientSize.Height,
