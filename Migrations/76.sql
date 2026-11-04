@@ -27,8 +27,9 @@ END;
 GO
 
 
--- Credit-only collections must use the enrollment date guard already applied
--- by cash collections. Credit funding as-of-date is a separate owner policy.
+-- Credit is deliberately forbidden on a backdated collection, regardless of
+-- how much advance exists today. Cash backdating retains its existing rules.
+-- Credit-only collections also obey the same enrollment date guard as cash.
 CREATE OR ALTER PROCEDURE dbo.ApplyCollectionCredit
  @UserId int,@TransactionDate date,@CreditsJson nvarchar(max)
 AS
@@ -38,6 +39,8 @@ BEGIN
  IF @@TRANCOUNT=0 THROW 54900,'Credit application requires the collection transaction.',1;
  IF @TransactionDate IS NULL OR @TransactionDate>CONVERT(date,GETDATE()) OR ISJSON(@CreditsJson)<>1
   THROW 54902,'Choose a valid payment date and credit allocation.',1;
+ IF @TransactionDate<CONVERT(date,GETDATE())
+  THROW 54902,'Advance cannot be used for a backdated collection. Select today for credit settlement.',1;
  DECLARE @Plan TABLE(ChargeId bigint PRIMARY KEY,AdmissionId int NOT NULL,EnrollmentId int NOT NULL,
   Amount decimal(12,2) NOT NULL,ExpectedBalance decimal(12,2) NOT NULL,ExpectedCredit decimal(12,2) NOT NULL);
  INSERT @Plan SELECT ChargeId,AdmissionId,EnrollmentId,Amount,ExpectedBalance,ExpectedCredit
@@ -94,5 +97,5 @@ GO
 
 INSERT dbo.DatabaseVersion(VersionNumber,AppliedOn,AppliedBy,Notes)
 VALUES(N'76',SYSDATETIME(),SUSER_SNAME(),
-       N'Collect-only student advance; reject credit settlements before enrollment');
+       N'Apply advance only during collection dated today; never in posting or backdated settlement');
 GO
