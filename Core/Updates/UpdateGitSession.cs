@@ -195,7 +195,7 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
             {
                 bytes += read;
                 if (bytes > maxOutputBytes)
-                    throw new InvalidDataException("Git emitted data larger than the allowed signed update file.");
+                    throw new InvalidDataException("Git emitted data larger than the allowed update file.");
                 await destination.WriteAsync(buffer.AsMemory(0, read), linked.Token);
             }
             await process.WaitForExitAsync(linked.Token);
