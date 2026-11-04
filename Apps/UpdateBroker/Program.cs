@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.AspNetCore.HttpOverrides;
 using System.Threading.RateLimiting;
 using FMSC_SMS.UpdateBroker;
 using Microsoft.AspNetCore.RateLimiting;
@@ -49,11 +50,30 @@ if (args.Length > 0)
 
 await store.VerifySchemaAsync();
 
+var trustedProxySetting = Environment.GetEnvironmentVariable("FMSC_UPDATE_TRUSTED_PROXY_IP");
+IPAddress? trustedProxy = null;
+if (!string.IsNullOrWhiteSpace(trustedProxySetting) &&
+    !IPAddress.TryParse(trustedProxySetting, out trustedProxy))
+    throw new InvalidOperationException("FMSC_UPDATE_TRUSTED_PROXY_IP must be one explicit proxy IP.");
+
 var builder = WebApplication.CreateBuilder(args);
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.SetMinimumLevel(LogLevel.Warning);
 builder.WebHost.ConfigureKestrel(server => server.Limits.MaxRequestBodySize = 4096);
+if (trustedProxy is not null)
+{
+    var onlyTrustedProxy = trustedProxy;
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        options.ForwardLimit = 1;
+        options.KnownNetworks.Clear();
+        options.KnownProxies.Clear();
+        options.KnownProxies.Add(onlyTrustedProxy);
+    });
+}
+
 builder.Services.AddSingleton(config);
 builder.Services.AddSingleton(store);
 builder.Services.AddHttpClient("github", client =>
@@ -87,6 +107,8 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+if (trustedProxy is not null)
+    app.UseForwardedHeaders();
 app.UseExceptionHandler(errorApp => errorApp.Run(async context =>
 {
     context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
