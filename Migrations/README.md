@@ -65,8 +65,11 @@ fee posting, activation and background billing. The compatibility procedure
 remains callable but cannot create payments or move credit; posting creates
 charges only. In Fee Collection, the operator reviews the student's own
 advance and saves the chosen credit allocation and any cash together with
-an immutable collection receipt. Historical credit payments and legacy receipt
-readers are preserved without rewriting school records. Apply only after
+an immutable collection receipt. Backdated collections cannot use advance,
+regardless of deposit date; the SQL writer rejects credit for any date before
+today while preserving cash backdating under its original enrollment guard.
+Historical credit payments and legacy receipt readers are preserved without
+rewriting school records. Apply only after
 schema 75 using the normal verified-backup migration workflow.
 
 ## Previous target: schema 75
