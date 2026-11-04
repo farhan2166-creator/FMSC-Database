@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace FMSC_SMS.Core.Updates;
@@ -15,35 +14,31 @@ internal interface IUpdateArtifactSource
 }
 
 internal sealed record VerifiedUpdate(UpdateManifest Manifest, string RepositoryVersion,
-    byte[] ManifestBytes, byte[] Signature);
+    byte[] ManifestBytes);
 
 internal sealed record PreparedUpdate(
     string Version,
     string StageDirectory,
-    string SignedManifestDirectory,
+    string ManifestDirectory,
     UpdateDownloadChoice Method,
     bool UsedFullFallback);
 
 /// <summary>
-/// A signed release is verified BEFORE selecting or downloading archives.
-/// The fetched chunks are checked independently and the reconstructed ZIP is
-/// checked again. All output is isolated; activation and SQL are separate.
+/// The versioned manifest comes from the owner's authenticated private Git repository.
+/// Each downloaded chunk, reconstructed ZIP and staged application file is checked
+/// against its published SHA-256 digest. Hashes detect mismatches, not compromised
+/// repository write access. Activation and SQL are separate.
 /// </summary>
 internal static class UpdateReleasePreparer
 {
     internal static async Task<VerifiedUpdate?> ReadLatestAsync(
-        IUpdateArtifactSource source, RSA pinnedPublisherPublicKey,
-        CancellationToken cancellationToken)
+        IUpdateArtifactSource source, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(source);
-        ArgumentNullException.ThrowIfNull(pinnedPublisherPublicKey);
-        if (pinnedPublisherPublicKey.KeySize < 3072)
-            throw new CryptographicException("FMSC publisher verification key is too short.");
-
         byte[] pointer = await source.ReadSmallAsync(
             "channel/stable.json", 4096, cancellationToken);
         if (pointer.Length is < 1 or > 4096)
-            throw new InvalidDataException("Invalid signed-update channel pointer size.");
+            throw new InvalidDataException("Invalid update channel pointer size.");
 
         using var document = JsonDocument.Parse(pointer);
         var root = document.RootElement;
@@ -55,13 +50,10 @@ internal static class UpdateReleasePreparer
         string folder = "versions/" + version + "/";
         byte[] manifestBytes = await source.ReadSmallAsync(
             folder + "update-manifest.json", 4 * 1024 * 1024, cancellationToken);
-        byte[] signature = await source.ReadSmallAsync(
-            folder + "update-manifest.sig", 8192, cancellationToken);
-        var manifest = UpdateManifestPolicy.ReadVerified(
-            manifestBytes, signature, pinnedPublisherPublicKey);
+        var manifest = UpdateManifestPolicy.ReadValidated(manifestBytes);
         if (!string.Equals(manifest.Version, version, StringComparison.Ordinal))
-            throw new InvalidDataException("Signed application version does not match the published channel.");
-        return new VerifiedUpdate(manifest, version, manifestBytes, signature);
+            throw new InvalidDataException("Update version does not match the published channel.");
+        return new VerifiedUpdate(manifest, version, manifestBytes);
     }
 
     internal static UpdateDownloadChoice Choose(
@@ -111,7 +103,7 @@ internal static class UpdateReleasePreparer
             throw new InvalidOperationException("Application-only preparation is forbidden for this update decision.");
         if (!string.Equals(release.RepositoryVersion, release.Manifest.Version, StringComparison.Ordinal) ||
             !UpdateManifestPolicy.IsPublishedVersion(release.RepositoryVersion))
-            throw new InvalidDataException("Requested release is not an approved signed version.");
+            throw new InvalidDataException("Requested release does not match its validated manifest version.");
         if (Directory.Exists(newStagingRoot) || File.Exists(newStagingRoot))
             throw new IOException("The update staging root must not already exist.");
         string stagedRoot = Path.GetFullPath(newStagingRoot);
@@ -124,27 +116,26 @@ internal static class UpdateReleasePreparer
         {
             Directory.CreateDirectory(stagedRoot);
             created = true;
-            string signedMetadata = Path.Combine(stagedRoot, "signed");
-            Directory.CreateDirectory(signedMetadata);
-            File.WriteAllBytes(Path.Combine(signedMetadata, "update-manifest.json"),
+            // Validate the original repository metadata again before creating
+            // any application files; do not trust a manually constructed record.
+            var manifest = UpdateManifestPolicy.ReadValidated(release.ManifestBytes);
+            if (manifest.Version != release.RepositoryVersion)
+                throw new InvalidDataException("Update metadata and requested version differ.");
+            string metadata = Path.Combine(stagedRoot, "metadata");
+            Directory.CreateDirectory(metadata);
+            File.WriteAllBytes(Path.Combine(metadata, "update-manifest.json"),
                 release.ManifestBytes);
-            File.WriteAllBytes(Path.Combine(signedMetadata, "update-manifest.sig"),
-                release.Signature);
-            // The caller MUST have verified the signature through
-            // ReadLatestAsync before entering this function. An authenticated
-            // Git transport alone does not make the release trustworthy.
-            var manifest = release.Manifest;
             await AttemptAsync(manifest, release.RepositoryVersion, source,
                 installed, stagedRoot, method == UpdateDownloadChoice.Incremental,
                 cancellationToken);
             return new PreparedUpdate(release.RepositoryVersion,
-                Path.Combine(stagedRoot, "application"), signedMetadata, method, false);
+                Path.Combine(stagedRoot, "application"), metadata, method, false);
         }
         catch (InvalidDataException) when (method == UpdateDownloadChoice.Incremental && created)
         {
             // A delta can stop being applicable if a school-side DLL changed
-            // between the check and staging. Rebuild from the signed FULL ZIP.
-            // Never accept an invalid manifest: that was checked BEFORE this.
+            // between the check and staging. Retry using the full package,
+            // whose file and archive digests are checked independently.
             string application = Path.Combine(stagedRoot, "application");
             if (Directory.Exists(application)) Directory.Delete(application, true);
             string downloaded = Path.Combine(stagedRoot, "download");
@@ -154,7 +145,7 @@ internal static class UpdateReleasePreparer
                 await AttemptAsync(release.Manifest, release.RepositoryVersion, source,
                     installed, stagedRoot, false, cancellationToken);
                 return new PreparedUpdate(release.RepositoryVersion,
-                    Path.Combine(stagedRoot, "application"), Path.Combine(stagedRoot, "signed"),
+                    Path.Combine(stagedRoot, "application"), Path.Combine(stagedRoot, "metadata"),
                     UpdateDownloadChoice.Full, true);
             }
             catch
@@ -176,9 +167,9 @@ internal static class UpdateReleasePreparer
         string installed, string root, bool incremental, CancellationToken token)
     {
         UpdateArchive archive = incremental
-            ? manifest.Incremental ?? throw new InvalidDataException("No signed incremental package.")
+            ? manifest.Incremental ?? throw new InvalidDataException("No incremental package in manifest.")
             : manifest.Full;
-        // Never build a URL/path from unchecked remote metadata.
+        // Never build a path from unchecked remote metadata.
         UpdateManifestPolicy.ValidateArchive(archive);
         string partDir = Path.Combine(root, "download", "parts");
         string assembledDir = Path.Combine(root, "download", "assembled");
@@ -194,7 +185,7 @@ internal static class UpdateReleasePreparer
             if (!downloaded.Exists || downloaded.Length != part.Length ||
                 !string.Equals(UpdateChunks.Sha256(target), part.Sha256,
                     StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("Private Git update part failed its signed SHA-256 digest.");
+                throw new InvalidDataException("Private Git update part failed its published SHA-256 digest.");
         }
         string zip = Path.Combine(assembledDir, archive.Name);
         UpdateChunks.ReassembleVerified(archive, partDir, zip);
@@ -211,27 +202,3 @@ internal static class UpdateReleasePreparer
     }
 }
 
-/// <summary>At runtime the publisher key MUST be embedded in the signed FMSC
-/// binary at build time. Do not load it from an unsigned Git config or from
-/// the update repository itself.</summary>
-internal static class UpdatePublisherTrust
-{
-    internal const string EmbeddedName = "FMSC_SMS.Updates.PublisherPublicKey";
-    internal static RSA LoadPinnedPublicKey()
-    {
-        using Stream resource = typeof(UpdatePublisherTrust).Assembly
-            .GetManifestResourceStream(EmbeddedName)
-            ?? throw new InvalidOperationException(
-                "FMSC publisher public key has not yet been provisioned for this build. " +
-                "Signed updates remain disabled.");
-        using var reader = new StreamReader(resource);
-        string pem = reader.ReadToEnd();
-        using var key = RSA.Create();
-        key.ImportFromPem(pem);
-        if (key.KeySize < 3072)
-            throw new CryptographicException("Configured update publisher key is too short.");
-        var verified = RSA.Create();
-        verified.ImportParameters(key.ExportParameters(false));
-        return verified;
-    }
-}
