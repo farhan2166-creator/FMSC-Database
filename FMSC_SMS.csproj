@@ -88,6 +88,7 @@
 	</ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.1" />
+		<PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
 		<PackageReference Include="PdfPig" Version="0.1.16" />
 		<PackageReference Include="PDFsharp-MigraDoc-GDI" Version="6.2.4" />
 		<PackageReference Include="ReportViewerCore.WinForms" Version="15.1.33" />
