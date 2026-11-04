@@ -172,7 +172,7 @@ internal static class DistributionSnapshot
     private static UpdateManifest ReadCheckedPackage(string directory)
     {
         if (!Directory.Exists(directory))
-            throw new DirectoryNotFoundException("Signed update release is missing.");
+            throw new DirectoryNotFoundException("Update release is missing.");
         foreach (var path in Directory.EnumerateFileSystemEntries(directory, "*", SearchOption.AllDirectories))
             if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
                 throw new InvalidDataException("Symbolic links are prohibited in release packages.");
