@@ -90,9 +90,12 @@ Do not make their defaults identical as a cosmetic consistency change.
 BD-12 Concessions and money: discount reduces the full fee; correcting a recorded
 payment is distinct from returning cash. Reductions consume unpaid dues first;
 paid differences become the explicitly selected advance or refund. Optional credit
-use follows the reviewed order, oldest due tuition then other due fees; future
-fees do not consume it early. Credit use is settlement, never new cash. Normal
-later billing keeps its existing eligible-credit rules. No silent money rounding.
+use follows the reviewed manual collection order, restricted to its owner unless
+transferred explicitly. Future posted fees may be prepaid deliberately only in
+collection; posting and automatic billing do not consume advance. Credit use is
+settlement, never new cash, and confirmed collection saves a receipt snapshot.
+This 4 Nov owner decision supersedes the earlier automatic-use rule. No silent
+money rounding.
 
 BD-13 Collection: posting creates dues; collection settles them. Partial and family
 collection keep each child's allocations, concessions and debt attached to that
