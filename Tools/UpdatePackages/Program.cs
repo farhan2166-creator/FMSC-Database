@@ -1,0 +1,237 @@
+using System.IO.Compression;
+using System.Security.Cryptography;
+using FMSC_SMS.Core.Updates;
+
+try
+{
+    if (args.Length == 1 && args[0] == "--self-test")
+    {
+        SelfTest.Run();
+        Console.WriteLine("PASS: signed incremental/full update packaging and fallback checks.");
+        return;
+    }
+
+    var options = Parse(args);
+    var current = Required(options, "current-dir");
+    var output = Required(options, "output-dir");
+    var version = Required(options, "version");
+    var schema = int.Parse(Required(options, "schema"));
+    var signingKey = Required(options, "signing-private-key");
+    options.TryGetValue("previous-dir", out string? previous);
+    options.TryGetValue("previous-version", out string? previousVersion);
+    if ((previous is null) != (previousVersion is null))
+        throw new ArgumentException("previous-dir and previous-version must be supplied together.");
+    using var rsa = RSA.Create();
+    rsa.ImportFromPem(File.ReadAllText(signingKey));
+    var manifest = PackageBuilder.Build(current, output, version, schema, previous, previousVersion, rsa);
+    Console.WriteLine($"Prepared signed application update {manifest.Version}; " +
+        $"delta: {(manifest.Incremental is null ? "unavailable" : manifest.ChangedFiles.Count + " changed files")}. " +
+        "Publishing, authorization and application activation are separate release gates.");
+}
+catch (Exception error)
+{
+    Console.Error.WriteLine("UPDATE PACKAGING FAILED: " + error.Message);
+    Environment.ExitCode = 1;
+}
+
+static Dictionary<string, string> Parse(string[] args)
+{
+    if (args.Length == 0 || args.Length % 2 != 0)
+        throw new ArgumentException("Expected --current-dir, --output-dir, --version, --schema, " +
+            "--signing-private-key; optional --previous-dir and --previous-version. Or --self-test.");
+    var result = new Dictionary<string, string>(StringComparer.Ordinal);
+    for (int i = 0; i < args.Length; i += 2)
+    {
+        if (!args[i].StartsWith("--", StringComparison.Ordinal) ||
+            args[i].Length < 3 || !result.TryAdd(args[i][2..], args[i + 1]))
+            throw new ArgumentException("Invalid or duplicate update packaging option.");
+    }
+    var known = new HashSet<string>(new[] { "current-dir", "output-dir", "version",
+        "schema", "signing-private-key", "previous-dir", "previous-version" }, StringComparer.Ordinal);
+    if (result.Keys.Any(key => !known.Contains(key)))
+        throw new ArgumentException("Unknown update packaging option.");
+    return result;
+}
+
+static string Required(Dictionary<string, string> args, string key) =>
+    args.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+        ? value : throw new ArgumentException("Missing --" + key);
+
+internal static class PackageBuilder
+{
+    internal static UpdateManifest Build(string currentDir, string outputDir, string version,
+        int schema, string? previousDir, string? previousVersion, RSA privateKey)
+    {
+        var current = Path.GetFullPath(currentDir);
+        var output = Path.GetFullPath(outputDir);
+        if (!Directory.Exists(current))
+            throw new DirectoryNotFoundException("Current published application folder was not found.");
+        if (IsWithin(output, current) || IsWithin(current, output))
+            throw new ArgumentException("The output folder cannot overlap the application input.");
+        if (previousDir is not null && IsWithin(output, Path.GetFullPath(previousDir)))
+            throw new ArgumentException("The output folder cannot overlap the previous application.");
+        var currentFiles = Inventory(current);
+        var baseFiles = previousDir is null ? new List<UpdateFile>() : Inventory(previousDir);
+        var changed = previousDir is null ? new List<string>() :
+            UpdateManifestPolicy.FindChanged(baseFiles, currentFiles);
+        var manifest = new UpdateManifest
+        {
+            Version = version,
+            BaseVersion = previousVersion,
+            RequiredDatabaseSchema = schema,
+            Files = currentFiles,
+            BaseFiles = baseFiles,
+            ChangedFiles = changed
+        };
+        Directory.CreateDirectory(output);
+        const string fullName = "FMSC_SMS-app-full.zip";
+        CreateZip(current, currentFiles.Select(f => f.Path), Path.Combine(output, fullName));
+        manifest.Full = Archive(output, fullName);
+
+        if (previousDir is not null)
+        {
+            const string deltaName = "FMSC_SMS-app-incremental.zip";
+            CreateZip(current, changed, Path.Combine(output, deltaName));
+            manifest.Incremental = Archive(output, deltaName);
+        }
+        byte[] data = UpdateManifestPolicy.Serialize(manifest);
+        byte[] signature = privateKey.SignData(data, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        File.WriteAllBytes(Path.Combine(output, "update-manifest.json"), data);
+        File.WriteAllBytes(Path.Combine(output, "update-manifest.sig"), signature);
+        return manifest;
+    }
+
+    private static bool IsWithin(string path, string folder)
+    {
+        string prefix = Path.TrimEndingDirectorySeparator(folder) + Path.DirectorySeparatorChar;
+        return string.Equals(path, folder, StringComparison.OrdinalIgnoreCase) ||
+            path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static List<UpdateFile> Inventory(string directory)
+    {
+        string root = Path.GetFullPath(directory);
+        if (!Directory.Exists(root)) throw new DirectoryNotFoundException(root);
+        var list = new List<UpdateFile>();
+        foreach (string path in Directory.EnumerateFileSystemEntries(root, "*", SearchOption.AllDirectories))
+        {
+            if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+                throw new InvalidDataException("Symbolic links and reparse points are prohibited in update packages.");
+            if (!File.Exists(path)) continue;
+            string name = Path.GetRelativePath(root, path).Replace('\\', '/');
+            if (!UpdateManifestPolicy.IsSafeRelativePath(name))
+                throw new InvalidDataException("Unsafe application file path: " + name);
+            string ext = Path.GetExtension(name);
+            if (new[] { ".mdf", ".ldf", ".bak", ".pfx", ".p12", ".pem", ".key" }
+                .Contains(ext, StringComparer.OrdinalIgnoreCase) ||
+                Path.GetFileName(name).StartsWith(".env", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("A database or secret-like file was found in the application package: " + name);
+            var file = new FileInfo(path);
+            list.Add(new UpdateFile { Path = name, Length = file.Length, Sha256 = Hash(path) });
+        }
+        list.Sort((a, b) => StringComparer.Ordinal.Compare(a.Path, b.Path));
+        if (list.Select(f => f.Path).Distinct(StringComparer.OrdinalIgnoreCase).Count() != list.Count)
+            throw new InvalidDataException("Application contains paths that collide on Windows.");
+        return list;
+    }
+
+    private static void CreateZip(string root, IEnumerable<string> paths, string destination)
+    {
+        using var file = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+        using var zip = new ZipArchive(file, ZipArchiveMode.Create);
+        foreach (string path in paths.OrderBy(path => path, StringComparer.Ordinal))
+        {
+            var item = zip.CreateEntry(path, CompressionLevel.Optimal);
+            item.LastWriteTime = new DateTimeOffset(2020, 1, 1, 0, 0, 0, TimeSpan.Zero);
+            using var source = File.OpenRead(Path.Combine(root, path.Replace('/', Path.DirectorySeparatorChar)));
+            using var target = item.Open();
+            source.CopyTo(target);
+        }
+    }
+
+    private static UpdateArchive Archive(string root, string name)
+    {
+        var path = Path.Combine(root, name);
+        return new UpdateArchive { Name = name, Length = new FileInfo(path).Length, Sha256 = Hash(path) };
+    }
+
+    private static string Hash(string path)
+    {
+        using var stream = File.OpenRead(path);
+        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+    }
+}
+
+internal static class SelfTest
+{
+    internal static void Run()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "fmsc-update-fixture-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string oldDir = Path.Combine(root, "old");
+            string newDir = Path.Combine(root, "new");
+            string output = Path.Combine(root, "out");
+            Directory.CreateDirectory(oldDir);
+            Directory.CreateDirectory(newDir);
+            File.WriteAllText(Path.Combine(oldDir, "FMSC_SMS.exe"), "exe");
+            File.WriteAllText(Path.Combine(newDir, "FMSC_SMS.exe"), "exe");
+            File.WriteAllText(Path.Combine(oldDir, "changed.dll"), "before");
+            File.WriteAllText(Path.Combine(newDir, "changed.dll"), "after");
+            File.WriteAllText(Path.Combine(oldDir, "removed.dll"), "remove me");
+            File.WriteAllText(Path.Combine(newDir, "added.dll"), "new file");
+            using var key = RSA.Create(3072);
+            var manifest = PackageBuilder.Build(newDir, output, "1.1.0", 75, oldDir, "1.1.0-rc.2", key);
+            using var publicKey = RSA.Create();
+            publicKey.ImportFromPem(key.ExportRSAPublicKeyPem());
+            byte[] bytes = File.ReadAllBytes(Path.Combine(output, "update-manifest.json"));
+            byte[] signature = File.ReadAllBytes(Path.Combine(output, "update-manifest.sig"));
+            var valid = UpdateManifestPolicy.ReadVerified(bytes, signature, publicKey);
+            Require(valid.ChangedFiles.SequenceEqual(new[] { "added.dll", "changed.dll" }), "Only changed files belong in the delta.");
+            using (var zip = ZipFile.OpenRead(Path.Combine(output, valid.Incremental!.Name)))
+                Require(zip.Entries.Select(x => x.FullName).SequenceEqual(valid.ChangedFiles), "Delta ZIP contents mismatch.");
+            using (var zip = ZipFile.OpenRead(Path.Combine(output, valid.Full.Name)))
+                Require(zip.Entries.Count == 3, "Full ZIP must contain the complete new application.");
+            Require(UpdateManifestPolicy.Choose(valid, "1.1.0-rc.2", 75,
+                valid.BaseFiles.ToDictionary(f => f.Path, f => f.Sha256, StringComparer.OrdinalIgnoreCase))
+                == UpdateDownloadChoice.Incremental, "Clean base must select delta.");
+            var corrupted = valid.BaseFiles.ToDictionary(f => f.Path, f => f.Sha256, StringComparer.OrdinalIgnoreCase);
+            corrupted["changed.dll"] = new string('0', 64);
+            Require(UpdateManifestPolicy.Choose(valid, "1.1.0-rc.2", 75, corrupted)
+                == UpdateDownloadChoice.Full, "Changed installed files must trigger full fallback.");
+            Require(UpdateManifestPolicy.Choose(valid, "1.1.0-rc.2", 74, corrupted)
+                == UpdateDownloadChoice.RequiresDatabaseInstaller, "Schema changes require the existing safe installer.");
+            Require(UpdateManifestPolicy.Choose(valid, "1.1.0", 75, corrupted)
+                == UpdateDownloadChoice.NotNewer, "Already updated installations must not update again.");
+            bytes[bytes.Length - 2] ^= 1;
+            try
+            {
+                _ = UpdateManifestPolicy.ReadVerified(bytes, signature, publicKey);
+                throw new Exception("Tampered publisher signature was accepted.");
+            }
+            catch (CryptographicException) { }
+            foreach (string unsafePath in new[] { "../FMSC_SMS.exe", "/absolute", "C:/evil",
+                "folder\\evil.exe", "CON.txt", "dir//evil" })
+                Require(!UpdateManifestPolicy.IsSafeRelativePath(unsafePath),
+                    "Unsafe archive path passed validation: " + unsafePath);
+            using var wrongKey = RSA.Create(3072);
+            try
+            {
+                _ = UpdateManifestPolicy.ReadVerified(
+                    File.ReadAllBytes(Path.Combine(output, "update-manifest.json")), signature, wrongKey);
+                throw new Exception("Wrong publisher key was accepted.");
+            }
+            catch (CryptographicException) { }
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static void Require(bool pass, string message)
+    {
+        if (!pass) throw new Exception(message);
+    }
+}
