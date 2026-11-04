@@ -6,7 +6,6 @@ internal static class BrokerSelfTests
 {
     internal static void Run()
     {
-        using var firstPepperRandom = RandomNumberGenerator.Create();
         var firstPepper = RandomNumberGenerator.GetBytes(32);
         var secondPepper = RandomNumberGenerator.GetBytes(32);
         var school = Guid.NewGuid();
