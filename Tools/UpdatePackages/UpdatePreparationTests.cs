@@ -105,6 +105,22 @@ internal static class UpdatePreparationTests
                 throw new Exception("Unsupported update manifest was accepted.");
             }
             catch (InvalidDataException) { }
+
+            // An unvalidated release record must NEVER enter full fallback.
+            var invalidRecord = new VerifiedUpdate(verified.Manifest,
+                verified.RepositoryVersion, File.ReadAllBytes(metadata));
+            string invalidStage = Path.Combine(root, "refused-invalid-metadata");
+            try
+            {
+                _ = UpdateReleasePreparer.PrepareAsync(invalidRecord, source,
+                    UpdateDownloadChoice.Incremental, oldApp, invalidStage,
+                    CancellationToken.None).GetAwaiter().GetResult();
+                throw new Exception("Malformed manifest triggered application staging.");
+            }
+            catch (InvalidDataException) { }
+            Require(!Directory.Exists(invalidStage),
+                "Rejected manifest must not create staging output.");
+
             Console.WriteLine("PASS: verified Git release metadata, delta, full fallback, " +
                 "schema gating, corrupt part recovery and live-app isolation.");
         }
