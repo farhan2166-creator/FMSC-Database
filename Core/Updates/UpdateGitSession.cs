@@ -128,7 +128,7 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         }
     }
 
-    private static bool IsAllowedMetadataPath(string value)
+    internal static bool IsAllowedMetadataPath(string value)
     {
         if (value == "channel/stable.json") return true;
         var pieces = value.Split('/');
@@ -137,7 +137,7 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
             (pieces[2] == "update-manifest.json" || pieces[2] == "update-manifest.sig");
     }
 
-    private static bool IsAllowedPartPath(string value)
+    internal static bool IsAllowedPartPath(string value)
     {
         var pieces = value.Split('/');
         if (pieces.Length != 3 || pieces[0] != "versions" ||
