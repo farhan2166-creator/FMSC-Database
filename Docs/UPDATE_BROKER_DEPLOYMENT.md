@@ -62,13 +62,16 @@ FMSC_UPDATE_GITHUB_INSTALLATION_ID=<installation id>
 FMSC_UPDATE_GITHUB_APP_PRIVATE_KEY_PATH=<secure server-only PEM file path>
 FMSC_UPDATE_PUBLISHER_PUBLIC_KEY_PATH=<pinned RSA publisher PUBLIC PEM path>
 FMSC_UPDATE_MAX_DEVICES_PER_SCHOOL=100
+FMSC_UPDATE_TRUSTED_PROXY_IP=<optional single trusted reverse-proxy IP>
 ```
 
 The enrollment ceiling is an operational anti-abuse configuration, **not** a
 final licensing policy. The owner may choose a different limit later.
 
-Only an HTTPS-capable Kestrel endpoint or a reverse proxy whose forwarded
-headers are configured for explicitly trusted proxies is supported. The
+Only an HTTPS-capable Kestrel endpoint or a reverse proxy explicitly listed
+by its IP through `FMSC_UPDATE_TRUSTED_PROXY_IP` is supported. The broker
+accepts only one forwarding hop and only from that address; omit the setting
+when Kestrel itself terminates TLS. The
 program rejects `HttpContext.Request.IsHttps == false` before accepting
 credentials. Configure the reverse proxy's TLS, forwarding, firewall and
 logs carefully; never log authorization headers or enrollment secrets.
