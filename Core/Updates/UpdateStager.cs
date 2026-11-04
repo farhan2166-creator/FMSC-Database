@@ -79,7 +79,7 @@ internal static class UpdateStager
             // before any outside component is permitted to activate the new version.
             var physicalFiles = Directory.GetFiles(staged, "*", SearchOption.AllDirectories);
             if (physicalFiles.Length != manifest.Files.Count)
-                throw new InvalidDataException("Staged application inventory differs from the signed manifest.");
+                throw new InvalidDataException("Staged application inventory differs from the manifest.");
             foreach (var file in manifest.Files)
             {
                 string path = SafePath(staged, file.Path);
