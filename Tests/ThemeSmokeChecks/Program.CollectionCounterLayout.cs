@@ -38,6 +38,48 @@ internal static partial class Program
             if(selected.Length == 1)
             {
                 Check(next.Visible && reserved > 0, "Ordinary collection retains Next Student and its action row");
+                // Programmatic enrollment binding used to launch an independent
+                // asynchronous reload, invalidating the just-selected student.
+                var enrollment=Field<LookupBox>("enrollment");
+                int beforeBind=Field<int>("loadVersion");
+                var placements=new DataTable();
+                placements.Columns.Add("EnrollmentId",typeof(int));
+                placements.Columns.Add("Display",typeof(string));
+                placements.Rows.Add(91,"Synthetic active placement");
+                enrollment.Bind(placements,"EnrollmentId","Display");
+                enrollment.SelectedValue=91;
+                Check(Field<int>("loadVersion")==beforeBind,
+                    "Binding and selecting the default enrollment do not launch competing charge loads");
+
+                var picker=Field<StudentPicker>("student");
+                var charges=Field<DataGridView>("charges");
+                var row=charges.Rows[charges.Rows.Add()];
+                row.Cells["BillingChargeId"].Value=7001L;
+                row.Cells["Balance"].Value=500m;
+                picker.SetStudent(41,"41 - Synthetic student");
+                var queueFocus=typeof(FeeCollectionPage).GetMethod("QueueLoadedAmountFocus",flags)!;
+                Field<ModernTextBox>("reference").Focus();
+                picker.Focus();
+                queueFocus.Invoke(page,new object[]{41,true});
+                Application.DoEvents();
+                Check(amount.ContainsFocus && amount.SelectionLength==amount.Text.Length,
+                    "Completed picker selection defers and selects Amount after the UI settles");
+
+                picker.Focus();
+                queueFocus.Invoke(page,new object[]{41,true});
+                Field<ModernTextBox>("reference").Focus();
+                Application.DoEvents();
+                Check(Field<ModernTextBox>("reference").ContainsFocus && !amount.ContainsFocus,
+                    "Deferred student focus does not steal an operator's new entry-field focus");
+
+                picker.Focus();
+                queueFocus.Invoke(page,new object[]{41,true});
+                picker.SetStudent(42,"42 - Different synthetic student");
+                Application.DoEvents();
+                Check(!amount.ContainsFocus,
+                    "A queued focus request for a superseded student is ignored");
+                picker.SetStudent(41,"41 - Synthetic student");
+                charges.Rows.Clear();
                 page.ConfigureCounter(selected); Application.DoEvents();
                 Check(normalHeight - summary.Height >= reserved, "Changing to counter mode releases the hidden action's full height");
             }
