@@ -6,7 +6,7 @@ using FMSC_SMS.Core;
 namespace FMSC_SMS.Core.Updates;
 
 /// <summary>
-/// School-facing manual Update Connection. No download, installation or SQL
+/// School-facing manual private Git Update Connection. No download, installation or SQL
 /// operation occurs here; nothing is run in the background at startup.
 /// A school receives authorization only after the repository owner adds this
 /// computer's public key as a READ-ONLY deploy key in FMSC-Updates.
