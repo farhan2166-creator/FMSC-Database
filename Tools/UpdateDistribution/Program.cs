@@ -7,7 +7,7 @@ try
     if (args.SequenceEqual(new[] { "--self-test" }, StringComparer.Ordinal))
     {
         SnapshotTests.Run();
-        Console.WriteLine("PASS: two-version signed distribution snapshot and retention tests.");
+        Console.WriteLine("PASS: two-version SHA-256 verified distribution snapshot and retention tests.");
         return;
     }
 
@@ -16,8 +16,7 @@ try
     var result = DistributionSnapshot.Prepare(
         Required(options, "new-package-dir"),
         previous,
-        Required(options, "output-dir"),
-        Required(options, "publisher-public-key"));
+        Required(options, "output-dir"));
     Console.WriteLine("Verified private Git distribution snapshot: latest " + result.LatestVersion +
         ", previous " + (result.PreviousVersion ?? "(none)") +
         ". Source packages remain untouched. Nothing was published or pushed.");
@@ -31,14 +30,13 @@ catch (Exception exception)
 static Dictionary<string, string> Parse(string[] args)
 {
     if (args.Length == 0 || args.Length % 2 != 0)
-        throw new ArgumentException("Use --new-package-dir --output-dir --publisher-public-key " +
+        throw new ArgumentException("Use --new-package-dir --output-dir " +
             "[--previous-snapshot-dir] or --self-test.");
     var found = new Dictionary<string, string>(StringComparer.Ordinal);
     for (int i = 0; i < args.Length; i += 2)
     {
         if (!args[i].StartsWith("--", StringComparison.Ordinal) ||
-            !new[] { "new-package-dir", "previous-snapshot-dir", "output-dir",
-                "publisher-public-key" }.Contains(args[i][2..], StringComparer.Ordinal) ||
+            !new[] { "new-package-dir", "previous-snapshot-dir", "output-dir" }.Contains(args[i][2..], StringComparer.Ordinal) ||
             !found.TryAdd(args[i][2..], args[i + 1]))
             throw new ArgumentException("Invalid or duplicate distribution option.");
     }
@@ -66,7 +64,7 @@ internal static class DistributionSnapshot
     };
 
     internal static UpdateChannel Prepare(string newPackageDirectory,
-        string? previousSnapshotDirectory, string outputDirectory, string publisherPublicKeyPath)
+        string? previousSnapshotDirectory, string outputDirectory)
     {
         string package = Path.GetFullPath(newPackageDirectory);
         string output = Path.GetFullPath(outputDirectory);
@@ -76,12 +74,7 @@ internal static class DistributionSnapshot
         if (Directory.Exists(output) || File.Exists(output) ||
             Overlaps(output, package) || (previous is not null && Overlaps(output, previous)))
             throw new InvalidOperationException("Output must be a new independent snapshot directory.");
-        using var key = RSA.Create();
-        key.ImportFromPem(File.ReadAllText(publisherPublicKeyPath));
-        if (key.KeySize < 3072)
-            throw new CryptographicException("Publisher signing public key must be at least 3072 bits.");
-
-        var current = ReadSignedPackage(package, key);
+        var current = ReadCheckedPackage(package);
         string? priorVersion = null;
         string? priorPackage = null;
         if (previous is not null)
@@ -102,7 +95,7 @@ internal static class DistributionSnapshot
                 throw new InvalidDataException("Previous distribution pointer is invalid.");
             priorVersion = oldPointer.LatestVersion;
             priorPackage = Path.Combine(previous, "versions", priorVersion);
-            var prior = ReadSignedPackage(priorPackage, key);
+            var prior = ReadCheckedPackage(priorPackage);
             if (prior.Version != priorVersion ||
                 UpdateManifestPolicy.CompareVersions(current.Version, priorVersion) <= 0)
                 throw new InvalidDataException("New approved version must be newer than the previous published version.");
@@ -124,8 +117,8 @@ internal static class DistributionSnapshot
             string versions = Path.Combine(output, "versions");
             Directory.CreateDirectory(versions);
             if (priorPackage is not null && priorVersion is not null)
-                CopyVerifiedPackage(priorPackage, Path.Combine(versions, priorVersion), key);
-            CopyVerifiedPackage(package, Path.Combine(versions, current.Version), key);
+                CopyVerifiedPackage(priorPackage, Path.Combine(versions, priorVersion));
+            CopyVerifiedPackage(package, Path.Combine(versions, current.Version));
             string channelDir = Path.Combine(output, "channel");
             Directory.CreateDirectory(channelDir);
             // A distribution publisher must switch the Git branch in one atomic commit.
@@ -133,10 +126,10 @@ internal static class DistributionSnapshot
             File.WriteAllBytes(Path.Combine(channelDir, "stable.json"),
                 JsonSerializer.SerializeToUtf8Bytes(snapshot, JsonOptions));
             File.WriteAllText(Path.Combine(output, "README.md"),
-                "# FMSC signed update distribution\n\n" +
+                "# FMSC private update distribution\n\n" +
                 "Private Git distribution. Current tree contains at most two approved versions.\n" +
                 "Do not place school databases, application source or private credentials here.\n");
-            ValidateSnapshot(output, key);
+            ValidateSnapshot(output);
             return snapshot;
         }
         catch
@@ -147,7 +140,7 @@ internal static class DistributionSnapshot
         }
     }
 
-    internal static void ValidateSnapshot(string root, RSA publisherPublicKey)
+    internal static void ValidateSnapshot(string root)
     {
         string pointer = Path.Combine(root, "channel", "stable.json");
         var snapshot = JsonSerializer.Deserialize<UpdateChannel>(
@@ -164,19 +157,19 @@ internal static class DistributionSnapshot
             (snapshot.PreviousVersion is null
                 ? versions.Length != 1
                 : versions.Length != 2 || !versions.Contains(snapshot.PreviousVersion, StringComparer.Ordinal)))
-            throw new InvalidDataException("Only the newest one or two signed versions may appear in the snapshot.");
+            throw new InvalidDataException("Only the newest one or two approved versions may appear in the snapshot.");
         foreach (string version in versions)
         {
-            var manifest = ReadSignedPackage(Path.Combine(versionsDir, version), publisherPublicKey);
+            var manifest = ReadCheckedPackage(Path.Combine(versionsDir, version));
             if (manifest.Version != version)
-                throw new InvalidDataException("Signed release version does not match its snapshot folder.");
+                throw new InvalidDataException("Release version does not match its snapshot folder.");
         }
         if (snapshot.PreviousVersion is not null &&
             UpdateManifestPolicy.CompareVersions(snapshot.LatestVersion, snapshot.PreviousVersion) <= 0)
             throw new InvalidDataException("Stable channel version order is invalid.");
     }
 
-    private static UpdateManifest ReadSignedPackage(string directory, RSA key)
+    private static UpdateManifest ReadCheckedPackage(string directory)
     {
         if (!Directory.Exists(directory))
             throw new DirectoryNotFoundException("Signed update release is missing.");
@@ -185,11 +178,9 @@ internal static class DistributionSnapshot
                 throw new InvalidDataException("Symbolic links are prohibited in release packages.");
 
         string manifestPath = Path.Combine(directory, "update-manifest.json");
-        string signaturePath = Path.Combine(directory, "update-manifest.sig");
-        if (!File.Exists(manifestPath) || !File.Exists(signaturePath))
-            throw new InvalidDataException("Signed release metadata is missing.");
-        var manifest = UpdateManifestPolicy.ReadVerified(
-            File.ReadAllBytes(manifestPath), File.ReadAllBytes(signaturePath), key);
+        if (!File.Exists(manifestPath))
+            throw new InvalidDataException("Update manifest is missing.");
+        var manifest = UpdateManifestPolicy.ReadValidated(File.ReadAllBytes(manifestPath));
         VerifyParts(directory, manifest.Full);
         if (manifest.Incremental is not null) VerifyParts(directory, manifest.Incremental);
         return manifest;
@@ -207,7 +198,7 @@ internal static class DistributionSnapshot
             if (!info.Exists || info.Attributes.HasFlag(FileAttributes.ReparsePoint) ||
                 info.Length != part.Length ||
                 !StringComparer.OrdinalIgnoreCase.Equals(UpdateChunks.Sha256(path), part.Sha256))
-                throw new InvalidDataException("Update archive part failed signed verification: " + part.Name);
+                throw new InvalidDataException("Update archive part failed SHA-256 verification: " + part.Name);
             using var source = info.OpenRead();
             int read;
             while ((read = source.Read(buffer, 0, buffer.Length)) > 0)
@@ -215,21 +206,21 @@ internal static class DistributionSnapshot
         }
         string reconstructedDigest = Convert.ToHexString(fullArchiveHash.GetHashAndReset());
         if (!StringComparer.OrdinalIgnoreCase.Equals(reconstructedDigest, archive.Sha256))
-            throw new InvalidDataException("The combined ZIP hash does not match the signed full-archive digest.");
+            throw new InvalidDataException("The combined ZIP hash does not match the manifest's full-archive digest.");
     }
 
-    private static void CopyVerifiedPackage(string inputDir, string destination, RSA key)
+    private static void CopyVerifiedPackage(string inputDir, string destination)
     {
-        var manifest = ReadSignedPackage(inputDir, key);
+        var manifest = ReadCheckedPackage(inputDir);
         Directory.CreateDirectory(destination);
-        foreach (string metadata in new[] { "update-manifest.json", "update-manifest.sig" })
+        foreach (string metadata in new[] { "update-manifest.json" })
             File.Copy(Path.Combine(inputDir, metadata), Path.Combine(destination, metadata));
         foreach (var archive in new[] { manifest.Full, manifest.Incremental }.OfType<UpdateArchive>())
             foreach (var part in archive.Parts)
                 File.Copy(Path.Combine(inputDir, part.Name), Path.Combine(destination, part.Name));
         // Prevent the unchunked, potentially >100MiB ZIP being committed to Git.
         // Re-verify the copied metadata and every new part before promotion.
-        ReadSignedPackage(destination, key);
+        ReadCheckedPackage(destination);
     }
 
     private static bool IsSimpleVersion(string? version)
@@ -264,20 +255,16 @@ internal static class SnapshotTests
         Directory.CreateDirectory(root);
         try
         {
-            using var signer = RSA.Create(3072);
-            string publicPath = Path.Combine(root, "publisher-public.pem");
-            File.WriteAllText(publicPath, signer.ExportRSAPublicKeyPem());
-
-            string first = CreateDummySignedPackage(root, "1.0.0", signer);
-            var initial = DistributionSnapshot.Prepare(first, null, Path.Combine(root, "snapshot1"), publicPath);
+            string first = CreateDummyPackage(root, "1.0.0");
+            var initial = DistributionSnapshot.Prepare(first, null, Path.Combine(root, "snapshot1"));
             Require(initial.LatestVersion == "1.0.0" && initial.PreviousVersion is null, "First snapshot must retain one release.");
-            string next = CreateDummySignedPackage(root, "1.1.0", signer);
+            string next = CreateDummyPackage(root, "1.1.0");
             var second = DistributionSnapshot.Prepare(next, Path.Combine(root, "snapshot1"),
-                Path.Combine(root, "snapshot2"), publicPath);
+                Path.Combine(root, "snapshot2"));
             Require(second.PreviousVersion == "1.0.0", "Second snapshot must retain the previous release.");
-            string third = CreateDummySignedPackage(root, "1.2.0", signer);
+            string third = CreateDummyPackage(root, "1.2.0");
             var thirdResult = DistributionSnapshot.Prepare(third, Path.Combine(root, "snapshot2"),
-                Path.Combine(root, "snapshot3"), publicPath);
+                Path.Combine(root, "snapshot3"));
             Require(thirdResult.LatestVersion == "1.2.0" && thirdResult.PreviousVersion == "1.1.0",
                 "Third snapshot must keep only the newest two versions.");
             Require(!Directory.Exists(Path.Combine(root, "snapshot3", "versions", "1.0.0")),
@@ -291,7 +278,7 @@ internal static class SnapshotTests
             File.WriteAllText(corrupt, "tampered download");
             try
             {
-                DistributionSnapshot.ValidateSnapshot(Path.Combine(root, "snapshot3"), signer);
+                DistributionSnapshot.ValidateSnapshot(Path.Combine(root, "snapshot3"));
                 throw new Exception("Tampered published package passed validation.");
             }
             catch (InvalidDataException) { }
@@ -304,7 +291,7 @@ internal static class SnapshotTests
         }
     }
 
-    private static string CreateDummySignedPackage(string root, string version, RSA signer)
+    private static string CreateDummyPackage(string root, string version)
     {
         string folder = Path.Combine(root, "package-" + version);
         Directory.CreateDirectory(folder);
@@ -328,8 +315,6 @@ internal static class SnapshotTests
         };
         byte[] raw = UpdateManifestPolicy.Serialize(manifest);
         File.WriteAllBytes(Path.Combine(folder, "update-manifest.json"), raw);
-        File.WriteAllBytes(Path.Combine(folder, "update-manifest.sig"),
-            signer.SignData(raw, HashAlgorithmName.SHA256, RSASignaturePadding.Pss));
         return folder;
     }
 
