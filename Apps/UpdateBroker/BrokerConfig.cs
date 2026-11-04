@@ -31,7 +31,7 @@ internal sealed class BrokerConfig
             throw new InvalidOperationException("Invalid GitHub owner or repository.");
         var connection = new SqlConnectionStringBuilder(Required("FMSC_UPDATE_SQL_CONNECTION"));
         if (connection.AttachDBFilename.Length != 0 || string.IsNullOrWhiteSpace(connection.InitialCatalog) ||
-            !connection.Encrypt || connection.TrustServerCertificate)
+            connection.Encrypt.ToString() is not ("Mandatory" or "Strict") || connection.TrustServerCertificate)
             throw new InvalidOperationException(
                 "Use an explicit broker database with Encrypt=true and TrustServerCertificate=false.");
         int maxDevices = int.TryParse(Environment.GetEnvironmentVariable("FMSC_UPDATE_MAX_DEVICES_PER_SCHOOL"),
