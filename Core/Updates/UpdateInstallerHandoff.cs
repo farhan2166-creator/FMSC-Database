@@ -55,7 +55,7 @@ internal static class UpdateInstallerHandoff
         string launcher = Path.Combine(prepared.StageDirectory, "UpdateSupport", "FMSC.Setup.exe");
         string root = Directory.GetParent(prepared.StageDirectory)!.FullName;
         if ((launcher + root).Contains('"')) throw new InvalidDataException("Invalid update directory.");
-        var start = new ProcessStartInfo(launcher) { UseShellExecute = true };
+        var start = new ProcessStartInfo(launcher) { UseShellExecute = true, Verb = "runas" };
         start.Arguments = "--update \"" + root + "\" " + original.Id + " " +
             original.StartTime.ToUniversalTime().Ticks + " " + WindowsIdentity.GetCurrent().User!.Value;
         Process.Start(start)?.Dispose();
