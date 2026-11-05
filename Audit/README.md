@@ -1,4 +1,15 @@
-# Audit index — FMSC
+# Audit — numbered files
+
+These are **actual numbered filenames** in the root of `Audit/`, not just section numbers. Each consolidates explanations and links while preserving all original reports and evidence.
+
+- [01 — Audit status and authority](01_STATUS_AND_SCOPE.md)
+- [02 — Finance and credit findings](02_FINANCE_AND_CREDIT.md)
+- [03 — UI and workflow investigations](03_UI_AND_WORKFLOW.md)
+- [04 — Release and SQL verification](04_RELEASE_AND_VERIFICATION.md)
+- [05 — Historical audit retention](05_ARCHIVE_AND_RETENTION.md)
+
+## Original audit references and guidance
+
 
 **Updated:** 5 November 2026 · **Purpose:** navigation and provenance, not new verification. No audit records are deleted or rewritten by this organization.
 

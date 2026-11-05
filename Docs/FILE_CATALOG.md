@@ -271,3 +271,23 @@ For meaning, canonical ownership and overlapping explanations see [Documentation
 - [This complete catalog](FILE_CATALOG.md): includes the original 218 files; the file catalog and map are additions, not hidden replacements.
 
 **Maintenance:** regenerate/reconcile this catalog after a batch of document additions or path changes. Do not remove historical evidence solely because its blob matches another test output; confirm fixture meaning and incoming references first.
+
+## Numbered consolidated guides — added after the original inventory
+
+The original 218-file inventory above is retained with its inventory-date scope. The following **new** numbered files are additional guides; original reports and evidence have not been renamed or removed.
+
+- [`Audit/01_STATUS_AND_SCOPE.md`](../Audit/01_STATUS_AND_SCOPE.md)
+- [`Audit/02_FINANCE_AND_CREDIT.md`](../Audit/02_FINANCE_AND_CREDIT.md)
+- [`Audit/03_UI_AND_WORKFLOW.md`](../Audit/03_UI_AND_WORKFLOW.md)
+- [`Audit/04_RELEASE_AND_VERIFICATION.md`](../Audit/04_RELEASE_AND_VERIFICATION.md)
+- [`Audit/05_ARCHIVE_AND_RETENTION.md`](../Audit/05_ARCHIVE_AND_RETENTION.md)
+- [`Docs/01_RULES_AND_DECISIONS.md`](01_RULES_AND_DECISIONS.md)
+- [`Docs/02_ADMISSIONS_AND_LIFECYCLE.md`](02_ADMISSIONS_AND_LIFECYCLE.md)
+- [`Docs/03_FINANCE_AND_FEES.md`](03_FINANCE_AND_FEES.md)
+- [`Docs/04_CERTIFICATES_AND_COMMUNICATION.md`](04_CERTIFICATES_AND_COMMUNICATION.md)
+- [`Docs/05_REPORTS_AND_PRINTING.md`](05_REPORTS_AND_PRINTING.md)
+- [`Docs/06_USER_GUIDES_AND_UI.md`](06_USER_GUIDES_AND_UI.md)
+- [`Docs/07_ARCHITECTURE_AND_DEVELOPMENT.md`](07_ARCHITECTURE_AND_DEVELOPMENT.md)
+- [`Docs/08_INSTALLATION_AND_UPDATES.md`](08_INSTALLATION_AND_UPDATES.md)
+- [`Docs/09_TESTING_AND_EVIDENCE.md`](09_TESTING_AND_EVIDENCE.md)
+- [`Docs/10_HISTORY_AND_CATALOG.md`](10_HISTORY_AND_CATALOG.md)

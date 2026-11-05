@@ -1,4 +1,20 @@
-# Docs — numbered navigation
+# Docs — numbered files
+
+These are **actual numbered filenames** in the root of `Docs/`, not just numbered headings. Each is a consolidated guide to the original detailed documents, which remain at their old paths.
+
+- [01 — Business rules and decisions](01_RULES_AND_DECISIONS.md)
+- [02 — Admissions and student lifecycle](02_ADMISSIONS_AND_LIFECYCLE.md)
+- [03 — Finance, fees and credits](03_FINANCE_AND_FEES.md)
+- [04 — Certificates and communication](04_CERTIFICATES_AND_COMMUNICATION.md)
+- [05 — Reports, PDF, receipts and printing](05_REPORTS_AND_PRINTING.md)
+- [06 — User guides and interface](06_USER_GUIDES_AND_UI.md)
+- [07 — Architecture and development](07_ARCHITECTURE_AND_DEVELOPMENT.md)
+- [08 — Installation, release and updates](08_INSTALLATION_AND_UPDATES.md)
+- [09 — Testing and evidence](09_TESTING_AND_EVIDENCE.md)
+- [10 — Historical reviews and original files](10_HISTORY_AND_CATALOG.md)
+
+## Original documentation references and guidance
+
 
 **Updated:** 5 November 2026. This index links existing files; no historical documentation or test evidence is removed. For every original path see the [full file catalog](FILE_CATALOG.md). For overlapping explanations, canonical ownership and exact duplicate evidence see the [consolidation map](DOCUMENTATION_MAP.md).
 
