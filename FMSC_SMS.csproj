@@ -34,9 +34,12 @@
 		<SatelliteResourceLanguages>en;en-US;en-GB;ur;ur-PK;ur-IN</SatelliteResourceLanguages>
 		<ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 		<ApplicationIcon>Assets\FMSC_Logo Icon.ico</ApplicationIcon>
-		<Version>1.0.0</Version>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
-		<FileVersion>1.0.0.0</FileVersion>
+		<!-- The installer version is the only editable application version; keep assembly/file metadata in sync. -->
+		<!-- Read the same exact source used by installer schema validation. -->
+		<_FmscInstallerText>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)/Installer/core.ps1'))</_FmscInstallerText>
+		<Version>$([System.Text.RegularExpressions.Regex]::Match('$(_FmscInstallerText)', '[$]AppVersion = [^0-9]*([0-9]+[.][0-9]+[.][0-9]+(?:-[A-Za-z0-9-]+(?:[.][A-Za-z0-9-]+)*)?)').Groups[1].Value)</Version>
+		<AssemblyVersion>$([System.Text.RegularExpressions.Regex]::Match('$(Version)', '^[0-9]+[.][0-9]+[.][0-9]+').Value).0</AssemblyVersion>
+		<FileVersion>$(AssemblyVersion)</FileVersion>
 	</PropertyGroup>
 	<ItemGroup>
 		<Content Include="Installer/core.ps1" Link="UpdateSupport/core.ps1" CopyToPublishDirectory="PreserveNewest" />
