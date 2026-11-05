@@ -141,6 +141,7 @@ function Open-UpdateWindow {
     Add-Type -AssemblyName System.Drawing
     [Windows.Forms.Application]::EnableVisualStyles()
     $script:UpdateWindow = New-Object Windows.Forms.Form
+    $script:UpdateWindow.AutoScaleMode = 'None' # Avoid a second WinForms font-based size pass.
     $script:UpdateWindow.Text = if ($PreparedRoot) { 'FMSC - Installing update' } else { 'FMSC - First-time setup' }
     # Shared first-install and prepared-update window: match the FMSC login dialog
     # baseline at 100% DPI. Both installer modes use this same UI and geometry.
