@@ -72,7 +72,7 @@ $catch = $source.IndexOf("'                    INSTALLATION FAILED'")
 if ($finish -le $verified -or $finish -ge $catch) { throw 'Restart must occur only on the verified success path.' }
 $handoff = Get-Content (Join-Path $PSScriptRoot '../Core/Updates/UpdateInstallerHandoff.cs') -Raw
 if (-not $handoff.Contains('FMSC.Setup.exe') -or -not $handoff.Contains('--update') -or
-    $handoff.Contains('UseShellExecute = true, Verb = "runas"')) {
-    throw 'Prepared updates must launch the verified shared GUI executable.'
+    -not $handoff.Contains('UseShellExecute = true, Verb = "runas"')) {
+    throw 'Prepared updates must request UAC through the verified shared GUI executable.'
 }
 Write-Output 'PASS: shared GUI setup launcher used by fresh installs and prepared updates; no console, UAC retained, eight-stage progress and safe restart preserved.'
