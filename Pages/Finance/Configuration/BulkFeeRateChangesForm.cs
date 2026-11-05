@@ -138,7 +138,7 @@ public sealed class BulkFeeRateChangesForm : ApplicationWindowForm, IUnsavedChan
         MaximizeBox = true;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(AppScale.Scale(900), AppScale.Scale(640));
+        ClientSize = AppMetrics.RateWorkspaceDialogClientSize;
         MinimumSize = new Size(AppScale.Scale(720), AppScale.Scale(420));
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
