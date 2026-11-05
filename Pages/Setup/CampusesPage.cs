@@ -67,7 +67,7 @@ public sealed class CampusesPage : MasterPage
             DatabaseHelper.P("@ContactNumber", v["ContactNumber"]),
             DatabaseHelper.P("@Email", v["Email"])
         },
-        splitEditorAndRecords: true,
+        splitEditorAndRecords: false,
         reorderProcedure: "ReorderCampuses",
         reorderItemField: "CampusId",
         getParams: () => new[] { DatabaseHelper.Int("@UserId", CurrentUser.UserId) },

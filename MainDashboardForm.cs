@@ -825,12 +825,6 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "School Profile",
                 "System.Setup"),
             new(
-                "Campuses",
-                () => new CampusesPage(),
-                "School Setup",
-                "Campuses",
-                "System.Setup"),
-            new(
                 "Academic Years",
                 () => new AcademicYearsPage(),
                 "School Setup",

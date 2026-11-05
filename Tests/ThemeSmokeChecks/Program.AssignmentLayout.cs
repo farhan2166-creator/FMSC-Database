@@ -70,6 +70,22 @@ internal static partial class Program
             kind.GetMethod("ResetChanges", flags)!.Invoke(refreshed, null);
             Check(!(bool)refreshedGrid.Rows[0].Cells[1].Value! && (bool)refreshedGrid.Rows[0].Cells[2].Value!,
                 "Reset after catalog refresh restores freshly loaded saved assignments");
+            refreshed.BindingContext = new BindingContext();
+            var lookup = (LookupBox)kind.GetField("campus", flags)!.GetValue(refreshed)!;
+            using var campusRows = new DataTable();
+            campusRows.Columns.Add("CampusId", typeof(int)); campusRows.Columns.Add("CampusName");
+            campusRows.Rows.Add(10, "Original campus"); campusRows.Rows.Add(20, "Other campus");
+            var refreshCampus = kind.GetMethod("RefreshCampusLookup", flags)!;
+            refreshCampus.Invoke(refreshed, new object[] { campusRows });
+            pending[(7,20)] = true;
+            campusRows.Rows[0]["CampusName"] = "Renamed campus";
+            refreshCampus.Invoke(refreshed, new object[] { campusRows });
+            Check(lookup.SelectedId == 10 && pending.Count == 1,
+                "Renaming a campus retains its selection and unapplied assignments");
+            campusRows.Rows.RemoveAt(0);
+            refreshCampus.Invoke(refreshed, new object[] { campusRows });
+            Check(lookup.SelectedId == 20 && pending.Count == 0,
+                "Deleting a campus cannot transfer its assignment draft to another campus");
         }
         using var years = new AcademicYearsPage(false);
         var yearGrid = (DataGridView)typeof(V2Page).GetField("Grid", flags | BindingFlags.Public)!.GetValue(years)!;

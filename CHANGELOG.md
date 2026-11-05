@@ -1,5 +1,14 @@
 # Changelog
 
+## Campus setup consolidation — 2026-11-05
+
+- Add Manage Campuses to Campus - Classes / Sections, using the existing campus
+  editor in the same stacked form/list layout as the class catalog. Remove the
+  separate campus menu entry and route campus readiness issues to the shared page.
+- Refresh campus choices without losing the selected campus's assignment draft;
+  discard its draft when that campus is removed. Existing contact validation,
+  ordering, permissions and deletion safeguards remain in use.
+
 ## Excel report export — 2026-11-02
 
 - Add Excel (.xlsx) to the existing report Export dialog, with the selected

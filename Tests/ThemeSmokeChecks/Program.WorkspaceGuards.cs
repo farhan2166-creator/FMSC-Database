@@ -9,11 +9,16 @@ internal static partial class Program
     {
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var saving = typeof(MasterPage).GetField("_saving", flags)!;
-        foreach (bool classes in new[] { true, false })
+        foreach (SetupCatalog catalog in Enum.GetValues<SetupCatalog>())
         {
-            using var setup = new ClassSectionCatalogDialog(classes);
+            using var setup = new ClassSectionCatalogDialog(catalog);
             var child = setup.Editor;
-            Check(classes ? child is ClassesPage : child is SectionsPage, "Catalog dialog retains the complete existing editor");
+            Check((catalog, child) switch {
+                (SetupCatalog.Campuses, FMSC_SMS.Pages.Setup.CampusesPage) => true,
+                (SetupCatalog.Classes, ClassesPage) => true,
+                (SetupCatalog.Sections, SectionsPage) => true,
+                _ => false
+            }, "Catalog dialog retains the complete existing editor: " + catalog);
             saving.SetValue(child, true);
             Check(setup.IsBusy && setup.BusyMessage == child.BusyMessage, "Catalog dialog forwards submitted saves");
             saving.SetValue(child, false);

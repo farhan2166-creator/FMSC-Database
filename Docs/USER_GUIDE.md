@@ -291,15 +291,18 @@ otherwise the record creation timestamp. Certificate Date is shown separately
 certificate; student admission/QR references use the current student record.
 Printing/exporting this register does not issue, reissue or collect certificates.
 
-### Manage classes and sections from campus assignments
+### Manage campuses, classes and sections together
 
-Open School Setup → Campus - Classes / Sections. Use Manage Classes or Manage
-Sections to add/edit the school-wide catalogs, manage class programs, reorder
+Open School Setup → Campus - Classes / Sections. Use Manage Campuses to define
+locations in the aligned form above the campus list. Manage Classes and Manage
+Sections add/edit the school-wide catalogs, manage class programs, reorder
 records, or delete records when existing usage safeguards allow it. Renames apply
 to all campuses. Adding a class or section does not assign it automatically.
 Close the dialog, tick the desired combinations for the campus, then Apply Changes.
 Pending ticks survive catalog refresh. Reset Changes restores saved assignments.
 Use Refresh Catalogs to retry a failed refresh.
+Campus names and the campus selector refresh when its dialog closes. Pending
+ticks stay with the same campus; deleting it never transfers those ticks to another.
 
 ### Understand debt and concession reports
 

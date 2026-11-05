@@ -10,7 +10,9 @@ internal static partial class Program
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         Directory.CreateDirectory("artifacts/setup-validation");
         foreach (bool campus in new[] { true, false })
-        foreach (int width in new[] { 710, 1700 })
+        // Campus now uses the full-width stacked editor: 710px can fit two
+        // columns. Use 560px to exercise the actual one-column fallback too.
+        foreach (int width in new[] { 560, 1700 })
         {
             using MasterPage page = campus ? new CampusesPage(false) : new AcademicYearsPage(false);
             var fields = (Dictionary<string, Control>)typeof(MasterPage).GetField("_controls", flags)!.GetValue(page)!;
@@ -20,7 +22,7 @@ internal static partial class Program
             host.Show();
             Application.DoEvents();
             var editor = (TableLayoutPanel)typeof(MasterPage).GetField("_editor", flags)!.GetValue(page)!;
-            Check(editor.ColumnCount == (width == 710 ? 1 : 2), "Validation layout is checked with the expected one/two-column editor");
+            Check(editor.ColumnCount == (width == 560 ? 1 : 2), "Validation layout is checked with the expected one/two-column editor");
             if (campus)
             {
                 fields["CampusName"].Text = "Test Campus";

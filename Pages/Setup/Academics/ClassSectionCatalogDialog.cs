@@ -2,21 +2,31 @@ using FMSC_SMS.Core;
 
 namespace FMSC_SMS.Pages.Setup.Academics;
 
+internal enum SetupCatalog { Campuses, Classes, Sections }
+
 internal sealed class ClassSectionCatalogDialog : ApplicationWindowForm, IBusyPage
 {
     internal MasterPage Editor { get; }
     public bool IsBusy => Editor.IsBusy;
     public string BusyMessage => Editor.BusyMessage;
 
-    internal ClassSectionCatalogDialog(bool classes)
+    internal ClassSectionCatalogDialog(SetupCatalog catalog)
     {
-        Text = classes ? "Manage Classes" : "Manage Sections";
+        Text = catalog switch {
+            SetupCatalog.Campuses => "Manage Campuses",
+            SetupCatalog.Classes => "Manage Classes",
+            _ => "Manage Sections"
+        };
         StartPosition = FormStartPosition.CenterParent;
         ShowInTaskbar = false;
         MinimizeBox = false;
         ClientSize = new Size(AppScale.Scale(1100), AppScale.Scale(740));
         MinimumSize = new Size(AppScale.Scale(850), AppScale.Scale(600));
-        Editor = classes ? new ClassesPage(false) : new SectionsPage(false);
+        Editor = catalog switch {
+            SetupCatalog.Campuses => new CampusesPage(),
+            SetupCatalog.Classes => new ClassesPage(false),
+            _ => new SectionsPage(false)
+        };
         Editor.PrepareForEmbedding(keepActions: true);
         Editor.HideRecordsChrome();
         Editor.Dock = DockStyle.Fill;

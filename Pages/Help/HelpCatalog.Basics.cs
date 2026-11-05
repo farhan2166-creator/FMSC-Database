@@ -37,7 +37,7 @@ internal static partial class HelpCatalog
             new[] { HelpRule.System }, HelpOwner.CSharp | HelpOwner.Environment,
             new[] { "Core/DpiLayout.cs", "Core/WorkingAreaLayout.cs" }, System.Array.Empty<string>(), ""),
         new("FAQ-007", "School Setup", "In what order should I configure a new school?",
-            "Set up School Profile and School Officials, Campuses and Academic Years. In Campus - Classes / Sections → Manage Classes, select School or College and manage the academic program before adding its classes. Use Manage Sections to create sections, then tick and apply valid campus assignments, then review Subjects and Fee Rate Setup. Setup Readiness shows missing prerequisites; complete the relevant setup before admission or billing.",
+            "Set up School Profile and School Officials, then open Campus - Classes / Sections → Manage Campuses to define locations. Configure Academic Years. Use Manage Classes to select School or College and manage the academic program before adding its classes. Use Manage Sections to create sections, then tick and apply valid campus assignments, then review Subjects and Fee Rate Setup. Setup Readiness shows missing prerequisites; complete the relevant setup before admission or billing.",
             "first setup,school,campus,year,class,section", "School Setup → Setup Readiness",
             new[] { HelpRule.System, HelpRule.Choice, HelpRule.Setting }, HelpOwner.CSharp | HelpOwner.ConfigurableData,
             new[] { "Pages/Setup/SetupReadinessPage.cs#SetupReadinessPage", "Services/SetupReadiness.cs", "Pages/Setup/Academics/ClassesPage.cs#ClassesPage" }, System.Array.Empty<string>(), ""),

@@ -37,7 +37,7 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
     private bool dragAssigned;
     private ModernButton resetButton = null!;
     public CampusClassSectionAssignmentsPage() : this(true) { }
-    internal CampusClassSectionAssignmentsPage(bool initialize)
+    internal CampusClassSectionAssignmentsPage(bool initialize, bool openCampusCatalog = false)
         : base(PageTitles.CampusAssignments, "Choose which classes and sections each campus offers.")
     {
         applyButton =
@@ -50,8 +50,9 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
             AddAction("Clear All", (_, _) => ClearAll(), "Secondary");
         matrixActions.AddRange(new[] { selectAll, clearAll, resetButton });
         RelocateFromActions(applyButton, selectAll, clearAll, resetButton);
-        AddAction("Manage Classes…", (_, _) => ManageCatalog(true), "Secondary");
-        AddAction("Manage Sections…", (_, _) => ManageCatalog(false), "Secondary");
+        AddAction("Manage Campuses…", (_, _) => ManageCatalog(SetupCatalog.Campuses), "Secondary");
+        AddAction("Manage Classes…", (_, _) => ManageCatalog(SetupCatalog.Classes), "Secondary");
+        AddAction("Manage Sections…", (_, _) => ManageCatalog(SetupCatalog.Sections), "Secondary");
         AddAction("Refresh Catalogs", (_, _) => RefreshCatalogs(), "Secondary");
         BuildMatrix();
         campus.SelectedIndexChanged +=
@@ -62,6 +63,7 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
                 LoadCampusMatrix();
             };
         if (initialize) Defer(BindLookups);
+        if (initialize && openCampusCatalog) Defer(() => ManageCatalog(SetupCatalog.Campuses));
         var matrixCard = HumanUi.Card("Class & Section Assignments", "Click and drag to check or uncheck a range. Ctrl+click toggles separate cells; Shift+click extends a range. Click a class name or section heading to toggle its group. Apply Changes saves your assignments.");
         var controlsRow = new Panel {
             Dock = DockStyle.Fill, AutoScroll = true, Margin = Padding.Empty
@@ -284,14 +286,14 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
                 e.ThrowException = false;
             };
     }
-    private void ManageCatalog(bool manageClasses)
+    private void ManageCatalog(SetupCatalog catalog)
     {
         if (!CurrentUser.HasPermission("System.Setup"))
         {
             Warn("School setup permission is required.");
             return;
         }
-        using var dialog = new ClassSectionCatalogDialog(manageClasses);
+        using var dialog = new ClassSectionCatalogDialog(catalog);
         dialog.ShowDialog(FindForm());
         RefreshCatalogs();
     }
@@ -313,7 +315,8 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
         }
         try
         {
-            // Read both catalogs before replacing either in-memory index.
+            // Read all catalogs before replacing the current selection/indexes.
+            using var campusRows = DatabaseHelper.QueryUser("GetCampuses");
             using var classRows = DatabaseHelper.QueryUser("GetClasses");
             using var sectionRows = DatabaseHelper.QueryUser("GetSections");
             var refreshedClasses = classRows.AsEnumerable().Select(row => new ClassInfo {
@@ -322,14 +325,35 @@ public sealed class CampusClassSectionAssignmentsPage : V2Page, IUnsavedChanges
             var refreshedSections = sectionRows.AsEnumerable().Select(row => new SectionInfo {
                 SectionId = Convert.ToInt32(row["SectionId"]), SectionName = Convert.ToString(row["SectionName"]) ?? ""
             }).ToArray();
+            int previousCampus = campus.SelectedId;
+            RefreshCampusLookup(campusRows);
             classes.Clear(); classes.AddRange(refreshedClasses);
             sections.Clear(); sections.AddRange(refreshedSections);
             LoadCampusMatrix();
             if (!matrixReady) return; // Retain the draft for Refresh Catalogs retry.
             RestoreCatalogDraft();
-            SetStatus("Catalogs refreshed. New entries are unassigned; unapplied selections were retained.");
+            SetStatus(previousCampus == campus.SelectedId
+                ? "Catalogs refreshed. New entries are unassigned; unapplied selections were retained."
+                : previousCampus > 0
+                    ? "Catalogs refreshed. The previous campus is no longer available; its unapplied selections were cleared."
+                    : "Catalogs refreshed. Choose the classes and sections this campus offers, then Apply Changes.");
         }
         catch (Exception ex) { Fail(ex); }
+    }
+
+    private void RefreshCampusLookup(DataTable rows)
+    {
+        int selected = campus.SelectedId;
+        suppressCampusChanged = true;
+        try
+        {
+            campus.Bind(rows, "CampusId", "CampusName", includeBlank: false);
+            if (rows.AsEnumerable().Any(row => Convert.ToInt32(row["CampusId"]) == selected))
+                campus.SelectedValue = selected;
+        }
+        finally { suppressCampusChanged = false; }
+        // A deleted campus must never transfer its pending assignments to another.
+        if (campus.SelectedId != selected) catalogDraft.Clear();
     }
 
     private void RestoreCatalogDraft()

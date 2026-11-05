@@ -63,7 +63,7 @@ public sealed class SetupReadinessPage : V2Page
         if (Grid.CurrentRow?.DataBoundItem is not DataRowView row) return null;
         return Convert.ToString(row["PageKey"]) switch {
             "Profile" => (() => new SchoolProfilePage(), "School Setup", "School Profile", "System.Setup"),
-            "Campuses" => (() => new CampusesPage(), "School Setup", "Campuses", "System.Setup"),
+            "Campuses" => (() => new CampusClassSectionAssignmentsPage(initialize: true, openCampusCatalog: true), "School Setup", PageTitles.CampusAssignments, "System.Setup"),
             "Assignments" => (() => new CampusClassSectionAssignmentsPage(), "School Setup", PageTitles.CampusAssignments, "System.Setup"),
             "Years" => (() => new AcademicYearsPage(), "School Setup", "Academic Years", "Calendar.Manage"),
             "Fees" => (() => FeeConfigurationWorkspace.Create(), "School Setup", PageTitles.FeeRateSetup, "Fees.Configuration.Manage"),
