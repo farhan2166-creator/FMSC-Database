@@ -40,6 +40,11 @@ internal static class ReportFilterState
                     if (!found) throw new ReportViewValidationException($"The saved {key} is no longer available. Choose an available value and save the view again.");
                     lookup.SelectedValue=id;
                     break;
+                case ModernComboBox combo when key=="Due status" && kind=="check" && payload is "0" or "1":
+                    string dueChoice=payload=="1"?"Overdue":"None";
+                    if(!combo.Items.Contains(dueChoice))throw new ReportViewValidationException("The saved due status is unavailable.");
+                    combo.SelectedItem=dueChoice;
+                    break;
                 case ModernComboBox combo when kind=="choice":
                     object? choice=combo.Items.Cast<object>().FirstOrDefault(item => Convert.ToString(item)==payload);
                     if(choice is null && key=="Order by")

@@ -8,6 +8,49 @@ public sealed partial class FeeCollectionPage
     private int historyReceiptChild;
     private bool changingHistorySelection;
 
+    private void ShowWholeReceiptHistory()
+    {
+        var receipts=familyPaymentBreakdowns.AsEnumerable()
+            .GroupBy(row=>GetText(row,"ReceiptNumber"),StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group=>Convert.ToDateTime(group.First()["TransactionDate"]))
+            .ThenBy(group=>Convert.ToDateTime(group.First()["CreatedAt"])).ToArray();
+        var references=receipts.Select(group=>group.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach(var row in recentPayments.Rows.Cast<DataGridViewRow>().ToArray())
+        {
+            if(references.Contains(GetText(row.Cells["ReceiptNumber"].Value)))
+                recentPayments.Rows.Remove(row);
+            else
+            {
+                // Older entries have no saved receipt balance. Never substitute today's dues.
+                if(row.Cells["ReceiptTotal"].Value is not null and not DBNull)
+                    row.Cells["Amount"].Value=row.Cells["ReceiptTotal"].Value;
+                row.Cells["ReceiptTotal"].Value=null;
+                row.Cells["BalanceThen"].Value=null;
+            }
+        }
+        foreach(var receipt in receipts)
+        {
+            var members=receipt.ToArray();var first=members[0];
+            decimal paid=GetDecimal(first,"OriginalTotal");
+            decimal adjusted=members.Sum(row=>GetDecimal(row,"Adjusted"));
+            decimal net=members.Sum(row=>GetDecimal(row,"NetSettled"));
+            bool recorded=members.All(row=>!row.IsNull("BalanceRemaining"));
+            decimal due=recorded?members.Sum(row=>GetDecimal(row,"BalanceRemaining")):0m;
+            string activity=members.All(row=>GetText(row,"PaymentStatus")=="Reversed")?"Reversed"
+                :members.Any(row=>GetText(row,"PaymentStatus")=="Partially reversed"||GetText(row,"PaymentStatus")=="Reversed")?"Partially reversed"
+                :adjusted!=0?"Adjusted":"Payment";
+            recentPayments.Rows.Insert(0,FormatDate(first,"TransactionDate"),receipt.Key,
+                members.Length==1?"1 student":$"{members.Length} students",activity,paid,GetText(first,"PaymentMethod"),0);
+            var added=recentPayments.Rows[0];
+            added.Cells["ReceiptTotal"].Value=recorded?paid+due:null;
+            added.Cells["BalanceThen"].Value=recorded?due:null;
+            added.Cells["Adjusted"].Value=adjusted;added.Cells["NetPaid"].Value=net;
+            added.Cells["Amount"].ToolTipText=$"Whole receipt originally paid: Rs. {paid:N0}; adjustments: Rs. {adjusted:N0}; net payment: Rs. {net:N0}. Select to see each student's share.";
+            added.Tag=true;
+        }
+        if(recentPayments.Rows.Count>0)recentPayments.CurrentCell=recentPayments.Rows[0].Cells["PaymentDate"];
+    }
+
     private void SelectHistoryReceipt(DataGridView? children=null)
     {
         if(changingHistorySelection || paymentHistoryDetails is null)return;
@@ -34,8 +77,10 @@ public sealed partial class FeeCollectionPage
     {
         try
         {
-            var data=await ReceiptPaymentBreakdown.ReadAsync(selectedAdmission);
+            int[] selected=SelectedBillStudents();
+            var data=await ReceiptPaymentBreakdown.ReadForStudentsAsync(selected);
             if(IsDisposed||version!=loadVersion||selectedAdmission!=admissionId){data.Dispose();return;}
+            if(!selected.SequenceEqual(SelectedBillStudents())){data.Dispose();return;}
             familyPaymentBreakdowns.Dispose();familyPaymentBreakdowns=data;
         }
         catch(Exception ex){AppExceptionHandler.LogNonFatal(ex,"Recent Payments sibling breakdown");}
@@ -47,7 +92,7 @@ public sealed partial class FeeCollectionPage
         if(panel.Tag is ValueTuple<DataTable,string> shown&&ReferenceEquals(shown.Item1,familyPaymentBreakdowns)&&shown.Item2==reference)return true;
         var members=familyPaymentBreakdowns.AsEnumerable()
             .Where(row=>string.Equals(GetText(row,"ReceiptNumber"),reference,StringComparison.OrdinalIgnoreCase)).ToArray();
-        if(members.Length<2)return false;
+        if(members.Length==0)return false;
         SetPaymentHistoryMinimum(380);
         decimal original=GetDecimal(members[0],"OriginalTotal"),adjusted=members.Sum(row=>GetDecimal(row,"Adjusted")),net=members.Sum(row=>GetDecimal(row,"NetSettled"));
         var grid=HumanUi.Grid(false);
@@ -86,7 +131,7 @@ public sealed partial class FeeCollectionPage
         grid.CellClick+=(_,e)=>{if(e.RowIndex>=0)SelectHistoryReceipt(grid);};
         grid.CurrentCellChanged+=(_,_)=>{if(grid.ContainsFocus)SelectHistoryReceipt(grid);};
         grid.Layout+=(_,_)=>FitFamilyPaymentBreakdown(grid);
-        string totals=$"Receipt total: Rs. {original:N0}    Adjustments: Rs. {adjusted:N0}    Net payment: Rs. {net:N0}";
+        string totals=$"Originally paid: Rs. {original:N0}    Adjustments: Rs. {adjusted:N0}    Net payment: Rs. {net:N0}";
         string heading=$"{reference} · Payments by student on this receipt";
         heading+=$"\r\nCash received: Rs. {GetDecimal(members[0],"ReceiptCashReceived"):N0} · Advance used: Rs. {GetDecimal(members[0],"ReceiptCreditApplied"):N0}";
         panel.SuspendLayout();

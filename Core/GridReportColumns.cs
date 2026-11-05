@@ -119,7 +119,7 @@ internal static class GridReportColumns
             caption=caption switch {
                 "Money Received" or "Payment Received"=>"Payment\nReceived", "Gross Received"=>"Gross\nReceived",
                 "Credit Applied"=>"Credit\nApplied", "Adjusted Collection"=>"Adjusted\nCollection",
-                "Open Charges (Net)"=>"Open Charges\n(Net)","Settled on Open Charges"=>"Settled on\nOpen Charges",
+                "Open Charges (Net)"=>"Total Fees","Settled on Open Charges" or "Settled On Open Charges"=>"Paid Towards Fees",
                 _=>caption
             };
             bool numeric=fields.Length==1 && Type.GetTypeCode(field.DataType) is TypeCode.Byte or TypeCode.SByte or TypeCode.Int16 or TypeCode.UInt16 or TypeCode.Int32 or TypeCode.UInt32 or TypeCode.Int64 or TypeCode.UInt64 or TypeCode.Single or TypeCode.Double or TypeCode.Decimal;

@@ -3024,7 +3024,8 @@
                                   <Style>
                                     <FontFamily>Segoe UI</FontFamily>
                                     <FontSize>8pt</FontSize>
-                                  </Style>
+                                  <TextDecoration>=IIF(Trim(First(Fields!Teacher.Value, "PageGroup")) = "", "None", "Underline")</TextDecoration>
+                                    </Style>
                                 </TextRun>
                               </TextRuns>
                               <Style>

@@ -12,6 +12,9 @@ internal static partial class Program
             {
                 AppTheme.SetTheme(theme);
                 using var page = new ClassSheetsPage();
+                var filters=Descendants(page).OfType<TableLayoutPanel>().Single(panel=>panel.ColumnCount==5&&panel.RowCount==2);
+                Check(filters.Controls.Count==9,"Class-sheet filters use two rows for nine fields");
+                Check(!Descendants(page).OfType<Label>().Any(label=>label.Text=="Find Student"),"The unnecessary student-search field is removed");
                 var load = Descendants(page).OfType<ModernButton>().Single(b => b.Text == "Load Students");
                 var row = load.Parent!.Parent!;
                 var root = (TableLayoutPanel)row.Parent!;

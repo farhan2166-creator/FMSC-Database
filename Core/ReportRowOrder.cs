@@ -83,10 +83,10 @@ internal static class ReportRowOrder
                 {
                     Student("Adm. / QR No.");
                     Text("Class / section", "Class / Section", ValueKind.Reference);
+                    Text("Campus", "Campus");
                 }
                 else Text("Family / student", "Family / Student", ValueKind.Reference);
-                Text("Campus", "Campus");
-                Amount("Available credit", "Available Credit");
+                Amount("Available advance", "Available Credit");
                 Date("Last activity", "Last Activity");
                 break;
             case "GetBillingAndDiscountsReport":

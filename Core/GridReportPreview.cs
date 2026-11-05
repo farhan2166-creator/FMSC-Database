@@ -100,7 +100,6 @@ internal static class GridReportPreview
         var metrics=presentation.Metrics;
         string scope=presentation.Scope;
         if(source.Columns.Cast<DataColumn>().Any(ReportPrintSummary.IsMoneyColumn)) scope+=(scope.Length>0?"   |   ":"")+"Amounts in Rs.";
-        scope+=(scope.Length>0?"   |   ":"")+"Data rows: "+ReportPrintSummary.DetailCount(source).ToString("N0",CultureInfo.CurrentCulture);
         using var bitmap=new Bitmap(1,1);using var graphics=Graphics.FromImage(bitmap);
         double TextHeight(string text,float points,double? availableWidth=null)
         {

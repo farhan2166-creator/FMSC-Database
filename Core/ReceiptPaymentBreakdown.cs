@@ -7,7 +7,7 @@ internal static class ReceiptPaymentBreakdown
     // GetStudentCollectionReceipts, once for each participant instead of one child.
     internal const string Sql = """
         EXEC dbo.RequirePermission @UserId,N'Fees.View';
-        SELECT R.ReceiptNumber,S.AdmissionId,S.AdmissionNumber,S.StudentName,
+        SELECT R.ReceiptNumber,R.TransactionDate,R.CreatedAt,R.PaymentMethod,S.AdmissionId,S.AdmissionNumber,S.StudentName,
             S.CashApplied,S.CreditApplied,S.BalanceRemaining,R.CashApplied+R.CreditApplied OriginalTotal,
             R.CashReceived ReceiptCashReceived,R.CreditApplied ReceiptCreditApplied,
             S.CashApplied+S.CreditApplied-COALESCE(N.NetSettled,0) Adjusted,
@@ -37,4 +37,8 @@ internal static class ReceiptPaymentBreakdown
 
     internal static Task<DataTable> ReadAsync(int admissionId)=>DatabaseHelper.QuerySqlAsync(Sql,
         DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.Int("@AdmissionId",admissionId));
+
+    internal static Task<DataTable> ReadForStudentsAsync(int[] admissions)=>DatabaseHelper.QuerySqlAsync(
+        Sql.Replace("M.AdmissionId=@AdmissionId","M.AdmissionId IN (SELECT TRY_CONVERT(int,value) FROM OPENJSON(@Admissions))",StringComparison.Ordinal),
+        DatabaseHelper.Int("@UserId",CurrentUser.UserId),DatabaseHelper.P("@Admissions",System.Text.Json.JsonSerializer.Serialize(admissions)));
 }

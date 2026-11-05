@@ -179,7 +179,7 @@ internal static partial class Program
                 Check(Inches(value,"Top")+Inches(value,"Height")<=double.Parse(xml.Descendants(ns+"PageHeader").Single().Element(ns+"Height")!.Value.Replace("in",""),System.Globalization.CultureInfo.InvariantCulture),
                     "Summary figures fit inside the reserved header");
             }
-            Check(xml.Descendants(ns+"Value").Any(v=>v.Value.Contains("Data rows: 1")),"Printed row count excludes the authoritative TOTAL");
+            Check(!xml.Descendants(ns+"Value").Any(v=>v.Value.Contains("Data rows:")),"Printed reports omit technical data-row counts");
             Check(report.Data.Rows[1].Field<bool>("IsReportTotal") && report.Data.Rows[0].Field<string>("C1")==1234.5m.ToString("#,##0.##"),
                 "Totals are emphasized and decimal money retains its readable precision");
             report.Data.Dispose();

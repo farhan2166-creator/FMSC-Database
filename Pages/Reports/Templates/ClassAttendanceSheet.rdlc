@@ -160,7 +160,8 @@
                                   <Style>
                                     <FontSize>9pt</FontSize>
                                     <FontWeight>Normal</FontWeight>
-                                  </Style>
+                                  <TextDecoration>=IIF(Trim(Fields!Teacher.Value) = "", "None", "Underline")</TextDecoration>
+                                    </Style>
                                 </TextRun>
                               </TextRuns>
                               <Style>
@@ -553,7 +554,8 @@
                                   <Style>
                                     <FontSize>9pt</FontSize>
                                     <FontWeight>Normal</FontWeight>
-                                  </Style>
+                                  <TextDecoration>=IIF(Trim(Fields!Teacher.Value) = "", "None", "Underline")</TextDecoration>
+                                    </Style>
                                 </TextRun>
                               </TextRuns>
                               <Style>

@@ -15,7 +15,9 @@ internal static partial class Program
         typeof(AdmissionNumbers).GetField("_numbers",BindingFlags.Static|BindingFlags.NonPublic)!.SetValue(null,new Dictionary<int,string>{{42,"6590"}});
         typeof(AdmissionNumbers).GetField("_loadedAt",BindingFlags.Static|BindingFlags.NonPublic)!.SetValue(null,DateTime.UtcNow);
         var data=Field<DataTable>("familyPaymentBreakdowns");
-        foreach(string name in new[]{"ReceiptNumber","AdmissionNumber","StudentName","PaymentStatus"})data.Columns.Add(name);
+        foreach(string name in new[]{"ReceiptNumber","AdmissionNumber","StudentName","PaymentStatus","PaymentMethod"})data.Columns.Add(name);
+        data.Columns.Add("TransactionDate",typeof(DateTime));data.Columns.Add("CreatedAt",typeof(DateTime));
+        data.Columns.Add("BalanceRemaining",typeof(decimal));
         data.Columns.Add("AdmissionId",typeof(int));
         foreach(string name in new[]{"CashApplied","CreditApplied","OriginalTotal","ReceiptCashReceived","ReceiptCreditApplied","Adjusted","NetSettled"})data.Columns.Add(name,typeof(decimal));
         void Member(string receipt,int id,string number,string name,decimal share,decimal adjusted,decimal total,string status)
@@ -23,12 +25,27 @@ internal static partial class Program
             var row=data.NewRow();row["ReceiptNumber"]=receipt;row["AdmissionNumber"]=number;row["StudentName"]=name;
             row["PaymentStatus"]=status;row["AdmissionId"]=id;row["CashApplied"]=share;row["CreditApplied"]=0m;
             row["OriginalTotal"]=total;row["ReceiptCashReceived"]=total;row["ReceiptCreditApplied"]=0m;row["Adjusted"]=adjusted;row["NetSettled"]=share-adjusted;data.Rows.Add(row);
+            row["TransactionDate"]=row["CreatedAt"]=new DateTime(2026,10,27);row["PaymentMethod"]="Cash";row["BalanceRemaining"]=500m;
         }
         Member("FR-2026-00007",41,"6510a","Test One",7500,0,22000,"Paid");
         Member("FR-2026-00007",42,"6590","Test Two",7600,7600,22000,"Reversed");
         Member("FR-2026-00007",43,"6591","Test Three",6900,0,22000,"Paid");
         for(int i=0;i<10;i++)Member("LARGE-FAMILY",51+i,"S"+i,"A sibling with a longer student name "+i,1000,0,10000,"Paid");
         var history=Field<DataGridView>("recentPayments");
+        Member("SIBLING-ONLY",99,"S99","Sibling alone",2800,0,2800,"Paid");
+        type.GetMethod("ShowWholeReceiptHistory",flags)!.Invoke(page,null);
+        var whole=history.Rows.Cast<DataGridViewRow>().Single(row=>Convert.ToString(row.Cells["ReceiptNumber"].Value)=="FR-2026-00007");
+        Check(history.Rows.Count==3&&Convert.ToDecimal(whole.Cells["Amount"].Value)==22000m
+            &&Convert.ToDecimal(whole.Cells["ReceiptTotal"].Value)==23500m&&Convert.ToDecimal(whole.Cells["BalanceThen"].Value)==1500m,
+            "Upper history has one row per receipt with whole-receipt total, original paid and saved due, rather than the main student's share");
+        Check(history.Rows.Cast<DataGridViewRow>().Any(row=>Convert.ToString(row.Cells["ReceiptNumber"].Value)=="SIBLING-ONLY"),
+            "A checked sibling's individual receipt remains visible even without the main student on it");
+        data.Rows[0]["BalanceRemaining"]=DBNull.Value;
+        type.GetMethod("ShowWholeReceiptHistory",flags)!.Invoke(page,null);
+        whole=history.Rows.Cast<DataGridViewRow>().Single(row=>Convert.ToString(row.Cells["ReceiptNumber"].Value)=="FR-2026-00007");
+        Check(whole.Cells["ReceiptTotal"].Value is null&&whole.Cells["BalanceThen"].Value is null,
+            "Missing historical dues remain unknown rather than being replaced by zero or today's balance");
+        data.Rows[0]["BalanceRemaining"]=500m;data.Rows.Remove(data.Rows[data.Rows.Count-1]);history.Rows.Clear();
         int Add(string reference,decimal amount,decimal total)
         {int index=history.Rows.Add("27-Oct-2026",reference,"Fees","Reversed",amount,"Cash",0);history.Rows[index].Cells["Adjusted"].Value=amount;history.Rows[index].Cells["NetPaid"].Value=0m;history.Rows[index].Cells["ReceiptTotal"].Value=total;history.Rows[index].Tag=true;return index;}
         int family=Add("FR-2026-00007",7600,22000),large=Add("LARGE-FAMILY",1000,10000),single=Add("R-2026-00001",2800,0);
@@ -54,9 +71,9 @@ internal static partial class Program
                     var reprint=Field<ModernButton>("reprintReceiptButton");
                     grid.CurrentCell=grid.Rows[2].Cells[0];
                     type.GetMethod("SelectHistoryReceipt",flags)!.Invoke(page,new object?[]{grid});
-                    Check(Field<int>("historyReceiptChild")==43 && history.SelectedRows.Count==0 && reprint.Text=="Reprint Child Receipt", "A child selection targets that saved member and clears the upper highlight");
+                    Check(Field<int>("historyReceiptChild")==43 && history.SelectedRows.Count==0 && reprint.Text=="Reprint Student Receipt", "A child selection targets that saved member and clears the upper highlight");
                     type.GetMethod("SelectHistoryReceipt",flags)!.Invoke(page,new object?[]{null});
-                    Check(Field<int>("historyReceiptChild")==0 && grid.SelectedRows.Count==0 && history.SelectedRows.Count==1 && reprint.Text=="Reprint Family Receipt", "Returning to the same upper receipt restores the full family target");
+                    Check(Field<int>("historyReceiptChild")==0 && grid.SelectedRows.Count==0 && history.SelectedRows.Count==1 && reprint.Text=="Reprint Full Receipt", "Returning to the same upper receipt restores the full family target");
                     using(var bitmap=new Bitmap(dialog.Width,dialog.Height)){dialog.DrawToBitmap(bitmap,new Rectangle(Point.Empty,bitmap.Size));bitmap.Save($"artifacts/receipt-breakdown/family-{size.Width}.png");}
                     Check(history.Height>70&&details.RectangleToScreen(details.ClientRectangle).Bottom<=reprint.Parent!.RectangleToScreen(reprint.Parent.ClientRectangle).Top,$"The breakdown fits beneath payments without covering actions or removing the payment list (payments {history.Height}, table {grid.Height}, window {size})");
                     Check(reprint.RectangleToScreen(reprint.ClientRectangle).Bottom<=dialog.RectangleToScreen(dialog.ClientRectangle).Bottom&&grid.RectangleToScreen(grid.ClientRectangle).Right<=dialog.RectangleToScreen(dialog.ClientRectangle).Right,"The full sibling table width and receipt actions remain inside the smaller window");
@@ -64,7 +81,7 @@ internal static partial class Program
                     {member["ReceiptCashReceived"]=21500m;member["ReceiptCreditApplied"]=500m;}
                     data.Rows[0]["CashApplied"]=7000m;data.Rows[0]["CreditApplied"]=500m;
                     history.CurrentCell=history.Rows[single].Cells["ReceiptNumber"];history.CurrentCell=history.Rows[family].Cells["ReceiptNumber"];Application.DoEvents();
-                    Check(details.Text.Contains("21,500")&&details.Text.Contains("credit used: Rs. 500")&&history.Height>70,
+                    Check(details.Text.Contains("21,500")&&details.Text.Contains("Advance used: Rs. 500")&&history.Height>70,
                         $"Mixed cash and credit remain distinct and fit below the payment list (payments {history.Height}, window {size})");
                     foreach(var member in data.AsEnumerable().Where(row=>row.Field<string>("ReceiptNumber")=="FR-2026-00007"))
                     {member["ReceiptCashReceived"]=22000m;member["ReceiptCreditApplied"]=0m;}

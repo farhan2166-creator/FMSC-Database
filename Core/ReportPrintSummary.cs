@@ -9,7 +9,11 @@ internal sealed record ReportPrintMetric(string Label, string Value);
 // Shared presentation metadata. Never recalculate money from subtotal/detail rows.
 internal static class ReportPrintSummary
 {
-    internal static string Caption(string label)=>label=="Money Received"?"Payment Received":label;
+    internal static string Caption(string label)=>label switch {
+        "Money Received"=>"Payment Received","Students holding credit"=>"Students with Advance",
+        "Credit held"=>"Total Advance Held","Open Charges (Net)"=>"Total Fees",
+        "Settled on Open Charges" or "Settled On Open Charges"=>"Paid Towards Fees",_=>label
+    };
     private static readonly HashSet<string> KnownMetrics = new(StringComparer.OrdinalIgnoreCase) {
         "Receipts", "Money Received", "Payment Received", "Gross Received", "Refunds", "Corrections", "Credit Applied", "Adjusted Collection",
         "Net Collection", "Students Owing", "Total Outstanding", "Overdue", "90+ Days", "Gross Billed", "Discounts", "Net Billed",
@@ -50,7 +54,7 @@ internal static class ReportPrintSummary
     }
 
     internal static bool IsMoneyColumn(DataColumn column) => column.DataType==typeof(decimal)
-        && Regex.IsMatch(column.ColumnName,@"amount|balance|billed|charges|paid|payable|credit|outstanding|discount|fees|settled|refund|collection|received|\(rs",RegexOptions.IgnoreCase);
+        && Regex.IsMatch(column.ColumnName,@"amount|balance|billed|charges|paid|payable|credit|advance|outstanding|discount|fees|settled|refund|collection|received|\(rs",RegexOptions.IgnoreCase);
 
     internal static bool IsTotalRow(DataRow row)
     {

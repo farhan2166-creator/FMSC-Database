@@ -94,6 +94,14 @@ internal static partial class Program
         data.Rows.Add(50m,DBNull.Value,0m,0m,0m,50m);
         Check((decimal)OutstandingReportFilter.Totals(data).Rows[0]["Due Date Missing"]==50m,
             "Legacy missing due dates remain visible as a separate amount, not future or overdue");
+        data.Rows.Add(70m,0,0m,70m,0m,0m);
+        Check(new OutstandingReportFilter(false,0,0,null){DueStatus="None"}.Apply(data).Rows.Count==3,"None applies no due-status restriction");
+        foreach(var (status,amount) in new[]{("Overdue",1200m),("Due Today",70m),("Not Yet Due",1200m),("No Due Date",50m)})
+        {
+            using var chosen=new OutstandingReportFilter(status=="Overdue",0,0,null){DueStatus=status}.Apply(data);
+            Check(chosen.Rows.Count==1&&chosen.Rows[0].Field<decimal>("Outstanding")==amount,status+" filters by saved category amounts and preserves the full student balance");
+        }
+        Check(ReportPrintSummary.Caption("Open Charges (Net)")=="Total Fees"&&ReportPrintSummary.Caption("Settled On Open Charges")=="Paid Towards Fees","Outstanding report captions use familiar fee wording");
     }
     private static DataTable CreditRows()
     {
@@ -111,12 +119,12 @@ internal static partial class Program
         var data=CreditRows();
         data.Columns.Add("AdmissionNumber");data.Columns.Add("__AdmissionNumberBase",typeof(long));
         var (students,totals)=CreditBalanceReportData.Create(data,false,0m);
-        Check(students.Rows.Count==4 && students.Columns.Count==9 && !students.Columns.Contains("AdmissionId") && !students.Columns.Contains("FamilyId"),"Internal credit identifiers and enrichment columns are never exported");
+        Check(students.Rows.Count==4 && students.Columns.Count==8 && !students.Columns.Contains("AdmissionId") && !students.Columns.Contains("FamilyId") && !students.Columns.Contains("Family"),"Internal identifiers, enrichment fields and the empty family-code column are never exported");
         Check((decimal)totals.Rows[0]["Credit held"]==1200m,"Credit register totals sum positive student balances once");
         var (families,_) = CreditBalanceReportData.Create(data,true,0m);
         Check(families.Rows.Count==3,"Unlinked students remain separate instead of forming a fake family");
-        Check((decimal)families.Rows[0]["Available Credit"]==850m && (string)families.Rows[0]["Campus"]=="Boys, Girls","Family total and actual campus names");
-        Check(families.Rows[0].Field<string>("Class / Section")=="Class 1 – A\nClass 2 – A" && families.Rows[0].Field<string>("Members")!.Contains("1001 - One, 1002 - Two s/d/o Parent"),"Family identities retain references and shared father, with classes in matching order");
+        Check((decimal)families.Rows[0]["Available Credit"]==850m && families.Rows[0].Field<string>("Members")!.Contains("Boys · Class 1 – A\nAdvance: Rs. 700"),"Family total preserves each student's placement and advance");
+        Check(families.Rows[0].Field<string>("Members")!.Contains("1001 - One child of Parent") && families.Rows[0].Field<string>("Members")!.Contains("1002 - Two child of Parent\nGirls · Class 2 – A\nAdvance: Rs. 150"),"Family details pair individual identities, campuses, classes and balances without guessing gender");
         Check(families.AsEnumerable().Sum(r=>r.Field<decimal>("Available Credit"))==1200m,"Family totals reconcile with student totals");
         var (minimum,minimumTotals)=CreditBalanceReportData.Create(data,true,200m);
         Check(minimum.Rows.Count==2 && (decimal)minimumTotals.Rows[0]["Credit held"]==950m,"Minimum credit is per student as labelled");

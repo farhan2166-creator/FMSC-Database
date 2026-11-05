@@ -355,7 +355,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         paymentHistoryButton =
             AddAction(
                 "Payment History",
-                (_, _) => OpenPaymentHistory(),
+                async (_, _) => await OpenPaymentHistoryAsync(),
                 "Secondary");
         paymentHistoryButton.Enabled = false;
         historyButton.EnabledChanged +=
@@ -1380,9 +1380,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             DefaultCellStyle = new DataGridViewCellStyle { Format = "#,0.##" }
         });
         recentPayments.Columns.Add(new DataGridViewTextBoxColumn {
-            Name = "BalanceThen", HeaderText = "Balance Then (Rs.)", ReadOnly = true,
+            Name = "BalanceThen", HeaderText = "Due Then (Rs.)", ReadOnly = true,
             MinimumWidth = AppScale.Scale(110),
-            ToolTipText = "This student's saved remaining fee balance immediately after this receipt, before any later payments or changes. A dash means it was not recorded.",
+            ToolTipText = "The whole receipt's saved remaining fees immediately after payment, across all its students. Not today's balance. A dash means it was not recorded.",
             DefaultCellStyle = new DataGridViewCellStyle { Format = "#,0.##", NullValue = "—", Alignment = DataGridViewContentAlignment.MiddleCenter }
         });
         recentPayments.Columns["Adjusted"].DisplayIndex = 5;
@@ -1411,12 +1411,13 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         recentPayments.Columns["ReceiptNumber"].HeaderText = "Receipt / Reference";
         recentPayments.Columns["TransactionType"].HeaderText = "Transaction";
         recentPayments.Columns["ChargeType"].HeaderText = "Details";
-        recentPayments.Columns["Amount"].HeaderText = "Original Student Amount (Rs.)";
-        recentPayments.Columns["Amount"].ToolTipText = "The amount recorded for this student in this transaction, before later adjustments.";
-        recentPayments.Columns["ReceiptTotal"].ToolTipText = "The original full receipt amount for all included students. For an individual receipt, this equals the student's payment. A dash means the receipt total is unavailable.";
+        recentPayments.Columns["Amount"].HeaderText = "Paid (Rs.)";
+        recentPayments.Columns["Amount"].ToolTipText = "Original fees paid across the whole receipt, including advance used. Select the receipt for each student's share and later adjustments.";
+        recentPayments.Columns["ReceiptTotal"].HeaderText = "Total (Rs.)";
+        recentPayments.Columns["ReceiptTotal"].ToolTipText = "Whole receipt's fees before payment: paid plus the saved remaining dues, across all included students.";
         recentPayments.Columns["PaymentMethod"].HeaderText = "Payment Method";
         int order = 0;
-        foreach (string name in new[] { "PaymentDate", "ReceiptNumber", "TransactionType", "ChargeType", "Amount", "PaymentMethod", "ReceiptTotal", "BalanceThen" })
+        foreach (string name in new[] { "PaymentDate", "ReceiptNumber", "TransactionType", "ChargeType", "ReceiptTotal", "Amount", "BalanceThen", "PaymentMethod" })
             recentPayments.Columns[name].DisplayIndex = order++;
         foreach (string name in new[] { "Amount", "Adjusted", "NetPaid", "ReceiptTotal" })
             recentPayments.Columns[name].DefaultCellStyle.Format = "#,0.##";
@@ -2667,6 +2668,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
                     recentPayments.Rows[index].Cells["Adjusted"].ToolTipText;
                 recentPayments.Rows[index].Tag = !reversed && (IsPrintablePayment(row) || (creditKind=="Application" && !string.IsNullOrWhiteSpace(GetText(row,"ReceiptNumber"))));
             }
+            ShowWholeReceiptHistory();
             UpdateReprintAvailability();
             UpdatePaymentHistoryDetails();
         }
@@ -3862,8 +3864,16 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             student.Text.Trim());
         dialog.ShowDialog(FindForm());
     }
-    // Carries the selected student into fee-history views.
-    /// <summary>It is the same grid with the same loader, moved into a dialog, so nothing about what it shows or how it loads has changed - only where it lives.</summary>
+    private async Task OpenPaymentHistoryAsync()
+    {
+        if(admissionId<=0||enrollmentId<=0){Warn(UiText.Prompts.SelectStudentAndEnrollment);return;}
+        int version=loadVersion;
+        int[] selected=SelectedBillStudents();
+        using(BeginBusy("Loading receipts…",this))await LoadRecentPaymentsAsync(version);
+        if(!IsDisposed&&version==loadVersion&&selected.SequenceEqual(SelectedBillStudents()))OpenPaymentHistory();
+    }
+
+    // Receipt-level history for the main student and checked siblings.
     private void OpenPaymentHistory()
     {
         using var returnFocus = new DialogReturnFocus(this);
@@ -3880,7 +3890,9 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
         }
         using var dialog =
             new ApplicationWindowForm {
-                Text = $"Recent Payments — {StudentNameFor(admissionId)} · Admission {AdmissionNumbers.ForId(admissionId)}",
+                Text = SelectedBillStudents().Length>1
+                    ? $"Recent Payments — {StudentNameFor(admissionId)} and checked siblings"
+                    : $"Recent Payments — {StudentNameFor(admissionId)} · Admission {AdmissionNumbers.ForId(admissionId)}",
                 StartPosition = FormStartPosition.CenterParent,
                 ClientSize = new Size(AppScale.Scale(1180), AppScale.Scale(680)),
                 MinimumSize = new Size(AppScale.Scale(720), AppScale.Scale(420)),

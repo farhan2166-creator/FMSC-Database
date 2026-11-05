@@ -41,7 +41,7 @@ internal static class CreditBalanceReportData
         {
             result = new DataTable();
             // Explicit projection also excludes admission-number enrichment/sort columns.
-            string[] fields = { "Adm. / QR No.", "Student", "Father Name", "Family", "Campus", "Class / Section", "Available Credit", "Last Activity", "Student Status" };
+            string[] fields = { "Adm. / QR No.", "Student", "Father Name", "Campus", "Class / Section", "Available Credit", "Last Activity", "Student Status" };
             foreach (string field in fields) result.Columns.Add(field,source.Columns[field]!.DataType);
             foreach (var row in selected) result.Rows.Add(fields.Select(field=>row[field]).ToArray());
             if(source.Columns.Contains("__StudentGender"))
@@ -53,20 +53,22 @@ internal static class CreditBalanceReportData
         else
         {
             result = new DataTable();
-            foreach (string c in new[] { "Family / Student", "Members", "Campus", "Class / Section" }) result.Columns.Add(c);
+            foreach (string c in new[] { "Family / Student", "Members" }) result.Columns.Add(c);
             result.Columns.Add("Students",typeof(int)); result.Columns.Add("Available Credit",typeof(decimal)); result.Columns.Add("Last Activity",typeof(DateTime));
             foreach (var group in selected.GroupBy(r => r.IsNull("FamilyId") ? "Student:"+r["AdmissionId"] : "Family:"+r["FamilyId"]))
             {
                 var first = group.First();
-                string references=string.Join(", ",group.Select(r=>Convert.ToString(r["Adm. / QR No."])??"").Where(value=>value.Length>0));
-                string label = first.IsNull("FamilyId") ? "Student: "+references : Convert.ToString(first["Family"])??"";
-                if(string.IsNullOrWhiteSpace(label))label=references.Length>0?"Family: "+references:"Family";
-                string[] campuses = group.Select(r => Convert.ToString(r["Campus"])??"").Where(value=>value.Length>0).Distinct().ToArray();
-                string members=StudentIdentityText.Family(group.Select(r=>new StudentIdentityText.Member(
-                    Convert.ToString(r["Adm. / QR No."])??"",Convert.ToString(r["Student"])??"",Convert.ToString(r["Father Name"])??"",
-                    source.Columns.Contains("__StudentGender")?Convert.ToString(r["__StudentGender"])??"":"")));
-                string placements=string.Join("\n",group.Select(r=>Convert.ToString(r["Class / Section"]) is {Length:>0} placement?placement:"Not recorded"));
-                result.Rows.Add(label,members,string.Join(", ",campuses),placements,group.Count(),
+                string[] parents=group.Select(r=>Convert.ToString(r["Father Name"])?.Trim()??"").Where(name=>name.Length>0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                string label=Convert.ToString(first["Family"])?.Trim()??"";
+                if(label.Length==0)label=first.IsNull("FamilyId")?"Individual student":parents.Length==1?"Parent: "+parents[0]:"Family";
+                string members=string.Join("\n\n",group.Select(r=>{
+                    string identity=StudentIdentityText.Format(Convert.ToString(r["Adm. / QR No."])??"",Convert.ToString(r["Student"])??"",Convert.ToString(r["Father Name"])??"",
+                        source.Columns.Contains("__StudentGender")?Convert.ToString(r["__StudentGender"])??"":"");
+                    string campus=Convert.ToString(r["Campus"]) is {Length:>0} place?place:"Not recorded";
+                    string placement=Convert.ToString(r["Class / Section"]) is {Length:>0} klass?klass:"Not recorded";
+                    return $"{identity}\n{campus} · {placement}\nAdvance: Rs. {Convert.ToDecimal(r["Available Credit"]):#,##0.##}";
+                }));
+                result.Rows.Add(label,members,group.Count(),
                     group.Sum(r => Convert.ToDecimal(r["Available Credit"])),group.Max(r => Convert.ToDateTime(r["Last Activity"])));
             }
         }

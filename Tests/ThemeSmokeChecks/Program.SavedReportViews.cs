@@ -19,6 +19,20 @@ internal static partial class Program
         try
         {
             CurrentUser.SignIn(fixtureActor,"Saved-view fixture","Administrator",false,Array.Empty<string>());
+            using(var duePage=new OutstandingAgingReportPage())
+            {
+                var due=(ModernComboBox)typeof(OutstandingAgingReportPage).GetField("dueStatus",flags)!.GetValue(duePage)!;
+                Check(due.Text=="None"&&due.Items.Count==5,"Due status starts at None and provides the five explicit selections");
+                var dueFields=new[]{("Due status",(Control)due)};
+                ReportFilterState.Restore(dueFields,new Dictionary<string,string>{{"Due status","check:1"}});
+                Check(due.Text=="Overdue","An earlier saved overdue checkbox restores the matching dropdown selection");
+                ReportFilterState.Restore(dueFields,new Dictionary<string,string>{{"Due status","check:0"}});
+                Check(due.Text=="None","An earlier unrestricted saved view restores None");
+                due.SelectedItem="Due Today";
+                var dueSaved=ReportFilterState.Capture(dueFields);due.SelectedItem="None";
+                ReportFilterState.Restore(dueFields,dueSaved);
+                Check(due.Text=="Due Today","New due-status selections round-trip through saved views");
+            }
             using(var ordering=new ModernComboBox())
             {
                 ordering.Items.AddRange(ReportRowOrder.Choices("GetCollectionsAndReceiptsReport","Receipts").Cast<object>().ToArray());

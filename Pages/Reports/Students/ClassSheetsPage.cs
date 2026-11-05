@@ -11,8 +11,7 @@ public sealed class ClassSheetsPage : V2Page
         Value = DateTime.Today
     };
     private readonly ModernTextBox exam = HumanUi.TextBox(false, 100), subject = HumanUi.TextBox(false, 100),
-        examDate = HumanUi.TextBox(false, 50), teacher = HumanUi.TextBox(false, 100),
-        search = HumanUi.TextBox(false, 100);
+        examDate = HumanUi.TextBox(false, 50), teacher = HumanUi.TextBox(false, 100);
     private readonly ModernButton previewButton;
     private readonly ModernButton selectAllButton, clearSelectionButton;
     private DataTable? placements, roster;
@@ -46,14 +45,14 @@ public sealed class ClassSheetsPage : V2Page
         selectAllButton = AddAction("Select All", (_, _) => SelectStudents(true), "Secondary");
         clearSelectionButton = AddAction("Clear Selection", (_, _) => SelectStudents(false), "Secondary");
         RelocateFromActions(load, reset, selectAllButton, clearSelectionButton, previewButton);
-        var fields = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 4, RowCount = 3,
-            Height = AppMetrics.FieldRowHeight * 3 };
-        for (int i = 0; i < 4; i++) fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
-        for (int i = 0; i < 3; i++) fields.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
+        var fields = new TableLayoutPanel { Dock = DockStyle.Top, ColumnCount = 5, RowCount = 2,
+            Height = AppMetrics.FieldRowHeight * 2 };
+        for (int i = 0; i < 5; i++) fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 20));
+        for (int i = 0; i < 2; i++) fields.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldRowHeight));
         (string Caption, Control Input)[] inputs = {
             ("Campus", campus), ("Academic Year", year), ("Class", klass), ("Section", section),
             ("Sheet", sheet), ("Exam (optional)", exam), ("Subject / Paper (optional)", subject),
-            ("Date (optional)", examDate), ("Teacher (optional)", teacher), ("Find Student", search)
+            ("Date (optional)", examDate), ("Teacher (optional)", teacher)
         };
         var fieldOf = new Dictionary<Control, Control>();
         var monthField = ReportUi.FormField("Month", attendanceMonth, true);
@@ -69,7 +68,8 @@ public sealed class ClassSheetsPage : V2Page
                 host.Controls.Add(field); host.Controls.Add(monthField);
                 cell = host;
             }
-            fields.Controls.Add(cell, i % 4, i / 4);
+            fields.Controls.Add(cell, i % 5, i / 5);
+            if(inputs[i].Input==teacher)fields.SetColumnSpan(cell,2);
         }
         void UpdateSheetFields()
         {
@@ -83,7 +83,6 @@ public sealed class ClassSheetsPage : V2Page
         }
         sheet.SelectedIndexChanged += (_, _) => UpdateSheetFields();
         examDate.PlaceholderText = "Leave blank to write by hand";
-        search.PlaceholderText = "Name / admission number";
         Grid.AutoGenerateColumns = false; Grid.ReadOnly = false;
         Grid.Columns.Add(new DataGridViewCheckBoxColumn { Name = "Include", DataPropertyName = "Include",
             HeaderText = "Print", Width = AppScale.Scale(65) });
@@ -106,22 +105,23 @@ public sealed class ClassSheetsPage : V2Page
         previewButton.EnabledChanged += (_, _) => {
             if (previewButton.Enabled && !CanPreviewSelection()) previewButton.Enabled = false;
         };
-        search.TextChanged += (_, _) => FilterStudents();
         var details = HumanUi.Card("Class and Sheet Details",
             "Choose a campus and year. Use All classes or All sections to print several together.");
         details.Content.Controls.Add(fields);
         var studentsCard = HumanUi.Card("Students to Print",
-            "Uncheck students to exclude. Search narrows the list; checked hidden students remain included.");
+            "Uncheck students to exclude them from the printed sheet.");
         studentsCard.Content.Controls.Add(Grid);
         var root = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(3)));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, AppMetrics.FieldCardHeight(2)));
         root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         root.Controls.Add(details, 0, 0);
         restoreDefaults = ReportUi.CaptureFilterDefaults(fields);
         var buttons = HumanUi.ButtonRow(load, reset, selectAllButton, clearSelectionButton, previewButton);
         buttons.Dock = DockStyle.Top;
+        var actionFlow=buttons.Controls.OfType<FlowLayoutPanel>().Single();
+        actionFlow.SizeChanged+=(_,_)=>buttons.MinimumSize=new Size(0,actionFlow.Height+buttons.Padding.Vertical+actionFlow.Margin.Vertical);
         root.Controls.Add(buttons, 0, 1);
         root.Controls.Add(studentsCard, 0, 2);
         savedViews=new ReportSavedViewsBar("students.class-sheets",()=>ReportFilterState.Capture(SavedFields()),RestoreSavedView,
@@ -140,7 +140,7 @@ public sealed class ClassSheetsPage : V2Page
     }
     private (string Key,Control Control)[] SavedFields() => new (string,Control)[] {
         ("Campus",campus),("Year",year),("Class",klass),("Section",section),("Sheet",sheet),
-        ("Attendance month",attendanceMonth),("Exam",exam),("Subject",subject),("Exam date",examDate),("Teacher",teacher),("Search",search)
+        ("Attendance month",attendanceMonth),("Exam",exam),("Subject",subject),("Exam date",examDate),("Teacher",teacher)
     };
     private void RestoreSavedView(IReadOnlyDictionary<string,string> state)
     {
@@ -212,16 +212,6 @@ public sealed class ClassSheetsPage : V2Page
             (BindingContext[Grid.DataSource] as CurrencyManager)?.EndCurrentEdit();
     }
 
-    private void FilterStudents()
-    {
-        CommitSelection();
-        if (roster is null) return;
-        string text = search.Text.Trim().Replace("'", "''").Replace("[", "[[]").Replace("%", "[%]").Replace("*", "[*]");
-        roster.DefaultView.RowFilter = text.Length == 0 ? ""
-            : $"StudentName LIKE '%{text}%' OR AdmissionNumber LIKE '%{text}%'";
-        UpdateSelection();
-    }
-
     private void SelectStudents(bool include)
     {
         CommitSelection();
@@ -265,7 +255,7 @@ public sealed class ClassSheetsPage : V2Page
             roster = ClassSheetData.CreateRoster(students); loadedScope = scope;
             Grid.Columns["ClassName"].Visible = scope.Class == 0;
             Grid.Columns["SectionName"].Visible = scope.Class == 0 || scope.Section == 0;
-            Grid.DataSource = roster.DefaultView; FilterStudents();
+            Grid.DataSource = roster.DefaultView; UpdateSelection();
             if (roster.Rows.Count == 0) Warn("No active students were found for the selected filters.");
         }
         catch (Exception ex) { if (!IsDisposed && revision == rosterRevision) Fail(ex); }
@@ -278,7 +268,7 @@ public sealed class ClassSheetsPage : V2Page
         CommitSelection();
         if (roster is null || loadedScope != CurrentScope())
         { Warn("Load students for the selected filters first."); return; }
-        // Snapshot includes every checked student, even when search hides a row.
+        // Snapshot includes every checked student.
         int revision = rosterRevision;
         var selected = roster.Copy();
         bool attendance = sheet.SelectedIndex == 1;

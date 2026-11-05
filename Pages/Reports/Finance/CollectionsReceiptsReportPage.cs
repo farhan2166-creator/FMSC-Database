@@ -21,8 +21,38 @@ public sealed class CollectionsReceiptsReportPage : CanonicalFinanceReportPage
     protected override int ExportRecordCount(DataTable source) => CollectionReceiptGrouping.Layout(source)?.Count(r=>r.Kind=="Detail") ?? source.Rows.Count;
     protected override string CsvExportLabel => "CSV data rows only (*.csv)";
     protected override string GroupingCaption => "Group By";
-    protected override IReadOnlyList<ReportColumnDef> DefineReportColumns()=>base.DefineReportColumns()
-        .Where(column=>ViewName!="Receipts"||column.Key!="Campus").ToArray();
+    protected override IReadOnlyList<ReportColumnDef> DefineReportColumns()
+    {
+        var columns=base.DefineReportColumns();
+        if(ViewName!="Receipts")return columns;
+        string[] priority={"Receipt / Reference","Date","Student / Family","Payment Received","Money Received",
+            "Credit Applied","Adjusted Collection","Class / Section","Payment Method","Refunds","Corrections","Scope","Received By"};
+        return columns.Where(column=>column.Key!="Campus")
+            .OrderBy(column=>Array.IndexOf(priority,column.Key) is int index&&index>=0?index:int.MaxValue).ToArray();
+    }
+    protected override void OnReportPageBound()
+    {
+        base.OnReportPageBound();
+        if(ViewName!="Receipts")return;
+        Grid.DefaultCellStyle.WrapMode=DataGridViewTriState.True;
+        Grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.DisplayedCells;
+        Grid.ColumnHeadersDefaultCellStyle.WrapMode=DataGridViewTriState.True;
+        Grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+        Grid.AutoSizeColumnsMode=DataGridViewAutoSizeColumnsMode.Fill;
+        foreach(DataGridViewColumn column in Grid.Columns)
+        {
+            if(!column.Visible)continue;
+            int width=column.Name switch {
+                "Student / Family"=>260,"Class / Section"=>190,"Receipt / Reference"=>155,
+                "Date"=>110,"Payment Method"=>125,"Scope"=>80,_=>110
+            };
+            column.MinimumWidth=DpiLayout.Pixels(width,Grid.DeviceDpi);
+            column.FillWeight=width;
+            column.AutoSizeMode=DataGridViewAutoSizeColumnMode.Fill;
+            column.DefaultCellStyle.WrapMode=DataGridViewTriState.True;
+        }
+        Grid.AutoResizeRows(DataGridViewAutoSizeRowsMode.DisplayedCells);
+    }
     protected override void UpdateViewControls()
     {
         base.UpdateViewControls();

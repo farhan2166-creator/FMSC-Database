@@ -6,14 +6,32 @@ public sealed class CreditBalanceReportPage : CanonicalFinanceReportPage
 {
     private readonly ModernNumericTextBox minimum = new() { Minimum = 0, Maximum = 1000000000m, ZeroAsPlaceholder = true };
     public CreditBalanceReportPage() : base("Student Advance Balance Register",
-        "Advance credit held for students. This is not outstanding fees or new income. Location filters use the current or latest placement.",
+        "Unused advance held for students. Location filters use each student's current or latest placement.",
         "CreditBalanceRegister", "FMSC_Credit_Balances", new[] { "Students", "Families" }, Array.Empty<string>(),false,false,false,false)
     {
         minimum.TextChanged += (_, _) => FiltersChanged();
     }
-    protected override IEnumerable<(string, Control)> AdditionalReportFilters() => new[] { ("Minimum credit per student (Rs.)",(Control)minimum) };
+    protected override IEnumerable<(string, Control)> AdditionalReportFilters() => new[] { ("Minimum advance per student (Rs.)",(Control)minimum) };
     protected override string AdditionalFilterSignature => NumericFilterSignature(minimum.Text);
-    protected override string AdditionalFilterDescription => $"Minimum credit per student: Rs. {minimum.Value:N0}";
+    protected override string AdditionalFilterDescription => (minimum.Value>0?$"Minimum advance per student: Rs. {minimum.Value:#,##0.##}. ":"")+"Only students matching the filters are included.";
+    protected override IReadOnlyList<ReportColumnDef> DefineReportColumns()=>base.DefineReportColumns().Select(column=>column with {
+        Header=column.Key switch {
+            "Available Credit"=>ViewName=="Families"?"Family Advance":"Available Advance",
+            "Students"=>"Students with Advance","Members"=>"Student Details","Family / Student"=>"Family",
+            "Last Activity"=>"Last Advance Activity",_=>column.Header
+        }
+    }).ToArray();
+    protected override void OnReportPageBound()
+    {
+        base.OnReportPageBound();
+        Grid.DefaultCellStyle.WrapMode=DataGridViewTriState.True;
+        Grid.AutoSizeRowsMode=DataGridViewAutoSizeRowsMode.DisplayedCells;
+        Grid.ColumnHeadersDefaultCellStyle.WrapMode=DataGridViewTriState.True;
+        Grid.ColumnHeadersHeightSizeMode=DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+        foreach(DataGridViewColumn column in Grid.Columns)
+            column.DefaultCellStyle.WrapMode=DataGridViewTriState.True;
+        Grid.AutoResizeRows(DataGridViewAutoSizeRowsMode.DisplayedCells);
+    }
     protected override bool AppendReportTotals => false;
     protected override IEnumerable<SqlParameter> BuildParameters()
     {
