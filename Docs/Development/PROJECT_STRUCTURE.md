@@ -6,9 +6,9 @@ The sidebar follows the operator's work. Source folders follow the same workflow
 
 | Group | Work |
 |---|---|
-| Daily Work | Student Admissions, Student Profile, Fee Collection, Student Certificates |
-| Student Management | Family/siblings, photos, transfers/re-admission, promotion, record checks and duplicate review |
-| Fees & Billing | Student Fee Corrections, Fee Posting, Fee Rate Setup |
+| Daily Work | Six shortcuts: Student Admissions, Pending Registrations, Student Profile, Fee Collection, Print Outstanding Bills and Daily Collection Closing |
+| Fees | Fee Rate Setup, Billing Center, Fee Collection, Print Outstanding Bills, Student Purchases, Student Fee Account and Daily Collection Closing |
+| Students | Admissions, pending registrations, profiles, Student Data Review, student certificates, family/siblings and placement management |
 | Staff | Staff Management and staff certificates |
 | Reports | Student reports and financial reports/documents |
 | School Setup | School profile, campuses, academic years, classes/sections, campus assignments and subjects |

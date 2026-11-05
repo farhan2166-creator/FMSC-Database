@@ -14,6 +14,7 @@ internal static partial class Program
 
     private static void CheckNavigationRecovery()
     {
+        CheckSidebarGroups();
         // Keep the real shell unshown. Its initial dashboard loader never starts;
         // injected reporting avoids opening a dialog or creating the shell handle.
         var flags = BindingFlags.Instance | BindingFlags.NonPublic;

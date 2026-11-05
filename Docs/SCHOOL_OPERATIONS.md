@@ -18,7 +18,7 @@ Open **Daily Work → Student Admissions**:
   Save a temporary QR reference, link siblings where appropriate and collect
   reviewed opening fees if needed. Later complete details and confirm from the
   pending list. Confirmation keeps the same child, bills and payments.
-For historical records, open **Daily Work → Student Data Review → Existing Student Setup**:
+For historical records, open **Students → Student Data Review → Existing Student Setup**:
 
 - Review a historical record, explicitly choose its
   current placement and billing start, and choose whether admission fees were
@@ -55,7 +55,7 @@ as returned. Printing a bill does not create charges or record money.
 
 ## Monthly and exceptional billing
 
-**Daily Work → Billing Center** opens with Billing Status. Current-month charges
+**Fees → Billing Center** opens with Billing Status. Current-month charges
 are automatic for eligible active placements with explicit billing commencement.
 Legacy reference records stay excluded. Select a setup exception to open that
 child's setup or collection account. This navigation does not activate anyone.

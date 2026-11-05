@@ -1,5 +1,13 @@
 # Changelog
 
+## Main navigation groups — 2026-11-05
+
+- Add Fees and Students below Daily Work. Keep Daily Work to six frequently used
+  links; move billing/posting to Fees, fee setup out of School Setup, and placement
+  management into Students. Shared shortcuts retain existing pages and permissions.
+- Keep page-search destinations unique when a page appears in both menus, including
+  after theme/sidebar rebuilds. Add Alt+3 for Fees and Alt+4 for Students.
+
 ## Campus setup consolidation — 2026-11-05
 
 - Add Manage Campuses to Campus - Classes / Sections, using the existing campus

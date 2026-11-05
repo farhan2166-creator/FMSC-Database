@@ -46,6 +46,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     private bool? _lastAutomaticCompactMode;
     private readonly List<DashboardNavButton> navButtons = new();
     private readonly List<NavigationCommand> navigationCommands = new();
+    private readonly Dictionary<string, NavigationCommand> navigationRouteCommands = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<Keys,DashboardNavButton> navigationShortcutTargets=new();
     /* Map destinations to sidebar entries for consistent highlighting. */
     private readonly Dictionary<DashboardNavButton, string> navTargets = new();
@@ -378,7 +379,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             if(dialog.SelectedRecord is { } record && GlobalRecordSearch.CanRead(record.Kind))
             {
                 if(record.Kind=="Student")NavigateTo(()=>StudentProfilePage.ForStudent(record.AdmissionId,
-                    (factory,module,title)=>NavigateTo(factory,module,title)),"Daily Work","Student Profile");
+                    (factory,module,title)=>NavigateTo(factory,module,title)),"Students","Student Profile");
                 else NavigateTo(()=>new SavedFinancialDocumentPage(record,
                     (factory,module,title)=>NavigateTo(factory,module,title)),"Finance","Saved Financial Document");
             }
@@ -636,14 +637,8 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             "Dashboard",
             "Overview",
             fontOverride: AppTheme.HeadingFont);
-        // One operator uses the whole application. Keep the common daily entry points
-        // together and open this group by default; periodic and setup work stays collapsed.
-        AddModule(
-            flow,
-            "academics.png",
-            "Daily Work",
-            AppTheme.Primary,
-            new NavigationItem[]
+        // Shared destinations keep Daily Work shortcuts identical to the full menus.
+        var workPages = new NavigationItem[]
             {
                 new(
                     PageTitles.Admissions,
@@ -717,14 +712,19 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 && (item.Title != "Fee Collection" || FeeCollectionAccess.CanUse(CurrentUser.HasPermission))
                 && (item.Title != PageTitles.StudentFeeAccount || StudentAccountStatementPage.CanOpenAccount)
                 && (item.Title != PageTitles.StudentPurchases || StudentPurchasesAccess.CanUse(CurrentUser.HasPermission))
-                && (item.Title != PageTitles.StudentCertificates || CertificateWorkspaceAccess.CanOpenHub(CurrentUser.HasPermission))).ToArray(),
-            expandInitially: true);
-        AddModule(
-            flow,
-            "promotion.png",
-            PageTitles.PlacementManagement,
-            AppTheme.Primary,
-            new NavigationItem[]
+                && (item.Title != PageTitles.StudentCertificates || CertificateWorkspaceAccess.CanOpenHub(CurrentUser.HasPermission))).ToArray();
+        AddModule(flow, "academics.png", "Daily Work", AppTheme.Primary,
+            workPages.Where(item => item.Title is PageTitles.Admissions or "Pending Registrations"
+                or "Student Profile" or "Fee Collection" or PageTitles.OutstandingBills
+                or "Daily Collection Closing").ToArray(), expandInitially: true);
+        var feeRateSetup = new NavigationItem(PageTitles.FeeRateSetup,
+            () => FeeConfigurationWorkspace.Create(), "Finance", PageTitles.FeeRateSetup, "Fees.Configuration.Manage");
+        var feePages = workPages.Where(item => item.Module == "Finance").Prepend(feeRateSetup).ToArray();
+        var feeOrder = new[] { PageTitles.FeeRateSetup, PageTitles.FeePosting, "Fee Collection",
+            PageTitles.OutstandingBills, PageTitles.StudentPurchases, PageTitles.StudentFeeAccount, "Daily Collection Closing" };
+        AddModule(flow, "finance.png", "Fees", AppTheme.Primary,
+            feePages.OrderBy(item => Array.IndexOf(feeOrder, item.Title)).ToArray());
+        var placementPages = new NavigationItem[]
             {
                 new(PageTitles.AnnualPromotion,
                     () => new StudentPlacementPage(StudentPlacementTask.AnnualPromotion,(factory,module,title)=>NavigateTo(factory,module,title)),
@@ -738,26 +738,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 new(PageTitles.PlacementHistory,
                     () => new StudentPlacementPage(StudentPlacementTask.History,(factory,module,title)=>NavigateTo(factory,module,title)),
                     PageTitles.PlacementManagement,PageTitles.PlacementHistory,"Enrollment.Manage")
-            });
-        AddModule(
-            flow,
-            "students.png",
-            "Student Management",
-            AppTheme.Primary,
-            new NavigationItem[]
-            {
-            Section("STUDENT DETAILS"),
-            new(
-                "Family / Siblings",
-                () => new StudentFamilyPage(),
-                "Students",
-                "Family / Siblings",
-                "Students.Family"),
-
-
-            // Normal family work opens from Student Profile. Retain the existing
-            // route for an account granted family access without profile access.
-            }.Where(item => item.Title != "Family / Siblings" || !CurrentUser.HasPermission("Students.View")).ToArray());
+            };
+        AddModule(flow, "students.png", "Students", AppTheme.Primary,
+            workPages.Where(item => item.Module != "Finance")
+                .Append(new NavigationItem("Family / Siblings", () => new StudentFamilyPage(),
+                    "Students", "Family / Siblings", "Students.Family"))
+                .Append(Section(PageTitles.PlacementManagement)).Concat(placementPages).ToArray());
         AddModule(
             flow,
             "staff.png",
@@ -842,12 +828,6 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "School Setup",
                 "Subjects",
                 "System.Setup"),
-            new(
-                PageTitles.FeeRateSetup,
-                () => FeeConfigurationWorkspace.Create(),
-                "Finance",
-                PageTitles.FeeRateSetup,
-                "Fees.Configuration.Manage"),
             });
         AddMainNav(
             flow,
@@ -885,11 +865,10 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             accent,
             false,
             fontOverride);
-        var command = new NavigationCommand(AppHotKeys.PlainCaption(text), () => {
+        var command = RegisterRouteCommand(module, title, text, () => {
             if (string.IsNullOrWhiteSpace(permission) || CurrentUser.HasPermission(permission))
                 NavigateTo(factory, module, title);
         });
-        navigationCommands.Add(command);
         button.Click += (_, _) => command.Execute();
         navTargets[button] = NavKey(module, title);
         navButtons.Add(button);
@@ -984,7 +963,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                 "Staff Management" => "Staff details and records. Open Employment for a selected staff member.",
                 _ => item.Title
             });
-            var command = new NavigationCommand(AppHotKeys.PlainCaption(item.Text), () => {
+            var command = RegisterRouteCommand(item.Module, item.Title, item.Text, () => {
                 if (!string.IsNullOrWhiteSpace(item.Permission) && !CurrentUser.HasPermission(item.Permission)) return;
                 if (item.Title == PageTitles.Admissions && !DirectAdmissionAccess.CanCreate(CurrentUser.HasPermission)) return;
                 if (item.Title == PageTitles.StudentFeeAccount && !StudentAccountStatementPage.CanOpenAccount) return;
@@ -993,7 +972,6 @@ public sealed class MainDashboardForm : ApplicationWindowForm
                     item.Module,
                     item.Title);
             });
-            navigationCommands.Add(command);
             child.Click += (_, _) => command.Execute();
             navTargets[child] = NavKey(item.Module, item.Title);
             navButtons.Add(child);
@@ -1050,6 +1028,15 @@ public sealed class MainDashboardForm : ApplicationWindowForm
     string Title,
     string? Permission = null,
     bool IsHeading = false);
+    private NavigationCommand RegisterRouteCommand(string module, string title, string caption, Action execute)
+    {
+        string key = NavKey(module, title);
+        if (navigationRouteCommands.TryGetValue(key, out var existing)) return existing;
+        var command = new NavigationCommand(AppHotKeys.PlainCaption(caption), execute);
+        navigationRouteCommands.Add(key, command);
+        navigationCommands.Add(command);
+        return command;
+    }
     /// <summary>A small non-clickable label that groups the entries under it (see the Finance module).</summary>
     private static NavigationItem Section(string text) =>
         new(text, () => new Panel(), string.Empty, string.Empty, null, true);
@@ -1698,6 +1685,7 @@ public sealed class MainDashboardForm : ApplicationWindowForm
         {
             navButtons.Clear();
             navigationCommands.Clear();
+            navigationRouteCommands.Clear();
             navigationShortcutTargets.Clear();ShortcutController.ClearLocalShortcuts();
             /* The entries are rebuilt below, so the old buttons' targets go with them rather than keeping disposed buttons alive in this map. */
             navTargets.Clear();

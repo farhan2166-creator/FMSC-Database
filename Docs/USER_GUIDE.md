@@ -9,6 +9,20 @@
 3. Sign in using your authorized account. A first-run setup or required password-change prompt must be completed by the appropriate administrator.
 4. Open the relevant workspace from the dashboard or navigation. Ctrl+K searches all destinations your account can open, including collapsed and compact sidebar entries. Use the navigation groups below rather than editing database files manually.
 
+## Main navigation
+
+- **Daily Work** contains six frequent shortcuts: Student Admissions, Pending
+  Registrations, Student Profile, Fee Collection, Print Outstanding Bills and
+  Daily Collection Closing. Billing/posting is under Fees.
+- **Fees** contains Fee Rate Setup, Billing Center, Fee Collection, Print
+  Outstanding Bills, Student Purchases, Student Fee Account and Daily Collection Closing.
+- **Students** contains admissions, pending registrations, profiles, Student Data
+  Review, student certificates, Family / Siblings and placement management.
+
+Daily shortcuts open the same destinations as the full menus. Permissions apply
+to both, and page search lists each destination once. Use **Alt+3** for Fees and
+**Alt+4** for Students; **Alt+2** still opens Daily Work.
+
 ## Communication Center
 
 Open Communication Center if your account has access. Start with a reviewed template and saved guardian/staff contacts whose ownership and consent have been verified. A student record with a phone number is not automatically a communication contact. Empty lists explain whether to widen filters, add contacts through Contacts / Consent, review a template or ask an administrator.
@@ -73,10 +87,10 @@ retains its financial preview, confirmation and server-side permissions.
 |---|---|---|
 | New student | **Daily Work → Student Admissions** | Check student, placement, guardian, date, and opening charges before saving |
 | Pending/sibling registration | **Daily Work → Student Admissions → Admit Sibling** or **Daily Work → Pending Registrations** | New siblings first receive a temporary reference; complete details and Confirm & Save in Admissions for official numbers |
-| Student history and family | **Student Profile / Student Management** | Verify the selected student before editing or printing |
-| Student leave/transfer/re-admission | **Student Management → Transfers / Re-Admission** | Preserve history; do not treat leaving as deleting the student |
-| Fee configuration | **School Setup → Fee Rate Setup** | Rates affect future billing; use approved whole-rupee rules |
-| Post fees or review payment corrections | **Daily Work → Billing Center / Daily Work → Student Fee Account → Payment History** | Billing remains in Billing Center; select the original payment to review an eligible correction, and check uncertain save outcomes before retrying |
+| Student history and family | **Student Profile / Students** | Verify the selected student before editing or printing |
+| Student leave/transfer/re-admission | **Students → Transfers / Re-Admission** | Preserve history; do not treat leaving as deleting the student |
+| Fee configuration | **Fees → Fee Rate Setup** | Rates affect future billing; use approved whole-rupee rules |
+| Post fees or review payment corrections | **Fees → Billing Center / Fees → Student Fee Account → Payment History** | Billing remains in Billing Center; select the original payment to review an eligible correction, and check uncertain save outcomes before retrying |
 | Receive a payment | **Daily Work → Fee Collection** | Reconcile an uncertain save outcome before attempting another payment |
 | School or financial reports | **Reports** | Confirm student, time range, report filters and selected printer/export path |
 | Staff and certificates | **Staff / Student Certificates** | Finish or intentionally discard edits before switching records |
@@ -95,7 +109,7 @@ Screen naming and source mapping: [PROJECT_STRUCTURE.md](Development/PROJECT_STR
 
 ## Admissions and pending registrations
 
-**Daily Work → Student Admissions** is the main admission and registration workspace. **Daily Work → Pending Registrations** opens the pending-record list; **Open** or **Review** loads the selected child into the same Admissions form. The old standalone **Quick Registration** page and separate **Family Admission** navigation entry are retired. **Existing Student Setup** remains under **Daily Work → Student Data Review**; Billing Center's exception lists can open the selected student directly. See [school operations](SCHOOL_OPERATIONS.md) for the daily sequence.
+**Daily Work → Student Admissions** is the main admission and registration workspace. **Daily Work → Pending Registrations** opens the pending-record list; **Open** or **Review** loads the selected child into the same Admissions form. The old standalone **Quick Registration** page and separate **Family Admission** navigation entry are retired. **Existing Student Setup** remains under **Students → Student Data Review**; Billing Center's exception lists can open the selected student directly. See [school operations](SCHOOL_OPERATIONS.md) for the daily sequence.
 
 **Direct admission:** Enter the student's details, placement and opening fees in Admissions. Review the details and charges before saving. Historical/legacy student activation uses its own guarded process.
 
@@ -137,7 +151,7 @@ Open **Placement Management** in the sidebar. It contains four separate pages un
 
 ## Student Fee Account and annual receipts
 
-Open **Daily Work → Student Fee Account** and select a student by admission number or name. From Fee Collection, choose **Student Fees → Student Fee Account** to open the same account with the student preselected. Finish or clear any collection draft first. Closing the account returns to Fee Collection and refreshes that collection context.
+Open **Fees → Student Fee Account** and select a student by admission number or name. From Fee Collection, choose **Student Fees → Student Fee Account** to open the same account with the student preselected. Finish or clear any collection draft first. Closing the account returns to Fee Collection and refreshes that collection context.
 
 The account has four direct tabs:
 

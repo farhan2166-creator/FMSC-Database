@@ -396,7 +396,7 @@ namespace FMSC_SMS.Core
                     Color.FromArgb(37, 99, 235),
                 "attendance" =>
                     Color.FromArgb(16, 185, 129),
-                "finance" =>
+                "finance" or "fees" =>
                     Color.FromArgb(245, 158, 11),
                 "staff" =>
                     Color.FromArgb(6, 182, 212),
