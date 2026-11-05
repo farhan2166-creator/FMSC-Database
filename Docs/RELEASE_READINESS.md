@@ -1,5 +1,7 @@
 # Operator-control revision readiness
 
+> **Dated, feature-specific readiness record.** For the first-production application 1.0.0 / schema-1 baseline approved on 5 November 2026, consult [the baseline decision](FIRST_RELEASE_BASELINE.md) and [release checklist](RELEASE_CHECKLIST.md). The status below is not a new release certification.
+
 > **Historical evidence — NOT a current release approval (reviewed 2026-11-01).**
 > This document records a **schema-21** operator-control release and its exact
 > 2026 test commit. The current application and installer require **schema 75**.

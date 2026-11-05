@@ -20,7 +20,7 @@ This is a logical dependency map, not a claim that all pages directly call every
 
 ## Startup and database identity
 
-`Program.cs` initializes WinForms and exception handling, displays a connection/startup dialog, performs first-run setup where needed, then login and the dashboard. `DatabaseHelper.cs` points at `C:\ProgramData\FMSC_Database\FMSC_DB.mdf` using the per-user LocalDB `(localdb)\MSSQLLocalDB` endpoint. It verifies the identity and calls the production `Core/DatabaseCompatibility.cs` contract; **required database schema version is 20**.
+`Program.cs` initializes WinForms and exception handling, displays a connection/startup dialog, performs first-run setup where needed, then login and the dashboard. `DatabaseHelper.cs` points at `C:\ProgramData\FMSC_Database\FMSC_DB.mdf` using the per-user LocalDB `(localdb)\MSSQLLocalDB` endpoint. It verifies the identity and calls the production `Core/DatabaseCompatibility.cs` contract; **required database schema version is 1** (the owner-approved first-production baseline of 5 November 2026; see [baseline decision](FIRST_RELEASE_BASELINE.md)).
 
 The compatibility contract combines version requirements with schema structural requirements stored in embedded JSON (`Core/DatabaseCompatibilityRequirements.json`, `Core/DatabaseMigrationRequirements.json`). The embedded compatibility manifests are enforced against the connected database at runtime; they do not authorize overwriting school database files.
 
@@ -62,7 +62,7 @@ Portable sizing checks and Windows native-control fixtures cover synthetic clien
 
 - Communication Center is optional and separately verified. Its already-applied setup script is retired and is not offered by the current installer. Fresh installations needing messaging use an owner-approved snapshot that includes the module; existing communication data is preserved. Opening the page does not install its schema or enable live dispatch. See [current deployment guidance](COMMUNICATION_CENTER.md).
 - Normal full packaging uses `Properties/PublishProfiles/PortableRelease.pubxml`, `Installer/ValidateReleaseAssets.ps1` and `Installer/core.ps1`.
-- This release requires the current schema-21 baseline. Applied migrations 2–7 are retired. An empty or missing migrations folder skips migration execution; numbered SQL files newer than the installed base version run in numeric order within the schema version supported by that release.
+- The first-production release requires **schema 1**, already present in the owner-supplied fully updated detached database pair. Production `Migrations/` starts without numbered SQL files; the next future change is `2.sql`. Historical pre-release migrations remain isolated in disposable test fixtures; never replay them against the baseline-1 school database. An empty or missing production migration folder skips execution; future numbered SQL is applied only through the approved backup/version safeguards. See [first-release baseline](FIRST_RELEASE_BASELINE.md) and [migration instructions](../Migrations/README.md).
 - The private complete-installer workflow obtains signed LocalDB MSI and pinned sqlcmd, bundles the application and scripts **without** school database files. The owner supplies verified detached MDF/LDF locally after download for a fresh install.
 - `CIAppOnlyBundle` is intentionally scoped to the separate app-only artifact, not the full installer validation.
 
@@ -82,7 +82,7 @@ GitHub Actions builds on `windows-2022`. Passing automated tests does **not** pr
 
 Before editing, read [AGENTS.md](../AGENTS.md), [development workflow](DEVELOPMENT_WORKFLOW.md), the active [audit](../Audit/FMSC_MASTER_AUDIT.md), and the relevant feature sources. Keep changes incremental; require a focused PR explaining behavior, safety impact, tests, and migration requirements. Do not edit or introduce real school data into test fixtures.
 
-## Current operator flow and schema 21
+## Current operator flow and production baseline
 
 Student Admissions groups direct admission/editing, pending registrations and
 existing-student activation. Student Data Review contains record corrections and
@@ -90,12 +90,6 @@ duplicate review. Billing Center groups status/exception resolution, reviewed
 recovery, additional charges and posting reversals. Exceptions open the selected
 student's setup or collection page with current permission checks.
 
-The app, installer, worker and webhook host require schema 21. Migrations 20 and 21 upgrade
-the supported schema-19/20 baselines, align the optional communication callback version
-guard and retires unused GetRoles, GetUserRoles, GetRolesAndPermissions and GetAdjustableFeePayments readers.
-No school/financial/permission rows are rewritten. Historical migrations 7–19 exist
-only under the isolated test fixture and are never copied into release packages.
+As of the owner-approved 5 November 2026 reset, the application and installer require **schema 1** and application release **1.0.0**. Current checks use the embedded structural compatibility contract in addition to the version number. Older development narratives involving schema 19–21, and older migrations 7–21, describe pre-baseline implementation and testing; their historical details remain in dated release and SQL-fixture records. They are **not** the supported production upgrade sequence for this first release.
 
-See SCHOOL_OPERATIONS.md for the operator routes and RELEASE_READINESS.md for the
-current validation record. Earlier schema-6 notes in historical audit documents
-describe earlier releases.
+See [school operations](SCHOOL_OPERATIONS.md) for operator routes, [first-release baseline](FIRST_RELEASE_BASELINE.md) for the current version policy, and [release checklist](RELEASE_CHECKLIST.md) for release gates. [Earlier release readiness](RELEASE_READINESS.md) retains historical scope rather than certifying this baseline.

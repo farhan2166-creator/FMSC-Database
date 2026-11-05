@@ -1,28 +1,38 @@
-# Audit reference
+# Audit index — FMSC
 
-- [Credit lifecycle audit — 4 November 2026](FMSC_CREDIT_LIFECYCLE_AUDIT_2026-11-04.md): five source-level findings, 18 lifecycle scenarios and verification limits; reviewed main `12f1d8f`, pending discussion.
-- [Master audit and release status](FMSC_MASTER_AUDIT.md): recorded findings,
-  baselines and remaining release gates. Read each entry's date and evidence scope.
-- [Business-decision handbook](../Docs/BUSINESS_DECISIONS.md): current rules and
-  the complete dated decision records, including the former owner-invariants summary.
-- [Source-resident business rules](../Core/BusinessDecisions.cs): self-contained
-  C# policy record with stable BD identifiers and comments at implementation sites.
-- [Consolidated review history](REVIEW_HISTORY.md): original investigation text,
-  finding IDs, fixes, commits, test results and limitations from the dated reviews.
-- [Earlier Git-based archive](Archive/FMSC_HISTORICAL_AUDITS.md): older report
-  revision links. Those external records are not a claim of present acceptance.
+**Updated:** 5 November 2026 · **Purpose:** navigation and provenance, not new verification. No audit records are deleted or rewritten by this organization.
 
-## Maintenance
+## 01. Start with the evidence you need
 
-Update the C# rule record and nearest invariant comment when a business decision
-changes; update the handbook's current-rule section to match. Keep the historical
-record, date and supersession explicit rather than rewriting past evidence.
+| Question | Read | Interpretation |
+|---|---|---|
+| Which findings and release gates were recorded? | [Master audit and release-status history](FMSC_MASTER_AUDIT.md) | Contains dated baselines; its older CI/installer observations are **not** current certification. |
+| What did prior reviews actually find? | [Consolidated review history](REVIEW_HISTORY.md) | Preserves the original report text, IDs, resolution evidence, limitations and commits. |
+| What did the 4 November credit review identify? | [Credit lifecycle audit](FMSC_CREDIT_LIFECYCLE_AUDIT_2026-11-04.md) | Source reviewed at `12f1d8f`; recheck the later implementation before calling findings still outstanding. |
+| What is the approved business rule? | [Business decision handbook](../Docs/BUSINESS_DECISIONS.md), [source rules](../Core/BusinessDecisions.cs) | Decisions are not equivalent to a verified UI/database behavior. |
+| How are overlapping documents organized? | [Documentation consolidation map](../Docs/DOCUMENTATION_MAP.md) | Crosswalk by topic, canonical owner, dated context and exact evidence duplicates. |
 
-Append new investigations to the review history with the inspected revision,
-scope and verification limits. Do not create competing release-status summaries.
-The existing filenames under Reviews and the older Docs audit paths are
-compatibility redirects; their original section headings preserve incoming links.
+## 02. Dated review entry points (preserved for existing links)
 
-Build/test success, real installer acceptance, operator acceptance and physical
-printing are separate evidence. Reorganizing documentation proves none of them.
-Never include school data, credentials or private backups in the audit record.
+1. [End-user flow audit — 14 October](Reviews/FMSC_END_USER_FLOW_AUDIT_2026-10-14.md)
+2. [Post-merge project audit — 14 October](Reviews/FMSC_POST_MERGE_PROJECT_AUDIT_2026-10-14.md)
+3. [UI guidance review — 20 October](Reviews/FMSC_UI_Guidance_Audit_2026-10-20.md)
+4. [Student posting hold/resume discussion — 21 October](Reviews/FMSC_Student_Hold_Resume_Discussion_2026-10-21.md)
+5. [UI improvements review](Reviews/UI_IMPROVEMENTS_REVIEW.md)
+6. [PDF and financial report presentation review — 2 November](Reviews/FMSC_PDF_FINANCE_PRESENTATION_2026-11-02.md)
+
+Many review-path files are compatibility locators into [review history](REVIEW_HISTORY.md); read the preserved section there rather than treating an abbreviated locator as missing evidence.
+
+## 03. Archive and decision locators
+
+- [Historical audit archive](Archive/FMSC_HISTORICAL_AUDITS.md) and [audit-fix verification — 13 October](Archive/AUDIT_FIX_VERIFICATION_2026-10-13.md): past scope and dated outcomes.
+- [Owner decisions and invariants](OWNER_DECISIONS_AND_INVARIANTS.md): preserved compatibility locator into the decision handbook.
+- [Docs-side dated reviews](../Docs/FILE_CATALOG.md#09--docs-time-stamped-reviews-and-audit-requests): original standalone/redirect audit paths remain available.
+
+## 04. Adding the next audit
+
+1. Record exact branch/commit, DACPAC or database origin, and inspection date.
+2. Separate **observed**, **proposed**, **approved**, **implemented**, and **verified**; do not mark a prior finding resolved from a merge alone.
+3. Append or cross-link into [review history](REVIEW_HISTORY.md), preserving original IDs and links. Keep the [master audit](FMSC_MASTER_AUDIT.md) focused on release gates, not a duplicate narrative.
+4. Link business-rule decisions to the [handbook](../Docs/BUSINESS_DECISIONS.md); list tests and limitations explicitly.
+5. Never include real school data, keys, private backups or patient/student-identifying captures. Native Windows, SQL, installer and physical printing acceptance remain distinct.
