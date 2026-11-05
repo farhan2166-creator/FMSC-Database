@@ -67,8 +67,8 @@ try {
 CREATE TABLE dbo.DatabaseVersion(VersionId int IDENTITY PRIMARY KEY,VersionNumber nvarchar(20));
 INSERT dbo.DatabaseVersion VALUES(N'1');
 CREATE TABLE dbo.MigrationProbe(VersionNumber int PRIMARY KEY);
-CREATE TABLE dbo.MigrationControl(Fail bit NOT NULL);
-INSERT dbo.MigrationControl VALUES(1);
+CREATE TABLE dbo.MigrationControl(Fail bit NOT NULL,Pause bit NOT NULL);
+INSERT dbo.MigrationControl VALUES(1,0);
 EXEC sys.sp_addextendedproperty @name=N'FMSC_RecoveryFixture',@value=N'$DatabaseName';
 "@
     Initialize-FmscRecoveryStorage $script:RecoveryRoot
@@ -81,7 +81,7 @@ EXEC sys.sp_addextendedproperty @name=N'FMSC_RecoveryFixture',@value=N'$Database
     $identity=$script:RecoveryJournal.DatabaseIdentity
     $migrations=Join-Path $root 'migrations';$null=New-Item -ItemType Directory $migrations
     Set-Content (Join-Path $migrations '2.sql') "INSERT dbo.MigrationProbe VALUES(2); INSERT dbo.DatabaseVersion VALUES(N'2');"
-    Set-Content (Join-Path $migrations '3.sql') "INSERT dbo.MigrationProbe VALUES(3); IF EXISTS(SELECT 1 FROM dbo.MigrationControl WHERE Fail=1) THROW 51000,'Deliberate disposable migration failure',1; INSERT dbo.DatabaseVersion VALUES(N'3');"
+    Set-Content (Join-Path $migrations '3.sql') "INSERT dbo.MigrationProbe VALUES(3); IF EXISTS(SELECT 1 FROM dbo.MigrationControl WHERE Pause=1) WAITFOR DELAY '00:05:00'; IF EXISTS(SELECT 1 FROM dbo.MigrationControl WHERE Fail=1) THROW 51000,'Deliberate disposable migration failure',1; INSERT dbo.DatabaseVersion VALUES(N'3');"
     $psi=[Diagnostics.ProcessStartInfo]::new('powershell.exe')
     $psi.UseShellExecute=$false;$psi.CreateNoWindow=$true;$psi.RedirectStandardOutput=$true;$psi.RedirectStandardError=$true
     $psi.Arguments='-NoProfile -ExecutionPolicy Bypass -File "'+$PSCommandPath+'" -ChildRoot "'+$root+'" -ChildDatabase '+$DatabaseName+' -Checkpoint AfterFirstCommit'
@@ -100,6 +100,27 @@ EXEC sys.sp_addextendedproperty @name=N'FMSC_RecoveryFixture',@value=N'$Database
     if ((Get-DatabaseVersion) -ne 2 -or $script:RecoveryJournal.LastSchema -ne 0) { throw 'Commit-before-journal interruption was not reproduced.' }
     $originalBackup=$script:RecoveryJournal.Backup
     $originalHash=$script:RecoveryJournal.BackupSha256
+    # Kill the actual SQL client while migration 3 has an open transaction with
+    # an uncommitted inserted row. READ UNCOMMITTED is used only to locate this
+    # disposable checkpoint; all recovery/version checks retain normal isolation.
+    $null=Sql $DatabaseName 'UPDATE dbo.MigrationControl SET Pause=1;'
+    $psi.Arguments='-NoProfile -ExecutionPolicy Bypass -File "'+$PSCommandPath+'" -ChildRoot "'+$root+'" -ChildDatabase '+$DatabaseName+' -Checkpoint DuringTransaction'
+    $child=[Diagnostics.Process]::Start($psi)
+    $out=$child.StandardOutput.ReadToEndAsync();$err=$child.StandardError.ReadToEndAsync()
+    try {
+        $watch=[Diagnostics.Stopwatch]::StartNew()
+        while (((Sql $DatabaseName 'SET NOCOUNT ON; SELECT COUNT(*) FROM dbo.MigrationProbe WITH(NOLOCK) WHERE VersionNumber=3;') -join '').Trim() -ne '1') {
+            if ($child.HasExited) { throw "In-flight SQL child failed: $($err.GetAwaiter().GetResult()) $($out.GetAwaiter().GetResult())" }
+            if ($watch.Elapsed.TotalSeconds -gt 90) { throw 'In-flight migration checkpoint timed out.' }
+            Start-Sleep -Milliseconds 100
+        }
+        $child.Kill($true);$child.WaitForExit()
+    } finally { if (-not $child.HasExited) { $child.Kill($true);$child.WaitForExit() }; $child.Dispose() }
+    if ((Get-DatabaseVersion) -ne 2 -or
+        ((Sql $DatabaseName 'SET NOCOUNT ON; SELECT COUNT(*) FROM dbo.MigrationProbe WHERE VersionNumber=3;') -join '').Trim() -ne '0') {
+        throw 'Killing an in-flight migration failed to roll back uncommitted data.'
+    }
+    $null=Sql $DatabaseName 'UPDATE dbo.MigrationControl SET Pause=0;'
     $failed=$false
     try { Invoke-PendingMigrations $migrations 3 } catch { $failed=$true }
     if (-not $failed -or (Get-DatabaseVersion) -ne 2 -or
@@ -122,7 +143,7 @@ EXEC sys.sp_addextendedproperty @name=N'FMSC_RecoveryFixture',@value=N'$Database
     $restored=$true
     if (((Sql $restoreName 'SET NOCOUNT ON; SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC;') -join '').Trim() -ne '1' -or
         (Get-DatabaseVersion) -ne 3) { throw 'Recovery backup restore did not preserve the original schema-1 state independently of the recovered target.' }
-    Write-Output 'PASS: actual LocalDB migration commit interrupted before journal update, failed migration transaction rollback, sequential forward resume, unchanged database identity, original verified backup reuse and restoration to a separate disposable database.'
+    Write-Output 'PASS: actual LocalDB commit interrupted before journal update, process-tree termination during an open migration transaction, failed migration rollback, sequential forward resume, unchanged database identity, original verified backup reuse and restoration to a separate disposable database.'
 } finally {
     foreach ($item in @(@($DatabaseName,$created),@($restoreName,$restored))) {
         if ($item[1]) {

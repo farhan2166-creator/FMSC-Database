@@ -1,4 +1,11 @@
-# Shared by the existing installer and its stable launcher. Loading defines helpers only.
+# Shared by the existing installer and its stable launcher; no installation entry point.
+# Windows PowerShell children must not auto-load PowerShell 7's .NET modules.
+# Scope this dependency path to the installer/launcher process only.
+if ($PSVersionTable.PSEdition -eq 'Desktop') {
+    $env:PSModulePath = [IO.Path]::Combine($PSHOME,'Modules') + ';' +
+        [IO.Path]::Combine([Environment]::GetFolderPath('ProgramFiles'),'WindowsPowerShell','Modules') + ';' +
+        [IO.Path]::Combine([Environment]::GetFolderPath('MyDocuments'),'WindowsPowerShell','Modules')
+}
 function Get-FmscRecoveryRoot {
     return Join-Path ([Environment]::GetFolderPath('CommonApplicationData')) 'FMSC_Updater'
 }
@@ -31,7 +38,7 @@ function Assert-FmscRecoveryStorage {
         foreach ($rule in $acl.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier])) {
             if ($rule.AccessControlType -eq 'Allow' -and $rule.IdentityReference.Value -notin $trusted -and
                 ([int]$rule.FileSystemRights -band 0xD0156)) {
-                throw 'Recovery storage permits unprivileged modification. Contact support.'
+                throw "Recovery storage permits unprivileged modification ($($item.Name): $($rule.IdentityReference.Value), $($rule.FileSystemRights)). Contact support."
             }
         }
     }
@@ -75,7 +82,7 @@ function Read-FmscRecoveryJournal {
     if (-not (Test-Path -LiteralPath $path)) { return $null }
     Assert-FmscRecoveryStorage $Root
     if ((Get-Item -LiteralPath $path).Length -gt 32768) { throw 'Recovery record is too large.' }
-    $record = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+    $record = [IO.File]::ReadAllText($path,[Text.Encoding]::UTF8) | ConvertFrom-Json
     if ($record.Format -ne 'fmsc-recovery/v1' -or $record.Transaction -notmatch '^[a-f0-9]{32}$' -or
         $record.Phase -notin @('Prepared','Migrating','Activating','Verified','Completed') -or
         $record.UserSid -notmatch '^S-1-5-21-[0-9-]+$' -or

@@ -1119,6 +1119,9 @@ function Invoke-PendingMigrations {
         }
     }
     foreach ($migration in $pending) {
+        if ($script:RecoveryJournal -and (Get-Process -Name 'FMSC_SMS' -ErrorAction SilentlyContinue)) {
+            throw 'FMSC was reopened during installation. Close it and use the recovery shortcut; no further migration was run.'
+        }
         Write-Step "Applying database migration $($migration.Version)..."
         Invoke-SqlMigration -FilePath $migration.FilePath -VersionBefore $current -ExpectedVersion $migration.Version
         $actual = Convert-ToDbVersion (Get-DatabaseVersion)
@@ -1744,6 +1747,9 @@ try {
         )
     }
     Write-Step 'Activating the staged application...'
+    if ($script:RecoveryJournal -and (Get-Process -Name 'FMSC_SMS' -ErrorAction SilentlyContinue)) {
+        throw 'FMSC was reopened during installation. Close it before recovering application activation.'
+    }
     Enable-StagedApplication -Staging $AppStagingDir -AppDir $AppDir -RollbackDir $AppRollbackDir
     Write-Success `
         "Final database schema version: $FinalDatabaseVersion"

@@ -14,7 +14,7 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     if (-not $ChildRoot) { Write-Output 'LOCAL FIXTURE: current-user owner substituted; actual Administrators ownership is checked on the elevated Windows CI runner.' }
 }
 Invoke-Expression $helper
-function Get-FmscDownloadParent { return Join-Path $script:fixture 'downloads/FMSC/Updates' }
+function Get-FmscDownloadParent { return Join-Path (Join-Path $script:fixture ('downloads-' + [char]0x0627)) 'FMSC/Updates' }
 $tokens = $null; $errors = $null
 $source = Get-Content (Join-Path $project 'Installer/core.ps1') -Raw
 $ast = [Management.Automation.Language.Parser]::ParseInput($source,[ref]$tokens,[ref]$errors)
@@ -57,7 +57,7 @@ if ($ChildRoot) {
 }
 $script:fixture = Join-Path ([IO.Path]::GetTempPath()) ('fmsc-recovery-' + [Guid]::NewGuid().ToString('N'))
 $script:RecoveryRoot = Join-Path $script:fixture 'protected'
-$prepared = Join-Path $script:fixture 'downloads/FMSC/Updates'
+$prepared = Get-FmscDownloadParent
 $prepared = Join-Path $prepared ('prepared-' + [Guid]::NewGuid().ToString('N'))
 $application = Join-Path $prepared 'application'
 $app = Join-Path $script:fixture 'app'; $stage = "$app.staging"; $rollback = "$app.rollback"
