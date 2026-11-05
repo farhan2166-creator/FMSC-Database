@@ -249,10 +249,11 @@ COMMIT;
  $header=Query 'EXEC dbo.GetFeeReceiptGroup @UserId=1,@ReceiptNumber=@Receipt;' @{'@Receipt'=$receipt}
  Check ($header.Tables[0].Rows[0].StudentCount -eq 2) 'Family receipt count includes the explicitly selected free child.'
  [void](Query "INSERT dbo.Roles(RoleName) VALUES(N'Accountant'); INSERT dbo.Users(Username,RoleId) VALUES(N'fictional_accountant',2); INSERT dbo.UserRoles(UserId,RoleId) VALUES(2,2); INSERT dbo.Permissions(PermissionCode,PermissionName) VALUES(N'Fees.Collect',N'Collect'),(N'Fees.View',N'View'); INSERT dbo.RolePermissions(RoleId,PermissionId) SELECT 2,PermissionId FROM dbo.Permissions;")
+ $creditBeforeAccountant=Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=2;'
  [void](Query "DECLARE @R uniqueidentifier=NEWID(); EXEC dbo.ProcessStudentCredit @UserId=2,@AdmissionId=2,@Action=N'Refund',@Amount=500,@RequestId=@R,@Reason=N'Fictional accountant credit refund';")
- Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=2;') -eq 1500) 'Accountant can refund unused credit with existing collection authority.'
+ Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=2;') -eq ($creditBeforeAccountant-500)) 'Accountant can refund unused credit with existing collection authority.'
  [void](Query "DECLARE @R uniqueidentifier=NEWID(); EXEC dbo.ProcessStudentCredit @UserId=2,@AdmissionId=2,@Action=N'Transfer',@Amount=500,@RequestId=@R,@TargetAdmissionId=1,@Reason=N'Fictional accountant sibling transfer';")
- Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=2;') -eq 1000) 'Accountant can transfer credit to a sibling.'
+ Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=2;') -eq ($creditBeforeAccountant-1000)) 'Accountant can transfer credit to a sibling.'
  $refused=$false;try{[void](Query 'EXEC dbo.RunAutomaticMonthlyBilling @UserId=2,@IncludeMissed=1;')}catch{$refused=$_.Exception.Message -like '*not authorized*'}
  Check $refused 'Accountant cannot authorize missed-month recovery without administrative permission.'
  [void](Query "UPDATE dbo.FeeTypes SET IsMandatory=1 WHERE FeeTypeId IN(1,3); UPDATE dbo.FeeTypes SET IsTransportLinked=1 WHERE FeeTypeId=2; INSERT dbo.FeeConfigurations(CampusId,ClassId,FeeTypeId,Amount,Frequency) VALUES(1,1,1,10000,N'Monthly'),(1,1,2,2000,N'Monthly'),(1,1,3,500,N'Yearly'); INSERT dbo.AdmissionNumberCounter(CounterId,LastNumber) VALUES(1,2000);")
