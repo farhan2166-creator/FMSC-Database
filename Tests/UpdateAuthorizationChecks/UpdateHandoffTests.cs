@@ -12,6 +12,9 @@ internal static class UpdateHandoffTests
         try
         {
             File.WriteAllText(Path.Combine(app, "FMSC_SMS.exe"), "inert fixture");
+            // No executable is launched; the manifest still requires this file.
+            string setup = Path.Combine(app, "UpdateSupport", "FMSC.Setup.exe");
+            File.WriteAllText(setup, "inert graphical setup fixture");
             File.WriteAllText(Path.Combine(app, "UpdateSupport", "core.ps1"), "$AppVersion = '2.0.0'\n$DatabaseVersion = '123'\n");
             File.WriteAllText(Path.Combine(app, "UpdateSupport", "Migrations", "123_fixture.sql"), "-- inert fixture");
             var manifest = new UpdateManifest { Version = "2.0.0", RequiredDatabaseSchema = 123,
@@ -29,6 +32,8 @@ internal static class UpdateHandoffTests
                 throw new Exception("Unsafe installer handoff accepted.");
             }
             Save(); UpdateInstallerHandoff.Validate(prepared);
+            File.Delete(setup); Reject();
+            File.WriteAllText(setup, "inert graphical setup fixture");
             File.WriteAllText(Path.Combine(app, "extra.txt"), "extra"); Reject(); File.Delete(Path.Combine(app, "extra.txt"));
             File.AppendAllText(Path.Combine(app, "FMSC_SMS.exe"), "damage"); Reject();
             File.WriteAllText(Path.Combine(app, "FMSC_SMS.exe"), "inert fixture");
