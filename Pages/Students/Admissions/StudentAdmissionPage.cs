@@ -3109,6 +3109,9 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             {
                 return false;
             }
+            /* Reflect the student actually loaded, including a selected sibling,
+               without firing UserSelectionChanged or starting another load. */
+            UpdateQuickStudentToLoadedRecord(row);
             UpdateStudentWorkspace();
             SwitchTab(0);
             SetStatus(
@@ -3140,9 +3143,6 @@ public sealed partial class StudentAdmissionPage : ContextPage, IUnsavedChanges,
             IsPendingRegistration ? $"{loadedStudent} · {AdmissionNumbers.ForId(admissionId)} · Complete details, then Confirm & Save."
                 : IsCancelledRegistration ? $"{loadedStudent} · Use Actions → Reopen Registration to review a new registration attempt. Cancellation history is retained."
                 : $"Student: {loadedStudent} (Admission Number {AdmissionNumbers.ForId(admissionId)}) - saving updates this student.");
-        /* Keep the toolbar search in sync with the loaded record, including sibling navigation.
-           SetStudent is programmatic and does not fire UserSelectionChanged or reload the record. */
-        UpdateQuickStudentToLoadedRecord(row);
         /* Capture the clean baseline after the record has settled. */
         CaptureAdmissionBaseline();
         Defer(() => RefreshConfirmReturnAvailabilityAsync(admissionId, version));
