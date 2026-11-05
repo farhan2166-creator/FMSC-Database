@@ -1,6 +1,6 @@
 # Student Fee Account validation — 28 October 2026
 
-Implementation map and design: [workspace decision](Decisions/STUDENT_FEE_ACCOUNT_WORKSPACE.md).
+Implementation map and design: [workspace decision](BUSINESS_DECISIONS.md#bd-20).
 
 ## Executed and passed
 

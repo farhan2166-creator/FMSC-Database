@@ -1,5 +1,7 @@
 # Quick counter implementation and verification — 20 October 2026
 
+> **Historical test record only:** The described Family Admission workspace was later retired. The current owner decision makes Admission the registration workspace ([BD-01](BUSINESS_DECISIONS.md#bd-01)). Do not treat this earlier flow as current operator guidance.
+
 The optional **Family Admission & Fees** workspace now coordinates the counter
 visit through the existing registration, return, fee-review, collection and RDLC
 paths. Full admission remains separate. No admission form, financial write rule,
@@ -62,7 +64,7 @@ of these results.
 
 ## Database delivery and live application
 
-[Migration 27](../Migrations/27.sql) requires schema 26, adds the read-only waiver
+[Migration 27](../Tests/LifecycleSqlChecks/Migrations/27.sql) requires schema 26, adds the read-only waiver
 procedure and corrects the all-zero bill total conversion in `IssueFeeBill`.
 It advances the schema to 27. It does not rewrite issued bills, school records,
 charges, payments, allocations or credit. Its SQL can be reapplied in sequence

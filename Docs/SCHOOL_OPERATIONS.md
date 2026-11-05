@@ -105,4 +105,4 @@ Use the verified database-free complete installer artifact. A fresh install gets
 the owner's matching detached database pair locally after download. An existing
 schema-19/20 installation upgrades through migrations 20/21 with a verified backup before
 application activation. Never replace an installed school database with a test
-fixture or a development DACPAC. See INSTALLATION.md and RELEASE_READINESS.md.
+fixture or a development DACPAC. See [Installation](INSTALLATION.md), [First Release Baseline](FIRST_RELEASE_BASELINE.md) and [Release Checklist](RELEASE_CHECKLIST.md).

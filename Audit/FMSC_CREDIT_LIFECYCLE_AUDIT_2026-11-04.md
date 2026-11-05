@@ -1,5 +1,7 @@
 # Credit lifecycle audit — 4 November 2026
 
+> **Historical source-snapshot note:** The migration links below now point to the retired development SQL fixtures under `Tests/LifecycleSqlChecks/Migrations/`. Current production schema starts at 1 with no numbered production scripts. The latest approved [credit policy](../Docs/BUSINESS_DECISIONS.md#bd-12) supersedes any audit *suggestion* to auto-apply advance or backdate its use.
+
 Reviewed main at `12f1d8f`, including the owner's latest `fmsc.dacpac`, the versioned migrations, collection/advance/counter forms, posting paths, collection writer, correction/refund handling, and receipt readers. This is an audit: no application code, migrations or school data were changed.
 
 Validation: the 16 production advance-allocation/ownership checks passed on this checkout. SQL findings below are from the current DACPAC definitions checked against migration sources and C# call paths. A fresh SQL Server database and native Windows forms were not executed in this audit; this is not a claim of a completed live end-to-end test. Procedure definitions were read directly from `fmsc.dacpac`; the references below identify matching migration definitions and current C# call paths.
@@ -14,7 +16,7 @@ Example: a student enrolled on 1 November with usable advance can have a zero-ca
 
 Fix: apply the same placement-date guard in the credit SQL path and in the form, with a versioned migration. Decide the permitted credit backdating rule explicitly; future posted fees may still be prepaid deliberately.
 
-Sources: [ApplyCollectionCredit date validation](../Migrations/22.sql#L17); [credit-only write branch](../Pages/Finance/Collection/FeeCollectionPage.cs#L3510). The cash enrollment-date guard was verified directly in the DACPAC definition of `ProcessFeeTransaction`, alongside `ApplyCollectionCredit` and `IssueCollectionReceipt`. No payment-date trigger in the DACPAC supplies the missing enrollment check.
+Sources: [ApplyCollectionCredit date validation](../Tests/LifecycleSqlChecks/Migrations/22.sql#L17); [credit-only write branch](../Pages/Finance/Collection/FeeCollectionPage.cs#L3510). The cash enrollment-date guard was verified directly in the DACPAC definition of `ProcessFeeTransaction`, alongside `ApplyCollectionCredit` and `IssueCollectionReceipt`. No payment-date trigger in the DACPAC supplies the missing enrollment check.
 
 ### 2. Closing Advance Balance can discard the allocation while retaining Amount Received
 
@@ -34,7 +36,7 @@ Example: October transport Rs. 1,000, November tuition Rs. 2,000, advance Rs. 1,
 
 Fix: use one agreed allocation order in C# and SQL. This is a versioned SQL change as well as focused regression coverage; it should not rewrite previous allocations.
 
-Sources: [automatic allocation](../Migrations/60.sql#L184); [manual allocation order](../Pages/Finance/Collection/FeeCollectionPage.Allocation.cs#L50).
+Sources: [automatic allocation](../Tests/LifecycleSqlChecks/Migrations/60.sql#L184); [manual allocation order](../Pages/Finance/Collection/FeeCollectionPage.Allocation.cs#L50).
 
 ### 4. Newly automatic credit applications use the historical receipt fallback
 
@@ -44,7 +46,7 @@ Consequently an application created today can print as historical/legacy; printi
 
 Fix: issue a durable normal receipt/snapshot for new automatic settlements, retaining the fallback only for genuinely existing unissued records. Preserve all historical stored numbers and payments.
 
-Sources: [automatic payment creation](../Migrations/60.sql#L195); [automatic/historical receipt reader](../Migrations/56.sql#L279); [legacy receipt classification](../Core/Reports/Fees/FeeReceiptDocuments.cs#L46).
+Sources: [automatic payment creation](../Tests/LifecycleSqlChecks/Migrations/60.sql#L195); [automatic/historical receipt reader](../Tests/LifecycleSqlChecks/Migrations/56.sql#L279); [legacy receipt classification](../Core/Reports/Fees/FeeReceiptDocuments.cs#L46).
 
 ### 5. Monthly-posting confirmation promises an effect that SQL can contradict
 

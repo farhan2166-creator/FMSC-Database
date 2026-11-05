@@ -4,7 +4,7 @@
 
 > **Historical evidence — NOT a current release approval (reviewed 2026-11-01).**
 > This document records a **schema-21** operator-control release and its exact
-> 2026 test commit. The current application and installer require **schema 75**.
+> 2026 test commit. At the dated 1 November review, the then-current application and installer required **schema 75**, before the owner-approved 5 November production reset to **schema 1**.
 > Do not reuse the success statement, artifact checksum, or schema-21 procedure
 > list below as certification of the current source. Consult the current release
 > checklist and record new same-commit evidence before deployment.
@@ -72,7 +72,7 @@ GitHub ZIP SHA256:
 Retained until 2026-11-01. The package records the tested source commit and contains
 its `SHA256SUMS.txt`; school database files are excluded.
 
-The [previous RC1 evidence](ReleaseHistory/1.1.0-rc.1.md) applies to that older
+The [first-production baseline](FIRST_RELEASE_BASELINE.md) applies to that older
 artifact only. It does not include this operator-control revision.
 
 ## Deployment and scope

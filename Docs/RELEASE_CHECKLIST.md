@@ -2,7 +2,7 @@
 
 **Release candidate commit:** `________________`  
 **Application version:** `________________`  
-**Required DB schema version:** `70` as of 2026-11-02; verify both `DatabaseHelper.cs` and `Installer/core.ps1` match before release.
+**Required DB schema version:** `1` under the owner-approved first-production reset of 5 November 2026. Verify both `DatabaseHelper.cs` and `Installer/core.ps1` match at the candidate commit; see [First Release Baseline](FIRST_RELEASE_BASELINE.md).
 **Reviewer and test date:** `________________`  
 **Windows account / OS / target hardware:** `________________`
 
@@ -28,7 +28,7 @@
 
 - [ ] [Complete installer workflow](../.github/workflows/fmsc-complete-installer.yml) finished **successfully** at the same SHA.
 - [ ] Downloaded database-free Actions artifact and recorded URL, run ID and checksum.
-- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, a `Migrations/` folder (empty when there are no pending scripts), required app resources, readme and communication deployment guide. Historical migrations 7–19 are test fixtures only; migrations 20–70 provide the current consecutive supported chain. Future numbered scripts must record their versions and match the application release; the installer refuses missing intermediate SQL files before taking the verified backup.
+- [ ] Package contains `FMSC_SMS/`, `Install FMSC_SMS.bat`, `core.ps1`, `Tools/SqlLocalDB.msi`, `Tools/sqlcmd.exe`, a `Migrations/` folder (empty when there are no pending scripts), required app resources, readme and communication deployment guide. The first-production schema-1 baseline ships **no numbered production migration scripts**; historical development scripts belong to disposable tests only. Future production migrations start at `2.sql`, must be complete and version-matched, and require the verified backup/missing-intermediate safeguards. Never replay old development versions 20–70 onto the baseline-1 school database.
 - [ ] Copied installer and any pending numbered SQL files match the source commit; copied-helper migration discovery/version tests passed. Start a new workflow run for new source rather than rerunning an older run.
 - [ ] Microsoft LocalDB MSI signature and pinned sqlcmd digest were verified by the workflow; double-check source of prerequisites if changed.
 - [ ] DB snapshot is **not** included in Actions. The owner locally supplies matching **detached** `FMSC_DB.mdf` and `FMSC_DB_log.ldf` only for fresh-install validation.

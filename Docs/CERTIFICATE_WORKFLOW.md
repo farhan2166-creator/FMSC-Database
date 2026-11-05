@@ -1,4 +1,4 @@
-# Certificate workflow — schema 51
+# Certificate workflow — current supported behavior
 
 Applies to Character, Date of Birth, Regular Student, School Leaving, College Leaving, Sports, No Objection, Provisional, Regular Teacher/Lecturer and Bank Account Opening certificates. The existing RDLC files are unchanged.
 
@@ -27,7 +27,7 @@ Applies to Character, Date of Birth, Regular Student, School Leaving, College Le
 - **Character:** separate SSC and HSSC certificate identities remain. Passing year, roll number, conduct, type and certificate date can be corrected on the latest uncollected copy. Earlier or collected copies are locked.
 - **DOB:** one identity per student; each issued copy retains its saved personal details. The latest uncollected certificate date can be corrected inline.
 - **Regular Student:** new certificates require an active placement. New identities are scoped to the enrollment rather than just the class name, allowing another enrollment in the same class. Saved copies retain the class they certify. The latest uncollected certificate date can be corrected inline.
-- **School/College Leaving:** creation retains the existing leaving and fee-review workflow. A selected historical episode has its own Issue Again action and duplicate allowance. Copy corrections cover promoted class, academic record, attendance and remarks; the recorded leaving date and lifecycle remain unchanged. Reprinting, collection or issuing another copy does not repeat withdrawal or reverse fees. The existing maximum of two non-void duplicate copies remains.
+- **School/College Leaving:** creation retains the existing leaving and fee-review workflow. A selected historical episode has its own Issue Again action and duplicate allowance. Copy corrections cover promoted class, academic record, attendance and remarks; the recorded leaving date and lifecycle remain unchanged. Reprinting, collection or issuing another copy does not repeat withdrawal or reverse fees. The existing maximum of two duplicate copies remains.
 - **Sports, NOC, Provisional and staff letters:** separate legitimate requests remain possible. Matching create requests reuse the existing record rather than silently adding an identical one. Issue Again creates a linked new record with current personal details and the saved certificate-specific information. Provisional subject snapshots retain their saved names and ordering.
 
 Collection status and collector details are shown in certificate histories and the certificate issue register for every type.
@@ -42,8 +42,6 @@ results and grades loaded into the editor use the standard labels (A1/A++ → A+
 B++/B+ → B, C+ → C, U → F). Loading an older record does not expand the dropdown
 with extra variants. This is an editor display change and needs no SQL migration.
 
-Cancellation is removed from the forms and database command in schema 51. The decision and rationale are recorded in [the cancellation decision](Decisions/CERTIFICATE_CANCELLATION_REMOVED.md). Schema 52 removes the cancellation columns and branches after the owner restored a clean schema-48 database. Snapshots containing historical cancelled copies are refused to avoid reviving them.
+**Current approved rule — [BD-21](BUSINESS_DECISIONS.md#bd-21):** There is no certificate cancel/void or replacement-from-cancelled-copy workflow. Issued copies and saved collection/print evidence remain preserved. Do not use the former cancellation-column or schema-51 upgrade text as current instructions.
 
-`Migrations/51.sql` retires the command after schema 50. `Migrations/50.sql` contains the complete schema/procedure/trigger change from schema 49. Apply it through the established transactional migration mechanism after restoring a schema-49 database. Older databases must first receive their intervening migrations. Existing collection timestamps are retained; collection is not invented for previously untracked certificates.
-
-`Tools/TestCertificateWorkflow.ps1` restores a uniquely owned clone, applies pending migrations 50 and 51, checks the startup/restore contract and executes `Validation/CertificateWorkflowChecks.sql`. The checks cover all ten types and roll back their test scenarios. `Tools/TestCertificateReissues.ps1` additionally verifies snapshot preservation, duplicate limits, concurrent reissues and lost-response recovery.
+The original certificate checks were developed against pre-production migrations 50–52; those SQL files are now historical disposable test fixtures, **not** production upgrades. The owner-approved first-production database schema is **1**, already containing the approved certificate structure. Future production migrations start at `2.sql`; see [First Release Baseline](FIRST_RELEASE_BASELINE.md) and [migration instructions](../Migrations/README.md). The focused certificate scripts do not, alone, certify school-PC or printer acceptance.

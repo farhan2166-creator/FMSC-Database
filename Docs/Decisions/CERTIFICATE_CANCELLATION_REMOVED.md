@@ -1,16 +1,3 @@
-# Decision: remove certificate cancellation
+# Certificate cancellation — current rule (BD-21)
 
-Consolidated in [Business Decisions](../BUSINESS_DECISIONS.md#certificate-cancellation-removed).
-The complete dated record, decisions and verification limits are preserved there.
-
-## Decision and reason
-
-See the [preserved section](../BUSINESS_DECISIONS.md#certificate-cancellation-removed-decision-and-reason).
-
-## Implementation and historical data
-
-See the [preserved section](../BUSINESS_DECISIONS.md#certificate-cancellation-removed-implementation-and-historical-data).
-
-## Follow-up: permanent column removal
-
-See the [preserved section](../BUSINESS_DECISIONS.md#certificate-cancellation-removed-follow-up-permanent-column-removal).
+**Compatibility pointer:** This filename remains because repository engineering instructions reference it. The latest approved rule is [BD-21 — certificates](../BUSINESS_DECISIONS.md#bd-21): no certificate cancellation/void action or cancelled-copy replacement flow. Existing certificate records and issue/collection evidence remain. This pointer is not the prior dated decision history.
