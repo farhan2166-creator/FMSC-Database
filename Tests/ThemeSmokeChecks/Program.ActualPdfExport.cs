@@ -35,8 +35,11 @@ internal static partial class Program
             foreach(var (field,amount) in new[]{("Refunds",20m),("Corrections",30m)})
             {
                 int column=columns.FindIndex(item=>item.Fields.Length==1&&projection.Columns[item.Fields[0]].ColumnName==field);
+                Check(column>=0,"Receipt PDF retains the "+field+" field");
+                // PDF renderer prepends a row-number column for grouped receipt reports.
+                int printedColumn=column+(CollectionReceiptGrouping.Layout(projection) is null?0:1);
                 var observations=printed.AsEnumerable().Select(row =>
-                    (Display:row.Field<string>("C"+column),Numeric:row.Field<decimal>("N"+column))).ToArray();
+                    (Display:row.Field<string>("C"+printedColumn),Numeric:row.Field<decimal>("N"+printedColumn))).ToArray();
                 Check(observations.Any(row=>row.Display==(-amount).ToString("#,##0.##")
                     &&row.Numeric==-amount),
                     "The Export handler signs "+field+" consistently for detail rows and grouped subtotal inputs. "
