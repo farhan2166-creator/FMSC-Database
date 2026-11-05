@@ -1,6 +1,6 @@
 # Bill and receipt scenario review pack
 
-The **Fee document rendering** Windows workflow generates a review batch from
+The **Fee Bills and Payment Receipts** Windows workflow generates a review batch from
 the checked-in `StudentBill`, `FamilyBill`, `StudentReceipt` and `FamilyReceipt`
 templates with static fixture data. It never connects to a school database,
 issues a real numbered document, posts a payment or sends pages to a printer.
@@ -12,7 +12,7 @@ legacy-data and annual batch examples; no FMSC or invented ANNUAL/TEST reference
 formats are substituted in the review PDFs. Separate legacy-reference lookup
 checks still cover older saved numbers without rewriting them.
 
-Download **REVIEW-ALL.pdf** from the workflow's Artifacts section
+Download **FMSC-Fee-Bills-and-Receipts-Review.pdf** from the workflow's Artifacts section
 or the link in its run summary. It is retained for seven days and downloads
 directly as a PDF, without a ZIP or extraction. It contains all generated pages in one
 file, with a scenario bookmark for each document. Original page sizes are retained.
@@ -24,8 +24,8 @@ The pack reuses the existing document fixtures, including these cases:
 | Area | Cases to review |
 | --- | --- |
 | Student/family bills | Ordinary bills, concessions, full waiver, partly paid scholarship, several billing months, separate family/standalone bills |
-| Receipts | Cash, bank, partial payment, credit-only, cash with credit, exhausted credit, remaining advance, overpayment retained as advance |
-| Families | Paid and unpaid siblings, child copies, six children, mixed campuses, several months, advance-only payment |
+| Receipts | Cash, bank, card, online, other/electronic, partial payment, credit-only, cash with credit, exhausted credit, remaining advance, overpayment retained as advance |
+| Families | Paid and unpaid siblings, child copies, six- and ten-child receipts, ten-child bills, mixed campuses, several months, advance-only payment |
 | Changes and history | Legacy documents, corrections/adjustments, later waivers, complete fee paper trail, repeated family visits, fee-change acknowledgements |
 | Layout | Long student/parent names, long fee labels, multiple pages, A4 bill/receipt sheets and annual receipts |
 

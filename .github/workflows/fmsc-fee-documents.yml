@@ -1,4 +1,4 @@
-name: '06 - Feature - Fee Document Rendering'
+name: '06 - Review - Fee Bills and Payment Receipts'
 
 on:
   workflow_dispatch:
@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   render:
-    name: Render fictional bills and receipts
+    name: Review bill and payment receipt scenarios
     runs-on: windows-2022
     timeout-minutes: 15
     steps:
@@ -60,10 +60,10 @@ jobs:
           exit $renderExit
       - name: Upload the single review PDF
         id: samples
-        if: ${{ success() && hashFiles('artifacts/fee-documents/REVIEW-ALL.pdf') != '' }}
+        if: ${{ success() && hashFiles('artifacts/fee-documents/FMSC-Fee-Bills-and-Receipts-Review.pdf') != '' }}
         uses: actions/upload-artifact@v7
         with:
-          path: artifacts/fee-documents/REVIEW-ALL.pdf
+          path: artifacts/fee-documents/FMSC-Fee-Bills-and-Receipts-Review.pdf
           archive: false
           if-no-files-found: error
           retention-days: 7
@@ -78,4 +78,4 @@ jobs:
             $review = Get-Content artifacts/fee-documents/provenance.json -Raw | ConvertFrom-Json
             "Scenarios: $($review.ScenarioCount). PDF pages: $($review.PageCount). Checks: $($review.Checks)." >> $env:GITHUB_STEP_SUMMARY
           }
-          'The download contains only REVIEW-ALL.pdf. Use its bookmarks to navigate all scenarios. No duplicate individual PDFs or PNG previews are included.' >> $env:GITHUB_STEP_SUMMARY
+          'The download contains only FMSC-Fee-Bills-and-Receipts-Review.pdf. Use its bookmarks to navigate all scenarios. No duplicate individual PDFs or PNG previews are included.' >> $env:GITHUB_STEP_SUMMARY

@@ -52,6 +52,14 @@ internal static partial class Program
         }
         Check(render("bank-payment-receipt",bank,false)==1,"A fictional bank payment renders with the normal receipt settlement");
         Check(render("bank-payment-receipt-a4",bank,true)>=1,"Bank receipt data renders in the annual A4 layout");
+        foreach (string method in new[] { "Online", "Card", "Other" })
+        {
+            using var alternate = bank.Copy();
+            foreach (DataRow row in alternate.Rows) row["PaymentMethod"] = method;
+            string label = method.ToLowerInvariant();
+            Check(render(label + "-payment-receipt",alternate,false)>=1,
+                method + " settlement renders without changing the saved fee amounts");
+        }
         using var advance=bank.Copy();
         foreach(DataRow row in advance.Rows)
         {
@@ -79,8 +87,10 @@ internal static partial class Program
         string H(string text)=>WebUtility.HtmlEncode(text);
         var index=new StringBuilder("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Bill and receipt scenario review</title><style>body{font:16px sans-serif;max-width:1100px;margin:24px auto;padding:0 12px;color:#000;background:#fff}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:8px;text-align:left}img{max-width:200px;max-height:260px}summary{cursor:pointer}</style><h1>Bill and receipt scenario review</h1>");
         index.Append($"<p>Checks: <b>{status}</b>. Source commit: <code>{H(commit)}</code>.</p><p>Static fictional fixtures; no school database, payment posting or physical printer is used. PNG previews show the first page only; PDFs and the combined review file retain every page.</p>");
-        index.Append("<p>Open <a href=\"REVIEW-ALL.pdf\">REVIEW-ALL.pdf</a> for all scenarios, with a bookmark for each. The individual PDFs below retain their original paper sizes.</p><table><thead><tr><th>Scenario</th><th>Paper / pages</th><th>PDF</th><th>First page</th></tr></thead><tbody>");
+        index.Append("<p>Open <a href=\"FMSC-Fee-Bills-and-Receipts-Review.pdf\">FMSC-Fee-Bills-and-Receipts-Review.pdf</a> for all scenarios, with a bookmark for each. The individual PDFs below retain their original paper sizes.</p><table><thead><tr><th>Scenario</th><th>Paper / pages</th><th>PDF</th><th>First page</th></tr></thead><tbody>");
         using var combined=new PdfDocument();
+        combined.Info.Title="FMSC Fee Bills and Payment Receipts — Scenario Review";
+        combined.Info.Subject=$"Fictional document fixtures; production report templates. Source commit: {commit}";
         var metadata=new List<object>();
         foreach(var sample in samples)
         {
@@ -99,7 +109,7 @@ internal static partial class Program
         Check(combined.Outlines.Count==samples.Count,"Each review scenario has a PDF bookmark");
         if(pageCount>0)
         {
-            string path=Path.Combine(folder,"REVIEW-ALL.pdf");combined.Save(path);
+            string path=Path.Combine(folder,"FMSC-Fee-Bills-and-Receipts-Review.pdf");combined.Save(path);
             using var verify=PdfReader.Open(path,PdfDocumentOpenMode.Import);
             Check(verify.PageCount==samples.Sum(sample=>sample.Pages),"The combined review PDF preserves every scenario page");
         }
