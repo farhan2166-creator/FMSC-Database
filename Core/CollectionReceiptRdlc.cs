@@ -21,7 +21,7 @@ internal static class CollectionReceiptRdlc
             box.Descendants(ns + "TextAlign").First().Value = alignment;
             return box;
         }
-        var groupHeading = E("TablixRow", E("Height", "0.28in"), E("TablixCells",
+        var groupHeading = E("TablixRow", E("Height", "0.23in"), E("TablixCells",
             E("TablixCell", E("CellContents", Text("ReceiptHeading" + band,
                 $"=Fields!GroupLabel.Value & \" (\" & CountRows(\"{group}\") & IIf(CountRows(\"{group}\") = 1, \" entry)\", \" entries)\")", true), E("ColSpan", indices.Length))),
             Enumerable.Range(1, indices.Length - 1).Select(_ => E("TablixCell"))));
@@ -39,13 +39,16 @@ internal static class CollectionReceiptRdlc
                 if(position==0&&labelSpan>1)contents.Add(E("ColSpan",labelSpan));
                 return E("TablixCell",contents);
             });
-            return E("TablixRow", E("Height", "0.28in"), E("TablixCells", cells));
+            return E("TablixRow", E("Height", "0.23in"), E("TablixCells", cells));
         }
         rows.RemoveNodes();
         rows.Add(heading, groupHeading, detail, Total(false), Total(true));
         var members = table.Element(ns + "TablixRowHierarchy")!.Element(ns + "TablixMembers")!;
         var columnsHeader = new XElement(members.Elements().First());
         var dynamicDetails = new XElement(members.Elements().Last());
+        // A detail group can split its growing textboxes despite KeepTogether.
+        // Give each receipt a real group keyed by its unique printed row number.
+        dynamicDetails.Element(ns+"Group")!.Add(E("GroupExpressions",E("GroupExpression","=Fields!C0.Value")));
         XElement EmptyGroupVisibility() => E("Visibility", E("Hidden", "=Len(Fields!GroupLabel.Value) = 0"));
         members.RemoveNodes();
         members.Add(columnsHeader,

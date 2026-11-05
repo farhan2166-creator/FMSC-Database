@@ -57,7 +57,7 @@ fixtures are included too. Those samples also use `GridReportPreview.ExportPdf`.
 Class & Section Summary, Class Outstanding Charges, Class Marks Sheet, Class Exam
 Attendance Sheet and Class Monthly Attendance Register are included from their
 RDLC templates. Heading checks verify centered text, full report/copy widths and
-the school heading's position in the rendered PDF. The review now includes **41 scenarios** covering individual, three-child and ten-child
+the school heading's position in the rendered PDF. The review now includes **49 scenarios** covering individual, three-child and ten-child
 receipts; whole-school, campus, class and section grouping; long receipt
 runs; student admissions, strength and changes; collections details and
 payment-method summaries; outstanding charges, aging and families; billing

@@ -84,7 +84,7 @@ internal static partial class Program
             string path=Path.Combine(folder,"campus-receipts.pdf");GridReportPreview.ExportPdf(path,campusBuilt);
             var search=ReportPageSearchIndex.FromPdf(File.ReadAllBytes(path));
             Check(search.FindPages("(1 entry)").Length==1 && search.FindPages("Subtotal").Length==1,"Campus PDF renders entry counts and named subtotals");
-            Check(campusBuilt.Data.Rows[0].Field<string>("C0")=="1" && campusBuilt.Data.Rows[0].Field<string>("C2")=="Family: Ali\nHadia (Nine – F), Hamid, Kausar (Four – M)","Printed receipt pairs each child with their class and shares repeated class labels");
+            Check(campusBuilt.Data.Rows[0].Field<string>("C0")=="1" && campusBuilt.Data.Rows[0].Field<string>("C2")!.Replace('\u00a0',' ')=="Family: Ali\nHadia (Nine – F), Hamid, Kausar (Four – M)","Printed receipt pairs each child with their class and shares repeated class labels");
             Check(rows.Rows[0].Field<string>("Student / Family")=="Hadia, Hamid, Kausar s/d/o Ali" && !rows.Columns.Contains("#"),"Compact print identities and numbering do not rewrite source or raw export columns");
         }
     }

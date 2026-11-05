@@ -15,6 +15,9 @@ internal static partial class Program
         CheckGridPdfReports();
         CheckReportStudentIdentity();
         CheckCollectionReceiptPresentation();
+        CheckCompactReceiptScenarios();
+        CheckFamilyAdvanceLayout();
+        CheckCompactFinancialScenarios();
         CheckDashboardReportScenarios();
         CheckAdditionalDashboardReportScenarios();
         CheckReportCaptions(new[]{"ClassSectionSummary","ClassOutstandingCharges","ClassMarksSheet","ClassAttendanceSheet","ClassMonthlyAttendanceSheet"});
@@ -22,12 +25,16 @@ internal static partial class Program
             ("Collections & Receipts — Whole School","grid-pdf/collections-receipts-export.pdf"),
             ("Collections & Receipts — By Campus","grid-pdf/collections-by-campus-export.pdf"),
             ("Family Receipts — Names, Classes and Payment Methods","collection-receipt-presentation/family-receipts.pdf"),
-            ("Receipts — Individual Student","dashboard-report-scenarios/receipts-individual-one.pdf"),
+            ("Receipt — Three Children","compact-management-reports/receipt-three-children.pdf"),
+            ("Receipt — Ten Children","compact-management-reports/receipt-ten-children.pdf"),
+            ("Receipts — Sixty Complete Entries","compact-management-reports/receipts-sixty.pdf"),
+            ("Receipts — Sixty Entries By Campus","compact-management-reports/receipts-sixty-campus.pdf"),
+            ("Advance Families — Many Families and Oversized Continuation","family-advance-layout/multiple-families.pdf"),
+            ("Outstanding & Aging — Seventy-five Long Names","compact-management-reports/outstanding-long-names.pdf"),
+            ("Billing & Discounts — Seventy-five Charges","compact-management-reports/billing-discounts.pdf"),
+            ("Monthly Reconciliation — Forty-eight Periods","compact-management-reports/monthly-reconciliation.pdf"),
             ("Receipts — Family with 3 Children","dashboard-report-scenarios/receipts-family-three.pdf"),
             ("Receipts — Family with 10 Children","dashboard-report-scenarios/receipts-family-ten.pdf"),
-            ("Receipts — Grouped by Campus","dashboard-report-scenarios/receipts-by-campus.pdf"),
-            ("Receipts — Grouped by Class","dashboard-report-scenarios/receipts-by-class.pdf"),
-            ("Receipts — Grouped by Section","dashboard-report-scenarios/receipts-by-section.pdf"),
             ("Receipts — Mixed 60-Entry Multipage","dashboard-report-scenarios/receipts-mixed-multipage.pdf"),
             ("Advance Balance — 22 Families Multipage","dashboard-report-scenarios/advance-families-multipage.pdf"),
             ("Outstanding & Aging — 75 Students Multipage","dashboard-report-scenarios/outstanding-students-multipage.pdf"),
@@ -46,6 +53,10 @@ internal static partial class Program
             ("Certificate Issue Register","report-student-identity/certificate-register.pdf"),
             ("Wide Layout Check — Multipage","grid-pdf/wide-multipage-export.pdf"),
             ("Empty Result Layout","grid-pdf/empty-report-export.pdf"),
+            ("Receipts — Individual Student","dashboard-report-scenarios/receipts-individual-one.pdf"),
+            ("Receipts — Grouped by Campus","dashboard-report-scenarios/receipts-by-campus.pdf"),
+            ("Receipts — Grouped by Class","dashboard-report-scenarios/receipts-by-class.pdf"),
+            ("Receipts — Grouped by Section","dashboard-report-scenarios/receipts-by-section.pdf"),
             ("Student Admissions — 64 Records","dashboard-report-coverage/student-admissions-multipage.pdf"),
             ("Student Strength — By Class","dashboard-report-coverage/student-strength-by-class.pdf"),
             ("Student Changes — 58 Records","dashboard-report-coverage/student-changes-multipage.pdf"),

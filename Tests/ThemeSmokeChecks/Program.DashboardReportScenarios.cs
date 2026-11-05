@@ -132,6 +132,8 @@ internal static partial class Program
                 export.Columns["Members"]!.ColumnName = "Children / Class";
                 export.Columns["Student Advances"]!.ColumnName = "Advance";
                 export.Columns["Available Credit"]!.ColumnName = "Family Total";
+                FamilyAdvanceLayout.Copy(projected.Rows,export);
+                Check(FamilyAdvanceReport.CanBuild(export),"The 22-family fixture uses the production grouped family print layout");
                 Check(export.Rows.Count == 22, "Family advance fixture retains 22 distinct families");
                 Render("advance-families-multipage", "Student Advance Balance Register — Families",
                     "View: Families | Campus: All", export, 2);

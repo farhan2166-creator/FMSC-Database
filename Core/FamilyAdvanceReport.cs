@@ -42,42 +42,52 @@ internal static class FamilyAdvanceReport
         XElement Box(string name,string value,bool bold=false,string align="Left",string size="9pt")=>
             E("Textbox",new XAttribute("Name",name),E("CanGrow",true),E("CanShrink",true),
                 E("Paragraphs",E("Paragraph",E("TextRuns",E("TextRun",E("Value",value),E("Style",E("FontFamily","Segoe UI"),E("FontSize",size),E("FontWeight",bold?"Bold":"Normal")))),E("Style",E("TextAlign",align)))),
-                E("Style",E("VerticalAlign","Top"),E("PaddingLeft","4pt"),E("PaddingRight","4pt"),E("PaddingTop","3pt"),E("PaddingBottom","3pt")));
+                E("Style",E("VerticalAlign","Top"),E("PaddingLeft","4pt"),E("PaddingRight","4pt"),E("PaddingTop","1pt"),E("PaddingBottom","1pt")));
         XElement Cell(XElement box)=>E("TablixCell",E("CellContents",box));
         var heading=new[]{"Father / Parent","Children / Class","Advance","Family Total"}.Select((caption,i)=>{
             var box=Box("AdvanceHeading"+i,caption,true,i>=2?"Right":"Left","8pt");
-            box.Element(ns+"Style")!.Add(E("BottomBorder",E("Style","Solid"),E("Width","0.5pt"),E("Color","#d0d0d0")));
+            box.Element(ns+"Style")!.Add(E("BottomBorder",E("Style","Solid"),E("Width","0.5pt"),E("Color","#000000")));
             return Cell(box);
         });
         var childBox=Box("AdvanceChild","=Fields!C1.Value");
         childBox.Element(ns+"Paragraphs")!.Add(E("Paragraph",E("TextRuns",E("TextRun",E("Value","=Fields!ChildPlacement.Value"),
-            E("Style",E("FontFamily","Segoe UI"),E("FontSize","7.5pt"),E("Color","#555555")))),E("Style")));
+            E("Style",E("FontFamily","Segoe UI"),E("FontSize","8pt"),E("Color","#000000")))),E("Style")));
         var groupCells=new[]{Cell(Box("AdvanceParent","=Fields!C0.Value",true)),Cell(Box("AdvanceGroupBlank1","")),
-            Cell(Box("AdvanceGroupBlank2","")),Cell(Box("AdvanceFamilyTotal","=Fields!C3.Value",true,"Right"))};
-        var detailCells=new[]{Cell(Box("AdvanceChildBlank1","")),Cell(childBox),
-            Cell(Box("AdvanceChildAmount","=Fields!C2.Value",false,"Right")),Cell(Box("AdvanceChildBlank2",""))};
-        foreach(var cell in detailCells.Skip(1).Take(2))cell.Descendants(ns+"Textbox").First().Element(ns+"Style")!.Add(
-            E("BottomBorder",E("Style","Solid"),E("Width","0.25pt"),E("Color","#eeeeee")));
+            Cell(Box("AdvanceGroupBlank2","")),Cell(Box("AdvanceGroupBlank3",""))};
+        var familyLabel=Box("AdvanceFamilyLabel","Family total",true);
+        var familyValue=Box("AdvanceFamilyTotal","=First(Fields!C3.Value, \"AdvanceFamily\")",true,"Right");
+        foreach(var box in new[]{familyLabel,familyValue})box.Element(ns+"Style")!.Add(
+            E("BottomBorder",E("Style","Solid"),E("Width","0.5pt"),E("Color","#000000")));
+        var childAmount=Box("AdvanceChildAmount","=Fields!C2.Value",false,"Right");
+        childBox.Add(E("Top","0in"),E("Left","1.8in"),E("Height","0.27in"),E("Width","3.3in"));
+        childAmount.Add(E("Top","0in"),E("Left","5.1in"),E("Height","0.27in"),E("Width","0.85in"));
+        var childBlock=E("Rectangle",new XAttribute("Name","AdvanceChildBlock"),E("ReportItems",childBox,childAmount),
+            E("KeepTogether",true),E("Height","0.27in"),E("Width","7.25in"),
+            E("Style",E("BottomBorder",E("Style","Solid"),E("Width","0.25pt"),E("Color","#000000"))));
+        var detailCells=new[]{E("TablixCell",E("CellContents",childBlock,E("ColSpan",4))),E("TablixCell"),E("TablixCell"),E("TablixCell")};
         var totalLabel=Box("AdvanceGrandLabel","Grand Total",true);
         var totalValue=Box("AdvanceGrandValue","=\"Rs. \" & Format(Sum(Fields!AdvanceAmount.Value), \""+moneyFormat+"\")",true,"Right");
         foreach(var box in new[]{totalLabel,totalValue})
         {
-            var style=box.Element(ns+"Style")!;style.Add(E("BackgroundColor","#f3f3f3"));
-            style.SetElementValue(ns+"PaddingTop","6pt");style.SetElementValue(ns+"PaddingBottom","6pt");
+            var style=box.Element(ns+"Style")!;style.Add(E("TopBorder",E("Style","Solid"),E("Width","0.8pt"),E("Color","#000000")));
+            style.SetElementValue(ns+"PaddingTop","3pt");style.SetElementValue(ns+"PaddingBottom","3pt");
         }
         var table=xml.Descendants(ns+"Tablix").Single();
         table.Element(ns+"TablixBody")!.ReplaceWith(E("TablixBody",
             E("TablixColumns",new[]{"1.8in","3.3in","0.85in","1.3in"}.Select(width=>E("TablixColumn",E("Width",width)))),
             E("TablixRows",E("TablixRow",E("Height","0.24in"),E("TablixCells",heading)),
                 E("TablixRow",E("Height","0.19in"),E("TablixCells",groupCells)),
-                E("TablixRow",E("Height","0.34in"),E("TablixCells",detailCells)),
+                E("TablixRow",E("Height","0.27in"),E("TablixCells",detailCells)),
+                E("TablixRow",E("Height","0.20in"),E("TablixCells",
+                    E("TablixCell",E("CellContents",familyLabel,E("ColSpan",3))),E("TablixCell"),E("TablixCell"),Cell(familyValue))),
                 E("TablixRow",E("Height","0.28in"),E("TablixCells",
                     E("TablixCell",E("CellContents",totalLabel,E("ColSpan",3))),E("TablixCell"),E("TablixCell"),Cell(totalValue))))));
         table.Element(ns+"TablixRowHierarchy")!.ReplaceWith(E("TablixRowHierarchy",E("TablixMembers",
             E("TablixMember",E("KeepWithGroup","After"),E("RepeatOnNewPage",true)),
             E("TablixMember",E("Group",new XAttribute("Name","AdvanceFamily"),E("GroupExpressions",E("GroupExpression","=Fields!FamilyKey.Value"))),
                 E("TablixMembers",E("TablixMember",E("KeepWithGroup","After"),E("RepeatOnNewPage",true)),
-                    E("TablixMember",E("Group",new XAttribute("Name","AdvanceChildRows")),E("KeepTogether",true))),E("KeepTogether",true)),
+                    E("TablixMember",E("Group",new XAttribute("Name","AdvanceChildRows")),E("KeepTogether",true)),
+                    E("TablixMember",E("KeepWithGroup","Before"))),E("KeepTogether",true)),
             E("TablixMember",E("KeepWithGroup","Before")))));
         table.Element(ns+"Width")!.Value="7.25in";
         var widths=table.Element(ns+"TablixColumnHierarchy")!.Element(ns+"TablixMembers")!;

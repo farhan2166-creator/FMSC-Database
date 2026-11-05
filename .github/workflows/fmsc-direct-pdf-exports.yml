@@ -6,6 +6,10 @@ on:
     branches: [main, chore/direct-pdf-export-evidence, fix/pdf-review-fidelity, fix/direct-pdf-export-context]
     paths:
       - 'Core/GridReportPreview.cs'
+      - 'Core/ManagementReportPrintLayout.cs'
+      - 'Core/FamilyAdvanceReport.cs'
+      - 'Tests/ThemeSmokeChecks/Program.CompactManagementReports.cs'
+      - 'Tests/ThemeSmokeChecks/Program.FamilyAdvanceLayout.cs'
       - 'Core/ReportContextProjection.cs'
       - 'Core/V2Page.cs'
       - 'Pages/Reports/Finance/CanonicalFinanceReportPage.cs'
@@ -35,6 +39,10 @@ on:
   pull_request:
     paths:
       - 'Core/GridReportPreview.cs'
+      - 'Core/ManagementReportPrintLayout.cs'
+      - 'Core/FamilyAdvanceReport.cs'
+      - 'Tests/ThemeSmokeChecks/Program.CompactManagementReports.cs'
+      - 'Tests/ThemeSmokeChecks/Program.FamilyAdvanceLayout.cs'
       - 'Core/ReportContextProjection.cs'
       - 'Core/V2Page.cs'
       - 'Pages/Reports/Finance/CanonicalFinanceReportPage.cs'

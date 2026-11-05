@@ -20,9 +20,12 @@ internal static class GridReportPreview
         string Inch(double value)=>value.ToString("0.####",CultureInfo.InvariantCulture)+"in";
         var columns=GridReportColumns.Create(source,moneyFormat);
         bool compactReceipts=CollectionReceiptGrouping.Layout(source) is not null;
+        bool compactFinancial=ManagementReportPrintLayout.Applies(title);
+        bool compactTable=compactReceipts||compactFinancial;
         if(compactReceipts)columns.Insert(0,new GridReportColumns.Column("#",Array.Empty<int>(),false,.3,.2));
         bool landscape=columns.Count>6||columns.Sum(column=>column.Minimum)>7.25;
         double width=landscape?10.67:7.25;
+        if(compactFinancial)ManagementReportPrintLayout.Apply(columns,width,title);
         var bands=GridReportColumns.Bands(columns,width);
         var data=new DataTable("ReportData");
         for(int i=0;i<columns.Count;i++)data.Columns.Add("C"+i);
@@ -59,7 +62,7 @@ internal static class GridReportPreview
             E("Textbox",new XAttribute("Name",name),E("CanGrow",true),E("CanShrink",true),
                 E("Paragraphs",E("Paragraph",E("TextRuns",E("TextRun",E("Value",value),
                     E("Style",E("FontFamily","Segoe UI"),E("FontSize",size),E("FontWeight",bold?"Bold":"Normal"),E("Color","#000000")))),E("Style",E("TextAlign",align)))),
-                E("Style",E("VerticalAlign","Middle"),E("PaddingLeft","4pt"),E("PaddingRight","4pt"),E("PaddingTop",compactReceipts?"1.5pt":"3pt"),E("PaddingBottom",compactReceipts?"1.5pt":"3pt")));
+                E("Style",E("VerticalAlign","Middle"),E("PaddingLeft","4pt"),E("PaddingRight","4pt"),E("PaddingTop",compactReceipts?"1.5pt":compactFinancial?"2pt":"3pt"),E("PaddingBottom",compactReceipts?"1.5pt":compactFinancial?"2pt":"3pt")));
         XElement Position(XElement text,double left,double top,double textWidth,double height)
         {text.Add(E("Top",Inch(top)),E("Left",Inch(left)),E("Height",Inch(height)),E("Width",Inch(textWidth)));return text;}
         var items=new List<XElement>();
@@ -71,7 +74,7 @@ internal static class GridReportPreview
             foreach(int index in indices)
             {
                 var column=columns[index];
-                string alignment=compactReceipts&&column.Numeric?"Right":GridReportColumns.Alignment(source,column);
+                string alignment=compactTable&&column.Numeric?"Right":GridReportColumns.Alignment(source,column);
                 var heading=Text($"Heading{bandIndex}_{index}",column.Caption,true,"Center","8.5pt");
                 heading.Element(ns+"Style")!.Add(E("BottomBorder",E("Style","Solid"),E("Width","0.8pt"),E("Color","#000000")));
                 headings.Add(E("TablixCell",E("CellContents",heading)));
@@ -81,15 +84,37 @@ internal static class GridReportPreview
                 detail.Element(ns+"Style")!.Add(E("TopBorder",E("Style","=IIf(Fields!IsReportTotal.Value, \"Solid\", \"None\")"),E("Width","0.8pt"),E("Color","#000000")));
                 details.Add(E("TablixCell",E("CellContents",detail)));
             }
+            if(compactReceipts)
+            {
+                double left=0;var receiptItems=new List<XElement>();
+                for(int position=0;position<details.Count;position++)
+                {
+                    var box=details[position].Descendants(ns+"Textbox").Single();
+                    box.Remove();
+                    var style=box.Element(ns+"Style")!;
+                    style.Element(ns+"BottomBorder")?.Remove();style.Element(ns+"TopBorder")?.Remove();
+                    style.SetElementValue(ns+"VerticalAlign","Top");
+                    receiptItems.Add(Position(box,left,0,widths[position],.22));left+=widths[position];
+                }
+                var block=E("Rectangle",new XAttribute("Name","ReceiptBlock"+bandIndex),E("ReportItems",receiptItems),
+                    E("KeepTogether",true),E("Height","0.22in"),E("Width",Inch(width)),
+                    E("Style",E("BottomBorder",E("Style","Solid"),E("Width","0.25pt"),E("Color","#000000"))));
+                details.Clear();details.Add(E("TablixCell",E("CellContents",block,E("ColSpan",indices.Length))));
+                details.AddRange(Enumerable.Range(1,indices.Length-1).Select(_=>E("TablixCell")));
+            }
             var table=E("Tablix",new XAttribute("Name","ReportRows"+bandIndex),
                 E("TablixBody",E("TablixColumns",widths.Select(w=>E("TablixColumn",E("Width",Inch(w))))),
-                    E("TablixRows",E("TablixRow",E("Height",compactReceipts?"0.32in":"0.42in"),E("TablixCells",headings)),E("TablixRow",E("Height",compactReceipts?"0.22in":"0.26in"),E("TablixCells",details)))),
+                    E("TablixRows",E("TablixRow",E("Height",compactTable?"0.32in":"0.42in"),E("TablixCells",headings)),E("TablixRow",E("Height",compactTable?"0.22in":"0.26in"),E("TablixCells",details)))),
                 E("TablixColumnHierarchy",E("TablixMembers",indices.Select(_=>E("TablixMember")))),
                 E("TablixRowHierarchy",E("TablixMembers",E("TablixMember",E("KeepWithGroup","After"),E("RepeatOnNewPage",true)),
                     E("TablixMember",E("Group",new XAttribute("Name","DetailRows"+bandIndex)),E("KeepTogether",true)))),
                 E("DataSetName","ReportData"),E("NoRowsMessage","No records match the selected filters."),E("Top",bands.Count>1?"0.25in":"0in"),E("Left","0in"),E("Height","0.68in"),E("Width",Inch(width)),
                 E("Style",E("FontFamily","Segoe UI"),E("FontSize","9pt"),E("Color","#000000"),E("TextAlign","Center")));
-            if (receiptLayout is not null) CollectionReceiptRdlc.Apply(table, indices, columns.Select(column => column.Numeric).ToArray(), bandIndex);
+            if (receiptLayout is not null)
+            {
+                table.Add(E("KeepTogether",true));
+                CollectionReceiptRdlc.Apply(table, indices, columns.Select(column => column.Numeric).ToArray(), bandIndex);
+            }
             if(bands.Count==1)items.Add(table);
             else
             {

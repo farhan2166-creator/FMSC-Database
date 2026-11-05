@@ -176,6 +176,14 @@ internal static class GridReportColumns
             }
             minimum=Math.Max(minimum,numeric?.65:identity?1.5:receipt?1.35:isPlacement?1.2:.85);
             double weight=numeric?1:identity?2.2:receipt?1.8:isPlacement?1.65:1.2;
+            if(compactReceipts)
+            {
+                // Spend spare page width on names/classes rather than short references.
+                if(presentation==Kind.ReceiptStudent){minimum=Math.Max(minimum,2.35);weight=4;}
+                else if(receipt)weight=.6;
+                else if(numeric)weight=.7;
+                else if(caption.StartsWith("Method",StringComparison.Ordinal)){minimum=Math.Max(minimum,1.5);weight=1;}
+            }
             result.Add(new(caption,fields,numeric,minimum,weight,presentation));
         }
         int Priority(Column column)
