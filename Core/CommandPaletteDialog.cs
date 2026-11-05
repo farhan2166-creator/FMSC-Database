@@ -28,7 +28,7 @@ public sealed class CommandPaletteDialog : ApplicationWindowForm
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(AppScale.S(620), AppScale.S(430));
+        ClientSize = AppMetrics.MediumDialogClientSize;
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
         KeyPreview = true;
