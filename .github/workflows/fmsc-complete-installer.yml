@@ -140,6 +140,8 @@ jobs:
             'FMSC_SMS/FMSC_SMS.dll',
             'FMSC_SMS/FMSC_SMS.deps.json',
             'FMSC_SMS/FMSC_SMS.runtimeconfig.json',
+            'FMSC_SMS/UpdateSupport/FMSC.Setup.exe',
+            'FMSC.Setup.exe',
             'Install FMSC_SMS.bat',
             'core.ps1',
             'Tools/SqlLocalDB.msi',
@@ -197,8 +199,8 @@ jobs:
             '2. Copy your verified DETACHED database pair into the Database folder:'
             '      Database\FMSC_DB.mdf'
             '      Database\FMSC_DB_log.ldf'
-            '3. Right-click "Install FMSC_SMS.bat" and choose Run as administrator.'
-            '4. Follow the existing installer prompts; it preserves installed databases.'
+            '3. Double-click "FMSC.Setup.exe" and approve the Windows administrator prompt.'
+            '4. Follow the FMSC graphical installation progress; databases are protected.'
             ''
             'APPLICATION UPDATE WITHOUT REPLACING A SCHOOL DATABASE'
             'Do not put a new MDF/LDF over an existing installed school database.'
