@@ -741,8 +741,12 @@ public sealed class MainDashboardForm : ApplicationWindowForm
             };
         AddModule(flow, "students.png", "Students", AppTheme.Primary,
             workPages.Where(item => item.Module != "Finance")
-                .Append(new NavigationItem("Family / Siblings", () => new StudentFamilyPage(),
-                    "Students", "Family / Siblings", "Students.Family"))
+                // Operators with Student Profile access reach family from the owned
+                // profile shortcut. Keep a direct route for family-only viewers.
+                .Concat(CurrentUser.HasPermission("Students.View")
+                    ? Array.Empty<NavigationItem>()
+                    : new[] { new NavigationItem("Family / Siblings", () => new StudentFamilyPage(),
+                        "Students", "Family / Siblings", "Students.Family") })
                 .Append(Section(PageTitles.PlacementManagement)).Concat(placementPages).ToArray());
         AddModule(
             flow,
