@@ -57,13 +57,14 @@ fixtures are included too. Those samples also use `GridReportPreview.ExportPdf`.
 Class & Section Summary, Class Outstanding Charges, Class Marks Sheet, Class Exam
 Attendance Sheet and Class Monthly Attendance Register are included from their
 RDLC templates. Heading checks verify centered text, full report/copy widths and
-the school heading's position in the rendered PDF. The review now includes **41 scenarios** covering individual, three-child and ten-child
+the school heading's position in the rendered PDF. The combined review retains Codex’s eight compact-layout and family-advance stress cases alongside all expanded fixtures. It now includes **49 scenarios** covering individual, three-child and ten-child
 receipts; whole-school, campus, class and section grouping; long receipt
 runs; student admissions, strength and changes; collections details and
 payment-method summaries; outstanding charges, aging and families; billing
 summaries, discounts, assignments and concessions; student and family
 advance balances; monthly reconciliation; class sheets; and one empty
-result. The exact page count is recorded in each workflow run.
+result. The compact-layout checks preserve tightly grouped receipt rows, repeated headers,
+family advance subtotals and page breaks without changing the approved bill/receipt templates. The exact page count is recorded in each workflow run.
 
 The combined file is published only after all fixture suites and the merge checks
 pass. A failed PDF check cannot publish a partial review or reuse a previous
