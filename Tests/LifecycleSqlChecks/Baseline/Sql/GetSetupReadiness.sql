@@ -1,12 +1,5 @@
--- Readiness must use the active placements offered in Campus - Classes / Sections.
--- Inactive assignments remain available for student and billing history only.
-SET XACT_ABORT ON; SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON;
-IF @@TRANCOUNT=0 THROW 51000,'Migration 53 requires an outer transaction.',1;
-IF ISNULL((SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC),-1)<>52
- THROW 51000,'Migration 53 requires schema 52.',1;
-GO
 -- GetSetupReadiness
-CREATE OR ALTER PROCEDURE dbo.GetSetupReadiness
+CREATE   PROCEDURE dbo.GetSetupReadiness
 @UserId INT
 AS
 BEGIN
@@ -117,7 +110,3 @@ BEGIN
     FROM     @Issues
     ORDER BY Area, Issue;
 END
-GO
-INSERT dbo.DatabaseVersion(VersionNumber,AppliedOn,AppliedBy,Notes)
-VALUES(N'53',SYSDATETIME(),SUSER_SNAME(),N'Exclude inactive campus class section assignments from setup readiness placement and missing fee checks');
-GO

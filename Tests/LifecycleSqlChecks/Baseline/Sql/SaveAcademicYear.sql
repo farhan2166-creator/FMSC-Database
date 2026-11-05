@@ -1,22 +1,3 @@
--- Owner decision, 31 October 2026: used years retain their dates; names,
--- remarks and the Current selection remain editable. No existing rows rewritten.
-SET XACT_ABORT ON; SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON;
-IF @@TRANCOUNT=0 THROW 51000,'Migration 63 requires an outer transaction.',1;
-IF ISNULL((SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC),-1)<>62
- THROW 51000,'Migration 63 requires schema 62.',1;
-GO
-CREATE OR ALTER PROCEDURE dbo.GetAcademicYears @UserId int
-AS
-BEGIN
- SET NOCOUNT ON;
- EXEC dbo.RequireAuthenticatedUser @UserId;
- SELECT Y.*,CONVERT(bit,CASE WHEN
-  EXISTS(SELECT 1 FROM dbo.Enrollments E WHERE E.AcademicYearId=Y.AcademicYearId) OR
-  EXISTS(SELECT 1 FROM dbo.PromotionBatches P WHERE P.SourceAcademicYearId=Y.AcademicYearId OR P.DestinationAcademicYearId=Y.AcademicYearId)
-  THEN 1 ELSE 0 END) AS DatesLocked
- FROM dbo.AcademicYears Y ORDER BY Y.StartDate DESC,Y.AcademicYearId DESC;
-END;
-GO
 CREATE OR ALTER PROCEDURE dbo.SaveAcademicYear
  @AcademicYearId int,@YearName nvarchar(50),@StartDate date,@EndDate date,
  @IsCurrent bit,@Remarks nvarchar(500),@UserId int
@@ -67,7 +48,3 @@ BEGIN
   THROW;
  END CATCH;
 END;
-GO
-INSERT dbo.DatabaseVersion(VersionNumber,AppliedOn,AppliedBy,Notes)
-VALUES(N'63',SYSDATETIME(),SUSER_SNAME(),N'Lock used academic-year dates; validate consecutive year names');
-GO

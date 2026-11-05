@@ -4,9 +4,7 @@ The first production release uses application **1.0.0**, database **1**.
 The supplied database already contains the complete approved schema. No numbered
 SQL is required for this first release. Future changes start at **2.sql**.
 
-Historical development migrations are test fixtures under
-`Tests/LifecycleSqlChecks/Migrations` and must never be shipped or replayed
-on baseline 1. See [the baseline decision](../Docs/FIRST_RELEASE_BASELINE.md).
+Disposable tests publish the complete schema-only baseline directly at version 1. Old development migrations are retired and must never be replayed on baseline 1. See [the baseline decision](../Docs/FIRST_RELEASE_BASELINE.md).
 
 # Apply migrations without the installer
 

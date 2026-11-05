@@ -258,20 +258,10 @@ SET NOCOUNT ON;
 IF EXISTS(SELECT 1 FROM dbo.DatabaseVersion) THROW 51000, 'Nonempty version fixture', 1;
 IF EXISTS(SELECT 1 FROM dbo.Students) THROW 51001, 'Unexpected student rows', 1;
 IF EXISTS(SELECT 1 FROM dbo.Users) THROW 51002, 'Unexpected user rows', 1;
-INSERT INTO dbo.DatabaseVersion(VersionNumber) VALUES(N'6');
-DECLARE @Scope uniqueidentifier=NEWID();
-EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@Scope;
+EXEC sys.sp_addextendedproperty @name=N'FMSC_DisposableFixture',@value=N'approved-synthetic-only';
 '@
     Sql 'FMSC_DB' $seed | Out-Null
-    # Upgrade only this owned, empty fixture before detaching it for the installer.
-    # Retired fixture scripts never enter the release migration directory.
-    $fixtureScripts=@(Get-ChildItem (Join-Path $project 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName}) + @(Get-Item (Join-Path $project 'Tools/ReleaseBaseline/Reset-Version.sql'))
-    foreach ($migration in $fixtureScripts) {
-        $scriptPath=Join-Path $root ('fixture-migration-'+$migration.BaseName+'.sql')
-        "SET XACT_ABORT ON;`nBEGIN TRANSACTION;`n"+(Get-Content -LiteralPath $migration.FullName -Raw)+"`nCOMMIT TRANSACTION;" | Set-Content -LiteralPath $scriptPath -Encoding utf8
-        & $sqlcmd -S $instance -E -d 'FMSC_DB' -b -i $scriptPath
-        NativeOk "Upgrade disposable fixture to $($migration.BaseName)"
-    }
+    Sql 'FMSC_DB' (Get-Content (Join-Path $project 'Tests/LifecycleSqlChecks/Baseline/Initialize.sql') -Raw) | Out-Null
     $paths=@(& $sqlcmd -S $instance -E -d 'FMSC_DB' -b -h -1 -W -Q 'SET NOCOUNT ON; SELECT physical_name FROM sys.database_files;' 2>&1)
     NativeOk 'Find fixture MDF and LDF'
     $mdf=$paths | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -match '^[A-Za-z]:\\.+\.mdf$' } | Select-Object -First 1

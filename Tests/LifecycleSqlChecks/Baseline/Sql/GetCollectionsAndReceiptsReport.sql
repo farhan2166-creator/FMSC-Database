@@ -1,11 +1,4 @@
--- Read-only collections report roster and actual payment-method display.
--- Preserve receipt identity, filters, financial arithmetic and summary totals.
-SET XACT_ABORT ON; SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON;
-IF @@TRANCOUNT=0 THROW 51000,'Migration 75 requires an outer transaction.',1;
-IF ISNULL((SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC),-1)<>74
- THROW 51000,'Migration 75 requires schema 74.',1;
-GO
-CREATE OR ALTER PROCEDURE dbo.GetCollectionsAndReceiptsReport
+CREATE   PROCEDURE dbo.GetCollectionsAndReceiptsReport
  @UserId int,@View nvarchar(30),@GroupBy nvarchar(30)=N'Day',
  @FromDate date=NULL,@ToDate date=NULL,@CampusId int=0,@ClassId int=0,@SectionId int=0,@PaymentMethod nvarchar(40)=NULL
 AS
@@ -31,7 +24,7 @@ BEGIN
   CASE WHEN P.IsCreditApplication=0 THEN P.TotalAmount ELSE CONVERT(decimal(12,2),0) END MoneyAmount,
   CASE WHEN P.IsCreditApplication=1 THEN P.TotalAmount ELSE CONVERT(decimal(12,2),0) END CreditAmount,
   S.StudentName,CA.CampusName,C.ClassName,
-  CONCAT(C.ClassName,CASE WHEN NULLIF(LTRIM(RTRIM(SEC.SectionName)),N'') IS NULL THEN N'' ELSE CONCAT(N' – ',SEC.SectionName) END) ClassSection,
+  CONCAT(C.ClassName,CASE WHEN NULLIF(LTRIM(RTRIM(SEC.SectionName)),N'') IS NULL THEN N'' ELSE CONCAT(N' â€“ ',SEC.SectionName) END) ClassSection,
   COALESCE(CA.DisplayOrder,2147483647) CampusSort,COALESCE(C.DisplayOrder,2147483647) ClassSort,
   U.Username ReceivedBy,Members.FamilyNames,R.SnapshotJson ReceiptSnapshotJson
  INTO #Payments
@@ -172,7 +165,3 @@ BEGIN
   COALESCE(SUM(CreditAmount),0) [Credit Applied],COALESCE(SUM(MoneyAmount),0) [Adjusted Collection]
  FROM #Payments;
 END;
-GO
-INSERT dbo.DatabaseVersion(VersionNumber,AppliedOn,AppliedBy,Notes)
-VALUES(N'75',SYSDATETIME(),SUSER_SNAME(),N'Provide receipt student rosters, historical placements and actual payment methods without changing collections amounts');
-GO

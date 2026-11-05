@@ -1,5 +1,13 @@
 # Changelog
 
+## Baseline 1 consolidation — 2026-11-05
+
+- Retire pre-release reset and historical migration replay tools; retain source Git history.
+- Publish the complete data-free test schema directly at version 1, with guarded initialization and SHA-256 provenance. Future migrations start at 2.
+- Consolidate the unchanged runtime compatibility requirements and preserve backup, migration and recovery safeguards.
+- Rebase current SQL regression runners and retain certificate, report, academic-year and setup-readiness behavior checks.
+- Validation pending: 101 billing SQL checks passed; the certificate fixture was corrected after a missing school-profile seed, but has not been rerun. Desktop build was cancelled. Remaining suites deferred at the owner's request.
+
 ## Compatible placement choices — 2026-11-05
 
 - Automatically choose the nearest later academic year for Annual Promotion and

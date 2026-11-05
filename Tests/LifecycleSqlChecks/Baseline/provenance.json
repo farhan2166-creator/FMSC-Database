@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "containsSchoolData": false,
+  "packageSha256": "2997dbf1fe3d139aeacb4c45a6b5264a443c980ca6263230eb5440a9d06c09f9",
+  "description": "Complete data-free first-production schema; deploy and initialize directly at baseline 1."
+}

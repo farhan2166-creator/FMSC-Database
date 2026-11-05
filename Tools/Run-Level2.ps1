@@ -163,9 +163,7 @@ LOG ON (NAME=N'${catalog}_log',FILENAME=N'$escaped\database\fixture_log.ldf');
         $connection="Server=(localdb)\$catalog;Initial Catalog=$catalog;Integrated Security=True;TrustServerCertificate=True"
         & dotnet tool run sqlpackage -- '/Action:Publish' "/SourceFile:$fixture" "/TargetConnectionString:$connection" '/p:DropObjectsNotInSource=False' '/p:DropExtendedPropertiesNotInSource=False' '/p:ScriptDatabaseOptions=False' '/Quiet:True'
         Native 'Publish approved schema'
-        Sql $catalog "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');" | Out-Null
-        $baselineScript=Get-Item (Join-Path $repo 'Tools/ReleaseBaseline/Reset-Version.sql')
-        $scripts=@(Get-ChildItem (Join-Path $repo 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName}) + @($baselineScript) + @(Get-ChildItem (Join-Path $repo 'Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName})
+        $scripts=@(Get-Item (Join-Path $repo 'Tests/LifecycleSqlChecks/Baseline/Initialize.sql')) + @(Get-ChildItem (Join-Path $repo 'Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName})
         foreach($migration in $scripts) {
             VerifyTarget
             $migrationScript=Join-Path $run ('migration-'+$migration.BaseName+'.sql')

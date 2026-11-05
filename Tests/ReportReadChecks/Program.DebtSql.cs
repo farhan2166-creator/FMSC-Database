@@ -16,7 +16,7 @@ internal static partial class Program
             INSERT dbo.BillingCharges(BillingChargeId,AdmissionId,EnrollmentId,FeeTypeId,BillingMonth,GrossAmount,DiscountAmount,NetAmount,Status,DueDate)
                 VALUES(7,3,5,1,'2026-10-01',100,0,100,N'Posted','2026-10-21'),(8,4,6,1,'2026-10-01',80,0,80,N'Posted','2026-10-01'),(9,4,6,1,'2026-10-01',50,0,50,N'Posted',NULL);
             CREATE TABLE dbo.DatabaseVersion(VersionId int IDENTITY,VersionNumber nvarchar(50),AppliedOn datetime2,AppliedBy nvarchar(200),Notes nvarchar(max));
-            INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'69');
+            INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'1');
             """);
         Execute(connection,"""
             CREATE FUNCTION dbo.GetFeeChargeBalance(@Id bigint) RETURNS decimal(12,2) AS
@@ -31,7 +31,7 @@ internal static partial class Program
             """);
         var folder=new DirectoryInfo(AppContext.BaseDirectory);
         while(folder is not null && !File.Exists(Path.Combine(folder.FullName,"fmsc.dacpac")))folder=folder.Parent;
-        string sql=File.ReadAllText(Path.Combine(folder!.FullName,"Tests","LifecycleSqlChecks","Migrations","70.sql"));
+        string sql=File.ReadAllText(Path.Combine(folder!.FullName,"Tests","LifecycleSqlChecks","Baseline","Sql","GetOutstandingAndAgingReport.sql"));
         Execute(connection,"BEGIN TRANSACTION;");
         try
         {

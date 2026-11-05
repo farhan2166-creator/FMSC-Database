@@ -23,32 +23,21 @@ internal static partial class Program
         var folder=new DirectoryInfo(AppContext.BaseDirectory);
         while(folder is not null && !File.Exists(Path.Combine(folder.FullName,"fmsc.dacpac")))folder=folder.Parent;
         if(folder is null)throw new InvalidOperationException("Run checks from a checkout containing fmsc.dacpac.");
-        string migration=File.ReadAllText(Path.Combine(folder.FullName,"Tests","LifecycleSqlChecks","Migrations","70.sql"));
-        string collectionMigration=File.ReadAllText(Path.Combine(folder.FullName,"Tests","LifecycleSqlChecks","Migrations","75.sql"));
+        string migration=File.ReadAllText(Path.Combine(folder.FullName,"Tests","LifecycleSqlChecks","Baseline","Sql","GetOutstandingAndAgingReport.sql"));
+        string collectionMigration=File.ReadAllText(Path.Combine(folder.FullName,"Tests","LifecycleSqlChecks","Baseline","Sql","GetCollectionsAndReceiptsReport.sql"));
         new TSql160Parser(true).Parse(new StringReader(collectionMigration),out var collectionErrors);
-        Check(collectionErrors.Count==0,"Migration 75 parses: "+string.Join("; ",collectionErrors.Select(e=>e.Message)));
+        Check(collectionErrors.Count==0,"Baseline collections procedure parses: "+string.Join("; ",collectionErrors.Select(e=>e.Message)));
         Check(collectionMigration.Contains("[__ReceiptStudents]")&&collectionMigration.Contains("A.__ReceiptSnapshot")&&!collectionMigration.Contains("THEN N'Mixed'"),"Collections exposes roster metadata and actual distinct methods");
         new TSql160Parser(true).Parse(new StringReader(migration),out var migrationErrors);
-        Check(migrationErrors.Count==0,"Migration 70 parses as SQL Server syntax: "+string.Join("; ",migrationErrors.Select(e=>e.Message)));
+        Check(migrationErrors.Count==0,"Baseline outstanding procedure parses as SQL Server syntax: "+string.Join("; ",migrationErrors.Select(e=>e.Message)));
         Check(migration.Contains("LEFT JOIN dbo.FamilyMembers") && migration.Contains("CASE WHEN F.FamilyId IS NULL THEN M.AdmissionId END"),
             "Family debt retains and separately groups students without family links");
         Check(System.Text.RegularExpressions.Regex.Matches(migration,@"\[Due Date Missing\]").Count==3,
             "All three debt views expose missing-date money instead of losing it from the split");
         Check(migration.Contains("DueDate < @AsOfDate") && migration.Contains("DueDate = @AsOfDate") && migration.Contains("DueDate > @AsOfDate"),
             "Debt reader separates overdue, due today and future charges");
-        string identityMigration=File.ReadAllText(Path.Combine(folder.FullName,"Tests","LifecycleSqlChecks","Migrations","74.sql"));
-        new TSql160Parser(true).Parse(new StringReader(identityMigration),out var identityErrors);
-        Check(identityErrors.Count==0,"Migration 74 parses as SQL Server syntax: "+string.Join("; ",identityErrors.Select(e=>e.Message)));
-        Check(System.Text.RegularExpressions.Regex.Matches(identityMigration,@"FatherName \[__StudentFatherName\], Gender \[__StudentGender\]").Count==2,
+        Check(System.Text.RegularExpressions.Regex.Matches(migration,@"FatherName \[__StudentFatherName\], Gender \[__StudentGender\]").Count==2,
             "Student and charge debt views return private recorded parent/gender metadata");
-        string Procedure(string sql)=>sql[sql.IndexOf("CREATE OR ALTER PROCEDURE",StringComparison.Ordinal)..sql.IndexOf("\nGO\nINSERT",StringComparison.Ordinal)].Replace("\r","");
-        // Strip only the four metadata additions, then compare the entire reader:
-        // permissions, grouping, arithmetic, filtering and sort must remain identical.
-        string withoutMetadata=identityMigration.Replace("\r","")
-            .Replace("S.StudentName, S.FatherName, S.Gender,","S.StudentName,")
-            .Replace("StudentName [Student], FatherName [__StudentFatherName], Gender [__StudentGender],","StudentName [Student],")
-            .Replace("AdmissionNumber, StudentName, FatherName, Gender, CampusName","AdmissionNumber, StudentName, CampusName");
-        Check(Procedure(withoutMetadata)==Procedure(migration.Replace("\r","")),"Migration 74 changes only parent/gender metadata; all financial logic is byte-for-byte preserved");
         using var archive=ZipFile.OpenRead(Path.Combine(folder.FullName,"fmsc.dacpac"));
         using var stream=archive.GetEntry("model.xml")!.Open();var model=XDocument.Load(stream);
         var columns=model.Descendants().Where(e=>(string?)e.Attribute("Type") is "SqlSimpleColumn" or "SqlComputedColumn").Select(e=>(string?)e.Attribute("Name")).ToHashSet();

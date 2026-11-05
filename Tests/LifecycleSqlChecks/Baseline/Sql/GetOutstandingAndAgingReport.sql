@@ -1,11 +1,4 @@
--- Read-only parent details for student identity in Outstanding & Aging print/PDF output.
--- Keep all charge selection, sorting, balance calculations and totals unchanged.
-SET XACT_ABORT ON; SET ANSI_NULLS ON; SET QUOTED_IDENTIFIER ON;
-IF @@TRANCOUNT=0 THROW 51000,'Migration 74 requires an outer transaction.',1;
-IF ISNULL((SELECT TOP(1) TRY_CONVERT(int,VersionNumber) FROM dbo.DatabaseVersion ORDER BY VersionId DESC),-1)<>73
- THROW 51000,'Migration 74 requires schema 73.',1;
-GO
-CREATE OR ALTER PROCEDURE dbo.GetOutstandingAndAgingReport
+CREATE   PROCEDURE dbo.GetOutstandingAndAgingReport
  @UserId int,@View nvarchar(20),@CampusId int=0,@AcademicYearId int=0,
  @ClassId int=0,@SectionId int=0,@AsOfDate date=NULL
 AS
@@ -15,7 +8,7 @@ BEGIN
     SET @AsOfDate = COALESCE(@AsOfDate, CONVERT(date, SYSDATETIME()));
 
     SELECT BC.BillingChargeId, BC.AdmissionId, S.RegistrationNumber, COALESCE(NULLIF(S.AdmissionNumber,''),NULLIF(S.QuickReference,''),CONCAT(N'ID-',S.AdmissionId)) AdmissionNumber, S.StudentName, S.FatherName, S.Gender,
-           CAMP.CampusName, CAMP.DisplayOrder CampusSort,C.DisplayOrder ClassSort,SEC.DisplayOrder SectionSort,FT.DisplayOrder FeeSort,S.AdmissionNumberBase,S.AdmissionNumberSuffix, CONCAT(C.ClassName,CASE WHEN NULLIF(LTRIM(RTRIM(SEC.SectionName)),N'') IS NULL THEN N'' ELSE CONCAT(N' – ',SEC.SectionName) END) ClassName, SEC.SectionName, FT.FeeTypeName,
+           CAMP.CampusName, CAMP.DisplayOrder CampusSort,C.DisplayOrder ClassSort,SEC.DisplayOrder SectionSort,FT.DisplayOrder FeeSort,S.AdmissionNumberBase,S.AdmissionNumberSuffix, CONCAT(C.ClassName,CASE WHEN NULLIF(LTRIM(RTRIM(SEC.SectionName)),N'') IS NULL THEN N'' ELSE CONCAT(N' â€“ ',SEC.SectionName) END) ClassName, SEC.SectionName, FT.FeeTypeName,
            BC.BillingMonth, BC.ChargeDate, BC.DueDate, BC.GrossAmount, BC.DiscountAmount,
            BC.NetAmount, BC.NetAmount - B.Balance PaidAmount, B.Balance Outstanding,
            CASE WHEN BC.DueDate IS NULL THEN N'Due Date Missing'
@@ -108,7 +101,3 @@ BEGIN
            SUM(CASE WHEN DueDate < @AsOfDate THEN Outstanding ELSE 0 END) Overdue,
            SUM(CASE WHEN DATEDIFF(day, DueDate, @AsOfDate) > 90 THEN Outstanding ELSE 0 END) [90+ Days] FROM #Charges;
 END;
-GO
-INSERT dbo.DatabaseVersion(VersionNumber,AppliedOn,AppliedBy,Notes)
-VALUES(N'74',SYSDATETIME(),SUSER_SNAME(),N'Provide parent and gender details for readable student identities in outstanding report printouts');
-GO

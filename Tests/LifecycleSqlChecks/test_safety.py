@@ -1,5 +1,6 @@
 from pathlib import Path
 import importlib.util
+import hashlib
 import json
 import subprocess
 import tempfile
@@ -14,6 +15,11 @@ spec.loader.exec_module(runner)
 
 
 class SafetyTests(unittest.TestCase):
+    def write_provenance(self, temporary, package):
+        provenance = json.loads((runner.PROJECT / "Baseline/provenance.json").read_text())
+        provenance["packageSha256"] = hashlib.sha256(package.read_bytes()).hexdigest()
+        (temporary / "Baseline/provenance.json").write_text(json.dumps(provenance))
+
     def test_data_free_fixture_and_provider_versions(self):
         self.assertTrue(runner.verify_baseline())
 
@@ -30,6 +36,7 @@ class SafetyTests(unittest.TestCase):
             package.write_bytes((runner.PROJECT / "Baseline/schema.dacpac").read_bytes())
             with zipfile.ZipFile(package, "a") as archive:
                 archive.writestr("Data/student.bcp", b"fictional-only")
+            self.write_provenance(temporary, package)
             with patch.object(runner, "PROJECT", temporary):
                 with self.assertRaisesRegex(ValueError, "Unexpected fixture content"):
                     runner.verify_baseline()
@@ -47,6 +54,7 @@ class SafetyTests(unittest.TestCase):
                             body = (b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
                                     b'<Relationship Target="Data/student.bcp" /></Relationships>')
                         changed.writestr(name, body)
+            self.write_provenance(temporary, package)
             with patch.object(runner, "PROJECT", temporary):
                 with self.assertRaisesRegex(ValueError, "relationships"):
                     runner.verify_baseline()

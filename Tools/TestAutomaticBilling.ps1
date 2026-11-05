@@ -1,5 +1,5 @@
 # Owns a unique schema-only LocalDB instance. Accepts no live database/connection parameter.
-param([switch]$KeepFixture,[switch]$AdmissionOnly,[switch]$TransferOnly,[switch]$PlacementOnly)
+param([switch]$KeepFixture,[switch]$AdmissionOnly,[switch]$TransferOnly,[switch]$PlacementOnly,[switch]$CertificateOnly)
 $ErrorActionPreference='Stop'
 $projectRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $owner=[guid]::NewGuid().ToString('N')
@@ -47,12 +47,8 @@ try {
  & dotnet $sqlPackage '/Action:Publish' "/SourceFile:$fixture" "/TargetConnectionString:Server=$instance;Database=$catalog;Integrated Security=True;TrustServerCertificate=True" '/p:DropObjectsNotInSource=False' '/p:DropExtendedPropertiesNotInSource=False' '/p:ScriptDatabaseOptions=False' '/Quiet:True'
  Native 'Publish data-free schema'
  # DacFx round-trips this recovery identity as varchar. Repair only this owned schema-only fixture.
- [void](Query "DECLARE @Scope uniqueidentifier=NEWID(); EXEC sys.sp_updateextendedproperty @name=N'FMSC_QuickRegistrationScope',@value=@Scope;")
- # Migration 59 defines the optional communication permission wrapper. This
- # schema-only fixture does not install the communication service itself.
- [void](Query "IF SCHEMA_ID(N'comm') IS NULL EXEC(N'CREATE SCHEMA comm AUTHORIZATION dbo');")
  # Migration changes run under the same transaction boundary used by deployment.
- $fixtureScripts=@(Get-ChildItem (Join-Path $projectRoot 'Tests/LifecycleSqlChecks/Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName}) + @(Get-Item (Join-Path $projectRoot 'Tools/ReleaseBaseline/Reset-Version.sql')) + @(Get-ChildItem (Join-Path $projectRoot 'Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName})
+ $fixtureScripts=@(Get-Item (Join-Path $projectRoot 'Tests/LifecycleSqlChecks/Baseline/Initialize.sql')) + @(Get-ChildItem (Join-Path $projectRoot 'Migrations') -Filter '*.sql' | Sort-Object {[int]$_.BaseName})
  foreach($file in $fixtureScripts) {
   $content=Get-Content -LiteralPath $file.FullName -Raw
   $connection=[Data.SqlClient.SqlConnection]::new("Server=$instance;Database=$catalog;Integrated Security=True;TrustServerCertificate=True")
@@ -71,6 +67,17 @@ try {
  }
  $seed=Get-Content -LiteralPath (Join-Path $projectRoot 'Validation/AutomaticBillingFixture.sql') -Raw
  [void](Query $seed)
+ if($CertificateOnly){
+  [void](Query "INSERT dbo.SchoolProfile(SchoolProfileId,SchoolName,CreatedAt,UpdatedAt,CreatedByUserId,UpdatedByUserId) VALUES(1,N'Fictional certificate school',SYSDATETIME(),SYSDATETIME(),1,1);")
+  [void](Query "EXEC sys.sp_addextendedproperty @name=N'FMSC_CertificateChecksOwner',@value=N'$owner';")
+  $env:FMSC_CERTIFICATE_TEST_CONNECTION="Server=$instance;Database=$catalog;Integrated Security=True;TrustServerCertificate=True"
+  $env:FMSC_CERTIFICATE_TEST_OWNER=$owner
+  try {
+   & dotnet run --project (Join-Path $projectRoot 'Tests/CertificateReissueSqlChecks/CertificateReissueSqlChecks.csproj') -c Release
+   Native 'Baseline-1 certificate snapshot/recovery checks'
+  } finally { Remove-Item Env:FMSC_CERTIFICATE_TEST_CONNECTION,Env:FMSC_CERTIFICATE_TEST_OWNER -ErrorAction SilentlyContinue }
+  return
+ }
  if($PlacementOnly){
   . (Join-Path $projectRoot 'Validation/PlacementPlanChecks.ps1')
   Write-Output "PASS: $checks placement-plan SQL checks."

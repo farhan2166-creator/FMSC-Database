@@ -2,7 +2,7 @@
 param([string]$Instance='(localdb)\MSSQLLocalDB')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
-$migration=Get-Content -LiteralPath (Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/63.sql') -Raw
+$migration=((Get-Content (Join-Path $root 'Tests/LifecycleSqlChecks/Baseline/Sql/GetAcademicYears.sql') -Raw), (Get-Content (Join-Path $root 'Tests/LifecycleSqlChecks/Baseline/Sql/SaveAcademicYear.sql') -Raw)) -join "`nGO`n"
 $procedures=@([regex]::Split($migration,'(?im)^GO\s*$') | Where-Object {$_ -match 'CREATE OR ALTER PROCEDURE'})
 if($procedures.Count -ne 2){throw 'Expected the two academic-year procedures.'}
 $fixture=Get-Content -LiteralPath (Join-Path $root 'Validation/AcademicYearDateLockChecks.sql') -Raw

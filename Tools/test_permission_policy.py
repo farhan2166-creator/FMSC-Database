@@ -56,8 +56,7 @@ class PermissionPolicyChecks(unittest.TestCase):
         self.assertEqual(int(installer.group(1)), required)
         self.assertEqual({f'{version}.sql' for version in range(2, required + 1)},
                          {path.name for path in (ROOT/'Migrations').glob('*.sql')})
-        self.assertEqual(set(range(7, 77)),
-                         {int(path.stem) for path in (ROOT/'Tests/LifecycleSqlChecks/Migrations').glob('*.sql')})
+        self.assertFalse((ROOT/'Tests/LifecycleSqlChecks/Migrations').exists(), 'Pre-release migration replay has been retired.')
 
     def test_release_schema_package_integrity(self):
         with zipfile.ZipFile(ROOT/'fmsc.dacpac') as package:

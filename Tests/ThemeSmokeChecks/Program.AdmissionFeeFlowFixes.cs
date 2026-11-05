@@ -97,6 +97,6 @@ internal static partial class Program
         using var connection=new SqlConnection(value);connection.Open();
         using var command=new SqlCommand("SELECT CONVERT(nvarchar(32),value) FROM sys.extended_properties WHERE class=0 AND name=N'FMSC_BillingChecksOwner'",connection);
         if(Convert.ToString(command.ExecuteScalar())!=owner)throw new InvalidOperationException("Fixture owner mismatch");
-        DatabaseCompatibility.Validate(connection);Check(true,"Schema 60 satisfies the complete application startup/restore contract");
+        DatabaseCompatibility.Validate(connection);Check(true,"Baseline 1 satisfies the complete application startup/restore contract");
     }
 }

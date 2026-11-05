@@ -17,7 +17,7 @@ internal static class CommunicationSqlChecks
             int grants=Sql.Count("SELECT COUNT(*) FROM dbo.RolePermissions;");
             using var connection=DatabaseHelper.GetConnection();connection.Open();
             string script=File.ReadAllText("Services/Communication/Schema.sql");
-            foreach(int version in new[]{5,7})
+            foreach(int version in new[]{0,int.Parse(DatabaseHelper.RequiredDatabaseSchemaVersion)+1})
             {
                 Sql.Query("UPDATE dbo.DatabaseVersion SET VersionNumber=@Version WHERE VersionId=(SELECT MAX(VersionId) FROM dbo.DatabaseVersion);",Sql.P("@Version",version));
                 try { report.Check(await CommunicationFixture.InstallAsync(connection,script)==CommunicationInstallation.BaseIncompatible && Sql.Count("SELECT COUNT(*) FROM sys.schemas WHERE name=N'comm';")==0,"Installer refuses base version "+version+" without creating communication objects."); }

@@ -5,6 +5,7 @@ Only a fixed report/summary allowlist is exported. No production connection opti
 """
 from pathlib import Path
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -39,9 +40,11 @@ def verify_baseline():
     migrations = {int(p.stem) for p in (ROOT / "Migrations").glob("*.sql") if p.stem.isdecimal()}
     if migrations != set(range(2, target + 1)):
         raise ValueError("Numbered migration chain must be complete through the required schema.")
-    historical = {int(p.stem) for p in (PROJECT / "Migrations").glob("*.sql")}
-    if historical != set(range(7, 77)):
-        raise ValueError("Historical test-only fixture chain must remain complete through the approved baseline.")
+    provenance = json.loads((PROJECT / "Baseline/provenance.json").read_text())
+    if provenance["schemaVersion"] != 1 or provenance["containsSchoolData"] is not False:
+        raise ValueError("Tests must start from the complete data-free baseline 1.")
+    if hashlib.sha256((PROJECT / "Baseline/schema.dacpac").read_bytes()).hexdigest() != provenance["packageSha256"]:
+        raise ValueError("Baseline fixture checksum differs from the reviewed provenance.")
     # Shared SQL test contexts must not silently lag the runtime contract.
     for context in ("QuickRegistrationSqlChecks", "MutationSqlChecks"):
         fixture = (ROOT / "Tests" / context / "DatabaseContext.cs").read_text()
@@ -181,9 +184,9 @@ def main():
     report = {"commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "runId": str(token), "workingTreeDirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT, text=True).strip()), "scenarios": [], "measurements": {"HostLogicalCpus": os.cpu_count() or 0, "HostMemoryMiB": os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE") / (1024 * 1024)}, "limitations": [
         "Linux real-SQL lifecycle/integration tests; existing desktop CI separately runs Windows control contracts and PDF export.",
         "No interactive visual, printing, installer, Windows LocalDB/operator-account or actual network-loss acceptance.",
-        "No real school rows are imported: the approved data-free test baseline is independently upgraded through the complete numbered migration chain in each owned catalog. The reference DACPAC is never published.",
+        "No real school rows are imported: the approved data-free test baseline starts directly at version 1, followed by any future numbered migrations in each owned catalog. The reference DACPAC is never published.",
         "Test-only seeds set baseline schema versions and repair DacFx recovery-scope type; this does not prove the owner's distributed MDF/LDF snapshot.",
-        "Legacy PowerShell scripts that back up FMSC_DB or hardcode school IDs are inspected but never executed."]}
+        "Owned disposable fixtures are used; production databases are never selected."]}
     current_stage = None
     private = tempfile.TemporaryDirectory(prefix="fmsc-level1-private-")
     secret = "A!" + secrets.token_urlsafe(32) + "9z"
@@ -262,13 +265,7 @@ def main():
         prefix = [str(args.sqlpackage)] if args.sqlpackage else [args.dotnet, "tool", "run", "sqlpackage", "--"]
         checked("schema-only publish", lambda: execute(prefix + ["/Action:Publish", "/SourceFile:" + package, "/TargetConnectionString:" + env["FMSC_AUDIT_CONNECTION"], "/p:CreateNewDatabase=True"], timeout=240, cwd=PROJECT))
         checked("owner registration", lambda: sql(catalog, "DECLARE @Owner uniqueidentifier='" + str(token) + "'; EXEC sys.sp_addextendedproperty @name=N'FMSC_Level1Owner',@value=@Owner;"))
-        # The approved data-free fixture is schema 6. Replay the entire chain into
-        # each isolated catalog; never seed a fabricated "current" version.
-        checked("baseline schema version", lambda: sql(catalog, "INSERT dbo.DatabaseVersion(VersionNumber) VALUES(N'6');"))
-        for migration in sorted((PROJECT / "Migrations").glob("*.sql"), key=lambda p: int(p.stem)):
-            if 6 < int(migration.stem) <= 76:
-                checked("fixture migration " + migration.stem, lambda: sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;"))
-        checked("first release baseline", lambda: sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + (ROOT / "Tools/ReleaseBaseline/Reset-Version.sql").read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;"))
+        checked("baseline 1 initialization", lambda: sql(catalog, (PROJECT / "Baseline/Initialize.sql").read_text(encoding="utf-8-sig")))
         for migration in sorted((ROOT / "Migrations").glob("*.sql"), key=lambda p: int(p.stem)):
             checked("migration " + migration.stem, lambda: sql(catalog, "SET XACT_ABORT ON; BEGIN TRANSACTION;\n" + migration.read_text(encoding="utf-8-sig") + "\nCOMMIT TRANSACTION;"))
         return catalog

@@ -3,7 +3,7 @@ namespace FMSC_SMS
 {
     public static class DatabaseHelper
     {
-        public const string RequiredDatabaseSchemaVersion="54";
+        public const string RequiredDatabaseSchemaVersion="1";
         internal static string ConnectionString="";
         public static SqlConnection GetConnection()=>new(ConnectionString);
         public static void OpenConnection(SqlConnection connection)=>connection.Open();

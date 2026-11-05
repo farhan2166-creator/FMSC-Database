@@ -1,5 +1,4 @@
 using Microsoft.Data.SqlClient;
-using System.Text.Json.Nodes;
 
 namespace FMSC_SMS.Core;
 
@@ -17,27 +16,7 @@ internal static class DatabaseCompatibility
             ?? throw new DatabaseCompatibilityException(new(DatabaseCompatibilityIssue.ApplicationDefinition,
                 DatabaseHelper.RequiredDatabaseSchemaVersion, Details: "The application's database compatibility definition is missing."));
         using var reader = new StreamReader(stream);
-        string baseline=reader.ReadToEnd();
-        // Baseline 1 contains the complete approved schema. Numeric version 1
-        // must not select the old pre-release version-1 compatibility contract.
-        var definition=JsonNode.Parse(baseline)!.AsObject();
-        if(definition["uniqueIndexes"] is JsonArray characterIndexes)
-            foreach(var index in characterIndexes.Where(item=>item?["name"]?.GetValue<string>()=="UX_CharacterCertificates_AdmissionId").ToArray())
-                characterIndexes.Remove(index);
-        // Preserve the embedded compatibility requirements and combine them with
-        // features installed by numbered migrations.
-        using var migrations=typeof(DatabaseCompatibility).Assembly.GetManifestResourceStream(
-            "FMSC_SMS.Core.DatabaseMigrationRequirements.json")
-            ?? throw new DatabaseCompatibilityException(new(DatabaseCompatibilityIssue.ApplicationDefinition,
-                DatabaseHelper.RequiredDatabaseSchemaVersion,Details:"The migrated database compatibility definition is missing."));
-        using var migrationReader=new StreamReader(migrations);
-        foreach(var section in JsonNode.Parse(migrationReader.ReadToEnd())!.AsObject())
-        {
-            var items=(definition[section.Key]??=new JsonArray()).AsArray();
-            foreach(var item in section.Value!.AsArray())
-                if(!items.Any(existing=>JsonNode.DeepEquals(existing,item)))items.Add(item!.DeepClone());
-        }
-        return definition.ToJsonString();
+        return reader.ReadToEnd();
     }
 
     internal static void Validate(SqlConnection connection)

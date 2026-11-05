@@ -1,8 +1,8 @@
-# Runs the migration's actual procedure against temporary synthetic tables only.
+# Runs the current baseline procedure against temporary synthetic tables only.
 param([string]$Instance='(localdb)\MSSQLLocalDB')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
-$migration=Get-Content (Join-Path $root 'Tests/LifecycleSqlChecks/Migrations/53.sql') -Raw
+$migration=Get-Content (Join-Path $root 'Tests/LifecycleSqlChecks/Baseline/Sql/GetSetupReadiness.sql') -Raw
 $batches=[regex]::Split($migration,'(?im)^GO\s*$')
 $procedure=@($batches | Where-Object {$_ -match 'CREATE OR ALTER PROCEDURE'})
 if($procedure.Count -ne 1){throw 'Expected one readiness procedure.'}

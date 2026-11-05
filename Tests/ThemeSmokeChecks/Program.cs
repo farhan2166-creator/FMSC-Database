@@ -146,7 +146,7 @@ internal static partial class Program
         }
         if(args.Contains("--admission-fee-flow-sql-compat"))
         {
-            CheckAdmissionFeeFlowSqlCompatibility();Console.WriteLine($"PASS: {checks} owned schema-60 compatibility check.");return;
+            CheckAdmissionFeeFlowSqlCompatibility();Console.WriteLine($"PASS: {checks} owned baseline compatibility check.");return;
         }
         if(args.Contains("--admission-fee-flow-fixes"))
         {

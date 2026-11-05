@@ -3,7 +3,7 @@ using FMSC_SMS.Pages.Security;
 using Microsoft.Data.SqlClient;
 
 if(args.Any(arg=>arg is not ("--compatibility" or "--additional-fee" or "--additional-fee-recovery" or "--bank" or "--adjustment-types")))
-    throw new ArgumentException("Use a disposable schema-6 baseline; legacy upgrade modes have been retired.");
+    throw new ArgumentException("Use a disposable baseline-1 schema; legacy upgrade modes have been retired.");
 string connectionText=Environment.GetEnvironmentVariable("FMSC_AUDIT_CONNECTION")??throw new Exception("Set the disposable audit connection.");
 var builder=new SqlConnectionStringBuilder(connectionText);
 if(!builder.InitialCatalog.StartsWith("FMSC_AuditChecks_",StringComparison.Ordinal)||!builder.DataSource.StartsWith("127.0.0.1,",StringComparison.Ordinal)||builder.UserID!="sa")throw new Exception("Only a disposable loopback audit clone is accepted.");
@@ -23,7 +23,7 @@ void Check(bool ok,string label)
 }
 using(var compatible=DatabaseHelper.GetConnection()){
     compatible.Open();DatabaseCompatibility.Validate(compatible);
-    Check(true,"current schema 6 meets production startup and restore compatibility requirements");
+    Check(true,"baseline 1 meets production startup and restore compatibility requirements");
 }
 if(args.Contains("--compatibility")) return;
 CurrentUser.UserId=Convert.ToInt32(Query("SELECT TOP(1) U.UserId FROM dbo.Users U JOIN dbo.Roles R ON R.RoleId=U.RoleId WHERE R.RoleName=N'Administrator'").Rows[0][0]);
@@ -125,5 +125,5 @@ var deniedArgs=Refund(10m);var deniedRequest=Intent(MutationKind.FeeAdjustment,d
 Check(denied.Outcome==MutationOutcome.Rejected&&Refunds()==before,"Accountant access is preserved and cannot acquire fee-adjustment authority through recovery");
 CurrentUser.UserId=admin;
 Check(await RecoverableMutationWriter.CheckAsync(deniedRequest) is null,"Administrator can verify a refused operator request as absent without performing it");
-using(var compatible=DatabaseHelper.GetConnection()){compatible.Open();DatabaseCompatibility.Validate(compatible);Check(true,"current app compatibility accepts migrated schema 20");}
+using(var compatible=DatabaseHelper.GetConnection()){compatible.Open();DatabaseCompatibility.Validate(compatible);Check(true,"current app compatibility accepts baseline 1");}
 Console.WriteLine($"PASS: {checks} native request recovery checks on the disposable clone.");
