@@ -387,6 +387,23 @@ backup restoration into a second newly named fixture database. Physical power-lo
 disk/controller failure and complete-machine-loss recovery are separate limits;
 local journaling cannot replace an independent school-data backup.
 
+The complete Windows installation acceptance also invokes
+`TestPreparedUpdateRecovery.ps1` against its already owned synthetic FMSC install.
+Only the private fixture copy is instrumented: it pauses after the old-directory
+rename, is forcibly terminated, and then the real stable launcher elevates and
+resumes the existing installer. Installed files, unchanged fictional SQL records,
+database GUID, user settings and cleanup are checked. Interactive restart is
+observed at its verified-completion boundary rather than launching a login window
+on the hosted runner. The activation mutex must be released before restart so
+the application's startup guard permits the completed application to open.
+
+Workflow 02 defaults to complete acceptance. Its optional `sql` test scope restores
+the pinned test tooling and runs the billing and uniquely named disposable
+migration/backup fixtures without rebuilding the Windows installer. Recovery tests
+include AUTO_CLOSE databases, both PowerShell JSON integer representations and
+UTF-8 download paths. None of these test modes publish an update or access school
+database files.
+
 The dialog displays download percentage, received/total bytes, remaining bytes,
 network speed, elapsed time and estimated time remaining. Git's network pack
 progress supplies speed measurements; local `git show` output is never treated
