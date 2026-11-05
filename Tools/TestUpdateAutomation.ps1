@@ -39,7 +39,9 @@ try {
     if (-not $script:UpdateWindow.Visible -or $script:UpdateWindow.ControlBox -or
         $script:UpdateWindow.ClientSize.Height -lt 400 -or
         $script:UpdateWindow.BackColor.ToArgb() -ne [Drawing.Color]::FromArgb(246,248,251).ToArgb() -or
-        $script:UpdateYes.Enabled -or $script:UpdateNo.Enabled) {
+        $script:UpdateYes.Enabled -or $script:UpdateNo.Enabled -or
+        $script:UpdateYes.Bottom -gt $script:UpdateYes.Parent.ClientSize.Height -or
+        $script:UpdateNo.Bottom -gt $script:UpdateNo.Parent.ClientSize.Height) {
         throw 'OceanBlue updater window must be tall and disable launch decisions during installation.'
     }
     $script:UpdateYes.PerformClick()
