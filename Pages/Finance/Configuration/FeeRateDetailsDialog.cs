@@ -20,7 +20,7 @@ internal sealed class FeeRateDetailsDialog : ApplicationWindowForm
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = MinimizeBox = false;
         BackColor = AppTheme.PageBackground;
-        ClientSize = new Size(AppScale.Scale(510), AppScale.Scale(285));
+        ClientSize = AppMetrics.CompactEditorDialogClientSize;
         frequency.Items.AddRange(new object[] { "Monthly", "Yearly", "As Needed" });
         frequency.SelectedItem = frequencyValue;
         if (frequency.SelectedIndex < 0) frequency.SelectedIndex = 0;
