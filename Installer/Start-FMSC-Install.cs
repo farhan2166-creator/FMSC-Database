@@ -33,9 +33,12 @@ internal static class FmscSetupLauncher
             };
             using (Process process = Process.Start(start)) { }
         }
-        catch (Win32Exception error) when (error.NativeErrorCode == 1223)
+        catch (Win32Exception error)
         {
             // UAC was declined: do not attempt an unelevated installation.
+            if (error.NativeErrorCode != 1223)
+                MessageBox.Show(error.Message, "FMSC - Setup Could Not Start",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         catch (Exception error)
         {
