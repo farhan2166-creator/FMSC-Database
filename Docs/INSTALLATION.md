@@ -11,8 +11,9 @@ FMSC_SMS/                 Published self-contained app and resources
 Database/                 You provide FMSC_DB.mdf and FMSC_DB_log.ldf for a fresh install
 Tools/                    Signed Microsoft SqlLocalDB.msi and verified sqlcmd.exe
 Migrations/               Empty at first-production schema 1; future numbered upgrades begin at 2.sql
-Install FMSC_SMS.bat
-core.ps1
+FMSC.Setup.exe             Native Windows GUI entry point for new installs
+Install FMSC_SMS.bat        Compatibility shortcut to FMSC.Setup.exe
+core.ps1                   Existing protected install/update engine
 READ_ME_FIRST.txt         Packaging instructions
 COMMUNICATION_CENTER.md  Optional add-on review, consent and deployment instructions
 SHA256SUMS.txt            Package content hashes
@@ -40,8 +41,8 @@ The installer checks `Migrations` for top-level `*.sql` files. An empty or missi
 ## Run the installer
 
 1. Close FMSC_SMS and other sessions connected to its LocalDB instance.
-2. Right-click **Install FMSC_SMS.bat** and choose **Run as administrator**.
-3. The FMSC setup dialog shows all eight installation stages, current verification activity, and completion or failure. The launcher keeps the PowerShell console hidden. It checks app/process state, LocalDB, database-file presence, staging, version/migration compatibility, and preserves existing school data.
+2. Double-click **FMSC.Setup.exe**. Approve the Windows administrator/UAC prompt. The existing **Install FMSC_SMS.bat** is a compatibility shortcut to the same GUI launcher.
+3. The FMSC setup dialog shows all eight installation stages, current verification activity, and completion or failure. The graphical executable runs the existing PowerShell installation engine with its console hidden. It checks app/process state, LocalDB, database-file presence, staging, version/migration compatibility, and preserves existing school data.
 4. **Never ignore a blocked or failed validation.** Record the exact message and installer logs and stop before retrying or adjusting data files.
 5. After successful installation, launch the application under the intended operator account; verify connection, login, schema compatibility, a read-only student search, a report preview, and permitted user actions.
 
@@ -51,7 +52,7 @@ If silent LocalDB installation fails (for example, MSI code 1603), the setup dia
 
 ## Updating an existing installation
 
-The in-app updater displays the same branded eight-stage installation progress window after it closes FMSC safely. A completed update restarts the application through the desktop shell; a failed update shows an actionable error without hiding its rollback or log information. The installer still uses a console-compatible non-GUI mode for unattended, explicitly isolated test execution.
+The in-app updater launches the verified **UpdateSupport/FMSC.Setup.exe** from its prepared release and displays the same branded eight-stage installation progress window after it closes FMSC safely. A completed update restarts the application through the desktop shell; a failed update shows an actionable error without hiding its rollback or log information. The GUI executable has separate fresh-install and update entry modes, but both use `core.ps1` for validation, SQL safeguards and recovery. The installer still supports a console-compatible non-GUI mode for unattended, explicitly isolated test execution.
 
 
 - Take and **verify** a recoverable backup first and note its storage path.

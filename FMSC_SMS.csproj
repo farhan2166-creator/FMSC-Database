@@ -6,6 +6,13 @@
         <MakeDir Directories="$(BaseIntermediateOutputPath)FmscLauncher/$(Configuration)" />
         <Exec Command="&quot;$(windir)\Microsoft.NET\Framework64\v4.0.30319\csc.exe&quot; /nologo /target:winexe /optimize+ /out:&quot;$(BaseIntermediateOutputPath)FmscLauncher\$(Configuration)\FMSC.Launcher.exe&quot; &quot;$(MSBuildProjectDirectory)\Installer\Launch-FMSC.cs&quot;" />
     </Target>
+    <!-- Native Windows GUI launcher; backend/core.ps1 stays the safety authority. -->
+    <Target Name="BuildFmscSetupLauncher" BeforeTargets="PrepareForBuild"
+            Inputs="$(MSBuildProjectDirectory)/Installer/FMSC.Setup.cs"
+            Outputs="$(BaseIntermediateOutputPath)FmscSetup/$(Configuration)/FMSC.Setup.exe">
+        <MakeDir Directories="$(BaseIntermediateOutputPath)FmscSetup/$(Configuration)" />
+        <Exec Command="&quot;$(windir)\Microsoft.NET\Framework64\v4.0.30319\csc.exe&quot; /nologo /target:winexe /optimize+ /win32icon:&quot;$(MSBuildProjectDirectory)\Assets\FMSC_Logo Icon.ico&quot; /out:&quot;$(BaseIntermediateOutputPath)FmscSetup\$(Configuration)\FMSC.Setup.exe&quot; &quot;$(MSBuildProjectDirectory)\Installer\FMSC.Setup.cs&quot;" />
+    </Target>
     <!-- Opt-in test binary; normal builds contain no disposable-target override. -->
     <PropertyGroup Condition="'$(FmscLevel2)' == 'true'">
         <DefineConstants>$(DefineConstants);FMSC_LEVEL2</DefineConstants>
@@ -21,6 +28,7 @@
         <!-- Standalone update packaging CLI is not part of the WinForms executable. -->
         <Compile Remove="Tools/**/*.cs" />
         <Compile Remove="Installer/Launch-FMSC.cs" />
+        <Compile Remove="Installer/FMSC.Setup.cs" />
     </ItemGroup>
 	<PropertyGroup>
 		<!-- Local verification repositories and generated files are not application inputs. -->
@@ -46,6 +54,7 @@
 		<Content Include="Installer/UpdateRecovery.ps1" Link="UpdateSupport/UpdateRecovery.ps1" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="Installer/Launch-FMSC.ps1" Link="UpdateSupport/Launch-FMSC.ps1" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="$(BaseIntermediateOutputPath)FmscLauncher/$(Configuration)/FMSC.Launcher.exe" Link="UpdateSupport/FMSC.Launcher.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+        <Content Include="$(BaseIntermediateOutputPath)FmscSetup/$(Configuration)/FMSC.Setup.exe" Link="UpdateSupport/FMSC.Setup.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="Migrations/*.sql" Link="UpdateSupport/Migrations/%(Filename)%(Extension)" CopyToPublishDirectory="PreserveNewest" />
 		<Content Include="Assets\academics.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -179,6 +188,7 @@
 		<Copy SourceFiles="@(MigrationFiles)" DestinationFiles="@(MigrationFiles->'$(ReleaseRoot)Migrations\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="@(MigrationApplierFiles)" DestinationFolder="$(ReleaseRoot)Migrations" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\core.ps1" DestinationFiles="$(ReleaseRoot)core.ps1" SkipUnchangedFiles="true" />
+		<Copy SourceFiles="$(BaseIntermediateOutputPath)FmscSetup/$(Configuration)/FMSC.Setup.exe" DestinationFiles="$(ReleaseRoot)FMSC.Setup.exe" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\UpdateRecovery.ps1" DestinationFiles="$(ReleaseRoot)UpdateRecovery.ps1" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\Install FMSC_SMS.bat" DestinationFiles="$(ReleaseRoot)Install FMSC_SMS.bat" SkipUnchangedFiles="true" />
 	</Target>
