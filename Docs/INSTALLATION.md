@@ -41,15 +41,18 @@ The installer checks `Migrations` for top-level `*.sql` files. An empty or missi
 
 1. Close FMSC_SMS and other sessions connected to its LocalDB instance.
 2. Right-click **Install FMSC_SMS.bat** and choose **Run as administrator**.
-3. Follow `Installer/core.ps1` prompts. It checks app/process state, LocalDB, database-file presence, staging, version/migration compatibility, and attempts to preserve an existing database.
+3. The FMSC setup dialog shows all eight installation stages, current verification activity, and completion or failure. The launcher keeps the PowerShell console hidden. It checks app/process state, LocalDB, database-file presence, staging, version/migration compatibility, and preserves existing school data.
 4. **Never ignore a blocked or failed validation.** Record the exact message and installer logs and stop before retrying or adjusting data files.
 5. After successful installation, launch the application under the intended operator account; verify connection, login, schema compatibility, a read-only student search, a report preview, and permitted user actions.
 
 The app expects `FMSC_DB` under `C:\ProgramData\FMSC_Database` and uses `(localdb)\MSSQLLocalDB` by default. Current required **database schema version: 1** (first-production baseline, 5 November 2026); application version is **1.0.0**. See [first-release baseline](FIRST_RELEASE_BASELINE.md). Future app-only releases can change the application version without changing the database schema.
 
-If silent LocalDB installation fails (for example, MSI code 1603), the current installer reports a verbose log under `C:\ProgramData\FMSC_Database` and asks whether to open the official Microsoft installer wizard. A failed/cancelled wizard or restart-required result stops installation safely. Code 1603 alone does not identify the underlying MSI problem; retain the verbose log for diagnosis. An immediate `SQL Server LocalDB installation failed. MSI exit code: 1603` message without this fallback belongs to the older installer: verify the artifact's source commit before retrying.
+If silent LocalDB installation fails (for example, MSI code 1603), the setup dialog offers a Yes/No choice to open Microsoft's official installer wizard and reports a verbose log under `C:\ProgramData\FMSC_Database` . A failed/cancelled wizard or restart-required result stops installation safely. Code 1603 alone does not identify the underlying MSI problem; retain the verbose log for diagnosis. An immediate `SQL Server LocalDB installation failed. MSI exit code: 1603` message without this fallback belongs to the older installer: verify the artifact's source commit before retrying.
 
 ## Updating an existing installation
+
+The in-app updater displays the same branded eight-stage installation progress window after it closes FMSC safely. A completed update restarts the application through the desktop shell; a failed update shows an actionable error without hiding its rollback or log information. The installer still uses a console-compatible non-GUI mode for unattended, explicitly isolated test execution.
+
 
 - Take and **verify** a recoverable backup first and note its storage path.
 - Do **not** copy a replacement MDF/LDF over an installed school's existing pair.
