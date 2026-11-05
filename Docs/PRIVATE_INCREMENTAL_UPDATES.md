@@ -109,7 +109,7 @@ Removing old update files from the current tree **does not reclaim historical
 Git blobs**. A bounded distribution history strategy remains a separate
 production gate, limited to `FMSC-Updates`; never rewrite the source history.
 
-## Implemented on draft PR #84
+## Implemented updater components
 
 - `Core/Updates/UpdateManifest.cs`: validated JSON manifest, path, version,
   inventory and SHA-256 structure, exact-baseline incremental selection,
@@ -458,9 +458,3 @@ installation retries removal of the fixed rollback directory. Older staging
 directories from installations predating this change are not swept automatically.
 Disposable-folder tests exercise verification failures, successful cleanup,
 locked files, scope refusal and preservation of enrollment and database backups.
-# First production version
-
-The owner-approved first production baseline is application **1.0.0**, database
-**1**. Historical development migrations are test fixtures and are excluded from
-release packages. Future database changes start at `Migrations/2.sql`. See
-[the reset and preservation decision](FIRST_RELEASE_BASELINE.md).

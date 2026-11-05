@@ -1,6 +1,6 @@
 # Agreed billing implementation — 18 October 2026
 
-> Historical design record. Current release routes and schema-20 deployment are described in [School operations](SCHOOL_OPERATIONS.md) and [Release readiness](RELEASE_READINESS.md).
+> **Historical billing implementation evidence (18 October).** Its original migration and automatic-credit narrative is superseded by the latest [BD-12](BUSINESS_DECISIONS.md#bd-12): posting does not automatically apply advance and backdated collection cannot apply advance. Use [school operations](SCHOOL_OPERATIONS.md) for present flows and [first-production baseline](FIRST_RELEASE_BASELINE.md) for schema 1. Do not treat the older rollout sequence below as current operational instructions.
 
 Work in the project folder only. No live database changes or Git operations.
 Existing migrations 7–13 are pending and must not be rewritten or assumed applied.
