@@ -151,7 +151,7 @@ internal static partial class Program
             for (int i = 1; i <= 75; i++)
                 outstanding.Rows.Add(i + " - " + SampleStudentName(i) + " / " + SampleParentName(i),
                     "Campus Boys\nClass " + (i % 10 + 1) + " - M",
-                    new DateTime(2026, 9, 1).AddDays(i % 21).ToString("dd-MM-yyyy") + "\\nOverdue",
+                    new DateTime(2026, 9, 1).AddDays(i % 21).ToString("dd-MM-yyyy") + "\nOverdue",
                     4150m + (i % 8) * 510m, 875m + (i % 5) * 230m,
                     4150m + (i % 8) * 510m - 875m - (i % 5) * 230m);
             Render("outstanding-students-multipage", "Outstanding & Aging — Students",
