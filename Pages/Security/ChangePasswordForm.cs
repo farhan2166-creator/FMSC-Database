@@ -14,7 +14,7 @@ public sealed class ChangePasswordForm : ApplicationWindowForm
     {
         Text = "FMSC - Change Password";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(AppScale.Scale(560), AppScale.Scale(430));
+        ClientSize = AppMetrics.CredentialDialogClientSize;
         MinimumSize = SizeFromClientSize(
             new Size(AppScale.Scale(520), AppScale.Scale(400)));
         BackColor = AppTheme.PageBackground;
@@ -117,8 +117,8 @@ public sealed class ChangePasswordForm : ApplicationWindowForm
             AppMetrics.SpacingLg;
         ClientSize =
             new Size(
-                AppScale.Scale(560),
-                Math.Max(AppScale.Scale(430), requiredClientHeight));
+                AppMetrics.CredentialDialogClientSize.Width,
+                Math.Max(AppMetrics.CredentialDialogClientSize.Height, requiredClientHeight));
         AcceptButton = save;
         SetSaveShortcut(save);
         FormFlow.EnterMovesToNext(this);
