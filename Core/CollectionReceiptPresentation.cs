@@ -54,12 +54,13 @@ internal static class CollectionReceiptPresentation
             string[] classes=Convert.ToString(row["Class / Section"])!.Split('\n');
             string[] fathers=students.Select(student=>RecordTextPolicy.DisplayText("FatherName",student.Father)).Distinct().ToArray();
             bool sharedParent=fathers.Length==1&&fathers[0].Length>0;
-            string members=string.Join(", ",students.Select((student,index)=>(Student:student,Class:classes[index]))
+            var memberGroups=students.Select((student,index)=>(Student:student,Class:classes[index]))
                 .GroupBy(item=>item.Class,StringComparer.Ordinal)
                 .Select(group=>string.Join(", ",group.Select(item=>sharedParent
-                    ?RecordTextPolicy.DisplayText("StudentName",item.Student.Name):Names(new[]{item.Student})))+$" ({group.Key})"));
+                    ?RecordTextPolicy.DisplayText("StudentName",item.Student.Name):Names(new[]{item.Student})))+$" ({group.Key.Replace(' ','\u00a0')})").ToArray();
+            string members=string.Join(memberGroups.Sum(value=>value.Length)>180?",\n":", ",memberGroups);
             printNames[(Convert.ToString(row["Student / Family"])!,Convert.ToString(row["Class / Section"])!)]=new(
-                Names(students)+" ("+string.Join(" / ",classes.Distinct())+")",
+                Names(students)+" ("+string.Join(" / ",classes.Distinct()).Replace(' ','\u00a0')+")",
                 (sharedParent?"Family: "+fathers[0]:"Family")+"\n"+members);
             var campuses=students.SelectMany(student=>student.Placements).Select(place=>place.Campus).Where(text=>text.Length>0).Distinct().ToArray();
             if(campuses.Length>0)row["Campus"]=string.Join(", ",campuses);

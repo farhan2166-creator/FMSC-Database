@@ -34,6 +34,10 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--compact-management-reports"))
+        {
+            CheckCompactReceiptScenarios();CheckCompactFinancialScenarios();Console.WriteLine($"PASS: {checks} compact management report PDF checks.");return;
+        }
         if(args.Contains("--family-advance-layout"))
         {
             CheckFamilyAdvanceLayout();Console.WriteLine($"PASS: {checks} compact family form, grouped printing and multi-page row-preservation checks (no database connection).");return;

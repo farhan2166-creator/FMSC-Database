@@ -32,6 +32,7 @@ internal static partial class Program
             Check(source.GetXmlForTest()==before,"Printing must not modify source rows, values or types");
             var columns=GridReportColumns.Create(source,"#,##0.##");
             Check(columns.SelectMany(c=>c.Fields).OrderBy(i=>i).SequenceEqual(Enumerable.Range(0,source.Columns.Count)),"Every selected source field appears exactly once in the print projection");
+            if(layout is not null)columns.Insert(0,new GridReportColumns.Column("#",Array.Empty<int>(),false,.3,.2));
             Check(built.Data.Rows.Count==(layout?.Count(row=>row.Kind=="Detail")??source.Rows.Count),"Print layout preserves all detail records without counting group headings or totals as receipts");
             int printedRow=0;
             for(int row=0;row<source.Rows.Count;row++)
@@ -40,6 +41,9 @@ internal static partial class Program
                 for(int column=0;column<source.Columns.Count;column++)
                 {
                     string value=GridReportColumns.Value(source.Rows[row],column,"#,##0.##");
+                    // Identity and scope are reformatted from the saved participant roster;
+                    // their name/class correspondence is checked in the receipt fixtures.
+                    if(layout is not null&&source.Columns[column].ColumnName is "Student / Family" or "Class / Section" or "Scope")continue;
                     if(value.Length>0)Check(built.Data.Rows[printedRow].ItemArray.Any(cell=>Convert.ToString(cell)!.Contains(value)),"Printed data preserves each source value");
                 }
                 printedRow++;
@@ -54,17 +58,19 @@ internal static partial class Program
             foreach(var box in boxes)
             {
                 string boxName=(string)box.Attribute("Name")!;
-                if(boxName.StartsWith("Heading") || boxName.StartsWith("MetricLabel") || boxName.StartsWith("MetricValue") || boxName.StartsWith("ReceiptHeading"))
+                if(boxName.StartsWith("ReceiptHeading"))Check(Align(box)=="Left","Receipt group labels read from the start of the table");
+                if(boxName.StartsWith("Heading") || boxName.StartsWith("MetricLabel") || boxName.StartsWith("MetricValue"))
                     Check(Align(box)=="Center","Table/group headings and summary labels/figures are centered");
                 if(System.Text.RegularExpressions.Regex.Match(boxName,@"^Value\d+_(\d+)$") is {Success:true} match)
                 {
                     var column=columns[int.Parse(match.Groups[1].Value)];
-                    if(column.Numeric || column.Caption.StartsWith("Receipt") || column.Caption.StartsWith("Adm.") || column.Caption.StartsWith("Oldest Due"))
+                    if(column.Numeric&&(layout is not null||ManagementReportPrintLayout.Applies(title)))Check(Align(box)=="Right","Financial register amounts align by their final digit");
+                    else if(column.Numeric || column.Caption.StartsWith("Receipt") || column.Caption.StartsWith("Adm.") || column.Caption.StartsWith("Oldest Due"))
                         Check(Align(box)=="Center","Amounts, counts, references and due dates have centered data");
                     if(column.Caption.StartsWith("Student"))Check(Align(box)=="Left","Student names remain readable and left aligned");
                 }
                 if(boxName.StartsWith("ReceiptTotal") && box.Descendants(ns+"Value").First().Value.StartsWith("=Format(Sum("))
-                    Check(Align(box)=="Center","Receipt subtotals and grand totals align with their centered amount columns");
+                    Check(Align(box)=="Right","Receipt subtotals and grand totals align with their amount columns");
             }
             Check(definition.Descendants(ns+"FontSize").Any(element=>element.Value=="9pt"),"Table text remains readable");
             Check(definition.Descendants(ns+"PageHeader").Any() && definition.Descendants(ns+"PageFooter").Any(),
@@ -151,7 +157,7 @@ internal static partial class Program
         }
         using var selectedReceipts=ReceiptExportReview(receipts,"Whole School").Rows;
         var receiptColumns=GridReportColumns.Create(selectedReceipts,"#,##0.##");
-        Check(receiptColumns.Count==9,"Receipt identity fields share cells instead of squeezing thirteen columns");
+        Check(receiptColumns.Count==8,"Receipt identity and class share a cell instead of squeezing thirteen columns");
         Check(receiptColumns.Single(c=>c.Caption=="Receipt / Date").Minimum>=1.3,"Receipt references and dates have a readable minimum width");
         using var outstanding=new DataTable();
         foreach(string name in new[]{"Adm. / QR No.","Student","Campus","Class / Section","Open Charges (Net)","Settled on Open Charges","Outstanding","Oldest Due Date","Aging"})

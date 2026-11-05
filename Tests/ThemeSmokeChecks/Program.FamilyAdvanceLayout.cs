@@ -62,6 +62,8 @@ internal static partial class Program
             string path=Path.Combine(folder,"multiple-families.pdf");GridReportPreview.ExportPdf(path,multipage);
             byte[] pdf=File.ReadAllBytes(path);using var parsed=UglyToad.PdfPig.PdfDocument.Open(pdf);
             var index=ReportPageSearchIndex.FromPdf(pdf);
+            int familyTotals=parsed.GetPages().Sum(page=>System.Text.RegularExpressions.Regex.Matches(page.Text,"Family total").Count);
+            Check(familyTotals==families.Count,"Each family total is printed once, including families continuing on another page");
             Check(parsed.NumberOfPages>2&&multipage.Data.Rows.Count==families.Sum(family=>family.Children.Length),"All children from many families and an oversized family are retained across multiple pages");
             foreach(var family in families)
             {

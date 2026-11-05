@@ -34,7 +34,7 @@ internal static partial class Program
             var columns=GridReportColumns.Create(projection,"#,##0.##");
             foreach(var (field,amount) in new[]{("Refunds",20m),("Corrections",30m)})
             {
-                int column=columns.FindIndex(item=>item.Fields.Length==1&&projection.Columns[item.Fields[0]].ColumnName==field);
+                int column=1+columns.FindIndex(item=>item.Fields.Length==1&&projection.Columns[item.Fields[0]].ColumnName==field); // Printed serial column precedes the selected data.
                 Check(printed.AsEnumerable().Any(row=>row.Field<string>("C"+column)==(-amount).ToString("#,##0.##")
                     &&row.Field<decimal>("N"+column)==-amount),
                     "The Export handler signs "+field+" consistently for detail rows and grouped subtotal inputs");
