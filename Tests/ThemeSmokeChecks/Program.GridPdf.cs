@@ -37,10 +37,15 @@ internal static partial class Program
             for(int row=0;row<source.Rows.Count;row++)
             {
                 if(layout is not null && layout[row].Kind!="Detail")continue;
-                for(int column=0;column<source.Columns.Count;column++)
+                foreach(var printColumn in columns)
                 {
-                    string value=GridReportColumns.Value(source.Rows[row],column,"#,##0.##");
-                    if(value.Length>0)Check(built.Data.Rows[printedRow].ItemArray.Any(cell=>Convert.ToString(cell)!.Contains(value)),"Printed data preserves each source value");
+                    // PDF presentation intentionally combines/reformats some raw fields
+                    // (for example a shared family parent and signed deductions).
+                    string value=GridReportColumns.DisplayValue(source.Rows[row],printColumn,"#,##0.##");
+                    if(value.Length>0)
+                        Check(built.Data.Rows[printedRow].ItemArray.Any(cell=>
+                            (Convert.ToString(cell)??"").Contains(value,StringComparison.Ordinal)),
+                            "Printed data preserves its intended compact representation");
                 }
                 printedRow++;
             }
