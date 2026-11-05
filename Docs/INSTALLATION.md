@@ -42,7 +42,7 @@ The installer checks `Migrations` for top-level `*.sql` files. An empty or missi
 
 1. Close FMSC_SMS and other sessions connected to its LocalDB instance.
 2. Double-click **FMSC.Setup.exe**. Approve the Windows administrator/UAC prompt. The existing **Install FMSC_SMS.bat** is a compatibility shortcut to the same GUI launcher.
-3. The FMSC setup dialog shows all eight installation stages, current verification activity, and completion or failure. The graphical executable runs the existing PowerShell installation engine with its console hidden. It checks app/process state, LocalDB, database-file presence, staging, version/migration compatibility, and preserves existing school data.
+3. The taller, OceanBlue-themed FMSC setup window shows all eight installation stages, current verification activity, and completion or failure. Its **Yes, open FMSC** and **No, close** buttons stay disabled until every installation and database check passes; choose Yes to open FMSC after verification or No to exit without launching it. The graphical executable runs the existing PowerShell installation engine with its console hidden. It checks app/process state, LocalDB, database-file presence, staging, version/migration compatibility, and preserves existing school data.
 4. **Never ignore a blocked or failed validation.** Record the exact message and installer logs and stop before retrying or adjusting data files.
 5. After successful installation, launch the application under the intended operator account; verify connection, login, schema compatibility, a read-only student search, a report preview, and permitted user actions.
 
@@ -52,7 +52,7 @@ If silent LocalDB installation fails (for example, MSI code 1603), the setup dia
 
 ## Updating an existing installation
 
-The in-app updater launches the verified **UpdateSupport/FMSC.Setup.exe** from its prepared release and displays the same branded eight-stage installation progress window after it closes FMSC safely. A completed update restarts the application through the desktop shell; a failed update shows an actionable error without hiding its rollback or log information. The GUI executable has separate fresh-install and update entry modes, but both use `core.ps1` for validation, SQL safeguards and recovery. The installer still supports a console-compatible non-GUI mode for unattended, explicitly isolated test execution.
+The in-app updater launches the verified **UpdateSupport/FMSC.Setup.exe** from its prepared release and displays the same OceanBlue-themed eight-stage installation window after it closes FMSC safely. On verified completion, its embedded **Yes, open FMSC** / **No, close** buttons become enabled; No leaves the updated app installed but closed until its normal desktop shortcut is opened. A completed update restarts the application through the desktop shell; a failed update shows an actionable error without hiding its rollback or log information. The GUI executable has separate fresh-install and update entry modes, but both use `core.ps1` for validation, SQL safeguards and recovery. The installer still supports a console-compatible non-GUI mode for unattended, explicitly isolated test execution.
 
 
 - Take and **verify** a recoverable backup first and note its storage path.
