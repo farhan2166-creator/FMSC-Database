@@ -8,7 +8,7 @@ internal static partial class Program
     private static void CheckDirectPdfReview()
     {
         string folder=Path.GetFullPath("artifacts/direct-pdf-review");Directory.CreateDirectory(folder);
-        string finalPath=Path.Combine(folder,"REVIEW-ALL.pdf"),pendingPath=Path.Combine(folder,"REVIEW-ALL.pending.pdf");
+        string finalPath=Path.Combine(folder,"FMSC-Dashboard-Reports-Review.pdf"),pendingPath=Path.Combine(folder,"FMSC-Dashboard-Reports-Review.pending.pdf");
         // A failed rerun must not advertise the previous successful review file.
         File.Delete(finalPath);
         CheckActualPdfExportContext();
@@ -16,13 +16,18 @@ internal static partial class Program
         CheckReportStudentIdentity();
         CheckCollectionReceiptPresentation();
         CheckDashboardReportScenarios();
+        CheckAdditionalDashboardReportScenarios();
         CheckReportCaptions(new[]{"ClassSectionSummary","ClassOutstandingCharges","ClassMarksSheet","ClassAttendanceSheet","ClassMonthlyAttendanceSheet"});
         var samples=new (string Title,string Path)[] {
             ("Collections & Receipts — Whole School","grid-pdf/collections-receipts-export.pdf"),
             ("Collections & Receipts — By Campus","grid-pdf/collections-by-campus-export.pdf"),
             ("Family Receipts — Names, Classes and Payment Methods","collection-receipt-presentation/family-receipts.pdf"),
+            ("Receipts — Individual Student","dashboard-report-scenarios/receipts-individual-one.pdf"),
             ("Receipts — Family with 3 Children","dashboard-report-scenarios/receipts-family-three.pdf"),
             ("Receipts — Family with 10 Children","dashboard-report-scenarios/receipts-family-ten.pdf"),
+            ("Receipts — Grouped by Campus","dashboard-report-scenarios/receipts-by-campus.pdf"),
+            ("Receipts — Grouped by Class","dashboard-report-scenarios/receipts-by-class.pdf"),
+            ("Receipts — Grouped by Section","dashboard-report-scenarios/receipts-by-section.pdf"),
             ("Receipts — Mixed 60-Entry Multipage","dashboard-report-scenarios/receipts-mixed-multipage.pdf"),
             ("Advance Balance — 22 Families Multipage","dashboard-report-scenarios/advance-families-multipage.pdf"),
             ("Outstanding & Aging — 75 Students Multipage","dashboard-report-scenarios/outstanding-students-multipage.pdf"),
@@ -40,7 +45,21 @@ internal static partial class Program
             ("Student Changes","report-student-identity/student-changes.pdf"),
             ("Certificate Issue Register","report-student-identity/certificate-register.pdf"),
             ("Wide Layout Check — Multipage","grid-pdf/wide-multipage-export.pdf"),
-            ("Empty Result Layout","grid-pdf/empty-report-export.pdf")
+            ("Empty Result Layout","grid-pdf/empty-report-export.pdf"),
+            ("Student Admissions — 64 Records","dashboard-report-coverage/student-admissions-multipage.pdf"),
+            ("Student Strength — By Class","dashboard-report-coverage/student-strength-by-class.pdf"),
+            ("Student Changes — 58 Records","dashboard-report-coverage/student-changes-multipage.pdf"),
+            ("Collections — Detailed Transactions","dashboard-report-coverage/collections-detailed-transactions.pdf"),
+            ("Collections — Payment Method Summary","dashboard-report-coverage/collections-payment-method-summary.pdf"),
+            ("Outstanding — 76 Charge Rows","dashboard-report-coverage/outstanding-charges-multipage.pdf"),
+            ("Outstanding — Aging Buckets","dashboard-report-coverage/outstanding-aging-bands.pdf"),
+            ("Outstanding — Family Balances","dashboard-report-coverage/outstanding-families-multipage.pdf"),
+            ("Billing — Monthly Summary","dashboard-report-coverage/billing-summary-multipage.pdf"),
+            ("Billing — Discount Detail","dashboard-report-coverage/billing-discount-detail.pdf"),
+            ("Billing — Concession Assignments","dashboard-report-coverage/billing-concession-assignments.pdf"),
+            ("Billing — Concession Summary","dashboard-report-coverage/billing-concession-summary.pdf"),
+            ("Advance Balances — Individual Students","dashboard-report-coverage/advance-students-multipage.pdf"),
+            ("Monthly Reconciliation — Campus and Fee Type","dashboard-report-coverage/monthly-reconciliation-by-campus.pdf")
         };
         string commit=Environment.GetEnvironmentVariable("GITHUB_SHA")??"Local build";
         var expected=new List<(double Width,double Height,string Text)>();
@@ -49,7 +68,7 @@ internal static partial class Program
         {
             using(var combined=new PdfDocument())
             {
-                combined.Info.Title="Management Report PDF Export Review";
+                combined.Info.Title="FMSC Dashboard Reports — PDF and Print Review";
                 combined.Info.Subject=$"Fictional fixtures; production Windows PDF exports. Source commit: {commit}";
                 foreach(var sample in samples)
                 {
@@ -87,7 +106,7 @@ internal static partial class Program
                 WorkflowRun=Environment.GetEnvironmentVariable("GITHUB_RUN_ID"),
                 Sha256=Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(finalPath))),Samples=provenance
             },new JsonSerializerOptions{WriteIndented=true}));
-            Console.WriteLine($"::notice title=Direct PDF export review::{samples.Length} scenarios, {expected.Count} pages in REVIEW-ALL.pdf.");
+            Console.WriteLine($"::notice title=Dashboard report review::{samples.Length} scenarios, {expected.Count} pages in FMSC-Dashboard-Reports-Review.pdf.");
         }
         finally { File.Delete(pendingPath); }
     }
