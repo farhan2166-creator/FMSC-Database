@@ -197,6 +197,12 @@ function Start-FmscAfterInstallation {
     $choice = Read-Host '  Start FMSC SMS now? (Y/N)'
     if ($choice -match '^[Yy]$') { Start-Process -FilePath $Application }
 }
+function Release-FmscInstallerLock {
+    if ($script:InstallerLockHeld) {
+        $script:InstallerMutex.ReleaseMutex()
+        $script:InstallerLockHeld = $false
+    }
+}
 function Write-Log {
     param(
         [string]$Message
@@ -1252,6 +1258,7 @@ try {
         Confirm-FmscRecoveryBackup -CurrentSchema (Convert-ToDbVersion (Get-DatabaseVersion))
         Complete-VerifiedApplicationUpdate -ApplicationDirectory $AppDir -Source $AppDir -Prepared (Join-Path $script:RecoveryRoot 'verification')
         Remove-FmscCompletedSnapshot
+        Release-FmscInstallerLock
         Start-FmscAfterInstallation -Application (Join-Path $AppDir 'FMSC_SMS.exe')
         return
     }
@@ -1841,6 +1848,7 @@ try {
     Write-Host `
         '  ------------------------------------------------------------' `
         -ForegroundColor $ColorDim
+    Release-FmscInstallerLock
     Start-FmscAfterInstallation -Application $InstalledExe
     Write-Host ''
     Write-Host `

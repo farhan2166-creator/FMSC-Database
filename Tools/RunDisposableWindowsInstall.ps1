@@ -406,6 +406,14 @@ VALUES(1,N'Fictional Level 3 Install School',SYSUTCDATETIME(),SYSUTCDATETIME(),@
             }
         } finally { $archive.Dispose() }
         $checks.Add('L3 ZIP | All required non-database assets present and readable; no MDF/LDF/NDF/BAK files; ZIP remains private and is deleted')
+        Stage 'Actual prepared updater interrupted between activation renames and resumed by its stable launcher'
+        Assert-Level3Database
+        & (Join-Path $project 'Tools/TestPreparedUpdateRecovery.ps1') -SourceApplication $app
+        Assert-Level3Database
+        if ((Install-Snapshot) -ne $before -or (Get-FileHash -LiteralPath $themeFile).Hash -ne $themeHash) {
+            throw 'Actual prepared recovery changed fictional school records, database identity or user settings.'
+        }
+        $checks.Add('Actual prepared installer and stable launcher | Forced activation interruption resumed with unchanged fictional school data/GUID/theme; verified cleanup and inert restart observation')
     }
     $status='PASS'
     Write-Host 'PASS: Disposable real Windows installer and synthetic LocalDB acceptance.'

@@ -36,6 +36,8 @@ $endpoint = [regex]::Match(($info -join "`n"), '(?:np:)?(' + [regex]::Escape('\\
 if (-not $endpoint.Success) { throw 'Cannot resolve the disposable runner LocalDB endpoint.' }
 $SqlInstance = 'np:' + $endpoint.Groups[1].Value
 $DatabaseDir = $root; $ReleaseRoot = $root
+$AppVersion = '1.0.0'
+$ColorDim = 'DarkGray'; $ColorInfo = 'White'; $ColorSuccess = 'Green'
 $script:RecoveryRoot = Join-Path $root 'protected'
 $null = New-Item -ItemType Directory -Path $root -Force
 $script:SqlCmdPath = Resolve-SqlCmd
