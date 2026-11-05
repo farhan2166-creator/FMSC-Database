@@ -40,10 +40,10 @@ The installer checks `Migrations` for top-level `*.sql` files. An empty or missi
 ## Run the installer
 
 1. Close FMSC_SMS and other sessions connected to its LocalDB instance.
-2. Right-click **Install FMSC_SMS.bat** and choose **Run as administrator**.
-3. Follow `Installer/core.ps1` prompts. It checks app/process state, LocalDB, database-file presence, staging, version/migration compatibility, and attempts to preserve an existing database.
-4. **Never ignore a blocked or failed validation.** Record the exact message and installer logs and stop before retrying or adjusting data files.
-5. After successful installation, launch the application under the intended operator account; verify connection, login, schema compatibility, a read-only student search, a report preview, and permitted user actions.
+2. Launch **FMSC.Setup.exe** from the extracted full-installer folder and approve the Windows administrator prompt. The existing **Install FMSC_SMS.bat** also opens this graphical launcher, but can briefly display its command window. For unattended acceptance on a disposable machine, invoke `core.ps1` directly as before.
+3. Follow the **FMSC Setup** window. It displays the current stage and status without exposing a PowerShell console. It still checks app/process state, LocalDB, database-file presence, staging, version/migration compatibility, and preserves the existing database. If Microsoft's LocalDB installer requires its official wizard, the graphical setup asks before launching it; declining stops safely.
+4. **Never ignore a blocked or failed validation.** The graphical error dialog shows the reason and installation log path. Stop before retrying or adjusting data files.
+5. After verified installation, the setup window asks whether to start FMSC. Launch the application under the intended operator account; verify connection, login, schema compatibility, a read-only student search, a report preview, and permitted user actions.
 
 The app expects `FMSC_DB` under `C:\ProgramData\FMSC_Database` and uses `(localdb)\MSSQLLocalDB` by default. Current required **database schema version: 1** (first-production baseline, 5 November 2026); application version is **1.0.0**. See [first-release baseline](FIRST_RELEASE_BASELINE.md). Future app-only releases can change the application version without changing the database schema.
 
