@@ -168,7 +168,12 @@
 		<ItemGroup>
 			<MigrationFiles Include="$(DeploymentMigrationDirectory)\*.sql" />
 			<MigrationApplierFiles Include="$(MSBuildProjectDirectory)\Migrations\Apply-Migrations.ps1;$(MSBuildProjectDirectory)\Migrations\Apply-Migrations.bat;$(MSBuildProjectDirectory)\Migrations\README.md" />
+			<RetiredReleaseMigrationFiles Include="$(ReleaseRoot)Migrations\*.sql" Exclude="@(MigrationFiles->'$(ReleaseRoot)Migrations\%(Filename)%(Extension)')" />
+			<CurrentUpdateMigrationFiles Include="$(MSBuildProjectDirectory)\Migrations\*.sql" />
+			<RetiredUpdateMigrationFiles Include="$(PublishDir)UpdateSupport\Migrations\*.sql" Exclude="@(CurrentUpdateMigrationFiles->'$(PublishDir)UpdateSupport\Migrations\%(Filename)%(Extension)')" />
 		</ItemGroup>
+		<!-- Reusing a local publish directory must not ship retired development SQL. -->
+		<Delete Files="@(RetiredReleaseMigrationFiles);@(RetiredUpdateMigrationFiles)" />
 		<Copy SourceFiles="@(MigrationFiles)" DestinationFiles="@(MigrationFiles->'$(ReleaseRoot)Migrations\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="@(MigrationApplierFiles)" DestinationFolder="$(ReleaseRoot)Migrations" SkipUnchangedFiles="true" />
 		<Copy SourceFiles="$(MSBuildProjectDirectory)\Installer\core.ps1" DestinationFiles="$(ReleaseRoot)core.ps1" SkipUnchangedFiles="true" />

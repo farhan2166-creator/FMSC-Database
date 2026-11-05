@@ -22,6 +22,13 @@ try {
     $env:PSModulePath = Join-Path $PSHOME 'Modules'
     $release = Join-Path $scratch 'release output'
     $application = Join-Path $release 'FMSC_SMS'
+    # Reuse an old output directory deliberately. Retired SQL must disappear
+    # from both installer and application support without deleting other files.
+    foreach ($folder in @((Join-Path $release 'Migrations'), (Join-Path $application 'UpdateSupport/Migrations'))) {
+        New-Item -ItemType Directory -Path $folder -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $folder '999999.sql') -Value '-- retired output fixture'
+        Set-Content -LiteralPath (Join-Path $folder 'retained.txt') -Value 'preserve unrelated output'
+    }
     $output = & dotnet publish (Join-Path $ProjectDirectory 'FMSC_SMS.csproj') `
         -c Release -r win-x64 --self-contained true -p:PublishProfile=PortableRelease `
         "-p:PublishDir=$application/" "-p:ReleaseRoot=$release/" `
@@ -67,6 +74,9 @@ try {
     $updateMigrations = Join-Path $application 'UpdateSupport/Migrations'
     $updateSql = if (Test-Path -LiteralPath $updateMigrations) { @(Get-ChildItem -LiteralPath $updateMigrations -Filter '*.sql' -File) } else { @() }
     if ($sourceSql.Count -ne $updateSql.Count) { throw 'Update support migration inventory differs from source.' }
+    foreach ($folder in @((Join-Path $release 'Migrations'), $updateMigrations)) {
+        if (-not (Test-Path -LiteralPath (Join-Path $folder 'retained.txt'))) { throw 'Migration cleanup removed an unrelated file.' }
+    }
     foreach ($file in $sourceSql) {
         if ((Get-FileHash -LiteralPath $file.FullName).Hash -ne
             (Get-FileHash -LiteralPath (Join-Path $application ('UpdateSupport/Migrations/' + $file.Name))).Hash) {
