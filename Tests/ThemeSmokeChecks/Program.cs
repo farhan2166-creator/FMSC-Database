@@ -42,6 +42,12 @@ internal static partial class Program
         {
             CheckFamilyAdvanceLayout();Console.WriteLine($"PASS: {checks} compact family form, grouped printing and multi-page row-preservation checks (no database connection).");return;
         }
+        if (args.Contains("--dialog-size-tiers"))
+        {
+            CheckDialogSizeTiers();
+            Console.WriteLine($"PASS: {checks} related dialog size and minimum-content checks.");
+            return;
+        }
         if (args.Contains("--startup-dialog-size"))
         {
             CheckStartupDialogSize();
