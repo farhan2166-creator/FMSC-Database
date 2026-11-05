@@ -3095,7 +3095,7 @@ public sealed partial class FeeCollectionPage : V2Page, IBusyPage, IUnsavedChang
             ?"Advance cannot be used for a backdated collection. Select today's date to apply advance."
             :counterIds is null&&credit>0m&&SettlementRows().Any(row=>
                 GetInt(row.Cells["AdmissionId"].Value)!=admissionId&&GetRowNetDue(row,discountMap)>0m)
-                ?"Advance applies only to the main student's fees. Transfer in Advance Balance to pay a sibling.":"";
+                ?"Main student only; transfer advance for siblings.":"";
         advanceScopeHint.Visible=advanceScopeHint.Text.Length>0;
         if (creditSummary is not null && remainingCreditSummary is not null)
         {
