@@ -234,7 +234,7 @@ function Open-UpdateWindow {
     $script:UpdateYes.BackColor = [Drawing.Color]::FromArgb(37,99,235)
     $script:UpdateYes.ForeColor = [Drawing.Color]::White
     $script:UpdateYes.Font = New-Object Drawing.Font('Segoe UI',9,[Drawing.FontStyle]::Bold)
-    $script:UpdateYes.Cursor = 'Hand'
+    $script:UpdateYes.Cursor = [Windows.Forms.Cursors]::Hand
     $script:UpdateYes.Enabled = $false
     $script:UpdateNo = New-Object Windows.Forms.Button
     $script:UpdateNo.SetBounds(503,378,118,36)
@@ -245,7 +245,7 @@ function Open-UpdateWindow {
     $script:UpdateNo.BackColor = [Drawing.Color]::FromArgb(250,251,253)
     $script:UpdateNo.ForeColor = [Drawing.Color]::FromArgb(31,41,55)
     $script:UpdateNo.Font = New-Object Drawing.Font('Segoe UI',9)
-    $script:UpdateNo.Cursor = 'Hand'
+    $script:UpdateNo.Cursor = [Windows.Forms.Cursors]::Hand
     $script:UpdateNo.Enabled = $false
     $script:UpdateDecision = $null
     $script:UpdateYes.Add_Click({ $script:UpdateDecision = 'Yes' })
