@@ -42,6 +42,12 @@ internal static partial class Program
         {
             CheckFamilyAdvanceLayout();Console.WriteLine($"PASS: {checks} compact family form, grouped printing and multi-page row-preservation checks (no database connection).");return;
         }
+        if (args.Contains("--startup-dialog-size"))
+        {
+            CheckStartupDialogSize();
+            Console.WriteLine($"PASS: {checks} login-standard startup and update window sizing checks.");
+            return;
+        }
         if (args.Contains("--update-dialog"))
         {
             CheckUpdateDialog(); Console.WriteLine($"PASS: {checks} modeless update dialog, cancellation and single-installer checks."); return;

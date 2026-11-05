@@ -62,6 +62,12 @@ namespace FMSC_SMS.Core
         public static int SidebarAvatarSize => AppScale.Scale(38);
         public static int SidebarToggleSize => AppScale.Scale(32);
         public const int SeparatorHeight = 1;
+        // Startup-window geometry follows the user login dialog. The installer
+        // (Installer/core.ps1) uses the same logical 760 x 500 baseline.
+        public const int StartupDialogWidth = 760;
+        public const int StartupDialogHeight = 500;
+        public static Size StartupDialogClientSize => new(
+            AppScale.Scale(StartupDialogWidth), AppScale.Scale(StartupDialogHeight));
         // Authentication
         public const int AuthenticationTitleRowHeight = 70;
         public const int PasswordFieldRowHeight = 70;

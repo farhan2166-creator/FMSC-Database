@@ -53,7 +53,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = MinimizeBox = ShowInTaskbar = false;
         AutoScaleMode = AutoScaleMode.None;
-        ClientSize = new Size(AppScale.S(780), AppScale.S(580));
+        ClientSize = AppMetrics.StartupDialogClientSize;
         Font = AppTheme.NormalFont;
         BackColor = AppTheme.PageBackground;
         var content = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 8,
@@ -196,7 +196,10 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
 
     private void SetContentSize(bool expanded)
     {
-        ClientSize = new Size(AppScale.S(780), AppScale.S((expanded ? 580 : 405) + (_showTransferStats ? 65 : 0)));
+        // Match login at rest; grow only for computer authorization or transfer details.
+        ClientSize = new Size(AppMetrics.StartupDialogClientSize.Width,
+            Math.Max(AppMetrics.StartupDialogClientSize.Height,
+                AppScale.S((expanded ? 580 : 405) + (_showTransferStats ? 65 : 0))));
         CenterOnOwnerScreen();
     }
 

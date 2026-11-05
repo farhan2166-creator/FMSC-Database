@@ -16,7 +16,7 @@ public sealed class LoginForm : ApplicationWindowForm
         FormClosing += (_, e) => { if (signingIn) e.Cancel = true; };
         Text = "FMSC - Sign In";
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(AppScale.Scale(760), AppScale.Scale(500));
+        ClientSize = AppMetrics.StartupDialogClientSize;
         MinimumSize = new Size(AppScale.Scale(680), AppScale.Scale(460));
         BackColor = AppTheme.PageBackground;
         Font = AppTheme.NormalFont;
