@@ -46,6 +46,11 @@ jobs:
         timeout-minutes: 45
         run: .\Tools\RunDisposableWindowsInstall.ps1 -ProjectDirectory . -Level3
 
+      - name: Restore pinned SQL test tooling for focused acceptance
+        if: ${{ inputs.test_scope == 'sql' }}
+        shell: pwsh
+        run: dotnet tool restore --tool-manifest Tests/LifecycleSqlChecks/.config/dotnet-tools.json
+
       - name: Exercise automatic billing, concessions, credit and lifecycle cutoff cases
         shell: pwsh
         timeout-minutes: 10
