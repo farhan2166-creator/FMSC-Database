@@ -48,9 +48,3 @@ internal static class UpdateGitReader
         }
     }
 }
-
-internal sealed class UpdateGitCommandException : Exception
-{
-    internal string Reason { get; }
-    internal UpdateGitCommandException(string reason) : base(reason) => Reason = reason;
-}

@@ -105,9 +105,14 @@ internal static class UpdatePreparationTests
             File.WriteAllBytes(brokenDelta, RandomNumberGenerator.GetBytes(
                 (int)packaged.Incremental.Parts[0].Length));
             string staging3 = Path.Combine(root, "staged-corrupt-delta");
+            var fallbackProgress = new List<UpdateDownloadProgress>();
             PreparedUpdate recovered = UpdateReleasePreparer.PrepareAsync(verified, source,
-                UpdateDownloadChoice.Incremental, oldApp, staging3, CancellationToken.None)
+                UpdateDownloadChoice.Incremental, oldApp, staging3, CancellationToken.None,
+                new UpdateInlineProgress<UpdateDownloadProgress>(state => fallbackProgress.Add(state)))
                 .GetAwaiter().GetResult();
+            Require(fallbackProgress.Last().Method == UpdateDownloadChoice.Full &&
+                fallbackProgress.Last().TotalBytes == packaged.Full.Length,
+                "Fallback progress must use the full package size and method.");
             Require(recovered.UsedFullFallback &&
                 File.ReadAllText(Path.Combine(recovered.StageDirectory, "main.dll")) == "after",
                 "Corrupt delta must not be used; valid full fallback is required.");
@@ -174,7 +179,7 @@ internal sealed class FolderUpdateSource : IUpdateArtifactSource
     }
 
     public Task FetchPartAsync(string relativePath, string destinationFile, long expectedBytes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IProgress<long>? progress = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         string path = Resolve(relativePath);

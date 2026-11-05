@@ -870,7 +870,65 @@ function Enable-StagedApplication {
     Write-Log `
         "Application activated: $AppDir"
 }
-# Keep MSI recovery independent of database updates so it can be tested with mocked msiexec.
+# Remove only application/update artifacts after successful activation.
+function Remove-VerifiedUpdateDirectory {
+    param([string]$Path, [string]$ExpectedPath)
+    $full = [IO.Path]::GetFullPath($Path).TrimEnd('\')
+    $expected = [IO.Path]::GetFullPath($ExpectedPath).TrimEnd('\')
+    if ($full -ine $expected -or $full -eq [IO.Path]::GetPathRoot($full).TrimEnd('\')) {
+        throw 'Refusing cleanup outside the expected update directory.'
+    }
+    if (-not (Test-Path -LiteralPath $full)) { return }
+    $ancestor = Get-Item -LiteralPath $full -Force
+    while ($null -ne $ancestor) {
+        if ($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Refusing cleanup through a link.' }
+        $ancestor = $ancestor.Parent
+    }
+    foreach ($entry in Get-ChildItem -LiteralPath $full -Recurse -Force -ErrorAction Stop) {
+        if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Refusing cleanup of a directory containing links.' }
+    }
+    Remove-Item -LiteralPath $full -Recurse -Force -ErrorAction Stop
+}
+function Complete-VerifiedApplicationUpdate {
+    param([string]$ApplicationDirectory, [string]$Source, [string]$Prepared = '')
+    # Verification failures keep rollback and downloads for recovery.
+    $null = Test-StagedApplication -Source $Source -Staging $ApplicationDirectory
+    if ($Prepared) {
+        Test-PreparedUpdate -Root $Prepared -Version $AppVersion -Schema ([int]$DatabaseVersion) -Application $ApplicationDirectory
+    }
+    $result = Invoke-InstallationDatabaseCheck -Application (Join-Path $ApplicationDirectory 'FMSC_SMS.exe')
+    if ($result -notin @(0,10)) { throw "Activated application verification failed (code $result). Recovery files have been kept." }
+    $rollback = "$ApplicationDirectory.rollback"
+    try {
+        Remove-VerifiedUpdateDirectory -Path $rollback -ExpectedPath $rollback
+        Write-Log 'Activated application verified; previous application copy removed.'
+    } catch { Write-WarningMessage "Update succeeded; previous application cleanup is pending: $($_.Exception.Message)" }
+    if (-not $Prepared) { return }
+    try {
+        $preparedPath = [IO.Path]::GetFullPath($Prepared).TrimEnd('\')
+        $state = Split-Path -Parent $preparedPath
+        if ((Split-Path -Leaf $preparedPath) -notmatch '^prepared-[a-f0-9]{32}$' -or
+            (Split-Path -Leaf $state) -ine 'Updates' -or
+            (Split-Path -Leaf (Split-Path -Parent $state)) -ine 'FMSC') {
+            throw 'Prepared directory is outside the standard updater storage layout.'
+        }
+        $cache = Join-Path $state 'download-cache'
+        if (Test-Path -LiteralPath $cache) {
+            $ancestor = Get-Item -LiteralPath $cache -Force
+            while ($null -ne $ancestor) {
+                if ($ancestor.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Linked cache directory refused.' }
+                $ancestor = $ancestor.Parent
+            }
+            foreach ($entry in Get-ChildItem -LiteralPath $cache -Directory -Force) {
+                if ($entry.Name -match '^[a-f0-9]{64}$') {
+                    Remove-VerifiedUpdateDirectory -Path $entry.FullName -ExpectedPath (Join-Path $cache $entry.Name)
+                }
+            }
+        }
+        Remove-VerifiedUpdateDirectory -Path $preparedPath -ExpectedPath (Join-Path $state (Split-Path -Leaf $preparedPath))
+        Write-Log 'Successful update staging files and downloaded chunks removed.'
+    } catch { Write-WarningMessage "Update succeeded; downloaded-file cleanup is pending: $($_.Exception.Message)" }
+}
 function Invoke-InstallationDatabaseCheck {
     param([string]$Application)
     $arguments = @('--verify-installation', ('"' + $SqlInstance + '"'), ('"' + $DatabaseName + '"'))
@@ -1555,21 +1613,6 @@ try {
         '  The application has been activated.' `
         -ForegroundColor $ColorInfo
     Write-Host ''
-    # The previous application is kept, not deleted.
-    if (Test-Path -LiteralPath $AppRollbackDir) {
-        Write-Host `
-            '  The previous application version is kept at:' `
-            -ForegroundColor $ColorDim
-        Write-Host `
-            "    $AppRollbackDir" `
-            -ForegroundColor $ColorDim
-        Write-Host `
-            '  It can be deleted once FMSC SMS has been used successfully.' `
-            -ForegroundColor $ColorDim
-        Write-Host ''
-        Write-Log `
-            "Previous application retained for rollback: $AppRollbackDir"
-    }
     Pause-Long
     Write-Step `
         'Creating desktop shortcut...'
@@ -1603,6 +1646,7 @@ try {
             "Could not create desktop shortcut: $($_.Exception.Message)"
     }
     Pause-Long
+    Complete-VerifiedApplicationUpdate -ApplicationDirectory $AppDir -Source $AppSource -Prepared $PreparedRoot
     Write-Section `
         'STEP 8 OF 8  -  INSTALLATION COMPLETE'
     Write-Host ''

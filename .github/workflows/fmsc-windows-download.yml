@@ -78,6 +78,7 @@ jobs:
           }
           & .\Tools\TestPreparedUpdate.ps1
           & .\Tools\TestInstallerMigrations.ps1
+          & .\Tools\TestUpdateCleanup.ps1
           & .\Tools\TestPublishPrivateUpdate.ps1
 
       # The ordinary PortableRelease publish remains subject to its installer/MSI

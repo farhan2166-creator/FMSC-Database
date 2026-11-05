@@ -59,6 +59,41 @@ internal static partial class Program
         using (var dialog = new UpdateConnectionForm(() => (true, "ssh-rsa fixture")))
         {
             parent.Show(); dialog.Show(parent); Application.DoEvents();
+            var transfer = new UpdateDownloadProgress(UpdateDownloadPhase.Downloading, 10 * 1048576, 20 * 1048576,
+                2 * 1048576, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5), 2, 3, 1, 0, "Downloading part 2 of 3");
+            dialog.ApplyDownloadProgress(transfer); Application.DoEvents();
+            var bar = (ProgressBar)typeof(UpdateConnectionForm).GetField("_progress", fields)!.GetValue(dialog)!;
+            var stats = (Label)typeof(UpdateConnectionForm).GetField("_transferStats", fields)!.GetValue(dialog)!;
+            Check(bar.Visible && bar.Style == ProgressBarStyle.Continuous && bar.Value == 50,
+                "Download progress is a real determinate bar");
+            Check(stats.Text.Contains("10.00 MB / 20.00 MB") && stats.Text.Contains("10.00 MB remaining") &&
+                stats.Text.Contains("2.00 MB/s") && stats.Text.Contains("00:05"), "Download amount, remaining bytes, speed, elapsed and ETA are visible");
+            Check(stats.GetPreferredSize(new Size(stats.Width, int.MaxValue)).Height <= stats.Height,
+                "Download statistics fit without clipping");
+            Find(dialog, "Check for Updates").Enabled = false;
+            // Let the native progress control finish its short visual transition
+            // before saving the review image (the Value contract is checked above).
+            var paintUntil = Environment.TickCount64 + 650;
+            while (Environment.TickCount64 < paintUntil) { Application.DoEvents(); Thread.Sleep(10); }
+            string output = Path.Combine(Environment.CurrentDirectory, "artifacts", "update-dialog-review");
+            Directory.CreateDirectory(output);
+            using (var bitmap = new Bitmap(dialog.Width, dialog.Height))
+            { dialog.DrawToBitmap(bitmap, new Rectangle(Point.Empty, dialog.Size)); bitmap.Save(Path.Combine(output, "downloading.png")); }
+            dialog.ApplyDownloadProgress(transfer with { Phase = UpdateDownloadPhase.Retrying, ReceivedBytes = 8 * 1048576,
+                BytesPerSecond = 0, TimeRemaining = null, Attempt = 3, Message = "Connection lost. Retrying in 4s (attempt 3/5)…" });
+            Check(bar.Value == 40 && stats.Text.Contains("Speed: —") && stats.Text.Contains("Time left: —"),
+                "Reconnect state shows only committed progress and no stale speed/ETA");
+            dialog.ApplyDownloadProgress(transfer with { Phase = UpdateDownloadPhase.Ready, ReceivedBytes = 20 * 1048576,
+                TimeRemaining = null, Message = "Download verified and prepared." });
+            Check(bar.Value == 100 && !Find(dialog, "Install Update").Enabled,
+                "A complete progress bar alone cannot bypass the validated installer handoff");
+            Find(dialog, "Close").PerformClick(); Application.DoEvents();
+            Check(dialog.IsDisposed, "A progress window remains dismissible");
+        }
+        using (var parent = new Form())
+        using (var dialog = new UpdateConnectionForm(() => (true, "ssh-rsa fixture")))
+        {
+            parent.Show(); dialog.Show(parent); Application.DoEvents();
             typeof(UpdateConnectionForm).GetField("_prepared", fields)!.SetValue(dialog, prepared);
             var install = Find(dialog, "Install Update"); install.Visible = install.Enabled = true;
             int requests = 0;

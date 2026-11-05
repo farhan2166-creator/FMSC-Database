@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Diagnostics;
 using FMSC_SMS.Core;
 
 namespace FMSC_SMS.Core.Updates;
@@ -27,6 +28,12 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
     private readonly Label _accessStatus;
     private readonly Panel _authorizationPanel;
     private readonly ProgressBar _progress;
+    private readonly Label _transferStats;
+    private readonly System.Windows.Forms.Timer _transferTimer = new() { Interval = 500 };
+    private readonly Stopwatch _downloadWatch = new();
+    private UpdateDownloadProgress? _lastTransfer;
+    private bool _showTransferStats;
+    private int _downloadGeneration;
     private readonly Func<(bool Enrolled, string PublicKey)> _authorization;
     private bool _hasAuthorization;
     private PreparedUpdate? _prepared;
@@ -49,10 +56,10 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         ClientSize = new Size(AppScale.S(780), AppScale.S(580));
         Font = AppTheme.NormalFont;
         BackColor = AppTheme.PageBackground;
-        var content = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 7,
+        var content = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 8,
             Padding = new Padding(AppScale.S(20)), BackColor = AppTheme.PageBackground };
         content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        for (int row = 0; row < 7; row++)
+        for (int row = 0; row < 8; row++)
             content.RowStyles.Add(new RowStyle(row == 4 ? SizeType.Percent : SizeType.AutoSize, row == 4 ? 100 : 0));
         var heading = new Label { Text = "Check for Updates", Font = AppTheme.HeadingFont,
             AutoSize = true, Dock = DockStyle.Top, TextAlign = ContentAlignment.MiddleCenter,
@@ -100,13 +107,15 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         _authorizationPanel.Controls.Add(enrollment);
         accessButton.Click += (_, _) => {
             _authorizationPanel.Visible = !_authorizationPanel.Visible;
-            ClientSize = new Size(AppScale.S(780), AppScale.S(_authorizationPanel.Visible ? 580 : 405));
-            CenterOnOwnerScreen();
+            SetContentSize(_authorizationPanel.Visible);
         };
         _status = new Label { AutoSize = false, Dock = DockStyle.Fill, ForeColor = AppTheme.Text,
             Margin = new Padding(0, 12, 0, 8), TextAlign = ContentAlignment.MiddleCenter };
-        _progress = new ProgressBar { Dock = DockStyle.Top, Height = AppScale.S(6), Style = ProgressBarStyle.Marquee,
+        _progress = new ProgressBar { Dock = DockStyle.Top, Height = AppScale.S(14), Style = ProgressBarStyle.Marquee,
             Visible = false, Margin = new Padding(0, 0, 0, 12) };
+        _transferStats = new Label { Dock = DockStyle.Top, Height = AppScale.S(48), TextAlign = ContentAlignment.MiddleCenter,
+            ForeColor = AppTheme.MutedText, Visible = false, Margin = new Padding(0, 0, 0, AppScale.S(8)) };
+        _transferTimer.Tick += (_, _) => RenderTransferStats();
         _check = Button("Check for Updates", 175, "Primary");
         _download = Button("Download Update", 170, "Primary"); _download.Enabled = false;
         _install = Button("Install Update", 150, "Primary"); _install.Enabled = false;
@@ -147,10 +156,12 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         actions.Controls.Add(dismissRow, 0, 1);
         content.Controls.Add(heading, 0, 0); content.Controls.Add(summary, 0, 1);
         content.Controls.Add(CenteredRow(access), 0, 2); content.Controls.Add(_authorizationPanel, 0, 3);
-        content.Controls.Add(_status, 0, 4); content.Controls.Add(_progress, 0, 5); content.Controls.Add(actions, 0, 6);
+        content.Controls.Add(_status, 0, 4); content.Controls.Add(_progress, 0, 5);
+        content.Controls.Add(_transferStats, 0, 6); content.Controls.Add(actions, 0, 7);
         Controls.Add(content);
         AcceptButton = _check; CancelButton = close;
-        FormClosing += (_, _) => _lifetime.Cancel();
+        FormClosed += (_, _) => { _transferTimer.Stop(); _lifetime.Cancel(); };
+        Disposed += (_, _) => { _lifetime.Cancel(); _transferTimer.Dispose(); };
         RefreshAuthorization();
     }
 
@@ -182,6 +193,44 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         Location = new Point(area.Left + Math.Max(0, (area.Width - Width) / 2),
             area.Top + Math.Max(0, (area.Height - Height) / 2));
     }
+
+    private void SetContentSize(bool expanded)
+    {
+        ClientSize = new Size(AppScale.S(780), AppScale.S((expanded ? 580 : 405) + (_showTransferStats ? 65 : 0)));
+        CenterOnOwnerScreen();
+    }
+
+    internal void ApplyDownloadProgress(UpdateDownloadProgress state)
+    {
+        if (IsDisposed || Disposing) return;
+        _lastTransfer = state;
+        bool resize = !_showTransferStats;
+        _showTransferStats = _transferStats.Visible = true;
+        if (resize) SetContentSize(_authorizationPanel.Visible);
+        _progress.Visible = true;
+        _progress.Style = ProgressBarStyle.Continuous;
+        _progress.Value = state.Percent;
+        _status.Text = state.Message;
+        _downloadDetails.Text = state.Method + " · " + SizeText(state.TotalBytes) +
+            (state.ReusedBytes > 0 ? " · " + SizeText(state.ReusedBytes) + " reused" : "");
+        RenderTransferStats();
+    }
+
+    private void RenderTransferStats()
+    {
+        if (_lastTransfer is not { } state || IsDisposed || Disposing) return;
+        TimeSpan elapsed = _downloadWatch.IsRunning ? _downloadWatch.Elapsed : state.Elapsed;
+        string speed = state.BytesPerSecond > 0 ? SizeText(state.BytesPerSecond) + "/s" : "—";
+        string remaining = state.TimeRemaining is { } eta ? "~" + DurationText(eta) :
+            state.Phase == UpdateDownloadPhase.Downloading ? "Calculating…" : "—";
+        _transferStats.Text = $"{state.Percent}% · Downloaded: {SizeText(state.ReceivedBytes)} / {SizeText(state.TotalBytes)} · " +
+            $"{SizeText(state.BytesRemaining)} remaining\nSpeed: {speed} · Elapsed: {DurationText(elapsed)} · Time left: {remaining}";
+    }
+
+    private static string SizeText(double bytes) => bytes >= 1048576 ? $"{bytes / 1048576:0.00} MB" :
+        bytes >= 1024 ? $"{bytes / 1024:0.0} KB" : $"{bytes:0} B";
+    private static string DurationText(TimeSpan span) => span.TotalHours >= 1 ?
+        $"{(int)span.TotalHours}:{span.Minutes:00}:{span.Seconds:00}" : $"{(int)span.TotalMinutes:00}:{span.Seconds:00}";
     private void RefreshAuthorization()
     {
         try
@@ -193,8 +242,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
             _check.Enabled = _copy.Enabled = state.Enrolled;
             _publicKey.Text = state.PublicKey;
             _authorizationPanel.Visible = !state.Enrolled;
-            ClientSize = new Size(AppScale.S(780), AppScale.S(state.Enrolled ? 405 : 580));
-            CenterOnOwnerScreen();
+            SetContentSize(!state.Enrolled);
             _accessStatus.Text = state.Enrolled ? "Computer key ready" : "Authorization required";
             _status.Text = state.Enrolled ? "Select Check for Updates to contact the private update repository." :
                 "Authorize this computer before checking for updates.";
@@ -225,14 +273,19 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
 
     private async Task CheckNowAsync()
     {
+        _showTransferStats = _transferStats.Visible = false;
+        _lastTransfer = null;
+        SetContentSize(_authorizationPanel.Visible);
         _check.Enabled = false;
         _generate.Enabled = false;
         _download.Enabled = false;
+        _download.Text = "Download Update";
         _release = null;
         _prepared = null;
         _install.Enabled = false;
         _status.Text = "Checking the private update repository without interrupting FMSC...";
         _progress.Visible = true;
+        _progress.Style = ProgressBarStyle.Marquee;
         try
         {
             await using var session = await UpdateGitSession.OpenAsync(_lifetime.Token);
@@ -288,37 +341,80 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
     {
         if (_release is null) return;
         var token = _lifetime.Token;
+        int generation = ++_downloadGeneration;
+        _prepared = null;
+        _install.Visible = _install.Enabled = false;
         _download.Enabled = _check.Enabled = false;
-        _progress.Visible = true;
-        var progress = new Progress<string>(message => { if (!IsDisposed && !Disposing) _status.Text = message; });
+        _downloadWatch.Restart();
+        _showTransferStats = _transferStats.Visible = true;
+        SetContentSize(_authorizationPanel.Visible);
+        var archive = _method == UpdateDownloadChoice.Incremental ? _release.Manifest.Incremental! : _release.Manifest.Full;
+        ApplyDownloadProgress(new(UpdateDownloadPhase.Connecting, 0, archive.Length, 0, TimeSpan.Zero, null,
+            0, archive.Parts.Count, 1, 0, "Connecting to the update repository…", _method));
+        _transferTimer.Start();
+        IProgress<UpdateDownloadProgress> progress = new Progress<UpdateDownloadProgress>(state => {
+            if (generation == _downloadGeneration) ApplyDownloadProgress(state);
+        });
         try
         {
             var release = _release;
             string root = Path.Combine(UpdateDeviceKey.StateDirectory, "prepared-" + Guid.NewGuid().ToString("N"));
             var prepared = await Task.Run(async () =>
             {
-                await using var session = await UpdateGitSession.OpenAsync(token);
+                int connectionAttempt = 0;
+                Task<UpdateGitSession> Connect()
+                {
+                    progress.Report(new(UpdateDownloadPhase.Connecting, 0, archive.Length, 0, _downloadWatch.Elapsed, null,
+                        0, archive.Parts.Count, ++connectionAttempt, 0,
+                        $"Connecting to the update repository (attempt {connectionAttempt}/{UpdateRetry.MaximumAttempts})…", _method));
+                    return UpdateGitSession.OpenAsync(token);
+                }
+                await using var session = await UpdateRetry.RunAsync(Connect, token,
+                    (attempt, wait) => progress.Report(new(UpdateDownloadPhase.Retrying, 0, archive.Length, 0,
+                        _downloadWatch.Elapsed, null, 0, archive.Parts.Count, attempt, 0,
+                        $"Connecting failed. Retrying in {wait.TotalSeconds:0}s (attempt {attempt}/{UpdateRetry.MaximumAttempts})…", _method)));
                 return await UpdateReleasePreparer.PrepareAsync(release, session, _method,
-                    AppContext.BaseDirectory, root, token, progress);
+                    AppContext.BaseDirectory, root, token, progress, Path.Combine(UpdateDeviceKey.StateDirectory, "download-cache"));
             }, token);
             await Task.Run(() => UpdateInstallerHandoff.Validate(prepared), token);
             if (!IsDisposed && !Disposing)
             {
+                _downloadWatch.Stop();
+                ++_downloadGeneration;
+                var completedArchive = prepared.Method == UpdateDownloadChoice.Incremental ? release.Manifest.Incremental! : release.Manifest.Full;
+                if (_lastTransfer is { } last)
+                    ApplyDownloadProgress(last with { Phase = UpdateDownloadPhase.Ready,
+                        TotalBytes = completedArchive.Length, ReceivedBytes = completedArchive.Length,
+                        Method = prepared.Method, VerifiedBytes = completedArchive.Length,
+                        Elapsed = _downloadWatch.Elapsed, TimeRemaining = null, Message = "Download complete. Update verified and ready to install." });
                 _prepared = prepared;
                 _install.Enabled = true;
                 _install.Visible = true;
                 _download.Visible = false;
                 _downloadDetails.Text = prepared.Method + " · downloaded and verified";
-                _status.Text = "Update and installer files verified. You can continue working. " +
-                    "Choose Install Update when ready to close FMSC safely.";
+                _status.Text = "Update verified and ready to install. You can continue working until you choose Install Update.";
             }
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException
-            or UpdateGitCommandException or System.ComponentModel.Win32Exception)
+            or UpdateGitCommandException or System.ComponentModel.Win32Exception or CryptographicException)
         {
-            if (!IsDisposed && !Disposing) { _status.Text = "Update could not be prepared: " + error.Message; _download.Enabled = true; }
+            if (!IsDisposed && !Disposing)
+            {
+                ++_downloadGeneration;
+                if (_lastTransfer is { } last)
+                    ApplyDownloadProgress(last with { Phase = UpdateDownloadPhase.Failed, ReceivedBytes = last.VerifiedBytes,
+                        BytesPerSecond = 0, TimeRemaining = null, Elapsed = _downloadWatch.Elapsed,
+                        Message = "Download stopped. Verified chunks are saved for retry." });
+                _status.Text = "Update could not be prepared: " + error.Message + " Verified chunks are saved for retry.";
+                _download.Text = "Retry Download";
+                _download.Enabled = true;
+            }
         }
-        finally { if (!IsDisposed && !Disposing) { _check.Enabled = true; _progress.Visible = false; } }
+        finally
+        {
+            _downloadWatch.Stop();
+            if (!IsDisposed && !Disposing) { _transferTimer.Stop(); _check.Enabled = true; }
+        }
     }
 }

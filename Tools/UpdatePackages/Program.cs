@@ -20,6 +20,7 @@ try
     {
         SelfTest.Run();
         UpdatePreparationTests.Run();
+        UpdateDownloadTests.Run();
         Console.WriteLine("PASS: SHA-256 verified incremental/full update packaging and fallback checks.");
         return;
     }

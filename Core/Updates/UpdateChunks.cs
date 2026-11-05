@@ -12,9 +12,10 @@ namespace FMSC_SMS.Core.Updates;
 internal static class UpdateChunks
 {
     internal const long DefaultMaximumPartBytes = 90L * 1024 * 1024;
+    internal const long PreferredPartBytes = 16L * 1024 * 1024;
 
     internal static List<UpdatePart> SplitArchive(
-        string zipPath, long maximumPartBytes = DefaultMaximumPartBytes)
+        string zipPath, long maximumPartBytes = PreferredPartBytes)
     {
         if (maximumPartBytes is < 1 or > DefaultMaximumPartBytes)
             throw new ArgumentOutOfRangeException(nameof(maximumPartBytes));

@@ -10,7 +10,7 @@ internal interface IUpdateArtifactSource
 {
     Task<byte[]> ReadSmallAsync(string relativePath, int maximumBytes, CancellationToken cancellationToken);
     Task FetchPartAsync(string relativePath, string destinationFile, long expectedBytes,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken, IProgress<long>? progress = null);
 }
 
 internal sealed record VerifiedUpdate(UpdateManifest Manifest, string RepositoryVersion,
@@ -100,7 +100,8 @@ internal static class UpdateReleasePreparer
         VerifiedUpdate release, IUpdateArtifactSource source,
         UpdateDownloadChoice method, string installedFolder,
         string newStagingRoot, CancellationToken cancellationToken,
-        IProgress<string>? progress = null)
+        IProgress<UpdateDownloadProgress>? progress = null, string? downloadCacheRoot = null,
+        Func<TimeSpan, CancellationToken, Task>? retryDelay = null)
     {
         ArgumentNullException.ThrowIfNull(release);
         ArgumentNullException.ThrowIfNull(source);
@@ -118,12 +119,22 @@ internal static class UpdateReleasePreparer
         string installed = Path.GetFullPath(installedFolder);
         if (IsInside(stagedRoot, installed) || IsInside(installed, stagedRoot))
             throw new InvalidOperationException("Update staging must not overlap the running application.");
-        long required = checked(validatedManifest.Full.Length * 2 +
-            validatedManifest.Files.Sum(file => file.Length) + 256L * 1024 * 1024);
+        string cacheRoot = Path.GetFullPath(downloadCacheRoot ?? Path.Combine(stagedRoot, "verified-cache"));
+        if (IsInside(cacheRoot, installed) || IsInside(installed, cacheRoot))
+            throw new InvalidOperationException("Download cache must not overlap the running application.");
+        UpdatePartDownload.RejectLinks(cacheRoot);
+        long required;
+        try
+        {
+            required = checked(validatedManifest.Full.Length * 3 + (validatedManifest.Incremental?.Length ?? 0) +
+                validatedManifest.Files.Sum(file => file.Length) + 256L * 1024 * 1024);
+        }
+        catch (OverflowException error) { throw new InvalidDataException("The declared update size is invalid.", error); }
         if (new DriveInfo(Path.GetPathRoot(stagedRoot)!).AvailableFreeSpace < required)
             throw new IOException("Not enough free disk space to download and prepare the complete update safely.");
 
         bool created = false;
+        var meter = new UpdateDownloadMeter(progress);
         try
         {
             Directory.CreateDirectory(stagedRoot);
@@ -134,12 +145,13 @@ internal static class UpdateReleasePreparer
                 release.ManifestBytes);
             await AttemptAsync(validatedManifest, release.RepositoryVersion, source,
                 installed, stagedRoot, method == UpdateDownloadChoice.Incremental,
-                cancellationToken, progress);
+                cancellationToken, meter, cacheRoot, retryDelay);
             return new PreparedUpdate(release.RepositoryVersion,
                 Path.Combine(stagedRoot, "application"), metadata, method, false);
         }
         catch (InvalidDataException) when (method == UpdateDownloadChoice.Incremental && created)
         {
+            meter.SetPhase(UpdateDownloadPhase.Connecting, "The incremental update could not be applied. Switching to the full package…");
             // A delta can stop being applicable if a school-side DLL changed
             // between the check and staging. Retry using the full package,
             // whose file and archive digests are checked independently.
@@ -150,7 +162,7 @@ internal static class UpdateReleasePreparer
             try
             {
                 await AttemptAsync(validatedManifest, release.RepositoryVersion, source,
-                    installed, stagedRoot, false, cancellationToken, progress);
+                    installed, stagedRoot, false, cancellationToken, meter, cacheRoot, retryDelay);
                 return new PreparedUpdate(release.RepositoryVersion,
                     Path.Combine(stagedRoot, "application"), Path.Combine(stagedRoot, "metadata"),
                     UpdateDownloadChoice.Full, true);
@@ -172,7 +184,7 @@ internal static class UpdateReleasePreparer
     private static async Task AttemptAsync(
         UpdateManifest manifest, string version, IUpdateArtifactSource source,
         string installed, string root, bool incremental, CancellationToken token,
-        IProgress<string>? progress)
+        UpdateDownloadMeter meter, string cacheRoot, Func<TimeSpan, CancellationToken, Task>? retryDelay)
     {
         UpdateArchive archive = incremental
             ? manifest.Incremental ?? throw new InvalidDataException("No incremental package in manifest.")
@@ -183,25 +195,18 @@ internal static class UpdateReleasePreparer
         string assembledDir = Path.Combine(root, "download", "assembled");
         Directory.CreateDirectory(partDir);
         Directory.CreateDirectory(assembledDir);
-        foreach (var part in archive.Parts)
-        {
-            progress?.Report("Downloading " + (incremental ? "incremental" : "full") + " update: part " +
-                (archive.Parts.IndexOf(part) + 1) + " of " + archive.Parts.Count);
-            token.ThrowIfCancellationRequested();
-            string relative = "versions/" + version + "/" + part.Name;
-            string target = Path.Combine(partDir, part.Name);
-            await source.FetchPartAsync(relative, target, part.Length, token);
-            var downloaded = new FileInfo(target);
-            if (!downloaded.Exists || downloaded.Length != part.Length ||
-                !string.Equals(UpdateChunks.Sha256(target), part.Sha256,
-                    StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("Private Git update part failed its published SHA-256 digest.");
-        }
+        await UpdatePartDownload.FetchAsync(source, archive, version, partDir, cacheRoot, meter, token, retryDelay,
+            incremental ? UpdateDownloadChoice.Incremental : UpdateDownloadChoice.Full);
+        token.ThrowIfCancellationRequested();
         string zip = Path.Combine(assembledDir, archive.Name);
-        progress?.Report("Verifying download and preparing application files…");
+        meter.SetPhase(UpdateDownloadPhase.Verifying, "Download complete. Verifying the complete archive…");
         UpdateChunks.ReassembleVerified(archive, partDir, zip);
+        token.ThrowIfCancellationRequested();
+        meter.SetPhase(UpdateDownloadPhase.Preparing, "Preparing and verifying application files…");
         UpdateStager.Prepare(manifest, zip, installed,
             Path.Combine(root, "application"), incremental);
+        token.ThrowIfCancellationRequested();
+        meter.SetPhase(UpdateDownloadPhase.Ready, "Update files are verified and prepared.");
     }
 
     private static bool IsInside(string path, string folder)

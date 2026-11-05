@@ -2,6 +2,8 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace FMSC_SMS.Core.Updates;
 
@@ -100,7 +102,7 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
     }
 
     public async Task FetchPartAsync(string relativePath, string destinationFile,
-        long expectedBytes, CancellationToken cancellationToken)
+        long expectedBytes, CancellationToken cancellationToken, IProgress<long>? progress = null)
     {
         EnsureOpen();
         if (!IsAllowedPartPath(relativePath) ||
@@ -110,6 +112,17 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
             throw new IOException("The destination update chunk must be a new file.");
         try
         {
+            using var objectId = new MemoryStream();
+            await RunGitAsync(new[] { "-C", "feed", "rev-parse", "HEAD:" + relativePath },
+                true, objectId, 128, cancellationToken, TimeSpan.FromSeconds(30));
+            string oid = Encoding.ASCII.GetString(objectId.ToArray()).Trim();
+            if (oid.Length is not (40 or 64) || !oid.All(Uri.IsHexDigit))
+                throw new InvalidDataException("Update part is not a valid Git object.");
+            // Fetch only this blob with progress enabled. Lazy `git show` otherwise
+            // hides the transfer, then emits local disk bytes at misleading speeds.
+            await RunGitAsync(new[] { "-C", "feed", "-c", "fetch.negotiationAlgorithm=noop", "fetch", "origin", "--progress",
+                "--no-tags", "--no-write-fetch-head", "--recurse-submodules=no", "--filter=blob:none", "--stdin" },
+                true, Stream.Null, 65536, cancellationToken, TimeSpan.FromMinutes(30), networkProgress: progress, input: oid);
             using (var output = new FileStream(destinationFile, FileMode.CreateNew,
                 FileAccess.Write, FileShare.None, 65536, useAsync: true))
             {
@@ -165,14 +178,14 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
     private async Task<(int ExitCode, long Bytes)> RunGitAsync(
         string[] arguments, bool isRepoCommand, Stream destination,
         long maxOutputBytes, CancellationToken cancellationToken,
-        TimeSpan maximumDuration, bool allowFailure = false)
+        TimeSpan maximumDuration, bool allowFailure = false, IProgress<long>? networkProgress = null, string? input = null)
     {
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         linked.CancelAfter(maximumDuration);
         var start = new ProcessStartInfo("git.exe")
         {
             WorkingDirectory = _workspace,
-            RedirectStandardInput = false,
+            RedirectStandardInput = input is not null,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -181,30 +194,46 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         start.Environment["GIT_TERMINAL_PROMPT"] = "0";
         start.Environment["GIT_LFS_SKIP_SMUDGE"] = "1";
         start.Environment["GIT_OPTIONAL_LOCKS"] = "0";
+        start.Environment["LC_ALL"] = "C";
+        start.Environment["GIT_PROGRESS_DELAY"] = "0";
         start.Environment["GIT_SSH_COMMAND"] = isRepoCommand
             ? GitSsh("../device.pem", "../known_hosts")
             : GitSsh("device.pem", "known_hosts");
         foreach (string argument in arguments) start.ArgumentList.Add(argument);
+        if (input is not null) start.StandardInputEncoding = new UTF8Encoding(false);
         using var process = new Process { StartInfo = start };
         process.Start();
         try
         {
-            var errorTask = process.StandardError.ReadToEndAsync(linked.Token);
+            var errorTask = ReadErrorsAsync(process.StandardError, networkProgress, linked.Token);
+            if (input is not null)
+            {
+                // Git's missing-object stdin protocol uses LF, including on Windows.
+                await process.StandardInput.WriteAsync((input + "\n").AsMemory(), linked.Token);
+                process.StandardInput.Close();
+            }
             long bytes = 0;
             var buffer = new byte[65536];
             int read;
-            while ((read = await process.StandardOutput.BaseStream.ReadAsync(buffer, linked.Token)) != 0)
+            while (true)
             {
+                var reading = process.StandardOutput.BaseStream.ReadAsync(buffer.AsMemory(), linked.Token).AsTask();
+                if (await Task.WhenAny(reading, errorTask) == errorTask && errorTask.IsFaulted) await errorTask;
+                read = await reading;
+                if (read == 0) break;
                 bytes += read;
                 if (bytes > maxOutputBytes)
                     throw new InvalidDataException("Git emitted data larger than the allowed update file.");
                 await destination.WriteAsync(buffer.AsMemory(0, read), linked.Token);
             }
             await process.WaitForExitAsync(linked.Token);
-            _ = await errorTask; // Deliberately never display stderr; it may contain paths.
+            string errors = await errorTask; // Never display raw stderr or key paths.
             if (process.ExitCode != 0 && !allowFailure)
-                throw new UpdateGitCommandException(
-                    "The private Git request was refused or network access failed.");
+            {
+                var failure = ClassifyFailure(errors);
+                failure.Data["GitDiagnostic"] = errors;
+                throw failure;
+            }
             return (process.ExitCode, bytes);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -221,8 +250,57 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
 
     private static string GitSsh(string pem, string knownHosts) =>
         "ssh -F none -o BatchMode=yes -o IdentitiesOnly=yes " +
+        "-o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 " +
         "-o StrictHostKeyChecking=yes -o PasswordAuthentication=no " +
         "-o UserKnownHostsFile=" + knownHosts + " -i " + pem;
+
+    internal static long? ParseNetworkBytes(string line)
+    {
+        var match = Regex.Match(line, @"Receiving objects:.*?,\s*([0-9.]+)\s+(bytes|KiB|MiB|GiB)\b",
+            RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+        if (!match.Success || !double.TryParse(match.Groups[1].Value, NumberStyles.AllowDecimalPoint,
+            CultureInfo.InvariantCulture, out double amount)) return null;
+        double scale = match.Groups[2].Value switch { "KiB" => 1024d, "MiB" => 1048576d, "GiB" => 1073741824d, _ => 1d };
+        double result = amount * scale;
+        return result is >= 0 and < long.MaxValue ? (long)result : null;
+    }
+
+    internal static UpdateGitCommandException ClassifyFailure(string errors)
+    {
+        if (errors.Contains("Permission denied (publickey)", StringComparison.OrdinalIgnoreCase) ||
+            errors.Contains("Repository not found", StringComparison.OrdinalIgnoreCase))
+            return new("This computer's update authorization was refused. Ask the owner to review its read-only key.", false);
+        if (errors.Contains("Host key verification failed", StringComparison.OrdinalIgnoreCase) ||
+            errors.Contains("REMOTE HOST IDENTIFICATION HAS CHANGED", StringComparison.OrdinalIgnoreCase))
+            return new("GitHub's host identity could not be verified. Update stopped.", false);
+        if (errors.Contains("not our ref", StringComparison.OrdinalIgnoreCase))
+            return new("The requested update part is unavailable. Check for updates again.", false);
+        return new("The update connection was interrupted or the network is unavailable.");
+    }
+
+    private static async Task<string> ReadErrorsAsync(StreamReader reader, IProgress<long>? progress, CancellationToken token)
+    {
+        var recent = new StringBuilder();
+        var line = new StringBuilder();
+        var buffer = new char[1024];
+        int read;
+        while ((read = await reader.ReadAsync(buffer.AsMemory(), token)) > 0)
+        {
+            recent.Append(buffer, 0, read);
+            if (recent.Length > 16384) recent.Remove(0, recent.Length - 16384);
+            for (int i = 0; i < read; i++)
+            {
+                if (buffer[i] is '\r' or '\n')
+                {
+                    if (progress is not null && ParseNetworkBytes(line.ToString()) is { } bytes) progress.Report(bytes);
+                    line.Clear();
+                }
+                else if (line.Length < 8192) line.Append(buffer[i]);
+            }
+        }
+        if (progress is not null && ParseNetworkBytes(line.ToString()) is { } final) progress.Report(final);
+        return recent.ToString();
+    }
 
     public ValueTask DisposeAsync()
     {
@@ -231,8 +309,14 @@ internal sealed class UpdateGitSession : IUpdateArtifactSource, IAsyncDisposable
         _isOpen = false;
         try
         {
+            string pem = Path.Combine(_workspace, "device.pem");
+            if (File.Exists(pem)) File.Delete(pem); // Remove plaintext key before any optional Git cleanup can fail.
             if (Directory.Exists(_workspace))
+            {
+                foreach (string path in Directory.EnumerateFiles(_workspace, "*", SearchOption.AllDirectories))
+                    if (File.GetAttributes(path).HasFlag(FileAttributes.ReadOnly)) File.SetAttributes(path, FileAttributes.Normal);
                 Directory.Delete(_workspace, recursive: true);
+            }
         }
         catch (IOException) { /* Never delete a live application file. */ }
         catch (UnauthorizedAccessException) { /* Temporary user-only folder. */ }

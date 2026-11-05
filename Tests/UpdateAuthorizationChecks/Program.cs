@@ -5,6 +5,17 @@ using FMSC_SMS.Core.Updates;
 
 if (!OperatingSystem.IsWindows())
     throw new PlatformNotSupportedException("DPAPI must be exercised on Windows.");
+if (args.SequenceEqual(new[] { "--live-transfer" }))
+{
+    LiveTransferChecks.RunAsync().GetAwaiter().GetResult();
+    return;
+}
+if (UpdateGitSession.ParseNetworkBytes("Receiving objects: 50% (1/2), 1.50 MiB | 2.00 MiB/s") != 1572864 ||
+    UpdateGitSession.ParseNetworkBytes("local disk copy: 99 MiB") is not null ||
+    UpdateGitSession.ClassifyFailure("Permission denied (publickey)").IsRetryable ||
+    UpdateGitSession.ClassifyFailure("Host key verification failed").IsRetryable ||
+    !UpdateGitSession.ClassifyFailure("Connection reset by peer").IsRetryable)
+    throw new Exception("Git network-progress parsing or retry classification failed.");
 UpdateHandoffTests.Run();
 
 int checks = 0;

@@ -146,10 +146,11 @@ The school's **SSH authorization key is separate** and is still required.
    oversized archives, Windows file-lock behavior and constrained disk space.
 2. Bundle reviewed Git/SSH binaries or an approved equivalent with the FMSC
    installer. The current manual checker needs Git/SSH installed.
-3. Complete persistent chunk resume/retry and acceptance of the connected
-   Download / Prepare dialog. It now shows installed/latest versions, method,
-   approximate size and chunk progress; Close cancels preparation. Remind Me
-   Later dismisses this manual check (it does not schedule a notification).
+3. Complete field acceptance of reconnect/resume under actual network disruption.
+   Verified chunk caching, bounded retries, live transfer figures and a determinate
+   download bar are implemented and covered by fault-injection tests. Close cancels
+   preparation and preserves verified chunks. Remind Me Later dismisses this manual
+   check (it does not schedule a notification).
 4. Complete disposable Windows/LocalDB acceptance of the connected installer
    handoff, including actual pre-migration backup, migration and rollback recovery.
 5. Accept the guarded manual publisher described below against the private
@@ -294,7 +295,7 @@ reaching it; no automatic history cleanup is authorized or performed.
 
 **Not production complete:** The handoff is implemented and offline checks pass;
 real activation/migration/recovery acceptance remains unverified. Bundled Git/SSH,
-transport failure/resume tests and private-distribution acceptance remain required.
+physical network-disruption and recovery acceptance remain required.
 No live installer, database or distribution package was changed in these tests.
 
 ## Local private-distribution acceptance and dialog corrections
@@ -319,6 +320,59 @@ access details and dismissal actions. A focused SQL-free WinForms suite reproduc
 the owned-window close path and tests exactly one inert installer callback.
 
 The owner has approved merging the source after these corrections. Further package
-publication remains owner controlled. Bundled Git/SSH, persistent download resume,
+publication remains owner controlled. Bundled Git/SSH, disrupted-network field acceptance,
 clean-machine acceptance, full transport acceptance and actual migration/recovery
 tests remain production limitations; successful incremental testing does not close them.
+
+## Download progress and recovery
+
+The dialog displays download percentage, received/total bytes, remaining bytes,
+network speed, elapsed time and estimated time remaining. Git's network pack
+progress supplies speed measurements; local `git show` output is never treated
+as network throughput. ETA is approximate and disappears while waiting, retrying,
+verifying or staging. A half-second heartbeat keeps elapsed time moving during
+quiet periods. Complete download remains distinct from validated installer readiness.
+
+Network failures retry the current part with 2/4/8/16-second backoff, stopping
+after five attempts. SSH keepalives detect dropped connections. Revoked keys,
+repository authorization refusal and host-identity errors stop without retry loops.
+Cancellation interrupts both the transfer and backoff; no running application file
+or SQL operation is modified by recovery.
+
+SHA-256-verified chunks are atomically retained under the current user's
+`Updates/download-cache/<archive-sha256>` directory. A later attempt or reopened
+dialog rechecks every cached chunk and fetches only missing/damaged ones. Incomplete
+incoming files are discarded. Cache paths cannot overlap the live app or use links.
+Git cannot resume a partly received blob at a byte offset: an unfinished chunk
+restarts. New packages therefore prefer 16 MiB chunks; the existing 90 MiB maximum
+remains accepted for older published packages. No manifest/version reset is needed.
+
+Offline tests cover interrupted transfer, verified resume in a separate attempt,
+damaged cache, retry exhaustion, backoff cancellation, revoked authorization,
+speed/ETA arithmetic, stalled connections and full-fallback size/method changes.
+The explicit `UpdateAuthorizationChecks --live-transfer` probe fetched a small
+retained private part (1,777,043 bytes), observed real network progress and verified
+its published hash using the existing computer key. The real download coordinator's
+second attempt reused that verified cache without issuing another network request.
+This probe is opt-in and is
+never run by credential-free CI. It does not install or access SQL. Larger sustained
+transfers and physical connection-loss acceptance remain separate field tests.
+
+## Successful installation cleanup
+
+After activation, the installer compares the installed application with its source,
+checks the prepared manifest again and runs the existing database compatibility
+check using the installed executable. Only after these checks succeed does it
+remove the fixed `.rollback` application directory. Verification failures retain
+the previous application and downloads for recovery; database recovery backups
+remain available in either case.
+
+Successful prepared updates also remove their own `prepared-<guid>` directory
+and hashed chunk-cache directories. The computer's enrollment key, database files
+and database backups are outside this cleanup. Absolute-path checks and link
+refusal limit recursive deletion. A locked file produces a cleanup warning without
+turning a verified activation into a failed installation; the next successful
+installation retries removal of the fixed rollback directory. Older staging
+directories from installations predating this change are not swept automatically.
+Disposable-folder tests exercise verification failures, successful cleanup,
+locked files, scope refusal and preservation of enrollment and database backups.
