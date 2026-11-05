@@ -129,8 +129,8 @@ internal static partial class Program
         var singleFamily=CreditBalanceReportData.Create(creditSource,true,0);
         using(singleFamily.Rows)using(singleFamily.Totals)
         {
-            Check(singleFamily.Rows.Rows[0].Field<string>("Family / Student")=="Parent: Ali","Missing family code uses a readable parent label without repeating admission numbers");
-            Check(singleFamily.Rows.Rows[0].Field<string>("Members")!.Contains("163 - Kausar d/o Ali\nCampus Girls · Four - F\nAdvance: Rs. 500"),"A one-member family keeps its identity, actual placement and advance together");
+            Check(singleFamily.Rows.Rows[0].Field<string>("Family / Student")=="Ali","Parent is shown once without repeating admission numbers");
+            Check(singleFamily.Rows.Rows[0].Field<string>("Members")!.Contains("163 - Kausar\nCampus Girls · Four - F")&&singleFamily.Rows.Rows[0].Field<string>("Student Advances")=="500","A one-member family keeps its identity and placement beside a separate advance amount");
         }
         var brother=creditSource.NewRow();brother.ItemArray=creditSource.Rows[0].ItemArray;
         brother["AdmissionId"]=2;brother["Adm. / QR No."]="164";brother["Student"]="Hamid";brother["__StudentGender"]="Male";
@@ -138,18 +138,18 @@ internal static partial class Program
         string sourceBefore=creditSource.GetXmlForTest();
         var familyCredit=CreditBalanceReportData.Create(creditSource,true,0);
         using(familyCredit.Rows)using(familyCredit.Totals)
-        using(var familyExport=Project(familyCredit.Rows,familyCredit.Rows.Columns.Cast<DataColumn>().Select(c=>(c.ColumnName,c.ColumnName switch {"Available Credit"=>"Family Advance","Members"=>"Student Details","Students"=>"Students with Advance",_=>c.ColumnName})).ToArray()))
+        using(var familyExport=Project(familyCredit.Rows,("Family / Student","Father / Parent"),("Members","Children / Class"),("Student Advances","Advance"),("Available Credit","Family Total")))
         {
             var familyPlan=Plan(familyExport);
-            Check(Cell(familyExport,familyPlan[0]).Contains("163 - Kausar d/o Ali")&&Cell(familyExport,familyPlan[0]).Contains("164 - Hamid s/o Ali"),"Each family member keeps their own admission, name and parent identity");
+            Check(familyCredit.Rows.Rows[0].Field<string>("Family / Student")=="Ali","Family has a readable shared parent heading");
             string members=familyCredit.Rows.Rows[0].Field<string>("Members")!;
-            Check(members.Contains("163 - Kausar d/o Ali\nCampus Girls · Four - F\nAdvance: Rs. 500")&&members.Contains("164 - Hamid s/o Ali\nCampus Boys · Eight – M\nAdvance: Rs. 250"),"Each student is explicitly paired with their own campus, class and advance, without a shared campus heading");
+            Check(members.Contains("163 - Kausar\nCampus Girls · Four - F")&&members.Contains("164 - Hamid\nCampus Boys · Eight – M")&&familyCredit.Rows.Rows[0].Field<string>("Student Advances")!.Contains("250"),"Each student keeps their own placement beside the separate advance column");
             Check(familyCredit.Rows.Rows.Count==1 && familyCredit.Rows.Rows[0].Field<decimal>("Available Credit")==750m && familyCredit.Rows.Rows[0].Field<int>("Students")==2 && familyCredit.Totals.Rows[0].Field<decimal>("Credit held")==750m,"Readable family identities preserve balances, student counts and totals");
-            Render("advance-balance-families","Student Advance Balance Register — Families",familyExport,"163 - Kausar d/o Ali","164 - Hamid s/o Ali","Parent: Ali","Advance: Rs. 500","Advance: Rs. 250","750","Eight – M");
+            Render("advance-balance-families","Student Advance Balance Register — Families",familyExport,"163 - Kausar","164 - Hamid","Ali","500","250","750","Eight – M","Grand Total");
         }
         var minimumCredit=CreditBalanceReportData.Create(creditSource,true,300m);
         using(minimumCredit.Rows)using(minimumCredit.Totals)
-            Check(minimumCredit.Rows.Rows.Count==1 && minimumCredit.Rows.Rows[0].Field<string>("Members")!.Contains("163 - Kausar d/o Ali") && !minimumCredit.Rows.Rows[0].Field<string>("Members")!.Contains("164 - Hamid") && minimumCredit.Totals.Rows[0].Field<decimal>("Credit held")==500m,"Minimum advance remains a per-student filter before family grouping");
+            Check(minimumCredit.Rows.Rows.Count==1 && minimumCredit.Rows.Rows[0].Field<string>("Members")!.Contains("163 - Kausar") && !minimumCredit.Rows.Rows[0].Field<string>("Members")!.Contains("164 - Hamid") && minimumCredit.Totals.Rows[0].Field<decimal>("Credit held")==500m,"Minimum advance remains a per-student filter before family grouping");
         Check(creditSource.GetXmlForTest()==sourceBefore,"Family presentation never modifies source student or ledger values");
     }
 }

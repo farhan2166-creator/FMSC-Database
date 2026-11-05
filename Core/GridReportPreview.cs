@@ -12,6 +12,7 @@ internal static class GridReportPreview
     internal static Report Build(string institution,string title,string subtitle,DataTable source,string printedBy,string moneyFormat="#,##0.##",IReadOnlyList<ReportPrintMetric>? summaryMetrics=null,string? campusContext=null)
     {
         if(source.Columns.Count==0)throw new ArgumentException("Choose at least one report column.",nameof(source));
+        if(FamilyAdvanceReport.CanBuild(source))return FamilyAdvanceReport.Build(institution,title,subtitle,source,printedBy,moneyFormat);
         using var printSource=ReportContextProjection.ForPdf(source,campusContext);
         source=printSource;
         XNamespace ns="http://schemas.microsoft.com/sqlserver/reporting/2008/01/reportdefinition";

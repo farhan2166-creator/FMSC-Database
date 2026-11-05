@@ -123,8 +123,9 @@ internal static partial class Program
         Check((decimal)totals.Rows[0]["Credit held"]==1200m,"Credit register totals sum positive student balances once");
         var (families,_) = CreditBalanceReportData.Create(data,true,0m);
         Check(families.Rows.Count==3,"Unlinked students remain separate instead of forming a fake family");
-        Check((decimal)families.Rows[0]["Available Credit"]==850m && families.Rows[0].Field<string>("Members")!.Contains("Boys · Class 1 – A\nAdvance: Rs. 700"),"Family total preserves each student's placement and advance");
-        Check(families.Rows[0].Field<string>("Members")!.Contains("1001 - One child of Parent") && families.Rows[0].Field<string>("Members")!.Contains("1002 - Two child of Parent\nGirls · Class 2 – A\nAdvance: Rs. 150"),"Family details pair individual identities, campuses, classes and balances without guessing gender");
+        var familyLayout=FamilyAdvanceLayout.Read(families.Rows[0].Field<string>(FamilyAdvanceLayout.Column)!);
+        Check((decimal)families.Rows[0]["Available Credit"]==850m && familyLayout.Children[0].Placement=="Boys · Class 1 – A"&&familyLayout.Children[0].Advance==700m,"Family total preserves each student's placement and advance");
+        Check(familyLayout.Parent=="Parent"&&familyLayout.Children[0].Name=="1001 - One"&&familyLayout.Children[1].Name=="1002 - Two"&&familyLayout.Children[1].Placement=="Girls · Class 2 – A"&&familyLayout.Children[1].Advance==150m,"Parent is shown once and each student keeps their own placement and amount");
         Check(families.AsEnumerable().Sum(r=>r.Field<decimal>("Available Credit"))==1200m,"Family totals reconcile with student totals");
         var (minimum,minimumTotals)=CreditBalanceReportData.Create(data,true,200m);
         Check(minimum.Rows.Count==2 && (decimal)minimumTotals.Rows[0]["Credit held"]==950m,"Minimum credit is per student as labelled");

@@ -34,6 +34,10 @@ internal static partial class Program
 
     private static void RunChecks(string[] args)
     {
+        if(args.Contains("--family-advance-layout"))
+        {
+            CheckFamilyAdvanceLayout();Console.WriteLine($"PASS: {checks} compact family form, grouped printing and multi-page row-preservation checks (no database connection).");return;
+        }
         if (args.Contains("--update-dialog"))
         {
             CheckUpdateDialog(); Console.WriteLine($"PASS: {checks} modeless update dialog, cancellation and single-installer checks."); return;

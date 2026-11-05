@@ -53,28 +53,33 @@ internal static class CreditBalanceReportData
         else
         {
             result = new DataTable();
-            foreach (string c in new[] { "Family / Student", "Members" }) result.Columns.Add(c);
+            foreach (string c in new[] { "Family / Student", "Members", "Student Advances" }) result.Columns.Add(c);
             result.Columns.Add("Students",typeof(int)); result.Columns.Add("Available Credit",typeof(decimal)); result.Columns.Add("Last Activity",typeof(DateTime));
+            result.Columns.Add(FamilyAdvanceLayout.Column);
             foreach (var group in selected.GroupBy(r => r.IsNull("FamilyId") ? "Student:"+r["AdmissionId"] : "Family:"+r["FamilyId"]))
             {
                 var first = group.First();
                 string[] parents=group.Select(r=>Convert.ToString(r["Father Name"])?.Trim()??"").Where(name=>name.Length>0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-                string label=Convert.ToString(first["Family"])?.Trim()??"";
-                if(label.Length==0)label=first.IsNull("FamilyId")?"Individual student":parents.Length==1?"Parent: "+parents[0]:"Family";
-                string members=string.Join("\n\n",group.Select(r=>{
-                    string identity=StudentIdentityText.Format(Convert.ToString(r["Adm. / QR No."])??"",Convert.ToString(r["Student"])??"",Convert.ToString(r["Father Name"])??"",
+                string label=parents.Length==1?parents[0]:Convert.ToString(first["Family"])?.Trim()??"";
+                if(label.Length==0)label=first.IsNull("FamilyId")?"Individual student":"Family";
+                var children=group.Select(r=>{
+                    string identity=StudentIdentityText.Format(Convert.ToString(r["Adm. / QR No."])??"",Convert.ToString(r["Student"])??"",parents.Length==1?"":Convert.ToString(r["Father Name"])??"",
                         source.Columns.Contains("__StudentGender")?Convert.ToString(r["__StudentGender"])??"":"");
                     string campus=Convert.ToString(r["Campus"]) is {Length:>0} place?place:"Not recorded";
                     string placement=Convert.ToString(r["Class / Section"]) is {Length:>0} klass?klass:"Not recorded";
-                    return $"{identity}\n{campus} · {placement}\nAdvance: Rs. {Convert.ToDecimal(r["Available Credit"]):#,##0.##}";
-                }));
-                result.Rows.Add(label,members,group.Count(),
-                    group.Sum(r => Convert.ToDecimal(r["Available Credit"])),group.Max(r => Convert.ToDateTime(r["Last Activity"])));
+                    return new FamilyAdvanceLayout.Child(identity,$"{campus} · {placement}",Convert.ToDecimal(r["Available Credit"]));
+                }).ToArray();
+                string members=string.Join("\n\n",children.Select(child=>$"{child.Name}\n{child.Placement}"));
+                string advances=string.Join("\n\n\n",children.Select(child=>child.Advance.ToString("#,##0.##")));
+                result.Rows.Add(label,members,advances,group.Count(),
+                    group.Sum(r => Convert.ToDecimal(r["Available Credit"])),group.Max(r => Convert.ToDateTime(r["Last Activity"])),
+                    System.Text.Json.JsonSerializer.Serialize(new FamilyAdvanceLayout.Family(label,children)));
             }
         }
         var totals = new DataTable();
         totals.Columns.Add("Students holding credit",typeof(int)); totals.Columns.Add("Credit held",typeof(decimal));
         totals.Rows.Add(selected.Length,selected.Sum(r => Convert.ToDecimal(r["Available Credit"])));
+        if(families){var count=totals.Columns.Add("Families",typeof(int));count.SetOrdinal(0);totals.Rows[0][count]=result.Rows.Count;}
         return (result,totals);
     }
 }
