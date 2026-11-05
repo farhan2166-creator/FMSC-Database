@@ -33,7 +33,7 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
         MaximizeBox = false;
         MinimizeBox = false;
         ShowInTaskbar = false;
-        ClientSize = new Size(AppScale.S(800), AppScale.S(440));
+        ClientSize = AppMetrics.StartupDialogClientSize;
         Font = AppTheme.NormalFont;
         BackColor = AppTheme.PageBackground;
         AutoScaleMode = AutoScaleMode.None;
@@ -139,7 +139,8 @@ internal sealed class DatabaseConnectionForm : ApplicationWindowForm
             root.SuspendLayout();
             detailsCard.Visible = detailsExpanded;
             root.RowStyles[4].Height = detailsExpanded ? AppScale.S(200) : 0;
-            ClientSize = new Size(ClientSize.Width, AppScale.S(detailsExpanded ? 640 : 440));
+            ClientSize = new Size(AppMetrics.StartupDialogClientSize.Width,
+                AppMetrics.StartupDialogClientSize.Height + (detailsExpanded ? AppScale.S(200) : 0));
             detailsLink.Text = detailsExpanded ? "Hide connection details" : "Show connection details";
             root.ResumeLayout(true);
             var fitted = WorkingAreaLayout.Fit(Bounds, MinimumSize, Screen.FromControl(this).WorkingArea);
