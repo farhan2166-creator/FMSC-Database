@@ -1,6 +1,6 @@
 # Bill and receipt scenario review pack
 
-The **Fee document rendering** Windows workflow generates a review batch from
+The **Fee Bills and Payment Receipts** Windows workflow generates a review batch from
 the checked-in `StudentBill`, `FamilyBill`, `StudentReceipt` and `FamilyReceipt`
 templates with static fixture data. It never connects to a school database,
 issues a real numbered document, posts a payment or sends pages to a printer.
@@ -12,7 +12,7 @@ legacy-data and annual batch examples; no FMSC or invented ANNUAL/TEST reference
 formats are substituted in the review PDFs. Separate legacy-reference lookup
 checks still cover older saved numbers without rewriting them.
 
-Download **REVIEW-ALL.pdf** from the workflow's Artifacts section
+Download **FMSC-Fee-Bills-and-Receipts-Review.pdf** from the workflow's Artifacts section
 or the link in its run summary. It is retained for seven days and downloads
 directly as a PDF, without a ZIP or extraction. It contains all generated pages in one
 file, with a scenario bookmark for each document. Original page sizes are retained.
