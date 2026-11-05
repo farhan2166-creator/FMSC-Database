@@ -206,7 +206,8 @@ internal static class UpdateReleasePreparer
         UpdateStager.Prepare(manifest, zip, installed,
             Path.Combine(root, "application"), incremental);
         token.ThrowIfCancellationRequested();
-        meter.SetPhase(UpdateDownloadPhase.Ready, "Update files are verified and prepared.");
+        // Only the caller's installer-handoff validation can declare readiness.
+        meter.SetPhase(UpdateDownloadPhase.Verifying, "Application files prepared. Checking installer readiness…");
     }
 
     private static bool IsInside(string path, string folder)

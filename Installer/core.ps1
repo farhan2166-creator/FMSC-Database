@@ -38,11 +38,6 @@ $TemplateMdf = Join-Path $DatabaseSource 'FMSC_DB.mdf'
 $TemplateLdf = Join-Path $DatabaseSource 'FMSC_DB_log.ldf'
 if ($PreparedRoot) {
     # Update mode is existing-installation only. Never seed a missing database.
-    Wait-OriginalFmscExit -ProcessId $OriginalProcessId -StartTicks $OriginalStartTicks -UserSid $OriginalUserSid
-    if (-not (Test-Path -LiteralPath $LiveMdf -PathType Leaf) -or
-        -not (Test-Path -LiteralPath $LiveLdf -PathType Leaf)) {
-        throw 'An existing complete school database is required. Update will never copy template database files.'
-    }
     $AppSource = Join-Path $PreparedRoot 'application'
     $MigrationsDir = Join-Path $AppSource 'UpdateSupport/Migrations'
     $DatabaseSource = Join-Path $PreparedRoot 'NO_DATABASE_TEMPLATES_ALLOWED'
@@ -93,6 +88,7 @@ function Write-Section {
     param(
         [string]$Title
     )
+    Set-UpdateWindowStatus $Title
     Write-Host ''
     Write-Host '  --------------------------------------------------------------' -ForegroundColor $ColorDim
     Write-Host "  $Title" -ForegroundColor $ColorStep
@@ -103,6 +99,7 @@ function Write-Step {
     param(
         [string]$Message
     )
+    Set-UpdateWindowStatus $Message
     Write-Host "  > $Message" -ForegroundColor $ColorInfo
 }
 function Write-Success {
@@ -124,10 +121,76 @@ function Write-Failure {
     Write-Host "  [X] $Message" -ForegroundColor $ColorError
 }
 function Pause-Step {
+    if ($PreparedRoot) { return }
     Start-Sleep -Milliseconds 700
 }
 function Pause-Long {
+    if ($PreparedRoot) { return }
     Start-Sleep -Milliseconds 1200
+}
+function Open-UpdateWindow {
+    if (-not $PreparedRoot) { return }
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    [Windows.Forms.Application]::EnableVisualStyles()
+    $script:UpdateWindow = New-Object Windows.Forms.Form
+    $script:UpdateWindow.Text = 'FMSC - Installing Update'
+    $script:UpdateWindow.ClientSize = New-Object Drawing.Size(540,155)
+    $script:UpdateWindow.StartPosition = 'CenterScreen'
+    $script:UpdateWindow.FormBorderStyle = 'FixedDialog'
+    $script:UpdateWindow.ControlBox = $false
+    $script:UpdateWindow.Font = New-Object Drawing.Font('Segoe UI',10)
+    $script:UpdateWindow.BackColor = [Drawing.Color]::FromArgb(250,248,247)
+    $script:UpdateStatus = New-Object Windows.Forms.Label
+    $script:UpdateStatus.SetBounds(20,15,500,85)
+    $script:UpdateStatus.TextAlign = 'MiddleCenter'
+    $script:UpdateBar = New-Object Windows.Forms.ProgressBar
+    $script:UpdateBar.SetBounds(25,115,490,16)
+    $script:UpdateBar.Style = 'Marquee'
+    $script:UpdateWindow.Controls.AddRange(@($script:UpdateStatus,$script:UpdateBar))
+    $script:UpdateWindow.Show()
+    Set-UpdateWindowStatus 'Waiting for FMSC to close safely...'
+}
+function Set-UpdateWindowStatus {
+    param([string]$Message)
+    if ($script:UpdateWindow -and -not $script:UpdateWindow.IsDisposed) {
+        $script:UpdateStatus.Text = "Installing`r`n$Message`r`nPlease keep this computer switched on."
+        [Windows.Forms.Application]::DoEvents()
+    }
+}
+function Get-FmscDesktopShell {
+    # Delegate restart to the existing desktop shell; never launch the school app
+    # directly from this elevated process or under another Windows user's LocalDB.
+    $shell = New-Object -ComObject Shell.Application
+    $handle = 0
+    $desktop = $shell.Windows().FindWindowSW(0,0,8,[ref]$handle,1)
+    if (-not $desktop) { throw 'The Windows desktop is unavailable. Open FMSC from its shortcut.' }
+    return $desktop.Document.Application
+}
+function Start-UpdatedFmsc {
+    param([string]$Application)
+    $desktop = Get-FmscDesktopShell
+    $desktop.ShellExecute($Application, '', (Split-Path -Parent $Application), 'open', 1)
+}
+function Start-FmscAfterInstallation {
+    param([string]$Application)
+    if ($PreparedRoot) {
+        if ($script:UpdateWindow) {
+            $script:UpdateWindow.Text = 'FMSC - Completed'
+            $script:UpdateStatus.Text = "Completed`r`nUpdate installed and verified. Starting FMSC..."
+            $script:UpdateBar.Style = 'Continuous'; $script:UpdateBar.Value = 100
+            [Windows.Forms.Application]::DoEvents()
+        }
+        try { Start-UpdatedFmsc -Application $Application }
+        catch {
+            Write-Log "Update completed; automatic restart failed: $($_.Exception.Message)"
+            [Windows.Forms.MessageBox]::Show('The update was installed successfully. Open FMSC from its desktop shortcut.',
+                'FMSC - Update Completed', 'OK', 'Information') | Out-Null
+        }
+        return
+    }
+    $choice = Read-Host '  Start FMSC SMS now? (Y/N)'
+    if ($choice -match '^[Yy]$') { Start-Process -FilePath $Application }
 }
 function Write-Log {
     param(
@@ -1054,6 +1117,9 @@ function Invoke-LocalDbMsiInstallation {
     $silentCode = $silent.ExitCode
     Write-WarningMessage "Silent LocalDB installation failed (MSI code $silentCode)."
     Write-WarningMessage "Detailed Microsoft Installer log: $silentLog"
+    if ($PreparedRoot) {
+        throw "LocalDB repair requires support. Update stopped without opening an installation wizard. Log: $silentLog"
+    }
     Write-Host '  You can complete LocalDB setup using the official Microsoft installer wizard.' -ForegroundColor $ColorInfo
     $choice = Read-Host 'Open Microsoft LocalDB installation wizard now? (Y/N)'
     if ($choice -notmatch '^[Yy]$') {
@@ -1110,6 +1176,14 @@ function Test-PreparedUpdate {
 }
 
 try {
+    Open-UpdateWindow
+    if ($PreparedRoot) {
+        Wait-OriginalFmscExit -ProcessId $OriginalProcessId -StartTicks $OriginalStartTicks -UserSid $OriginalUserSid
+        if (-not (Test-Path -LiteralPath $LiveMdf -PathType Leaf) -or
+            -not (Test-Path -LiteralPath $LiveLdf -PathType Leaf)) {
+            throw 'An existing complete school database is required. Update will never copy template database files.'
+        }
+    }
     $script:InstallerMutex = New-Object Threading.Mutex($false, 'Global\FMSCInstallerActivation')
     $script:InstallerLockHeld = $false
     try { $script:InstallerLockHeld = $script:InstallerMutex.WaitOne(0) }
@@ -1117,6 +1191,7 @@ try {
     if (-not $script:InstallerLockHeld) { throw 'Another FMSC installer is active. No update was installed.' }
     if ($PreparedRoot) { Test-PreparedUpdate -Root $PreparedRoot -Version $AppVersion -Schema ([int]$DatabaseVersion) }
     Show-Banner
+    Write-Section 'Installing - preparing and activating the application update'
     Write-Log '================================================'
     Write-Log 'FMSC SMS installation started.'
     Write-Log "Application version: $AppVersion"
@@ -1142,7 +1217,7 @@ try {
             '  Run as administrator' `
             -ForegroundColor $ColorWarning
         Write-Host ''
-        exit 1
+        throw 'Administrator privileges are required. No update was installed.'
     }
     Write-Success `
         'Administrator privileges confirmed.'
@@ -1648,7 +1723,7 @@ try {
     Pause-Long
     Complete-VerifiedApplicationUpdate -ApplicationDirectory $AppDir -Source $AppSource -Prepared $PreparedRoot
     Write-Section `
-        'STEP 8 OF 8  -  INSTALLATION COMPLETE'
+        'STEP 8 OF 8  -  COMPLETED'
     Write-Host ''
     Write-Host `
         '  ============================================================' `
@@ -1702,23 +1777,7 @@ try {
     Write-Host `
         '  ------------------------------------------------------------' `
         -ForegroundColor $ColorDim
-    $StartApp =
-        Read-Host `
-            '  Start FMSC SMS now? (Y/N)'
-    Write-Host ''
-    if ($StartApp -match '^[Yy]$') {
-        Write-Host `
-            '  Starting FMSC SMS...' `
-            -ForegroundColor $ColorSuccess
-        Start-Process `
-            -FilePath $InstalledExe
-        Start-Sleep -Milliseconds 500
-    }
-    else {
-        Write-Host `
-            '  Installation finished. FMSC SMS was not started.' `
-            -ForegroundColor $ColorInfo
-    }
+    Start-FmscAfterInstallation -Application $InstalledExe
     Write-Host ''
     Write-Host `
         '  Thank you for using FMSC School Management System.' `
@@ -1773,11 +1832,15 @@ catch {
         "  $LogFile" `
         -ForegroundColor $ColorInfo
     Write-Host ''
-    Read-Host `
-        '  Press ENTER to close'
+    if ($PreparedRoot) {
+        [Windows.Forms.MessageBox]::Show(
+            "Update could not be completed. FMSC has not been restarted.`r`n`r`n$($_.Exception.Message)`r`n`r`nLog: $LogFile`r`nPrevious application: $AppRollbackDir`r`nDatabase backup: $RecoveryBackupPath",
+            'FMSC - Update Needs Attention', 'OK', 'Error') | Out-Null
+    } else { Read-Host '  Press ENTER to close' }
     exit 1
 }
 finally {
+    if ($script:UpdateWindow) { $script:UpdateWindow.Dispose() }
     if ($script:InstallerLockHeld) { $script:InstallerMutex.ReleaseMutex() }
     if ($script:InstallerMutex) { $script:InstallerMutex.Dispose() }
 }

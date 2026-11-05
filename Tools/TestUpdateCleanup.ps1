@@ -60,6 +60,8 @@ try {
     $activation = $source.IndexOf('    Enable-StagedApplication -Staging')
     $cleanup = $source.IndexOf('    Complete-VerifiedApplicationUpdate -ApplicationDirectory')
     if ($activation -lt 0 -or $cleanup -le $activation) { throw 'Cleanup must follow activation.' }
+    $completed = $source.IndexOf("'STEP 8 OF 8  -  COMPLETED'")
+    if ($completed -le $cleanup) { throw 'Completed must follow activated-application verification.' }
     Write-Output 'PASS: verification failures preserve recovery; successful activation cleanup, locked files, scope guards, database backup and enrollment preservation.'
 } finally {
     $absolute = [IO.Path]::GetFullPath($root)

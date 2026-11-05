@@ -210,7 +210,13 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         _progress.Visible = true;
         _progress.Style = ProgressBarStyle.Continuous;
         _progress.Value = state.Percent;
-        _status.Text = state.Message;
+        string stage = state.Phase switch {
+            UpdateDownloadPhase.Verifying or UpdateDownloadPhase.Preparing => "Verifying",
+            UpdateDownloadPhase.Ready => "Ready to Install",
+            UpdateDownloadPhase.Failed => "Download stopped",
+            _ => "Downloading"
+        };
+        _status.Text = stage + Environment.NewLine + state.Message;
         _downloadDetails.Text = state.Method + " · " + SizeText(state.TotalBytes) +
             (state.ReusedBytes > 0 ? " · " + SizeText(state.ReusedBytes) + " reused" : "");
         RenderTransferStats();
@@ -223,7 +229,7 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
         string speed = state.BytesPerSecond > 0 ? SizeText(state.BytesPerSecond) + "/s" : "—";
         string remaining = state.TimeRemaining is { } eta ? "~" + DurationText(eta) :
             state.Phase == UpdateDownloadPhase.Downloading ? "Calculating…" : "—";
-        _transferStats.Text = $"{state.Percent}% · Downloaded: {SizeText(state.ReceivedBytes)} / {SizeText(state.TotalBytes)} · " +
+        _transferStats.Text = $"Download: {state.Percent}% · Downloaded: {SizeText(state.ReceivedBytes)} / {SizeText(state.TotalBytes)} · " +
             $"{SizeText(state.BytesRemaining)} remaining\nSpeed: {speed} · Elapsed: {DurationText(elapsed)} · Time left: {remaining}";
     }
 
@@ -392,7 +398,8 @@ internal sealed class UpdateConnectionForm : ApplicationWindowForm
                 _install.Visible = true;
                 _download.Visible = false;
                 _downloadDetails.Text = prepared.Method + " · downloaded and verified";
-                _status.Text = "Update verified and ready to install. You can continue working until you choose Install Update.";
+                _status.Text = "Ready to Install" + Environment.NewLine +
+                    "Downloaded and verified. The update is not installed yet. Choose Install Update when you are ready.";
             }
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }

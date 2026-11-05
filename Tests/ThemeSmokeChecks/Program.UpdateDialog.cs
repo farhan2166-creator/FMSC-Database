@@ -83,9 +83,18 @@ internal static partial class Program
                 BytesPerSecond = 0, TimeRemaining = null, Attempt = 3, Message = "Connection lost. Retrying in 4s (attempt 3/5)…" });
             Check(bar.Value == 40 && stats.Text.Contains("Speed: —") && stats.Text.Contains("Time left: —"),
                 "Reconnect state shows only committed progress and no stale speed/ETA");
+            var status = (Label)typeof(UpdateConnectionForm).GetField("_status", fields)!.GetValue(dialog)!;
+            dialog.ApplyDownloadProgress(transfer with { Phase = UpdateDownloadPhase.Verifying, ReceivedBytes = 20 * 1048576,
+                TimeRemaining = null, Message = "Checking downloaded files." });
+            Check(bar.Value == 100 && stats.Text.StartsWith("Download: 100%") &&
+                status.Text.StartsWith("Verifying") && !Find(dialog, "Install Update").Enabled,
+                "100 percent describes download only; verification cannot enable installation");
+            dialog.ApplyDownloadProgress(transfer with { Phase = UpdateDownloadPhase.Preparing,
+                Message = "Preparing application files." });
+            Check(status.Text.StartsWith("Verifying"), "Staging remains part of verification, never installation");
             dialog.ApplyDownloadProgress(transfer with { Phase = UpdateDownloadPhase.Ready, ReceivedBytes = 20 * 1048576,
                 TimeRemaining = null, Message = "Download verified and prepared." });
-            Check(bar.Value == 100 && !Find(dialog, "Install Update").Enabled,
+            Check(bar.Value == 100 && status.Text.StartsWith("Ready to Install") && !Find(dialog, "Install Update").Enabled,
                 "A complete progress bar alone cannot bypass the validated installer handoff");
             Find(dialog, "Close").PerformClick(); Application.DoEvents();
             Check(dialog.IsDisposed, "A progress window remains dismissible");

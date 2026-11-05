@@ -52,7 +52,7 @@ internal static class UpdateInstallerHandoff
         if ((script + root).Contains('"')) throw new InvalidDataException("Invalid update directory.");
         var start = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
             @"WindowsPowerShell\v1.0\powershell.exe")) { UseShellExecute = true, Verb = "runas" };
-        start.Arguments = "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" -PreparedRoot \"" + root +
+        start.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File \"" + script + "\" -PreparedRoot \"" + root +
             "\" -OriginalProcessId " + original.Id + " -OriginalStartTicks " + original.StartTime.ToUniversalTime().Ticks +
             " -OriginalUserSid " + WindowsIdentity.GetCurrent().User!.Value;
         Process.Start(start)?.Dispose();

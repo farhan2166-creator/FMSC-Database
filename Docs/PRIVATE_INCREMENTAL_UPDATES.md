@@ -326,6 +326,37 @@ tests remain production limitations; successful incremental testing does not clo
 
 ## Download progress and recovery
 
+The user-visible stages are Downloading → Verifying → Ready to Install in FMSC,
+then Installing → Completed in the external installer after FMSC closes.
+The percentage explicitly measures **Download**, never installation. A 100%
+download continues through archive, staged-file and installer-handoff validation
+before Ready to Install. Installation requires the user's separate action and
+safe shutdown. Completed is shown only after activated-file and database checks.
+
+Prepared updates launch elevated Windows PowerShell with its console hidden and
+show a small Installing progress window instead. Existing installer pauses and
+Y/N restart prompts are skipped for this path; ordinary full installation keeps
+its interactive behavior. After verified activation, restart is delegated to the
+existing Windows desktop shell, then the installer window and process exit.
+Windows administrator consent and FMSC's existing safe-close confirmation remain.
+Failure shows an attention dialog with the log and recovery paths, without
+restarting FMSC. A missing desktop shell after successful installation asks the
+user to open the normal shortcut instead of launching an elevated application.
+
+### Forced interruption limitations
+
+An ordinary caught activation failure attempts to restore the previous application
+directory; completed migrations remain applied and their verified backup is kept.
+A forced process termination or power failure bypasses those handlers. There is
+currently no durable startup repair journal or stable recovery launcher: interruption
+between the two activation directory renames can leave the application shortcut
+without a target until the installation is repaired. Interruption between numbered
+migrations can leave a schema incompatible with the previous application, which
+normal database compatibility checks must refuse. SQL transaction rollback for an
+interrupted individual migration is separate from restoring earlier committed
+migrations. Database backup restoration is not automatic. These cases require
+disposable power-interruption/recovery acceptance before claiming crash-safe updates.
+
 The dialog displays download percentage, received/total bytes, remaining bytes,
 network speed, elapsed time and estimated time remaining. Git's network pack
 progress supplies speed measurements; local `git show` output is never treated
