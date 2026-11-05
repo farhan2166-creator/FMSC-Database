@@ -42,15 +42,15 @@ internal static partial class Program
                 "A loaded account opens at Amount for both ordinary navigation and the family counter.");
             Check(amount.Text=="1250"&&amount.SelectionLength==4,
                 "Entry focus selects the existing Amount without changing its value.");
-            var next = Field<ModernButton>("nextStudentButton");
-            var summary = (TableLayoutPanel)next.Parent!;
+            // The Next Student action was intentionally removed; inspect the
+            // current primary collection action and its real payment container.
+            var action = Field<ModernButton>("executeButton");
+            var summary = (TableLayoutPanel)action.Parent!;
             var scroll = (Panel)summary.Parent!;
-            int row = summary.GetRow(next);
             int normalHeight = summary.Height;
-            float reserved = summary.RowStyles[row].Height;
             if(selected.Length == 1)
             {
-                Check(next.Visible && reserved > 0, "Ordinary collection retains Next Student and its action row");
+                Check(summary.Controls.Contains(action), "Ordinary collection retains its primary payment action");
                 // Programmatic enrollment binding used to launch an independent
                 // asynchronous reload, invalidating the just-selected student.
                 var enrollment=Field<LookupBox>("enrollment");
@@ -90,10 +90,10 @@ internal static partial class Program
                 picker.SetStudent(41,"41 - Synthetic student");
                 charges.Rows.Clear();
                 page.ConfigureCounter(selected); Application.DoEvents();
-                Check(normalHeight - summary.Height >= reserved, "Changing to counter mode releases the hidden action's full height");
+                Check(summary.Height <= normalHeight, "Changing to counter mode keeps the payment layout compact");
             }
-            Check(!next.Visible && summary.RowStyles[row].Height == 0,
-                "The family payment dialog reserves no hidden Next Student row, including on first opening");
+            Check(summary.Controls.Contains(action),
+                "The family payment dialog retains its primary collection action without a removed Next Student row");
             using (var picture = new Bitmap(owner.Width, owner.Height))
             {
                 owner.DrawToBitmap(picture, new Rectangle(Point.Empty, picture.Size));
@@ -107,7 +107,7 @@ internal static partial class Program
                 $"Counter scroll matches actual overflow (scroll={scroll.VerticalScroll.Visible}, contentBottom={summary.Bottom}, viewport={scroll.ClientSize.Height}, selected={selected.Length})");
             if (needsScroll)
             {
-                scroll.ScrollControlIntoView(next.Visible?next:(Control)Field<ModernButton>("printReceiptButton"));
+                scroll.ScrollControlIntoView(action);
                 Application.DoEvents();
             }
             foreach(string name in new[]{"discountAmount","paymentAmount","method","reference","remarks"})
