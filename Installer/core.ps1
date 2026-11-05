@@ -142,7 +142,11 @@ function Open-UpdateWindow {
     [Windows.Forms.Application]::EnableVisualStyles()
     $script:UpdateWindow = New-Object Windows.Forms.Form
     $script:UpdateWindow.Text = if ($PreparedRoot) { 'FMSC - Installing update' } else { 'FMSC - First-time setup' }
-    $script:UpdateWindow.ClientSize = New-Object Drawing.Size(650,430)
+    # Shared first-install and prepared-update window: match the FMSC login dialog
+    # baseline at 100% DPI. Both installer modes use this same UI and geometry.
+    $clientWidth = 760
+    $clientHeight = 500
+    $script:UpdateWindow.ClientSize = [Drawing.Size]::new($clientWidth, $clientHeight)
     $script:UpdateWindow.StartPosition = 'CenterScreen'
     $script:UpdateWindow.FormBorderStyle = 'FixedDialog'
     $script:UpdateWindow.ControlBox = $false
@@ -152,44 +156,44 @@ function Open-UpdateWindow {
     $script:UpdateWindow.BackColor = [Drawing.Color]::FromArgb(246,248,251)
 
     $header = New-Object Windows.Forms.Panel
-    $header.SetBounds(0,0,650,124)
+    $header.SetBounds(0,0,$clientWidth,138)
     $header.BackColor = [Drawing.Color]::White
     $mark = New-Object Windows.Forms.Label
-    $mark.SetBounds(26,30,54,54)
+    $mark.SetBounds(30,38,54,54)
     $mark.Text = 'F'
     $mark.TextAlign = 'MiddleCenter'
     $mark.BackColor = [Drawing.Color]::FromArgb(37,99,235)
     $mark.ForeColor = [Drawing.Color]::White
     $mark.Font = New-Object Drawing.Font('Segoe UI',21,[Drawing.FontStyle]::Bold)
     $name = New-Object Windows.Forms.Label
-    $name.SetBounds(94,28,520,36)
+    $name.SetBounds(98,36,600,36)
     $name.Text = 'FMSC School Management'
     $name.ForeColor = [Drawing.Color]::FromArgb(17,24,39)
     $name.Font = New-Object Drawing.Font('Segoe UI',16,[Drawing.FontStyle]::Bold)
     $mode = New-Object Windows.Forms.Label
-    $mode.SetBounds(96,68,340,20)
+    $mode.SetBounds(100,77,480,20)
     $mode.Text = if ($PreparedRoot) { 'SECURE APPLICATION UPDATE' } else { 'FIRST-TIME INSTALLATION' }
     $mode.ForeColor = [Drawing.Color]::FromArgb(37,99,235)
     $mode.Font = New-Object Drawing.Font('Segoe UI',9,[Drawing.FontStyle]::Bold)
     $version = New-Object Windows.Forms.Label
-    $version.SetBounds(404,94,218,22)
+    $version.SetBounds(495,105,235,22)
     $version.Text = "App $AppVersion   |   Database $DatabaseVersion"
     $version.TextAlign = 'MiddleRight'
     $version.ForeColor = [Drawing.Color]::FromArgb(107,114,128)
     $version.Font = New-Object Drawing.Font('Segoe UI',8.5)
     $header.Controls.AddRange(@($mark,$name,$mode,$version))
     $accent = New-Object Windows.Forms.Panel
-    $accent.SetBounds(0,124,650,3)
+    $accent.SetBounds(0,138,$clientWidth,3)
     $accent.BackColor = [Drawing.Color]::FromArgb(37,99,235)
 
     $script:UpdatePhase = New-Object Windows.Forms.Label
-    $script:UpdatePhase.SetBounds(27,150,594,28)
+    $script:UpdatePhase.SetBounds(30,165,700,30)
     $script:UpdatePhase.Text = 'PREPARING A SAFE INSTALLATION'
     $script:UpdatePhase.ForeColor = [Drawing.Color]::FromArgb(37,99,235)
     $script:UpdatePhase.Font = New-Object Drawing.Font('Segoe UI',9,[Drawing.FontStyle]::Bold)
 
     $script:UpdateStatus = New-Object Windows.Forms.Label
-    $script:UpdateStatus.SetBounds(27,187,593,79)
+    $script:UpdateStatus.SetBounds(30,204,700,90)
     $script:UpdateStatus.TextAlign = 'MiddleLeft'
     $script:UpdateStatus.ForeColor = [Drawing.Color]::FromArgb(31,41,55)
     $script:UpdateStatus.Font = New-Object Drawing.Font('Segoe UI',11.5,[Drawing.FontStyle]::Bold)
@@ -197,37 +201,37 @@ function Open-UpdateWindow {
     $script:UpdateStepBars = @()
     foreach ($i in 0..7) {
         $segment = New-Object Windows.Forms.Panel
-        $segment.SetBounds((27 + 74 * $i),278,68,7)
+        $segment.SetBounds((30 + 88 * $i),314,82,7)
         $segment.BackColor = [Drawing.Color]::FromArgb(226,232,240)
         $script:UpdateWindow.Controls.Add($segment)
         $script:UpdateStepBars += $segment
     }
     $script:UpdateBar = New-Object Windows.Forms.ProgressBar
-    $script:UpdateBar.SetBounds(27,303,590,12)
+    $script:UpdateBar.SetBounds(30,342,700,14)
     $script:UpdateBar.Style = 'Marquee'
     $script:UpdateBar.MarqueeAnimationSpeed = 28
 
     $foot = New-Object Windows.Forms.Label
-    $foot.SetBounds(27,328,590,24)
+    $foot.SetBounds(30,369,700,24)
     $foot.Text = 'Please keep this computer on. Database safety checks remain active.'
     $foot.ForeColor = [Drawing.Color]::FromArgb(107,114,128)
     $foot.Font = New-Object Drawing.Font('Segoe UI',8.5)
     # A stable, integrated action footer. Buttons cannot be used during
     # installation or verification; they activate only after successful setup.
     $separator = New-Object Windows.Forms.Panel
-    $separator.SetBounds(0,363,650,1)
+    $separator.SetBounds(0,424,$clientWidth,1)
     $separator.BackColor = [Drawing.Color]::FromArgb(226,232,240)
     $actions = New-Object Windows.Forms.Panel
-    $actions.SetBounds(0,364,650,66)
+    $actions.SetBounds(0,425,$clientWidth,75)
     $actions.BackColor = [Drawing.Color]::White
     $script:UpdateFinishPrompt = New-Object Windows.Forms.Label
-    $script:UpdateFinishPrompt.SetBounds(27,12,290,34)
+    $script:UpdateFinishPrompt.SetBounds(30,20,365,34)
     $script:UpdateFinishPrompt.Text = 'Open FMSC when setup finishes?'
     $script:UpdateFinishPrompt.TextAlign = 'MiddleLeft'
     $script:UpdateFinishPrompt.ForeColor = [Drawing.Color]::FromArgb(107,114,128)
     $script:UpdateFinishPrompt.Font = New-Object Drawing.Font('Segoe UI',9)
     $script:UpdateYes = New-Object Windows.Forms.Button
-    $script:UpdateYes.SetBounds(324,14,170,36)
+    $script:UpdateYes.SetBounds(420,18,170,38)
     $script:UpdateYes.Text = 'Yes, open FMSC'
     $script:UpdateYes.FlatStyle = 'Flat'
     $script:UpdateYes.FlatAppearance.BorderSize = 0
@@ -237,7 +241,7 @@ function Open-UpdateWindow {
     $script:UpdateYes.Cursor = [Windows.Forms.Cursors]::Hand
     $script:UpdateYes.Enabled = $false
     $script:UpdateNo = New-Object Windows.Forms.Button
-    $script:UpdateNo.SetBounds(503,14,118,36)
+    $script:UpdateNo.SetBounds(602,18,128,38)
     $script:UpdateNo.Text = 'No, close'
     $script:UpdateNo.FlatStyle = 'Flat'
     $script:UpdateNo.FlatAppearance.BorderSize = 1
