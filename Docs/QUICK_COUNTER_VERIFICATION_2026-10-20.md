@@ -62,7 +62,7 @@ of these results.
 
 ## Database delivery and live application
 
-[Migration 27](../Migrations/27.sql) requires schema 26, adds the read-only waiver
+[Migration 27](../Tests/LifecycleSqlChecks/Migrations/27.sql) requires schema 26, adds the read-only waiver
 procedure and corrects the all-zero bill total conversion in `IssueFeeBill`.
 It advances the schema to 27. It does not rewrite issued bills, school records,
 charges, payments, allocations or credit. Its SQL can be reapplied in sequence

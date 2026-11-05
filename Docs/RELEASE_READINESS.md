@@ -72,7 +72,7 @@ GitHub ZIP SHA256:
 Retained until 2026-11-01. The package records the tested source commit and contains
 its `SHA256SUMS.txt`; school database files are excluded.
 
-The [previous RC1 evidence](ReleaseHistory/1.1.0-rc.1.md) applies to that older
+The [first-production baseline](FIRST_RELEASE_BASELINE.md) applies to that older
 artifact only. It does not include this operator-control revision.
 
 ## Deployment and scope

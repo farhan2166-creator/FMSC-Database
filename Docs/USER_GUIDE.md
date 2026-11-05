@@ -119,7 +119,7 @@ Screen naming and source mapping: [PROJECT_STRUCTURE.md](Development/PROJECT_STR
 
 **Reopen a cancelled pending child:** Review the new placement, academic year, joining date, reason and financial preservation notice. Reopening retains the same child identity and temporary reference and preserves earlier cancelled placements, bills, payments and family history; it does **not** automatically restore cancelled fees or bills. Review the current fee plan before subsequently confirming admission.
 
-If a registration save has an uncertain result, use **Check Registration Save** when offered rather than creating or confirming a second child. Other admission saves also retain their existing **Check Saved Admission** or recovery controls. Do not close an active save or blindly repeat a transaction. See [current admission/registration decisions](Decisions/ADMISSION_REGISTRATION_SIMPLIFICATION.md) and [admission workflow](Workflows/ADMISSION_WORKFLOW.md) for details.
+If a registration save has an uncertain result, use **Check Registration Save** when offered rather than creating or confirming a second child. Other admission saves also retain their existing **Check Saved Admission** or recovery controls. Do not close an active save or blindly repeat a transaction. See [current admission/registration decisions](BUSINESS_DECISIONS.md#bd-01) and [admission workflow](Workflows/ADMISSION_WORKFLOW.md) for details.
 
 ## Find Student
 

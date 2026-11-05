@@ -9,7 +9,7 @@ The first-production baseline is application 1.0.0 and required database schema 
 3. [INSTALLATION](../Docs/INSTALLATION.md)
 4. [BACKUP RECOVERY](../Docs/BACKUP_RECOVERY.md)
 5. [FMSC MASTER AUDIT](FMSC_MASTER_AUDIT.md)
-6. [RELEASE VERIFICATION 2026 11 01](../Docs/RELEASE_VERIFICATION_2026-11-01.md)
+6. [RELEASE VERIFICATION 2026 11 01](../Docs/RELEASE_CHECKLIST.md)
 
 ## Retention and use
 

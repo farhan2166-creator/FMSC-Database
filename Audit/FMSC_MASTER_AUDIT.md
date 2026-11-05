@@ -1,5 +1,7 @@
 # FMSC_SMS — Master Audit and Release Status
 
+> **Historical evidence notice (5 November 2026):** This file retains dated pre-production audit summaries. The first-production baseline is application 1.0.0 / schema 1 ([current baseline](../Docs/FIRST_RELEASE_BASELINE.md)). Older schema versions and acceptance claims below are historical, not current deployment approval. For current approved behavior consult [BD-01–BD-38](../Docs/BUSINESS_DECISIONS.md).
+
 **Documentation consolidation — 2 November 2026:** current business rules live in
 [C#](../Core/BusinessDecisions.cs) and the [decision handbook](../Docs/BUSINESS_DECISIONS.md).
 [Review history](REVIEW_HISTORY.md) preserves dated reports and their original finding IDs.
@@ -39,13 +41,13 @@ The owner-approved Admission registration simplification and migration 64 are
 implemented and locally applied with a verified backup and unchanged hashes for
 79 existing business tables. Native row-action/status layout checks and isolated
 clone registration/cancel/reopen/confirmation checks passed. See the
-[decision and scope of evidence](../Docs/Decisions/ADMISSION_REGISTRATION_SIMPLIFICATION.md).
+[decision and scope of evidence](../Docs/BUSINESS_DECISIONS.md#bd-01).
 Joint acceptance of the updated entry/confirmation UI remains a separate gate.
 
 The owner-approved academic-year date lock is implemented in migration 63 and
 applied locally after a verified backup with unchanged hashes across 79 business
 tables. Portable, native-control and isolated SQL checks passed. See the
-[decision and dated evidence](../Docs/Decisions/ACADEMIC_YEAR_DATE_LOCK.md) for the
+[decision and dated evidence](../Docs/BUSINESS_DECISIONS.md#bd-23) for the
 reviewed working-tree baseline, initial checker rollback and exact test scope.
 Joint operator acceptance remains pending; this does not change unrelated release
 gates or certify all forms.

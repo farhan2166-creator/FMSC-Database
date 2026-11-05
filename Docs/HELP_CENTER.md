@@ -20,7 +20,7 @@ An entry can carry more than one label:
 | Permission required | The action requires the relevant access in addition to valid data. |
 | Recovery guidance | Determine the recorded outcome or use the supported recovery path before retrying. |
 
-Maintainer-only ownership records SQL, C#, configurable data and external provider/environment dependencies. It is separate from operator labels. Source references and related IDs live with each entry. See the [coverage matrix](FAQ_COVERAGE_MATRIX.md) for every question and the [source audit](FAQ_AUDIT_REPORT.md) for corrections and unresolved differences.
+Maintainer-only ownership records SQL, C#, configurable data and external provider/environment dependencies. It is separate from operator labels. Source references and related IDs live with each entry. See the [coverage matrix](FAQ_COVERAGE_MATRIX.md) for every question and the [retained historical audit evidence](../Audit/REVIEW_HISTORY.md#help--faq-source-audit--2026-10-16) for corrections and unresolved differences.
 
 ## Structure and maintenance
 
