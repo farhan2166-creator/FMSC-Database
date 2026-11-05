@@ -222,7 +222,7 @@ ServiceFabricBackup/
 *.ndf
 *.bak
 # Private configuration and key containers belong outside source control.
-# NEVER commit publisher signing private material (public publisher key is deliberate).
+# School SSH private keys and Windows-protected credentials stay local.
 **/*private*.pem
 **/*private*.key
 **/*.dpapi
@@ -237,6 +237,13 @@ credentials.json
 appsettings.Production.json
 appsettings.*.local.json
 *.p12
+*.bacpac
+*.key
+# Private Git recovery archives and raw SSH private-key filenames.
+*.bundle
+id_rsa
+id_ed25519
+id_ecdsa
 # Business Intelligence projects
 *.rdl.data
 *.bim.layout

@@ -24,10 +24,12 @@ Release validation and remaining school-PC checks are recorded in [Release readi
 
 For detailed screen naming, see [project structure](Docs/Development/PROJECT_STRUCTURE.md). [Admission workflow decisions](Docs/Workflows/ADMISSION_WORKFLOW.md) contain historical process context and should be read with the current code and schema-version notes.
 
+To recover development after losing a PC or local folder, follow [Restore the project on a new PC](Docs/RESTORE_DEVELOPMENT_PC.md). GitHub contains the source and build/test tooling; keep school databases and private backups separately.
+
 ## Technical overview
 
 - **Platform:** Windows x64; WinForms on .NET 8. The complete installer publishes a self-contained Windows application.
-- **Database:** Local SQL Server database `FMSC_DB`, normally managed through the current Windows user's `(localdb)\MSSQLLocalDB` instance. The application expects **schema version 29** and checks structural compatibility.
+- **Database:** Local SQL Server database `FMSC_DB`, normally managed through the current Windows user's `(localdb)\MSSQLLocalDB` instance. The first production baseline is application **1.0.0**, database **1**, with complete structural compatibility checks. See [the baseline decision](Docs/FIRST_RELEASE_BASELINE.md).
 - **Database delivery:** Fresh installs require an owner-provided, verified, **detached matching MDF/LDF pair**. Real school database files, backup files and credentials must not be committed to GitHub or uploaded to Actions.
 - **Installer:** `Installer/core.ps1`, launched by `Install FMSC_SMS.bat` in the release bundle. Existing installation and migration behavior must be tested against a disposable copy before production.
 - **Reporting:** PDF/CSV and RDLC report components are included; physical printing and target-printer settings require Windows acceptance.
@@ -51,7 +53,7 @@ The Windows CI additionally builds and runs focused WinForms page/host tests and
 - [Windows application-only ZIP](.github/workflows/fmsc-windows-download.yml): manual application bundle; **not** a complete installer.
 - [Complete Windows installer ZIP](.github/workflows/fmsc-complete-installer.yml): manual database-free package with installer scripts, migrations, and prerequisites; the owner adds the detached MDF/LDF **after download** for a fresh install.
 
-Run status, download availability and retention are shown in the [Actions tab](https://github.com/farhan2166-creator/FMSC-Source/actions). No GitHub workflow installs onto a school PC or publishes a public release.
+Run status, download availability and retention are shown in the [Actions tab](https://github.com/farhan2166-creator/FMSC-Source/actions). Workflow 04 can also publish an approved update to the private `FMSC-Updates` repository when the owner explicitly enables publication. No workflow installs onto a school PC or publishes a public release.
 
 ## Dependency updates and secret checks
 

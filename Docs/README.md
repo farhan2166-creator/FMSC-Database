@@ -26,6 +26,7 @@ Operator guides, deployment runbooks and evidence files remain separate because 
 
 - [Architecture](ARCHITECTURE.md)
 - [Development workflow and verification scope](DEVELOPMENT_WORKFLOW.md)
+- [Restore development on a new PC](RESTORE_DEVELOPMENT_PC.md)
 - [Project structure and screen names](Development/PROJECT_STRUCTURE.md)
 - [UI style guide](Design/UI_STYLE_GUIDE.md)
 - [UI tuning guide](Design/UI_TUNING_GUIDE.md)
