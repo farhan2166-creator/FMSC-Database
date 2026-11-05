@@ -22,15 +22,22 @@ internal static class CollectionReceiptRdlc
             return box;
         }
         var groupHeading = E("TablixRow", E("Height", "0.28in"), E("TablixCells",
-            E("TablixCell", E("CellContents", Text("ReceiptHeading" + band, "=Fields!GroupLabel.Value", true,"Center"), E("ColSpan", indices.Length))),
+            E("TablixCell", E("CellContents", Text("ReceiptHeading" + band,
+                $"=Fields!GroupLabel.Value & \" (\" & CountRows(\"{group}\") & IIf(CountRows(\"{group}\") = 1, \" entry)\", \" entries)\")", true), E("ColSpan", indices.Length))),
             Enumerable.Range(1, indices.Length - 1).Select(_ => E("TablixCell"))));
         XElement Total(bool grand)
         {
+            int labelSpan=Math.Max(1,indices.TakeWhile(index=>!numeric[index]).Count());
             var cells = indices.Select((index, position) => {
-                string value = position == 0 ? (grand ? "Grand Total" : "Subtotal")
+                if(position>0&&position<labelSpan)return E("TablixCell");
+                string value = position == 0 ? (grand
+                    ? "=\"Grand Total (\" & CountRows(\"ReportData\") & IIf(CountRows(\"ReportData\") = 1, \" entry)\", \" entries)\")"
+                    : $"=\"Subtotal — \" & First(Fields!GroupLabel.Value, \"{group}\")")
                     : numeric[index] ? $"=Format(Sum(Fields!N{index}.Value{(grand ? "" : ", \"" + group + "\"")}), \"#,##0.##\")" : "";
-                return E("TablixCell", E("CellContents", Text($"ReceiptTotal{band}_{index}_{grand}", value, true,
-                    numeric[index] ? "Center" : "Left")));
+                var contents=E("CellContents",Text($"ReceiptTotal{band}_{index}_{grand}", value, true,
+                    numeric[index] ? "Right" : "Left"));
+                if(position==0&&labelSpan>1)contents.Add(E("ColSpan",labelSpan));
+                return E("TablixCell",contents);
             });
             return E("TablixRow", E("Height", "0.28in"), E("TablixCells", cells));
         }

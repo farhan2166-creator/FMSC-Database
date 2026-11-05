@@ -5,6 +5,8 @@ namespace FMSC_SMS.Core;
 // Read-only display projection. Receipt amounts and saved snapshots are untouched.
 internal static class CollectionReceiptPresentation
 {
+    internal const string PrintNamesKey="FMSC.ReceiptNamesWithClasses";
+    internal sealed record PrintNames(string Individual,string Family);
     private sealed record Placement(string ClassSection,string Campus);
     private sealed record Student(long Id,string Name,string Father,string Gender,IReadOnlyList<Placement> Placements);
     private static string Text(JsonElement value,string name)=>value.TryGetProperty(name,out var field)&&field.ValueKind==JsonValueKind.String?field.GetString()??"":"";
@@ -22,6 +24,8 @@ internal static class CollectionReceiptPresentation
     internal static void Apply(DataTable rows)
     {
         if(!rows.Columns.Contains("__ReceiptStudents"))return;
+        var printNames=new Dictionary<(string Identity,string Classes),PrintNames>();
+        rows.Columns["Student / Family"]!.ExtendedProperties[PrintNamesKey]=printNames;
         foreach(DataRow row in rows.Rows)
         {
             if(row.IsNull("__ReceiptStudents"))continue;
@@ -47,6 +51,16 @@ internal static class CollectionReceiptPresentation
             row["Student / Family"]=Names(students);
             // Keep one entry per student, including repeated classes, in the same order.
             row["Class / Section"]=string.Join("\n",students.Select(student=>string.Join(" / ",student.Placements.Select(place=>place.ClassSection).Where(text=>text.Length>0).Distinct()) is {Length:>0} label?label:"Not recorded"));
+            string[] classes=Convert.ToString(row["Class / Section"])!.Split('\n');
+            string[] fathers=students.Select(student=>RecordTextPolicy.DisplayText("FatherName",student.Father)).Distinct().ToArray();
+            bool sharedParent=fathers.Length==1&&fathers[0].Length>0;
+            string members=string.Join(", ",students.Select((student,index)=>(Student:student,Class:classes[index]))
+                .GroupBy(item=>item.Class,StringComparer.Ordinal)
+                .Select(group=>string.Join(", ",group.Select(item=>sharedParent
+                    ?RecordTextPolicy.DisplayText("StudentName",item.Student.Name):Names(new[]{item.Student})))+$" ({group.Key})"));
+            printNames[(Convert.ToString(row["Student / Family"])!,Convert.ToString(row["Class / Section"])!)]=new(
+                Names(students)+" ("+string.Join(" / ",classes.Distinct())+")",
+                (sharedParent?"Family: "+fathers[0]:"Family")+"\n"+members);
             var campuses=students.SelectMany(student=>student.Placements).Select(place=>place.Campus).Where(text=>text.Length>0).Distinct().ToArray();
             if(campuses.Length>0)row["Campus"]=string.Join(", ",campuses);
         }

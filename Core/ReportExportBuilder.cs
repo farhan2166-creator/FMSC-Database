@@ -32,6 +32,8 @@ internal static class ReportExportBuilder
             bool asDate = dates.Contains(sourceColumn.ColumnName);
             var exportedColumn=export.Columns.Add(uniqueHeader, asDate && !preserveDateTypes ? typeof(string) : sourceColumn.DataType);
             exportedColumn.ExtendedProperties[ReportStudentIdentity.SourceColumnKey]=sourceColumn.ColumnName;
+            if(sourceColumn.ExtendedProperties[CollectionReceiptPresentation.PrintNamesKey] is { } receiptNames)
+                exportedColumn.ExtendedProperties[CollectionReceiptPresentation.PrintNamesKey]=receiptNames;
             if (asDate)
                 dateOrdinals.Add(sourceColumns.Count - 1);
         }

@@ -6,7 +6,7 @@ namespace FMSC_SMS.Core;
 // identity fields share a cell so amounts and references have room to read.
 internal static class GridReportColumns
 {
-    internal enum Kind { Standard, Student, Placement, Admission, Leaving, ClassChange, StatusChange, Due, Recipient, Certificate, Collection, Recorded, Family }
+    internal enum Kind { Standard, Student, Placement, Admission, Leaving, ClassChange, StatusChange, Due, Recipient, Certificate, Collection, Recorded, Family, ReceiptStudent }
     internal sealed record Column(string Caption,int[] Fields,bool Numeric,double Minimum,double Weight,Kind Presentation=Kind.Standard);
 
     internal static string Alignment(DataTable source,Column column)
@@ -43,6 +43,33 @@ internal static class GridReportColumns
         string ValueAt(int index)=>Value(row,index,moneyFormat);
         string Label(int index,string label)=>ValueAt(index) is {Length:>0} value?label+value:"";
         string Lines(IEnumerable<string> values)=>string.Join("\n",values.Where(value=>value.Length>0).Distinct());
+        if(column.Presentation==Kind.ReceiptStudent)
+        {
+            int student=Find("Student / Family"),scope=Find("Scope");
+            string identity=ValueAt(student);
+            int klass=Find("Class / Section");
+            if(klass>=0 && row.Table.Columns[student].ExtendedProperties[CollectionReceiptPresentation.PrintNamesKey]
+                is Dictionary<(string Identity,string Classes),CollectionReceiptPresentation.PrintNames> names
+                && names.TryGetValue((Convert.ToString(row[student])??"",Convert.ToString(row[klass])??""),out var paired))
+            {
+                string pairedIdentity=scope>=0&&ValueAt(scope).Equals("Family",StringComparison.OrdinalIgnoreCase)?paired.Family:paired.Individual;
+                return Lines(new[]{pairedIdentity}.Concat(column.Fields.Where(index=>index!=student&&index!=scope&&index!=klass).Select(ValueAt)));
+            }
+            if(scope>=0 && ValueAt(scope).Equals("Family",StringComparison.OrdinalIgnoreCase))
+            {
+                // Reformat only an unambiguous shared-parent label; retain other identities verbatim.
+                var matches=System.Text.RegularExpressions.Regex.Matches(identity,@" s(?:/d)?/o | d/o ");
+                if(matches.Count==1)
+                {
+                    var separator=matches[0];
+                    identity=$"Family: {identity[(separator.Index+separator.Length)..]} ({identity[..separator.Index]})";
+                }
+                else identity="Family: "+identity;
+            }
+            else if(scope>=0 && ValueAt(scope) is {Length:>0} label && !label.Equals("Individual",StringComparison.OrdinalIgnoreCase))
+                identity=label+": "+identity;
+            return Lines(new[]{identity}.Concat(column.Fields.Where(index=>index!=student&&index!=scope).Select(ValueAt)));
+        }
         if(column.Presentation==Kind.Student || column.Caption=="Student / Admission")
         {
             int student=Find("Student","StudentName"),admission=Find("Adm. / QR No.","AdmissionNumber","Adm. No.","AdmissionNumberText"),father=Find("Father","FatherName"),gender=Find("Gender");
@@ -90,7 +117,11 @@ internal static class GridReportColumns
             Find("Father","FatherName"),Find("DateOfBirth","DOB"),Find("Gender"),Original("StudentStatus"));
         MergeAs(Kind.Recipient,"Recipient",Find("Name","Recipient","Recipient Name"),Find("Student / Staff No.","Student No.","Staff No."),Find("Recipient Type"));
         Merge("Receipt / Date",Find("Receipt / Reference","Receipt No.","Receipt Number","Receipt"),Find("Date"));
-        Merge("Student / Family",Find("Student / Family"),Find("Scope"));
+        bool compactReceipts=CollectionReceiptGrouping.Layout(source) is not null;
+        if(compactReceipts)
+            MergeAs(Kind.ReceiptStudent,"Student / Family (Class / Section)",Find("Student / Family"),Find("Scope"),Find("Class / Section"));
+        else
+            Merge("Student / Family",Find("Student / Family"),Find("Scope"));
         int campus=Find("Campus","CampusName"),klass=Find("Class / Section","Class – Section","ClassSection","ClassName","Class"),year=Find("Academic Year","YearName");
         int placement=campus>=0?campus:klass>=0?klass:year;
         string placementCaption=string.Join("\n",new[]{campus>=0?"Campus":"",klass>=0?"Class / Section":"",year>=0?"Academic Year":""}.Where(text=>text.Length>0));

@@ -19,6 +19,8 @@ internal static class GridReportPreview
         XElement E(string name,params object[] content)=>new(ns+name,content);
         string Inch(double value)=>value.ToString("0.####",CultureInfo.InvariantCulture)+"in";
         var columns=GridReportColumns.Create(source,moneyFormat);
+        bool compactReceipts=CollectionReceiptGrouping.Layout(source) is not null;
+        if(compactReceipts)columns.Insert(0,new GridReportColumns.Column("#",Array.Empty<int>(),false,.3,.2));
         bool landscape=columns.Count>6||columns.Sum(column=>column.Minimum)>7.25;
         double width=landscape?10.67:7.25;
         var bands=GridReportColumns.Bands(columns,width);
@@ -39,7 +41,8 @@ internal static class GridReportPreview
             for (int i = 0; i < columns.Count; i++)
             {
                 var column = columns[i];
-                printed["C" + i] = GridReportColumns.DisplayValue(row,column,moneyFormat);
+                printed["C" + i] = compactReceipts&&column.Caption=="#" ? (data.Rows.Count+1).ToString(CultureInfo.CurrentCulture)
+                    : GridReportColumns.DisplayValue(row,column,moneyFormat);
                 if (receiptLayout is not null && column.Numeric)
                     printed["N" + i] = row.IsNull(column.Fields[0]) ? 0m
                         : ReportMoneyPresentation.Amount(source.Columns[column.Fields[0]],Convert.ToDecimal(row[column.Fields[0]]));
@@ -56,7 +59,7 @@ internal static class GridReportPreview
             E("Textbox",new XAttribute("Name",name),E("CanGrow",true),E("CanShrink",true),
                 E("Paragraphs",E("Paragraph",E("TextRuns",E("TextRun",E("Value",value),
                     E("Style",E("FontFamily","Segoe UI"),E("FontSize",size),E("FontWeight",bold?"Bold":"Normal"),E("Color","#000000")))),E("Style",E("TextAlign",align)))),
-                E("Style",E("VerticalAlign","Middle"),E("PaddingLeft","4pt"),E("PaddingRight","4pt"),E("PaddingTop","3pt"),E("PaddingBottom","3pt")));
+                E("Style",E("VerticalAlign","Middle"),E("PaddingLeft","4pt"),E("PaddingRight","4pt"),E("PaddingTop",compactReceipts?"1.5pt":"3pt"),E("PaddingBottom",compactReceipts?"1.5pt":"3pt")));
         XElement Position(XElement text,double left,double top,double textWidth,double height)
         {text.Add(E("Top",Inch(top)),E("Left",Inch(left)),E("Height",Inch(height)),E("Width",Inch(textWidth)));return text;}
         var items=new List<XElement>();
@@ -68,7 +71,7 @@ internal static class GridReportPreview
             foreach(int index in indices)
             {
                 var column=columns[index];
-                string alignment=GridReportColumns.Alignment(source,column);
+                string alignment=compactReceipts&&column.Numeric?"Right":GridReportColumns.Alignment(source,column);
                 var heading=Text($"Heading{bandIndex}_{index}",column.Caption,true,"Center","8.5pt");
                 heading.Element(ns+"Style")!.Add(E("BottomBorder",E("Style","Solid"),E("Width","0.8pt"),E("Color","#000000")));
                 headings.Add(E("TablixCell",E("CellContents",heading)));
@@ -80,7 +83,7 @@ internal static class GridReportPreview
             }
             var table=E("Tablix",new XAttribute("Name","ReportRows"+bandIndex),
                 E("TablixBody",E("TablixColumns",widths.Select(w=>E("TablixColumn",E("Width",Inch(w))))),
-                    E("TablixRows",E("TablixRow",E("Height","0.42in"),E("TablixCells",headings)),E("TablixRow",E("Height","0.26in"),E("TablixCells",details)))),
+                    E("TablixRows",E("TablixRow",E("Height",compactReceipts?"0.32in":"0.42in"),E("TablixCells",headings)),E("TablixRow",E("Height",compactReceipts?"0.22in":"0.26in"),E("TablixCells",details)))),
                 E("TablixColumnHierarchy",E("TablixMembers",indices.Select(_=>E("TablixMember")))),
                 E("TablixRowHierarchy",E("TablixMembers",E("TablixMember",E("KeepWithGroup","After"),E("RepeatOnNewPage",true)),
                     E("TablixMember",E("Group",new XAttribute("Name","DetailRows"+bandIndex)),E("KeepTogether",true)))),

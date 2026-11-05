@@ -72,10 +72,20 @@ internal static partial class Program
         {
             string path=Path.Combine(folder,"family-receipts.pdf");GridReportPreview.ExportPdf(path,built);
             var search=ReportPageSearchIndex.FromPdf(File.ReadAllBytes(path));
-            foreach(string text in new[]{"Hadia, Hamid, Kausar s/d/o Ali","Cash + Account Credit","Payment","Nine – F","Four – M"})Check(search.FindPages(text).SequenceEqual(new[]{1}),"Receipt PDF contains "+text);
+            foreach(string text in new[]{"Family: Ali","Hadia (Nine – F), Hamid, Kausar (Four – M)","Cash + Account Credit","Payment","Grand Total (1 entry)"})Check(search.FindPages(text).SequenceEqual(new[]{1}),"Receipt PDF contains "+text);
             Check(search.FindPages("Mixed").Length==0 && search.FindPages("Multiple").Length==0 && search.FindPages("Money").Length==0,"Printed receipt uses actual placements and methods and Payment terminology");
             using var report=new LocalReport();report.LoadReportDefinition(new StringReader(built.Definition));report.DataSources.Add(new ReportDataSource("ReportData",built.Data));
             File.WriteAllBytes(Path.Combine(folder,"family-receipts.png"),report.Render("IMAGE","<DeviceInfo><OutputFormat>PNG</OutputFormat><DpiX>130</DpiX><DpiY>130</DpiY></DeviceInfo>"));
+        }
+        var campusReview=ReceiptExportReview(rows,"Campus");using var campusExport=campusReview.Rows;
+        var campusBuilt=GridReportPreview.Build("Fictional Meadow School & College",campusReview.Title,campusReview.Scope,campusExport,"Example Operator");
+        using(campusBuilt.Data)
+        {
+            string path=Path.Combine(folder,"campus-receipts.pdf");GridReportPreview.ExportPdf(path,campusBuilt);
+            var search=ReportPageSearchIndex.FromPdf(File.ReadAllBytes(path));
+            Check(search.FindPages("(1 entry)").Length==1 && search.FindPages("Subtotal").Length==1,"Campus PDF renders entry counts and named subtotals");
+            Check(campusBuilt.Data.Rows[0].Field<string>("C0")=="1" && campusBuilt.Data.Rows[0].Field<string>("C2")=="Family: Ali\nHadia (Nine – F), Hamid, Kausar (Four – M)","Printed receipt pairs each child with their class and shares repeated class labels");
+            Check(rows.Rows[0].Field<string>("Student / Family")=="Hadia, Hamid, Kausar s/d/o Ali" && !rows.Columns.Contains("#"),"Compact print identities and numbering do not rewrite source or raw export columns");
         }
     }
 }
