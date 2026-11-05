@@ -205,8 +205,9 @@ COMMIT;
  Check ((Number 'SELECT COUNT(*) FROM dbo.FeePayments;') -eq $beforePayments) 'Waiving the remaining partial balance creates neither a fake payment nor a refund.'
  Check ((Number "SELECT dbo.GetFeeChargeBalance(BillingChargeId) FROM dbo.BillingCharges WHERE EnrollmentId=1 AND FeeTypeId=1 AND ChargeKind=N'Monthly' AND BillingMonth=DATEADD(month,-1,DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1));") -eq 0) 'A partial-bill concession settles only its remaining unpaid amount.'
  [void](Query "DECLARE @Month date=DATEFROMPARTS(YEAR(GETDATE()),MONTH(GETDATE()),1),@S dbo.PostingSelectionType; INSERT @S VALUES(2,1,@Month); EXEC dbo.PostSelectedMonthlyFees @UserId=1,@BillingMonth=@Month,@Selection=@S,@AcademicYearId=1;")
+ $creditBeforeSurplus=Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=2;'
  $surplus=Query "DECLARE @Bill bigint=(SELECT BillingChargeId FROM dbo.BillingCharges WHERE EnrollmentId=2 AND FeeTypeId=1 AND ChargeKind=N'Monthly'),@Today date=CONVERT(date,GETDATE()),@A dbo.FamilyFeeAllocationType,@R uniqueidentifier=NEWID(); INSERT @A VALUES(2,2,@Bill,9001); EXEC dbo.ProcessFamilyFeeTransaction @TransactionType=N'Collection',@TransactionDate=@Today,@PaymentMethod=N'Cash',@ReferenceNumber=NULL,@Remarks=N'Fictional excess payment',@Allocations=@A,@UserId=1,@ReceivedAmount=11001,@CreditAdmissionId=2,@CreditRequestId=@R;"
- Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=2;') -eq 2000) 'Excess collection is retained as student credit under the same transaction.'
+ Check ((Number 'SELECT SUM(Amount) FROM dbo.StudentCreditEntries WHERE AdmissionId=2;') -eq ($creditBeforeSurplus+2000)) 'Excess collection is retained as student credit under the same transaction.'
  $receipt=[string]$surplus.Tables[0].Rows[0].ReceiptNumber
  $lines=Query 'EXEC dbo.GetFeeReceiptLines @UserId=1,@ReceiptNumber=@Receipt;' @{'@Receipt'=$receipt}
  Check (([decimal]($lines.Tables[0].Rows | Measure-Object -Property Amount -Sum).Sum) -eq 11001) 'Receipt lines reconcile the settled fees plus future credit with money received.'

@@ -2,6 +2,12 @@ name: '02 - Release - Windows Installation Acceptance'
 
 on:
   workflow_dispatch:
+    inputs:
+      test_scope:
+        description: 'Complete installation acceptance, or focused disposable SQL checks'
+        type: choice
+        options: [complete, sql]
+        default: complete
   workflow_call:
 permissions:
   contents: read
@@ -35,6 +41,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install full FMSC package on disposable Windows with synthetic SQL
+        if: ${{ inputs.test_scope != 'sql' }}
         shell: pwsh
         timeout-minutes: 45
         run: .\Tools\RunDisposableWindowsInstall.ps1 -ProjectDirectory . -Level3

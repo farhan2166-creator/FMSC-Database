@@ -190,8 +190,10 @@ function Initialize-FmscRecoveryTransaction {
 }
 function Assert-FmscRecoveryDatabaseIdentity {
     if (-not $script:RecoveryJournal) { return }
-    $name = $DatabaseName.Replace("'", "''")
-    $lines = Invoke-SqlMaster -Query "SET NOCOUNT ON; SELECT CONVERT(nvarchar(36),database_guid) FROM sys.database_recovery_status WHERE database_id=DB_ID(N'$name');"
+    # Keep the target open while reading its identity. Express/LocalDB databases
+    # with AUTO_CLOSE can expose NULL recovery metadata from master after the
+    # previous short-lived connection closes.
+    $lines = Invoke-SqlDatabase -Query 'SET NOCOUNT ON; SELECT CONVERT(nvarchar(36),database_guid) FROM sys.database_recovery_status WHERE database_id=DB_ID();'
     $identity = @($lines | ForEach-Object { $_.ToString().Trim() } | Where-Object { $_ -match '^[a-fA-F0-9]{8}-[a-fA-F0-9-]{27}$' })
     if ($identity.Count -ne 1) { throw 'Cannot confirm the school database identity. Recovery stopped.' }
     if ($script:RecoveryJournal.DatabaseIdentity -and $script:RecoveryJournal.DatabaseIdentity -ne $identity[0]) {

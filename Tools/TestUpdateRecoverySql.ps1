@@ -29,6 +29,11 @@ $restoreName = $DatabaseName + '_Restored'
 $SqlInstance = '(localdb)\MSSQLLocalDB'
 $localDb = Get-Command sqllocaldb.exe -ErrorAction SilentlyContinue
 $localDbPath = if ($localDb) { $localDb.Source } else { Join-Path $env:ProgramFiles 'Microsoft SQL Server/160/Tools/Binn/SqlLocalDB.exe' }
+$null = & $localDbPath info MSSQLLocalDB 2>&1
+if ($LASTEXITCODE -ne 0) {
+    $null = & $localDbPath create MSSQLLocalDB 2>&1
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot create the disposable runner LocalDB instance.' }
+}
 $null = & $localDbPath start MSSQLLocalDB 2>&1
 if ($LASTEXITCODE -ne 0) { throw 'Cannot start the disposable runner LocalDB engine.' }
 $info = @(& $localDbPath info MSSQLLocalDB 2>&1)
@@ -47,6 +52,7 @@ function Sql([string]$Database,[string]$Query) {
     return $result
 }
 function Invoke-SqlMaster { param($Query) Sql 'master' $Query }
+function Invoke-SqlDatabase { param($Query) Sql $DatabaseName $Query }
 function Get-DatabaseVersion { return [int]((Sql $DatabaseName 'SET NOCOUNT ON; SELECT TOP(1) VersionNumber FROM dbo.DatabaseVersion ORDER BY VersionId DESC;') -join '').Trim() }
 if ($ChildRoot) {
     $script:RecoveryJournal = Read-FmscRecoveryJournal $script:RecoveryRoot
@@ -63,7 +69,7 @@ if ($ChildRoot) {
 }
 $created=$false; $restored=$false
 try {
-    $null=Sql 'master' "CREATE DATABASE [$DatabaseName];"
+    $null=Sql 'master' "CREATE DATABASE [$DatabaseName]; ALTER DATABASE [$DatabaseName] SET AUTO_CLOSE ON;"
     $created=$true
     $null=Sql $DatabaseName @"
 CREATE TABLE dbo.DatabaseVersion(VersionId int IDENTITY PRIMARY KEY,VersionNumber nvarchar(20));
@@ -79,7 +85,12 @@ EXEC sys.sp_addextendedproperty @name=N'FMSC_RecoveryFixture',@value=N'$Database
         UserSid=[Security.Principal.WindowsIdentity]::GetCurrent().User.Value;DownloadRoot=(Join-Path (Get-FmscDownloadParent) ('prepared-' + [Guid]::NewGuid().ToString('N')))
         Backup='';BackupSha256='';BeforeSchema=0;LastSchema=0;DatabaseIdentity='';ScriptSha256=('a'*64);HelperSha256=('b'*64)
     }
-    Assert-FmscRecoveryDatabaseIdentity
+    try { Assert-FmscRecoveryDatabaseIdentity }
+    catch {
+        $diagnostic=Sql $DatabaseName 'SET NOCOUNT ON; SELECT DB_NAME(),CONVERT(nvarchar(36),database_guid) FROM sys.database_recovery_status WHERE database_id=DB_ID();'
+        Write-Output ('Synthetic identity diagnostic: ' + ($diagnostic -join ' | '))
+        throw
+    }
     $identity=$script:RecoveryJournal.DatabaseIdentity
     $migrations=Join-Path $root 'migrations';$null=New-Item -ItemType Directory $migrations
     Set-Content (Join-Path $migrations '2.sql') "INSERT dbo.MigrationProbe VALUES(2); INSERT dbo.DatabaseVersion VALUES(N'2');"
