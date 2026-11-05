@@ -1,4 +1,4 @@
-name: '07 - Feature - Direct PDF Exports'
+name: '07 - Review - Dashboard Reports (PDF and Print)'
 
 on:
   workflow_dispatch:
@@ -69,9 +69,9 @@ concurrency:
 
 jobs:
   render:
-    name: Render direct exports with fictional data
+    name: Review all dashboard reports with fictional data
     runs-on: windows-2022
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -79,7 +79,7 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
-      - name: Generate and verify direct PDF exports
+      - name: Generate and verify dashboard report PDFs
         id: render
         shell: pwsh
         run: |
@@ -88,19 +88,19 @@ jobs:
           if ($renderExit -ne 0) {
             $detail = ($renderOutput | Select-Object -Last 40) -join "`n"
             $detail = $detail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
-            Write-Output "::error title=Direct PDF review failed::$detail"
+            Write-Output "::error title=Dashboard report PDF review failed::$detail"
           }
           exit $renderExit
-      - name: Upload the single direct-export review PDF
+      - name: Upload dashboard report review PDF
         id: samples
-        if: ${{ success() && hashFiles('artifacts/direct-pdf-review/REVIEW-ALL.pdf') != '' }}
+        if: ${{ success() && hashFiles('artifacts/direct-pdf-review/FMSC-Dashboard-Reports-Review.pdf') != '' }}
         uses: actions/upload-artifact@v7
         with:
-          path: artifacts/direct-pdf-review/REVIEW-ALL.pdf
+          path: artifacts/direct-pdf-review/FMSC-Dashboard-Reports-Review.pdf
           archive: false
           retention-days: 7
           if-no-files-found: error
-      - name: Link the review PDF in the run summary
+      - name: Link dashboard report review PDF in run summary
         if: ${{ always() && steps.samples.outcome == 'success' }}
         shell: pwsh
         env:
@@ -108,8 +108,8 @@ jobs:
           SAMPLE_COMMIT: ${{ github.sha }}
           SAMPLE_CHECK_OUTCOME: ${{ steps.render.outcome }}
         run: |
-          "[Download the single direct-export review PDF]($env:SAMPLE_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+          "[Download the dashboard report review PDF]($env:SAMPLE_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
           "Source commit: $env:SAMPLE_COMMIT. Export checks: $env:SAMPLE_CHECK_OUTCOME." >> $env:GITHUB_STEP_SUMMARY
           $review = Get-Content artifacts/direct-pdf-review/provenance.json -Raw | ConvertFrom-Json
           "Scenarios: $($review.ScenarioCount). PDF pages: $($review.PageCount). SHA-256: $($review.Sha256)." >> $env:GITHUB_STEP_SUMMARY
-          'The download is REVIEW-ALL.pdf, without a ZIP. Its bookmarks navigate every report scenario, including every page of wide reports. Fictional data rendered with the production export code on Windows.' >> $env:GITHUB_STEP_SUMMARY
+          'The download is FMSC-Dashboard-Reports-Review.pdf, without a ZIP. Its bookmarks navigate every report scenario, including every page of wide reports. Fictional data rendered with the production export code on Windows.' >> $env:GITHUB_STEP_SUMMARY
