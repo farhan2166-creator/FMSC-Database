@@ -184,11 +184,13 @@ internal static partial class Program
         using (var summary = Rows(new[] { "Charge Month", "Campus", "Fee Type" },
             new[] { "Charges", "Gross Billed", "Discounts", "Net Billed" }))
         {
-            for (int i = 0; i < 26; i++)
+            // Multiple campus/fee groups per billing month keep the scenario
+            // multi-page even under the denser production compact renderer.
+            for (int i = 0; i < 84; i++)
             {
                 decimal gross = 87000m + 3250m * (i % 10);
                 decimal discount = (i % 4 + 1) * 1750m;
-                summary.Rows.Add(new DateTime(2025 + i / 12, i % 12 + 1, 1).ToString("MMM yyyy"),
+                summary.Rows.Add(new DateTime(2023 + i / 24, (i / 2) % 12 + 1, 1).ToString("MMM yyyy"),
                     i % 2 == 0 ? "Campus Girls" : "Campus Boys",
                     i % 3 == 0 ? "Transport Fee" : "Tuition Fee",
                     21m + (i % 11), gross, discount, gross - discount);
