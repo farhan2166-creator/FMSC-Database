@@ -10,7 +10,7 @@ internal sealed class AnnualReceiptYearDialog : ApplicationWindowForm
     internal AnnualReceiptYearDialog(string student,DataTable years)
     {
         Text="Annual Receipts";StartPosition=FormStartPosition.CenterParent;
-        ClientSize=new Size(AppScale.Scale(540),AppScale.Scale(210));
+        ClientSize=AppMetrics.CompactChoiceDialogClientSize;
         FormBorderStyle=FormBorderStyle.FixedDialog;MinimizeBox=MaximizeBox=false;ShowInTaskbar=false;
         var view=new ModernButton {Text="View / Print Receipts",ThemeRole="Primary",DialogResult=DialogResult.OK};
         var close=new ModernButton {Text="Close",DialogResult=DialogResult.Cancel};
