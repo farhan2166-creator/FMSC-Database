@@ -49,7 +49,8 @@ try {
         'FMSC_SMS/FMSC_SMS.deps.json', 'FMSC_SMS/FMSC_SMS.runtimeconfig.json',
         'FMSC_SMS/UpdateSupport/core.ps1', 'FMSC_SMS/UpdateSupport/UpdateRecovery.ps1',
         'FMSC_SMS/UpdateSupport/Launch-FMSC.ps1', 'FMSC_SMS/UpdateSupport/FMSC.Launcher.exe',
-        'UpdateRecovery.ps1', 'core.ps1', 'Install FMSC_SMS.bat', 'Tools/SqlLocalDB.msi')) {
+        'FMSC_SMS/UpdateSupport/FMSC.Setup.exe',
+        'UpdateRecovery.ps1', 'core.ps1', 'Install FMSC_SMS.bat', 'FMSC.Setup.exe', 'Tools/SqlLocalDB.msi')) {
         $file = Join-Path $release $relative
         if (-not (Test-Path -LiteralPath $file -PathType Leaf) -or (Get-Item -LiteralPath $file).Length -eq 0) {
             throw "Full publish did not copy its required output: $relative"
@@ -67,6 +68,21 @@ try {
         if ($actual -ne $expected) { throw "Published installer asset differs from checked-out source: $($pair[1])" }
     }
     & (Join-Path $ProjectDirectory 'Tools/TestWindowlessLauncher.ps1') -LauncherPath (Join-Path $application 'UpdateSupport/FMSC.Launcher.exe')
+    # GUI setup is one native executable copied to both first install and
+    # private update support. Inspect PE subsystem without running UAC or SQL.
+    $setupRelease = Join-Path $release 'FMSC.Setup.exe'
+    $setupUpdate = Join-Path $application 'UpdateSupport/FMSC.Setup.exe'
+    if ((Get-FileHash -LiteralPath $setupRelease -Algorithm SHA256).Hash -ne
+        (Get-FileHash -LiteralPath $setupUpdate -Algorithm SHA256).Hash) {
+        throw 'Full installer and private update must package the same FMSC.Setup.exe.'
+    }
+    $setupBytes = [IO.File]::ReadAllBytes($setupRelease)
+    $pe = [BitConverter]::ToInt32($setupBytes, 0x3c)
+    if ($pe -lt 64 -or $pe + 96 -ge $setupBytes.Length -or
+        [BitConverter]::ToUInt16($setupBytes, $pe + 24 + 68) -ne 2) {
+        throw 'FMSC.Setup.exe must be a Windows GUI executable, not a console application.'
+    }
+    & (Join-Path $ProjectDirectory 'Tools/TestUpdateAutomation.ps1')
     if (-not (Test-Path -LiteralPath (Join-Path $release 'Migrations') -PathType Container)) { throw 'Package must include its migrations folder even when empty.' }
     $sourceSql = @(Get-ChildItem -LiteralPath (Join-Path $ProjectDirectory 'Migrations') -Filter '*.sql' -File)
     $copiedSql = @(Get-ChildItem -LiteralPath (Join-Path $release 'Migrations') -Filter '*.sql' -File)
