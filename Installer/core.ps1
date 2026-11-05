@@ -142,77 +142,116 @@ function Open-UpdateWindow {
     [Windows.Forms.Application]::EnableVisualStyles()
     $script:UpdateWindow = New-Object Windows.Forms.Form
     $script:UpdateWindow.Text = if ($PreparedRoot) { 'FMSC - Installing update' } else { 'FMSC - First-time setup' }
-    $script:UpdateWindow.ClientSize = New-Object Drawing.Size(650,324)
+    $script:UpdateWindow.ClientSize = New-Object Drawing.Size(650,430)
     $script:UpdateWindow.StartPosition = 'CenterScreen'
     $script:UpdateWindow.FormBorderStyle = 'FixedDialog'
     $script:UpdateWindow.ControlBox = $false
     $script:UpdateWindow.MaximizeBox = $false
     $script:UpdateWindow.MinimizeBox = $false
     $script:UpdateWindow.Font = New-Object Drawing.Font('Segoe UI',10)
-    $script:UpdateWindow.BackColor = [Drawing.Color]::FromArgb(246,248,252)
+    $script:UpdateWindow.BackColor = [Drawing.Color]::FromArgb(246,248,251)
 
     $header = New-Object Windows.Forms.Panel
-    $header.SetBounds(0,0,650,112)
-    $header.BackColor = [Drawing.Color]::FromArgb(22,40,68)
+    $header.SetBounds(0,0,650,124)
+    $header.BackColor = [Drawing.Color]::White
     $mark = New-Object Windows.Forms.Label
-    $mark.SetBounds(26,26,50,50)
+    $mark.SetBounds(26,30,54,54)
     $mark.Text = 'F'
     $mark.TextAlign = 'MiddleCenter'
-    $mark.BackColor = [Drawing.Color]::FromArgb(35,168,184)
+    $mark.BackColor = [Drawing.Color]::FromArgb(37,99,235)
     $mark.ForeColor = [Drawing.Color]::White
     $mark.Font = New-Object Drawing.Font('Segoe UI',21,[Drawing.FontStyle]::Bold)
     $name = New-Object Windows.Forms.Label
-    $name.SetBounds(92,23,520,36)
+    $name.SetBounds(94,28,520,36)
     $name.Text = 'FMSC School Management'
-    $name.ForeColor = [Drawing.Color]::White
+    $name.ForeColor = [Drawing.Color]::FromArgb(17,24,39)
     $name.Font = New-Object Drawing.Font('Segoe UI',16,[Drawing.FontStyle]::Bold)
     $mode = New-Object Windows.Forms.Label
-    $mode.SetBounds(94,62,340,20)
+    $mode.SetBounds(96,68,340,20)
     $mode.Text = if ($PreparedRoot) { 'SECURE APPLICATION UPDATE' } else { 'FIRST-TIME INSTALLATION' }
-    $mode.ForeColor = [Drawing.Color]::FromArgb(164,220,228)
+    $mode.ForeColor = [Drawing.Color]::FromArgb(37,99,235)
     $mode.Font = New-Object Drawing.Font('Segoe UI',9,[Drawing.FontStyle]::Bold)
     $version = New-Object Windows.Forms.Label
-    $version.SetBounds(412,82,208,22)
+    $version.SetBounds(404,94,218,22)
     $version.Text = "App $AppVersion   |   Database $DatabaseVersion"
     $version.TextAlign = 'MiddleRight'
-    $version.ForeColor = [Drawing.Color]::FromArgb(218,226,236)
+    $version.ForeColor = [Drawing.Color]::FromArgb(107,114,128)
     $version.Font = New-Object Drawing.Font('Segoe UI',8.5)
     $header.Controls.AddRange(@($mark,$name,$mode,$version))
     $accent = New-Object Windows.Forms.Panel
-    $accent.SetBounds(0,112,650,4)
-    $accent.BackColor = [Drawing.Color]::FromArgb(35,168,184)
+    $accent.SetBounds(0,124,650,3)
+    $accent.BackColor = [Drawing.Color]::FromArgb(37,99,235)
 
     $script:UpdatePhase = New-Object Windows.Forms.Label
-    $script:UpdatePhase.SetBounds(27,137,594,25)
+    $script:UpdatePhase.SetBounds(27,150,594,28)
     $script:UpdatePhase.Text = 'PREPARING A SAFE INSTALLATION'
-    $script:UpdatePhase.ForeColor = [Drawing.Color]::FromArgb(22,126,145)
+    $script:UpdatePhase.ForeColor = [Drawing.Color]::FromArgb(37,99,235)
     $script:UpdatePhase.Font = New-Object Drawing.Font('Segoe UI',9,[Drawing.FontStyle]::Bold)
 
     $script:UpdateStatus = New-Object Windows.Forms.Label
-    $script:UpdateStatus.SetBounds(27,167,593,73)
+    $script:UpdateStatus.SetBounds(27,187,593,79)
     $script:UpdateStatus.TextAlign = 'MiddleLeft'
-    $script:UpdateStatus.ForeColor = [Drawing.Color]::FromArgb(31,47,70)
+    $script:UpdateStatus.ForeColor = [Drawing.Color]::FromArgb(31,41,55)
     $script:UpdateStatus.Font = New-Object Drawing.Font('Segoe UI',11.5,[Drawing.FontStyle]::Bold)
 
     $script:UpdateStepBars = @()
     foreach ($i in 0..7) {
         $segment = New-Object Windows.Forms.Panel
-        $segment.SetBounds((27 + 74 * $i),250,68,7)
-        $segment.BackColor = [Drawing.Color]::FromArgb(218,227,236)
+        $segment.SetBounds((27 + 74 * $i),278,68,7)
+        $segment.BackColor = [Drawing.Color]::FromArgb(226,232,240)
         $script:UpdateWindow.Controls.Add($segment)
         $script:UpdateStepBars += $segment
     }
     $script:UpdateBar = New-Object Windows.Forms.ProgressBar
-    $script:UpdateBar.SetBounds(27,272,590,11)
+    $script:UpdateBar.SetBounds(27,303,590,12)
     $script:UpdateBar.Style = 'Marquee'
     $script:UpdateBar.MarqueeAnimationSpeed = 28
 
     $foot = New-Object Windows.Forms.Label
-    $foot.SetBounds(27,296,590,19)
+    $foot.SetBounds(27,328,590,24)
     $foot.Text = 'Please keep this computer on. Database safety checks remain active.'
-    $foot.ForeColor = [Drawing.Color]::FromArgb(106,120,139)
+    $foot.ForeColor = [Drawing.Color]::FromArgb(107,114,128)
     $foot.Font = New-Object Drawing.Font('Segoe UI',8.5)
-    $script:UpdateWindow.Controls.AddRange(@($header,$accent,$script:UpdatePhase,$script:UpdateStatus,$script:UpdateBar,$foot))
+    # A stable, integrated action footer. Buttons cannot be used during
+    # installation or verification; they activate only after successful setup.
+    $separator = New-Object Windows.Forms.Panel
+    $separator.SetBounds(0,363,650,1)
+    $separator.BackColor = [Drawing.Color]::FromArgb(226,232,240)
+    $actions = New-Object Windows.Forms.Panel
+    $actions.SetBounds(0,364,650,66)
+    $actions.BackColor = [Drawing.Color]::White
+    $script:UpdateFinishPrompt = New-Object Windows.Forms.Label
+    $script:UpdateFinishPrompt.SetBounds(27,378,290,34)
+    $script:UpdateFinishPrompt.Text = 'Open FMSC when setup finishes?'
+    $script:UpdateFinishPrompt.TextAlign = 'MiddleLeft'
+    $script:UpdateFinishPrompt.ForeColor = [Drawing.Color]::FromArgb(107,114,128)
+    $script:UpdateFinishPrompt.Font = New-Object Drawing.Font('Segoe UI',9)
+    $script:UpdateYes = New-Object Windows.Forms.Button
+    $script:UpdateYes.SetBounds(324,378,170,36)
+    $script:UpdateYes.Text = 'Yes, open FMSC'
+    $script:UpdateYes.FlatStyle = 'Flat'
+    $script:UpdateYes.FlatAppearance.BorderSize = 0
+    $script:UpdateYes.BackColor = [Drawing.Color]::FromArgb(37,99,235)
+    $script:UpdateYes.ForeColor = [Drawing.Color]::White
+    $script:UpdateYes.Font = New-Object Drawing.Font('Segoe UI',9,[Drawing.FontStyle]::Bold)
+    $script:UpdateYes.Cursor = 'Hand'
+    $script:UpdateYes.Enabled = $false
+    $script:UpdateNo = New-Object Windows.Forms.Button
+    $script:UpdateNo.SetBounds(503,378,118,36)
+    $script:UpdateNo.Text = 'No, close'
+    $script:UpdateNo.FlatStyle = 'Flat'
+    $script:UpdateNo.FlatAppearance.BorderSize = 1
+    $script:UpdateNo.FlatAppearance.BorderColor = [Drawing.Color]::FromArgb(226,232,240)
+    $script:UpdateNo.BackColor = [Drawing.Color]::FromArgb(250,251,253)
+    $script:UpdateNo.ForeColor = [Drawing.Color]::FromArgb(31,41,55)
+    $script:UpdateNo.Font = New-Object Drawing.Font('Segoe UI',9)
+    $script:UpdateNo.Cursor = 'Hand'
+    $script:UpdateNo.Enabled = $false
+    $script:UpdateDecision = $null
+    $script:UpdateYes.Add_Click({ $script:UpdateDecision = 'Yes' })
+    $script:UpdateNo.Add_Click({ $script:UpdateDecision = 'No' })
+    $actions.Controls.AddRange(@($script:UpdateFinishPrompt,$script:UpdateYes,$script:UpdateNo))
+    $script:UpdateWindow.Controls.AddRange(@($header,$accent,$script:UpdatePhase,$script:UpdateStatus,$script:UpdateBar,$foot,$separator,$actions))
     $script:UpdateWindow.Show()
     if ($PreparedRoot) {
         Set-UpdateWindowStatus 'Waiting for FMSC to close safely...'
@@ -229,11 +268,11 @@ function Set-UpdateWindowStage {
         $script:UpdatePhase.Text = "STEP $number OF 8  |  $($Matches[2].ToUpperInvariant())"
         for ($i = 0; $i -lt $script:UpdateStepBars.Count; $i++) {
             $script:UpdateStepBars[$i].BackColor = if ($i -lt ($number - 1)) {
-                [Drawing.Color]::FromArgb(22,126,145)
+                [Drawing.Color]::FromArgb(37,99,235)
             } elseif ($i -eq ($number - 1)) {
-                [Drawing.Color]::FromArgb(35,168,184)
+                [Drawing.Color]::FromArgb(59,130,246)
             } else {
-                [Drawing.Color]::FromArgb(218,227,236)
+                [Drawing.Color]::FromArgb(226,232,240)
             }
         }
     }
@@ -261,44 +300,46 @@ function Start-UpdatedFmsc {
     $desktop = Get-FmscDesktopShell
     $desktop.ShellExecute($Application, '', (Split-Path -Parent $Application), 'open', 1)
 }
+function Wait-FmscSetupChoice {
+    if (-not $script:UpdateWindow -or $script:UpdateWindow.IsDisposed) {
+        throw 'The FMSC setup window is unavailable.'
+    }
+    # The user may decide whether to launch FMSC only after all eight stages.
+    while (-not $script:UpdateDecision) {
+        [Windows.Forms.Application]::DoEvents()
+        Start-Sleep -Milliseconds 50
+    }
+    return $script:UpdateDecision -eq 'Yes'
+}
 function Start-FmscAfterInstallation {
     param([string]$Application)
     if ($PreparedRoot -or $ShowInstallerWindow) {
-        if ($script:UpdateWindow) {
-            $script:UpdateWindow.Text = 'FMSC - Installation complete'
-            $script:UpdatePhase.Text = 'ALL 8 STAGES COMPLETE'
-            $script:UpdatePhase.ForeColor = [Drawing.Color]::FromArgb(22,126,145)
-            $script:UpdateStatus.Text = 'Installation complete' + [Environment]::NewLine +
-                'FMSC has been verified and is ready to use.'
-            foreach ($segment in $script:UpdateStepBars) {
-                $segment.BackColor = [Drawing.Color]::FromArgb(22,126,145)
-            }
-            $script:UpdateBar.MarqueeAnimationSpeed = 0
-            $script:UpdateBar.Style = 'Continuous'
-            $script:UpdateBar.Value = 100
-            [Windows.Forms.Application]::DoEvents()
+        if (-not $script:UpdateWindow -or $script:UpdateWindow.IsDisposed) {
+            throw 'The FMSC setup window closed unexpectedly after verification.'
         }
-        if ($PreparedRoot) {
-            try { Start-UpdatedFmsc -Application $Application }
-            catch {
-                Write-Log "Update completed; automatic restart failed: $($_.Exception.Message)"
-                [Windows.Forms.MessageBox]::Show('The update was installed successfully. Open FMSC from its desktop shortcut.',
-                    'FMSC - Update Completed', 'OK', 'Information') | Out-Null
-            }
-            return
+        $script:UpdateWindow.Text = 'FMSC - Installation complete'
+        $script:UpdatePhase.Text = 'ALL 8 STAGES COMPLETE'
+        $script:UpdatePhase.ForeColor = [Drawing.Color]::FromArgb(22,163,74)
+        $script:UpdateStatus.Text = 'Installation complete' + [Environment]::NewLine +
+            'FMSC has been verified and is ready to use.'
+        foreach ($segment in $script:UpdateStepBars) {
+            $segment.BackColor = [Drawing.Color]::FromArgb(37,99,235)
         }
-        $choice = [Windows.Forms.MessageBox]::Show($script:UpdateWindow,
-            'FMSC was installed and verified successfully. Start FMSC now?',
-            'FMSC - Setup Complete', [Windows.Forms.MessageBoxButtons]::YesNo,
-            [Windows.Forms.MessageBoxIcon]::Information)
-        if ($choice -eq [Windows.Forms.DialogResult]::Yes) {
-            try { Start-UpdatedFmsc -Application $Application }
-            catch {
-                Write-Log "Installation completed; automatic launch failed: $($_.Exception.Message)"
-                [Windows.Forms.MessageBox]::Show($script:UpdateWindow,
-                    'FMSC is installed. Please open it from its desktop shortcut.',
-                    'FMSC - Setup Complete', 'OK', 'Information') | Out-Null
-            }
+        $script:UpdateBar.MarqueeAnimationSpeed = 0
+        $script:UpdateBar.Style = 'Continuous'
+        $script:UpdateBar.Value = 100
+        $script:UpdateFinishPrompt.Text = 'Installation successful. Open FMSC?'
+        $script:UpdateFinishPrompt.ForeColor = [Drawing.Color]::FromArgb(31,41,55)
+        $script:UpdateYes.Enabled = $true
+        $script:UpdateNo.Enabled = $true
+        [Windows.Forms.Application]::DoEvents()
+        if (-not (Wait-FmscSetupChoice)) { return }
+        try { Start-UpdatedFmsc -Application $Application }
+        catch {
+            Write-Log "Installation completed; automatic launch failed: $($_.Exception.Message)"
+            [Windows.Forms.MessageBox]::Show($script:UpdateWindow,
+                'FMSC is installed. Please open it from its desktop shortcut.',
+                'FMSC - Setup Complete', 'OK', 'Information') | Out-Null
         }
         return
     }
