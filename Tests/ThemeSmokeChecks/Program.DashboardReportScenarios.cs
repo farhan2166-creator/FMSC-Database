@@ -62,7 +62,7 @@ internal static partial class Program
             row["Student / Family"] = childrenCount > 1 ? parent : students[0].StudentName;
             row["Campus"] = childrenCount > 1 ? "Multiple" : students[0].Placements[0].CampusName;
             row["Class / Section"] = "Class " + (sequence % 10 + 1) + " – " + (sequence % 2 == 0 ? "F" : "M");
-            string method = sequence % 11 switch {
+            string method = (sequence % 11) switch {
                 0 => "Account Credit", 2 => "Bank", 3 => "Card", 4 => "Online",
                 5 => "Cash + Account Credit", 7 => "Refund", 8 => "Correction", _ => "Cash"
             };
