@@ -30,8 +30,10 @@ internal static partial class Program
                 Check(Links("Fees").Contains(PageTitles.FeePosting) && Links("Fees").Contains(PageTitles.FeeRateSetup),
                     "Billing and fee setup have their home in Fees");
                 Check(new[] { PageTitles.Admissions, "Student Profile", PageTitles.StudentRecordChecks,
-                    PageTitles.StudentCertificates, "Family / Siblings", PageTitles.AnnualPromotion, PageTitles.PlacementHistory }
+                    PageTitles.StudentCertificates, PageTitles.AnnualPromotion, PageTitles.PlacementHistory }
                     .All(Links("Students").Contains), "Student and placement work is grouped under Students");
+                Check(!Links("Students").Contains("Family / Siblings"),
+                    "Family navigation is consolidated into Student Profile when profile access is available");
                 var commands = (List<NavigationCommand>)type.GetField("navigationCommands", flags)!.GetValue(shell)!;
                 Check(commands.Select(c => c.Caption).Distinct().Count() == commands.Count,
                     "Daily aliases do not duplicate command-palette destinations");
