@@ -28,6 +28,10 @@ internal static class UpdateInstallerHandoff
                 !UpdateChunks.Sha256(path).Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidDataException("Prepared application changed: " + file.Path);
         }
+        // The same WinExe entry point used by a first install must also be
+        // present in the hash-verified private update inventory.
+        if (!File.Exists(Path.Combine(prepared.StageDirectory, "UpdateSupport", "FMSC.Setup.exe")))
+            throw new InvalidDataException("The graphical update launcher is missing.");
         string installer = File.ReadAllText(Path.Combine(prepared.StageDirectory, "UpdateSupport", "core.ps1"));
         string version = Regex.Match(installer, @"(?m)^\$AppVersion = '([^']+)'\r?$").Groups[1].Value;
         string schema = Regex.Match(installer, @"(?m)^\$DatabaseVersion = '([0-9]+)'\r?$").Groups[1].Value;
@@ -45,16 +49,15 @@ internal static class UpdateInstallerHandoff
             @"C:\FMSC School Management", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Automatic update installation supports the existing standard installation folder only.");
         using var original = Process.GetCurrentProcess();
-        string script = Path.Combine(prepared.StageDirectory, "UpdateSupport", "core.ps1");
+        // Run the same native GUI launcher as the full installer. The launcher
+        // elevates hidden PowerShell; core.ps1 retains process identity checks,
+        // staged-file verification, SQL backup, migration and recovery guards.
+        string launcher = Path.Combine(prepared.StageDirectory, "UpdateSupport", "FMSC.Setup.exe");
         string root = Directory.GetParent(prepared.StageDirectory)!.FullName;
-        // Windows PowerShell joins ArgumentList for shell execution. Reject quotes
-        // and use quoted paths; no command string or expression is evaluated.
-        if ((script + root).Contains('"')) throw new InvalidDataException("Invalid update directory.");
-        var start = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),
-            @"WindowsPowerShell\v1.0\powershell.exe")) { UseShellExecute = true, Verb = "runas" };
-        start.Arguments = "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File \"" + script + "\" -PreparedRoot \"" + root +
-            "\" -OriginalProcessId " + original.Id + " -OriginalStartTicks " + original.StartTime.ToUniversalTime().Ticks +
-            " -OriginalUserSid " + WindowsIdentity.GetCurrent().User!.Value;
+        if ((launcher + root).Contains('"')) throw new InvalidDataException("Invalid update directory.");
+        var start = new ProcessStartInfo(launcher) { UseShellExecute = true };
+        start.Arguments = "--update \"" + root + "\" " + original.Id + " " +
+            original.StartTime.ToUniversalTime().Ticks + " " + WindowsIdentity.GetCurrent().User!.Value;
         Process.Start(start)?.Dispose();
 #endif
     }
